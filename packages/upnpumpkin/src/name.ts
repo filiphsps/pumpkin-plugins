@@ -1,0 +1,2 @@
+/** The name Pumpkin knows the plugin by. */
+export const PLUGIN_NAME = 'UPnPumpkin';

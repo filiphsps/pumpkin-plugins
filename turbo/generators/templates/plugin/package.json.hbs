@@ -1,0 +1,56 @@
+{
+    "name": "@pumpkin-plugins/{{ name }}",
+    "version": "0.0.0",
+    "private": true,
+    "description": {{{ json description }}},
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/packages/{{ name }}#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
+        "directory": "packages/{{ name }}"
+    },
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/filiphsps"
+        },
+        {
+            "type": "custom",
+            "url": "https://paypal.me/filiph"
+        }
+    ],
+    "type": "module",
+    "scripts": {
+        "build": "pumpkin-plugins-build",
+        "types": "pumpkin-plugins-build --types-only",
+        "typecheck": "pnpm types && tsc --noEmit",
+        "test": "vitest run --project unit",
+        "test:integration": "vitest run --project integration",
+        "readme": "pumpkin-plugins-docs",
+        "readme:check": "pumpkin-plugins-docs --check"
+    },
+    "dependencies": {
+        "@pumpkinmc/pumpkin-api-ts": "catalog:"
+    },
+    "devDependencies": {
+        "@pumpkin-plugins/build": "workspace:*",
+        "@pumpkin-plugins/docs": "workspace:*",
+        "@pumpkin-plugins/test-harness": "workspace:*",
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:"
+    },
+    "pumpkinPlugin": {
+        "entry": "src/plugin.ts",
+        "output": "build/{{ name }}.wasm",
+        "wasi": []
+    }
+}

@@ -1,0 +1,17 @@
+node_modules/
+/packages/*/build/
+dist/
+*.wasm
+*.tgz
+.DS_Store
+
+# Addon packs are user content; only explicit CI stubs are tracked
+*.mcpack
+*.mcaddon
+!**/test/fixtures/*.mcpack
+
+# Downloaded Pumpkin server binaries used by integration tests
+.cache/
+
+# Turborepo local cache
+.turbo/

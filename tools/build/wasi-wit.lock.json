@@ -1,0 +1,24 @@
+{
+    "version": "0.2.3",
+    "files": {
+        "clocks/monotonic-clock.wit": "ffb4d4e52b0b3fbce90efa365fcbd1b63f724696dac9f269ed70d798b64b0f47",
+        "clocks/timezone.wit": "661469d5c0d1bd943c8e07e37927ba569c9d2813ff2de9823f089e3802af0848",
+        "clocks/wall-clock.wit": "1e8e6bf52e76aaebd471112bb8eaa70ef1e11c183cd28b9eb012de5382370cc9",
+        "clocks/world.wit": "4ac7cd7eae10eaaf98b93d760350eece7cd4e30cc7d23d1a029b0fc4cd417925",
+        "filesystem/preopens.wit": "0e838ee8abba3bdc0a7be20549312514ca8a28770fd3997d1f1f1407acf6f1fc",
+        "filesystem/types.wit": "26e069bade72e3c98da948fe9668d9fc43e9f8e465a3e0cde61f2c6dfaf01110",
+        "filesystem/world.wit": "04f42e76fb1322db234f394f427b3ee2bd777f0378ee4a642f888aa424387b50",
+        "io/error.wit": "910ed309534a26ac004ae882fbb3be82ccb05d16ae646ae351fde66bbf14e4bd",
+        "io/poll.wit": "e8069d860b0e837a81f820ab13c700a90bd71da9e1f774bbfaeca31daf920371",
+        "io/streams.wit": "b8cc539eb831695e3340243d7f0dd643c47d9adbbd355866bc604a25a5765dff",
+        "io/world.wit": "acc9fc0d7f96658d7bdf88e0a8c01d51db3ee35d5cff07f9f4b2f4a5c47d83b1",
+        "sockets/instance-network.wit": "1e4a5d97df44421503a169e1d514eca2cf160f545c44d320ce8a82f726a40cf8",
+        "sockets/ip-name-lookup.wit": "2b9db4b6c6eae692c8285ae57adb318750061a02a850e37410bef87d5909e69c",
+        "sockets/network.wit": "bdcf7ba3a0d04c0a071f06cba8a4072eca884d30f6d89c2e55e6047f657694cf",
+        "sockets/tcp-create-socket.wit": "96a6a1a93b859127ee60273f0a77cda8d60930f7952174fb22469293b5da6a3a",
+        "sockets/tcp.wit": "2ec54e09277bd8f917154696c812a943f0f2ea365feb6e32d88c65871362f1dd",
+        "sockets/udp-create-socket.wit": "c52b9bf91ef4e30e7ec08ad1fc9e77ef005a0a87648c5d2e416dd6e35369f08c",
+        "sockets/udp.wit": "63ea1696a3c9dd500ba8d0f518c526ff0e04e5cbeca4f56950756b0b217487c2",
+        "sockets/world.wit": "6e2bd764df0037ebcec03c63f92bd47f4e69679cf608f6b3d2073cf10fb3672f"
+    }
+}

@@ -1,0 +1,65 @@
+{
+    "name": "@pumpkin-plugins/bedrock-addon-manager",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Serves Bedrock resource packs to Pumpkin players",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/packages/bedrock-addon-manager#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
+        "directory": "packages/bedrock-addon-manager"
+    },
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/filiphsps"
+        },
+        {
+            "type": "custom",
+            "url": "https://paypal.me/filiph"
+        }
+    ],
+    "type": "module",
+    "scripts": {
+        "build": "pumpkin-plugins-build",
+        "types": "pumpkin-plugins-build --types-only",
+        "typecheck": "pnpm types && tsc --noEmit",
+        "test": "vitest run --project unit",
+        "test:integration": "vitest run --project integration",
+        "readme": "pumpkin-plugins-docs",
+        "readme:check": "pumpkin-plugins-docs --check"
+    },
+    "dependencies": {
+        "@pumpkinmc/pumpkin-api-ts": "catalog:",
+        "fflate": "0.8.3"
+    },
+    "devDependencies": {
+        "@pumpkin-plugins/build": "workspace:*",
+        "@pumpkin-plugins/config": "workspace:*",
+        "@pumpkin-plugins/docs": "workspace:*",
+        "@pumpkin-plugins/plugin-kit": "workspace:*",
+        "@pumpkin-plugins/port-mapping": "workspace:*",
+        "@pumpkin-plugins/test-harness": "workspace:*",
+        "@pumpkin-plugins/upnpumpkin-api": "workspace:*",
+        "@types/node": "catalog:",
+        "smol-toml": "1.9.0",
+        "typescript": "catalog:",
+        "vitest": "catalog:"
+    },
+    "pumpkinPlugin": {
+        "entry": "src/plugin.ts",
+        "output": "build/bedrock-addon-manager.wasm",
+        "wasi": [
+            "filesystem",
+            "sockets"
+        ]
+    }
+}

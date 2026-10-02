@@ -1,0 +1,13 @@
+packages:
+  - "packages/*"
+  - "tools/*"
+saveExact: true
+allowBuilds:
+  esbuild: true
+catalog:
+  # Must match the Pumpkin server's plugin ABI (v0.1.1 = Pumpkin 0.2.0+26.3-26.51).
+  "@pumpkinmc/pumpkin-api-ts": https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz
+  # Shared dev tooling versions.
+  vitest: 4.1.11
+  typescript: 5.9.3
+  "@types/node": 24.19.0

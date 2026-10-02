@@ -1,0 +1,56 @@
+{
+    "name": "@pumpkin-plugins/docs",
+    "version": "0.1.0",
+    "private": true,
+    "description": "README generator for the plugins",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/docs#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
+        "directory": "tools/docs"
+    },
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/filiphsps"
+        },
+        {
+            "type": "custom",
+            "url": "https://paypal.me/filiph"
+        }
+    ],
+    "type": "module",
+    "sideEffects": false,
+    "module": "./src/info.ts",
+    "types": "./src/info.ts",
+    "exports": {
+        ".": "./src/info.ts"
+    },
+    "bin": {
+        "pumpkin-plugins-docs": "bin/pumpkin-plugins-docs.mjs"
+    },
+    "files": [
+        "src",
+        "bin"
+    ],
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:"
+    }
+}

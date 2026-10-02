@@ -1,0 +1,111 @@
+{
+    "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+    "vcs": {
+        "enabled": true,
+        "clientKind": "git",
+        "useIgnoreFile": true
+    },
+    "files": {
+        "ignoreUnknown": true,
+        "includes": [
+            "**",
+            "!**/node_modules",
+            "!**/dist",
+            "!packages/*/build",
+            "!**/coverage",
+            "!**/.cache",
+            "!**/*.lock",
+            "!**/*.log",
+            "!**/*.bak",
+            "!pnpm-lock.yaml"
+        ]
+    },
+    "formatter": {
+        "enabled": true,
+        "formatWithErrors": false,
+        "indentStyle": "space",
+        "indentWidth": 4,
+        "lineEnding": "lf",
+        "lineWidth": 120,
+        "attributePosition": "auto"
+    },
+    "assist": {
+        "actions": {
+            "source": {
+                "organizeImports": "on"
+            }
+        }
+    },
+    "linter": {
+        "enabled": true,
+        "rules": {
+            "preset": "recommended",
+            "complexity": {
+                "noBannedTypes": "error",
+                "noUselessConstructor": "off",
+                "noUselessTypeConstraint": "error"
+            },
+            "correctness": {
+                "noUnusedImports": "warn",
+                "noUnusedVariables": "warn"
+            },
+            "style": {
+                "noNamespace": "error",
+                "noNonNullAssertion": "warn",
+                "useAsConstAssertion": "error",
+                "useBlockStatements": "off",
+                "useConsistentArrayType": {
+                    "level": "error",
+                    "options": {
+                        "syntax": "shorthand"
+                    }
+                },
+                "useForOf": "error",
+                "useImportType": "error",
+                "useShorthandFunctionType": "error",
+                "noUnusedTemplateLiteral": "error",
+                "useExportType": "error",
+                "useSingleVarDeclarator": "off",
+                "noCommonJs": "warn",
+                "useConsistentMemberAccessibility": "off"
+            },
+            "suspicious": {
+                "noConsole": "off",
+                "noDebugger": "error",
+                "noExplicitAny": "error",
+                "noNonNullAssertedOptionalChain": "warn",
+                "noRedeclare": "error"
+            },
+            "performance": {
+                "noDelete": "warn"
+            }
+        }
+    },
+    "javascript": {
+        "formatter": {
+            "quoteProperties": "asNeeded",
+            "trailingCommas": "none",
+            "semicolons": "always",
+            "arrowParentheses": "always",
+            "bracketSpacing": true,
+            "quoteStyle": "single"
+        }
+    },
+    "json": {
+        "formatter": {
+            "trailingCommas": "none"
+        }
+    },
+    "overrides": [
+        {
+            "includes": ["scripts/**"],
+            "linter": {
+                "rules": {
+                    "suspicious": {
+                        "noUndeclaredEnvVars": "off"
+                    }
+                }
+            }
+        }
+    ]
+}

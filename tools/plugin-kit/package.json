@@ -1,0 +1,59 @@
+{
+    "name": "@pumpkin-plugins/plugin-kit",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Host helpers shared by plugins",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/plugin-kit#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
+        "directory": "tools/plugin-kit"
+    },
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/filiphsps"
+        },
+        {
+            "type": "custom",
+            "url": "https://paypal.me/filiph"
+        }
+    ],
+    "type": "module",
+    "sideEffects": false,
+    "exports": {
+        "./commands": "./src/commands.ts",
+        "./data-dir": "./src/data-dir.ts",
+        "./files": "./src/files.ts",
+        "./handlers": "./src/handlers.ts",
+        "./host": "./src/host.ts",
+        "./ipc": "./src/ipc.ts",
+        "./logger": "./src/logger.ts",
+        "./register-commands": "./src/register-commands.ts",
+        "./testing": "./src/testing/index.ts",
+        "./wasi-error": "./src/wasi-error.ts"
+    },
+    "files": [
+        "src"
+    ],
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@pumpkin-plugins/docs": "workspace:*"
+    },
+    "devDependencies": {
+        "vitest": "catalog:"
+    }
+}

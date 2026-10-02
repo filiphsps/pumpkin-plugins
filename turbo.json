@@ -1,0 +1,40 @@
+{
+    "$schema": "https://turborepo.dev/schema.json",
+    "agentGuidance": false,
+    "globalDependencies": ["pnpm-workspace.yaml", "tsconfig.base.json"],
+    "globalPassThroughEnv": [
+        "PUMPKIN_BIN",
+        "PUMPKIN_CACHE_DIR",
+        "PUMPKIN_KEEP_DIR",
+        "PUMPKIN_PLUGINS_CACHE_DIR",
+        "PUMPKIN_TEST_LOG_DIR"
+    ],
+    "tasks": {
+        "transit": {
+            "dependsOn": ["^transit"]
+        },
+        "build": {
+            "dependsOn": ["transit"],
+            "env": ["PUMPKIN_API_DIR"],
+            "outputs": ["build/**", "!build/types/**"]
+        },
+        "typecheck": {
+            "dependsOn": ["transit"],
+            "env": ["PUMPKIN_API_DIR"],
+            "outputs": ["build/types/**"]
+        },
+        "test": {
+            "dependsOn": ["transit"]
+        },
+        "test:integration": {
+            "dependsOn": ["build"],
+            "cache": false
+        },
+        "readme": {
+            "cache": false
+        },
+        "readme:check": {
+            "cache": false
+        }
+    }
+}

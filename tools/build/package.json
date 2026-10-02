@@ -1,0 +1,53 @@
+{
+    "name": "@pumpkin-plugins/build",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Shared build tool for the plugins",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/build#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
+        "directory": "tools/build"
+    },
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/filiphsps"
+        },
+        {
+            "type": "custom",
+            "url": "https://paypal.me/filiph"
+        }
+    ],
+    "type": "module",
+    "bin": {
+        "pumpkin-plugins-build": "bin/pumpkin-plugins-build.mjs"
+    },
+    "files": [
+        "src",
+        "bin",
+        "wasi-wit.lock.json"
+    ],
+    "scripts": {
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@bytecodealliance/jco": "1.35.0",
+        "componentize-qjs": "0.4.5",
+        "esbuild": "0.28.2"
+    },
+    "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:"
+    }
+}

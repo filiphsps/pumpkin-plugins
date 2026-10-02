@@ -1,0 +1,298 @@
+name: CI
+
+on:
+    pull_request:
+    push:
+        branches:
+            - master
+            - main
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+    CI: true
+
+permissions:
+    contents: read
+
+jobs:
+    commits:
+        name: 💬 Commit messages
+        if: github.event_name == 'pull_request'
+        timeout-minutes: 5
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: read
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 💬 Lint commits
+              uses: wagoid/commitlint-github-action@v6.2.1
+              with:
+                  configFile: commitlint.config.mjs
+
+    lint:
+        name: 📋 Lint
+        timeout-minutes: 15
+        runs-on: ubuntu-latest
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 📋 Lint
+              run: pnpm run lint
+
+    typecheck:
+        name: ✅ Typecheck
+        timeout-minutes: 15
+        runs-on: ubuntu-latest
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: ✅ Typecheck
+              run: pnpm run typecheck
+
+    test:
+        name: 🧪 Test
+        timeout-minutes: 15
+        runs-on: ubuntu-latest
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 🧪 Unit tests
+              run: pnpm run test
+
+            - name: 🧪 Script tests
+              run: pnpm run test:scripts
+
+    docs:
+        name: 📝 Docs and config
+        timeout-minutes: 10
+        runs-on: ubuntu-latest
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            # Generated READMEs are committed to the release PR, so this only has to succeed.
+            - name: 📝 READMEs generate cleanly
+              run: pnpm run readme
+
+            # Release config, package metadata, and hand-written docs against the code.
+            - name: 🏷️ Repo checks
+              run: pnpm run check
+
+    build:
+        name: 🔨 Build
+        needs: [lint, typecheck]
+        timeout-minutes: 25
+        runs-on: ubuntu-latest
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 🔨 Build All
+              run: pnpm run build
+
+            - name: 📦 Collect plugins
+              run: pnpm run package
+              env:
+                  PLUGIN_SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY }}
+
+            - name: 📦 Upload build artifact
+              uses: actions/upload-artifact@v7.0.1
+              with:
+                  retention-days: 1
+                  overwrite: true
+                  compression-level: 0
+                  if-no-files-found: error
+                  name: plugins
+                  path: dist/
+
+    integration:
+        name: 🎃 Integration (real Pumpkin)
+        needs: [build]
+        timeout-minutes: 60
+        runs-on: ubuntu-latest
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 🎃 Integration tests
+              run: pnpm run test:integration
+              env:
+                  PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/pumpkin-logs
+
+            - name: 📤 Upload server logs
+              if: failure()
+              uses: actions/upload-artifact@v7.0.1
+              with:
+                  name: pumpkin-logs
+                  path: ${{ runner.temp }}/pumpkin-logs
+                  if-no-files-found: ignore
+
+    generator:
+        name: 🧬 Generator
+        needs: [lint]
+        timeout-minutes: 60
+        runs-on: ubuntu-latest
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            # A throwaway plugin proves the templates still produce something that builds and loads.
+            - name: 🧬 Generate a sample plugin
+              run: pnpm gen --args ci-sample CiSample "Generator smoke test"
+
+            - name: 🏷️ It is registered and documented
+              run: |
+                  pnpm run check
+                  pnpm run readme:check
+
+            - name: 🎃 Typecheck, build and load it on a real Pumpkin
+              run: pnpm exec turbo run typecheck build test:integration --filter=@pumpkin-plugins/ci-sample
+              env:
+                  PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/pumpkin-logs
+
+            - name: 📤 Upload server logs
+              if: failure()
+              uses: actions/upload-artifact@v7.0.1
+              with:
+                  name: generator-pumpkin-logs
+                  path: ${{ runner.temp }}/pumpkin-logs
+                  if-no-files-found: ignore
+
+    release:
+        name: 🚢 Release
+        needs: [build, test, docs, integration]
+        if: github.event_name == 'push'
+        timeout-minutes: 10
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            issues: write
+            pull-requests: write
+        outputs:
+            paths_released: ${{ steps.release.outputs.paths_released }}
+            all: ${{ toJSON(steps.release.outputs) }}
+        steps:
+            - name: 🚢 Release Please
+              id: release
+              uses: googleapis/release-please-action@v5.0.0
+              with:
+                  # GITHUB_TOKEN-created PRs don't trigger CI. Set RELEASE_PLEASE_TOKEN to a PAT
+                  # or app token if CI should run on the release PR.
+                  token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+                  config-file: release-please-config.json
+                  manifest-file: .release-please-manifest.json
+
+            # release-please rewrites its branch whenever it updates the PR, so this runs
+            # every time it does and re-adds the commit.
+            - name: 🕶️ Checkout release PR branch
+              if: ${{ steps.release.outputs.prs_created == 'true' }}
+              uses: actions/checkout@v7.0.1
+              with:
+                  ref: ${{ fromJSON(steps.release.outputs.prs)[0].headBranchName }}
+                  token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+            - name: 🚀 Bootstrap
+              if: ${{ steps.release.outputs.prs_created == 'true' }}
+              uses: ./.github/common/bootstrap
+
+            - name: 📝 Regenerate READMEs
+              if: ${{ steps.release.outputs.prs_created == 'true' }}
+              run: pnpm run readme
+
+            - name: 💾 Commit READMEs to the release PR
+              if: ${{ steps.release.outputs.prs_created == 'true' }}
+              run: |
+                  if [ -z "$(git status --porcelain)" ]; then
+                      echo "READMEs are already up to date"
+                      exit 0
+                  fi
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add -- README.md 'packages/*/README.md'
+                  git commit -m "docs: update generated READMEs"
+                  git push
+
+    assets:
+        name: 📎 Attach ${{ matrix.path }}
+        needs: [release]
+        if: ${{ needs.release.outputs.paths_released != '[]' }}
+        timeout-minutes: 10
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        strategy:
+            fail-fast: false
+            matrix:
+                path: ${{ fromJSON(needs.release.outputs.paths_released) }}
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            GH_REPO: ${{ github.repository }}
+            TAG: ${{ fromJSON(needs.release.outputs.all)[format('{0}--tag_name', matrix.path)] }}
+        steps:
+            - name: 📥 Download build artifact
+              uses: actions/download-artifact@v8.0.1
+              with:
+                  name: plugins
+                  path: dist/
+
+            - name: 📎 Upload to the release
+              run: |
+                  name="$(basename "${{ matrix.path }}")"
+                  gh release upload "$TAG" "dist/$name.wasm" "dist/$name.wasm.sha256" --clobber
+
+    market:
+        name: 🛒 Market (stub) ${{ matrix.path }}
+        needs: [release, assets]
+        if: ${{ needs.release.outputs.paths_released != '[]' }}
+        timeout-minutes: 10
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                path: ${{ fromJSON(needs.release.outputs.paths_released) }}
+        env:
+            MARKET_API_TOKEN: ${{ secrets.MARKET_API_TOKEN }}
+            TAG: ${{ fromJSON(needs.release.outputs.all)[format('{0}--tag_name', matrix.path)] }}
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 📥 Download build artifact
+              uses: actions/download-artifact@v8.0.1
+              with:
+                  name: plugins
+                  path: dist/
+
+            # ⚠️ Not implemented. Prints what would be uploaded and warns; never fails the release.
+            - name: 🛒 Publish to market.pumpkinmc.org (stub)
+              run: node scripts/publish-to-market.mjs "${{ matrix.path }}" "$TAG" "dist/$(basename "${{ matrix.path }}").wasm"
