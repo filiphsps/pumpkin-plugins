@@ -1,3 +1,18 @@
 {
-    "cSpell.words": ["upnpumpkin"]
+    "cSpell.words": [
+        "barebones",
+        "blocklist",
+        "CGNAT",
+        "commitlint",
+        "itest",
+        "mcaddon",
+        "mcpack",
+        "outgoingdatagram",
+        "pumpkinmc",
+        "Speedport",
+        "SSDP",
+        "upnp",
+        "upnpumpkin",
+        "WASI"
+    ]
 }
