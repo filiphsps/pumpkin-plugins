@@ -18,6 +18,7 @@ if (!pluginDir || !tag || !wasmFile) {
 
 const apiUrl = (process.env.MARKET_API_URL ?? 'https://market.pumpkinmc.org/api/v1/rest').replace(/\/$/, '');
 const token = process.env.MARKET_API_TOKEN?.trim();
+const releaseNotes = process.env.MARKET_RELEASE_NOTES?.trim();
 
 await publish();
 
@@ -37,7 +38,7 @@ async function publish() {
         return;
     }
 
-    const metadata = { version: versionFrom(tag), track: 'stable' };
+    const metadata = { version: versionFrom(tag), track: 'stable', releaseNotes };
     const form = new FormData();
     form.append('wasm', new Blob([fs.readFileSync(wasmFile)]), path.basename(wasmFile));
     form.append('metadata', JSON.stringify(metadata));

@@ -346,6 +346,7 @@ jobs:
         env:
             MARKET_API_TOKEN: ${{ secrets.MARKET_API_TOKEN }}
             TAG: ${{ fromJSON(needs.release.outputs.all)[format('{0}--tag_name', matrix.path)] }}
+            MARKET_RELEASE_NOTES: ${{ fromJSON(needs.release.outputs.all)[format('{0}--body', matrix.path)] }}
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1

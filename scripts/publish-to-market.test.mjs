@@ -100,12 +100,19 @@ describe('publish-to-market', () => {
             }
         });
         try {
-            const result = await run(fixture(), { MARKET_API_TOKEN: 'test-token', MARKET_API_URL: market.url });
+            const result = await run(fixture(), {
+                MARKET_API_TOKEN: 'test-token',
+                MARKET_API_URL: market.url,
+                MARKET_RELEASE_NOTES: '## Fixed\n\n- Kept the ports open.'
+            });
             assert.equal(result.status, 0, result.stderr);
             assert.equal(requests[1].method, 'PUT');
             assert.equal(requests[1].url, '/plugins/42');
             assert.equal(requests[1].headers.authorization, 'Bearer test-token');
-            assert.match(requests[1].body, /name="metadata"\r\n\r\n{"version":"1.2.3","track":"stable"}/);
+            assert.match(
+                requests[1].body,
+                /name="metadata"\r\n\r\n{"version":"1.2.3","track":"stable","releaseNotes":"## Fixed\\n\\n- Kept the ports open\."}/
+            );
             assert.match(result.stdout, /Published Published plugin 1\.2\.3 to market listing 42/);
         } finally {
             market.instance.close();

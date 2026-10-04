@@ -164,8 +164,8 @@ generator and the checks can't drift:
 After the GitHub release assets are attached, the `market` job uploads the exact `.wasm` from the
 build artifact to the matching existing Market listing. It calls `PUT /api/v1/rest/plugins/<id>`
 with bearer authentication and multipart `wasm` and `metadata` fields. The metadata sets the
-release version and the stable track. Builds aren't byte-reproducible, so it must upload the build
-artifact rather than rebuild.
+release version, stable track and the per-plugin Release Please changelog. Builds aren't
+byte-reproducible, so it must upload the build artifact rather than rebuild.
 
 The job identifies a listing by its exact Pumpkin plugin name from `src/info.ts`. It never creates a
 listing: listing metadata and review happen in Market. If the plugin is not listed, has not yet
