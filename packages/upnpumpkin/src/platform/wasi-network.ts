@@ -1,10 +1,7 @@
 import type { InputStream, OutputStream } from 'wasi:io/streams@0.2.3';
-import { instanceNetwork } from 'wasi:sockets/instance-network@0.2.3';
-import type { IpSocketAddress } from 'wasi:sockets/network@0.2.3';
+import type { IpSocketAddress, Network as WasiNet } from 'wasi:sockets/network@0.2.3';
 import type { TcpSocket } from 'wasi:sockets/tcp@0.2.3';
-import { createTcpSocket } from 'wasi:sockets/tcp-create-socket@0.2.3';
 import type { UdpSocket } from 'wasi:sockets/udp@0.2.3';
-import { createUdpSocket } from 'wasi:sockets/udp-create-socket@0.2.3';
 import { wasiErrorCode } from '@pumpkin-plugins/plugin-kit/wasi-error';
 import type {
     Connection,
@@ -15,6 +12,17 @@ import type {
     Ipv4,
     Network
 } from '@pumpkin-plugins/port-mapping';
+
+/**
+ * The host resources the adapter talks to. `plugin.ts` passes the ones WASI gives a plugin; the
+ * tests pass fakes, which is the only way to try what the adapter does with a socket.
+ */
+export interface Sockets {
+    /** The network the host routes over. */
+    instance(): WasiNet;
+    tcp(): TcpSocket;
+    udp(): UdpSocket;
+}
 
 /** Where to point a connected UDP socket to learn which local address leads to the internet. No packet is sent. */
 const INTERNET: Ipv4 = [8, 8, 8, 8];
@@ -53,8 +61,8 @@ function settle<T>(step: () => T): T {
     }
 }
 
-function bindAnyPort(socket: UdpSocket): void {
-    socket.startBind(instanceNetwork(), { tag: 'ipv4', val: { port: 0, address: [0, 0, 0, 0] } });
+function bindAnyPort(socket: UdpSocket, network: WasiNet): void {
+    socket.startBind(network, { tag: 'ipv4', val: { port: 0, address: [0, 0, 0, 0] } });
     settle(() => socket.finishBind());
 }
 
@@ -137,10 +145,10 @@ class WasiConnection implements Connection {
 class WasiDial implements Dial {
     private socket: TcpSocket | undefined;
 
-    constructor(to: Endpoint) {
-        const socket = createTcpSocket('ipv4');
+    constructor(sockets: Sockets, to: Endpoint) {
+        const socket = sockets.tcp();
         try {
-            socket.startConnect(instanceNetwork(), address(to));
+            socket.startConnect(sockets.instance(), address(to));
         } catch (err) {
             socket[Symbol.dispose]();
             throw new Error(describe(err));
@@ -170,8 +178,14 @@ class WasiDial implements Dial {
     }
 }
 
-/** The `Network` the port mapping code runs on, over WASI UDP and TCP sockets. */
+/**
+ * The `Network` the port mapping code runs on, over WASI UDP and TCP sockets.
+ *
+ * @param sockets - The host's sockets, from `wasiSockets` on a real server.
+ */
 export class WasiNetwork implements Network {
+    constructor(private readonly sockets: Sockets) {}
+
     /** {@inheritDoc Network.now} */
     now(): number {
         return Date.now();
@@ -179,9 +193,9 @@ export class WasiNetwork implements Network {
 
     /** {@inheritDoc Network.openDatagram} */
     openDatagram(): DatagramSocket {
-        const socket = createUdpSocket('ipv4');
+        const socket = this.sockets.udp();
         try {
-            bindAnyPort(socket);
+            bindAnyPort(socket, this.sockets.instance());
             const [incoming, outgoing] = socket.stream(undefined);
             return new WasiDatagramSocket(socket, incoming, outgoing);
         } catch (err) {
@@ -192,7 +206,7 @@ export class WasiNetwork implements Network {
 
     /** {@inheritDoc Network.dial} */
     dial(to: Endpoint): Dial {
-        return new WasiDial(to);
+        return new WasiDial(this.sockets, to);
     }
 
     /**
@@ -201,9 +215,9 @@ export class WasiNetwork implements Network {
      * and tells which address it would send from, without sending anything.
      */
     localAddress(toward: Ipv4 = INTERNET): Ipv4 | undefined {
-        const socket = createUdpSocket('ipv4');
+        const socket = this.sockets.udp();
         try {
-            bindAnyPort(socket);
+            bindAnyPort(socket, this.sockets.instance());
             const [incoming, outgoing] = socket.stream(address({ address: toward, port: 9 }));
             try {
                 const local = socket.localAddress();

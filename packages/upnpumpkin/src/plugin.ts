@@ -16,6 +16,7 @@ import { registerCommands } from './commands/register.ts';
 import { PortForwarder } from './forwarder.ts';
 import { info } from './info.ts';
 import { WasiNetwork } from './platform/wasi-network.ts';
+import { wasiSockets } from './platform/wasi-sockets.ts';
 
 let forwarder: PortForwarder | undefined;
 
@@ -40,7 +41,7 @@ class UPnPumpkin extends Plugin {
             return;
         }
 
-        const started = new PortForwarder(files, hostLogger, new WasiNetwork());
+        const started = new PortForwarder(files, hostLogger, new WasiNetwork(wasiSockets));
         started.start();
         forwarder = started;
         this.tickTask = scheduleRepeating(1, () => started.tick());
