@@ -7,7 +7,7 @@ import type { PluginInfo } from '@pumpkin-plugins/docs';
  */
 export const info = {
     name: 'AppleSkinPumpkin',
-    description: 'AppleSkin serer-side support',
+    description: 'AppleSkin server-side support',
     permissions: [],
     commands: []
 } satisfies PluginInfo<'AppleSkinPumpkin'>;
