@@ -5,6 +5,7 @@
     "bump-patch-for-minor-pre-major": true,
     "separate-pull-requests": true,
     "always-update": true,
+    "force-tag-creation": true,
     "include-component-in-tag": true,
     "include-v-in-tag": true,
     "packages": {

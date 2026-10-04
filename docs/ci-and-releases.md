@@ -70,6 +70,10 @@ the tag and the release, which is usually the older run, and the artifact it hol
 earlier commit. The attach job therefore resolves the tag first and refuses to upload unless it
 points at the commit that run built, which leaves the release to the run for the released commit.
 
+Release Please creates a tag immediately, including while a GitHub release is a draft. Without that,
+a later release run can miss the previous release and recreate its changelog. The release config
+keeps `force-tag-creation` enabled, and the repository check enforces it.
+
 Each time release-please creates or updates a release PR, the release job regenerates the READMEs
 and pushes a `docs: update generated READMEs` commit to the PR branch, so they are current when the
 release merges. The same run retires the `release-as` pin of any plugin the PR releases (see below).

@@ -247,6 +247,7 @@ describe('check-release-config', () => {
         'release-please-config.json': {
             'separate-pull-requests': true,
             'always-update': true,
+            'force-tag-creation': true,
             packages: { 'packages/plug': { component: 'plug', ...(releaseAs ? { 'release-as': releaseAs } : {}) } }
         }
     });
@@ -294,5 +295,9 @@ describe('check-release-config', () => {
         const withoutRefresh = files();
         withoutRefresh['release-please-config.json']['always-update'] = false;
         assert.match(run('check-release-config.mjs', repo(withoutRefresh)).out, /"always-update": true/);
+
+        const withoutTag = files();
+        withoutTag['release-please-config.json']['force-tag-creation'] = false;
+        assert.match(run('check-release-config.mjs', repo(withoutTag)).out, /"force-tag-creation": true/);
     });
 });

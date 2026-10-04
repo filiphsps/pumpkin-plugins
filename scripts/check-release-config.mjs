@@ -28,6 +28,11 @@ if (config['separate-pull-requests'] !== true) {
 if (config['always-update'] !== true) {
     problems.push('release-please-config.json needs "always-update": true so the release PR follows master');
 }
+if (config['force-tag-creation'] !== true) {
+    problems.push(
+        'release-please-config.json needs "force-tag-creation": true so the next run finds the previous release'
+    );
+}
 for (const dir of plugins) {
     const name = path.basename(dir);
     const version = read(`${dir}/package.json`).version;
