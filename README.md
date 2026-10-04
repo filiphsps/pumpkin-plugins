@@ -43,6 +43,7 @@ pnpm test
 | `pnpm gen` | Create a new plugin (see below) |
 | `pnpm build` | Build every plugin to `packages/*/build/*.wasm` |
 | `pnpm lint` | Biome (lint, formatting, import order) and the JSDoc check (`pnpm lint:fix` applies fixes) |
+| `pnpm lint:commits` | Check the last commit message against Conventional Commits, the way CI does |
 | `pnpm typecheck` | Typecheck every package |
 | `pnpm test` | Unit tests |
 | `pnpm test:scripts` | Tests of the repo checks in `scripts/` |

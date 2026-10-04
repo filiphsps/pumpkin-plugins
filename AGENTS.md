@@ -22,6 +22,7 @@ work for tells you something different from this file, do what they say.
 | What | Command |
 | --- | --- |
 | Lint (Biome, then the JSDoc rule) | `pnpm lint`, `pnpm lint:fix` |
+| Commit message against Conventional Commits, which CI lints on every PR | `pnpm lint:commits` |
 | Typecheck. Run it once on a fresh checkout, since it generates the guest types | `pnpm typecheck` |
 | Unit tests | `pnpm test` |
 | Docs, package metadata and release config against the code | `pnpm check`, `pnpm readme:check` |
