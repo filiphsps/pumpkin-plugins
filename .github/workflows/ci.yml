@@ -120,9 +120,8 @@ jobs:
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
-            # Generated READMEs are committed to the release PR, so this only has to succeed.
-            - name: 📝 READMEs generate cleanly
-              run: pnpm run readme
+            - name: 📝 Generated READMEs are current
+              run: pnpm run readme:check
 
             # Release config, package metadata, and hand-written docs against the code.
             - name: 🏷️ Repo checks

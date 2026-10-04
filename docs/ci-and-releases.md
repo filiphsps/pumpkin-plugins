@@ -11,8 +11,8 @@ cache) is the composite action in `.github/common/bootstrap`.
 | 💬 Commit messages | PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
-| 🧪 Test | code changes | Unit tests, and the tests of the repo checks (`pnpm test:scripts`) |
-| 📝 Docs and config | always | README generation succeeds, and `pnpm check` passes: release config, package metadata, docs against the code |
+| 🧪 Test | code changes | Unit tests, and the tests of the repo checks and agent hooks (`pnpm test:scripts`) |
+| 📝 Docs and config | always | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after lint and typecheck | Builds every plugin and uploads them as an artifact |
 | 🎃 Integration | code changes, after build | Runs the integration tests against the pinned Pumpkin release (downloaded and checksum-verified); server logs are uploaded on failure |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin with `pnpm gen` and typechecks, builds and integration-tests it |
@@ -154,8 +154,8 @@ generator and the checks can't drift:
 | `scripts/package-metadata.mjs` | a `package.json` lacks the license, author, contributors, homepage, repository, bugs, funding or a short description, or a library lacks `sideEffects`, `module`, `types`, `files` and `publishConfig`. `--fix` writes everything but the description |
 | `scripts/check-docs.mjs` | a package has no README, a link, heading or path in the docs doesn't exist, a `pnpm` command isn't a script, a doc page isn't in the docs index, a root script isn't documented, or a CI job isn't in the table above |
 
-`pnpm test:scripts` runs the tests of those three, and of `scripts/unpin-release-as.mjs` and
-`scripts/changed-areas.mjs`, all against throwaway repos. See "Docs match the code" in
+`pnpm test:scripts` runs the tests of those three, `scripts/unpin-release-as.mjs`,
+`scripts/changed-areas.mjs`, and the agent hooks, all against throwaway repos. See "Docs match the code" in
 [Code style](code-style.md).
 
 ## Not implemented: publishing to market.pumpkinmc.org

@@ -8,8 +8,8 @@ work for tells you something different from this file, do what they say.
 ## Ground rules
 
 - **Don't commit, push, tag, or open, comment on or review PRs and issues** unless the user asked for it in
-  this conversation. Leave your work in the working tree and say what you changed. When you are asked to commit,
-  load the `commit` skill first.
+  this conversation. Leave your work in the working tree and say what you changed. When asked to commit, stage
+  only your own files, inspect the staged diff, and use a Conventional Commit message.
 - The working tree can hold someone else's uncommitted work. Don't revert, stash, reformat or stage changes
   you didn't make, and don't run `git checkout`, `git restore`, `git reset` or `git clean` on them.
 - Use pnpm only (`pnpm exec` for local binaries, `pnpm dlx` for one-offs). Versions are pinned exactly, and
@@ -28,7 +28,7 @@ work for tells you something different from this file, do what they say.
 | Docs, package metadata and release config against the code | `pnpm check`, `pnpm readme:check` |
 | One package | `pnpm exec turbo run typecheck test --filter=@pumpkin-plugins/<folder>` |
 | Build, then run on a real Pumpkin server (slow) | `pnpm exec turbo run test:integration --filter=@pumpkin-plugins/<folder>` |
-| All of the above that CI would fail on, scoped to what you changed | `node .agents/hooks/check.mjs` |
+| Fast checks, scoped to what you changed (integration tests excluded) | `node .agents/hooks/check.mjs` |
 
 ## Things that will bite you
 
@@ -76,11 +76,11 @@ work for tells you something different from this file, do what they say.
 
 ## Before you say you're done
 
-1. Run `node .agents/hooks/check.mjs`. In OpenCode it also runs on its own when you finish a turn in which
-   you edited files. A message starting with `[pumpkin-plugins checks]` is that run's report: fix the cause, not
-   the check.
-2. If you changed what a plugin does at runtime, run its integration tests. The `pumpkin-server` skill covers
-   getting a server binary and debugging a failing run.
+1. Run `node .agents/hooks/check.mjs`. The optional OpenCode adapter in `.agents/hooks/opencode.mjs` runs the
+   same checks only when it has been installed in that user's OpenCode configuration. A message starting with
+   `[pumpkin-plugins checks]` is that run's report: fix the cause, not the check.
+2. If you changed what a plugin does at runtime, run its integration tests. [Testing](docs/testing.md) explains
+   how the server binary is selected and how to keep logs for failures.
 3. Read your own diff: what each removed line did and where that went, the other callers of shared code you
    changed, and the docs that describe it.
 4. Say what you ran, and what you couldn't check.

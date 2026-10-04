@@ -57,10 +57,13 @@ describe('checkEdit', () => {
         for (const file of [
             'pnpm-lock.yaml',
             'packages/p/build/p.wasm',
+            'tools/build/build/p.wasm',
+            'tools/config/dist/index.js',
             'dist/p.wasm',
             '.cache/pumpkin/x',
             'tools/config/node_modules/x/index.js',
             'packages/p/CHANGELOG.md',
+            'tools/config/CHANGELOG.md',
             '.release-please-manifest.json'
         ]) {
             assert.ok(checkEdit(file, {}, read), file);
@@ -76,6 +79,10 @@ describe('checkEdit', () => {
             /pnpm readme/
         );
         assert.equal(checkEdit('packages/p/README.md', { oldString: 'Hand-written outro.' }, read), undefined);
+    });
+
+    it('refuses patch-style edits to READMEs with generated blocks', () => {
+        assert.match(checkEdit('packages/p/README.md', {}, read) ?? '', /pnpm readme/);
     });
 
     it('refuses a rewrite that changes a generated block and allows one that keeps it', () => {

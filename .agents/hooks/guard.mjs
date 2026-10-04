@@ -37,11 +37,11 @@ const PROTECTED_PATHS = [
         reason: 'pnpm writes the lockfile. Change dependencies with `pnpm add`, `pnpm remove` or `pnpm install`.'
     },
     {
-        pattern: /^(packages\/[^/]+\/build|dist|\.cache|\.turbo)\/|(^|\/)(node_modules|\.turbo)\//,
+        pattern: /(^|\/)(build|dist|\.cache|\.turbo|node_modules)\//,
         reason: 'This is build output or a cache. Change the source and rebuild instead.'
     },
     {
-        pattern: /^packages\/[^/]+\/CHANGELOG\.md$|^\.release-please-manifest\.json$/,
+        pattern: /(^|\/)CHANGELOG\.md$|^\.release-please-manifest\.json$/,
         reason: 'release-please owns this file. New plugins are registered by `pnpm gen`.'
     }
 ];
@@ -61,7 +61,8 @@ const GENERATED_README =
  *
  * @param {string} file Path relative to the repo root, with forward slashes.
  * @param {{ oldString?: string, content?: string }} change The text being replaced (edits) or the
- *   new file content (writes). Patches pass neither, so only the path rules apply to them.
+ *   new file content (writes). Patches pass neither, so generated README blocks cannot be safely
+ *   inspected and the whole README is refused when it contains one.
  * @param {(file: string) => string | undefined} read Current content of a repo file, if it exists.
  * @returns {string | undefined}
  */
@@ -74,6 +75,8 @@ export function checkEdit(file, change, read) {
     if (current === undefined) return;
     const blocks = generatedBlocks(current);
     if (blocks.length === 0) return;
+
+    if (change.oldString === undefined && change.content === undefined) return GENERATED_README;
 
     if (change.oldString !== undefined) {
         let from = current.indexOf(change.oldString);
