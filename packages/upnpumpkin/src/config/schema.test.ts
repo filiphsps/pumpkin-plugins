@@ -15,7 +15,7 @@ describe('configSchema', () => {
             },
             java: { enabled: true, port: 25565 },
             bedrock: { enabled: true, port: 19132 },
-            plugins: { allow_requests: true }
+            plugins: { allow_requests: true, max_requests_per_plugin: 16 }
         });
     });
 });

@@ -131,6 +131,7 @@ Settings live in `plugins/data/UPnPumpkin/config.toml`. The plugin creates the f
 | `bedrock.enabled` | boolean | `true` | Open the Bedrock Edition port. |
 | `bedrock.port` | integer | `19132` | Port of the Bedrock Edition listener. |
 | `plugins.allow_requests` | boolean | `true` | Let other plugins ask for ports to be opened, for example BedrockAddonManager for its pack downloads. They are closed again when the plugin stops asking. |
+| `plugins.max_requests_per_plugin` | integer | `16` | How many ports each plugin may keep open at once. Every plugin has its own limit. |
 
 A fresh install gets this file:
 
@@ -186,5 +187,8 @@ port = 19132
 # Let other plugins ask for ports to be opened, for example BedrockAddonManager for its pack
 # downloads. They are closed again when the plugin stops asking.
 allow_requests = true
+
+# How many ports each plugin may keep open at once. Every plugin has its own limit.
+max_requests_per_plugin = 16
 ```
 <!-- docs:end config -->

@@ -66,6 +66,12 @@ export const configSchema = defineConfig('UPnPumpkin', {
                 description:
                     'Let other plugins ask for ports to be opened, for example BedrockAddonManager for its pack downloads. They are closed again when the plugin stops asking.',
                 default: true
+            }),
+            max_requests_per_plugin: int({
+                description: 'How many ports each plugin may keep open at once. Every plugin has its own limit.',
+                default: 16,
+                min: 1,
+                max: 256
             })
         }
     })

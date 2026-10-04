@@ -188,14 +188,17 @@ describe('PortForwarder', () => {
             expect(forwarder.snapshot.mappings).toEqual([]);
         });
 
-        it('limits how many ports plugins may hold, but lets known ones through', () => {
-            const { forwarder, ask } = setup('[java]\nenabled = false\n\n[bedrock]\nenabled = false\n');
+        it("limits each plugin without letting one plugin use another plugin's share", () => {
+            const { forwarder, ask } = setup(
+                '[java]\nenabled = false\n\n[bedrock]\nenabled = false\n\n[plugins]\nmax_requests_per_plugin = 2\n'
+            );
             forwarder.start();
-            for (let i = 1; i <= 16; i++)
+            for (let i = 1; i <= 2; i++)
                 expect(ask('X', ensure({ ...web, key: `k${i}`, port: 1000 + i }))).toMatchObject({ ok: true });
-            expect(ask('X', ensure({ ...web, key: 'k17', port: 2000 }))).toEqual({
+            expect(ask('Y', ensure({ ...web, key: 'k1', port: 2000 }))).toMatchObject({ ok: true });
+            expect(ask('X', ensure({ ...web, key: 'k3', port: 1003 }))).toEqual({
                 ok: false,
-                error: expect.stringContaining('at most 16')
+                error: expect.stringContaining('at most 2 ports can be requested per plugin')
             });
             expect(ask('X', ensure({ ...web, key: 'k1', port: 1001 }))).toMatchObject({ ok: true });
         });

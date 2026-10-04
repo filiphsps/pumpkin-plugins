@@ -21,8 +21,6 @@ import { loadPluginConfig } from './config/load.ts';
 import type { Config } from './config/schema.ts';
 import { type Refusal, refusalMessage } from './refusal.ts';
 
-/** Most ports other plugins may keep open at once. */
-const MAX_PLUGIN_REQUESTS = 16;
 /** A request nobody has repeated for this long is dropped: the plugin that asked is gone. */
 const REQUEST_TTL_MS = 5 * 60_000;
 const PRUNE_EVERY_MS = 10_000;
@@ -152,10 +150,15 @@ export class PortForwarder {
                         error: 'requests from other plugins are turned off in the UPnPumpkin config (plugins.allow_requests)'
                     };
                 }
-                if (!this.requests.has(key) && this.requests.size >= MAX_PLUGIN_REQUESTS) {
-                    return { ok: false, error: `at most ${MAX_PLUGIN_REQUESTS} ports can be requested by plugins` };
+                const known = this.requests.has(key);
+                const requestCount = [...this.requests.values()].filter((current) => current.sender === sender).length;
+                if (!known && requestCount >= this.settings.plugins.max_requests_per_plugin) {
+                    return {
+                        ok: false,
+                        error: `at most ${this.settings.plugins.max_requests_per_plugin} ports can be requested per plugin`
+                    };
                 }
-                if (!this.requests.has(key))
+                if (!known)
                     this.log.info(
                         `${sender} asked for ${request.protocol.toUpperCase()} port ${request.port} to be opened (${request.description}).`
                     );
