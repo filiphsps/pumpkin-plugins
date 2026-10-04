@@ -22,6 +22,7 @@ const tag = 'AppleSkinPumpkin';
  */
 export class PlayerSync {
     private readonly sent = new SyncTracker();
+    private readonly lastRegeneration = new Map<string, boolean>();
 
     constructor(private readonly log: Logger) {}
 
@@ -29,18 +30,21 @@ export class PlayerSync {
     joined(player: Player): void {
         const id = playerKey(player);
         this.sent.forget(id);
-        if (!isJavaPlayer(player)) {
+        this.lastRegeneration.delete(id);
+        const sent = this.withJavaClient(player, (java) => {
+            this.log.debug(`${tag} ${player.getName()} joined, sending their current hunger.`);
+            this.sendRegeneration(player, id, java);
+            this.send(player, id, java);
+        });
+        if (!sent) {
             this.log.debug(`${tag} ${player.getName()} is not on Java Edition, so there is nothing to sync.`);
-            return;
         }
-        this.log.debug(`${tag} ${player.getName()} joined, sending their current hunger.`);
-        this.sendRegeneration(player);
-        this.send(player, id);
     }
 
     /** Forgets a player who left, so that their next join starts from scratch. */
     left(player: Player): void {
         this.sent.forget(playerKey(player));
+        this.lastRegeneration.delete(playerKey(player));
         this.log.debug(`${tag} ${player.getName()} left, forgetting their hunger.`);
     }
 
@@ -54,7 +58,10 @@ export class PlayerSync {
             try {
                 const id = playerKey(player);
                 online.add(id);
-                this.send(player, id);
+                this.withJavaClient(player, (java) => {
+                    this.send(player, id, java);
+                    this.sendRegeneration(player, id, java);
+                });
             } finally {
                 // Every handle the host hands out is ours to release. Keeping them would grow the
                 // server's resource table by one entry per player per tick.
@@ -62,48 +69,48 @@ export class PlayerSync {
             }
         }
         this.sent.retain(online);
+        for (const id of this.lastRegeneration.keys()) if (!online.has(id)) this.lastRegeneration.delete(id);
     }
 
-    private send(player: Player, id: string): void {
-        this.withJavaClient(player, (java) => {
-            const update = this.sent.update(id, player.getSaturation(), player.getExhaustion());
-            if (update.saturation === undefined && update.exhaustion === undefined) return;
-            const who = player.getName();
-            if (update.saturation !== undefined) {
-                java.sendCustomPayload(SATURATION_CHANNEL, floatPayload(update.saturation));
-                this.log.debug(`${tag} ${who}: saturation ${update.saturation}.`);
-            }
-            if (update.exhaustion !== undefined) {
-                java.sendCustomPayload(EXHAUSTION_CHANNEL, floatPayload(update.exhaustion));
-                this.log.debug(`${tag} ${who}: exhaustion ${update.exhaustion}.`);
-            }
-        });
+    private send(player: Player, id: string, java: JavaPlayer): void {
+        const update = this.sent.update(id, player.getSaturation(), player.getExhaustion());
+        if (update.saturation === undefined && update.exhaustion === undefined) return;
+        const who = player.getName();
+        if (update.saturation !== undefined) {
+            java.sendCustomPayload(SATURATION_CHANNEL, floatPayload(update.saturation));
+            this.log.debug(`${tag} ${who}: saturation ${update.saturation}.`);
+        }
+        if (update.exhaustion !== undefined) {
+            java.sendCustomPayload(EXHAUSTION_CHANNEL, floatPayload(update.exhaustion));
+            this.log.debug(`${tag} ${who}: exhaustion ${update.exhaustion}.`);
+        }
     }
 
-    private sendRegeneration(player: Player): void {
+    private sendRegeneration(player: Player, id: string, java: JavaPlayer): void {
         const world = player.getWorld();
         try {
             const rule = world.getGameRule('natural-health-regeneration');
-            // The client assumes regeneration is on, so only an off switch is worth a packet.
-            if (rule.tag !== 'bool' || rule.val) return;
-            this.withJavaClient(player, (java) => {
-                java.sendCustomPayload(NATURAL_REGENERATION_CHANNEL, boolPayload(false));
-                this.log.debug(`${tag} ${player.getName()}: natural regeneration is off in ${world.getName()}.`);
-            });
+            if (rule.tag !== 'bool' || this.lastRegeneration.get(id) === rule.val) return;
+            java.sendCustomPayload(NATURAL_REGENERATION_CHANNEL, boolPayload(rule.val));
+            this.lastRegeneration.set(id, rule.val);
+            this.log.debug(
+                `${tag} ${player.getName()}: natural regeneration is ${rule.val ? 'on' : 'off'} in ${world.getName()}.`
+            );
         } finally {
             world[Symbol.dispose]();
         }
     }
 
     /** Runs `send` against a player's client, for the Java players AppleSkin runs on. */
-    private withJavaClient(player: Player, send: (java: JavaPlayer) => void): void {
+    private withJavaClient(player: Player, send: (java: JavaPlayer) => void): boolean {
         const java = player.asJava();
-        if (!java) return;
+        if (!java) return false;
         try {
             send(java);
         } finally {
             java[Symbol.dispose]();
         }
+        return true;
     }
 }
 
@@ -111,12 +118,4 @@ export class PlayerSync {
 function playerKey(player: Player): string {
     const { high, low } = player.getId();
     return `${high}:${low}`;
-}
-
-/** Whether a player has a Java client. AppleSkin is a Java mod, so nobody else is worth syncing. */
-function isJavaPlayer(player: Player): boolean {
-    const java = player.asJava();
-    if (!java) return false;
-    java[Symbol.dispose]();
-    return true;
 }

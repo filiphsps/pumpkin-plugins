@@ -13,28 +13,36 @@ describe('PlayerSync', () => {
 
         sync.joined(player.host);
 
-        expect(player.channels).toEqual([SATURATION, EXHAUSTION]);
+        expect(player.channels).toEqual([REGENERATION, SATURATION, EXHAUSTION]);
+        expect(player.flags(REGENERATION)).toEqual([true]);
         expect(player.floats(SATURATION)).toEqual([5]);
         // The values travel as 32-bit floats, so what arrives is the nearest one the format holds.
         expect(player.floats(EXHAUSTION)).toEqual([Math.fround(0.4)]);
     });
 
-    it('tells the client when natural regeneration is off in the world it joined', () => {
+    it('tells the client whether natural regeneration is on in the world it joined', () => {
         const { player, sync } = setup();
-        player.naturalRegeneration = false;
         player.worldName = 'arena';
 
         sync.joined(player.host);
 
-        expect(player.flags(REGENERATION)).toEqual([false]);
+        expect(player.flags(REGENERATION)).toEqual([true]);
     });
 
-    it('says nothing about regeneration while the world heals players by food, as the client assumes', () => {
-        const { player, sync } = setup();
-
+    it('updates natural regeneration after a gamerule change or world transition', () => {
+        const { player, server, sync } = setup();
         sync.joined(player.host);
+        player.sent.length = 0;
 
-        expect(player.channels).not.toContain(REGENERATION);
+        player.naturalRegeneration = false;
+        sync.tick(server.host);
+
+        player.naturalRegeneration = true;
+        player.worldName = 'world_nether';
+        sync.tick(server.host);
+        sync.tick(server.host);
+
+        expect(player.flags(REGENERATION)).toEqual([false, true]);
     });
 
     it('sends a value on the tick it changes, and only then', () => {
@@ -62,13 +70,13 @@ describe('PlayerSync', () => {
 
         sync.tick(server.host);
 
-        // One for the player out of the server's list, one for the Java client it was sent to.
-        expect(player.disposals).toBe(2);
+        // One for the player out of the server's list, one Java client and one world handle.
+        expect(player.disposals).toBe(3);
 
         player.saturation = 4.5;
         sync.tick(server.host);
 
-        expect(player.disposals).toBe(4);
+        expect(player.disposals).toBe(6);
     });
 
     it('releases the world handle too, when it reads the game rule', () => {
@@ -76,8 +84,8 @@ describe('PlayerSync', () => {
 
         sync.joined(player.host);
 
-        // One to check the platform, one for the world, one for the client it was sent to.
-        expect(player.disposals).toBe(3);
+        // One Java client and one world handle.
+        expect(player.disposals).toBe(2);
     });
 
     it('leaves Bedrock players alone, and says why once instead of every tick', () => {
@@ -110,6 +118,7 @@ describe('PlayerSync', () => {
 
         expect(log.of('debug')).toEqual([
             'AppleSkinPumpkin ada joined, sending their current hunger.',
+            'AppleSkinPumpkin ada: natural regeneration is on in world.',
             'AppleSkinPumpkin ada: saturation 5.',
             'AppleSkinPumpkin ada: exhaustion 0.4.'
         ]);
