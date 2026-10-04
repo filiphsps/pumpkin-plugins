@@ -16,7 +16,7 @@ if (!pluginDir || !tag || !wasmFile) {
     process.exit(1);
 }
 
-const apiUrl = (process.env.MARKET_API_URL ?? 'https://market.pumpkinmc.org/api/v1/rest').replace(/\/$/, '');
+const apiUrl = (process.env.MARKET_API_URL ?? 'https://market.pumpkinmc.org/api').replace(/\/$/, '');
 const token = process.env.MARKET_API_TOKEN?.trim();
 const releaseNotes = process.env.MARKET_RELEASE_NOTES?.trim();
 
