@@ -1,0 +1,19 @@
+import { builtPluginPath, type PumpkinInstance, startPumpkin } from '@pumpkin-plugins/test-harness';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { info } from '../src/info.ts';
+
+describe(info.name, () => {
+    let server: PumpkinInstance;
+
+    beforeAll(async () => {
+        server = await startPumpkin({ name: 'apple-skin-pumpkin', plugins: [builtPluginPath(process.cwd())] });
+    });
+    afterAll(async () => {
+        await server?.stop();
+    });
+
+    it('loads on a real server', async () => {
+        await server.waitForLog(new RegExp(`Loaded ${info.name}`));
+        expect(server.errors()).toEqual([]);
+    });
+});

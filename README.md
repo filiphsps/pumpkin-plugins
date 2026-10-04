@@ -10,6 +10,7 @@ Monorepo for [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) plugins written in
 
 | Plugin | Description |
 | --- | --- |
+| [AppleSkinPumpkin](packages/apple-skin-pumpkin) | AppleSkin serer-side support |
 | [BedrockAddonManager](packages/bedrock-addon-manager) | Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and adds them to what connecting players are offered, using each pack's own manifest. |
 | [UPnPumpkin](packages/upnpumpkin) | Opens ports on your router with UPnP and NAT-PMP so players can reach the server from the internet, and lets other plugins ask for the same. |
 

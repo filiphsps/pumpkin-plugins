@@ -4,6 +4,10 @@ import type { Logger } from '../logger.ts';
 export class MemoryLogger implements Logger {
     readonly lines: string[] = [];
 
+    debug(message: string): void {
+        this.lines.push(`debug: ${message}`);
+    }
+
     info(message: string): void {
         this.lines.push(`info: ${message}`);
     }
@@ -17,7 +21,7 @@ export class MemoryLogger implements Logger {
     }
 
     /** Messages of one level, without the level prefix. */
-    of(level: 'info' | 'warn' | 'error'): string[] {
+    of(level: 'debug' | 'info' | 'warn' | 'error'): string[] {
         return this.lines.filter((l) => l.startsWith(`${level}: `)).map((l) => l.slice(level.length + 2));
     }
 }

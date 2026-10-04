@@ -6,6 +6,7 @@ import type { Logger } from './logger.ts';
 
 /** The server log, through the host's logging interface. */
 export const hostLogger: Logger = {
+    debug: (message) => logging.log('debug', message),
     info: (message) => logging.log('info', message),
     warn: (message) => logging.log('warn', message),
     error: (message) => logging.log('error', message)
