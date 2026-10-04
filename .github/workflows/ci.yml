@@ -18,6 +18,28 @@ permissions:
     contents: read
 
 jobs:
+    changes:
+        name: 🔍 Changed files
+        timeout-minutes: 5
+        runs-on: ubuntu-latest
+        outputs:
+            code: ${{ steps.classify.outputs.code }}
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+              with:
+                  # Diffing against the base needs the history behind it, not just the one commit.
+                  fetch-depth: 0
+
+            # Everything else keys off this: a change that touches only documentation can't break a
+            # build, a test or a plugin, so it skips the jobs that would tell us otherwise.
+            - name: 🔍 What the change touches
+              id: classify
+              env:
+                  BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+                  HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+              run: node scripts/changed-areas.mjs "$BASE" "$HEAD"
+
     commits:
         name: 💬 Commit messages
         if: github.event_name == 'pull_request'
@@ -37,6 +59,8 @@ jobs:
 
     lint:
         name: 📋 Lint
+        needs: [changes]
+        if: needs.changes.outputs.code == 'true'
         timeout-minutes: 15
         runs-on: ubuntu-latest
         steps:
@@ -51,6 +75,8 @@ jobs:
 
     typecheck:
         name: ✅ Typecheck
+        needs: [changes]
+        if: needs.changes.outputs.code == 'true'
         timeout-minutes: 15
         runs-on: ubuntu-latest
         steps:
@@ -65,6 +91,8 @@ jobs:
 
     test:
         name: 🧪 Test
+        needs: [changes]
+        if: needs.changes.outputs.code == 'true'
         timeout-minutes: 15
         runs-on: ubuntu-latest
         steps:
@@ -101,7 +129,8 @@ jobs:
 
     build:
         name: 🔨 Build
-        needs: [lint, typecheck]
+        needs: [changes, lint, typecheck]
+        if: needs.changes.outputs.code == 'true'
         timeout-minutes: 25
         runs-on: ubuntu-latest
         steps:
@@ -131,7 +160,8 @@ jobs:
 
     integration:
         name: 🎃 Integration (real Pumpkin)
-        needs: [build]
+        needs: [changes, build]
+        if: needs.changes.outputs.code == 'true'
         timeout-minutes: 60
         runs-on: ubuntu-latest
         steps:
@@ -156,7 +186,8 @@ jobs:
 
     generator:
         name: 🧬 Generator
-        needs: [lint]
+        needs: [changes, lint]
+        if: needs.changes.outputs.code == 'true'
         timeout-minutes: 60
         runs-on: ubuntu-latest
         steps:
@@ -190,8 +221,8 @@ jobs:
 
     release:
         name: 🚢 Release
-        needs: [build, test, docs, integration]
-        if: github.event_name == 'push'
+        needs: [changes, build, test, docs, integration]
+        if: needs.changes.outputs.code == 'true' && github.event_name == 'push'
         timeout-minutes: 10
         runs-on: ubuntu-latest
         permissions:

@@ -7,16 +7,41 @@ cache) is the composite action in `.github/common/bootstrap`.
 
 | Job | Runs | What |
 | --- | --- | --- |
+| 🔍 Changed files | always | Works out whether the change can affect a build, a test or a plugin, which is what the code jobs below wait for |
 | 💬 Commit messages | PRs | Lints every commit with `commitlint.config.mjs` |
-| 📋 Lint | always | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
-| ✅ Typecheck | always | `pnpm typecheck` |
-| 🧪 Test | always | Unit tests, and the tests of the repo checks (`pnpm test:scripts`) |
+| 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
+| ✅ Typecheck | code changes | `pnpm typecheck` |
+| 🧪 Test | code changes | Unit tests, and the tests of the repo checks (`pnpm test:scripts`) |
 | 📝 Docs and config | always | README generation succeeds, and `pnpm check` passes: release config, package metadata, docs against the code |
-| 🔨 Build | after lint and typecheck | Builds every plugin and uploads them as an artifact |
-| 🎃 Integration | after build | Runs the integration tests against the pinned Pumpkin release (downloaded and checksum-verified); server logs are uploaded on failure |
-| 🧬 Generator | after lint | Generates a throwaway plugin with `pnpm gen` and typechecks, builds and integration-tests it |
-| 🚢 Release | `master` pushes, after the checks | release-please, then keeps the release PR's READMEs and `release-as` pins current |
+| 🔨 Build | code changes, after lint and typecheck | Builds every plugin and uploads them as an artifact |
+| 🎃 Integration | code changes, after build | Runs the integration tests against the pinned Pumpkin release (downloaded and checksum-verified); server logs are uploaded on failure |
+| 🧬 Generator | code changes, after lint | Generates a throwaway plugin with `pnpm gen` and typechecks, builds and integration-tests it |
+| 🚢 Release | code changes, on `master` pushes, after the checks | release-please, then keeps the release PR's READMEs and `release-as` pins current |
 | 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, then uploads the `.wasm`; the market step is a stub |
+
+## Running only what a change needs
+
+`scripts/changed-areas.mjs`, in the `🔍 Changed files` job, diffs the change against what came
+before it (the base of the pull request, or the push's `before` commit) and calls a changed file
+documentation when it ends in `.md`, sits under `docs/`, or is the `LICENSE`. Nothing that builds,
+tests or ships reads those, so a change touching only them skips lint, typecheck, tests, the build,
+integration and the generator. A docs commit costs a checkout, the docs job and the commit lint
+instead of the whole suite.
+
+Everything else is a change to code and runs everything, including changes under `tools/`,
+`scripts/` and `.github/`, and deletions. Biome, the type checker and the tests read none of the
+documentation files, so a docs-only change cannot fail them.
+
+Two jobs never skip. `📝 Docs and config` is what keeps the docs true, so it has to run on the
+commits that change them. `💬 Commit messages` is cheap and belongs on every pull request.
+
+Skipping the release job on a docs-only push costs nothing. release-please only releases a plugin
+that a `feat`, `fix` or `Release-As` commit touched, and merging a release PR is a commit of its own
+that bumps `package.json`, so the push that has to release is never a docs-only change.
+
+Know this before narrowing a job further: a skipped job takes every job that needs it with it, so no
+job can be gated on less than the jobs below it. Gating `📋 Lint` without `🔨 Build` would leave a
+release with no artifact to attach, and nothing would say so.
 
 ## Merging
 
@@ -125,8 +150,9 @@ generator and the checks can't drift:
 | `scripts/package-metadata.mjs` | a `package.json` lacks the license, author, contributors, homepage, repository, bugs, funding or a short description, or a library lacks `sideEffects`, `module`, `types`, `files` and `publishConfig`. `--fix` writes everything but the description |
 | `scripts/check-docs.mjs` | a package has no README, a link, heading or path in the docs doesn't exist, a `pnpm` command isn't a script, a doc page isn't in the docs index, a root script isn't documented, or a CI job isn't in the table above |
 
-`pnpm test:scripts` tests the three against throwaway repos, and `scripts/unpin-release-as.mjs` on
-its own. See "Docs match the code" in [Code style](code-style.md).
+`pnpm test:scripts` runs the tests of those three, and of `scripts/unpin-release-as.mjs` and
+`scripts/changed-areas.mjs`, all against throwaway repos. See "Docs match the code" in
+[Code style](code-style.md).
 
 ## Not implemented: publishing to market.pumpkinmc.org
 
