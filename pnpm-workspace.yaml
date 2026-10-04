@@ -10,4 +10,4 @@ catalog:
   # Shared dev tooling versions.
   vitest: 4.1.11
   typescript: 5.9.3
-  "@types/node": 24.19.0
+  "@types/node": 24.19.1
