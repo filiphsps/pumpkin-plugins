@@ -1,0 +1,28 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    // Conventional commits with a lowercase subject, because CI lints every commit with
+    // commitlint.config.mjs and release-please reads all of them on master.
+    "extends": [
+        ":semanticCommits",
+        // Exact versions, the way saveExact: true in pnpm-workspace.yaml and the pinned tags of the
+        // CI actions already do it. The shared versions stay in the catalog, and Renovate edits the
+        // catalog entry instead of every `catalog:` reference.
+        ":pinVersions",
+        // Patch and minor updates merge themselves once CI is green. Majors come as a pull request:
+        // the plugin ABI, the pinned Pumpkin release and the WASI WITs move on purpose.
+        ":automergeMinor",
+        // The lockfile pins a lot of transitives exactly, so give it a weekly refresh.
+        ":maintainLockFilesWeekly"
+    ],
+    "packageRules": [
+        {
+            // The catalog entry in pnpm-workspace.yaml is a tarball URL for one plugin ABI, and it
+            // has to change together with PUMPKIN_RELEASE in
+            // tools/test-harness/src/pumpkin-version.ts. Renovate can't see that link, so it leaves
+            // this package alone.
+            "matchPackageNames": ["@pumpkinmc/pumpkin-api-ts"],
+            "enabled": false,
+            "description": "Pinned to the Pumpkin release the integration tests run against"
+        }
+    ]
+}
