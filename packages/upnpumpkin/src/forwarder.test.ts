@@ -163,10 +163,23 @@ describe('PortForwarder', () => {
             expect(port).toMatchObject({ ok: false });
         });
 
-        it('refuses them when turned off in the config', () => {
-            const { forwarder, ask } = setup('[plugins]\nallow_requests = false\n');
+        it('refuses new ports when turned off in the config, but still gives open ones back', () => {
+            const { files, forwarder, settle, ask, keys } = setup('[plugins]\nallow_requests = false\n');
             forwarder.start();
             expect(ask('X', ensure())).toEqual({ ok: false, error: expect.stringContaining('plugins.allow_requests') });
+
+            files.put(CONFIG_FILE, '[plugins]\nallow_requests = true\n');
+            forwarder.reload();
+            ask('X', ensure());
+            settle(() => keys().includes('tcp:8123'));
+
+            files.put(CONFIG_FILE, '[plugins]\nallow_requests = false\n');
+            forwarder.reload();
+            expect(ask('X', { op: 'release', key: 'web' })).toEqual({ ok: true });
+            settle(() => !keys().includes('tcp:8123'));
+            expect(keys()).toEqual(['tcp:25565', 'udp:19132']);
+            expect(ask('X', { op: 'status', key: 'web' })).toEqual({ ok: true, status: { kind: 'unknown' } });
+            expect(ask('X', { op: 'info' })).toMatchObject({ ok: true });
         });
 
         it('refuses them before it has started', () => {

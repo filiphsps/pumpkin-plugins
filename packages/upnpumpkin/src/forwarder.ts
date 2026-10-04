@@ -124,12 +124,6 @@ export class PortForwarder {
         const decoded = decodeRequest(bytes);
         if ('error' in decoded) return { ok: false, error: decoded.error };
         if (!this.settings || !this.mapper) return { ok: false, error: 'UPnPumpkin is not ready yet' };
-        if (!this.settings.plugins.allow_requests) {
-            return {
-                ok: false,
-                error: 'requests from other plugins are turned off in the UPnPumpkin config (plugins.allow_requests)'
-            };
-        }
         const { request } = decoded;
         const key = 'key' in request ? pluginKey(sender, request.key) : '';
 
@@ -143,6 +137,15 @@ export class PortForwarder {
                 this.mapper.release(key);
                 return { ok: true };
             case 'ensure': {
+                // Only asking for a port is turned off. A plugin must keep being able to give one
+                // back and to read about it, or its ports would stay open after the operator
+                // stopped requests.
+                if (!this.settings.plugins.allow_requests) {
+                    return {
+                        ok: false,
+                        error: 'requests from other plugins are turned off in the UPnPumpkin config (plugins.allow_requests)'
+                    };
+                }
                 const port: PortRequest = {
                     key: request.key,
                     protocol: request.protocol,
