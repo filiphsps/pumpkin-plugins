@@ -27,11 +27,13 @@ function fixture(name = 'Published plugin') {
 
 function run(dir, env = {}) {
     return new Promise((resolve, reject) => {
+        const childEnv = { ...process.env, ...env };
+        childEnv.GITHUB_STEP_SUMMARY = undefined;
         const child = spawn(
             'node',
             [path.join(scripts, 'publish-to-market.mjs'), dir, 'plug-v1.2.3', path.join(dir, 'plugin.wasm')],
             {
-                env: { ...process.env, ...env }
+                env: childEnv
             }
         );
         let stdout = '';
@@ -100,10 +102,13 @@ describe('publish-to-market', () => {
             }
         });
         try {
-            const result = await run(fixture(), {
+            const pluginDir = fixture();
+            const summaryFile = path.join(pluginDir, 'summary.md');
+            const result = await run(pluginDir, {
                 MARKET_API_TOKEN: 'test-token',
                 MARKET_API_URL: market.url,
-                MARKET_RELEASE_NOTES: '## Fixed\n\n- Kept the ports open.'
+                MARKET_RELEASE_NOTES: '## Fixed\n\n- Kept the ports open.',
+                GITHUB_STEP_SUMMARY: summaryFile
             });
             assert.equal(result.status, 0, result.stderr);
             assert.equal(requests[1].method, 'PUT');
@@ -113,6 +118,7 @@ describe('publish-to-market', () => {
                 requests[1].body,
                 /name="metadata"\r\n\r\n{"version":"1.2.3","track":"stable","releaseNotes":"## Fixed\\n\\n- Kept the ports open\."}/
             );
+            assert.equal(fs.existsSync(summaryFile), false, 'test publisher must not write to the CI summary');
             assert.match(result.stdout, /Published Published plugin 1\.2\.3 to market listing 42/);
         } finally {
             market.instance.close();
