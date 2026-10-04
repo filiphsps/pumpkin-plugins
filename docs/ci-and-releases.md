@@ -56,7 +56,8 @@ footer.
 ## Releases
 
 On `master`, once the checks pass, [release-please](https://github.com/googleapis/release-please)
-keeps one release PR up to date from the conventional commits. Merging it:
+keeps an independent release PR up to date for each plugin with releasable conventional commits.
+Merging one:
 
 - bumps each changed plugin's version and changelog,
 - tags it `<folder>-v<version>` and creates its GitHub release,
@@ -69,14 +70,14 @@ the tag and the release, which is usually the older run, and the artifact it hol
 earlier commit. The attach job therefore resolves the tag first and refuses to upload unless it
 points at the commit that run built, which leaves the release to the run for the released commit.
 
-Each time release-please creates or updates the release PR, the release job regenerates the READMEs
+Each time release-please creates or updates a release PR, the release job regenerates the READMEs
 and pushes a `docs: update generated READMEs` commit to the PR branch, so they are current when the
 release merges. The same run retires the `release-as` pin of any plugin the PR releases (see below).
 release-please rewrites its branch on every update, so those commits are re-added each time.
 
-The release PR is also updated when a commit leaves its generated notes unchanged, so its branch
-always follows `master`. Its grouped title uses the scope, component and version placeholders that
-release-please needs to recognize an existing PR.
+Each release PR is also updated when a commit leaves its generated notes unchanged, so its branch
+always follows `master`. Separate PRs keep a plugin that is not ready from being released with one
+that is.
 
 ## Signing
 

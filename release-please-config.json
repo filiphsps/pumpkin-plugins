@@ -3,9 +3,8 @@
     "release-type": "node",
     "bump-minor-pre-major": true,
     "bump-patch-for-minor-pre-major": true,
-    "separate-pull-requests": false,
+    "separate-pull-requests": true,
     "always-update": true,
-    "group-pull-request-title-pattern": "chore${scope}: release${component} ${version}",
     "include-component-in-tag": true,
     "include-v-in-tag": true,
     "packages": {

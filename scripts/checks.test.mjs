@@ -245,8 +245,8 @@ describe('check-release-config', () => {
         'packages/plug/package.json': { name: 'plug', version },
         '.release-please-manifest.json': { 'packages/plug': manifest },
         'release-please-config.json': {
+            'separate-pull-requests': true,
             'always-update': true,
-            'group-pull-request-title-pattern': 'chore\${scope}: release\${component} \${version}',
             packages: { 'packages/plug': { component: 'plug', ...(releaseAs ? { 'release-as': releaseAs } : {}) } }
         }
     });
@@ -286,14 +286,13 @@ describe('check-release-config', () => {
         );
     });
 
-    it('requires an always-current release PR with a parseable grouped title', () => {
+    it('requires independent, always-current release PRs', () => {
+        const combined = files();
+        combined['release-please-config.json']['separate-pull-requests'] = false;
+        assert.match(run('check-release-config.mjs', repo(combined)).out, /"separate-pull-requests": true/);
+
         const withoutRefresh = files();
         withoutRefresh['release-please-config.json']['always-update'] = false;
         assert.match(run('check-release-config.mjs', repo(withoutRefresh)).out, /"always-update": true/);
-
-        const withoutTitleParts = files();
-        withoutTitleParts['release-please-config.json']['group-pull-request-title-pattern'] =
-            'chore: release \${branch}';
-        assert.match(run('check-release-config.mjs', repo(withoutTitleParts)).out, /group-pull-request-title-pattern/);
     });
 });
