@@ -91,5 +91,3 @@ Load these from `.agents/skills/` when the task matches:
 | Skill | Use it when |
 | --- | --- |
 | `pumpkin-plugin-api` | Writing plugin code that calls the host: events, commands, scheduling, files, sockets |
-| `pumpkin-server` | Running or debugging integration tests, or building a Pumpkin server from source |
-| `commit` | The user asks you to commit |
