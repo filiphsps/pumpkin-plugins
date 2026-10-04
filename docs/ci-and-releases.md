@@ -16,7 +16,7 @@ cache) is the composite action in `.github/common/bootstrap`.
 | 🎃 Integration | after build | Runs the integration tests against the pinned Pumpkin release (downloaded and checksum-verified); server logs are uploaded on failure |
 | 🧬 Generator | after lint | Generates a throwaway plugin with `pnpm gen` and typechecks, builds and integration-tests it |
 | 🚢 Release | `master` pushes, after the checks | release-please |
-| 📎 Attach, 🛒 Market | per released plugin | Upload the `.wasm`; the market step is a stub |
+| 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, then uploads the `.wasm`; the market step is a stub |
 
 ## Merging
 
@@ -37,6 +37,12 @@ keeps one release PR up to date from the conventional commits. Merging it:
 - tags it `<folder>-v<version>` and creates its GitHub release,
 - attaches `<folder>.wasm` and `<folder>.wasm.sha256`, taken from the artifact the build job made
   in the same run.
+
+The merge of a release PR is a commit of its own, so the push it triggers starts a run while the run
+for the commit before the merge can still be going. Whichever reaches the release job first creates
+the tag and the release, which is usually the older run, and the artifact it holds was built from an
+earlier commit. The attach job therefore resolves the tag first and refuses to upload unless it
+points at the commit that run built, which leaves the release to the run for the released commit.
 
 Each time release-please creates or updates the release PR, the release job regenerates the READMEs
 and pushes a `docs: update generated READMEs` commit to the PR branch, so they are current when the

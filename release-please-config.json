@@ -8,8 +8,7 @@
     "include-v-in-tag": true,
     "packages": {
         "packages/apple-skin-pumpkin": {
-            "component": "apple-skin-pumpkin",
-            "release-as": "0.0.1"
+            "component": "apple-skin-pumpkin"
         },
         "packages/bedrock-addon-manager": {
             "component": "bedrock-addon-manager",

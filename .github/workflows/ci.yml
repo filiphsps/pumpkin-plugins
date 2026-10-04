@@ -265,6 +265,21 @@ jobs:
                   name: plugins
                   path: dist/
 
+            # A master push from before the release PR merged can still be running when its
+            # release job creates the tag, and it would attach the build of that older commit. The
+            # tag says which commit it releases, so only the run for that commit may attach.
+            - name: 🔒 Check the tag is the commit this run built
+              run: |
+                  ref="$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')"
+                  sha="${ref##* }"
+                  if [ "${ref%% *}" = tag ]; then
+                      sha="$(gh api "repos/$GH_REPO/git/tags/$TAG" --jq '.object.sha')"
+                  fi
+                  if [ "$sha" != "$GITHUB_SHA" ]; then
+                      echo "::error::$TAG releases $sha, but this run built $GITHUB_SHA. Not attaching anything."
+                      exit 1
+                  fi
+
             - name: 📎 Upload to the release
               run: |
                   name="$(basename "${{ matrix.path }}")"
