@@ -20,8 +20,16 @@ const plugins = fs
 
 const FIRST_VERSION_BASE = '0.0.0';
 const FIRST_RELEASE = '0.0.1';
+const TITLE_PARTS = ['scope', 'component', 'version'].map((part) => `\${${part}}`);
 
 const problems = [];
+if (config['always-update'] !== true) {
+    problems.push('release-please-config.json needs "always-update": true so the release PR follows master');
+}
+const groupTitle = config['group-pull-request-title-pattern'];
+if (typeof groupTitle !== 'string' || TITLE_PARTS.some((part) => !groupTitle.includes(part))) {
+    problems.push(`release-please-config.json needs "group-pull-request-title-pattern" with ${TITLE_PARTS.join(', ')}`);
+}
 for (const dir of plugins) {
     const name = path.basename(dir);
     const version = read(`${dir}/package.json`).version;

@@ -74,6 +74,10 @@ and pushes a `docs: update generated READMEs` commit to the PR branch, so they a
 release merges. The same run retires the `release-as` pin of any plugin the PR releases (see below).
 release-please rewrites its branch on every update, so those commits are re-added each time.
 
+The release PR is also updated when a commit leaves its generated notes unchanged, so its branch
+always follows `master`. Its grouped title uses the scope, component and version placeholders that
+release-please needs to recognize an existing PR.
+
 ## Signing
 
 Pumpkin can check a plugin's integrity: a signed `.wasm` carries two custom sections,
