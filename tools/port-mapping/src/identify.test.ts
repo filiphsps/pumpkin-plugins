@@ -26,7 +26,7 @@ describe('describeIdentity', () => {
 describe('probeWeb', () => {
     const login = (title: string) => ({ '/html/login/index.html': { body: `<html><head><title>${title}</title>` } });
 
-    it('recognises a Speedport by its public login page', () => {
+    it('recognizes a Speedport by its public login page', () => {
         const net = new FakeNetwork([
             new FakeIgd({ upnp: false, natPmp: false, webPages: login('Speedport Konfigurationsprogramm') })
         ]);
@@ -46,7 +46,7 @@ describe('probeWeb', () => {
         expect(net.leaks).toBe(0);
     });
 
-    it('recognises nothing from another router, a missing page or a page that is not Speedport', () => {
+    it('recognizes nothing from another router, a missing page or a page that is not Speedport', () => {
         const net = new FakeNetwork([new FakeIgd({ webPages: login('FRITZ!Box') })]);
         expect(runSteps(net, probeWeb(net, [[192, 168, 1, 1]]))).toBeUndefined();
         expect(runSteps(net, probeWeb(net, [[192, 168, 1, 77]]))).toBeUndefined();

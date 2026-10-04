@@ -29,7 +29,7 @@ export class Task<T> {
     /** Stops the work and lets it clean up (its `finally` blocks run). */
     cancel(): void {
         if (this.result.state !== 'running') return;
-        this.result = { state: 'failed', error: new Error('cancelled') };
+        this.result = { state: 'failed', error: new Error('canceled') };
         try {
             this.steps.return(undefined as T);
         } catch {
@@ -53,7 +53,7 @@ export function* parallel<T>(jobs: Steps<T>[]): Steps<Settled<T>[]> {
             if (states.every((s) => s.state !== 'running')) {
                 return states.map((s): Settled<T> => {
                     if (s.state === 'done') return { ok: true, value: s.value };
-                    return { ok: false, error: s.state === 'failed' ? s.error : new Error('cancelled') };
+                    return { ok: false, error: s.state === 'failed' ? s.error : new Error('canceled') };
                 });
             }
             yield;

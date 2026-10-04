@@ -164,7 +164,7 @@ describe('verifyWasm', () => {
         }
     });
 
-    it('fails when code is changed but the sections stay recognisable', () => {
+    it('fails when code is changed but the sections stay recognizable', () => {
         const tampered = Buffer.from(signed);
         tampered[11] = (tampered[11] as number) ^ 0xff;
         const result = verifyWasm(tampered);

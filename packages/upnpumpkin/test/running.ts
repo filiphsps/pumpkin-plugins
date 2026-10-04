@@ -23,7 +23,7 @@ export function upnpServers() {
         await Promise.all(routers.splice(0).map((r) => r.close()));
     });
     return {
-        /** Starts a fake router with the given behaviour. */
+        /** Starts a fake router with the given behavior. */
         async router(options: Parameters<typeof startFakeRouter>[0] = {}): Promise<FakeRouter> {
             const router = await startFakeRouter(options);
             routers.push(router);

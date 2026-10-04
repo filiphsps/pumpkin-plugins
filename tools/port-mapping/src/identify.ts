@@ -13,7 +13,7 @@ export interface RouterIdentity {
     modelNumber?: string;
     /** What the router calls itself, for example `FRITZ!Box 7590 (UPnP/1.0)` or `Speedport`. */
     name?: string;
-    /** `upnp`: from the UPnP device description. `web`: recognised by its web interface. */
+    /** `upnp`: from the UPnP device description. `web`: recognized by its web interface. */
     source: 'upnp' | 'web';
 }
 
@@ -46,12 +46,12 @@ export function describeIdentity({ manufacturer, model, name }: RouterIdentity):
 interface WebFingerprint {
     /** Where the page is. Redirects are not followed, so this is the page itself. */
     path: string;
-    /** Recognises the router from the page. */
+    /** Recognizes the router from the page. */
     identify(response: HttpResponse): RouterIdentity | undefined;
 }
 
 /**
- * Pages to recognise routers by. Add one for a router that cannot be told apart otherwise, which
+ * Pages to recognize routers by. Add one for a router that cannot be told apart otherwise, which
  * means one that has no UPnP: the others describe themselves.
  */
 const WEB_FINGERPRINTS: readonly WebFingerprint[] = [
@@ -70,7 +70,7 @@ const PROBE_TIMEOUT_MS = 1500;
 const HTTP_PORT = 80;
 
 /**
- * Recognises a router by its web interface, which is the only way when it answers no UPnP search.
+ * Recognizes a router by its web interface, which is the only way when it answers no UPnP search.
  * @param addresses - Where the router may be. Usually its first or last address on the local network.
  * @returns The identity of the first address that gave itself away, or undefined.
  */

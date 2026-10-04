@@ -40,7 +40,7 @@ describe('parseDescription', () => {
         ]);
     });
 
-    it('prefers IP connections over PPP and newer over older, and honours URLBase', () => {
+    it('prefers IP connections over PPP and newer over older, and honors URLBase', () => {
         const service = (type: string, url: string) =>
             `<service><serviceType>urn:schemas-upnp-org:service:${type}</serviceType><controlURL>${url}</controlURL></service>`;
         const xml = `<root><URLBase>http://10.0.0.1:49000/</URLBase><device><serviceList>${service('WANPPPConnection:1', '/ppp')}${service('Layer3Forwarding:1', '/l3')}${service('WANIPConnection:1', '/ip1')}${service('WANIPConnection:2', '/ip2')}</serviceList></device></root>`;

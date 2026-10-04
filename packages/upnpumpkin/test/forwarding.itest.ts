@@ -4,7 +4,7 @@ import { routerConfig, upnpServers } from './running.ts';
 
 const { router: startRouter, start } = upnpServers();
 
-// A machine with a public address needs no mapping, which is the right behaviour but not what these tests check.
+// A machine with a public address needs no mapping, which is the right behavior but not what these tests check.
 const hasPublicAddress = Object.values(os.networkInterfaces())
     .flat()
     .some(

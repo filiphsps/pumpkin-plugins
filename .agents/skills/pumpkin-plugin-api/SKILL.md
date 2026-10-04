@@ -26,7 +26,7 @@ build time or, worse, at load time.
 
 ## Check what the server does
 
-The WIT says what you can call, not when an event fires, what cancelling it does, or which permission names
+The WIT says what you can call, not when an event fires, what canceling it does, or which permission names
 exist. For that, read the Pumpkin source at the pinned release tag (the value of `PUMPKIN_RELEASE`, which is
 also the tag name):
 
@@ -34,7 +34,7 @@ also the tag name):
 | --- | --- |
 | The WIT as the server sees it | `crates/pumpkin-plugin-wit/v0.1/` |
 | What a host call does | `crates/pumpkin/src/plugin/loader/wasm/` |
-| Where and when an event fires, and what cancelling it skips | `crates/pumpkin/src/plugin/api/events/`, then search for where the event is fired |
+| Where and when an event fires, and what canceling it skips | `crates/pumpkin/src/plugin/api/events/`, then search for where the event is fired |
 | Permission names and defaults | `crates/pumpkin/src/plugin/permissions.rs` |
 
 Read files at the tag without cloning:

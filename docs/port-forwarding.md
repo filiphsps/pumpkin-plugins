@@ -47,7 +47,7 @@ identified. The order is:
 3. Only then the protocols themselves (the UPnP actions, NAT-PMP). NAT-PMP therefore waits for the
    UPnP search, which makes finding a router take up to the length of that search longer.
 
-NAT-PMP has no way to ask a router what it is, so a NAT-PMP-only router is only recognised by its web
+NAT-PMP has no way to ask a router what it is, so a NAT-PMP-only router is only recognized by its web
 interface. A router that says nothing about itself is never turned down.
 
 UPnPumpkin's `screen` is its blocklist, see below.

@@ -36,7 +36,7 @@ Anyone on your network can use UPnP, so only run this where you trust the networ
 
 ## Unsupported routers
 
-Some routers never work, or misbehave when asked, so UPnPumpkin recognises them and stays away from
+Some routers never work, or misbehave when asked, so UPnPumpkin recognizes them and stays away from
 them. It works out the make and model from the device description a UPnP router gives about itself
 and, for routers that answer no UPnP search at all, from their web interface. It does this before it
 sends the router anything to open a port.

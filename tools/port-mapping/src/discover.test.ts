@@ -45,7 +45,7 @@ describe('discover', () => {
         expect(() => runSteps(net, discover(net, { upnp: false, natPmp: false }))).toThrow('both turned off');
     });
 
-    it('honours an explicit NAT-PMP gateway and an explicit search address', () => {
+    it('honors an explicit NAT-PMP gateway and an explicit search address', () => {
         const igd = new FakeIgd({ address: [10, 9, 8, 7] });
         const net = new FakeNetwork([igd]);
         net.local = [192, 168, 1, 50];
@@ -89,7 +89,7 @@ describe('discover', () => {
             identity.manufacturer?.includes('Telekom') ? 'no UPnP on Telekom' : undefined;
         const speedport = { '/html/login/index.html': { body: '<title>Speedport Konfigurationsprogramm</title>' } };
 
-        it('refuses a router recognised by its web interface before sending it anything', () => {
+        it('refuses a router recognized by its web interface before sending it anything', () => {
             const net = new FakeNetwork([new FakeIgd({ upnp: false, natPmp: false, webPages: speedport })]);
             let refusal: unknown;
             try {
