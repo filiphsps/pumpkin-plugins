@@ -229,6 +229,23 @@ jobs:
               if: ${{ steps.release.outputs.prs_created == 'true' }}
               run: pnpm run readme
 
+            # The pin that forces a first release to 0.0.1 also pins every release after it, and
+            # master fails the release config check while it is there, which takes the release and
+            # attach jobs with it. Drop it on the PR, so the merge push can tag and attach.
+            - name: 🎉 Retire release-as for released plugins
+              if: ${{ steps.release.outputs.prs_created == 'true' }}
+              run: |
+                  node scripts/unpin-release-as.mjs
+                  if [ -z "$(git status --porcelain -- release-please-config.json)" ]; then
+                      echo "Nothing to retire"
+                      exit 0
+                  fi
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add -- release-please-config.json
+                  git commit -m "chore: let release-please bump the released plugins"
+                  git push
+
             - name: 💾 Commit READMEs to the release PR
               if: ${{ steps.release.outputs.prs_created == 'true' }}
               run: |

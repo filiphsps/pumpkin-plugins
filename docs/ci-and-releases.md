@@ -15,7 +15,7 @@ cache) is the composite action in `.github/common/bootstrap`.
 | 🔨 Build | after lint and typecheck | Builds every plugin and uploads them as an artifact |
 | 🎃 Integration | after build | Runs the integration tests against the pinned Pumpkin release (downloaded and checksum-verified); server logs are uploaded on failure |
 | 🧬 Generator | after lint | Generates a throwaway plugin with `pnpm gen` and typechecks, builds and integration-tests it |
-| 🚢 Release | `master` pushes, after the checks | release-please |
+| 🚢 Release | `master` pushes, after the checks | release-please, then keeps the release PR's READMEs and `release-as` pins current |
 | 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, then uploads the `.wasm`; the market step is a stub |
 
 ## Merging
@@ -46,8 +46,8 @@ points at the commit that run built, which leaves the release to the run for the
 
 Each time release-please creates or updates the release PR, the release job regenerates the READMEs
 and pushes a `docs: update generated READMEs` commit to the PR branch, so they are current when the
-release merges. release-please rewrites its branch on every update, so the commit is re-added each
-time.
+release merges. The same run retires the `release-as` pin of any plugin the PR releases (see below).
+release-please rewrites its branch on every update, so those commits are re-added each time.
 
 ## Signing
 
@@ -97,8 +97,11 @@ both automatically. If you ever create a plugin by hand, do these three things:
    ```
 
    `release-as` makes the first release `0.0.1` whatever the first commits are (a breaking change
-   would otherwise make it `0.1.0`). It pins every release until it is removed, so **delete it in
-   the first release PR** (or right after it merges); the check below fails until you do.
+   would otherwise make it `0.1.0`). It pins every release until it is removed, so the release job
+   removes it from the release PR (`scripts/unpin-release-as.mjs`). That has to happen **before** the
+   release PR merges, not after: `master` fails the release config check while the pin is there, and
+   the release and attach jobs both need that check, so a release merged with the pin still in place
+   is never tagged and gets no `.wasm`. To do it by hand, delete the line from the PR branch.
 
 2. Add it to `.release-please-manifest.json`, at the same version as the plugin's `package.json`:
 
@@ -122,8 +125,8 @@ generator and the checks can't drift:
 | `scripts/package-metadata.mjs` | a `package.json` lacks the license, author, contributors, homepage, repository, bugs, funding or a short description, or a library lacks `sideEffects`, `module`, `types`, `files` and `publishConfig`. `--fix` writes everything but the description |
 | `scripts/check-docs.mjs` | a package has no README, a link, heading or path in the docs doesn't exist, a `pnpm` command isn't a script, a doc page isn't in the docs index, a root script isn't documented, or a CI job isn't in the table above |
 
-`pnpm test:scripts` tests the three against throwaway repos. See "Docs match the code" in
-[Code style](code-style.md).
+`pnpm test:scripts` tests the three against throwaway repos, and `scripts/unpin-release-as.mjs` on
+its own. See "Docs match the code" in [Code style](code-style.md).
 
 ## Not implemented: publishing to market.pumpkinmc.org
 
