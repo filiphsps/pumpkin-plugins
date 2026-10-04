@@ -1,11 +1,17 @@
 import type { DataFiles } from '@pumpkin-plugins/plugin-kit/files';
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
-import { formatIpv4, type MappingState, type Network, PortMapper, Task } from '@pumpkin-plugins/port-mapping';
+import {
+    formatIpv4,
+    type MappingSpec,
+    type MappingState,
+    type Network,
+    PortMapper,
+    Task
+} from '@pumpkin-plugins/port-mapping';
 import {
     decodeRequest,
     encodeReply,
     type NetworkInfo,
-    type PortRequest,
     type PortStatus,
     type Reply
 } from '@pumpkin-plugins/upnpumpkin-api';
@@ -25,7 +31,7 @@ const SHUTDOWN_BUDGET_MS = 3000;
 
 interface PluginRequest {
     sender: string;
-    request: PortRequest;
+    spec: MappingSpec;
     lastSeen: number;
 }
 
@@ -146,22 +152,15 @@ export class PortForwarder {
                         error: 'requests from other plugins are turned off in the UPnPumpkin config (plugins.allow_requests)'
                     };
                 }
-                const port: PortRequest = {
-                    key: request.key,
-                    protocol: request.protocol,
-                    port: request.port,
-                    externalPort: request.externalPort,
-                    description: request.description
-                };
                 if (!this.requests.has(key) && this.requests.size >= MAX_PLUGIN_REQUESTS) {
                     return { ok: false, error: `at most ${MAX_PLUGIN_REQUESTS} ports can be requested by plugins` };
                 }
                 if (!this.requests.has(key))
                     this.log.info(
-                        `${sender} asked for ${port.protocol.toUpperCase()} port ${port.port} to be opened (${port.description}).`
+                        `${sender} asked for ${request.protocol.toUpperCase()} port ${request.port} to be opened (${request.description}).`
                     );
-                this.requests.set(key, { sender, request: port, lastSeen: this.net.now() });
-                return { ok: true, status: toStatus(this.mapper.request(key, this.specOf(port))) };
+                this.requests.set(key, { sender, spec: request, lastSeen: this.net.now() });
+                return { ok: true, status: toStatus(this.mapper.request(key, request)) };
             }
         }
     }
@@ -173,10 +172,6 @@ export class PortForwarder {
             gateway: gateway && { kind: gateway.kind, address: formatIpv4(gateway.address) },
             externalAddress: externalAddress && formatIpv4(externalAddress)
         };
-    }
-
-    private specOf({ protocol, port, externalPort, description }: PortRequest) {
-        return { protocol, port, externalPort, description };
     }
 
     private openMapper(settingsKey: string): void {
@@ -192,7 +187,7 @@ export class PortForwarder {
             onRefused: (refusal) => this.log.warn(refusalMessage(refusal)),
             log: (message, level) => (level === 'warn' ? this.log.warn(message) : this.log.info(message))
         });
-        for (const [key, { request }] of this.requests) this.mapper.request(key, this.specOf(request));
+        for (const [key, { spec }] of this.requests) this.mapper.request(key, spec);
     }
 
     private closeMapper(): void {
