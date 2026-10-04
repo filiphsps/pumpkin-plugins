@@ -44,6 +44,11 @@ await server.stop();
 
 Servers are killed on exit, so a crashed test run doesn't leave processes holding ports.
 
+Ports come from 20000 to 30000, below the range the operating system hands out for connections
+(32768 up on Linux, 49152 on macOS and Windows), so nothing that connects while a server is starting
+can take the port a test was given. A server that still finds one of its ports taken is started again
+on ports of its own, three times over, before the start is failed.
+
 ## The server binary
 
 The release is pinned in `tools/test-harness/src/pumpkin-version.ts`, and it should match the

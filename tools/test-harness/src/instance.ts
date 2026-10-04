@@ -15,6 +15,13 @@ export interface StartOptions extends ServerDirOptions {
 
 const READY = /Server is now running/;
 
+// A port is free when the harness picks it and again when the server binds it, and something else on
+// the machine may take it in between. That is nobody else's doing, so a server that starts and then
+// finds a port taken is started again on ports of its own.
+const PORT_TAKEN = /Address already in use/;
+/** How many times a server is started before the start is failed. */
+const START_ATTEMPTS = 3;
+
 // Errors Pumpkin 0.2.0 logs on every first start of an empty server directory, with or
 // without plugins. Ignored by errors() so tests only fail on new problems.
 const BASELINE_ERRORS = [/Failed to save level\.dat: Info not found!/];
@@ -53,20 +60,24 @@ export class PumpkinInstance {
      * Starts a server and waits until it is running.
      * @param options - What to put in its directory and how to name its log.
      * @returns The running server.
-     * @throws {Error} When it doesn't start in time. The server is stopped first.
+     * @throws {Error} When it doesn't start in time, or keeps losing its port to another process.
+     * The server is stopped first.
      */
     static async start(options: StartOptions = {}): Promise<PumpkinInstance> {
         const bin = await resolvePumpkinBinary();
-        const server = await prepareServerDir(options);
-        const child = spawn(bin, [], { cwd: server.dir, stdio: 'pipe' });
-        const instance = new PumpkinInstance(child, server, options.name ?? 'pumpkin');
-        try {
-            await instance.waitForLog(READY, options.readyTimeoutMs ?? 90_000);
-        } catch (err) {
-            await instance.stop();
-            throw err;
+        for (let attempt = 1; ; attempt++) {
+            const server = await prepareServerDir(options);
+            const child = spawn(bin, [], { cwd: server.dir, stdio: 'pipe' });
+            const instance = new PumpkinInstance(child, server, options.name ?? 'pumpkin');
+            try {
+                await instance.waitForLog(READY, options.readyTimeoutMs ?? 90_000);
+                return instance;
+            } catch (err) {
+                await instance.stop();
+                if (attempt < START_ATTEMPTS && PORT_TAKEN.test(instance.logs())) continue;
+                throw err;
+            }
         }
-        return instance;
     }
 
     /** The server's temporary directory. */
