@@ -41,7 +41,7 @@
         "test": "vitest run"
     },
     "dependencies": {
-        "@bytecodealliance/jco": "1.35.0",
+        "@bytecodealliance/jco": "1.36.0",
         "componentize-qjs": "0.4.5",
         "esbuild": "0.28.2"
     },
