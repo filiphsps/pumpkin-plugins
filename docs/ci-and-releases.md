@@ -17,7 +17,7 @@ cache) is the composite action in `.github/common/bootstrap`.
 | 🎃 Integration | code changes, after build | Runs the integration tests against the pinned Pumpkin release (downloaded and checksum-verified); server logs are uploaded on failure |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin with `pnpm gen` and typechecks, builds and integration-tests it |
 | 🚢 Release | code changes, on `master` pushes, after the checks | release-please, then keeps the release PR's READMEs and `release-as` pins current |
-| 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, then uploads the `.wasm`; the market step is a stub |
+| 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, uploads the `.wasm`, then updates an existing Market listing |
 
 ## Running only what a change needs
 
@@ -159,15 +159,18 @@ generator and the checks can't drift:
 `scripts/changed-areas.mjs`, and the agent hooks, all against throwaway repos. See "Docs match the code" in
 [Code style](code-style.md).
 
-## Not implemented: publishing to market.pumpkinmc.org
+## Publishing to market.pumpkinmc.org
 
-The `market` job and `scripts/publish-to-market.mjs` are a stub. They report what would be uploaded
-and emit a warning annotation per released plugin; nothing is sent. The upload API isn't publicly
-documented, so the script's header lists what has to be settled first: the endpoint, the
-`MARKET_API_TOKEN` secret, whether the market signs builds itself or expects them pre-signed, and
-what metadata it needs. Builds are [signed](#signing) with our own key when `PLUGIN_SIGNING_KEY` is
-set, which may not be what the market expects. Builds aren't byte-reproducible, so the upload must
-use the build job's artifact.
+After the GitHub release assets are attached, the `market` job uploads the exact `.wasm` from the
+build artifact to the matching existing Market listing. It calls `PUT /api/v1/rest/plugins/<id>`
+with bearer authentication and multipart `wasm` and `metadata` fields. The metadata sets the
+release version and the stable track. Builds aren't byte-reproducible, so it must upload the build
+artifact rather than rebuild.
+
+The job identifies a listing by its exact Pumpkin plugin name from `src/info.ts`. It never creates a
+listing: listing metadata and review happen in Market. If the plugin is not listed, has not yet
+been published there, or the token is not configured, the job emits a warning and succeeds so the
+GitHub release is unaffected. Other Market API failures fail the job and can be retried.
 
 ## GitHub settings
 
@@ -181,5 +184,6 @@ These aren't done by the workflows:
    `GITHUB_TOKEN`. That includes the README commit.
 4. Optional: add the Ed25519 signing key as the `PLUGIN_SIGNING_KEY` secret (see [Signing](#signing)).
    Without it, plugins are released unsigned.
-5. Later, for market publishing: add the API token as the `MARKET_API_TOKEN` secret. Nothing reads it
-   yet beyond reporting whether it is set.
+5. For market publishing: create a Market API key with the `plugins:update` and
+   `plugins:versions:upload` scopes, then add it as the `MARKET_API_TOKEN` repository secret. Keep
+   the key out of the repository and chat messages.

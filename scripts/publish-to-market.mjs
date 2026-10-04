@@ -1,32 +1,14 @@
-// STUB: publishing to market.pumpkinmc.org is NOT implemented.
-//
-// Called by the `market` job in .github/workflows/ci.yml for each plugin that was just
-// released. It reports what would be uploaded and emits a warning annotation, and it never
-// touches the network, so releases are unaffected. Replace the body of `publish()` when the
-// market's upload contract is known; the workflow wiring (matrix, artifact, secret) is done.
+// Uploads a released plugin build to its existing market.pumpkinmc.org listing.
 //
 // Usage: node scripts/publish-to-market.mjs <plugin-dir> <tag> <wasm-file>
 //
-// Open questions to settle before implementing:
-//  - Upload endpoint and request format. Nothing is publicly documented. The only market
-//    endpoints seen are under https://market.pumpkinmc.org/api/v1/rest/ (telemetry heartbeat
-//    and public-key); do not guess an upload route.
-//  - Auth: an API token, expected in the MARKET_API_TOKEN repository secret.
-//  - Signing: marketplace plugins carry `pumpkin.metadata` and `wasm_signature` custom
-//    sections (Ed25519, see docs.pumpkinmc.org/developer/plugins/wasm-signing). Find out
-//    whether the market signs an uploaded build itself or expects a pre-signed one. The
-//    .wasm uploaded to the GitHub release is signed with our own key (an independent
-//    plugin: marketplace ids 0) when the PLUGIN_SIGNING_KEY secret is set, else unsigned.
-//  - Metadata the market likely needs from the release: version (the tag), changelog (the
-//    release-please `<path>--body` output), and the plugin name from src/info.ts.
-//  - Reproducibility: two builds of identical source produce different bytes (cause not
-//    investigated). Sign and upload the exact artifact from the build job, which this job
-//    downloads, and never rebuild.
-//  - Idempotency: the job can be re-run, so a repeated upload of the same version must be
-//    handled.
+// The market listing must already exist. This deliberately does not create listings: creating one
+// needs its store metadata and is a human review step. A missing listing is a warning so a GitHub
+// release is never held up by a plugin that has not reached the market yet.
 
-import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const [pluginDir, tag, wasmFile] = process.argv.slice(2);
 if (!pluginDir || !tag || !wasmFile) {
@@ -34,29 +16,79 @@ if (!pluginDir || !tag || !wasmFile) {
     process.exit(1);
 }
 
-const token = process.env.MARKET_API_TOKEN;
-const sha256 = createHash('sha256').update(fs.readFileSync(wasmFile)).digest('hex');
+const apiUrl = (process.env.MARKET_API_URL ?? 'https://market.pumpkinmc.org/api/v1/rest').replace(/\/$/, '');
+const token = process.env.MARKET_API_TOKEN?.trim();
 
-const summary = [
-    `Plugin:  ${pluginDir}`,
-    `Release: ${tag}`,
-    `File:    ${wasmFile}`,
-    `SHA-256: ${sha256}`,
-    `Token:   ${token ? 'MARKET_API_TOKEN is set' : 'MARKET_API_TOKEN is not set'}`
-].join('\n');
+await publish();
 
-publish();
-
-function publish() {
-    // TODO: upload to market.pumpkinmc.org once its API is documented. See the notes above.
-    console.log(`Would publish to market.pumpkinmc.org:\n${summary}`);
-    console.log(
-        `::warning title=Not published to market.pumpkinmc.org::${pluginDir} ${tag} was only released on GitHub. Uploading to market.pumpkinmc.org is a stub (scripts/publish-to-market.mjs).`
-    );
-    if (process.env.GITHUB_STEP_SUMMARY) {
-        fs.appendFileSync(
-            process.env.GITHUB_STEP_SUMMARY,
-            `### ⚠️ ${tag}: not published to market.pumpkinmc.org\nUploading is a stub, nothing was sent.\n\n\`\`\`\n${summary}\n\`\`\`\n`
-        );
+async function publish() {
+    if (!token) {
+        warn(`${tag} was not published because MARKET_API_TOKEN is not set.`);
+        return;
     }
+
+    const pluginName = await nameOf(pluginDir);
+    const listing = await findListing(pluginName);
+    if (!listing?.version) {
+        const reason = listing
+            ? `market listing ${listing.id} named ${JSON.stringify(pluginName)} has not been published yet`
+            : `no market listing named ${JSON.stringify(pluginName)} exists`;
+        warn(`${tag} was not published because ${reason}.`);
+        return;
+    }
+
+    const metadata = { version: versionFrom(tag), track: 'stable' };
+    const form = new FormData();
+    form.append('wasm', new Blob([fs.readFileSync(wasmFile)]), path.basename(wasmFile));
+    form.append('metadata', JSON.stringify(metadata));
+
+    const response = await fetch(`${apiUrl}/plugins/${listing.id}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+    });
+    if (!response.ok)
+        throw new Error(`market update for ${pluginName} failed (${response.status}): ${await response.text()}`);
+
+    const message = `Published ${pluginName} ${metadata.version} to market listing ${listing.id}.`;
+    console.log(message);
+    summary(`### 🛒 ${tag}: published to market.pumpkinmc.org\n${message}\n`);
+}
+
+/** Returns the plugin's Pumpkin name from the same info module used by the build collector. */
+async function nameOf(dir) {
+    const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+    const infoFile = path.resolve(dir, pkg.pumpkinPlugin?.info ?? 'src/info.ts');
+    const mod = await import(pathToFileURL(infoFile).href);
+    const name = (mod.info ?? mod.default)?.name;
+    if (typeof name !== 'string' || !name) throw new Error(`${infoFile} must export an info object with a name`);
+    return name;
+}
+
+/** Finds the single existing market listing with this exact Pumpkin plugin name. */
+async function findListing(pluginName) {
+    const response = await fetch(`${apiUrl}/plugins?limit=100`);
+    if (!response.ok) throw new Error(`could not list market plugins (${response.status}): ${await response.text()}`);
+    const body = await response.json();
+    const listings = Array.isArray(body) ? body : (body.data ?? body.results);
+    if (!Array.isArray(listings)) throw new Error('market plugin list was not an array');
+    const matches = listings.filter((listing) => listing?.name === pluginName && Number.isInteger(listing.id));
+    if (matches.length > 1) throw new Error(`market has multiple listings named ${JSON.stringify(pluginName)}`);
+    return matches[0];
+}
+
+/** Extracts the version portion of a release-please tag such as `upnpumpkin-v1.2.3`. */
+function versionFrom(releaseTag) {
+    const version = releaseTag.match(/-v(.+)$/)?.[1];
+    if (!version) throw new Error(`cannot extract a version from release tag ${JSON.stringify(releaseTag)}`);
+    return version;
+}
+
+function warn(message) {
+    console.log(`::warning title=Not published to market.pumpkinmc.org::${message}`);
+    summary(`### ⚠️ ${tag}: not published to market.pumpkinmc.org\n${message}\n`);
+}
+
+function summary(content) {
+    if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${content}\n`);
 }

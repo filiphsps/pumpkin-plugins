@@ -334,7 +334,7 @@ jobs:
                   gh release upload "$TAG" "dist/$name.wasm" "dist/$name.wasm.sha256" --clobber
 
     market:
-        name: 🛒 Market (stub) ${{ matrix.path }}
+        name: 🛒 Market ${{ matrix.path }}
         needs: [release, assets]
         if: ${{ needs.release.outputs.paths_released != '[]' }}
         timeout-minutes: 10
@@ -350,12 +350,17 @@ jobs:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
 
+            # The publisher imports src/info.ts to use the canonical Pumpkin plugin name.
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
             - name: 📥 Download build artifact
               uses: actions/download-artifact@v8.0.1
               with:
                   name: plugins
                   path: dist/
 
-            # ⚠️ Not implemented. Prints what would be uploaded and warns; never fails the release.
-            - name: 🛒 Publish to market.pumpkinmc.org (stub)
+            # A plugin needs a listing before its releases can be uploaded. The script warns and
+            # succeeds when there is no matching listing, so GitHub releases remain unaffected.
+            - name: 🛒 Publish to market.pumpkinmc.org
               run: node scripts/publish-to-market.mjs "${{ matrix.path }}" "$TAG" "dist/$(basename "${{ matrix.path }}").wasm"
