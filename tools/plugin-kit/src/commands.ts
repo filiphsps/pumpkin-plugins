@@ -4,6 +4,7 @@ import {
     type CommandLine,
     type CommandPath,
     type CommandTree,
+    flattenCommands,
     type SubcommandTree
 } from '@pumpkin-plugins/docs';
 
@@ -55,6 +56,16 @@ export function buildCommands<Sender, T extends CommandTree>(
 ): BuiltCommand[] {
     const lookup = handlers as unknown as Record<string, ((sender: Sender) => readonly CommandLine[]) | undefined>;
 
+    const handlerFor = (key: string): ((sender: Sender) => readonly CommandLine[]) => {
+        const handler = lookup[key];
+        if (!Object.hasOwn(lookup, key) || typeof handler !== 'function') {
+            throw new Error(`no handler for /${key}`);
+        }
+        return handler;
+    };
+    // Validate before allocating host nodes or callbacks, so a missing late handler leaves no partial tree.
+    for (const { path } of flattenCommands(tree)) handlerFor(path.join(' '));
+
     const fill = (node: CommandNodeLike, subs: SubcommandTree, path: string[]): void => {
         for (const [name, spec] of Object.entries(subs)) {
             const child = host.literal(name);
@@ -68,8 +79,7 @@ export function buildCommands<Sender, T extends CommandTree>(
 
     const attach = (node: CommandNodeLike, path: string[]): void => {
         const key = path.join(' ') as CommandPath<T>;
-        const handler = lookup[key];
-        if (!handler) throw new Error(`no handler for /${key}`);
+        const handler = handlerFor(key);
         node.executeWithHandlerId(
             host.onRun((sender) => {
                 let lines: readonly CommandLine[];

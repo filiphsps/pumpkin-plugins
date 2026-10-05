@@ -1,5 +1,5 @@
 import { CommandFailed, commandInfos, defineCommands, errorLine } from '@pumpkin-plugins/docs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildCommands } from './commands.ts';
 import { FakeCommandFailure, FakeCommandHost, type FakeNode } from './testing/fake-commands.ts';
 
@@ -101,5 +101,29 @@ describe('buildCommands', () => {
     it('fails when a handler is missing, as it would if the types were bypassed', () => {
         const partial = { ping: handlers.ping } as unknown as typeof handlers;
         expect(() => buildCommands(new FakeCommandHost(), tree, partial)).toThrow('no handler for /demo list');
+    });
+    it('validates all handlers before allocating host nodes or callbacks', () => {
+        const host = new FakeCommandHost();
+        const root = vi.spyOn(host, 'root');
+        const onRun = vi.spyOn(host, 'onRun');
+        expect(() => buildCommands(host, tree, { 'demo list': handlers['demo list'] } as typeof handlers)).toThrow(
+            'no handler for /demo pack add'
+        );
+        expect(root).not.toHaveBeenCalled();
+        expect(onRun).not.toHaveBeenCalled();
+    });
+
+    it('does not mistake an inherited property for a registered handler', () => {
+        const spec = defineCommands('Demo', {
+            toString: { description: 'Example', permission: 'Demo:command.example' }
+        });
+        expect(() => buildCommands(new FakeCommandHost(), spec, {} as never)).toThrow('no handler for /toString');
+    });
+
+    it('rejects a wrong root name in the fake host', () => {
+        const host = new FakeCommandHost();
+        const [, ping] = buildCommands(host, tree, handlers);
+        expect(() => host.run(ping.node as FakeNode, ['wrong'])).toThrow('/wrong is not runnable');
+        expect(() => host.run(ping.node as FakeNode, [])).toThrow('is not runnable');
     });
 });

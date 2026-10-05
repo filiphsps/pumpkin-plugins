@@ -64,7 +64,7 @@ export class FakeCommandHost implements CommandHost<FakeSender> {
      * @throws {FakeCommandFailure} When the command failed.
      */
     runAs(root: FakeNode, path: string[]): FakeSender {
-        let node: FakeNode | undefined = root;
+        let node: FakeNode | undefined = path[0] === root.name ? root : undefined;
         for (const word of path.slice(1)) node = node?.children.find((child) => child.name === word);
         const handler = node?.handlerId === undefined ? undefined : this.handlers.get(node.handlerId);
         if (!handler) throw new Error(`/${path.join(' ')} is not runnable`);
