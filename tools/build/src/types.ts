@@ -20,10 +20,44 @@ export function numberifyBigints(declarations: string): string {
  */
 export function generateTypes(witDir: string, outDir: string): void {
     const jco = path.join(import.meta.dirname, '../node_modules/.bin/jco');
-    execFileSync(jco, ['guest-types', witDir, '-n', 'plugin', '-o', outDir, '--name', 'index'], { stdio: 'inherit' });
-    for (const entry of fs.readdirSync(outDir, { withFileTypes: true, recursive: true })) {
-        if (!entry.isFile() || !entry.name.endsWith('.d.ts')) continue;
-        const file = path.join(entry.parentPath, entry.name);
-        fs.writeFileSync(file, numberifyBigints(fs.readFileSync(file, 'utf8')));
+    const output = path.resolve(outDir);
+    const parent = path.dirname(output);
+    fs.mkdirSync(parent, { recursive: true });
+    const temporary = fs.mkdtempSync(path.join(parent, `.${path.basename(output)}-`));
+    const generated = path.join(temporary, 'generated');
+    fs.mkdirSync(generated);
+    try {
+        execFileSync(jco, ['guest-types', witDir, '-n', 'plugin', '-o', generated, '--name', 'index'], {
+            stdio: 'inherit'
+        });
+        for (const entry of fs.readdirSync(generated, { withFileTypes: true, recursive: true })) {
+            if (!entry.isFile() || !entry.name.endsWith('.d.ts')) continue;
+            const file = path.join(entry.parentPath, entry.name);
+            fs.writeFileSync(file, numberifyBigints(fs.readFileSync(file, 'utf8')));
+        }
+        publishTypes(generated, output, temporary);
+    } finally {
+        fs.rmSync(temporary, { recursive: true, force: true });
+    }
+}
+
+function publishTypes(generated: string, output: string, temporary: string): void {
+    if (!fs.existsSync(output)) {
+        fs.renameSync(generated, output);
+        return;
+    }
+
+    if (!fs.statSync(output).isDirectory()) throw new Error(`type output is not a directory: ${output}`);
+    const previous = path.join(temporary, 'previous');
+    fs.renameSync(output, previous);
+    try {
+        fs.renameSync(generated, output);
+    } catch (publishError) {
+        try {
+            fs.renameSync(previous, output);
+        } catch (restoreError) {
+            throw new AggregateError([publishError, restoreError], `could not publish or restore ${output}`);
+        }
+        throw publishError;
     }
 }
