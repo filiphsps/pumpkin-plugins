@@ -16,10 +16,17 @@ describe('Pumpkin terrain adapter', () => {
     it('reads negative coordinates locally and disposes chunk, border, world and client handles', () => {
         const values = defaultValues(schema),
             settings = { ...values.support, worlds: values.worlds };
+        state.lookup.mockReturnValueOnce({
+            name: 'minecraft:oak_log',
+            properties: [
+                ['waterlogged', 'false'],
+                ['axis', 'y']
+            ]
+        });
         const chunk = {
             getBlockStateId: vi.fn(() => 1),
             getBiome: vi.fn(() => 'old-growth-pine-taiga'),
-            getTopBlockY: () => 64,
+            getTopBlockY: vi.fn(() => 64),
             getSkyLight: () => 15,
             getBlockLight: () => 0,
             [Symbol.dispose]: vi.fn()
@@ -47,10 +54,12 @@ describe('Pumpkin terrain adapter', () => {
                 expect(peer.insideBorder(-5, 0)).toBe(true);
                 expect(peer.insideBorder(-6, 0)).toBe(false);
                 expect(peer.terrain.sample(-1, 64, -17).mapping).toBe(
-                    'minecraft:old_growth_pine_taiga_DH-BSW_minecraft:stone'
+                    'minecraft:old_growth_pine_taiga_DH-BSW_minecraft:oak_log_STATE_{axis:y}{waterlogged:false}'
                 );
                 expect(world.getChunk).toHaveBeenCalledWith(-1, -2);
                 expect(chunk.getBlockStateId).toHaveBeenCalledWith({ x: 15, y: 64, z: 15 });
+                expect(peer.terrain.top?.(-1, -17)).toBe(64);
+                expect(chunk.getTopBlockY).toHaveBeenLastCalledWith(15, 15);
                 throw new Error('callback failure');
             })
         ).toThrow('callback failure');
