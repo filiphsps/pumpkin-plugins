@@ -107,8 +107,15 @@ jobs:
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
-            - name: 🧪 Unit tests
-              run: pnpm run test
+            - name: 🧪 Unit tests with coverage
+              run: pnpm run coverage
+
+            - name: ☂️ Upload coverage
+              uses: codecov/codecov-action@v7.0.0
+              with:
+                  directory: .
+                  flags: unittests
+                  token: ${{ secrets.CODECOV_TOKEN }}
 
             - name: 🧪 Script tests
               run: pnpm run test:scripts
