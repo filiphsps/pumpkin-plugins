@@ -246,7 +246,7 @@ describe('check-release-config', () => {
         '.release-please-manifest.json': { 'packages/plug': manifest },
         'release-please-config.json': {
             'separate-pull-requests': true,
-            'always-update': true,
+            'always-update': false,
             'force-tag-creation': true,
             packages: { 'packages/plug': { component: 'plug', ...(releaseAs ? { 'release-as': releaseAs } : {}) } }
         }
@@ -287,14 +287,14 @@ describe('check-release-config', () => {
         );
     });
 
-    it('requires independent, always-current release PRs', () => {
+    it('requires independent release PRs but permits always-update to stay disabled', () => {
         const combined = files();
         combined['release-please-config.json']['separate-pull-requests'] = false;
         assert.match(run('check-release-config.mjs', repo(combined)).out, /"separate-pull-requests": true/);
 
-        const withoutRefresh = files();
-        withoutRefresh['release-please-config.json']['always-update'] = false;
-        assert.match(run('check-release-config.mjs', repo(withoutRefresh)).out, /"always-update": true/);
+        const withAlwaysUpdate = files();
+        withAlwaysUpdate['release-please-config.json']['always-update'] = true;
+        assert.match(run('check-release-config.mjs', repo(withAlwaysUpdate)).out, /"always-update": false/);
 
         const withoutTag = files();
         withoutTag['release-please-config.json']['force-tag-creation'] = false;

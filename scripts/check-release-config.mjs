@@ -25,8 +25,8 @@ const problems = [];
 if (config['separate-pull-requests'] !== true) {
     problems.push('release-please-config.json needs "separate-pull-requests": true for independent plugin releases');
 }
-if (config['always-update'] !== true) {
-    problems.push('release-please-config.json needs "always-update": true so the release PR follows master');
+if (config['always-update'] !== false) {
+    problems.push('release-please-config.json needs "always-update": false to avoid empty follow-up releases');
 }
 if (config['force-tag-creation'] !== true) {
     problems.push(

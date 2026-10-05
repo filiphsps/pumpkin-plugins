@@ -85,9 +85,9 @@ and pushes a `docs: update generated READMEs` commit to the PR branch, so they a
 release merges. The same run retires the `release-as` pin of any plugin the PR releases (see below).
 release-please rewrites its branch on every update, so those commits are re-added each time.
 
-Each release PR is also updated when a commit leaves its generated notes unchanged, so its branch
-always follows `master`. Separate PRs keep a plugin that is not ready from being released with one
-that is.
+Release PRs update when release notes change. `always-update` stays off so a release run that has
+just published a version cannot open an empty follow-up PR with the previous version's changelog.
+Separate PRs keep a plugin that is not ready from being released with one that is.
 
 ## Signing
 
