@@ -1,3 +1,4 @@
+import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
 import { MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { describe, expect, it } from 'vitest';
 import { FakePlayer, FakeServer } from '../../test/fake-player.ts';
@@ -96,7 +97,9 @@ describe('PlayerSync', () => {
         sync.tick(server.host);
 
         expect(player.sent).toEqual([]);
-        expect(log.of('debug')).toEqual(['AppleSkinPumpkin ada is not on Java Edition, so there is nothing to sync.']);
+        expect(log.of('debug')).toEqual([
+            `${colorLogValue('AppleSkinPumpkin', 'cyan')} ${colorLogValue('ada', 'cyan')} is not on Java Edition, so there is nothing to sync.`
+        ]);
     });
 
     it('sends everything again after a player leaves and comes back', () => {
@@ -117,10 +120,10 @@ describe('PlayerSync', () => {
         sync.joined(player.host);
 
         expect(log.of('debug')).toEqual([
-            'AppleSkinPumpkin ada joined, sending their current hunger.',
-            'AppleSkinPumpkin ada: natural regeneration is on in world.',
-            'AppleSkinPumpkin ada: saturation 5.',
-            'AppleSkinPumpkin ada: exhaustion 0.4.'
+            `${colorLogValue('AppleSkinPumpkin', 'cyan')} ${colorLogValue('ada', 'cyan')} joined, sending their current hunger.`,
+            `${colorLogValue('AppleSkinPumpkin', 'cyan')} ${colorLogValue('ada', 'cyan')}: natural regeneration is on in ${colorLogValue('world', 'cyan')}.`,
+            `${colorLogValue('AppleSkinPumpkin', 'cyan')} ${colorLogValue('ada', 'cyan')}: saturation ${colorLogValue('5', 'yellow')}.`,
+            `${colorLogValue('AppleSkinPumpkin', 'cyan')} ${colorLogValue('ada', 'cyan')}: exhaustion ${colorLogValue('0.4', 'yellow')}.`
         ]);
     });
 
