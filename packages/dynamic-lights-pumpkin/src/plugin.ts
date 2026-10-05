@@ -68,7 +68,7 @@ class DynamicLightsPumpkin extends PluginBase {
         const journal = new LightJournal(files);
         this.preferences = new PlayerLightPreferences(files);
         this.tracker = new ClientLightTracker(clientLightStates);
-        this.entityTracker = new EntityLightTracker(clientLightStates);
+        this.entityTracker = new EntityLightTracker(this.tracker);
         this.lightLevels = new HeldItemLightLevels(sourceLevels(config.sources));
         this.droppedItemLevels = new DroppedItemLightLevels((itemName) => this.lightLevels?.level(itemName) ?? 0);
         this.entityLevels = new Map(Object.entries(sourceLevels(config.entity_sources)));
@@ -147,7 +147,6 @@ class DynamicLightsPumpkin extends PluginBase {
     /** Drops tracked client overrides before Pumpkin unloads the plugin. */
     protected override onPluginUnload(_ctx: Context): void {
         this.tracker?.clear();
-        this.entityTracker?.clear();
         if (this.entityTask !== undefined) cancelTask(this.entityTask);
     }
 
