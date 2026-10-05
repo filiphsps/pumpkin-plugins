@@ -137,6 +137,9 @@ the release PR and the README would be stale the moment it merged.
 The package tables in the root `README.md` are rebuilt by `pnpm readme` from each package's folder:
 one row per folder in `packages/` and `tools/`, linked to the folder. Plugins are listed by their
 `info.name` and `info.description`, tools by their `package.json`.
+Both tables show the `license` from each package's `package.json`. A package with its own
+`LICENSE`, `LICENSE.md` or `LICENSE.txt` file (case-insensitive) gets a relative link to that file.
+Packages using the repository's root license show the license as plain text.
 
 Tools aren't generated: each one has a small hand-written README (a title that is its package name,
 what it is for, and a link to the doc that covers it), and `pnpm check` fails when one is missing.

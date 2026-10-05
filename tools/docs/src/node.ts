@@ -74,10 +74,15 @@ async function rows(root: string, group: 'packages' | 'tools'): Promise<PackageR
         const pkg = readJson(path.join(dir, 'package.json'));
         // Plugins are shown by their Pumpkin name and description when they define them.
         const info = group === 'packages' && fs.existsSync(infoPath(dir)) ? await loadInfo(dir) : undefined;
+        const licenseFile = fs
+            .readdirSync(dir, { withFileTypes: true })
+            .find((file) => file.isFile() && /^license(?:\.md|\.txt)?$/i.test(file.name));
         out.push({
             dir: `${group}/${entry.name}`,
             name: info?.name ?? pkg.name,
-            description: info?.description ?? pkg.description ?? ''
+            description: info?.description ?? pkg.description ?? '',
+            license: pkg.license ?? '',
+            licenseFile: licenseFile ? `${group}/${entry.name}/${licenseFile.name}` : undefined
         });
     }
     return out;

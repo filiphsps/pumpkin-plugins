@@ -8,26 +8,26 @@ Monorepo for [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) plugins written in
 
 **Plugins**
 
-| Plugin | Description |
-| --- | --- |
-| [AppleSkinPumpkin](packages/apple-skin-pumpkin) | AppleSkin server-side support |
-| [BedrockAddonManager](packages/bedrock-addon-manager) | Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and adds them to what connecting players are offered, using each pack's own manifest. |
-| [DynamicLightsPumpkin](packages/dynamic-lights-pumpkin) | Server-driven dynamic lights for held items and nearby entities |
-| [UPnPumpkin](packages/upnpumpkin) | Opens ports on your router with UPnP and NAT-PMP so players can reach the server from the internet, and lets other plugins ask for the same. |
+| Plugin | Description | License |
+| --- | --- | --- |
+| [AppleSkinPumpkin](packages/apple-skin-pumpkin) | AppleSkin server-side support | MIT |
+| [BedrockAddonManager](packages/bedrock-addon-manager) | Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and adds them to what connecting players are offered, using each pack's own manifest. | MIT |
+| [DynamicLightsPumpkin](packages/dynamic-lights-pumpkin) | Server-driven dynamic lights for held items and nearby entities | MIT |
+| [UPnPumpkin](packages/upnpumpkin) | Opens ports on your router with UPnP and NAT-PMP so players can reach the server from the internet, and lets other plugins ask for the same. | MIT |
 
 **Tools**
 
-| Package | Description |
-| --- | --- |
-| [@pumpkin-plugins/build](tools/build) | Shared build tool for the plugins |
-| [@pumpkin-plugins/config](tools/config) | Schema-driven TOML config for plugins |
-| [@pumpkin-plugins/docs](tools/docs) | README generator for the plugins |
-| [@pumpkin-plugins/plugin-kit](tools/plugin-kit) | Host helpers shared by plugins |
-| [@pumpkin-plugins/port-mapping](tools/port-mapping) | UPnP and NAT-PMP port mapping |
-| [@pumpkin-plugins/signing](tools/signing) | Ed25519 signing for plugin builds |
-| [@pumpkin-plugins/test-harness](tools/test-harness) | Runs plugins on a real Pumpkin in vitest |
-| [@pumpkin-plugins/update-check](tools/update-check) | Check plugin versions against Pumpkin Market |
-| [@pumpkin-plugins/upnpumpkin-api](tools/upnpumpkin-api) | Asks UPnPumpkin to open a port |
+| Package | Description | License |
+| --- | --- | --- |
+| [@pumpkin-plugins/build](tools/build) | Shared build tool for the plugins | MIT |
+| [@pumpkin-plugins/config](tools/config) | Schema-driven TOML config for plugins | MIT |
+| [@pumpkin-plugins/docs](tools/docs) | README generator for the plugins | MIT |
+| [@pumpkin-plugins/plugin-kit](tools/plugin-kit) | Host helpers shared by plugins | MIT |
+| [@pumpkin-plugins/port-mapping](tools/port-mapping) | UPnP and NAT-PMP port mapping | MIT |
+| [@pumpkin-plugins/signing](tools/signing) | Ed25519 signing for plugin builds | MIT |
+| [@pumpkin-plugins/test-harness](tools/test-harness) | Runs plugins on a real Pumpkin in vitest | MIT |
+| [@pumpkin-plugins/update-check](tools/update-check) | Check plugin versions against Pumpkin Market | MIT |
+| [@pumpkin-plugins/upnpumpkin-api](tools/upnpumpkin-api) | Asks UPnPumpkin to open a port | MIT |
 <!-- docs:end packages -->
 
 ## Getting started

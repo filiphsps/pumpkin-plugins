@@ -8,6 +8,10 @@ export interface PackageRow {
     name: string;
     /** One-line description. */
     description: string;
+    /** License identifier from package.json. */
+    license: string;
+    /** Package-specific license file relative to the repo root, when present. */
+    licenseFile?: string;
 }
 
 /** Comment placed at the top of the generated packages block in the root README. */
@@ -22,14 +26,20 @@ export const ROOT_NOTE =
  */
 export function renderPackagesBlock(plugins: PackageRow[], tools: PackageRow[]): string {
     const rows = (list: PackageRow[]) =>
-        [...list].sort((a, b) => a.dir.localeCompare(b.dir)).map((p) => [`[${p.name}](${p.dir})`, p.description]);
+        [...list]
+            .sort((a, b) => a.dir.localeCompare(b.dir))
+            .map((p) => [
+                `[${p.name}](${p.dir})`,
+                p.description,
+                p.licenseFile ? `[${p.license}](${p.licenseFile})` : p.license
+            ]);
     return [
         '**Plugins**',
         '',
-        table(['Plugin', 'Description'], rows(plugins)),
+        table(['Plugin', 'Description', 'License'], rows(plugins)),
         '',
         '**Tools**',
         '',
-        table(['Package', 'Description'], rows(tools))
+        table(['Package', 'Description', 'License'], rows(tools))
     ].join('\n');
 }

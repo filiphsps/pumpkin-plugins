@@ -112,18 +112,19 @@ describe('root README', () => {
     beforeEach(() => {
         put('pnpm-workspace.yaml', 'packages: []\n');
         put('README.md', readme);
-        put('packages/alpha/package.json', '{"name":"@x/alpha","description":"ignored, info wins"}');
+        put('LICENSE', 'Root MIT license');
+        put('packages/alpha/package.json', '{"name":"@x/alpha","description":"ignored, info wins","license":"MIT"}');
         put('packages/alpha/src/info.ts', plugin('Alpha', 'Alpha plugin.'));
-        put('packages/beta/package.json', '{"name":"@x/beta","description":"Beta from package.json"}');
-        put('tools/build/package.json', '{"name":"@x/build","description":"Builds"}');
+        put('packages/beta/package.json', '{"name":"@x/beta","description":"Beta from package.json","license":"MIT"}');
+        put('tools/build/package.json', '{"name":"@x/build","description":"Builds","license":"MIT"}');
     });
 
     it('has one linked row per package folder and follows additions', () => {
         expect(run(dir, 'root').stdout).toContain('README.md: updated');
         const first = read('README.md');
-        expect(first).toContain('| [Alpha](packages/alpha) | Alpha plugin. |');
-        expect(first).toContain('| [@x/beta](packages/beta) | Beta from package.json |');
-        expect(first).toContain('| [@x/build](tools/build) | Builds |');
+        expect(first).toContain('| [Alpha](packages/alpha) | Alpha plugin. | MIT |');
+        expect(first).toContain('| [@x/beta](packages/beta) | Beta from package.json | MIT |');
+        expect(first).toContain('| [@x/build](tools/build) | Builds | MIT |');
         expect(first).toContain('After.');
         expect(first.match(/^\| \[/gm)).toHaveLength(3);
 
@@ -137,6 +138,41 @@ describe('root README', () => {
         run(dir, 'root');
         expect(read('README.md')).not.toContain('beta');
         expect(run(dir, 'root', '--check').status).toBe(0);
+    });
+
+    it.each(['LICENSE', 'LICENSE.md', 'license.txt'])(
+        'links local %s files in both tables and detects their removal',
+        (file) => {
+            put('packages/alpha/package.json', '{"name":"@x/alpha","license":"LGPL-3.0-only"}');
+            put(`packages/alpha/${file}`, 'Plugin license');
+            put(`tools/build/${file}`, 'Tool license');
+            expect(run(dir, 'root').status).toBe(0);
+            const generated = read('README.md');
+            expect(generated).toContain(
+                `| [Alpha](packages/alpha) | Alpha plugin. | [LGPL-3.0-only](packages/alpha/${file}) |`
+            );
+            expect(generated).toContain(`| [@x/build](tools/build) | Builds | [MIT](tools/build/${file}) |`);
+            expect(generated).toContain('| [@x/beta](packages/beta) | Beta from package.json | MIT |');
+            expect(run(dir, 'root', '--check').status).toBe(0);
+
+            fs.rmSync(path.join(dir, 'packages/alpha', file));
+            fs.rmSync(path.join(dir, 'tools/build', file));
+            expect(run(dir, 'root', '--check').status).toBe(1);
+            expect(read('README.md')).toBe(generated);
+            expect(run(dir, 'root').status).toBe(0);
+            expect(read('README.md')).toContain('| [Alpha](packages/alpha) | Alpha plugin. | LGPL-3.0-only |');
+            expect(read('README.md')).toContain('| [@x/build](tools/build) | Builds | MIT |');
+        }
+    );
+
+    it('ignores a directory named LICENSE and detects license metadata changes', () => {
+        put('packages/alpha/LICENSE/note.txt', 'Not a license file');
+        expect(run(dir, 'root').status).toBe(0);
+        expect(read('README.md')).toContain('| [Alpha](packages/alpha) | Alpha plugin. | MIT |');
+        put('packages/alpha/package.json', '{"name":"@x/alpha","license":"Apache-2.0"}');
+        expect(run(dir, 'root', '--check').status).toBe(1);
+        expect(run(dir, 'root').status).toBe(0);
+        expect(read('README.md')).toContain('| [Alpha](packages/alpha) | Alpha plugin. | Apache-2.0 |');
     });
 
     it('requires the marker and the repo root', () => {
