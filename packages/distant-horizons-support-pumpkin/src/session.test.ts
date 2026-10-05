@@ -132,6 +132,19 @@ describe('DH sessions', () => {
         queued.sessions.receive(queued.peer, disabled);
         expect(queued.sessions.status()).toContain('0 queued packet(s)');
     });
+    it('drops a pending capture when a client closes its session', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 64;
+        f.sessions.receive(f.peer, f.request());
+        f.sessions.tick(f.peers);
+        expect(f.reads()).toBe(64);
+
+        f.sessions.receive(f.peer, packet(1).string('client leaving').finish());
+        f.sessions.tick(f.peers);
+
+        expect(f.reads()).toBe(64);
+        expect(f.sessions.status()).toContain('0 DH client(s), 0 pending LOD request(s)');
+    });
     it('drains two full-height captures at the default tick budget instead of scanning empty sky', () => {
         const f = fixture();
         f.settings.blocks_per_tick = 2048;
