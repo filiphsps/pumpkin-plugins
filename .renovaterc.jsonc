@@ -16,6 +16,13 @@
     ],
     "packageRules": [
         {
+            // Node declarations are needed by Node-hosted tools, tests, and Vitest configs. Keep the
+            // ambient type surface stable and update it deliberately with the Node baseline.
+            "matchPackageNames": ["@types/node"],
+            "enabled": false,
+            "description": "Pinned Node.js ambient types; update intentionally with the Node baseline"
+        },
+        {
             // The catalog entry in pnpm-workspace.yaml is a tarball URL for one plugin ABI, and it
             // has to change together with PUMPKIN_RELEASE in
             // tools/test-harness/src/pumpkin-version.ts. Renovate can't see that link, so it leaves

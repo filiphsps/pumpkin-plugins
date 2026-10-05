@@ -50,6 +50,7 @@
         "commitlint": "21.2.3",
         "eslint": "10.12.0",
         "eslint-plugin-jsdoc": "65.1.0",
+        "typescript": "catalog:",
         "turbo": "2.11.7",
         "typescript-eslint": "8.71.0"
     },
