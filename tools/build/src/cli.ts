@@ -20,6 +20,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
     if (unknownArgument) throw new BuildError(`unknown argument "${unknownArgument}" (supported: --types-only)`);
 
     const config = readPluginConfig(pluginDir);
+    const buildFields = args.includes('--types-only') ? undefined : requireBuildFields(config);
     const buildDir = path.join(pluginDir, 'build');
     const apiRoot = process.env.PUMPKIN_API_DIR
         ? path.resolve(process.env.PUMPKIN_API_DIR)
@@ -34,7 +35,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
     const apiWit = path.join(apiRoot, 'wit/v0.1');
 
     // Types go to build/types so `types` and `build` can run in parallel (turbo) without sharing files.
-    if (args.includes('--types-only')) {
+    if (!buildFields) {
         const witDir = prepareWit({
             apiWit,
             interfaces,
@@ -46,7 +47,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
         return;
     }
 
-    const { entry, output } = requireBuildFields(config);
+    const { entry, output } = buildFields;
     const witDir = prepareWit({
         apiWit,
         interfaces,
