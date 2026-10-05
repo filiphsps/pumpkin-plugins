@@ -51,6 +51,15 @@ const EXTRA_FILES = { 'tools/build': ['wasi-wit.lock.json'] };
 
 const readJson = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
 
+function hasLocalLicense(dir) {
+    return (
+        dir !== '.' &&
+        fs
+            .readdirSync(path.join(root, dir), { withFileTypes: true })
+            .some((file) => file.isFile() && /^license(?:\.md|\.txt)?$/i.test(file.name))
+    );
+}
+
 function packageDirs() {
     const dirs = ['.'];
     for (const group of ['packages', 'tools']) {
@@ -67,7 +76,7 @@ function packageDirs() {
 function expected(dir, pkg) {
     const isRoot = dir === '.';
     const want = {
-        license: 'MIT',
+        license: hasLocalLicense(dir) && typeof pkg.license === 'string' && pkg.license.trim() ? pkg.license : 'MIT',
         author: AUTHOR,
         contributors: [AUTHOR],
         homepage: isRoot ? REPO : `${REPO}/tree/master/${dir}#readme`,

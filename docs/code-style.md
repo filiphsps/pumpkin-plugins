@@ -63,12 +63,14 @@ and update this convention if its palette or log handling changes.
 
 ## Package metadata
 
-Every `package.json` (the root, each plugin, each tool) carries the same license, author,
+Every `package.json` (the root, each plugin, each tool) carries the same author,
 contributors, homepage, repository, bugs and funding fields, and a description of at most 70
 characters. Tools that export code also set `sideEffects`, `module`, `types`, `files` and
 `publishConfig`. `node scripts/package-metadata.mjs` checks it and `--fix` writes everything that can
 be derived; `pnpm gen` already generates plugins that pass. The homepage of a package is its folder's
-README on `master`.
+README on `master`. Packages use MIT by default. A package with its own `LICENSE`, `LICENSE.md`
+or `LICENSE.txt` file keeps the license declared in its `package.json`, including when metadata
+is fixed.
 
 ## Docs match the code
 

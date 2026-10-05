@@ -210,6 +210,33 @@ describe('package-metadata', () => {
         );
     });
 
+    it('preserves package-specific licenses when checking and fixing plugins and tools', () => {
+        for (const licenseFile of ['LICENSE', 'LICENSE.md', 'license.txt']) {
+            const dir = repo(
+                files({
+                    [`packages/plug/${licenseFile}`]: 'GPL license',
+                    [`tools/lib/${licenseFile}`]: 'Apache license'
+                })
+            );
+            for (const [folder, license] of [
+                ['packages/plug', 'GPL-3.0-or-later'],
+                ['tools/lib', 'Apache-2.0']
+            ]) {
+                const file = path.join(dir, folder, 'package.json');
+                const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+                pkg.license = license;
+                fs.writeFileSync(file, JSON.stringify(pkg));
+            }
+            assert.ok(run('package-metadata.mjs', dir).ok);
+            assert.ok(run('package-metadata.mjs', dir, '--fix').ok);
+            assert.equal(
+                JSON.parse(fs.readFileSync(path.join(dir, 'packages/plug/package.json'))).license,
+                'GPL-3.0-or-later'
+            );
+            assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'tools/lib/package.json'))).license, 'Apache-2.0');
+        }
+    });
+
     it('wants the library fields on a tool that exports code', () => {
         const lib = {
             name: 'lib',
