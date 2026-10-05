@@ -13,8 +13,7 @@
             "component": "apple-skin-pumpkin"
         },
         "packages/bedrock-addon-manager": {
-            "component": "bedrock-addon-manager",
-            "release-as": "0.0.1"
+            "component": "bedrock-addon-manager"
         },
         "packages/dynamic-lights-pumpkin": {
             "component": "dynamic-lights-pumpkin"
