@@ -13,7 +13,8 @@ Put `dynamic-lights-pumpkin.wasm` from the plugin's GitHub release in your serve
 ## How it works
 
 Holding a supported light source shows a temporary invisible light block only to your client. It
-updates only when you enter another block, change held slot, teleport, respawn, or change world.
+updates when you enter another block, change held slot, teleport, respawn, or change world. Movement
+within the same block is ignored to avoid repeated world and inventory lookups.
 Either hand can provide light, and the brighter configured item wins. The server world is never
 changed, so no light block can replace terrain or be left behind after a crash.
 

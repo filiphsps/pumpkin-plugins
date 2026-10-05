@@ -49,6 +49,7 @@ class DynamicLightsPumpkin extends Plugin {
     private droppedItemLevels: DroppedItemLightLevels | undefined;
     private preferences: PlayerLightPreferences | undefined;
     private entityTask: number | undefined;
+    private readonly playerBlockPositions = new Map<string, BlockPosition>();
 
     /** Describes the plugin to the server. */
     metadata(): PluginMetadata {
@@ -97,8 +98,10 @@ class DynamicLightsPumpkin extends Plugin {
             });
         });
         this.registerEvent(ctx, 'player-leave-event', (_server, event: PlayerLeaveEventData) => {
-            this.tracker?.remove(event.player.getName(), event.player);
-            this.entityTracker?.remove(event.player.getName(), event.player);
+            const playerName = event.player.getName();
+            this.playerBlockPositions.delete(playerName);
+            this.tracker?.remove(playerName, event.player);
+            this.entityTracker?.remove(playerName, event.player);
         });
         this.registerEvent(ctx, 'player-item-held-event', (_server, event: PlayerItemHeldEventData) => {
             this.syncPlayer(event.player);
@@ -107,7 +110,7 @@ class DynamicLightsPumpkin extends Plugin {
             this.syncPlayer(event.player);
         });
         this.registerEvent(ctx, 'player-move-event', (_server, event: PlayerMoveEventData) => {
-            this.syncPlayer(event.player, event.toPosition);
+            this.syncMovedPlayer(event.player, event.toPosition);
         });
         this.registerEvent(ctx, 'player-teleport-event', (_server, event: PlayerTeleportEventData) => {
             this.syncPlayer(event.player, event.toPosition);
@@ -156,21 +159,26 @@ class DynamicLightsPumpkin extends Plugin {
     }
 
     private syncPlayer(player: PlayerJoinEventData['player'], precisePosition = player.getPosition()): void {
-        if (!this.preferences?.isEnabled(player.getName())) {
-            this.tracker?.remove(player.getName(), player);
+        const playerName = player.getName();
+        const position = toBlockPosition(precisePosition);
+        this.playerBlockPositions.set(playerName, position);
+        if (!this.preferences?.isEnabled(playerName)) {
+            this.tracker?.remove(playerName, player);
             return;
         }
         const rightItem = player.getItemInHand('right');
         const leftItem = player.getItemInHand('left');
         const level = this.lightLevels?.levelForHands(rightItem?.getRegistryKey(), leftItem?.getRegistryKey()) ?? 0;
-        const position = toBlockPosition(precisePosition);
         const lightPosition = level === 0 ? position : findClientLightPosition(player.getWorld(), position);
-        this.tracker?.sync(
-            player.getName(),
-            player,
-            lightPosition ?? position,
-            lightPosition === undefined ? 0 : level
-        );
+        this.tracker?.sync(playerName, player, lightPosition ?? position, lightPosition === undefined ? 0 : level);
+    }
+
+    private syncMovedPlayer(player: PlayerJoinEventData['player'], precisePosition: [number, number, number]): void {
+        const playerName = player.getName();
+        const [x, y, z] = precisePosition;
+        const previous = this.playerBlockPositions.get(playerName);
+        if (previous?.x === Math.floor(x) && previous.y === Math.floor(y) && previous.z === Math.floor(z)) return;
+        this.syncPlayer(player, precisePosition);
     }
 
     private syncEntityLights(server: Server): void {
@@ -178,19 +186,21 @@ class DynamicLightsPumpkin extends Plugin {
         const players = server.getAllPlayers();
         if (players.length === 0) return;
         for (const player of players) {
-            if (!this.preferences?.isEnabled(player.getName())) {
-                this.entityTracker?.remove(player.getName(), player);
+            const playerName = player.getName();
+            if (!this.preferences?.isEnabled(playerName)) {
+                this.entityTracker?.remove(playerName, player);
                 continue;
             }
             const visible: VisibleEntityLight[] = [];
+            const world = player.getWorld();
             for (const entity of player.asEntity().getNearbyEntities(15, 15, 15)) {
-                const level =
-                    this.droppedItemLevels?.level(entity.getId()) ?? this.entityLevels.get(entity.getType()) ?? 0;
+                const entityId = entity.getId();
+                const level = this.droppedItemLevels?.level(entityId) ?? this.entityLevels.get(entity.getType()) ?? 0;
                 if (level === 0) continue;
-                const position = findClientLightPosition(player.getWorld(), toBlockPosition(entity.getPosition()));
-                if (position !== undefined) visible.push({ entityId: entity.getId(), position, level });
+                const position = findClientLightPosition(world, toBlockPosition(entity.getPosition()));
+                if (position !== undefined) visible.push({ entityId, position, level });
             }
-            this.entityTracker?.sync(player.getName(), player, visible);
+            this.entityTracker?.sync(playerName, player, visible);
         }
     }
 
