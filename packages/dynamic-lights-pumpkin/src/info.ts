@@ -11,8 +11,11 @@ export const info = {
     name: 'DynamicLightsPumpkin',
     description: 'Server-driven dynamic lights for held items and nearby entities',
     permissions: [
-        { name: 'fs.read.data', reason: 'Read its light-source settings and old recovery data.' },
-        { name: 'fs.write.data', reason: 'Write its light-source settings.' }
+        { name: 'fs.read.data', reason: 'Read its light-source settings, player preferences and old recovery data.' },
+        {
+            name: 'fs.write.data',
+            reason: 'Write its light-source settings and player preferences, and clean up old recovery data.'
+        }
     ],
     commands: commandInfos(commands),
     config: configInfo

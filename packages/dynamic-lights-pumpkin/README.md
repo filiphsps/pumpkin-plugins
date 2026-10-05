@@ -13,7 +13,8 @@ Put `dynamic-lights-pumpkin.wasm` from the plugin's GitHub release in your serve
 ## How it works
 
 Holding a supported light source shows a temporary invisible light block only to your client. It
-updates when you enter another block, change held slot, teleport, respawn, or change world. Movement
+updates when you enter another block, change held slot or inventory, drop or use an item, teleport,
+respawn, or change world. Event updates read the completed action on the next tick. Movement
 within the same block is ignored to avoid repeated world and inventory lookups.
 Either hand can provide light, and the brighter configured item wins. The server world is never
 changed, so no light block can replace terrain or be left behind after a crash.
@@ -24,11 +25,13 @@ disable it, change its `light_level`, or add any item ID you want to support.
 Entity lights are enabled by default. The plugin checks entities in a 15-block cube around each player every
 10 ticks by default and sends changes only when a configured entity light moves, changes level or leaves
 range. Configure `entity_sources` with Pumpkin entity names such as `blaze`, `magma-cube`, `glow-squid` or
-`glow-squid`. Dropped items use the same configured level as their held form when the plugin observes them
-spawn or drop. Existing drops are deliberately not guessed at after a plugin or server restart.
+`glow-item-frame`. Dropped items use the same configured level as their held form when the plugin observes them
+spawn or drop. A player drop is identified only when exactly one new nearby item entity appears;
+ambiguous drops and existing drops after a plugin or server restart are deliberately not guessed at.
 
 Use `/dynamiclights` to toggle dynamic lights for yourself. It is available to all players by default and
-remembers your choice.
+remembers your choice. Overlapping sources use the brightest level, and disabling lights or unloading
+the plugin restores the real blocks.
 
 The plugin retains its old recovery data reader solely to repair temporary server light levels written by
 an earlier version.
@@ -42,8 +45,8 @@ Pumpkin asks for these on the server console the first time the plugin loads.
 
 | Permission | Why |
 | --- | --- |
-| `fs.read.data` | Read its light-source settings and old recovery data. |
-| `fs.write.data` | Write its light-source settings. |
+| `fs.read.data` | Read its light-source settings, player preferences and old recovery data. |
+| `fs.write.data` | Write its light-source settings and player preferences, and clean up old recovery data. |
 | `http.outbound` | Check Pumpkin Market for plugin updates. |
 <!-- docs:end permissions -->
 
