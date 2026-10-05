@@ -75,6 +75,13 @@ describe('prepareWit', () => {
         expect(fs.existsSync(path.join(target, 'stale.wit'))).toBe(false);
     });
 
+    it('does not leave a temporary directory after preparation', () => {
+        const { apiWit, wasiWit, target } = layout();
+        prepareWit({ apiWit, target, wasiWit, interfaces: ['io/poll'] });
+
+        expect(fs.readdirSync(path.dirname(target)).filter((name) => name.startsWith('.wit-'))).toEqual([]);
+    });
+
     it('needs the WASI files when it has interfaces to import', () => {
         const { apiWit, target } = layout();
         expect(() => prepareWit({ apiWit, target, interfaces: ['io/poll'] })).toThrow(BuildError);

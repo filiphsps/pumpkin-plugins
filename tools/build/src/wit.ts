@@ -45,14 +45,37 @@ export function prepareWit(options: PrepareWitOptions): string {
         throw new BuildError('the WASI WIT files are needed but were not provided');
     }
 
-    fs.rmSync(options.target, { recursive: true, force: true });
-    fs.mkdirSync(path.dirname(options.target), { recursive: true });
-    fs.cpSync(options.apiWit, options.target, { recursive: true });
+    const parent = path.dirname(options.target);
+    fs.mkdirSync(parent, { recursive: true });
+    const temporary = fs.mkdtempSync(path.join(parent, `.${path.basename(options.target)}-`));
+    try {
+        retryTransientCopy(() => fs.cpSync(options.apiWit, temporary, { recursive: true }));
 
-    if (options.interfaces.length > 0 && options.wasiWit) {
-        fs.cpSync(options.wasiWit, path.join(options.target, 'deps'), { recursive: true });
-        const pluginWit = path.join(options.target, 'plugin.wit');
-        fs.writeFileSync(pluginWit, injectWasiImports(fs.readFileSync(pluginWit, 'utf8'), options.interfaces));
+        if (options.interfaces.length > 0 && options.wasiWit) {
+            retryTransientCopy(() => fs.cpSync(options.wasiWit, path.join(temporary, 'deps'), { recursive: true }));
+            const pluginWit = path.join(temporary, 'plugin.wit');
+            fs.writeFileSync(pluginWit, injectWasiImports(fs.readFileSync(pluginWit, 'utf8'), options.interfaces));
+        }
+        fs.rmSync(options.target, { recursive: true, force: true });
+        fs.renameSync(temporary, options.target);
+    } catch (error) {
+        fs.rmSync(temporary, { recursive: true, force: true });
+        throw error;
     }
     return options.target;
+}
+
+function retryTransientCopy(copy: () => void): void {
+    for (let attempt = 0; ; attempt += 1) {
+        try {
+            copy();
+            return;
+        } catch (error) {
+            if (!isInputOutputError(error) || attempt === 2) throw error;
+        }
+    }
+}
+
+function isInputOutputError(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'EIO';
 }
