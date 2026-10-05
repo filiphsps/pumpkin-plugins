@@ -31,7 +31,7 @@ function fixture() {
 }
 
 describe('TcpTransport', () => {
-    it('distinguishes data, no data yet, and a closed peer', () => {
+    it('distinguishes empty and closed reads while propagating other host errors', () => {
         const { input, transport } = fixture();
         const bytes = new Uint8Array([1, 2, 3]);
         input.read.mockReturnValueOnce(bytes).mockReturnValueOnce(new Uint8Array());
@@ -42,7 +42,22 @@ describe('TcpTransport', () => {
             throw Object.assign(new Error('closed'), { payload: { tag: 'closed' } });
         });
         expect(transport.read(8)).toBe('closed');
+        const failure = new Error('read failed');
+        input.read.mockImplementationOnce(() => {
+            throw failure;
+        });
+        expect(() => transport.read(8)).toThrow(failure);
         expect(input.read).toHaveBeenCalledWith(8);
+    });
+
+    it('reports output capacity and sends response bytes through the host stream', () => {
+        const { output, transport } = fixture();
+        output.checkWrite.mockReturnValue(17);
+        const bytes = new Uint8Array([4, 5, 6]);
+
+        expect(transport.writable()).toBe(17);
+        transport.write(bytes);
+        expect(output.write).toHaveBeenCalledWith(bytes);
     });
 
     it('waits for a pending flush before shutting down and releasing the connection', () => {
