@@ -38,6 +38,7 @@
         "readme:check": "pumpkin-plugins-docs --check"
     },
     "dependencies": {
+        "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkinmc/pumpkin-api-ts": "catalog:"
     },
     "devDependencies": {
@@ -51,6 +52,8 @@
     "pumpkinPlugin": {
         "entry": "src/plugin.ts",
         "output": "build/{{ name }}.wasm",
-        "wasi": []
+        "wasi": [
+            "http"
+        ]
     }
 }

@@ -99,6 +99,7 @@ Pumpkin asks for these on the server console the first time the plugin loads.
 | `network.udp.bind` | Receive the answers of routers to UPnP searches and NAT-PMP requests. |
 | `network.udp.outgoingdatagram` | Search for routers (UPnP) and talk to them (NAT-PMP). |
 | `network.tcp.connect` | Send UPnP commands to the router's control URL. |
+| `http.outbound` | Check Pumpkin Market for plugin updates. |
 <!-- docs:end permissions -->
 
 ## Commands

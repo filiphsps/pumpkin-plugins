@@ -39,13 +39,13 @@
     },
     "dependencies": {
         "@pumpkinmc/pumpkin-api-ts": "catalog:",
+        "@pumpkin-plugins/plugin-kit": "workspace:*",
         "fflate": "0.8.3"
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",
         "@pumpkin-plugins/config": "workspace:*",
         "@pumpkin-plugins/docs": "workspace:*",
-        "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/port-mapping": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@pumpkin-plugins/upnpumpkin-api": "workspace:*",
@@ -59,7 +59,8 @@
         "output": "build/bedrock-addon-manager.wasm",
         "wasi": [
             "filesystem",
-            "sockets"
+            "sockets",
+            "http"
         ]
     }
 }

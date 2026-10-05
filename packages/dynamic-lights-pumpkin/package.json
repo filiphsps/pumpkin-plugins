@@ -55,7 +55,8 @@
         "entry": "src/plugin.ts",
         "output": "build/dynamic-lights-pumpkin.wasm",
         "wasi": [
-            "filesystem"
+            "filesystem",
+            "http"
         ]
     }
 }

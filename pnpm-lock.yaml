@@ -214,6 +214,9 @@ importers:
 
   packages/apple-skin-pumpkin:
     dependencies:
+      '@pumpkin-plugins/plugin-kit':
+        specifier: workspace:*
+        version: link:../../tools/plugin-kit
       '@pumpkinmc/pumpkin-api-ts':
         specifier: 'catalog:'
         version: https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz
@@ -224,9 +227,6 @@ importers:
       '@pumpkin-plugins/docs':
         specifier: workspace:*
         version: link:../../tools/docs
-      '@pumpkin-plugins/plugin-kit':
-        specifier: workspace:*
-        version: link:../../tools/plugin-kit
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../../tools/test-harness
@@ -242,6 +242,9 @@ importers:
 
   packages/bedrock-addon-manager:
     dependencies:
+      '@pumpkin-plugins/plugin-kit':
+        specifier: workspace:*
+        version: link:../../tools/plugin-kit
       '@pumpkinmc/pumpkin-api-ts':
         specifier: 'catalog:'
         version: https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz
@@ -258,9 +261,6 @@ importers:
       '@pumpkin-plugins/docs':
         specifier: workspace:*
         version: link:../../tools/docs
-      '@pumpkin-plugins/plugin-kit':
-        specifier: workspace:*
-        version: link:../../tools/plugin-kit
       '@pumpkin-plugins/port-mapping':
         specifier: workspace:*
         version: link:../../tools/port-mapping
@@ -418,6 +418,12 @@ importers:
       '@pumpkin-plugins/docs':
         specifier: workspace:*
         version: link:../docs
+      '@pumpkin-plugins/update-check':
+        specifier: workspace:*
+        version: link:../update-check
+      '@pumpkinmc/pumpkin-api-ts':
+        specifier: 'catalog:'
+        version: https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz
     devDependencies:
       vitest:
         specifier: 'catalog:'

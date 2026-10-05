@@ -1,4 +1,4 @@
-import type { PluginInfo } from './info.ts';
+import { type PluginInfo, pluginPermissions } from './info.ts';
 import { code, table } from './markdown.ts';
 
 /** The generated blocks of a plugin README. */
@@ -33,7 +33,8 @@ export function renderBlocks(info: PluginInfo): Record<string, string> {
     return { ...renderSections(info), ...own };
 }
 
-function renderPermissions({ permissions = [] }: PluginInfo): string {
+function renderPermissions(info: PluginInfo): string {
+    const permissions = pluginPermissions(info);
     if (permissions.length === 0) return 'This plugin requests no permissions.';
     return [
         'Pumpkin asks for these on the server console the first time the plugin loads.',

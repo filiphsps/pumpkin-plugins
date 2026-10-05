@@ -26,6 +26,7 @@ describe('renderSections', () => {
         expect(Object.keys(s)).toEqual([...SECTIONS]);
         expect(s.summary).toBe('Does demo things.');
         expect(s.permissions).toContain('| `fs.read.data` | Read packs \\| and config |');
+        expect(s.permissions).toContain('| `http.outbound` | Check Pumpkin Market for plugin updates. |');
         expect(s.commands).toContain('| `/demo list` | List things | `Demo:list` |');
         expect(s.commands).toContain('| `/demo help` | Help | none |');
         expect(s.config).toContain('`plugins/data/Demo/config.toml`');
@@ -36,7 +37,7 @@ describe('renderSections', () => {
 
     it('says what is missing instead of leaving sections empty', () => {
         const s = renderSections({ name: 'Bare', description: 'd' });
-        expect(s.permissions).toBe('This plugin requests no permissions.');
+        expect(s.permissions).toContain('| `http.outbound` | Check Pumpkin Market for plugin updates. |');
         expect(s.commands).toBe('This plugin registers no commands.');
         expect(s.config).toBe('This plugin has no configuration file.');
     });

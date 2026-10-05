@@ -72,6 +72,21 @@ export interface PluginInfo<Name extends string = string> {
     blocks?: Readonly<Record<string, string>>;
 }
 
+/** Permission required by the automatic Pumpkin Market update check. */
+export const UPDATE_CHECK_PERMISSION: PermissionInfo<'http.outbound'> = {
+    name: 'http.outbound',
+    reason: 'Check Pumpkin Market for plugin updates.'
+};
+
+/** Lists declared permissions plus the one required for the automatic update check. */
+export function pluginPermissions(info: Pick<PluginInfo, 'permissions'>): PermissionInfo[] {
+    const permissions = [...(info.permissions ?? [])];
+    if (!permissions.some((permission) => permission.name === UPDATE_CHECK_PERMISSION.name)) {
+        permissions.push(UPDATE_CHECK_PERMISSION);
+    }
+    return permissions;
+}
+
 /** Pumpkin's `plugin-metadata` for a plugin, from its info and package version. */
 export function pluginMetadata(info: PluginInfo, version: string) {
     return {
@@ -80,6 +95,6 @@ export function pluginMetadata(info: PluginInfo, version: string) {
         authors: info.authors ?? [],
         description: info.description,
         dependencies: [] as string[],
-        permissions: (info.permissions ?? []).map((p) => p.name)
+        permissions: pluginPermissions(info).map((p) => p.name)
     };
 }

@@ -32,6 +32,7 @@ Pumpkin asks for these on the server console the first time the plugin loads.
 | `fs.read.data` | Read the packs folder and the plugin config in its data folder. |
 | `fs.write.data` | Create and update the config, and write the resource packs found in `.mcaddon` files. |
 | `network.tcp.bind` | Listen for pack downloads from Bedrock clients. |
+| `http.outbound` | Check Pumpkin Market for plugin updates. |
 <!-- docs:end permissions -->
 
 ## Commands

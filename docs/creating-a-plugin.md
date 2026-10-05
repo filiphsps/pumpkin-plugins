@@ -41,9 +41,11 @@ and typechecks, builds and integration-tests it, so the templates can't silently
 
 - Describe what the plugin needs in `src/info.ts` (permissions, commands, config), declaring commands
   with `defineCommands`. See [Plugin info and READMEs](plugin-info-and-readmes.md).
-- Write the plugin in `src/plugin.ts`. Read [Building](building.md) first: the plugins run on
-  QuickJS and a few API calls need workarounds. Follow [Code style](code-style.md): public code
-  needs JSDoc descriptions and `pnpm lint` checks it.
+- Add plugin-specific behavior in `src/plugin.ts`'s `onPluginLoad` hook. The generated plugin extends
+  `PluginBase` and calls `registerPlugin`, which provide shared metadata, lifecycle logging and the
+  automatic update check. Read [Building](building.md) first: plugins run on QuickJS and a few API
+  calls need workarounds. Follow [Code style](code-style.md): public code needs JSDoc descriptions
+  and `pnpm lint` checks it.
 - If the plugin needs settings, declare them as a schema with `@pumpkin-plugins/config` and add it
   as a dev dependency. See [Plugin config](plugin-config.md).
 - Run `pnpm exec turbo run build test:integration --filter=@pumpkin-plugins/<folder>` to build the
@@ -55,16 +57,18 @@ A plugin can't read files or open sockets unless its WIT world imports the WASI 
 per plugin in `package.json`:
 
 ```json
-"pumpkinPlugin": { "entry": "src/plugin.ts", "output": "build/my-plugin.wasm", "wasi": ["filesystem", "sockets"] }
+"pumpkinPlugin": { "entry": "src/plugin.ts", "output": "build/my-plugin.wasm", "wasi": ["filesystem", "sockets", "http"] }
 ```
 
-The server also has to grant the matching permissions, so list them in `info.permissions`:
+The server also has to grant the matching permissions. `PluginBase` metadata includes the automatic
+updater permission; list other permissions in `info.permissions`:
 
 | Capability | Permissions the plugin will typically request |
 | --- | --- |
 | `filesystem` | `fs.read.data`, `fs.write.data` (access is limited to the plugin's own data folder, preopened as `data`) |
 | `sockets` | `network.tcp.bind` to listen, `network.tcp.connect` to connect out |
 | `udp` | `network.udp.bind` to receive, `network.udp.outgoingdatagram` to send to any address, `network.udp.connect` to talk to one |
+| `http` | `http.outbound` to make HTTP or HTTPS requests; the automatic updater adds this permission |
 
 ## Without the generator
 

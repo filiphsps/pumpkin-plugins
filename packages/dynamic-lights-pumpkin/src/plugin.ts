@@ -16,17 +16,11 @@ import type {
     PlayerTeleportEventData
 } from 'pumpkin:plugin/event@0.1.0';
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
-import type { PluginMetadata } from 'pumpkin:plugin/metadata@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
-import { pluginMetadata } from '@pumpkin-plugins/docs';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
-import { cancelTask, runCommand, runTask, scheduleDelayed, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
-import {
-    handleCommand as apiHandleCommand,
-    handleTask as apiHandleTask,
-    Plugin,
-    registerPlugin
-} from '@pumpkinmc/pumpkin-api-ts';
+import { cancelTask, runCommand, scheduleDelayed, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
+import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
+import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
 import { registerCommands } from './commands/register.ts';
 import { loadPluginConfig } from './config/load.ts';
 import { info } from './info.ts';
@@ -41,7 +35,7 @@ import { resolveClientLightStates } from './platform/client-light-states.ts';
 import { PumpkinLightWorld } from './platform/pumpkin-light-world.ts';
 
 /** The plugin. Pumpkin creates it once and calls `onLoad` when the server starts. */
-class DynamicLightsPumpkin extends Plugin {
+class DynamicLightsPumpkin extends PluginBase {
     private tracker: ClientLightTracker | undefined;
     private entityTracker: EntityLightTracker | undefined;
     private lightLevels: HeldItemLightLevels | undefined;
@@ -51,15 +45,12 @@ class DynamicLightsPumpkin extends Plugin {
     private entityTask: number | undefined;
     private readonly playerBlockPositions = new Map<string, BlockPosition>();
 
-    /** Describes the plugin to the server. */
-    metadata(): PluginMetadata {
-        return pluginMetadata(info, __PLUGIN_VERSION__);
+    constructor() {
+        super(info, __PLUGIN_VERSION__);
     }
 
     /** Runs when the server loads the plugin. */
-    onLoad(ctx: Context): void {
-        super.onLoad(ctx);
-        logging.log('info', `${info.name} ${__PLUGIN_VERSION__} loaded`);
+    protected onPluginLoad(ctx: Context): void {
         const clientLightStates = resolveClientLightStates();
         if (clientLightStates === undefined) {
             logging.log('error', `${info.name} could not resolve Minecraft light block states`);
@@ -151,11 +142,10 @@ class DynamicLightsPumpkin extends Plugin {
     }
 
     /** Drops tracked client overrides before Pumpkin unloads the plugin. */
-    onUnload(ctx: Context): void {
+    protected override onPluginUnload(_ctx: Context): void {
         this.tracker?.clear();
         this.entityTracker?.clear();
         if (this.entityTask !== undefined) cancelTask(this.entityTask);
-        super.onUnload(ctx);
     }
 
     private syncPlayer(player: PlayerJoinEventData['player'], precisePosition = player.getPosition()): void {
@@ -258,10 +248,7 @@ function distanceSquared(
 
 registerPlugin(new DynamicLightsPumpkin());
 
-/** Dispatches scheduled plugin work before delegating to Pumpkin's API package. */
-export function handleTask(id: number, server: Server): void {
-    if (!runTask(id, server)) apiHandleTask(id, server);
-}
+export { handleTask } from '@pumpkin-plugins/plugin-kit/plugin';
 
 /** Dispatches plugin command handlers before delegating to Pumpkin's API package. */
 export function handleCommand(id: number, sender: CommandSender, server: Server, args: ConsumedArgs): number {

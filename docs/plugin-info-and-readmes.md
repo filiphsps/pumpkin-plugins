@@ -20,15 +20,19 @@ export const info = {
 } satisfies PluginInfo<typeof PLUGIN_NAME>;
 ```
 
-`permissions`, `commands` and `config` are optional. The plugin builds its Pumpkin metadata from
-the same object, so the README can't drift from what the plugin actually asks for:
+`permissions`, `commands` and `config` are optional. Plugins pass this object and the injected
+package version to `PluginBase` from `@pumpkin-plugins/plugin-kit/plugin`. It builds Pumpkin
+metadata from the same object, so the README can't drift from what the plugin actually asks for.
+The shared metadata helper also adds `http.outbound` for the automatic Pumpkin Market update check;
+it appears in the generated README even though plugins don't repeat it in `info.permissions`:
 
 ```ts
-import { pluginMetadata } from '@pumpkin-plugins/docs';
+import { PluginBase } from '@pumpkin-plugins/plugin-kit/plugin';
 
-/** Describes the plugin to the server. */
-metadata(): PluginMetadata {
-    return pluginMetadata(info, __PLUGIN_VERSION__);
+class MyPlugin extends PluginBase {
+    constructor() {
+        super(info, __PLUGIN_VERSION__);
+    }
 }
 ```
 
@@ -113,7 +117,7 @@ in a plugin's `README.md`:
 | Block | Rendered from |
 | --- | --- |
 | `summary` | `info.description` |
-| `permissions` | `info.permissions` |
+| `permissions` | `info.permissions` plus the automatic updater permission |
 | `commands` | `info.commands` |
 | `config` | `info.config`: the options table and the default file contents |
 | anything else | `info.blocks`: the markdown the plugin gave under that name |

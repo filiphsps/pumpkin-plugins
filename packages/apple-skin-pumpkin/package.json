@@ -38,12 +38,12 @@
         "readme:check": "pumpkin-plugins-docs --check"
     },
     "dependencies": {
-        "@pumpkinmc/pumpkin-api-ts": "catalog:"
+        "@pumpkinmc/pumpkin-api-ts": "catalog:",
+        "@pumpkin-plugins/plugin-kit": "workspace:*"
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",
         "@pumpkin-plugins/docs": "workspace:*",
-        "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
         "typescript": "catalog:",
@@ -52,6 +52,8 @@
     "pumpkinPlugin": {
         "entry": "src/plugin.ts",
         "output": "build/apple-skin-pumpkin.wasm",
-        "wasi": []
+        "wasi": [
+            "http"
+        ]
     }
 }

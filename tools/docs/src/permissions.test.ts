@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { PermissionInfo, PluginInfo } from './info.ts';
+import { type PermissionInfo, type PluginInfo, pluginMetadata, pluginPermissions } from './info.ts';
 import { isPumpkinPermission, PUMPKIN_PERMISSIONS, type PumpkinPermission } from './permissions.ts';
 
 describe('isPumpkinPermission', () => {
@@ -36,5 +36,22 @@ describe('types', () => {
             permissions: [{ name: 'network.tcp.bnd', reason: 'x' }]
         };
         expect(info.name).toBe('Demo');
+    });
+});
+
+describe('automatic update permission', () => {
+    it('adds the outbound HTTP permission to plugin metadata and docs', () => {
+        const info: PluginInfo<'Demo'> = { name: 'Demo', description: 'd' };
+        expect(pluginPermissions(info).map(({ name }) => name)).toEqual(['http.outbound']);
+        expect(pluginMetadata(info, '1.0.0').permissions).toEqual(['http.outbound']);
+    });
+
+    it('does not duplicate a manually declared outbound HTTP permission', () => {
+        const info: PluginInfo<'Demo'> = {
+            name: 'Demo',
+            description: 'd',
+            permissions: [{ name: 'http.outbound', reason: 'Use an external HTTP service.' }]
+        };
+        expect(pluginPermissions(info)).toHaveLength(1);
     });
 });

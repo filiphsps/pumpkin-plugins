@@ -44,6 +44,7 @@ Pumpkin asks for these on the server console the first time the plugin loads.
 | --- | --- |
 | `fs.read.data` | Read its light-source settings and old recovery data. |
 | `fs.write.data` | Write its light-source settings. |
+| `http.outbound` | Check Pumpkin Market for plugin updates. |
 <!-- docs:end permissions -->
 
 ## Commands

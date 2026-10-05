@@ -37,10 +37,12 @@
         "./host": "./src/host.ts",
         "./ipc": "./src/ipc.ts",
         "./logger": "./src/logger.ts",
+        "./plugin": "./src/plugin.ts",
         "./payload": "./src/payload.ts",
         "./registry-id": "./src/registry-id.ts",
         "./register-commands": "./src/register-commands.ts",
         "./testing": "./src/testing/index.ts",
+        "./wasi-resource": "./src/wasi-resource.ts",
         "./wasi-error": "./src/wasi-error.ts"
     },
     "files": [
@@ -53,7 +55,9 @@
         "test": "vitest run"
     },
     "dependencies": {
-        "@pumpkin-plugins/docs": "workspace:*"
+        "@pumpkin-plugins/docs": "workspace:*",
+        "@pumpkin-plugins/update-check": "workspace:*",
+        "@pumpkinmc/pumpkin-api-ts": "catalog:"
     },
     "devDependencies": {
         "vitest": "catalog:"
