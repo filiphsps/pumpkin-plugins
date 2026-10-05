@@ -51,9 +51,9 @@ export interface BuiltCommand {
 export function buildCommands<Sender, T extends CommandTree>(
     host: CommandHost<Sender>,
     tree: T,
-    handlers: CommandHandlers<T>
+    handlers: CommandHandlers<T, Sender>
 ): BuiltCommand[] {
-    const lookup = handlers as unknown as Record<string, (() => readonly CommandLine[]) | undefined>;
+    const lookup = handlers as unknown as Record<string, ((sender: Sender) => readonly CommandLine[]) | undefined>;
 
     const fill = (node: CommandNodeLike, subs: SubcommandTree, path: string[]): void => {
         for (const [name, spec] of Object.entries(subs)) {
@@ -74,7 +74,7 @@ export function buildCommands<Sender, T extends CommandTree>(
             host.onRun((sender) => {
                 let lines: readonly CommandLine[];
                 try {
-                    lines = handler();
+                    lines = handler(sender);
                 } catch (err) {
                     if (err instanceof CommandFailed) host.fail(err.message);
                     throw err;

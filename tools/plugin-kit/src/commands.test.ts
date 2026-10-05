@@ -48,6 +48,21 @@ describe('buildCommands', () => {
         expect(host.run(ping as FakeNode, ['ping'])).toEqual(['pong']);
     });
 
+    it('passes the sender to command handlers', () => {
+        const host = new FakeCommandHost();
+        let received: unknown;
+        const [, ping] = buildCommands(host, tree, {
+            ...handlers,
+            ping: (sender) => {
+                received = sender;
+                return ['pong'];
+            }
+        }).map((command) => command.node as FakeNode);
+
+        const sender = host.runAs(ping as FakeNode, ['ping']);
+        expect(received).toBe(sender);
+    });
+
     it('sends error lines in red and the rest as plain text', () => {
         const host = new FakeCommandHost();
         const [, ping] = buildCommands(host, tree, {
