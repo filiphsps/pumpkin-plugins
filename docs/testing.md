@@ -8,6 +8,12 @@ Each plugin has two vitest projects, set up by `definePluginVitestConfig()` from
 | `unit` | `src/**/*.test.ts` | `pnpm test`. No server needed. |
 | `integration` | `test/**/*.itest.ts` | `pnpm test:integration`. Builds first, then runs against a real Pumpkin. Test files and up to four package suites run concurrently. |
 
+Run `pnpm coverage` from the repository root to run every package's unit tests with Vitest's V8
+coverage provider. Each package writes an LCOV report to `coverage/lcov.info`; source files are
+included even when no test imports them. CI uploads these reports to Codecov. Coverage measures
+TypeScript executed in the test process; integration tests verify compiled WASM behavior but do not
+collect guest-code coverage.
+
 Run one plugin's integration tests with
 `pnpm exec turbo run test:integration --filter=@pumpkin-plugins/<folder>`. To run only changed
 packages and their dependents locally, compare with the base branch, for example

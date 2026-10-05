@@ -1,5 +1,8 @@
 # pumpkin-plugins
 
+[![CI](https://github.com/filiphsps/pumpkin-plugins/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/filiphsps/pumpkin-plugins/actions/workflows/ci.yml?query=branch%3Amaster)
+[![codecov](https://codecov.io/gh/filiphsps/pumpkin-plugins/branch/master/graph/badge.svg)](https://codecov.io/gh/filiphsps/pumpkin-plugins)
+
 Monorepo for [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) plugins written in TypeScript
 (built on [pumpkin-api-ts](https://github.com/Pumpkin-MC/pumpkin-api-ts)).
 
@@ -49,6 +52,7 @@ pnpm test
 | `pnpm lint:commits` | Check the last commit message against Conventional Commits, the way CI does |
 | `pnpm typecheck` | Typecheck every package |
 | `pnpm test` | Unit tests |
+| `pnpm coverage` | Unit tests with V8 coverage; writes LCOV reports under each package's `coverage/` directory |
 | `pnpm test:scripts` | Tests of the repo checks in `scripts/` |
 | `pnpm test:integration` | Build, then run the tests against a real Pumpkin server (`PUMPKIN_BIN` picks the binary, see [Testing](docs/testing.md)) |
 | `pnpm readme` | Regenerate the plugin READMEs and the package tables above |

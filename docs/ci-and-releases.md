@@ -11,7 +11,7 @@ cache) is the composite action in `.github/common/bootstrap`.
 | 💬 Commit messages | PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
-| 🧪 Test | code changes | Unit tests, and the tests of the repo checks and agent hooks (`pnpm test:scripts`) |
+| 🧪 Test | code changes | Unit tests with V8 coverage uploaded to Codecov, and the tests of the repo checks and agent hooks (`pnpm test:scripts`) |
 | 📝 Docs and config | always | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after lint and typecheck | Builds every plugin and uploads them as an artifact |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
@@ -222,3 +222,6 @@ These aren't done by the workflows:
 5. For market publishing: create a Market API key with the `plugins:update` and
    `plugins:versions:upload` scopes, then add it as the `MARKET_API_TOKEN` repository secret. Keep
    the key out of the repository and chat messages.
+6. Optional: add the Codecov repository upload token as the `CODECOV_TOKEN` Actions secret to publish
+   coverage from protected branches and same-repository runs. Public fork pull requests can use
+   Codecov's tokenless upload setting.
