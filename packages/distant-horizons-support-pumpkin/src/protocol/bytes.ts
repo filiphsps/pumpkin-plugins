@@ -79,8 +79,10 @@ export class Reader {
     constructor(private readonly data: Uint8Array) {}
     /** Reads one unsigned byte. */
     byte(): number {
-        if (this.offset >= this.data.length) throw new RangeError('Truncated DH message');
-        return this.data[this.offset++]!;
+        const byte = this.data[this.offset];
+        if (byte === undefined) throw new RangeError('Truncated DH message');
+        this.offset++;
+        return byte;
     }
     /** Reads a boolean and rejects invalid encodings. */
     bool(): boolean {
@@ -119,7 +121,9 @@ export class Reader {
         const bytes = this.bytes(this.short());
         let result = '';
         for (let i = 0; i < bytes.length; ) {
-            const first = bytes[i++]!;
+            const first = bytes[i];
+            if (first === undefined) throw new RangeError('Invalid UTF-8');
+            i++;
             let c = first;
             let count = 0;
             let minimum = 0;

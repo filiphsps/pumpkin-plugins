@@ -24,6 +24,7 @@ export default [
     {
         ignores: [
             '**/node_modules/**',
+            '**/coverage/**',
             'build/**',
             'packages/*/build/**',
             'tools/*/build/**',
