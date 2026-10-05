@@ -63,6 +63,10 @@ Tasks are defined in `turbo.json` and run with the root scripts (`pnpm build`, `
 
 Run one plugin with `pnpm exec turbo run build --filter=@pumpkin-plugins/<folder>`.
 
+The shared build tool's own `typecheck` task runs `tsc --noEmit`, so its package-level Turbo
+configuration declares no outputs. Plugin typechecks keep the root `build/types/**` outputs because
+they generate guest declarations needed by builds and editors.
+
 Things to know when changing `turbo.json`:
 
 - **Cache invalidation.** The workspace packages are used as source (their `exports` point at
