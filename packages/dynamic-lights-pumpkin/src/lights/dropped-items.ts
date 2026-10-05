@@ -32,3 +32,9 @@ export class DroppedItemLightLevels {
         return this.levels.get(entityId);
     }
 }
+
+/** Identifies a single new item after a drop, excluding existing or ambiguous nearby items. */
+export function newDroppedItemId(previous: ReadonlySet<number>, current: readonly number[]): number | undefined {
+    const added = [...new Set(current.filter((id) => !previous.has(id)))];
+    return added.length === 1 ? added[0] : undefined;
+}

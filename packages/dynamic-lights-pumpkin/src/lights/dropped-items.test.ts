@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DroppedItemLightLevels } from './dropped-items.ts';
+import { DroppedItemLightLevels, newDroppedItemId } from './dropped-items.ts';
 
 describe(DroppedItemLightLevels.name, () => {
     it('uses the same level for spawned drops as for held items', () => {
@@ -30,5 +30,16 @@ describe(DroppedItemLightLevels.name, () => {
         levels.recordLevel(4, 14);
 
         expect(levels.level(4)).toBe(14);
+    });
+});
+
+describe('newDroppedItemId', () => {
+    it('identifies only a newly observed item entity', () => {
+        expect(newDroppedItemId(new Set([4]), [4, 5])).toBe(5);
+        expect(newDroppedItemId(new Set([4]), [4])).toBeUndefined();
+    });
+
+    it('does not guess when multiple new drops are nearby', () => {
+        expect(newDroppedItemId(new Set([4]), [4, 5, 6])).toBeUndefined();
     });
 });
