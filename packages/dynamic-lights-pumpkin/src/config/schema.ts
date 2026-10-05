@@ -27,12 +27,14 @@ export const DEFAULT_SOURCES = {
     'minecraft:fire_charge': { light_level: 15 },
     'minecraft:glow_ink_sac': { light_level: 8 },
     'minecraft:glowstone_dust': { light_level: 8 },
+    'minecraft:glow_item_frame': { light_level: 8 },
     'minecraft:magma_cream': { light_level: 8 }
 };
 
 /** Entity light sources included in the first generated configuration file. */
 export const DEFAULT_ENTITY_SOURCES = {
     blaze: { light_level: 15 },
+    'glow-item-frame': { light_level: 8 },
     'magma-cube': { light_level: 8 },
     'glow-squid': { light_level: 8 }
 };

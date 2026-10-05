@@ -150,6 +150,9 @@ light_level = 8
 [sources."minecraft:glowstone_dust"]
 light_level = 8
 
+[sources."minecraft:glow_item_frame"]
+light_level = 8
+
 [sources."minecraft:magma_cream"]
 light_level = 8
 
@@ -171,6 +174,9 @@ refresh_interval_ticks = 10
 
 [entity_sources."blaze"]
 light_level = 15
+
+[entity_sources."glow-item-frame"]
+light_level = 8
 
 [entity_sources."magma-cube"]
 light_level = 8
