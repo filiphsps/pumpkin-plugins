@@ -59,7 +59,7 @@ describe('readPluginConfig', () => {
     });
 
     it('rejects invalid build paths before resolving them against the package', () => {
-        for (const entry of [42, '', '../outside.ts', '/tmp/plugin.ts', 'C:\\outside.ts']) {
+        for (const entry of [42, '', '.', '../outside.ts', '/tmp/plugin.ts', 'C:\\outside.ts', 'C:plugin.ts']) {
             expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { entry } }))).toThrow(
                 '"pumpkinPlugin.entry"'
             );
@@ -67,14 +67,17 @@ describe('readPluginConfig', () => {
         expect(() =>
             readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { output: '../outside.wasm' } }))
         ).toThrow('"pumpkinPlugin.output"');
+        expect(() =>
+            readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { output: 'package.json' } }))
+        ).toThrow('must name a .wasm file');
     });
 });
 
 describe('requireBuildFields', () => {
     it('returns entry and output', () => {
-        expect(requireBuildFields({ entry: 'a', output: 'b', wasi: [], version: '0.0.0' })).toEqual({
+        expect(requireBuildFields({ entry: 'a', output: 'b.wasm', wasi: [], version: '0.0.0' })).toEqual({
             entry: 'a',
-            output: 'b'
+            output: 'b.wasm'
         });
     });
 

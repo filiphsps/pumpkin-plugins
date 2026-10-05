@@ -90,10 +90,15 @@ function requiredRelativePath(value: unknown, name: string): string {
         value.length === 0 ||
         path.isAbsolute(value) ||
         path.win32.isAbsolute(value) ||
+        path.win32.parse(value).root !== '' ||
+        normalized === '.' ||
         normalized === '..' ||
         normalized.startsWith('../')
     ) {
         throw new BuildError(`"pumpkinPlugin.${name}" must be a path inside the package`);
+    }
+    if (name === 'output' && path.posix.extname(normalized).toLowerCase() !== '.wasm') {
+        throw new BuildError('"pumpkinPlugin.output" must name a .wasm file');
     }
     return value;
 }
