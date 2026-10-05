@@ -26,6 +26,10 @@
         "test": {
             "dependsOn": ["transit"]
         },
+        "test:coverage": {
+            "dependsOn": ["transit"],
+            "outputs": ["coverage/**"]
+        },
         "test:integration": {
             "dependsOn": ["build"],
             "cache": false

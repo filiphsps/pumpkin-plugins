@@ -43,6 +43,7 @@
     },
     "scripts": {
         "test": "vitest run --project unit",
+        "test:coverage": "vitest run --project unit --coverage",
         "test:integration": "vitest run --project integration",
         "typecheck": "tsc --noEmit"
     },
@@ -54,6 +55,7 @@
     },
     "devDependencies": {
         "@types/node": "catalog:",
+        "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
     }

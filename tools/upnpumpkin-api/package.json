@@ -42,13 +42,15 @@
     },
     "scripts": {
         "typecheck": "tsc --noEmit",
-        "test": "vitest run"
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage"
     },
     "dependencies": {
         "fflate": "0.8.3"
     },
     "devDependencies": {
         "@types/node": "catalog:",
+        "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
     }

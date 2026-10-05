@@ -46,10 +46,12 @@
     },
     "scripts": {
         "test": "vitest run",
+        "test:coverage": "vitest run --coverage",
         "typecheck": "tsc --noEmit"
     },
     "devDependencies": {
         "@types/node": "catalog:",
+        "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
     }

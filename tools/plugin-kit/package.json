@@ -53,7 +53,8 @@
     },
     "scripts": {
         "typecheck": "pumpkin-plugins-build --types-only && tsc --noEmit",
-        "test": "vitest run"
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage"
     },
     "dependencies": {
         "@pumpkin-plugins/docs": "workspace:*",
@@ -63,6 +64,7 @@
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",
         "@types/node": "catalog:",
+        "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
     },

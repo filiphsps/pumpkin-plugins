@@ -44,6 +44,7 @@
         "build": "pumpkin-plugins-build",
         "typecheck": "pnpm build --types-only && tsc --noEmit",
         "test": "vitest run --project unit",
+        "test:coverage": "vitest run --project unit --coverage",
         "test:integration": "vitest run --project integration"
     },
     "dependencies": {
@@ -54,6 +55,7 @@
         "@pumpkin-plugins/build": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
+        "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
     },

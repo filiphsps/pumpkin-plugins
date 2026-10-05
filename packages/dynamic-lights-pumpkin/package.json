@@ -33,6 +33,7 @@
         "types": "pumpkin-plugins-build --types-only",
         "typecheck": "pnpm types && tsc --noEmit",
         "test": "vitest run --project unit",
+        "test:coverage": "vitest run --project unit --coverage",
         "test:integration": "vitest run --project integration",
         "readme": "pumpkin-plugins-docs",
         "readme:check": "pumpkin-plugins-docs --check"
@@ -48,6 +49,7 @@
         "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
+        "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
     },

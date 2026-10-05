@@ -15,6 +15,12 @@ export function definePluginVitestConfig() {
         define: { __PLUGIN_VERSION__: JSON.stringify(pkg.version ?? '0.0.0') },
         test: {
             passWithNoTests: true,
+            coverage: {
+                provider: 'v8',
+                include: ['src/**/*.ts'],
+                exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
+                reporter: ['text', 'lcov']
+            },
             projects: [
                 { extends: true, test: { name: 'unit', include: ['src/**/*.test.ts'] } },
                 {
