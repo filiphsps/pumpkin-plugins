@@ -58,6 +58,98 @@ describe('loadConfig', () => {
         expect(loadConfig(v2, store).status).toBe('unchanged');
     });
 
+    it('seeds multiple new settings from one old value and then removes the old setting', () => {
+        const schema = defineConfig('Demo', {
+            web: section({
+                description: 'The web server.',
+                fields: {
+                    memory_limit: int({
+                        description: 'In-memory limit.',
+                        default: 64,
+                        min: 0,
+                        migrateFrom: ['web', 'shared_limit']
+                    }),
+                    disk_limit: int({
+                        description: 'Disk limit.',
+                        default: 128,
+                        min: 0,
+                        migrateFrom: ['web', 'shared_limit']
+                    })
+                }
+            })
+        });
+        const store = new MemoryStore('[web]\nshared_limit = 0\n');
+
+        const result = loadConfig(schema, store);
+
+        expect(result.status).toBe('updated');
+        expect(result.values.web).toEqual({ memory_limit: 0, disk_limit: 0 });
+        expect(result.added).toEqual(['web.memory_limit', 'web.disk_limit']);
+        expect(result.removed).toEqual(['web.shared_limit']);
+        expect(store.text).toContain('memory_limit = 0');
+        expect(store.text).toContain('disk_limit = 0');
+        expect(store.text).not.toContain('shared_limit');
+    });
+
+    it('uses defaults when no migration source exists and keeps explicitly configured new values', () => {
+        const schema = defineConfig('Demo', {
+            web: section({
+                description: 'The web server.',
+                fields: {
+                    memory_limit: int({
+                        description: 'In-memory limit.',
+                        default: 64,
+                        min: 0,
+                        migrateFrom: ['web', 'shared_limit']
+                    }),
+                    disk_limit: int({
+                        description: 'Disk limit.',
+                        default: 128,
+                        min: 0,
+                        migrateFrom: ['web', 'shared_limit']
+                    })
+                }
+            })
+        });
+
+        expect(loadConfig(schema, new MemoryStore('[web]\n')).values.web).toEqual({
+            memory_limit: 64,
+            disk_limit: 128
+        });
+        expect(loadConfig(schema, new MemoryStore('[web]\nshared_limit = 12\nmemory_limit = 24\n')).values.web).toEqual(
+            { memory_limit: 24, disk_limit: 12 }
+        );
+    });
+
+    it('does not rewrite a file when a migrated value is invalid for the new setting', () => {
+        const schema = defineConfig('Demo', {
+            web: section({
+                description: 'The web server.',
+                fields: {
+                    limit: int({
+                        description: 'Limit.',
+                        default: 64,
+                        min: 1,
+                        migrateFrom: ['web', 'old_limit']
+                    })
+                }
+            })
+        });
+        const text = '[web]\nold_limit = 0\n';
+        const store = new MemoryStore(text);
+
+        const result = loadConfig(schema, store);
+
+        expect(result.status).toBe('kept');
+        expect(result.values.web.limit).toBe(64);
+        expect(result.warnings).toEqual([
+            'web.limit must be a whole number of at least 1; using 64',
+            'unknown option web.old_limit'
+        ]);
+        expect(store.text).toBe(text);
+        expect(store.writes).toBe(0);
+    });
+
     it('normalizes a hand-written file but keeps its values', () => {
         const store = new MemoryStore('[web]\nport = 4000 # my comment\n');
         const result = loadConfig(demo, store);

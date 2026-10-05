@@ -19,6 +19,8 @@ export interface Field<T> {
     readonly expected: string;
     /** A TOML literal shown in the commented example of an unset optional setting. */
     readonly example: string;
+    /** Path to an older setting whose value should seed this setting when it is absent. */
+    readonly migrateFrom?: readonly string[];
     /** Validates a raw TOML value. */
     parse(raw: unknown): Parsed<Exclude<T, undefined>>;
     /** Writes a value as a TOML literal. */
@@ -35,6 +37,8 @@ interface BaseOptions<T> {
     default?: T;
     /** Example value for the commented hint of an optional setting. */
     example?: T;
+    /** Path to an older setting whose value should seed this setting when it is absent. */
+    migrateFrom?: readonly string[];
 }
 
 /** Writes a string as a TOML basic string, which JSON string syntax is a valid subset of. */
@@ -47,6 +51,7 @@ export function field<T>(spec: {
     default: T | undefined;
     expected: string;
     example: T;
+    migrateFrom?: readonly string[];
     parse: (raw: unknown) => Parsed<T>;
     format: (value: T) => string;
 }): Field<T | undefined> {
@@ -68,6 +73,7 @@ export function bool(options: BaseOptions<boolean>): Field<boolean | undefined> 
         default: options.default,
         expected: 'true or false',
         example: options.example ?? options.default ?? false,
+        migrateFrom: options.migrateFrom,
         parse: (raw) => (typeof raw === 'boolean' ? { ok: true, value: raw } : { ok: false }),
         format: String
     });
@@ -94,6 +100,7 @@ export function int(options: BaseOptions<number> & { min?: number; max?: number 
         default: options.default,
         expected,
         example: options.example ?? options.default ?? min,
+        migrateFrom: options.migrateFrom,
         parse: (raw) => {
             const n = typeof raw === 'bigint' ? Number(raw) : raw;
             return typeof n === 'number' && Number.isSafeInteger(n) && n >= min && n <= max
@@ -130,6 +137,7 @@ export function str(options: BaseOptions<string> & { check?: StringCheck }): Fie
         default: options.default,
         expected: check?.expected ?? 'a string',
         example: options.example ?? options.default ?? '',
+        migrateFrom: options.migrateFrom,
         parse: (raw) => {
             if (typeof raw !== 'string' || (check && !check.test(raw))) return { ok: false };
             return { ok: true, value: check?.normalize ? check.normalize(raw) : raw };

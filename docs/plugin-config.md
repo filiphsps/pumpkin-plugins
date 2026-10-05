@@ -39,7 +39,7 @@ export type Config = ConfigValues<typeof configSchema>;
 
 | Piece | |
 | --- | --- |
-| `bool`, `int`, `str` | Settings. Give a `default`, or leave it out to make the setting optional (its value is then `undefined` when unset). `int` takes `min` and `max`; `str` takes a `check` with its own `test` and `normalize`. |
+| `bool`, `int`, `str` | Settings. Give a `default`, or leave it out to make the setting optional (its value is then `undefined` when unset). `int` takes `min` and `max`; `str` takes a `check` with its own `test` and `normalize`. Any field can use `migrateFrom: ['section', 'old_key']` to seed a newly added setting from an older value when its new key is absent. Multiple fields can read the same old key. |
 | `section` | A fixed group of settings, written as `[name]`. |
 | `table` | Named entries that share optional settings, written as `[name."entry"]`. Entries are user data and are kept as they are. |
 | `ConfigValues` | The typed object `loadConfig` returns, inferred from the schema. |
@@ -66,11 +66,16 @@ What `loadConfig` does to the file:
 | --- | --- |
 | No file | Writes the defaults. Status `created`. |
 | File matches the schema | Nothing. Status `unchanged`. |
-| A setting was added to the schema | Written to the file with its default. Listed in `added`. |
+| A setting was added to the schema | Written with a migrated value when configured, otherwise its default. Listed in `added`. |
 | A setting was removed from the schema | Dropped from the file. Listed in `removed`. |
 | The user's values | Kept. |
 | A value is invalid | The default is used and a warning is returned. **The file is not rewritten**, so what the user typed isn't lost. Status `kept`. |
 | The file isn't valid TOML | Throws `ConfigSyntaxError` with the line and column. **The file is not touched.** |
+
+When a field declares `migrateFrom`, an existing source value is validated with the new field's
+rules and used in place of its default. The new field is still listed in `added`; the old source
+key is removed with other unknown settings. If the source value is invalid for the new field, the
+file is left untouched and a warning is returned.
 
 Rewriting the file normalizes it, so comments the user adds are not kept. The header note says so.
 The plugin writes through `DataFiles.writeFile`, which replaces the file atomically, so a crash

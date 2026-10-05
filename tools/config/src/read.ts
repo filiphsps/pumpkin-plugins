@@ -60,12 +60,12 @@ export function readConfig<S extends ConfigSchema>(schema: S, raw: Table): ReadR
         }
 
         if (node.node === 'section') {
-            values[name] = readFields(node.fields, found ?? {}, name, issues, true);
+            values[name] = readFields(node.fields, found ?? {}, name, issues, true, raw);
         } else {
             const entries: Record<string, unknown> = {};
             for (const [key, entry] of Object.entries(found ?? {})) {
                 const path = entryPath(name, key);
-                if (isTable(entry)) entries[key] = readFields(node.fields, entry, path, issues, false);
+                if (isTable(entry)) entries[key] = readFields(node.fields, entry, path, issues, false, raw);
                 else issues.push({ kind: 'invalid', path, message: `${path} must be a table; ignoring it` });
             }
             values[name] = entries;
@@ -78,12 +78,32 @@ export function readConfig<S extends ConfigSchema>(schema: S, raw: Table): ReadR
     return { values: values as ConfigValues<S>, issues };
 }
 
-function readFields(fields: Fields, raw: Table, path: string, issues: Issue[], reportMissing: boolean) {
+function readFields(
+    fields: Fields,
+    raw: Table,
+    path: string,
+    issues: Issue[],
+    reportMissing: boolean,
+    document: Table
+) {
     const out: Record<string, unknown> = {};
     for (const [key, f] of Object.entries(fields)) {
         const at = `${path}.${key}`;
         const value = raw[key];
         if (value === undefined) {
+            const previous = f.migrateFrom ? readPath(document, f.migrateFrom) : undefined;
+            if (previous?.found) {
+                const parsed = f.parse(previous.value);
+                if (parsed.ok) {
+                    out[key] = parsed.value;
+                } else {
+                    issues.push({ kind: 'invalid', path: at, message: invalidMessage(at, f) });
+                    if (f.default !== undefined) out[key] = f.default;
+                }
+                if (f.default !== undefined && reportMissing)
+                    issues.push({ kind: 'missing', path: at, message: `${at} is not in the file` });
+                continue;
+            }
             if (f.default === undefined) continue;
             if (reportMissing) issues.push({ kind: 'missing', path: at, message: `${at} is not in the file` });
             out[key] = f.default;
@@ -102,6 +122,16 @@ function readFields(fields: Fields, raw: Table, path: string, issues: Issue[], r
             issues.push({ kind: 'unknown', path: `${path}.${key}`, message: `unknown option ${path}.${key}` });
     }
     return out;
+}
+
+function readPath(document: Table, path: readonly string[]): { found: true; value: unknown } | undefined {
+    if (path.length === 0) return undefined;
+    let value: unknown = document;
+    for (const key of path) {
+        if (!isTable(value) || !Object.hasOwn(value, key)) return undefined;
+        value = value[key];
+    }
+    return { found: true, value };
 }
 
 function invalidMessage(path: string, f: Field<unknown>): string {
