@@ -66,6 +66,23 @@ Tasks are defined in `turbo.json` and run with the root scripts (`pnpm build`, `
 
 Run one plugin with `pnpm exec turbo run build --filter=@pumpkin-plugins/<folder>`.
 
+## Run all plugins on Pumpkin
+
+Run `pnpm dev` to build every plugin and start the latest stable Pumpkin release. GitHub's latest
+release endpoint excludes prereleases, so the `nightly` build is not selected. The server binary is
+downloaded once into `.cache/pumpkin` and checked against the release's `checksums.sha256`.
+
+The dev server lives in `.cache/pumpkin-dev`, so its world and settings remain between runs. On first
+start it enables Pumpkin's plugin hot reload. `turbo watch` rebuilds plugins as workspace packages
+change, and the dev command copies each completed `.wasm` into the server's `plugins/` directory.
+This copy is needed because Pumpkin watches that directory, while build outputs live under each
+package. A file linked to a build output would not notify Pumpkin when the target changes. Reloading
+plugins that request permissions still requires granting permissions on their initial load.
+
+Set `PUMPKIN_BIN` to use a local server binary instead of downloading the latest release. Set
+`PUMPKIN_CACHE_DIR` to change the binary cache directory. To reset the dev server's world, config and
+plugins, stop the server and remove `.cache/pumpkin-dev`.
+
 The build tool and test harness `typecheck` tasks run `tsc --noEmit`, so their package-level Turbo
 configurations declare no outputs. Plugin typechecks keep the root `build/types/**` outputs because
 they generate guest declarations needed by builds and editors.
