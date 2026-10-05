@@ -10,9 +10,10 @@ by the `pumpkinPlugin` key in each plugin's `package.json`:
 ```
 
 It uses the WIT from the pinned `@pumpkinmc/pumpkin-api-ts` (the version is the `catalog:` entry in
-`pnpm-workspace.yaml`, and it must match the Pumpkin server's plugin ABI) and the same bundler and
-componentizer as upstream's `master`. It exists because the pinned release's own build script
-uses a componentizer that produces 55 MB plugins and can't run the WASI socket code.
+`pnpm-workspace.yaml`, and it must match the Pumpkin server's plugin ABI), esbuild and the
+Wasmtime 48 CLI fork of `componentize-qjs`. The fork is needed because the upstream Wasmtime 47 CLI
+fails to link the WASI HTTP types used by plugins. The pinned release's own build script uses a
+componentizer that produces 55 MB plugins and can't run the WASI socket code.
 
 | Command | Result |
 | --- | --- |
@@ -35,7 +36,7 @@ makes the generated declarations win (they use `number` for 64-bit values).
 
 Plugins run on QuickJS inside the server's WebAssembly runtime:
 
-- There is no `TextEncoder`, `TextDecoder` or `fetch`. `fflate` provides `strToU8` and `strFromU8`.
+- There is no global `TextEncoder`, `TextDecoder` or `fetch`. `fflate` provides `strToU8` and `strFromU8`. Plugins that need HTTP can import `wasi:http` by declaring the `http` capability; the update-check tool already does this.
 - `u64`/`s64` values are plain JS numbers in both directions. Passing a `BigInt` panics the guest,
   so the build rewrites the generated types from `bigint` to `number`.
 - The base `Plugin` class's `scheduleDelayedTask` and `scheduleRepeatingTask` pass `BigInt`, so

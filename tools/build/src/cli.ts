@@ -6,7 +6,7 @@ import { BuildError } from './errors.ts';
 import { readPluginConfig, requireBuildFields } from './plugin-config.ts';
 import { cacheDir } from './repo.ts';
 import { generateTypes } from './types.ts';
-import { ensureWasiWit } from './wasi-wit.ts';
+import { ensureWasiWit, readLock } from './wasi-wit.ts';
 import { prepareWit } from './wit.ts';
 
 /**
@@ -24,7 +24,10 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
               createRequire(path.join(pluginDir, 'package.json')).resolve('@pumpkinmc/pumpkin-api-ts/package.json')
           );
     const interfaces = wasiInterfaces(config.wasi);
-    const wasiWit = interfaces.length > 0 ? await ensureWasiWit({ cacheDir: cacheDir(pluginDir) }) : undefined;
+    const wasiLock = readLock();
+    const wasiWit =
+        interfaces.length > 0 ? await ensureWasiWit({ cacheDir: cacheDir(pluginDir), lock: wasiLock }) : undefined;
+    const wasiFiles = Object.keys(wasiLock.files);
     const apiWit = path.join(apiRoot, 'wit/v0.1');
 
     // Types go to build/types so `types` and `build` can run in parallel (turbo) without sharing files.
@@ -33,6 +36,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
             apiWit,
             interfaces,
             wasiWit,
+            wasiFiles,
             target: path.join(buildDir, 'types', 'wit')
         });
         generateTypes(witDir, path.join(buildDir, 'types', 'bindings'));
@@ -44,6 +48,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
         apiWit,
         interfaces,
         wasiWit,
+        wasiFiles,
         target: path.join(buildDir, 'wit')
     });
     console.log(`Bundling ${entry}...`);

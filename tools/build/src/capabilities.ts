@@ -3,6 +3,7 @@ export const WASI_VERSION = '0.2.3';
 
 /** WASI interfaces a plugin can opt into, by the name used in `pumpkinPlugin.wasi`. */
 export const CAPABILITIES = {
+    http: ['http/types', 'http/outgoing-handler'],
     filesystem: ['filesystem/types', 'filesystem/preopens'],
     sockets: ['sockets/network', 'sockets/instance-network', 'sockets/tcp', 'sockets/tcp-create-socket'],
     udp: ['sockets/network', 'sockets/instance-network', 'sockets/udp', 'sockets/udp-create-socket']

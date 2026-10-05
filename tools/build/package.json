@@ -42,7 +42,7 @@
     },
     "dependencies": {
         "@bytecodealliance/jco": "1.35.0",
-        "componentize-qjs": "0.4.5",
+        "@di-framework/componentize-qjs": "0.4.4-di.3",
         "esbuild": "0.28.2"
     },
     "devDependencies": {

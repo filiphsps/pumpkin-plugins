@@ -365,9 +365,9 @@ importers:
       '@bytecodealliance/jco':
         specifier: 1.35.0
         version: 1.35.0
-      componentize-qjs:
-        specifier: 0.4.5
-        version: 0.4.5
+      '@di-framework/componentize-qjs':
+        specifier: 0.4.4-di.3
+        version: 0.4.4-di.3
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
@@ -469,6 +469,31 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@types/node@24.19.1)(vite@8.3.2(@types/node@24.19.1)(jiti@2.6.1))
+
+  tools/update-check:
+    dependencies:
+      '@pumpkinmc/pumpkin-api-ts':
+        specifier: 'catalog:'
+        version: https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
+    devDependencies:
+      '@pumpkin-plugins/build':
+        specifier: workspace:*
+        version: link:../build
+      '@pumpkin-plugins/test-harness':
+        specifier: workspace:*
+        version: link:../test-harness
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@types/node@24.19.1)(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.6.1))
 
   tools/upnpumpkin-api:
     dependencies:
@@ -829,6 +854,46 @@ packages:
   '@conventional-changelog/template@1.4.0':
     resolution: {integrity: sha512-aalGyl7dbB5PArRebDIX43ZvBlXrYm9uWzGJ26t+4SzJVPsOuvfILGGbw5X4yX7i50YEmJ8zvbiWnqH/AAnZqg==}
     engines: {node: '>=22'}
+
+  '@di-framework/componentize-qjs@0.4.4-di.3':
+    resolution: {integrity: sha512-lT56Ho4ACmJHEKRFXEnyUPIr66hQyhs1ygSj1/1/GvYqSINpLOvnE4PNobvSaC/flfLVxp4uIb7A3kDI38bk1g==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  '@di-framework/componentize-qjs@0.4.4-di.3-darwin-arm64':
+    resolution: {integrity: sha512-dN2P9iJYJXPRk2K1Vlo1kha4blSwD1YSEuwtLxqgQgp/LgqwkzK/1d+u2bg7Ac/zx4tUnKqAN18fQUG2sk7N2g==}
+    engines: {node: '>=18'}
+    cpu: [arm64]
+    os: [darwin]
+    hasBin: true
+
+  '@di-framework/componentize-qjs@0.4.4-di.3-darwin-x64':
+    resolution: {integrity: sha512-JAx/FQ1Q+0DBhh9NET3NPcbauSTwkXoTnjk6eHLf4PY/G5ONCZNFG7qEf/aAPkjXXwmpIiQ4FBiRJOJCz7/ysA==}
+    engines: {node: '>=18'}
+    cpu: [x64]
+    os: [darwin]
+    hasBin: true
+
+  '@di-framework/componentize-qjs@0.4.4-di.3-linux-arm64':
+    resolution: {integrity: sha512-vMY4tcus7oF2P3QoE4nu0oVt3cuEXEEmGph+6uQa7OhpmTcOgEE0QVJGOxHrJ8oPj7tSlxDWIKLkpdsyTWxYsw==}
+    engines: {node: '>=18'}
+    cpu: [arm64]
+    os: [linux]
+    hasBin: true
+
+  '@di-framework/componentize-qjs@0.4.4-di.3-linux-x64':
+    resolution: {integrity: sha512-MwTqXbYdv2zezNpIHDOGiTo6MhvDvbXHFKSnC+Y6mh4BrXUcVrMRZ5sSuYMwwVz5aHdE1V9zyyARE3fafywNFA==}
+    engines: {node: '>=18'}
+    cpu: [x64]
+    os: [linux]
+    hasBin: true
+
+  '@di-framework/componentize-qjs@0.4.4-di.3-win32-x64':
+    resolution: {integrity: sha512-O2f8+zQRbdp0UvS8uqT86MB/ZkhJQGSCutPuOFWplZKvkCdk9uplHwxWrj3ydqeWLtuTmpCu4lU+bKSe/t5tYw==}
+    engines: {node: '>=18'}
+    cpu: [x64]
+    os: [win32]
+    hasBin: true
 
   '@emnapi/core@1.11.1':
     resolution: {integrity: sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ==}
@@ -3546,6 +3611,29 @@ snapshots:
       conventional-commits-parser: 7.1.2
 
   '@conventional-changelog/template@1.4.0': {}
+
+  '@di-framework/componentize-qjs@0.4.4-di.3':
+    optionalDependencies:
+      componentize-qjs-darwin-arm64: '@di-framework/componentize-qjs@0.4.4-di.3-darwin-arm64'
+      componentize-qjs-darwin-x64: '@di-framework/componentize-qjs@0.4.4-di.3-darwin-x64'
+      componentize-qjs-linux-arm64: '@di-framework/componentize-qjs@0.4.4-di.3-linux-arm64'
+      componentize-qjs-linux-x64: '@di-framework/componentize-qjs@0.4.4-di.3-linux-x64'
+      componentize-qjs-win32-x64: '@di-framework/componentize-qjs@0.4.4-di.3-win32-x64'
+
+  '@di-framework/componentize-qjs@0.4.4-di.3-darwin-arm64':
+    optional: true
+
+  '@di-framework/componentize-qjs@0.4.4-di.3-darwin-x64':
+    optional: true
+
+  '@di-framework/componentize-qjs@0.4.4-di.3-linux-arm64':
+    optional: true
+
+  '@di-framework/componentize-qjs@0.4.4-di.3-linux-x64':
+    optional: true
+
+  '@di-framework/componentize-qjs@0.4.4-di.3-win32-x64':
+    optional: true
 
   '@emnapi/core@1.11.1':
     dependencies:

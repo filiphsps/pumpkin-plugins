@@ -26,6 +26,7 @@ Monorepo for [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) plugins written in
 | [@pumpkin-plugins/port-mapping](tools/port-mapping) | UPnP and NAT-PMP port mapping |
 | [@pumpkin-plugins/signing](tools/signing) | Ed25519 signing for plugin builds |
 | [@pumpkin-plugins/test-harness](tools/test-harness) | Runs plugins on a real Pumpkin in vitest |
+| [@pumpkin-plugins/update-check](tools/update-check) | Check plugin versions against Pumpkin Market |
 | [@pumpkin-plugins/upnpumpkin-api](tools/upnpumpkin-api) | Asks UPnPumpkin to open a port |
 <!-- docs:end packages -->
 

@@ -38,7 +38,7 @@ describe('readPluginConfig', () => {
     it('explains a missing key and an unknown capability', () => {
         expect(() => readPluginConfig(packageWith({ version: '0.0.0' }))).toThrow(BuildError);
         expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { wasi: ['network'] } }))).toThrow(
-            'unknown wasi capability "network" (known: filesystem, sockets, udp)'
+            'unknown wasi capability "network" (known: http, filesystem, sockets, udp)'
         );
     });
 });

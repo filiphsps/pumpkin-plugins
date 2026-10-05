@@ -1,0 +1,67 @@
+{
+    "name": "@pumpkin-plugins/update-check",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Check plugin versions against Pumpkin Market",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/update-check#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
+        "directory": "tools/update-check"
+    },
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/filiphsps"
+        },
+        {
+            "type": "custom",
+            "url": "https://paypal.me/filiph"
+        }
+    ],
+    "type": "module",
+    "sideEffects": false,
+    "module": "./src/index.ts",
+    "types": "./src/index.ts",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "files": [
+        "src"
+    ],
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "build": "pumpkin-plugins-build",
+        "typecheck": "pnpm build --types-only && tsc --noEmit",
+        "test": "vitest run --project unit",
+        "test:integration": "vitest run --project integration"
+    },
+    "dependencies": {
+        "@pumpkinmc/pumpkin-api-ts": "catalog:",
+        "fflate": "0.8.3"
+    },
+    "devDependencies": {
+        "@pumpkin-plugins/build": "workspace:*",
+        "@pumpkin-plugins/test-harness": "workspace:*",
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:"
+    },
+    "pumpkinPlugin": {
+        "entry": "test/fixture-plugin.ts",
+        "output": "build/update-check-fixture.wasm",
+        "wasi": [
+            "http"
+        ]
+    }
+}

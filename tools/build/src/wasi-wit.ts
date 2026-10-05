@@ -9,6 +9,8 @@ export interface WasiWitLock {
     version: string;
     /** SHA-256 of each file, by path below `wasip2/`. */
     files: Record<string, string>;
+    /** Alternate pinned source URLs for WIT files outside the wasi repository. */
+    sources?: Record<string, string>;
 }
 
 /** Downloads a URL. */
@@ -60,7 +62,9 @@ export async function ensureWasiWit(options: WasiWitOptions): Promise<string> {
     const missing = Object.entries(lock.files).filter(([rel, hash]) => !isCached(path.join(dir, rel), hash));
     await Promise.all(
         missing.map(async ([rel, hash]) => {
-            const url = `https://raw.githubusercontent.com/WebAssembly/WASI/v${lock.version}/wasip2/${rel}`;
+            const url =
+                lock.sources?.[rel] ??
+                `https://raw.githubusercontent.com/WebAssembly/WASI/v${lock.version}/wasip2/${rel}`;
             let bytes: Uint8Array;
             try {
                 bytes = await fetchFile(url);

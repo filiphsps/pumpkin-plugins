@@ -1,7 +1,10 @@
+import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { componentize } from 'componentize-qjs';
 import * as esbuild from 'esbuild';
+
+const require = createRequire(import.meta.url);
 
 /** Inputs to `bundlePlugin`. */
 export interface BundleOptions {
@@ -34,14 +37,24 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
             external: ['pumpkin:plugin/*', 'wasi:*'],
             define: { __PLUGIN_VERSION__: JSON.stringify(options.version) }
         });
-        const { component } = await componentize({
-            world: 'plugin',
-            witPath: options.witDir,
-            jsSource: fs.readFileSync(bundle, 'utf8'),
-            optSize: true
-        });
-        fs.writeFileSync(options.output, component);
-        return component.length;
+        const componentizerPackage = path.dirname(require.resolve('@di-framework/componentize-qjs/package.json'));
+        execFileSync(
+            process.execPath,
+            [
+                path.join(componentizerPackage, 'bin/componentize-qjs.cjs'),
+                '--world',
+                'plugin',
+                '--wit',
+                options.witDir,
+                '--js',
+                bundle,
+                '--opt-size',
+                '--output',
+                options.output
+            ],
+            { stdio: 'inherit' }
+        );
+        return fs.statSync(options.output).size;
     } finally {
         fs.rmSync(bundle, { force: true });
     }

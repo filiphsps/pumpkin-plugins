@@ -31,6 +31,8 @@ export interface PrepareWitOptions {
     interfaces: readonly string[];
     /** The folder `ensureWasiWit` returned. Only needed when there are interfaces. */
     wasiWit?: string;
+    /** Exact WASI WIT paths from the lock, to keep stale cached files out of the component world. */
+    wasiFiles?: readonly string[];
 }
 
 /**
@@ -52,7 +54,21 @@ export function prepareWit(options: PrepareWitOptions): string {
     try {
         retryTransientCopy(() => fs.cpSync(options.apiWit, temporary, { recursive: true }));
 
-        retryTransientCopy(() => fs.cpSync(wasiWit, path.join(temporary, 'deps'), { recursive: true }));
+        if (options.wasiFiles) {
+            for (const rel of options.wasiFiles) {
+                const target = path.join(temporary, 'deps', rel);
+                fs.mkdirSync(path.dirname(target), { recursive: true });
+                fs.copyFileSync(path.join(wasiWit, rel), target);
+            }
+        } else {
+            retryTransientCopy(() => fs.cpSync(wasiWit, path.join(temporary, 'deps'), { recursive: true }));
+        }
+        if (options.interfaces.includes('http/outgoing-handler')) {
+            fs.copyFileSync(
+                path.join(import.meta.dirname, '../wit/http-package.wit'),
+                path.join(temporary, 'deps/http/package.wit')
+            );
+        }
         const pluginWit = path.join(temporary, 'plugin.wit');
         fs.writeFileSync(pluginWit, injectWasiImports(fs.readFileSync(pluginWit, 'utf8'), options.interfaces));
         fs.rmSync(options.target, { recursive: true, force: true });
