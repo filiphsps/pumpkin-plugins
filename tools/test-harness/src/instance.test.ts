@@ -109,4 +109,21 @@ describe('startPumpkin', () => {
         expect(fs.readFileSync(path.join(logDir, savedName ?? ''), 'utf8')).toContain('Server is now running');
         expect(fs.existsSync(dir)).toBe(false);
     });
+
+    it('keeps the temporary server directory when requested', async () => {
+        delete process.env.PUMPKIN_TEST_LOG_DIR;
+        process.env.PUMPKIN_KEEP_DIR = '1';
+        fakePumpkin(0);
+
+        const server = await startPumpkin();
+        const dir = server.dir;
+        made.push(dir);
+        try {
+            await server.waitForLog(/Server is now running/);
+        } finally {
+            await server.stop();
+        }
+
+        expect(fs.existsSync(dir)).toBe(true);
+    });
 });
