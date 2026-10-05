@@ -52,7 +52,13 @@ export function prepareWit(options: PrepareWitOptions): string {
     fs.mkdirSync(parent, { recursive: true });
     const temporary = fs.mkdtempSync(path.join(parent, `.${path.basename(options.target)}-`));
     try {
-        retryTransientCopy(() => fs.cpSync(options.apiWit, temporary, { recursive: true }));
+        retryTransientCopy(
+            () => fs.cpSync(options.apiWit, temporary, { recursive: true }),
+            () => {
+                fs.rmSync(temporary, { recursive: true, force: true });
+                fs.mkdirSync(temporary);
+            }
+        );
 
         if (options.wasiFiles) {
             for (const rel of options.wasiFiles) {
@@ -61,7 +67,11 @@ export function prepareWit(options: PrepareWitOptions): string {
                 fs.copyFileSync(path.join(wasiWit, rel), target);
             }
         } else {
-            retryTransientCopy(() => fs.cpSync(wasiWit, path.join(temporary, 'deps'), { recursive: true }));
+            const deps = path.join(temporary, 'deps');
+            retryTransientCopy(
+                () => fs.cpSync(wasiWit, deps, { recursive: true }),
+                () => fs.rmSync(deps, { recursive: true, force: true })
+            );
         }
         if (options.interfaces.includes('http/outgoing-handler')) {
             fs.copyFileSync(
@@ -80,13 +90,14 @@ export function prepareWit(options: PrepareWitOptions): string {
     return options.target;
 }
 
-function retryTransientCopy(copy: () => void): void {
+function retryTransientCopy(copy: () => void, reset: () => void): void {
     for (let attempt = 0; ; attempt += 1) {
         try {
             copy();
             return;
         } catch (error) {
             if (!isInputOutputError(error) || attempt === 2) throw error;
+            reset();
         }
     }
 }

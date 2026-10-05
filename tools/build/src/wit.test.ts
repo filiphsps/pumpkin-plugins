@@ -1,9 +1,18 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('node:fs', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('node:fs')>();
+    return { ...actual, cpSync: vi.fn(actual.cpSync) };
+});
+
 import { BuildError } from './errors.ts';
 import { injectWasiImports, prepareWit } from './wit.ts';
+
+const copy = vi.mocked(fs.cpSync).getMockImplementation();
+if (!copy) throw new Error('node:fs.cpSync mock has no implementation');
 
 const PLUGIN_WIT = `world plugin {
     import logging;
@@ -20,6 +29,7 @@ const tmp = () => {
     return dir;
 };
 afterEach(() => {
+    vi.mocked(fs.cpSync).mockReset().mockImplementation(copy);
     for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -72,6 +82,22 @@ describe('prepareWit', () => {
         fs.mkdirSync(target, { recursive: true });
         fs.writeFileSync(path.join(target, 'stale.wit'), 'old');
         prepareWit({ apiWit, target, wasiWit, interfaces: ['io/poll'] });
+        expect(fs.existsSync(path.join(target, 'stale.wit'))).toBe(false);
+    });
+
+    it('cleans a partial API copy before retrying a transient I/O error', () => {
+        const { apiWit, wasiWit, target } = layout();
+        let attempts = 0;
+        vi.mocked(fs.cpSync).mockImplementation((source, destination, options) => {
+            if (source === apiWit && attempts++ === 0) {
+                fs.writeFileSync(path.join(String(destination), 'stale.wit'), 'partial copy');
+                throw Object.assign(new Error('temporary I/O error'), { code: 'EIO' });
+            }
+            return copy(source, destination, options);
+        });
+
+        prepareWit({ apiWit, wasiWit, target, interfaces: ['io/poll'] });
+
         expect(fs.existsSync(path.join(target, 'stale.wit'))).toBe(false);
     });
 
