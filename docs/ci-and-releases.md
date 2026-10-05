@@ -71,6 +71,10 @@ the tag and the release, which is usually the older run, and the artifact it hol
 earlier commit. The attach job therefore resolves the tag first and refuses to upload unless it
 points at the commit that run built, which leaves the release to the run for the released commit.
 
+Push workflow runs are not canceled when a newer commit arrives. This lets release-please finish
+creating a tag and updating its release PR before the next push run reads that state. Pull request
+runs are still canceled when superseded.
+
 Release Please creates a tag immediately, including while a GitHub release is a draft. Without that,
 a later release run can miss the previous release and recreate its changelog. The release config
 keeps `force-tag-creation` enabled, and the repository check enforces it.

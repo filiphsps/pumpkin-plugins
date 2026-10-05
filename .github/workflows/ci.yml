@@ -9,7 +9,9 @@ on:
 
 concurrency:
     group: ci-${{ github.ref }}
-    cancel-in-progress: true
+    # Let push runs finish: release-please must not be interrupted between creating a tag
+    # and updating its release PR. Pull request runs can still be superseded safely.
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
     CI: true
