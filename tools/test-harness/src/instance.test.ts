@@ -6,10 +6,16 @@ import { startPumpkin } from './instance.ts';
 
 const made: string[] = [];
 const realBinary = process.env.PUMPKIN_BIN;
+const realLogDir = process.env.PUMPKIN_TEST_LOG_DIR;
+const realKeepDir = process.env.PUMPKIN_KEEP_DIR;
 
 afterEach(() => {
     if (realBinary === undefined) delete process.env.PUMPKIN_BIN;
     else process.env.PUMPKIN_BIN = realBinary;
+    if (realLogDir === undefined) delete process.env.PUMPKIN_TEST_LOG_DIR;
+    else process.env.PUMPKIN_TEST_LOG_DIR = realLogDir;
+    if (realKeepDir === undefined) delete process.env.PUMPKIN_KEEP_DIR;
+    else process.env.PUMPKIN_KEEP_DIR = realKeepDir;
     for (const dir of made.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -81,5 +87,26 @@ describe('startPumpkin', () => {
         } finally {
             await server.stop();
         }
+    });
+
+    it('saves a named log before removing the temporary server directory', async () => {
+        const logDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-test-logs-'));
+        made.push(logDir);
+        process.env.PUMPKIN_TEST_LOG_DIR = logDir;
+        delete process.env.PUMPKIN_KEEP_DIR;
+        fakePumpkin(0);
+
+        const server = await startPumpkin({ name: 'plugin test' });
+        const dir = server.dir;
+        try {
+            await server.waitForLog(/Server is now running/);
+        } finally {
+            await server.stop();
+        }
+
+        const [savedName] = fs.readdirSync(logDir);
+        expect(savedName).toBe(`plugin_test-${path.basename(dir)}.log`);
+        expect(fs.readFileSync(path.join(logDir, savedName ?? ''), 'utf8')).toContain('Server is now running');
+        expect(fs.existsSync(dir)).toBe(false);
     });
 });
