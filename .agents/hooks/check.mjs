@@ -45,11 +45,20 @@ export function planChecks(files, exists = defaultExists, packageName = defaultP
     const present = relevant.filter(exists);
     if (present.length > 0) {
         steps.push({
-            name: 'Biome',
-            args: ['exec', 'biome', 'check', '--no-errors-on-unmatched', '--files-ignore-unknown=true', ...present]
+            name: 'Biome fixes',
+            args: [
+                'exec',
+                'biome',
+                'check',
+                '--write',
+                '--no-errors-on-unmatched',
+                '--files-ignore-unknown=true',
+                ...present
+            ]
         });
         const ts = present.filter((f) => /\.[cm]?ts$/.test(f));
-        if (ts.length > 0) steps.push({ name: 'JSDoc lint', args: ['exec', 'eslint', '--no-warn-ignored', ...ts] });
+        if (ts.length > 0)
+            steps.push({ name: 'JSDoc fixes', args: ['exec', 'eslint', '--fix', '--no-warn-ignored', ...ts] });
     }
 
     const filters = new Set();

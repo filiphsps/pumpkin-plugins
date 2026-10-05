@@ -143,13 +143,15 @@ describe('planChecks', () => {
 
     it('lints the changed files and checks their package', () => {
         const steps = plan(['packages/upnpumpkin/src/forwarder.ts', 'packages/upnpumpkin/README.md']);
-        assert.deepEqual(steps.find((s) => s.name === 'Biome')?.args.slice(-2), [
+        const biome = steps.find((s) => s.name === 'Biome fixes');
+        assert.ok(biome?.args.includes('--write'));
+        assert.deepEqual(biome?.args.slice(-2), [
             'packages/upnpumpkin/src/forwarder.ts',
             'packages/upnpumpkin/README.md'
         ]);
-        assert.deepEqual(steps.find((s) => s.name === 'JSDoc lint')?.args.slice(-1), [
-            'packages/upnpumpkin/src/forwarder.ts'
-        ]);
+        const jsdoc = steps.find((s) => s.name === 'JSDoc fixes');
+        assert.ok(jsdoc?.args.includes('--fix'));
+        assert.deepEqual(jsdoc?.args.slice(-1), ['packages/upnpumpkin/src/forwarder.ts']);
         assert.ok(turbo(steps)?.includes('--filter=@pumpkin-plugins/upnpumpkin'));
         assert.deepEqual(
             steps.slice(-2).map((s) => s.name),
@@ -182,7 +184,7 @@ describe('planChecks', () => {
     it('does not lint deleted files, and ignores build output', () => {
         const steps = plan(['packages/upnpumpkin/src/gone.ts'], () => false);
         assert.equal(
-            steps.some((s) => s.name === 'Biome'),
+            steps.some((s) => s.name === 'Biome fixes'),
             false
         );
         assert.ok(turbo(steps));

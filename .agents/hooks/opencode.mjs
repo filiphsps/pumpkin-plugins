@@ -2,9 +2,10 @@
 //
 // - Before a tool runs: refuses the shell commands and file edits guard.mjs rules out, and quiets
 //   Turborepo output (output.mjs).
-// - When the agent finishes a turn in which it edited files: runs check.mjs on those files and,
-//   if something fails, sends the failures back to the session so the agent fixes them. It does this
-//   at most MAX_ROUNDS times in a row before leaving the rest to the user.
+// - When the agent finishes a turn in which it edited files: runs check.mjs on those files, which
+//   applies lint fixes before package checks. If a check fails, it sends the failures back to the
+//   session so the agent fixes them. It does this at most MAX_ROUNDS times before leaving the rest
+//   to the user.
 //
 // Formatting after edits is OpenCode's built-in Biome formatter, configured in /opencode.jsonc.
 import * as fs from 'node:fs';
