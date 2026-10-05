@@ -1,6 +1,7 @@
 import { instanceNetwork } from 'wasi:sockets/instance-network@0.2.3';
 import type { TcpSocket } from 'wasi:sockets/tcp@0.2.3';
 import { createTcpSocket } from 'wasi:sockets/tcp-create-socket@0.2.3';
+import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import type { Logger } from '../platform/logger.ts';
 import { wasiErrorCode } from '../platform/wasi-error.ts';
 import { parseIpv4 } from './ipv4.ts';
@@ -65,7 +66,11 @@ export class TcpWebServer implements WebServer {
             socket.startListen();
             settle(() => socket.finishListen());
         } catch (err) {
-            socket[Symbol.dispose]();
+            try {
+                disposeWasiResource(socket);
+            } catch {
+                // Preserve the socket setup error.
+            }
             const code = wasiErrorCode(err) ?? String(err);
             throw new Error(`cannot listen on ${settings.bind}:${settings.port}: ${BIND_REASONS[code] ?? code}`);
         }
@@ -83,7 +88,7 @@ export class TcpWebServer implements WebServer {
     stop(): void {
         for (const session of this.sessions) session.abort();
         this.sessions.clear();
-        this.listener?.[Symbol.dispose]();
+        if (this.listener) disposeWasiResource(this.listener);
         this.listener = undefined;
     }
 

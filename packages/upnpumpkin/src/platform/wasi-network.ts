@@ -3,6 +3,7 @@ import type { IpSocketAddress, Network as WasiNet } from 'wasi:sockets/network@0
 import type { TcpSocket } from 'wasi:sockets/tcp@0.2.3';
 import type { UdpSocket } from 'wasi:sockets/udp@0.2.3';
 import { wasiErrorCode } from '@pumpkin-plugins/plugin-kit/wasi-error';
+import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import type {
     Connection,
     Datagram,
@@ -93,7 +94,7 @@ class WasiDatagramSocket implements DatagramSocket {
         this.closed = true;
         for (const resource of [this.incoming, this.outgoing, this.socket]) {
             try {
-                resource[Symbol.dispose]();
+                disposeWasiResource(resource);
             } catch {
                 // Already released.
             }
@@ -134,7 +135,7 @@ class WasiConnection implements Connection {
         this.closed = true;
         for (const resource of [this.input, this.output, this.socket]) {
             try {
-                resource[Symbol.dispose]();
+                disposeWasiResource(resource);
             } catch {
                 // Already released.
             }
@@ -150,7 +151,7 @@ class WasiDial implements Dial {
         try {
             socket.startConnect(sockets.instance(), address(to));
         } catch (err) {
-            socket[Symbol.dispose]();
+            disposeWasiResource(socket);
             throw new Error(describe(err));
         }
         this.socket = socket;
@@ -173,7 +174,7 @@ class WasiDial implements Dial {
     }
 
     abort(): void {
-        this.socket?.[Symbol.dispose]();
+        if (this.socket) disposeWasiResource(this.socket);
         this.socket = undefined;
     }
 }
@@ -199,7 +200,7 @@ export class WasiNetwork implements Network {
             const [incoming, outgoing] = socket.stream(undefined);
             return new WasiDatagramSocket(socket, incoming, outgoing);
         } catch (err) {
-            socket[Symbol.dispose]();
+            disposeWasiResource(socket);
             throw new Error(describe(err));
         }
     }
@@ -225,13 +226,13 @@ export class WasiNetwork implements Network {
                 const [a, b, c, d] = local.val.address;
                 return a === 0 ? undefined : [a, b, c, d];
             } finally {
-                incoming[Symbol.dispose]();
-                outgoing[Symbol.dispose]();
+                disposeWasiResource(incoming);
+                disposeWasiResource(outgoing);
             }
         } catch {
             return undefined;
         } finally {
-            socket[Symbol.dispose]();
+            disposeWasiResource(socket);
         }
     }
 }

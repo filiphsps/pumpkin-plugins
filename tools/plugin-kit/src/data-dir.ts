@@ -2,6 +2,7 @@ import { getDirectories } from 'wasi:filesystem/preopens@0.2.3';
 import type { Descriptor } from 'wasi:filesystem/types@0.2.3';
 import type { DataFiles, FileInfo, FileKind, RandomAccessFile } from './files.ts';
 import { wasiErrorCode } from './wasi-error.ts';
+import { disposeWasiResource } from './wasi-resource.ts';
 
 /** Most bytes read from a file in one call. */
 const READ_CHUNK = 1 << 20;
@@ -49,11 +50,11 @@ export class WasiDataDir implements DataFiles {
                     names.push(entry.name);
                 }
             } finally {
-                entries[Symbol.dispose]();
+                disposeWasiResource(entries);
             }
             return names;
         } finally {
-            folder[Symbol.dispose]();
+            disposeWasiResource(folder);
         }
     }
 
@@ -86,11 +87,11 @@ export class WasiDataDir implements DataFiles {
                 offset += written;
             }
         } catch (err) {
-            file[Symbol.dispose]();
+            disposeWasiResource(file);
             this.root.unlinkFileAt(temp);
             throw err;
         }
-        file[Symbol.dispose]();
+        disposeWasiResource(file);
         this.root.renameAt(temp, this.root, path);
     }
 
@@ -120,7 +121,7 @@ export class WasiDataDir implements DataFiles {
         return {
             size,
             read: (offset, length) => file.read(length, offset)[0],
-            close: () => file[Symbol.dispose]()
+            close: () => disposeWasiResource(file)
         };
     }
 }

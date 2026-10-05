@@ -1,5 +1,6 @@
 import type { InputStream, OutputStream } from 'wasi:io/streams@0.2.3';
 import type { TcpSocket } from 'wasi:sockets/tcp@0.2.3';
+import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { wasiErrorCode } from '../platform/wasi-error.ts';
 import type { Transport } from './session.ts';
 
@@ -65,7 +66,7 @@ export class TcpTransport implements Transport {
         this.released = true;
         for (const resource of [this.input, this.output, this.socket]) {
             try {
-                resource[Symbol.dispose]();
+                disposeWasiResource(resource);
             } catch {
                 // Already closed.
             }
