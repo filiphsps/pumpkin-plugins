@@ -86,7 +86,6 @@ function publishComponent(component: string, output: string, temporaryDir: strin
             }
             throw publishError;
         }
-        fs.rmSync(previous, { force: true });
     }
 }
 

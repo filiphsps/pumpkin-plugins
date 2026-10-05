@@ -51,7 +51,11 @@ describe('bundlePlugin', () => {
     it('keeps the previous artifact and removes staging files when componentization fails', async () => {
         const { output } = buildAt();
         fs.writeFileSync(output, 'known-good artifact');
-        componentize.mockImplementation(() => {
+        componentize.mockImplementation((_file, args) => {
+            const outputIndex = args?.indexOf('--output') ?? -1;
+            const staged = args?.[outputIndex + 1];
+            if (!staged) throw new Error('missing componentizer output argument');
+            fs.writeFileSync(staged, 'partial component');
             throw new Error('componentizer failed');
         });
 
@@ -64,8 +68,10 @@ describe('bundlePlugin', () => {
     });
 
     it('uses separate temporary bundles for concurrent builds', async () => {
-        const first = buildAt('first.wasm');
-        const second = buildAt('second.wasm');
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-build-'));
+        dirs.push(dir);
+        const first = { output: path.join(dir, 'first.wasm') };
+        const second = { output: path.join(dir, 'second.wasm') };
         const bundles: string[] = [];
         esbuild.mockImplementation(async ({ outfile }) => {
             bundles.push(outfile as string);
