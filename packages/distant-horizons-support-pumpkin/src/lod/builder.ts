@@ -31,6 +31,7 @@ interface Point {
 /** Incrementally builds the 64x64 columns of an LOD, with a bounded number of block reads. */
 export class LodBuilder {
     private column = 0;
+    private points = 0;
     private y: number;
     private readonly columns: Point[][] = [];
     private readonly ids = new Map<string, number>();
@@ -62,7 +63,11 @@ export class LodBuilder {
             if (previous?.id === id) {
                 previous.start = this.y;
                 previous.height++;
-            } else column.push({ id, start: this.y, height: 1, sky: sample.sky, block: sample.block });
+            } else {
+                // Bound guest memory even for custom worlds with alternating blocks at every height.
+                if (++this.points > 131072) throw new RangeError('LOD section is too complex');
+                column.push({ id, start: this.y, height: 1, sky: sample.sky, block: sample.block });
+            }
             if (--this.y < 0) {
                 this.y = this.height - 1;
                 this.column++;

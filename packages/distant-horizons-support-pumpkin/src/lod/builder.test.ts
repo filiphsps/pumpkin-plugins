@@ -70,6 +70,15 @@ describe('LOD builder', () => {
         expect(data.words()).toEqual({ high: 0x1001, low: 1 });
         expect(data.words()).toEqual({ high: 1, low: 0 });
     });
+    it('rejects overly complex terrain before retaining an unbounded set of points', () => {
+        const builder = new LodBuilder(section, 0, 33);
+        const terrain = {
+            minY: 0,
+            height: 33,
+            sample: (_x: number, y: number) => ({ mapping: y % 2 ? 'stone' : 'air', sky: 0, block: 0 })
+        };
+        expect(() => builder.step(terrain, 4096 * 33)).toThrow('too complex');
+    });
     it('propagates missing terrain and refuses a changed world height', () => {
         const b = new LodBuilder(section, 0, 3);
         expect(() =>
