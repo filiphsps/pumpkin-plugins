@@ -1,10 +1,27 @@
 import { MemoryFiles } from '@pumpkin-plugins/plugin-kit/testing';
 import { strToU8 } from 'fflate';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { BlockPosition } from './client-light.ts';
 import { LightJournal, type LightRecoveryWorld } from './journal.ts';
 
 describe(LightJournal.name, () => {
+    it.each([
+        [block(0.5, 64, 0), 0, 14],
+        [block(2147483648, 64, 0), 0, 14],
+        [block(0, 64, 0), -1, 14],
+        [block(0, 64, 0), 16, 14],
+        [block(0, 64, 0), 0, 14.5],
+        [block(0, 64, 0), 0, 16]
+    ] as const)('rejects invalid recovery coordinates or light levels: %j, %s, %s', (position, original, applied) => {
+        const files = new MemoryFiles();
+        const world = new FakeWorld();
+        const read = vi.spyOn(world, 'getBlockLight');
+        const write = vi.spyOn(world, 'setBlockLight');
+        writeJournal(files, position, original, applied);
+        expect(new LightJournal(files).recover([world])).toBe(0);
+        expect(read).not.toHaveBeenCalled();
+        expect(write).not.toHaveBeenCalled();
+    });
     it('restores light after an interrupted server', () => {
         const files = new MemoryFiles();
         const world = new FakeWorld();

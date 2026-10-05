@@ -82,14 +82,24 @@ function isJournalEntry(value: unknown): value is JournalEntry {
         typeof entry.key === 'string' &&
         typeof entry.worldId === 'string' &&
         isPosition(entry.position) &&
-        typeof entry.originalLevel === 'number' &&
+        isLightLevel(entry.originalLevel) &&
         Array.isArray(entry.appliedLevels) &&
-        entry.appliedLevels.every((level) => typeof level === 'number')
+        entry.appliedLevels.every(isLightLevel)
     );
 }
 
 function isPosition(value: unknown): value is BlockPosition {
     if (typeof value !== 'object' || value === null) return false;
     const position = value as Partial<BlockPosition>;
-    return typeof position.x === 'number' && typeof position.y === 'number' && typeof position.z === 'number';
+    return [position.x, position.y, position.z].every(
+        (coordinate) =>
+            typeof coordinate === 'number' &&
+            Number.isInteger(coordinate) &&
+            coordinate >= -2147483648 &&
+            coordinate <= 2147483647
+    );
+}
+
+function isLightLevel(value: unknown): value is number {
+    return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 15;
 }
