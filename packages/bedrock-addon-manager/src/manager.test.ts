@@ -270,7 +270,13 @@ describe('PackManager', () => {
         files.put('packs/a.mcpack', pack(1));
         manager.start();
         expect(log.of('info')).toContain(
-            'Offering 1 Bedrock pack to players who join from now on (not connected to the server yet, so players are not sent them).'
+            `Offering ${colorLogValue('1', 'yellow')} Bedrock pack to players who join from now on (not connected to the server yet, so players are not sent them).`
+        );
+
+        files.put('packs/b.mcpack', pack(2));
+        manager.reload();
+        expect(log.of('info')).toContain(
+            `Offering ${colorLogValue('2', 'yellow')} Bedrock packs to players who join from now on (not connected to the server yet, so players are not sent them).`
         );
     });
 

@@ -222,7 +222,9 @@ describe('PortForwarder', () => {
             }
             settle(() => keys().length === 1);
             expect(keys()).toEqual(['tcp:2222']);
-            expect(log.of('info')).toContain('Gone stopped asking, so its port was closed.');
+            expect(log.of('info')).toContain(
+                `${colorLogValue('Gone', 'cyan')} stopped asking, so its port was closed.`
+            );
         });
     });
 
