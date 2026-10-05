@@ -22,14 +22,19 @@ export function checkMarketUpdate(options: MarketUpdateOptions): UpdateCheck {
     );
     if (typeof response !== 'object' || response === null) throw new TypeError('Invalid Market update response');
     const payload = response as { latest_version?: unknown; update_available?: unknown };
-    if (typeof payload.update_available !== 'boolean') throw new TypeError('Invalid Market update response');
-    const latestVersion = typeof payload.latest_version === 'string' ? payload.latest_version : null;
+    if (
+        typeof payload.update_available !== 'boolean' ||
+        (payload.latest_version !== null && typeof payload.latest_version !== 'string') ||
+        (payload.latest_version === null && payload.update_available)
+    ) {
+        throw new TypeError('Invalid Market update response');
+    }
+    const latestVersion = payload.latest_version;
+    // Validate the installed version even when Market has no release to compare.
+    compareVersions(options.currentVersion, options.currentVersion);
     return {
         currentVersion: options.currentVersion,
         latestVersion,
-        updateAvailable:
-            latestVersion === null
-                ? payload.update_available
-                : compareVersions(options.currentVersion, latestVersion) < 0
+        updateAvailable: latestVersion === null ? false : compareVersions(options.currentVersion, latestVersion) < 0
     };
 }
