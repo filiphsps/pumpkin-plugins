@@ -1,4 +1,5 @@
 import { defaultValues } from '@pumpkin-plugins/config';
+import { MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
@@ -7,8 +8,9 @@ const state = vi.hoisted(() => ({
 vi.mock('pumpkin:plugin/world@0.1.0', () => ({ blockStateToInfo: state.lookup }));
 
 import type { Player } from 'pumpkin:plugin/player@0.1.0';
+import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { schema } from '../config/schema.ts';
-import { withPlayer } from './peers.ts';
+import { serverPeers, withPlayer } from './peers.ts';
 
 describe('Pumpkin terrain adapter', () => {
     it('reads negative coordinates locally and disposes chunk, border, world and client handles', () => {
@@ -22,7 +24,7 @@ describe('Pumpkin terrain adapter', () => {
             getBlockLight: () => 0,
             [Symbol.dispose]: vi.fn()
         };
-        const border = { getCenterX: () => 0, getCenterZ: () => 0, getSize: () => 60000000, [Symbol.dispose]: vi.fn() };
+        const border = { getCenterX: () => 0.5, getCenterZ: () => 0, getSize: () => 10, [Symbol.dispose]: vi.fn() };
         const world = {
             getName: () => 'world',
             getDimension: () => 'minecraft:overworld',
@@ -40,6 +42,10 @@ describe('Pumpkin terrain adapter', () => {
         };
         expect(() =>
             withPlayer(player as unknown as Player, settings, (peer) => {
+                expect(peer.insideBorder(5, 0)).toBe(true);
+                expect(peer.insideBorder(6, 0)).toBe(false);
+                expect(peer.insideBorder(-5, 0)).toBe(true);
+                expect(peer.insideBorder(-6, 0)).toBe(false);
                 expect(peer.terrain.sample(-1, 64, -17).mapping).toBe(
                     'minecraft:old_growth_pine_taiga_DH-BSW_minecraft:stone'
                 );
@@ -109,5 +115,40 @@ describe('Pumpkin terrain adapter', () => {
             )
         ).toBe(false);
         expect(getWorld).not.toHaveBeenCalled();
+    });
+});
+
+describe('server player lookup', () => {
+    const values = defaultValues(schema),
+        settings = { ...values.support, worlds: values.worlds };
+
+    it('returns false when a player disconnected before lookup', () => {
+        const getPlayerByName = vi.fn(() => undefined);
+        const log = new MemoryLogger();
+        const peers = serverPeers({ getPlayerByName } as unknown as Server, settings, log);
+
+        expect(peers.withPeer('Alice', () => {})).toBe(false);
+        expect(getPlayerByName).toHaveBeenCalledWith('Alice');
+        expect(log.of('warn')).toEqual([]);
+    });
+
+    it('warns and releases player handles when terrain access fails', () => {
+        const java = { [Symbol.dispose]: vi.fn() };
+        const player = {
+            asJava: () => java,
+            getWorld: () => {
+                throw new Error('world unavailable');
+            },
+            [Symbol.dispose]: vi.fn()
+        };
+        const log = new MemoryLogger();
+        const peers = serverPeers({ getPlayerByName: () => player } as unknown as Server, settings, log);
+
+        expect(peers.withPeer('Alice', () => {})).toBe(false);
+        expect(log.of('warn')).toEqual([
+            'DistantHorizonsSupportPumpkin: cannot access player terrain: Error: world unavailable'
+        ]);
+        expect(java[Symbol.dispose]).toHaveBeenCalledOnce();
+        expect(player[Symbol.dispose]).toHaveBeenCalledOnce();
     });
 });
