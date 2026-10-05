@@ -11,4 +11,8 @@ writes and renames clean up that sibling without replacing the original error. D
 checks that existing entries are directories; removing a symlink removes the link itself.
 Random-access file handles reject invalid read ranges and can be closed more than once.
 
+The `MemoryFiles` test fake copies bytes at its boundaries, rejects file/directory conflicts and
+nonempty directory removal, and enforces file-handle closure. Use `put` to seed fixtures with missing
+parents; `writeFile` requires its parent directory to exist, matching the WASI adapter.
+
 An internal package of [pumpkin-plugins](../../README.md): it is not published to npm, and the plugins in this repo use it as a workspace dependency. See [the docs](../../docs/code-style.md) for how it is used.
