@@ -16,6 +16,10 @@
             "component": "bedrock-addon-manager",
             "release-as": "0.0.1"
         },
+        "packages/dynamic-lights-pumpkin": {
+            "component": "dynamic-lights-pumpkin",
+            "release-as": "0.0.1"
+        },
         "packages/upnpumpkin": {
             "component": "upnpumpkin"
         }
