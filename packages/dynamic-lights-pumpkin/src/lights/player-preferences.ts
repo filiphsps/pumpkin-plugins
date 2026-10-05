@@ -5,7 +5,7 @@ const PREFERENCES_FILE = 'disabled-players.json';
 
 /** Stores the players who have chosen to hide dynamic lights. */
 export class PlayerLightPreferences {
-    private readonly disabled: Set<string>;
+    private disabled: Set<string>;
 
     constructor(private readonly files: DataFiles) {
         this.disabled = readDisabledPlayers(files);
@@ -18,18 +18,13 @@ export class PlayerLightPreferences {
 
     /** Toggles a player's setting and returns whether dynamic lights are now enabled. */
     toggle(playerName: string): boolean {
-        const enabled = this.disabled.delete(playerName);
-        if (!enabled) this.disabled.add(playerName);
-        this.write();
+        const disabled = new Set(this.disabled);
+        const enabled = disabled.delete(playerName);
+        if (!enabled) disabled.add(playerName);
+        if (disabled.size === 0) this.files.remove(PREFERENCES_FILE);
+        else this.files.writeFile(PREFERENCES_FILE, strToU8(JSON.stringify([...disabled].sort())));
+        this.disabled = disabled;
         return enabled;
-    }
-
-    private write(): void {
-        if (this.disabled.size === 0) {
-            this.files.remove(PREFERENCES_FILE);
-            return;
-        }
-        this.files.writeFile(PREFERENCES_FILE, strToU8(JSON.stringify([...this.disabled].sort())));
     }
 }
 
