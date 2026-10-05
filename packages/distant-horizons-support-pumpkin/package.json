@@ -43,6 +43,7 @@
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",
+        "@pumpkin-plugins/config": "workspace:*",
         "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
@@ -53,6 +54,7 @@
         "entry": "src/plugin.ts",
         "output": "build/distant-horizons-support-pumpkin.wasm",
         "wasi": [
+            "filesystem",
             "http"
         ]
     }

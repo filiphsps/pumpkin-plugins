@@ -295,6 +295,9 @@ importers:
       '@pumpkin-plugins/build':
         specifier: workspace:*
         version: link:../../tools/build
+      '@pumpkin-plugins/config':
+        specifier: workspace:*
+        version: link:../../tools/config
       '@pumpkin-plugins/docs':
         specifier: workspace:*
         version: link:../../tools/docs
