@@ -49,6 +49,9 @@ work for tells you something different from this file, do what they say.
   this file and `.agents/`. When you rename something, search `docs/` and the READMEs for the old name.
 - **Exported code needs a JSDoc description** that says what it's for (`pnpm lint` checks it). Tags don't take
   `{types}`, and a `@param` must name a real parameter. See [JSDoc](docs/code-style.md#jsdoc).
+- **Console log colors** should use `colorLogValue` from `@pumpkin-plugins/plugin-kit/logger` and follow
+  [the documented palette and Pumpkin source references](docs/code-style.md#console-log-colors); don't add
+  ANSI escape sequences directly at log call sites.
 - **Every `package.json`** carries the same license, author, repository and funding fields, and a description of
   70 characters or fewer. `node scripts/package-metadata.mjs --fix` fills in all of it except the description.
 - **Turborepo.** Don't use `^` in `dependsOn`, add new shared inputs to `globalDependencies`, and declare any

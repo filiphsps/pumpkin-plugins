@@ -9,3 +9,13 @@ export interface Logger {
     /** Something failed. */
     error(message: string): void;
 }
+
+/** A color from Pumpkin's console palette. */
+export type LogColor = 'cyan' | 'green' | 'yellow';
+
+const ANSI_COLOR: Record<LogColor, number> = { cyan: 36, green: 32, yellow: 33 };
+
+/** Colors one high-signal value in a log message with Pumpkin's console palette. */
+export function colorLogValue(value: string, color: LogColor): string {
+    return `\u001b[${ANSI_COLOR[color]}m${value}\u001b[0m`;
+}

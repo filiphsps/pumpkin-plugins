@@ -24,6 +24,22 @@ means. If you write a `@param`, its name must match a real parameter, and tags d
 Tests (including the `testing/` folders of shared packages), config files and generator templates are exempt, as are private helpers. A good description
 says what the thing is for, not what its name says.
 
+## Console log colors
+
+Use `colorLogValue` from `@pumpkin-plugins/plugin-kit/logger` to color a few useful values in console
+messages. Keep the surrounding message plain and color only values that help someone scan it, such
+as names and URLs in cyan, versions in green, and ports, UUIDs or other identifiers in yellow. Do
+not add ANSI escape sequences directly at log call sites.
+
+Keep this palette aligned with the Pumpkin server version pinned in
+[`tools/test-harness/src/pumpkin-version.ts`](../tools/test-harness/src/pumpkin-version.ts). Pumpkin
+uses cyan for plugin names, green for versions and bold yellow for permissions in its
+[plugin permission prompt](https://github.com/Pumpkin-MC/Pumpkin/blob/0.2.0%2B26.3-26.51/crates/pumpkin/src/plugin/mod.rs#L493-L504).
+Its [rolling log file layer](https://github.com/Pumpkin-MC/Pumpkin/blob/0.2.0%2B26.3-26.51/crates/pumpkin/src/logging.rs#L281-L335)
+removes ANSI codes before writing files, leaving the console color useful without adding escape
+codes to saved logs. When the pinned server version changes, check these Pumpkin source references
+and update this convention if its palette or log handling changes.
+
 ## Structure
 
 - Keep files small and focused. A file that does two things should be two files. Around 150 lines

@@ -6,6 +6,11 @@ The scheduling helpers accept whole, nonnegative tick counts; repeating periods 
 one tick. `cancelTask` cancels either delayed or repeating tasks and releases their callbacks.
 Delayed callbacks are also released before they run, and failed scheduling retains no callback.
 
+Use `colorLogValue` from `@pumpkin-plugins/plugin-kit/logger` for a few values worth scanning, such
+as names, filenames, URLs, versions, UUIDs and ports. Follow the
+[console color convention](../../docs/code-style.md#console-log-colors), which links to the pinned
+Pumpkin source for its palette and ANSI handling.
+
 `WasiDataDir.writeFile` replaces files through an exclusively created temporary sibling. Failed
 writes and renames clean up that sibling without replacing the original error. Directory creation
 checks that existing entries are directories; removing a symlink removes the link itself.
