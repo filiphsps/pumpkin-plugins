@@ -5,6 +5,8 @@
         "blocklist",
         "CGNAT",
         "commitlint",
+        "despawn",
+        "dynamiclights",
         "itest",
         "mcaddon",
         "mcpack",
