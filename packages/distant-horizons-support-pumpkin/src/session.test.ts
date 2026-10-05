@@ -89,6 +89,49 @@ describe('DH sessions', () => {
         f.sessions.tick(f.peers);
         expect(f.sessions.status()).toContain('1 served');
     });
+    it('stops pending captures and drops queued transfers when the client disables LOD requests', () => {
+        const disabled = packet(4)
+            .byte(3)
+            .int(16)
+            .int(0)
+            .int(0)
+            .int(0)
+            .int(0)
+            .bool(false)
+            .int(0)
+            .bool(false)
+            .int(16)
+            .int(0)
+            .int(0)
+            .finish();
+
+        const pending = fixture();
+        pending.settings.blocks_per_tick = 64;
+        pending.sessions.receive(pending.peer, pending.request());
+        pending.sessions.tick(pending.peers);
+        expect(pending.sessions.status()).toContain('1 pending');
+
+        pending.sessions.receive(pending.peer, disabled);
+        expect(pending.sessions.status()).toContain('0 pending');
+        expect(pending.sessions.status()).not.toContain('Capturing');
+        const readsAfterDisable = pending.reads();
+        pending.sessions.tick(pending.peers);
+        expect(pending.reads()).toBe(readsAfterDisable);
+
+        pending.sent.length = 0;
+        pending.sessions.receive(pending.peer, pending.request(2));
+        expect(pending.ids()).toEqual([6]);
+        expect(pending.sessions.status()).toContain('LOD requests disabled by client');
+
+        const queued = fixture();
+        queued.settings.packets_per_tick = 0;
+        queued.sessions.receive(queued.peer, queued.request());
+        queued.sessions.tick(queued.peers);
+        expect(queued.sessions.status()).not.toContain('0 queued packet(s)');
+
+        queued.sessions.receive(queued.peer, disabled);
+        expect(queued.sessions.status()).toContain('0 queued packet(s)');
+    });
     it('drains two full-height captures at the default tick budget instead of scanning empty sky', () => {
         const f = fixture();
         f.settings.blocks_per_tick = 2048;
