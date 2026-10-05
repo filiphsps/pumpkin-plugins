@@ -235,6 +235,14 @@ describe('PackManager', () => {
             gone.upnp.available = false;
             expect(() => gone.manager.stop()).not.toThrow();
         });
+
+        it('does not send IPC when stopping during plugin unload', () => {
+            const { upnp, manager } = setup();
+            manager.start();
+            manager.stop({ releasePort: false });
+
+            expect(upnp.ops).toEqual(['ensure']);
+        });
     });
 
     it('serves downloads on every tick', () => {

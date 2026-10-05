@@ -48,11 +48,12 @@ export class MappingWatcher {
         }
     }
 
-    /** Stops asking and tells UPnPumpkin to close the port. Safe to call twice. */
-    stop(): void {
+    /** Stops asking and optionally tells UPnPumpkin to close the port. Safe to call twice. */
+    stop(options: { releasePort?: boolean } = {}): void {
         if (!this.running) return;
         this.running = false;
         this.current = undefined;
+        if (options.releasePort === false) return;
         try {
             this.client.release(this.request.key);
         } catch {

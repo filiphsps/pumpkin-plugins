@@ -99,9 +99,9 @@ export class PackManager {
         this.reportLateUnavailable();
     }
 
-    /** Stops the web server and gives the port back to UPnPumpkin. */
-    stop(): void {
-        this.stopForwarding(false);
+    /** Stops the web server and optionally releases its UPnPumpkin mapping. */
+    stop(options: { releasePort?: boolean } = {}): void {
+        this.stopForwarding(false, options.releasePort !== false);
         this.server.stop();
         this.running = undefined;
     }
@@ -137,8 +137,8 @@ export class PackManager {
         this.watcher.start();
     }
 
-    private stopForwarding(resetUrl = true): void {
-        this.watcher?.stop();
+    private stopForwarding(resetUrl = true, releasePort = true): void {
+        this.watcher?.stop({ releasePort });
         this.watcher = undefined;
         this.forwardedPort = undefined;
         this.unavailableSince = undefined;

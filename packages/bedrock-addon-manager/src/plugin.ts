@@ -45,7 +45,7 @@ class BedrockAddonManager extends PluginBase {
     /** Stops the tick and the web server. */
     protected override onPluginUnload(_ctx: Context): void {
         if (this.tickTask !== undefined) cancelTask(this.tickTask);
-        this.manager?.stop();
+        this.manager?.stop({ releasePort: false });
     }
 }
 
