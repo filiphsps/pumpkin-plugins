@@ -43,4 +43,20 @@ describe('resolvePumpkinBinary', () => {
         expect(await resolvePumpkinBinary()).toBe(expected);
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
+
+    it('rejects a binary with the wrong checksum without caching it', async () => {
+        const cache = setupCache();
+        const asset = assetName(process.platform, process.arch);
+        const expectedBytes = Buffer.from('trusted Pumpkin binary');
+        const actualBytes = Buffer.from('corrupted Pumpkin binary');
+        const checksum = createHash('sha256').update(expectedBytes).digest('hex');
+        const fetchMock = vi.fn<typeof fetch>(async (input) => {
+            if (String(input).endsWith('/checksums.sha256')) return new Response(`${checksum}  ${asset}\n`);
+            return new Response(actualBytes);
+        });
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(resolvePumpkinBinary()).rejects.toThrow(/Checksum mismatch/);
+        expect(fs.readdirSync(cache)).toEqual([]);
+    });
 });
