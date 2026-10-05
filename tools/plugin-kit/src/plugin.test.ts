@@ -38,7 +38,6 @@ vi.mock('./host.ts', () => ({
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { registerPluginWithUpdates } from '@pumpkin-plugins/update-check';
-import { colorLogValue } from './logger.ts';
 import { handleTask, PluginBase, registerPlugin } from './plugin.ts';
 
 const info = { name: 'ExamplePlugin', description: 'An example plugin.' };
@@ -71,7 +70,7 @@ describe('PluginBase', () => {
         });
     });
 
-    it('runs the common and plugin-specific lifecycle behavior', () => {
+    it('runs the common and plugin-specific lifecycle behavior without a duplicate load log', () => {
         const plugin = new ExamplePlugin();
         const ctx = {} as Context;
 
@@ -79,9 +78,7 @@ describe('PluginBase', () => {
         plugin.onUnload(ctx);
 
         expect(calls.apiLoad).toHaveBeenCalledWith(ctx);
-        expect(calls.info).toHaveBeenCalledWith(
-            `${colorLogValue('ExamplePlugin', 'cyan')} ${colorLogValue('1.2.3', 'green')} loaded`
-        );
+        expect(calls.info).not.toHaveBeenCalled();
         expect(calls.pluginLoad).toHaveBeenCalledWith(ctx);
         expect(calls.apiUnload).toHaveBeenCalledWith(ctx);
         expect(calls.pluginUnload).toHaveBeenCalledWith(ctx);
@@ -110,16 +107,5 @@ describe('PluginBase', () => {
         expect(calls.runTask).toHaveBeenNthCalledWith(2, 1, server);
         expect(calls.apiHandleTask).toHaveBeenCalledTimes(1);
         expect(calls.apiHandleTask).toHaveBeenCalledWith(1, server);
-    });
-    it('only logs a successful load after the plugin hook completes', () => {
-        const plugin = new ExamplePlugin();
-        calls.pluginLoad.mockImplementationOnce(() => {
-            throw new Error('setup failed');
-        });
-        expect(() => plugin.onLoad({} as Context)).toThrow('setup failed');
-        expect(calls.info).not.toHaveBeenCalled();
-        plugin.onLoad({} as Context);
-        expect(calls.info).toHaveBeenCalledOnce();
-        expect(calls.pluginLoad.mock.invocationCallOrder[1]).toBeLessThan(calls.info.mock.invocationCallOrder[0]);
     });
 });

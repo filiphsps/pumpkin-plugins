@@ -4,8 +4,7 @@ import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { type PluginInfo, pluginMetadata } from '@pumpkin-plugins/docs';
 import { registerPluginWithUpdates } from '@pumpkin-plugins/update-check';
 import { handleTask as apiHandleTask, Plugin } from '@pumpkinmc/pumpkin-api-ts';
-import { hostLogger, runTask, scheduleDelayed } from './host.ts';
-import { colorLogValue } from './logger.ts';
+import { runTask, scheduleDelayed } from './host.ts';
 
 /** Base class for plugins, keeping metadata, lifecycle hooks, logging and update checks consistent. */
 export abstract class PluginBase extends Plugin {
@@ -26,11 +25,10 @@ export abstract class PluginBase extends Plugin {
         return pluginMetadata(this.info, this.version);
     }
 
-    /** Registers the API's pending events, logs the load and runs the plugin's load hook. */
+    /** Registers the API's pending events and runs the plugin's load hook. */
     onLoad(ctx: Context): void {
         super.onLoad(ctx);
         this.onPluginLoad(ctx);
-        hostLogger.info(`${colorLogValue(this.info.name, 'cyan')} ${colorLogValue(this.version, 'green')} loaded`);
     }
 
     /** Runs the plugin's unload hook after the API's unload handler. */
