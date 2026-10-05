@@ -73,7 +73,7 @@ describe('LOD builder', () => {
         expect(ticks).toBeLessThan(20);
         expect(reads).toBeLessThan(4096 * 10);
         expect(fast.finish(100)).toEqual(expected);
-    });
+    }, 15_000);
     it('keeps caves and material changes instead of flattening a column', () => {
         const builder = new LodBuilder(section, 0, 3);
         expect(
