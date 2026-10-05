@@ -160,6 +160,19 @@ describe('loadConfig', () => {
         expect(store.text).not.toContain('my comment');
     });
 
+    it('keeps valid TOML integers beyond the JavaScript safe range for field validation', () => {
+        const text = '[web]\nport = 9007199254740992\n';
+        const store = new MemoryStore(text);
+
+        const result = loadConfig(demo, store);
+
+        expect(result.status).toBe('kept');
+        expect(result.values.web.port).toBe(8123);
+        expect(result.warnings[0]).toContain('web.port must be a whole number from 1 to 65535');
+        expect(store.text).toBe(text);
+        expect(store.writes).toBe(0);
+    });
+
     it('keeps table entries the schema does not know about', () => {
         const store = new MemoryStore('[overrides."some.file.txt"]\norder = 4\n');
         loadConfig(demo, store);

@@ -63,7 +63,7 @@ export function loadConfig<S extends ConfigSchema>(
 
     let raw: Record<string, unknown>;
     try {
-        raw = parse(text);
+        raw = parse(text, { integersAsBigInt: 'asNeeded' });
     } catch (err) {
         throw new ConfigSyntaxError(describeSyntaxError(err));
     }
