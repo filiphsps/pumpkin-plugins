@@ -232,6 +232,7 @@ jobs:
         outputs:
             paths_released: ${{ steps.release.outputs.paths_released }}
             all: ${{ toJSON(steps.release.outputs) }}
+            prs: ${{ steps.release.outputs.prs }}
         steps:
             - name: 🚢 Release Please
               id: release
@@ -243,28 +244,36 @@ jobs:
                   config-file: release-please-config.json
                   manifest-file: .release-please-manifest.json
 
-            # release-please rewrites its branch whenever it updates the PR, so this runs
-            # every time it does and re-adds the commit.
+    release-pr:
+        name: 📝 Prepare release PR ${{ matrix.pr.headBranchName }}
+        needs: [release]
+        if: ${{ needs.release.outputs.prs != '' && needs.release.outputs.prs != '[]' }}
+        timeout-minutes: 10
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        strategy:
+            fail-fast: false
+            matrix:
+                pr: ${{ fromJSON(needs.release.outputs.prs) }}
+        steps:
+            # Release Please rewrites each PR branch on updates. Prepare every returned PR.
             - name: 🕶️ Checkout release PR branch
-              if: ${{ steps.release.outputs.prs_created == 'true' }}
               uses: actions/checkout@v7.0.1
               with:
-                  ref: ${{ fromJSON(steps.release.outputs.prs)[0].headBranchName }}
+                  ref: ${{ matrix.pr.headBranchName }}
                   token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
             - name: 🚀 Bootstrap
-              if: ${{ steps.release.outputs.prs_created == 'true' }}
               uses: ./.github/common/bootstrap
 
             - name: 📝 Regenerate READMEs
-              if: ${{ steps.release.outputs.prs_created == 'true' }}
               run: pnpm run readme
 
             # The pin that forces a first release to 0.0.1 also pins every release after it, and
             # master fails the release config check while it is there, which takes the release and
             # attach jobs with it. Drop it on the PR, so the merge push can tag and attach.
             - name: 🎉 Retire release-as for released plugins
-              if: ${{ steps.release.outputs.prs_created == 'true' }}
               run: |
                   node scripts/unpin-release-as.mjs
                   if [ -z "$(git status --porcelain -- release-please-config.json)" ]; then
@@ -278,7 +287,6 @@ jobs:
                   git push
 
             - name: 💾 Commit READMEs to the release PR
-              if: ${{ steps.release.outputs.prs_created == 'true' }}
               run: |
                   if [ -z "$(git status --porcelain)" ]; then
                       echo "READMEs are already up to date"

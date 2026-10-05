@@ -16,7 +16,8 @@ cache) is the composite action in `.github/common/bootstrap`.
 | 🔨 Build | code changes, after lint and typecheck | Builds every plugin and uploads them as an artifact |
 | 🎃 Integration | code changes, after build | Runs the integration tests against the pinned Pumpkin release (downloaded and checksum-verified); server logs are uploaded on failure |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin with `pnpm gen` and typechecks, builds and integration-tests it |
-| 🚢 Release | code changes, on `master` pushes, after the checks | release-please, then keeps the release PR's READMEs and `release-as` pins current |
+| 🚢 Release | code changes, on `master` pushes, after the checks | Runs release-please |
+| 📝 Prepare release PR | per created or updated release PR | Keeps every release PR's READMEs and `release-as` pins current |
 | 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, uploads the `.wasm`, then updates an existing Market listing |
 
 ## Running only what a change needs
@@ -74,7 +75,8 @@ Release Please creates a tag immediately, including while a GitHub release is a 
 a later release run can miss the previous release and recreate its changelog. The release config
 keeps `force-tag-creation` enabled, and the repository check enforces it.
 
-Each time release-please creates or updates a release PR, the release job regenerates the READMEs
+Each time release-please creates or updates release PRs, a separate matrix job prepares every returned
+PR branch. It regenerates the READMEs
 and pushes a `docs: update generated READMEs` commit to the PR branch, so they are current when the
 release merges. The same run retires the `release-as` pin of any plugin the PR releases (see below).
 release-please rewrites its branch on every update, so those commits are re-added each time.
