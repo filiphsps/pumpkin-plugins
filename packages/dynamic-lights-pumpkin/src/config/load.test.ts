@@ -21,4 +21,32 @@ describe(loadPluginConfig.name, () => {
 
         expect(loadPluginConfig(files, () => undefined).sources).toEqual({});
     });
+
+    it('keeps invalid values for the user to fix', () => {
+        const original = '[entities]\nrefresh_interval_ticks = 0\n';
+        const files = new MemoryFiles().put('config.toml', original);
+        const reports: { level: string; message: string }[] = [];
+
+        const config = loadPluginConfig(files, (level, message) => reports.push({ level, message }));
+
+        expect(config.entities.refresh_interval_ticks).toBe(10);
+        expect(files.text('config.toml')).toBe(original);
+        expect(
+            reports.some(({ level, message }) => level === 'warn' && message.includes('must be a whole number'))
+        ).toBe(true);
+    });
+
+    it('uses defaults and preserves a file with invalid TOML', () => {
+        const original = '[entities\nrefresh_interval_ticks = 10';
+        const files = new MemoryFiles().put('config.toml', original);
+        const reports: { level: string; message: string }[] = [];
+
+        const config = loadPluginConfig(files, (level, message) => reports.push({ level, message }));
+
+        expect(config.entities.enabled).toBe(true);
+        expect(files.text('config.toml')).toBe(original);
+        expect(reports).toHaveLength(1);
+        expect(reports[0]).toMatchObject({ level: 'error' });
+        expect(reports[0]?.message).toContain('is not valid TOML');
+    });
 });
