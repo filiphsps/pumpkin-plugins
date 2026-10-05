@@ -12,7 +12,7 @@ export function commandHandlers(toggler: PlayerLightToggler): CommandHandlers<ty
     return {
         dynamiclights: (sender) => {
             const player = sender.asPlayer();
-            if (player === undefined) return [errorLine('This command can only be used by a player.')];
+            if (player == null) return [errorLine('This command can only be used by a player.')];
             return [`Dynamic lights ${toggler.togglePlayerLights(player) ? 'enabled' : 'disabled'}.`];
         }
     };

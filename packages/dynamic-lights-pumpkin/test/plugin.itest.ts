@@ -16,4 +16,13 @@ describe(info.name, () => {
         await server.waitForLog(new RegExp(`Loaded ${info.name}`));
         expect(server.errors()).toEqual([]);
     });
+
+    it('routes its command handler without stopping the plugin store', async () => {
+        const from = server.lines.length;
+
+        server.command('dynamiclights');
+
+        await server.waitForLog(/This command can only be used by a player\./, 10_000, from);
+        expect(server.errors()).toEqual([]);
+    });
 });

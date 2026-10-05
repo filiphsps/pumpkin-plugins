@@ -1,3 +1,4 @@
+import type { CommandSender, ConsumedArgs } from 'pumpkin:plugin/command@0.1.0';
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type {
     EntityRemoveEventData,
@@ -19,8 +20,13 @@ import type { PluginMetadata } from 'pumpkin:plugin/metadata@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { pluginMetadata } from '@pumpkin-plugins/docs';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
-import { cancelTask, runTask, scheduleDelayed, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
-import { handleTask as apiHandleTask, Plugin, registerPlugin } from '@pumpkinmc/pumpkin-api-ts';
+import { cancelTask, runCommand, runTask, scheduleDelayed, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
+import {
+    handleCommand as apiHandleCommand,
+    handleTask as apiHandleTask,
+    Plugin,
+    registerPlugin
+} from '@pumpkinmc/pumpkin-api-ts';
 import { registerCommands } from './commands/register.ts';
 import { loadPluginConfig } from './config/load.ts';
 import { info } from './info.ts';
@@ -245,6 +251,11 @@ registerPlugin(new DynamicLightsPumpkin());
 /** Dispatches scheduled plugin work before delegating to Pumpkin's API package. */
 export function handleTask(id: number, server: Server): void {
     if (!runTask(id, server)) apiHandleTask(id, server);
+}
+
+/** Dispatches plugin command handlers before delegating to Pumpkin's API package. */
+export function handleCommand(id: number, sender: CommandSender, server: Server, args: ConsumedArgs): number {
+    return runCommand(id, sender, args) ?? apiHandleCommand(id, sender, server, args);
 }
 
 export * from '@pumpkinmc/pumpkin-api-ts';
