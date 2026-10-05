@@ -1,4 +1,6 @@
-import type { PluginInfo } from '@pumpkin-plugins/docs';
+import { commandInfos, type PluginInfo } from '@pumpkin-plugins/docs';
+import { commands } from './commands/spec.ts';
+import { configInfo } from './config/schema.ts';
 
 /**
  * What the plugin is and offers. Feeds both its Pumpkin metadata and its generated README. Declare
@@ -8,6 +10,10 @@ import type { PluginInfo } from '@pumpkin-plugins/docs';
 export const info = {
     name: 'DistantHorizonsSupportPumpkin',
     description: 'Unofficial Distant Horizons server support for Pumpkin',
-    permissions: [],
-    commands: []
+    permissions: [
+        { name: 'fs.read.data', reason: 'Read settings and cached LOD terrain.' },
+        { name: 'fs.write.data', reason: 'Write settings and persist captured LOD terrain.' }
+    ],
+    commands: commandInfos(commands),
+    config: configInfo
 } satisfies PluginInfo<'DistantHorizonsSupportPumpkin'>;
