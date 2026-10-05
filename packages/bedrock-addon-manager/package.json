@@ -1,6 +1,6 @@
 {
     "name": "@pumpkin-plugins/bedrock-addon-manager",
-    "version": "0.0.0",
+    "version": "0.0.1",
     "private": true,
     "description": "Serves Bedrock resource packs to Pumpkin players",
     "license": "MIT",
