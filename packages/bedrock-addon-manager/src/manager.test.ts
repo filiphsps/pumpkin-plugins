@@ -1,3 +1,4 @@
+import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
 import { describe, expect, it } from 'vitest';
 import { FakeServer } from '../test/fake-server.ts';
 import { FakeUpnpumpkin } from '../test/fake-upnpumpkin.ts';
@@ -48,7 +49,7 @@ describe('PackManager', () => {
         expect(files.stat('packs')?.kind).toBe('directory');
         expect(manager.entries.map((e) => e.fileName)).toEqual(['a.mcpack']);
         expect(server.started).toEqual([{ bind: '0.0.0.0', port: 8123 }]);
-        expect(log.of('info')).toContain('Serving packs on http://0.0.0.0:8123/packs/.');
+        expect(log.of('info')).toContain(`Serving packs on ${colorLogValue('http://0.0.0.0:8123/packs/', 'cyan')}.`);
     });
 
     it('creates the packs folder when it is missing', () => {
@@ -62,7 +63,7 @@ describe('PackManager', () => {
         files.put('packs/a.mcpack', pack(1));
         manager.start();
         expect(log.of('warn')).toEqual([
-            'web.public_url is not set, so clients are told to download packs from http://127.0.0.1:8123, which only works for players on this machine. Set it to the address players can reach.'
+            `web.public_url is not set, so clients are told to download packs from ${colorLogValue('http://127.0.0.1:8123', 'cyan')}, which only works for players on this machine. Set it to the address players can reach.`
         ]);
     });
 
@@ -119,7 +120,7 @@ describe('PackManager', () => {
             wait(1000);
             expect(urls(manager)).toEqual(['http://93.184.216.34:8123/packs/a.mcpack']);
             expect(log.of('info')).toContain(
-                'Opened port 8123 on the router (upnp): clients download packs from http://93.184.216.34:8123.'
+                `Opened port ${colorLogValue('8123', 'yellow')} on the router (upnp): clients download packs from ${colorLogValue('http://93.184.216.34:8123', 'cyan')}.`
             );
             expect(log.of('warn')).toEqual([]);
         });
@@ -140,7 +141,7 @@ describe('PackManager', () => {
             manager.start();
             expect(urls(manager)).toEqual(['http://93.184.216.99:8123/packs/a.mcpack']);
             expect(log.of('info')).toContain(
-                'This machine has a public address, so clients download packs from http://93.184.216.99:8123.'
+                `This machine has a public address, so clients download packs from ${colorLogValue('http://93.184.216.99:8123', 'cyan')}.`
             );
         });
 
@@ -151,7 +152,7 @@ describe('PackManager', () => {
             manager.start();
             expect(urls(manager)).toEqual(['http://127.0.0.1:8123/packs/a.mcpack']);
             expect(log.of('warn')).toEqual([
-                'Could not make port 8123 reachable from the internet: no router answered the search. Clients are told to download packs from http://127.0.0.1:8123, which only works for players on this machine. Open the port yourself and set web.public_url, or set web.port_forwarding = false.'
+                `Could not make port ${colorLogValue('8123', 'yellow')} reachable from the internet: no router answered the search. Clients are told to download packs from ${colorLogValue('http://127.0.0.1:8123', 'cyan')}, which only works for players on this machine. Open the port yourself and set web.public_url, or set web.port_forwarding = false.`
             ]);
         });
 

@@ -1,3 +1,4 @@
+import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
 import {
     MappingWatcher,
     openUrl,
@@ -113,7 +114,7 @@ export class PackManager {
             this.index.refresh(config, this.reachableUrl);
             this.scanned = true;
         } catch (err) {
-            this.log.error(`Could not scan ${config.packs.directory}/: ${errorText(err)}`);
+            this.log.error(`Could not scan ${colorLogValue(`${config.packs.directory}/`, 'cyan')}: ${errorText(err)}`);
             return;
         }
         this.announce();
@@ -150,16 +151,17 @@ export class PackManager {
         this.unavailableSince = state.kind === 'unavailable' ? (this.unavailableSince ?? this.now()) : undefined;
         if (state.kind === 'open') {
             const url = openUrl(state);
+            if (url === undefined) return;
             this.log.info(
                 state.via === 'public'
-                    ? `This machine has a public address, so clients download packs from ${url}.`
-                    : `Opened port ${port} on the router (${state.via}): clients download packs from ${url}.`
+                    ? `This machine has a public address, so clients download packs from ${colorLogValue(url, 'cyan')}.`
+                    : `Opened port ${colorLogValue(String(port), 'yellow')} on the router (${state.via}): clients download packs from ${colorLogValue(url, 'cyan')}.`
             );
             this.setReachableUrl(url);
         } else if (state.kind === 'failed') {
             this.setReachableUrl(undefined);
             this.log.warn(
-                `Could not make port ${port} reachable from the internet: ${state.reason}. Clients are told to download packs from http://127.0.0.1:${port}, which only works for players on this machine. Open the port yourself and set web.public_url, or set web.port_forwarding = false.`
+                `Could not make port ${colorLogValue(String(port), 'yellow')} reachable from the internet: ${state.reason}. Clients are told to download packs from ${colorLogValue(`http://127.0.0.1:${port}`, 'cyan')}, which only works for players on this machine. Open the port yourself and set web.public_url, or set web.port_forwarding = false.`
             );
         } else if (state.kind === 'unavailable') {
             this.setReachableUrl(undefined);
@@ -173,7 +175,7 @@ export class PackManager {
         this.reportedUnavailable = true;
         const port = this.forwardedPort;
         this.log.warn(
-            `web.port_forwarding is on, but the UPnPumpkin plugin does not answer, so clients are told to download packs from http://127.0.0.1:${port}, which only works for players on this machine. Install UPnPumpkin to open the port on your router automatically, set web.public_url to the address players can reach, or set web.port_forwarding = false.`
+            `web.port_forwarding is on, but the UPnPumpkin plugin does not answer, so clients are told to download packs from ${colorLogValue(`http://127.0.0.1:${port}`, 'cyan')}, which only works for players on this machine. Install UPnPumpkin to open the port on your router automatically, set web.public_url to the address players can reach, or set web.port_forwarding = false.`
         );
     }
 
@@ -190,7 +192,7 @@ export class PackManager {
     private announce(): void {
         const count = this.index.entries.length;
         this.log.info(
-            `Offering ${count} Bedrock pack${count === 1 ? '' : 's'} to players who join from now on (not connected to the server yet, so players are not sent them).`
+            `Offering ${colorLogValue(String(count), 'yellow')} Bedrock pack${count === 1 ? '' : 's'} to players who join from now on (not connected to the server yet, so players are not sent them).`
         );
     }
 
@@ -208,7 +210,7 @@ export class PackManager {
         try {
             this.server.start(wanted);
             this.running = wanted;
-            this.log.info(`Serving packs on http://${wanted.bind}:${wanted.port}/packs/.`);
+            this.log.info(`Serving packs on ${colorLogValue(`http://${wanted.bind}:${wanted.port}/packs/`, 'cyan')}.`);
         } catch (err) {
             this.log.error(`Could not start the web server: ${errorText(err)}`);
         }
@@ -223,7 +225,7 @@ export class PackManager {
             this.entries.some((e) => e.downloadUrl.startsWith(base.url));
         if (affected) {
             this.log.warn(
-                `web.public_url is not set, so clients are told to download packs from ${base.url}, which only works for players on this machine. Set it to the address players can reach.`
+                `web.public_url is not set, so clients are told to download packs from ${colorLogValue(base.url, 'cyan')}, which only works for players on this machine. Set it to the address players can reach.`
             );
         }
     }

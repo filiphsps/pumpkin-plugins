@@ -1,4 +1,5 @@
 import { defaultValues } from '@pumpkin-plugins/config';
+import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
 import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import { makeMcpack, manifestJson, noise } from '../../test/fixtures.ts';
@@ -25,14 +26,16 @@ describe('PackIndex', () => {
         index.refresh(settings);
 
         expect(index.entries.map((e) => [e.fileName, e.uuid])).toEqual([['a.mcpack', uuid(1)]]);
-        expect(log.of('info')).toEqual([`Found 1 Bedrock pack: a.mcpack (${uuid(1)} v1.0.0).`]);
+        expect(log.of('info')).toEqual([
+            `Found ${colorLogValue('1', 'yellow')} Bedrock pack: ${colorLogValue('a.mcpack', 'cyan')} (${colorLogValue(uuid(1), 'yellow')} v${colorLogValue('1.0.0', 'green')}).`
+        ]);
     });
 
     it('says so when there are no packs', () => {
         const { log, settings, index } = setup();
         index.refresh(settings);
         expect(log.of('info')).toEqual([
-            'No packs in packs/. Put .mcpack or .mcaddon files there and run /baddon reload.'
+            `No packs in ${colorLogValue('packs/', 'cyan')}. Put .mcpack or .mcaddon files there and run /baddon reload.`
         ]);
     });
 

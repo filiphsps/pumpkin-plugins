@@ -1,3 +1,4 @@
+import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
 import type { Config } from '../config/schema.ts';
 import type { DataFiles, RandomAccessFile } from '../platform/files.ts';
 import type { Logger } from '../platform/logger.ts';
@@ -35,11 +36,20 @@ export class PackIndex {
         const built = this.rebuild(config, reachableUrl);
 
         if (built.entries.length === 0) {
-            this.log.info(`No packs in ${directory}/. Put .mcpack or .mcaddon files there and run /baddon reload.`);
+            this.log.info(
+                `No packs in ${colorLogValue(`${directory}/`, 'cyan')}. Put .mcpack or .mcaddon files there and run /baddon reload.`
+            );
             return;
         }
-        const list = built.entries.map((e) => `${e.fileName} (${e.uuid} v${e.version})`).join(', ');
-        this.log.info(`Found ${built.entries.length} Bedrock pack${built.entries.length === 1 ? '' : 's'}: ${list}.`);
+        const list = built.entries
+            .map(
+                (e) =>
+                    `${colorLogValue(e.fileName, 'cyan')} (${colorLogValue(e.uuid, 'yellow')} v${colorLogValue(e.version, 'green')})`
+            )
+            .join(', ');
+        this.log.info(
+            `Found ${colorLogValue(String(built.entries.length), 'yellow')} Bedrock pack${built.entries.length === 1 ? '' : 's'}: ${list}.`
+        );
     }
 
     /**
