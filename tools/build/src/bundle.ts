@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { createRequire } from 'node:module';
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import * as esbuild from 'esbuild';
 

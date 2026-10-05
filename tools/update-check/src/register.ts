@@ -11,11 +11,7 @@ export type UpdateRegistrationOptions =
     | { request?: never; marketplaceUrl?: string; schedule: SchedulePoll };
 
 /** Registers a plugin and checks Pumpkin Market for an update after the plugin loads. */
-export function registerPluginWithUpdates(
-    plugin: Plugin,
-    info: PluginInfo,
-    options: UpdateRegistrationOptions
-): void {
+export function registerPluginWithUpdates(plugin: Plugin, info: PluginInfo, options: UpdateRegistrationOptions): void {
     const onLoad = plugin.onLoad.bind(plugin);
     plugin.onLoad = (ctx) => {
         onLoad(ctx);
