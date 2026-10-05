@@ -59,4 +59,15 @@ describe('resolvePumpkinBinary', () => {
         await expect(resolvePumpkinBinary()).rejects.toThrow(/Checksum mismatch/);
         expect(fs.readdirSync(cache)).toEqual([]);
     });
+
+    it('explains when PUMPKIN_BIN points to a missing file', async () => {
+        const cache = setupCache();
+        const missing = path.join(cache, 'missing-pumpkin');
+        const fetchMock = vi.fn<typeof fetch>();
+        vi.stubEnv('PUMPKIN_BIN', missing);
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(resolvePumpkinBinary()).rejects.toThrow(`PUMPKIN_BIN does not exist: ${missing}`);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
 });
