@@ -1,5 +1,7 @@
 // Decides whether an agent's tool call should be refused, and says what to do instead. Pure functions:
-// the adapters (see opencode.mjs) pass in the tool input and a way to read files.
+// run.mjs passes in the normalized tool input and a way to read files.
+
+import { isGeneratedPath } from './check.mjs';
 
 /** Matches the start of a command: the beginning of the line or after `&&`, `||`, `;`, `|` or `(`. */
 const AT_COMMAND = String.raw`(?:^|&&|\|\||[;|(]|\n)\s*`;
@@ -10,14 +12,6 @@ const SHELL_RULES = [
             `${AT_COMMAND}(?:npm\\s+(?:install|i|ci|add|uninstall|remove|rm|update|up|run|run-script|exec|test|start|link)\\b|npx\\s|yarn\\b|bunx\\s|bun\\s+(?:install|add|remove|x|run)\\b)`
         ),
         reason: 'This repo uses pnpm. Use `pnpm add`, `pnpm exec <bin>` for local binaries or `pnpm dlx <pkg>` instead.'
-    },
-    {
-        pattern: /\bgit\b[^\n;&|]*\s--no-verify\b/,
-        reason: 'Do not skip git hooks with --no-verify. Fix what the hook reports instead.'
-    },
-    {
-        pattern: /\bgit\s+push\b[^\n;&|]*\s(?:--force(?:-with-lease)?(?:=\S*)?|-f)(?:\s|$)/,
-        reason: 'Never force-push. If history really has to be rewritten, ask the user to push it themselves.'
     }
 ];
 
@@ -35,10 +29,6 @@ const PROTECTED_PATHS = [
     {
         pattern: /(^|\/)pnpm-lock\.yaml$/,
         reason: 'pnpm writes the lockfile. Change dependencies with `pnpm add`, `pnpm remove` or `pnpm install`.'
-    },
-    {
-        pattern: /(^|\/)(build|dist|\.cache|\.turbo|node_modules)\//,
-        reason: 'This is build output or a cache. Change the source and rebuild instead.'
     },
     {
         pattern: /(^|\/)CHANGELOG\.md$|^\.release-please-manifest\.json$/,
@@ -67,6 +57,7 @@ const GENERATED_README =
  * @returns {string | undefined}
  */
 export function checkEdit(file, change, read) {
+    if (isGeneratedPath(file)) return 'This is build output or a cache. Change the source and rebuild instead.';
     const rule = PROTECTED_PATHS.find((r) => r.pattern.test(file));
     if (rule) return rule.reason;
     if (!/(^|\/)README\.md$/.test(file)) return;

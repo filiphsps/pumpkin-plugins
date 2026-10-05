@@ -24,7 +24,9 @@ export default [
     {
         ignores: [
             '**/node_modules/**',
-            '**/build/**',
+            'build/**',
+            'packages/*/build/**',
+            'tools/*/build/**',
             '**/dist/**',
             '**/.turbo/**',
             '**/.cache/**',

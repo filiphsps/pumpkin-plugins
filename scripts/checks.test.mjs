@@ -89,6 +89,22 @@ describe('check-docs', () => {
         assert.ok(inCode.ok, inCode.out);
     });
 
+    it('validates agent guidance and skill links and commands too', () => {
+        const result = run(
+            'check-docs.mjs',
+            repo({
+                ...good,
+                'AGENTS.md': '# Agents\n\n[missing](.agents/skills/missing/SKILL.md)\n',
+                '.agents/skills/example/SKILL.md':
+                    '# Skill\n\nRun `pnpm nonexistent`. See `.agents/hooks/missing.mjs`.\n'
+            })
+        );
+        assert.equal(result.ok, false);
+        assert.match(result.out, /AGENTS\.md links to/);
+        assert.match(result.out, /SKILL\.md runs `pnpm nonexistent`/);
+        assert.match(result.out, /mentions \.agents\/hooks\/missing\.mjs/);
+    });
+
     it('fails for a path in a code span that does not exist', () => {
         const result = run(
             'check-docs.mjs',

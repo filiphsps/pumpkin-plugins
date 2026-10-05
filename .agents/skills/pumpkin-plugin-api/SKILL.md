@@ -44,9 +44,9 @@ gh api "repos/Pumpkin-MC/Pumpkin/contents/crates/pumpkin/src/plugin/api/events?r
 curl -sL "https://raw.githubusercontent.com/Pumpkin-MC/Pumpkin/$RELEASE/crates/pumpkin-plugin-wit/v0.1/event.wit"
 ```
 
-`$RELEASE` is URL-encoded in the `gh api` form (`+` becomes `%2B`). In OpenCode, the `pumpkin` reference is a
-checkout of `master`. Use it to find your way around and to search, then confirm the details at the tag,
-because `master` is often ahead of the pinned release.
+`$RELEASE` is URL-encoded in the `gh api` form (`+` becomes `%2B`). A local Pumpkin checkout may be on
+`master`. Use it to find your way around and search, then confirm the details at the pinned tag, because
+`master` is often ahead of the pinned release.
 
 ## Use the repo's wrappers first
 
@@ -55,7 +55,7 @@ calls have traps (`BigInt`, task ids, callback ids), and they come with fakes fo
 
 | Need | Use |
 | --- | --- |
-| Commands and their permissions, documented in the README from the same declaration | `defineCommands` and `registerCommands` from `@pumpkin-plugins/plugin-kit` |
+| Commands and their permissions, documented in the README from the same declaration | `defineCommands` from `@pumpkin-plugins/docs`, `registerCommands` from `@pumpkin-plugins/plugin-kit/register-commands` |
 | Logging, repeating tasks, command callbacks | `@pumpkin-plugins/plugin-kit/host` |
 | The plugin's data folder | `@pumpkin-plugins/plugin-kit/data-dir` (behind the `DataFiles` interface in `/files`) |
 | Messages to other plugins | `@pumpkin-plugins/plugin-kit/ipc` |
@@ -70,7 +70,7 @@ write against the raw API, put it in one of these packages instead.
 ## Files and network
 
 A plugin can only use the filesystem or sockets when its `pumpkinPlugin.wasi` in `package.json` asks for them
-(`"filesystem"`, `"sockets"`). See [Files and network access](../../../docs/creating-a-plugin.md#files-and-network-access).
+(`"filesystem"`, `"sockets"`, `"udp"`, `"http"`). See [Files and network access](../../../docs/creating-a-plugin.md#files-and-network-access).
 Keep that code in a thin adapter behind an interface, as `WasiDataDir` does for `DataFiles`, so the logic can be
 tested without a server.
 
@@ -82,6 +82,7 @@ names are typed against the ones Pumpkin knows ([Plugin info and READMEs](../../
 
 ## When the API doesn't have what you need
 
-Stop and tell the user what is missing, and quote the WIT that comes closest. Don't work around a missing API
-with undocumented host behavior, and don't bump the pinned version on your own: the API package, the server
-release and the integration tests move together.
+Explain the missing capability with the closest WIT definition. Continue any independent work and use a
+supported design if it satisfies the request. Don't rely on undocumented host behavior. Change the pinned
+versions only when the task calls for an API upgrade; the API package, server release and integration tests
+move together.

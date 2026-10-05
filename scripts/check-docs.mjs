@@ -33,7 +33,9 @@ const docs = [
     ...(exists('README.md') ? ['README.md'] : []),
     ...markdownFiles('docs'),
     ...packages.map((p) => `${p}/README.md`).filter((p) => exists(p)),
-    ...markdownFiles('.github')
+    ...markdownFiles('.github'),
+    ...(exists('AGENTS.md') ? ['AGENTS.md'] : []),
+    ...markdownFiles('.agents')
 ];
 
 // 1. Every package has a README that names it.
@@ -84,7 +86,7 @@ const code = (text) => [...text.matchAll(/```[\s\S]*?```|`[^`\n]*`/g)].map((m) =
 const PLACEHOLDERS = ['my-plugin'];
 
 // 3. Repo paths in code spans exist.
-const PATH_IN_CODE = /`((?:packages|tools|scripts|docs|\.github)\/[\w./@-]+)`/g;
+const PATH_IN_CODE = /`((?:packages|tools|scripts|docs|\.github|\.agents)\/[\w./@-]+)`/g;
 for (const file of docs) {
     for (const match of read(file).matchAll(PATH_IN_CODE)) {
         const target = (match[1] ?? '').replace(/[.,;:]+$/, '');
