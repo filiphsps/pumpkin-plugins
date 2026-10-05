@@ -117,6 +117,21 @@ describe('DynamicLightsPumpkin host lifecycle', () => {
         expect(env.player.resets).toEqual([]);
     });
 
+    it('lights new player drops with no configured entity types, without lighting old unknown drops', () => {
+        const files = state.files;
+        if (files === undefined) throw new Error('Missing files');
+        files.put('config.toml', '[entities]\nenabled = true\n[sources."minecraft:torch"]\nlight_level = 14\n');
+        const env = setup();
+        env.player.entities = [entity(7, 'item', 1)];
+
+        env.event('player-drop-item-event', { itemName: 'minecraft:torch', cancelled: false });
+        env.player.entities.push(entity(8, 'item', 2));
+        env.delayed();
+        env.repeating();
+
+        expect(env.player.sent).toEqual([{ x: 2, y: 64, z: 0, level: 14 }]);
+    });
+
     it('clears the last held light after dropping its item', () => {
         const env = setup();
         env.player.item = 'minecraft:torch';

@@ -27,13 +27,13 @@ import { registerCommands } from './commands/register.ts';
 import { loadPluginConfig } from './config/load.ts';
 import { info } from './info.ts';
 import { type BlockPosition, ClientLightTracker } from './lights/client-light.ts';
-import { DroppedItemLightLevels } from './lights/dropped-items.ts';
+import { DroppedItemLightLevels, newDroppedItemId } from './lights/dropped-items.ts';
 import { EntityLightTracker } from './lights/entity-lights.ts';
 import { HeldItemLightLevels } from './lights/held-items.ts';
 import { LightJournal } from './lights/journal.ts';
 import { PlayerLightPreferences } from './lights/player-preferences.ts';
 import { resolveClientLightStates } from './platform/client-light-states.ts';
-import { readEntityLights, readHeldLight } from './platform/player-lights.ts';
+import { nearbyItemIds, playerWorldId, readEntityLights, readHeldLight } from './platform/player-lights.ts';
 import { PumpkinLightWorld } from './platform/pumpkin-light-world.ts';
 
 /** The plugin. Pumpkin creates it once and calls `onLoad` when the server starts. */
@@ -131,22 +131,44 @@ class DynamicLightsPumpkin extends PluginBase {
             this.forgetPlayer(event.player.getName());
             this.deferPlayerSync(event.player.getName());
         });
-        this.registerEvent(ctx, 'player-drop-item-event', (_server, event: PlayerDropItemEventData) => {
-            this.deferPlayerSync(event.player.getName());
-            const level = this.lightLevels?.level(event.itemName) ?? 0;
-            if (level === 0) return;
-            const playerName = event.player.getName();
-            this.defer((server) => this.recordPlayerDrop(server, playerName, level));
-        });
-        this.registerEvent(ctx, 'item-spawn-event', (_server, event: ItemSpawnEventData) => {
-            this.droppedItemLevels?.recordSpawn(event.entityId, event.itemName);
-        });
-        this.registerEvent(ctx, 'item-merge-event', (_server, event: ItemMergeEventData) => {
-            this.droppedItemLevels?.merge(event.entityId, event.targetId);
-        });
-        this.registerEvent(ctx, 'item-despawn-event', (_server, event: ItemDespawnEventData) => {
-            this.droppedItemLevels?.remove(event.entityId);
-        });
+        this.registerEvent(
+            ctx,
+            'player-drop-item-event',
+            (_server, event: PlayerDropItemEventData) => {
+                this.deferPlayerSync(event.player.getName());
+                const level = this.lightLevels?.level(event.itemName) ?? 0;
+                if (event.cancelled || level === 0) return;
+                const playerName = event.player.getName();
+                const previous = new Set(nearbyItemIds(event.player));
+                const worldId = playerWorldId(event.player);
+                this.defer((server) => this.recordPlayerDrop(server, playerName, level, worldId, previous));
+            },
+            'lowest'
+        );
+        this.registerEvent(
+            ctx,
+            'item-spawn-event',
+            (_server, event: ItemSpawnEventData) => {
+                if (!event.cancelled) this.droppedItemLevels?.recordSpawn(event.entityId, event.itemName);
+            },
+            'lowest'
+        );
+        this.registerEvent(
+            ctx,
+            'item-merge-event',
+            (_server, event: ItemMergeEventData) => {
+                if (!event.cancelled) this.droppedItemLevels?.merge(event.entityId, event.targetId);
+            },
+            'lowest'
+        );
+        this.registerEvent(
+            ctx,
+            'item-despawn-event',
+            (_server, event: ItemDespawnEventData) => {
+                if (!event.cancelled) this.droppedItemLevels?.remove(event.entityId);
+            },
+            'lowest'
+        );
         this.registerEvent(ctx, 'entity-remove-event', (_server, event: EntityRemoveEventData) => {
             this.droppedItemLevels?.remove(event.entityId);
         });
@@ -273,23 +295,22 @@ class DynamicLightsPumpkin extends PluginBase {
         this.entityTracker?.sync(playerName, player, lights.visible);
     }
 
-    private recordPlayerDrop(server: Server, playerName: string, level: number): void {
+    private recordPlayerDrop(
+        server: Server,
+        playerName: string,
+        level: number,
+        worldId: string,
+        previous: ReadonlySet<number>
+    ): void {
         const player = server.getPlayerByName(playerName);
         if (player == null) return;
-        const [playerX, playerY, playerZ] = player.getPosition();
-        const candidates = player
-            .asEntity()
-            .getNearbyEntities(2, 2, 2)
-            .filter(
-                (entity) => entity.getType() === 'item' && this.droppedItemLevels?.level(entity.getId()) === undefined
-            )
-            .sort(
-                (left, right) =>
-                    distanceSquared(left.getPosition(), playerX, playerY, playerZ) -
-                    distanceSquared(right.getPosition(), playerX, playerY, playerZ)
-            );
-        const dropped = candidates[0];
-        if (dropped !== undefined) this.droppedItemLevels?.recordLevel(dropped.getId(), level);
+        try {
+            if (playerWorldId(player) !== worldId) return;
+            const dropped = newDroppedItemId(previous, nearbyItemIds(player));
+            if (dropped !== undefined) this.droppedItemLevels?.recordLevel(dropped, level);
+        } finally {
+            disposeWasiResource(player);
+        }
     }
 
     /** Toggles one player's dynamic lights and immediately clears them when disabling. */
@@ -309,15 +330,6 @@ function sourceLevels(sources: Record<string, { light_level?: number }>): Record
         if (source.light_level !== undefined) levels[item] = source.light_level;
     }
     return levels;
-}
-
-function distanceSquared(
-    [x, y, z]: [number, number, number],
-    originX: number,
-    originY: number,
-    originZ: number
-): number {
-    return (x - originX) ** 2 + (y - originY) ** 2 + (z - originZ) ** 2;
 }
 
 registerPlugin(new DynamicLightsPumpkin());
