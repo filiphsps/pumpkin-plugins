@@ -21,6 +21,7 @@ import { pluginMetadata } from '@pumpkin-plugins/docs';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
 import { cancelTask, runTask, scheduleDelayed, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
 import { handleTask as apiHandleTask, Plugin, registerPlugin } from '@pumpkinmc/pumpkin-api-ts';
+import { registerCommands } from './commands/register.ts';
 import { loadPluginConfig } from './config/load.ts';
 import { info } from './info.ts';
 import { type BlockPosition, ClientLightTracker } from './lights/client-light.ts';
@@ -28,6 +29,7 @@ import { DroppedItemLightLevels } from './lights/dropped-items.ts';
 import { EntityLightTracker, type VisibleEntityLight } from './lights/entity-lights.ts';
 import { HeldItemLightLevels } from './lights/held-items.ts';
 import { LightJournal } from './lights/journal.ts';
+import { PlayerLightPreferences } from './lights/player-preferences.ts';
 import { findClientLightPosition } from './platform/client-light-position.ts';
 import { resolveClientLightStates } from './platform/client-light-states.ts';
 import { PumpkinLightWorld } from './platform/pumpkin-light-world.ts';
@@ -39,6 +41,7 @@ class DynamicLightsPumpkin extends Plugin {
     private lightLevels: HeldItemLightLevels | undefined;
     private entityLevels = new Map<string, number>();
     private droppedItemLevels: DroppedItemLightLevels | undefined;
+    private preferences: PlayerLightPreferences | undefined;
     private entityTask: number | undefined;
 
     /** Describes the plugin to the server. */
@@ -62,11 +65,13 @@ class DynamicLightsPumpkin extends Plugin {
         }
         const config = loadPluginConfig(files, (level, message) => logging.log(level, `${info.name}: ${message}`));
         const journal = new LightJournal(files);
+        this.preferences = new PlayerLightPreferences(files);
         this.tracker = new ClientLightTracker(clientLightStates);
         this.entityTracker = new EntityLightTracker(clientLightStates);
         this.lightLevels = new HeldItemLightLevels(sourceLevels(config.sources));
         this.droppedItemLevels = new DroppedItemLightLevels((itemName) => this.lightLevels?.level(itemName) ?? 0);
         this.entityLevels = new Map(Object.entries(sourceLevels(config.entity_sources)));
+        registerCommands(ctx, this);
         if (config.entities.enabled) {
             logging.log(
                 'info',
@@ -145,6 +150,10 @@ class DynamicLightsPumpkin extends Plugin {
     }
 
     private syncPlayer(player: PlayerJoinEventData['player'], precisePosition = player.getPosition()): void {
+        if (!this.preferences?.isEnabled(player.getName())) {
+            this.tracker?.remove(player.getName(), player);
+            return;
+        }
         const rightItem = player.getItemInHand('right');
         const leftItem = player.getItemInHand('left');
         const level = this.lightLevels?.levelForHands(rightItem?.getRegistryKey(), leftItem?.getRegistryKey()) ?? 0;
@@ -163,6 +172,10 @@ class DynamicLightsPumpkin extends Plugin {
         const players = server.getAllPlayers();
         if (players.length === 0) return;
         for (const player of players) {
+            if (!this.preferences?.isEnabled(player.getName())) {
+                this.entityTracker?.remove(player.getName(), player);
+                continue;
+            }
             const visible: VisibleEntityLight[] = [];
             for (const entity of player.asEntity().getNearbyEntities(15, 15, 15)) {
                 const level =
@@ -192,6 +205,17 @@ class DynamicLightsPumpkin extends Plugin {
             );
         const dropped = candidates[0];
         if (dropped !== undefined) this.droppedItemLevels?.recordLevel(dropped.getId(), level);
+    }
+
+    /** Toggles one player's dynamic lights and immediately clears them when disabling. */
+    togglePlayerLights(player: PlayerJoinEventData['player']): boolean {
+        const enabled = this.preferences?.toggle(player.getName()) ?? true;
+        if (enabled) this.syncPlayer(player);
+        else {
+            this.tracker?.remove(player.getName(), player);
+            this.entityTracker?.remove(player.getName(), player);
+        }
+        return enabled;
     }
 }
 

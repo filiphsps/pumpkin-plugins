@@ -1,4 +1,5 @@
-import type { PluginInfo } from '@pumpkin-plugins/docs';
+import { commandInfos, type PluginInfo } from '@pumpkin-plugins/docs';
+import { commands } from './commands/spec.ts';
 import { configInfo } from './config/schema.ts';
 
 /**
@@ -13,6 +14,6 @@ export const info = {
         { name: 'fs.read.data', reason: 'Read its light-source settings and old recovery data.' },
         { name: 'fs.write.data', reason: 'Write its light-source settings.' }
     ],
-    commands: [],
+    commands: commandInfos(commands),
     config: configInfo
 } satisfies PluginInfo<'DynamicLightsPumpkin'>;
