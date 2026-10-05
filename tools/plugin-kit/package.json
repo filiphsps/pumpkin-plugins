@@ -38,6 +38,7 @@
         "./ipc": "./src/ipc.ts",
         "./logger": "./src/logger.ts",
         "./payload": "./src/payload.ts",
+        "./registry-id": "./src/registry-id.ts",
         "./register-commands": "./src/register-commands.ts",
         "./testing": "./src/testing/index.ts",
         "./wasi-error": "./src/wasi-error.ts"
