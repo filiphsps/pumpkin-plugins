@@ -84,4 +84,25 @@ describe('resolvePumpkinBinary', () => {
         expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/checksums.sha256');
         expect(fs.readdirSync(cache)).toEqual([]);
     });
+
+    it.each(['checksum list', 'binary asset'] as const)(
+        'reports an HTTP error for the %s download',
+        async (failedDownload) => {
+            const cache = setupCache();
+            const asset = assetName(process.platform, process.arch);
+            const bytes = Buffer.from('test Pumpkin binary');
+            const checksum = createHash('sha256').update(bytes).digest('hex');
+            const fetchMock = vi.fn<typeof fetch>(async (input) => {
+                const isChecksumList = String(input).endsWith('/checksums.sha256');
+                if (isChecksumList && failedDownload === 'checksum list') return new Response(null, { status: 503 });
+                if (!isChecksumList && failedDownload === 'binary asset') return new Response(null, { status: 503 });
+                return new Response(`${checksum}  ${asset}\n`);
+            });
+            vi.stubGlobal('fetch', fetchMock);
+
+            await expect(resolvePumpkinBinary()).rejects.toThrow(/HTTP 503/);
+            expect(fetchMock).toHaveBeenCalledTimes(failedDownload === 'checksum list' ? 1 : 2);
+            expect(fs.readdirSync(cache)).toEqual([]);
+        }
+    );
 });
