@@ -24,7 +24,6 @@ export function definePluginVitestConfig() {
                         include: ['test/**/*.itest.ts'],
                         testTimeout: 120_000,
                         hookTimeout: 180_000,
-                        fileParallelism: false,
                         globalSetup: [fileURLToPath(new URL('./global-setup.ts', import.meta.url))]
                     }
                 }

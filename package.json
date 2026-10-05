@@ -34,7 +34,7 @@
         "typecheck": "turbo run typecheck",
         "test": "turbo run test",
         "test:scripts": "node --test scripts/*.test.mjs .agents/hooks/*.test.mjs",
-        "test:integration": "turbo run test:integration --concurrency=1",
+        "test:integration": "turbo run test:integration --concurrency=4",
         "readme": "turbo run readme && pumpkin-plugins-docs root",
         "readme:check": "turbo run readme:check && pumpkin-plugins-docs root --check",
         "check": "node scripts/check-release-config.mjs && node scripts/package-metadata.mjs && node scripts/check-docs.mjs",
