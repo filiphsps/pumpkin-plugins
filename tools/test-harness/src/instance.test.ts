@@ -20,7 +20,7 @@ afterEach(() => {
  * @param failures - How many runs should report the port as taken.
  * @returns A reader for the Java port each run was given.
  */
-function fakePumpkin(failures: number): () => string[] {
+function fakePumpkin(failures: number, errorLines: string[] = []): () => string[] {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-pumpkin-'));
     made.push(dir);
     const file = path.join(dir, 'runs');
@@ -37,6 +37,7 @@ if (count <= ${failures}) {
     console.error('ERROR Failed to bind the Bedrock UDP socket on 127.0.0.1:' + port + ': Address already in use (os error 98)');
     process.exit(1);
 }
+for (const line of ${JSON.stringify(errorLines)}) console.error(line);
 console.log('Server is now running');
 process.stdin.once('data', () => process.exit(0));
 process.stdin.resume();
@@ -69,5 +70,16 @@ describe('startPumpkin', () => {
         expect(error).toBeInstanceOf(Error);
         expect((error as Error).message).toMatch(/exited before/);
         expect(ports()).toHaveLength(3);
+    });
+
+    it('filters the known baseline error but exposes other server errors', async () => {
+        fakePumpkin(0, ['ERROR Failed to save level.dat: Info not found!', 'ERROR Plugin failed to load']);
+        const server = await startPumpkin();
+        try {
+            await server.waitForLog(/Plugin failed to load/);
+            expect(server.errors()).toEqual(['ERROR Plugin failed to load']);
+        } finally {
+            await server.stop();
+        }
     });
 });
