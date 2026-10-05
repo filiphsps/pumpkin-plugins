@@ -70,4 +70,18 @@ describe('resolvePumpkinBinary', () => {
         await expect(resolvePumpkinBinary()).rejects.toThrow(`PUMPKIN_BIN does not exist: ${missing}`);
         expect(fetchMock).not.toHaveBeenCalled();
     });
+
+    it('does not download an asset missing from the checksum list', async () => {
+        const cache = setupCache();
+        const asset = assetName(process.platform, process.arch);
+        const fetchMock = vi.fn<typeof fetch>(async () => new Response(`${'f'.repeat(64)}  other-platform\n`));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(resolvePumpkinBinary()).rejects.toThrow(
+            `checksums.sha256 for ${PUMPKIN_RELEASE} has no entry for ${asset}`
+        );
+        expect(fetchMock).toHaveBeenCalledOnce();
+        expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/checksums.sha256');
+        expect(fs.readdirSync(cache)).toEqual([]);
+    });
 });
