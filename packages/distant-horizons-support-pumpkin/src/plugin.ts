@@ -13,6 +13,7 @@ import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
+import { commandHandlers } from './commands/handlers.ts';
 import { commands } from './commands/spec.ts';
 import { readSettings } from './config/load.ts';
 import { info } from './info.ts';
@@ -33,7 +34,7 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
         const settings = readSettings(files, hostLogger);
         const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries);
         const sessions = new Sessions(settings, cache, hostLogger);
-        registerCommands(ctx, commands, { 'dhs status': () => [sessions.status()] });
+        registerCommands(ctx, commands, commandHandlers(sessions, cache));
         this.registerEvent(ctx, 'player-custom-payload-event', (_server, event: PlayerCustomPayloadEventData) => {
             if (event.channel !== CHANNEL) return;
             try {

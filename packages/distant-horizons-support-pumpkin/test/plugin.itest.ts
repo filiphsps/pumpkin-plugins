@@ -25,6 +25,13 @@ describe(info.name, () => {
         expect(config).toContain('disk_cache_entries = 4096');
         server.command('dhs status');
         await server.waitForLog(/0 DH client\(s\), 0 pending LOD request\(s\)/);
+        const cacheStatusFrom = server.lines.length;
+        server.command('dhs cache status');
+        await server.waitForLog(/Memory cache: 0\/128 entries/, 5000, cacheStatusFrom);
+        await server.waitForLog(/Disk cache: 0\/4096 entries/, 5000, cacheStatusFrom);
+        const cacheClearFrom = server.lines.length;
+        server.command('dhs cache clear');
+        await server.waitForLog(/Cleared 0 in-memory and 0 disk cache entries/, 5000, cacheClearFrom);
         // A successful load alone does not prove that the worker's event is being dispatched.
         await vi.waitFor(
             async () => {

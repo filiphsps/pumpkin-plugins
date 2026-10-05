@@ -32,6 +32,10 @@ Pumpkin asks for these on the server console the first time the plugin loads.
 | Command | Description | Permission |
 | --- | --- | --- |
 | `/dhs status` | Show connected DH clients and pending requests | `DistantHorizonsSupportPumpkin:command.dhs` |
+| `/dhs cache status` | Show memory and disk cache usage | `DistantHorizonsSupportPumpkin:command.dhs` |
+| `/dhs cache clear` | Clear both cache tiers | `DistantHorizonsSupportPumpkin:command.dhs` |
+| `/dhs cache memory clear` | Clear the in-memory cache | `DistantHorizonsSupportPumpkin:command.dhs` |
+| `/dhs cache disk clear` | Clear the disk cache | `DistantHorizonsSupportPumpkin:command.dhs` |
 <!-- docs:end commands -->
 
 ## Configuration
@@ -117,6 +121,9 @@ bound memory use. Memory and disk cache limits are independent: `support.memory_
 defaults to 128 and `support.disk_cache_entries` defaults to 4096. Set either limit to `0` to
 disable that cache tier; any negative value makes it unlimited. Existing `support.cache_entries`
 values are copied to both new settings when the config is upgraded.
+
+Use `/dhs cache status` to inspect entry counts and storage use. `/dhs cache clear` clears both
+tiers; `/dhs cache memory clear` and `/dhs cache disk clear` clear one tier at a time.
 
 Cached sections are refreshed on requests after `support.refresh_seconds` when their chunks
 are loaded. Otherwise the last cached capture is returned. Block placement and breaking
