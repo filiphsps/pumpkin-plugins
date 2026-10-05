@@ -1,13 +1,8 @@
 import type { JavaPlayer, Player } from 'pumpkin:plugin/player@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
-import {
-    boolPayload,
-    EXHAUSTION_CHANNEL,
-    floatPayload,
-    NATURAL_REGENERATION_CHANNEL,
-    SATURATION_CHANNEL
-} from '../payload.ts';
+import { bool, float32be } from '@pumpkin-plugins/plugin-kit/payload';
+import { EXHAUSTION_CHANNEL, NATURAL_REGENERATION_CHANNEL, SATURATION_CHANNEL } from '../payload.ts';
 import { SyncTracker } from '../sync.ts';
 
 // Pumpkin leaves the logging target out of its default output, so every line names the plugin.
@@ -77,11 +72,11 @@ export class PlayerSync {
         if (update.saturation === undefined && update.exhaustion === undefined) return;
         const who = player.getName();
         if (update.saturation !== undefined) {
-            java.sendCustomPayload(SATURATION_CHANNEL, floatPayload(update.saturation));
+            java.sendCustomPayload(SATURATION_CHANNEL, float32be(update.saturation));
             this.log.debug(`${tag} ${who}: saturation ${update.saturation}.`);
         }
         if (update.exhaustion !== undefined) {
-            java.sendCustomPayload(EXHAUSTION_CHANNEL, floatPayload(update.exhaustion));
+            java.sendCustomPayload(EXHAUSTION_CHANNEL, float32be(update.exhaustion));
             this.log.debug(`${tag} ${who}: exhaustion ${update.exhaustion}.`);
         }
     }
@@ -91,7 +86,7 @@ export class PlayerSync {
         try {
             const rule = world.getGameRule('natural-health-regeneration');
             if (rule.tag !== 'bool' || this.lastRegeneration.get(id) === rule.val) return;
-            java.sendCustomPayload(NATURAL_REGENERATION_CHANNEL, boolPayload(rule.val));
+            java.sendCustomPayload(NATURAL_REGENERATION_CHANNEL, bool(rule.val));
             this.lastRegeneration.set(id, rule.val);
             this.log.debug(
                 `${tag} ${player.getName()}: natural regeneration is ${rule.val ? 'on' : 'off'} in ${world.getName()}.`

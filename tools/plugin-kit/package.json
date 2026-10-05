@@ -37,6 +37,7 @@
         "./host": "./src/host.ts",
         "./ipc": "./src/ipc.ts",
         "./logger": "./src/logger.ts",
+        "./payload": "./src/payload.ts",
         "./register-commands": "./src/register-commands.ts",
         "./testing": "./src/testing/index.ts",
         "./wasi-error": "./src/wasi-error.ts"
