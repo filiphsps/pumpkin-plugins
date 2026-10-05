@@ -12,7 +12,7 @@ function fixture() {
     const settings = readSettings(files, log);
     settings.blocks_per_tick = 16384;
     settings.packets_per_tick = 16;
-    const cache = new LodCache(files, settings.cache_entries),
+    const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries),
         sessions = new Sessions(settings, cache, log, () => 1000);
     const sent: Uint8Array[] = [];
     let reads = 0;

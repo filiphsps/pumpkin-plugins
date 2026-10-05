@@ -31,7 +31,8 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
         const files = WasiDataDir.open();
         if (!files) throw new Error('DistantHorizonsSupportPumpkin requires access to its data folder');
         const settings = readSettings(files, hostLogger);
-        const sessions = new Sessions(settings, new LodCache(files, settings.cache_entries), hostLogger);
+        const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries);
+        const sessions = new Sessions(settings, cache, hostLogger);
         registerCommands(ctx, commands, { 'dhs status': () => [sessions.status()] });
         this.registerEvent(ctx, 'player-custom-payload-event', (_server, event: PlayerCustomPayloadEventData) => {
             if (event.channel !== CHANNEL) return;

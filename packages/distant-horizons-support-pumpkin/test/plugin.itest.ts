@@ -21,6 +21,8 @@ describe(info.name, () => {
         const config = await readFile(path.join(server.pluginDataDir(info.name), 'config.toml'), 'utf8');
         expect(config).toContain('render_distance = 128');
         expect(config).toContain('blocks_per_tick = 2048');
+        expect(config).toContain('memory_cache_entries = 128');
+        expect(config).toContain('disk_cache_entries = 4096');
         server.command('dhs status');
         await server.waitForLog(/0 DH client\(s\), 0 pending LOD request\(s\)/);
         // A successful load alone does not prove that the worker's event is being dispatched.
@@ -41,7 +43,7 @@ describe(info.name, () => {
             plugins: [builtPluginPath(process.cwd())],
             files: {
                 [`plugins/data/${info.name}/config.toml`]:
-                    '[support]\nrender_distance = 256\nserver_key = "integration-test"\n'
+                    '[support]\nrender_distance = 256\nserver_key = "integration-test"\ncache_entries = 512\n'
             }
         });
         try {
@@ -50,6 +52,9 @@ describe(info.name, () => {
             expect(config).toContain('render_distance = 256');
             expect(config).toContain('server_key = "integration-test"');
             expect(config).toContain('blocks_per_tick = 2048');
+            expect(config).toContain('memory_cache_entries = 512');
+            expect(config).toContain('disk_cache_entries = 512');
+            expect(config).not.toMatch(/^cache_entries =/m);
             expect(custom.errors()).toEqual([]);
         } finally {
             await custom.stop();

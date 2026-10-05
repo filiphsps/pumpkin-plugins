@@ -49,7 +49,8 @@ Settings live in `plugins/data/DistantHorizonsSupportPumpkin/config.toml`. The p
 | `support.pending_requests` | integer | `16` | Maximum pending requests across all players. |
 | `support.blocks_per_tick` | integer | `2048` | Maximum block samples per server tick across all LOD requests. |
 | `support.packets_per_tick` | integer | `2` | Maximum 30 KB transfer packets sent per server tick across all players. |
-| `support.cache_entries` | integer | `128` | Maximum LOD sections cached in memory and on disk. |
+| `support.memory_cache_entries` | integer | `128` | Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited. |
+| `support.disk_cache_entries` | integer | `4096` | Maximum LOD sections cached on disk. Set to 0 to disable; any negative value means unlimited. |
 | `support.refresh_seconds` | integer | `30` | Rebuild cached sections after this age when all their chunks are loaded. |
 | `worlds."<world>".height` | integer | none | World height in blocks above its minimum Y. |
 
@@ -80,8 +81,11 @@ blocks_per_tick = 2048
 # Maximum 30 KB transfer packets sent per server tick across all players.
 packets_per_tick = 2
 
-# Maximum LOD sections cached in memory and on disk.
-cache_entries = 128
+# Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited.
+memory_cache_entries = 128
+
+# Maximum LOD sections cached on disk. Set to 0 to disable; any negative value means unlimited.
+disk_cache_entries = 4096
 
 # Rebuild cached sections after this age when all their chunks are loaded.
 refresh_seconds = 30
@@ -109,7 +113,10 @@ receive a retryable request rejection immediately.
 
 Sampling and transfers run within the configured tick budgets. An uncached section may take
 many ticks to complete. Air above the heightmap is collapsed without reading every empty block. Sections with more than 131,072 material segments are rejected to
-bound memory use. The cache evicts old entries once `support.cache_entries` is reached.
+bound memory use. Memory and disk cache limits are independent: `support.memory_cache_entries`
+defaults to 128 and `support.disk_cache_entries` defaults to 4096. Set either limit to `0` to
+disable that cache tier; any negative value makes it unlimited. Existing `support.cache_entries`
+values are copied to both new settings when the config is upgraded.
 
 Cached sections are refreshed on requests after `support.refresh_seconds` when their chunks
 are loaded. Otherwise the last cached capture is returned. Block placement and breaking

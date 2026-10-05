@@ -43,11 +43,17 @@ export const schema = defineConfig('DistantHorizonsSupportPumpkin', {
                 min: 1,
                 max: 16
             }),
-            cache_entries: int({
-                description: 'Maximum LOD sections cached in memory and on disk.',
+            memory_cache_entries: int({
+                description:
+                    'Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited.',
                 default: 128,
-                min: 1,
-                max: 4096
+                migrateFrom: ['support', 'cache_entries']
+            }),
+            disk_cache_entries: int({
+                description:
+                    'Maximum LOD sections cached on disk. Set to 0 to disable; any negative value means unlimited.',
+                default: 4096,
+                migrateFrom: ['support', 'cache_entries']
             }),
             refresh_seconds: int({
                 description: 'Rebuild cached sections after this age when all their chunks are loaded.',
