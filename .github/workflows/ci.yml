@@ -284,15 +284,18 @@ jobs:
             all: ${{ toJSON(steps.release.outputs) }}
             prs: ${{ steps.release.outputs.prs }}
         steps:
-            - name: 🚢 Release Please
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 🚢 Release Please with bundled dependency changes
               id: release
-              uses: googleapis/release-please-action@v5.0.0
-              with:
-                  # GITHUB_TOKEN-created PRs don't trigger CI. Set RELEASE_PLEASE_TOKEN to a PAT
-                  # or app token if CI should run on the release PR.
-                  token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
-                  config-file: release-please-config.json
-                  manifest-file: .release-please-manifest.json
+              env:
+                  # GITHUB_TOKEN-created PRs do not trigger CI. Use a PAT or app token for that.
+                  RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+              run: pnpm --package=release-please@17.11.2 dlx -c 'node scripts/release.mjs "$(command -v release-please)"'
 
     release-pr:
         name: 📝 Prepare release PR ${{ matrix.pr.headBranchName }}

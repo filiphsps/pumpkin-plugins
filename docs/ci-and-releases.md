@@ -39,7 +39,7 @@ Two jobs never skip. `📝 Docs and config` is what keeps the docs true, so it h
 commits that change them. `💬 Commit messages` is cheap and belongs on every pull request.
 
 Skipping the release job on a docs-only push costs nothing. release-please only releases a plugin
-that a `feat`, `fix` or `Release-As` commit touched, and merging a release PR is a commit of its own
+with releasable changes to its code or bundled dependencies, and merging a release PR is a commit of its own
 that bumps `package.json`, so the push that has to release is never a docs-only change.
 
 Know this before narrowing a job further: a skipped job takes every job that needs it with it, so no
@@ -52,9 +52,11 @@ Pull requests are **rebase-merged**, never squashed. Every commit lands on `mast
 release-please reads each one, so every commit message must be a conventional commit:
 `feat(scope): ...`, `fix: ...`, `feat!: ...` for breaking changes. The commit lint enforces it.
 
-Only commits that touch a plugin's directory release that plugin. A change under `tools/` that
-should ship in plugin builds needs a commit touching each affected plugin, or a `Release-As:`
-footer.
+Commits touching a plugin or its bundled workspace dependencies release that plugin. This includes
+transitive runtime dependencies such as `plugin-kit` and `update-check`, and the workspace build
+tool. A shared fix appears in each affected plugin's changelog, starting at that plugin's own last
+release. Tests, test helpers, generated build output and documentation do not count as shipped code.
+Changes to the dependency catalog or shared TypeScript configuration count for every plugin.
 
 ## Releases
 
@@ -90,6 +92,22 @@ release-please rewrites its branch on every update, so those commits are re-adde
 Release PRs update when release notes change. `always-update` stays off so a release run that has
 just published a version cannot open an empty follow-up PR with the previous version's changelog.
 Separate PRs keep a plugin that is not ready from being released with one that is.
+
+`scripts/release.mjs` runs the pinned Release Please runtime through `pnpm dlx`.
+`scripts/release-commits.mjs` supplies shared commits through its plugin hook before versions and
+changelogs are calculated. Features, fixes and performance improvements appear in the notes.
+The generator fails if it cannot find a previous release or fetch enough history, rather than
+publishing incomplete notes. Increase `commit-search-depth` in the release configuration if needed.
+Changelogs stay generated; do not edit them by hand.
+
+To preview without changing GitHub, set `GITHUB_REPOSITORY` and `RELEASE_PLEASE_TOKEN`, then run:
+
+```sh
+pnpm --package=release-please@17.11.2 dlx -c 'node scripts/release.mjs --dry-run "$(command -v release-please)"'
+```
+
+Add `--component=<folder>` to preview one plugin. `--pull-requests-only` updates release PRs without
+creating tags or GitHub releases.
 
 ## Signing
 
@@ -168,7 +186,8 @@ generator and the checks can't drift:
 | `scripts/check-docs.mjs` | a package has no README, a link, heading or path in the docs doesn't exist, a `pnpm` command isn't a script, a doc page isn't in the docs index, a root script isn't documented, or a CI job isn't in the table above |
 
 `pnpm test:scripts` runs the tests of those three, `scripts/unpin-release-as.mjs`,
-`scripts/changed-areas.mjs`, and the agent hooks, all against throwaway repos. See "Docs match the code" in
+`scripts/changed-areas.mjs`, the bundled release commit selector, and the agent hooks, using fixtures
+and throwaway repos. See "Docs match the code" in
 [Code style](code-style.md).
 
 ## Publishing to market.pumpkinmc.org

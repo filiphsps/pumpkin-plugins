@@ -59,7 +59,8 @@ work for tells you something different from this file, do what they say.
   AGENTS.md. See [Turborepo](docs/building.md#turborepo); the installed version's own docs are in
   `node_modules/turbo/docs/`.
 - **Releases come from commit messages.** Pull requests are rebase-merged and release-please reads every commit.
-  A plugin only releases when a commit touches its folder. See [Merging](docs/ci-and-releases.md#merging).
+  A plugin releases for changes to its folder or bundled workspace dependencies. See
+  [Merging](docs/ci-and-releases.md#merging).
 
 ## Writing code
 

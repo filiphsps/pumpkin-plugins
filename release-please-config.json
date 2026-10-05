@@ -22,5 +22,19 @@
         "packages/upnpumpkin": {
             "component": "upnpumpkin"
         }
-    }
+    },
+    "changelog-sections": [
+        {
+            "type": "feat",
+            "section": "Features"
+        },
+        {
+            "type": "fix",
+            "section": "Bug Fixes"
+        },
+        {
+            "type": "perf",
+            "section": "Performance Improvements"
+        }
+    ]
 }
