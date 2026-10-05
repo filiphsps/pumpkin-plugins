@@ -86,6 +86,31 @@ describe('bundlePlugin', () => {
         expect(rename).toHaveBeenCalledTimes(3);
     });
 
+    it('restores the previous artifact if publishing fails after it was moved aside', async () => {
+        const { output } = buildAt();
+        fs.writeFileSync(output, 'known-good artifact');
+        const rename = vi.mocked(fs.renameSync);
+        const actualRename = rename.getMockImplementation();
+        if (!actualRename) throw new Error('missing real rename implementation');
+        rename
+            .mockImplementationOnce(() => {
+                throw Object.assign(new Error('access denied'), { code: 'EACCES' });
+            })
+            .mockImplementationOnce((source, destination) => actualRename(source, destination))
+            .mockImplementationOnce(() => {
+                throw Object.assign(new Error('disk full'), { code: 'ENOSPC' });
+            })
+            .mockImplementationOnce((source, destination) => actualRename(source, destination));
+
+        await expect(bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0' })).rejects.toThrow(
+            'disk full'
+        );
+
+        expect(fs.readFileSync(output, 'utf8')).toBe('known-good artifact');
+        expect(fs.readdirSync(path.dirname(output))).toEqual(['plugin.wasm']);
+        expect(rename).toHaveBeenCalledTimes(4);
+    });
+
     it('uses separate temporary bundles for concurrent builds', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-build-'));
         dirs.push(dir);
