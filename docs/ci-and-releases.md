@@ -89,13 +89,17 @@ and pushes a `docs: update generated READMEs` commit to the PR branch, so they a
 release merges. The same run retires the `release-as` pin of any plugin the PR releases (see below).
 release-please rewrites its branch on every update, so those commits are re-added each time.
 
-Release PRs update when release notes change. `always-update` stays off so a release run that has
-just published a version cannot open an empty follow-up PR with the previous version's changelog.
-Separate PRs keep a plugin that is not ready from being released with one that is.
+Release PRs refresh on every release run, even when their release notes are unchanged.
+`always-update` keeps the remaining branches based on current `master` after another plugin's
+release merges, preventing conflicts in the shared manifest and release configuration. Every
+refreshed PR goes through the README and pin preparation job again. Separate PRs keep a plugin
+that is not ready from being released with one that is.
 
 `scripts/release.mjs` runs the pinned Release Please runtime through `pnpm dlx`.
 `scripts/release-commits.mjs` supplies shared commits through its plugin hook before versions and
 changelogs are calculated. Features, fixes and performance improvements appear in the notes.
+After publishing, the runner reloads the manifest before generating PRs. Each plugin's commits
+stop at its own latest release, so refreshing branches does not propose an empty follow-up release.
 The generator fails if it cannot find a previous release or fetch enough history, rather than
 publishing incomplete notes. Increase `commit-search-depth` in the release configuration if needed.
 Changelogs stay generated; do not edit them by hand.

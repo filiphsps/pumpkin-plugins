@@ -95,6 +95,17 @@ describe('bundled release commits', () => {
         assert.throws(() => releaseCommits([{ sha: 'missing-files' }], new Set()), /no changed-file list/);
     });
 
+    it('keeps pending plugin changes while excluding an already published plugin from follow-up releases', () => {
+        const history = [
+            commit('released-a', ['packages/a/package.json', '.release-please-manifest.json'], 'chore: release a'),
+            commit('shared-fix', ['tools/plugin-kit/src/host.ts']),
+            commit('released-b', ['packages/b/package.json'], 'chore: release b')
+        ];
+        const paths = new Set(['tools/plugin-kit']);
+        assert.deepEqual(releaseCommits(history, paths, 'released-a'), []);
+        assert.deepEqual(releaseCommits(history, paths, 'released-b'), [history[1]]);
+    });
+
     it('supplies unfiltered shared commits to the public preconfigure hook', async () => {
         const history = [
             commit('update', ['tools/update-check/src/http.ts']),

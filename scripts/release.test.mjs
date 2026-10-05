@@ -15,20 +15,28 @@ function run(args) {
             `
             const { appendFileSync } = require('node:fs');
             const record = (call) => appendFileSync(process.env.CALLS_FILE, call + '\\n');
+            let published = false;
             module.exports = {
                 VERSION: '17.11.2',
                 GitHub: { create: async () => ({ repository: { defaultBranch: 'master' } }) },
-                Manifest: { fromManifest: async () => ({
+                Manifest: { fromManifest: async () => {
+                    const latestReleasePublished = published;
+                    return {
                     plugins: [], releasedVersions: {}, commitSearchDepth: 500,
-                    createReleases: async () => { record('release'); return [{
+                    createReleases: async () => { record('release'); published = true; return [{
                         path: 'packages/plugin', tagName: 'plugin-v1.0.0',
                         notes: 'Features\\n\\n* Added update checks', url: 'https://example.com/release'
                     }]; },
-                    createPullRequests: async () => { record('update-pr'); return [{ headBranchName: 'release-branch' }]; },
+                    createPullRequests: async () => {
+                        record('update-pr');
+                        const prs = [{ headBranchName: 'release-branch' }];
+                        if (published && !latestReleasePublished) prs.push({ headBranchName: 'empty-follow-up' });
+                        return prs;
+                    },
                     buildPullRequests: async () => { record('preview'); return [{
                         title: 'Release', body: 'Update checks', headRefName: 'release-branch'
                     }]; }
-                }) }
+                }; } }
             };
         `
         );
@@ -83,6 +91,14 @@ it('preserves workflow tag and multiline release-note outputs for assets and Mar
     assert.match(result.output, /paths_released<<[^\n]+\n\["packages\/plugin"\]\n/);
     assert.match(result.output, /packages\/plugin--tag_name<<[^\n]+\nplugin-v1\.0\.0\n/);
     assert.match(result.output, /packages\/plugin--body<<[^\n]+\nFeatures\n\n\* Added update checks\n/);
+});
+
+it('reloads release state after publishing before preparing the remaining PRs', () => {
+    const result = run([]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(result.calls, ['release', 'update-pr']);
+    assert.match(result.output, /prs<<[^\n]+\n\[{"headBranchName":"release-branch"}\]\n/);
+    assert.doesNotMatch(result.output, /empty-follow-up/);
 });
 
 it('rejects misspelled modes before making any GitHub changes', () => {
