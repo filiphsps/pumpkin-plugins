@@ -30,4 +30,11 @@ export class HandlerRegistry<F> {
     get(id: number): F | undefined {
         return this.handlers.get(id);
     }
+
+    /** Removes and returns a handler by id. */
+    take(id: number): F | undefined {
+        const handler = this.handlers.get(id);
+        this.handlers.delete(id);
+        return handler;
+    }
 }

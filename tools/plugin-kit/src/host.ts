@@ -1,6 +1,7 @@
 import type { CommandSender, ConsumedArgs } from 'pumpkin:plugin/command@0.1.0';
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import * as scheduler from 'pumpkin:plugin/scheduler@0.1.0';
+import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { HandlerRegistry } from './handlers.ts';
 import type { Logger } from './logger.ts';
 
@@ -14,7 +15,8 @@ export const hostLogger: Logger = {
 
 // The base `Plugin` class can't be used for these: its scheduler calls pass `BigInt` where the
 // runtime needs numbers, and its handler maps are private. Ids start far above the ones it hands out.
-const tasks = new HandlerRegistry<() => void>(900_000);
+const tasks = new HandlerRegistry<(server: Server) => void>(900_000);
+const delayedTasks = new HandlerRegistry<(server: Server) => void>(905_000);
 const commandHandlers = new HandlerRegistry<(sender: CommandSender) => number>(910_000);
 
 /**
@@ -23,8 +25,18 @@ const commandHandlers = new HandlerRegistry<(sender: CommandSender) => number>(9
  * @param run - The function to run.
  * @returns The scheduler's task id, for `cancelTask`.
  */
-export function scheduleRepeating(periodTicks: number, run: () => void): number {
+export function scheduleRepeating(periodTicks: number, run: (server: Server) => void): number {
     return scheduler.scheduleRepeatingTask(tasks.add(run), periodTicks, periodTicks);
+}
+
+/**
+ * Runs a function once after `delayTicks` game ticks.
+ * @param delayTicks - Ticks to wait before running the function.
+ * @param run - The function to run.
+ * @returns The scheduler's task id, for `cancelTask`.
+ */
+export function scheduleDelayed(delayTicks: number, run: (server: Server) => void): number {
+    return scheduler.scheduleDelayedTask(delayedTasks.add(run), delayTicks);
 }
 
 /**
@@ -49,9 +61,14 @@ export function onCommand(handler: (sender: CommandSender) => number): number {
  * @param id - The handler id the host passed back.
  * @returns False when the id belongs to the API package's own scheduler.
  */
-export function runTask(id: number): boolean {
+export function runTask(id: number, server: Server): boolean {
+    const delayedTask = delayedTasks.take(id);
+    if (delayedTask !== undefined) {
+        delayedTask(server);
+        return true;
+    }
     const task = tasks.get(id);
-    task?.();
+    task?.(server);
     return task !== undefined;
 }
 

@@ -14,4 +14,12 @@ describe('HandlerRegistry', () => {
     it('returns undefined for ids it did not hand out, so callers can fall through', () => {
         expect(new HandlerRegistry<() => void>(900_000).get(5)).toBeUndefined();
     });
+
+    it('removes a handler when it is taken', () => {
+        const registry = new HandlerRegistry<string>(7);
+        const id = registry.add('once');
+
+        expect(registry.take(id)).toBe('once');
+        expect(registry.get(id)).toBeUndefined();
+    });
 });

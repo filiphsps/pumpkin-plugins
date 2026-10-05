@@ -67,7 +67,7 @@ registerPlugin(new BedrockAddonManager());
  * @param server - The server instance.
  */
 export function handleTask(id: number, server: Server): void {
-    if (!runTask(id)) apiHandleTask(id, server);
+    if (!runTask(id, server)) apiHandleTask(id, server);
 }
 
 /**
