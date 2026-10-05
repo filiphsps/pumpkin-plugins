@@ -45,6 +45,21 @@ describe('DH settings', () => {
         expect(settings.memory_cache_entries).toBe(-42);
         expect(settings.disk_cache_entries).toBe(-99);
     });
+    it('treats arbitrarily large negative TOML integers as unlimited', () => {
+        const files = new MemoryFiles(),
+            log = new MemoryLogger();
+        files.put(
+            'config.toml',
+            '[support]\nmemory_cache_entries = -9223372036854775808\ndisk_cache_entries = -9223372036854775808\n'
+        );
+
+        const settings = readSettings(files, log);
+
+        expect(settings.memory_cache_entries).toBe(-1);
+        expect(settings.disk_cache_entries).toBe(-1);
+        expect(files.text('config.toml')).toContain('memory_cache_entries = -1');
+        expect(files.text('config.toml')).toContain('disk_cache_entries = -1');
+    });
     it('preserves invalid values and malformed TOML without overwriting user files', () => {
         const files = new MemoryFiles(),
             log = new MemoryLogger(),

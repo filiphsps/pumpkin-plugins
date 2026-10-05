@@ -1,4 +1,14 @@
-import { type ConfigValues, defineConfig, describeConfig, int, section, str, table } from '@pumpkin-plugins/config';
+import {
+    type ConfigValues,
+    defineConfig,
+    describeConfig,
+    type Field,
+    field,
+    int,
+    section,
+    str,
+    table
+} from '@pumpkin-plugins/config';
 
 /** Settings for bounded LOD requests and the identity announced to DH clients. */
 export const schema = defineConfig('DistantHorizonsSupportPumpkin', {
@@ -43,18 +53,14 @@ export const schema = defineConfig('DistantHorizonsSupportPumpkin', {
                 min: 1,
                 max: 16
             }),
-            memory_cache_entries: int({
-                description:
-                    'Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited.',
-                default: 128,
-                migrateFrom: ['support', 'cache_entries']
-            }),
-            disk_cache_entries: int({
-                description:
-                    'Maximum LOD sections cached on disk. Set to 0 to disable; any negative value means unlimited.',
-                default: 4096,
-                migrateFrom: ['support', 'cache_entries']
-            }),
+            memory_cache_entries: cacheLimit(
+                'Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited.',
+                128
+            ),
+            disk_cache_entries: cacheLimit(
+                'Maximum LOD sections cached on disk. Set to 0 to disable; any negative value means unlimited.',
+                4096
+            ),
             refresh_seconds: int({
                 description: 'Rebuild cached sections after this age when all their chunks are loaded.',
                 default: 30,
@@ -79,3 +85,17 @@ export type Settings = ConfigValues<typeof schema>['support'] & { worlds: Config
 export const renderOptions = { note: 'Changes apply after a server restart. Invalid files are left untouched.' };
 /** Generated documentation for the installed settings file. */
 export const configInfo = describeConfig(schema, 'config.toml', renderOptions);
+
+function cacheLimit(description: string, defaultValue: number) {
+    const integer = int({ description, default: defaultValue });
+    return field<number>({
+        type: 'integer',
+        description,
+        default: defaultValue,
+        expected: 'a whole number',
+        example: defaultValue,
+        migrateFrom: ['support', 'cache_entries'],
+        parse: (raw) => (typeof raw === 'bigint' && raw < 0n ? { ok: true, value: -1 } : integer.parse(raw)),
+        format: String
+    }) as Field<number>;
+}

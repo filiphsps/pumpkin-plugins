@@ -67,4 +67,27 @@ describe(info.name, () => {
             await custom.stop();
         }
     });
+    it('treats full-range negative cache limits as unlimited on the real server', async () => {
+        const custom = await startPumpkin({
+            name: 'distant-horizons-unlimited-cache-config',
+            plugins: [builtPluginPath(process.cwd())],
+            files: {
+                [`plugins/data/${info.name}/config.toml`]:
+                    '[support]\nmemory_cache_entries = -9223372036854775808\ndisk_cache_entries = -9223372036854775808\n'
+            }
+        });
+        try {
+            await custom.waitForLog(new RegExp(`Loaded ${info.name}`));
+            const config = await readFile(path.join(custom.pluginDataDir(info.name), 'config.toml'), 'utf8');
+            expect(config).toContain('memory_cache_entries = -1');
+            expect(config).toContain('disk_cache_entries = -1');
+            const from = custom.lines.length;
+            custom.command('dhs cache status');
+            await custom.waitForLog(/Memory cache: 0\/unlimited entries/, 5000, from);
+            await custom.waitForLog(/Disk cache: 0\/unlimited entries/, 5000, from);
+            expect(custom.errors()).toEqual([]);
+        } finally {
+            await custom.stop();
+        }
+    });
 });

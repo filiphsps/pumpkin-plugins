@@ -54,11 +54,16 @@ describe('LOD cache', () => {
         expect(diskOnly.get('disk')).toEqual(lod(2));
         expect(diskOnly.stats().memoryEntries).toBe(0);
 
+        const memoryOnly = new LodCache(files, 1, 0);
+        memoryOnly.put('memory', lod(3));
+        expect(memoryOnly.stats()).toMatchObject({ memoryEntries: 1, diskEntries: 0 });
+        expect(memoryOnly.get('memory')).toEqual(lod(3));
+
         const unlimited = new LodCache(files, -2, -3);
-        unlimited.put('a', lod(3));
-        unlimited.put('b', lod(4));
-        unlimited.put('c', lod(5));
-        expect(unlimited.stats()).toMatchObject({ memoryEntries: 3, diskEntries: 4 });
+        unlimited.put('a', lod(4));
+        unlimited.put('b', lod(5));
+        unlimited.put('c', lod(6));
+        expect(unlimited.stats()).toMatchObject({ memoryEntries: 3, diskEntries: 3 });
     });
     it('clears memory and disk independently or together', () => {
         const files = new MemoryFiles(),
