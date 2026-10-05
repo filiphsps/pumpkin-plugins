@@ -19,7 +19,7 @@ export interface PluginBuildConfig {
  * Reads the `pumpkinPlugin` key of a package's `package.json`.
  * @param pluginDir - The package folder.
  * @returns The declared settings.
- * @throws {BuildError} When the key is missing or names a capability that doesn't exist.
+ * @throws {BuildError} When the package data is invalid.
  */
 export function readPluginConfig(pluginDir: string): PluginBuildConfig {
     let pkg: unknown;
@@ -73,7 +73,7 @@ export function readPluginConfig(pluginDir: string): PluginBuildConfig {
  * Checks that a config has what a full build needs.
  * @param config - The declared settings.
  * @returns The entry and output paths.
- * @throws {BuildError} When either is missing.
+ * @throws {BuildError} When either is missing or invalid.
  */
 export function requireBuildFields(config: PluginBuildConfig): { entry: string; output: string } {
     if (!config.entry || !config.output) {

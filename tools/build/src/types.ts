@@ -25,8 +25,8 @@ export function generateTypes(witDir: string, outDir: string): void {
     fs.mkdirSync(parent, { recursive: true });
     const temporary = fs.mkdtempSync(path.join(parent, `.${path.basename(output)}-`));
     const generated = path.join(temporary, 'generated');
-    fs.mkdirSync(generated);
     try {
+        fs.mkdirSync(generated);
         execFileSync(jco, ['guest-types', witDir, '-n', 'plugin', '-o', generated, '--name', 'index'], {
             stdio: 'inherit'
         });
