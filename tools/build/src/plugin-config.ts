@@ -96,6 +96,7 @@ function requiredRelativePath(value: unknown, name: string): string {
     const normalized = path.posix.normalize(value.replaceAll('\\', '/'));
     if (
         value.length === 0 ||
+        value.includes('\0') ||
         path.isAbsolute(value) ||
         path.win32.isAbsolute(value) ||
         path.win32.parse(value).root !== '' ||

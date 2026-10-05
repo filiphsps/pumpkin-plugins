@@ -69,7 +69,16 @@ describe('readPluginConfig', () => {
     });
 
     it('rejects invalid build paths before resolving them against the package', () => {
-        for (const entry of [42, '', '.', '../outside.ts', '/tmp/plugin.ts', 'C:\\outside.ts', 'C:plugin.ts']) {
+        for (const entry of [
+            42,
+            '',
+            '.',
+            '\0plugin.ts',
+            '../outside.ts',
+            '/tmp/plugin.ts',
+            'C:\\outside.ts',
+            'C:plugin.ts'
+        ]) {
             expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { entry } }))).toThrow(
                 '"pumpkinPlugin.entry"'
             );
