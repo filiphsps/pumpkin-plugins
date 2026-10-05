@@ -58,6 +58,16 @@ describe('readPluginConfig', () => {
         );
     });
 
+    it('reports missing or invalid package.json files as build errors', () => {
+        const dir = packageWith({ version: '0.0.0', pumpkinPlugin: {} });
+        fs.unlinkSync(path.join(dir, 'package.json'));
+        expect(() => readPluginConfig(dir)).toThrow('could not read package.json');
+
+        const malformed = packageWith({});
+        fs.writeFileSync(path.join(malformed, 'package.json'), '{');
+        expect(() => readPluginConfig(malformed)).toThrow('package.json is not valid JSON');
+    });
+
     it('rejects invalid build paths before resolving them against the package', () => {
         for (const entry of [42, '', '.', '../outside.ts', '/tmp/plugin.ts', 'C:\\outside.ts', 'C:plugin.ts']) {
             expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { entry } }))).toThrow(

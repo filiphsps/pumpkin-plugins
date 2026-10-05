@@ -27,6 +27,14 @@ export function readPluginConfig(pluginDir: string): PluginBuildConfig {
         pkg = JSON.parse(fs.readFileSync(path.join(pluginDir, 'package.json'), 'utf8'));
     } catch (error) {
         if (error instanceof SyntaxError) throw new BuildError(`package.json is not valid JSON (${error.message})`);
+        if (
+            typeof error === 'object' &&
+            error !== null &&
+            'code' in error &&
+            (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+        ) {
+            throw new BuildError(`could not read package.json in ${pluginDir}`);
+        }
         throw error;
     }
     if (!isRecord(pkg)) throw new BuildError('package.json must contain an object');
