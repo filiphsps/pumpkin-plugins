@@ -25,6 +25,7 @@ export function generateTypes(witDir: string, outDir: string): void {
     fs.mkdirSync(parent, { recursive: true });
     const temporary = fs.mkdtempSync(path.join(parent, `.${path.basename(output)}-`));
     const generated = path.join(temporary, 'generated');
+    let preserveTemporary = false;
     try {
         fs.mkdirSync(generated);
         execFileSync(jco, ['guest-types', witDir, '-n', 'plugin', '-o', generated, '--name', 'index'], {
@@ -35,13 +36,15 @@ export function generateTypes(witDir: string, outDir: string): void {
             const file = path.join(entry.parentPath, entry.name);
             fs.writeFileSync(file, numberifyBigints(fs.readFileSync(file, 'utf8')));
         }
-        publishTypes(generated, output, temporary);
+        publishTypes(generated, output, temporary, () => {
+            preserveTemporary = true;
+        });
     } finally {
-        fs.rmSync(temporary, { recursive: true, force: true });
+        if (!preserveTemporary) fs.rmSync(temporary, { recursive: true, force: true });
     }
 }
 
-function publishTypes(generated: string, output: string, temporary: string): void {
+function publishTypes(generated: string, output: string, temporary: string, preserveForRecovery: () => void): void {
     if (!fs.existsSync(output)) {
         fs.renameSync(generated, output);
         return;
@@ -56,7 +59,11 @@ function publishTypes(generated: string, output: string, temporary: string): voi
         try {
             fs.renameSync(previous, output);
         } catch (restoreError) {
-            throw new AggregateError([publishError, restoreError], `could not publish or restore ${output}`);
+            preserveForRecovery();
+            throw new AggregateError(
+                [publishError, restoreError],
+                `could not publish or restore ${output}; previous declarations preserved at ${previous}`
+            );
         }
         throw publishError;
     }

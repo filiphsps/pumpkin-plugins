@@ -79,4 +79,34 @@ describe('generateTypes', () => {
         expect(fs.readdirSync(dir)).toEqual(['bindings']);
         expect(rename).toHaveBeenCalledTimes(3);
     });
+
+    it('preserves a recovery copy if publishing and restoring declarations both fail', () => {
+        const { output } = outputAt();
+        fs.mkdirSync(output);
+        fs.writeFileSync(path.join(output, 'index.d.ts'), 'export type Size = number;');
+        const rename = vi.mocked(fs.renameSync);
+        const actualRename = rename.getMockImplementation();
+        if (!actualRename) throw new Error('missing real rename implementation');
+        rename
+            .mockImplementationOnce((source, destination) => actualRename(source, destination))
+            .mockImplementationOnce(() => {
+                throw new Error('type publish failed');
+            })
+            .mockImplementationOnce(() => {
+                throw new Error('restore failed');
+            });
+
+        let failure: unknown;
+        try {
+            generateTypes('wit', output);
+        } catch (error) {
+            failure = error;
+        }
+
+        expect(failure).toBeInstanceOf(AggregateError);
+        const message = (failure as AggregateError).message;
+        const recoveryPath = message.split('previous declarations preserved at ')[1];
+        expect(recoveryPath).toBeDefined();
+        expect(fs.readFileSync(path.join(recoveryPath ?? '', 'index.d.ts'), 'utf8')).toBe('export type Size = number;');
+    });
 });
