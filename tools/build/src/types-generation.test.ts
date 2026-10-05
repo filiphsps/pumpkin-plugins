@@ -58,4 +58,25 @@ describe('generateTypes', () => {
         expect(fs.readFileSync(path.join(output, 'index.d.ts'), 'utf8')).toBe('export type Size = number;');
         expect(fs.readdirSync(dir)).toEqual(['bindings']);
     });
+
+    it('restores existing declarations if publishing generated types fails', () => {
+        const { dir, output } = outputAt();
+        fs.mkdirSync(output);
+        fs.writeFileSync(path.join(output, 'index.d.ts'), 'export type Size = number;');
+        const rename = vi.mocked(fs.renameSync);
+        const actualRename = rename.getMockImplementation();
+        if (!actualRename) throw new Error('missing real rename implementation');
+        rename
+            .mockImplementationOnce((source, destination) => actualRename(source, destination))
+            .mockImplementationOnce(() => {
+                throw new Error('type publish failed');
+            })
+            .mockImplementationOnce((source, destination) => actualRename(source, destination));
+
+        expect(() => generateTypes('wit', output)).toThrow('type publish failed');
+
+        expect(fs.readFileSync(path.join(output, 'index.d.ts'), 'utf8')).toBe('export type Size = number;');
+        expect(fs.readdirSync(dir)).toEqual(['bindings']);
+        expect(rename).toHaveBeenCalledTimes(3);
+    });
 });
