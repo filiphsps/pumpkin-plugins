@@ -1,5 +1,5 @@
 import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FakeServer } from '../test/fake-server.ts';
 import { FakeUpnpumpkin } from '../test/fake-upnpumpkin.ts';
 import { makeMcpack, manifestJson } from '../test/fixtures.ts';
@@ -56,6 +56,19 @@ describe('PackManager', () => {
         const { files, manager } = setup();
         manager.start();
         expect(files.stat('packs')?.kind).toBe('directory');
+    });
+
+    it('keeps the web server running when the packs folder cannot be scanned', () => {
+        const { files, log, server, manager } = setup();
+        vi.spyOn(files, 'list').mockImplementation((directory) => {
+            if (directory === 'packs') throw new Error('permission denied');
+            return [];
+        });
+
+        manager.start();
+
+        expect(log.of('error')).toEqual([`Could not scan ${colorLogValue('packs/', 'cyan')}: permission denied`]);
+        expect(server.started).toEqual([{ bind: '0.0.0.0', port: 8123 }]);
     });
 
     it('warns that the default public url only works on this machine', () => {
