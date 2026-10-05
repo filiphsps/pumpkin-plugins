@@ -17,8 +17,7 @@
             "release-as": "0.0.1"
         },
         "packages/dynamic-lights-pumpkin": {
-            "component": "dynamic-lights-pumpkin",
-            "release-as": "0.0.1"
+            "component": "dynamic-lights-pumpkin"
         },
         "packages/upnpumpkin": {
             "component": "upnpumpkin"
