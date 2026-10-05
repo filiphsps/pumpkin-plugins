@@ -47,7 +47,9 @@ Distant Horizons Team release or endorsed by that team.
 
 Adapted protocol and LOD code retains its upstream copyright notices. This plugin is licensed
 under [GPL-3.0-or-later](LICENSE). The other packages in this repository retain their own licenses.
-The initial reference revision is `56a01110579b94c9946130092500c00df7c31925`.
+The protocol 16 format follows [Distant Horizons core 3.3.4](https://gitlab.com/distant-horizons-team/distant-horizons-core/-/tree/3.3.4),
+Copyright (C) 2020 James Seibel, originally under [LGPL-3.0-only](LICENSE.LESSER.txt).
+The initial server-plugin reference revision is `56a01110579b94c9946130092500c00df7c31925`.
 
 ## TODO
 
