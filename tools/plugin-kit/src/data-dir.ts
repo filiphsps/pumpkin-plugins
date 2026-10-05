@@ -1,5 +1,6 @@
 import { getDirectories } from 'wasi:filesystem/preopens@0.2.3';
 import type { Descriptor } from 'wasi:filesystem/types@0.2.3';
+import { atomicWrite } from './atomic-write.ts';
 import type { DataFiles, FileInfo, FileKind, RandomAccessFile } from './files.ts';
 import { wasiErrorCode } from './wasi-error.ts';
 import { disposeWasiResource } from './wasi-resource.ts';
@@ -19,7 +20,11 @@ export class WasiDataDir implements DataFiles {
      * @returns The folder, or undefined when the server didn't mount it because `fs.*.data` isn't granted.
      */
     static open(): WasiDataDir | undefined {
-        const mount = getDirectories().find(([, path]) => path === 'data');
+        const mounts = getDirectories();
+        const mount = mounts.find(([, path]) => path === 'data');
+        for (const [descriptor] of mounts) {
+            if (descriptor !== mount?.[0]) disposeWasiResource(descriptor);
+        }
         return mount ? new WasiDataDir(mount[0]) : undefined;
     }
 
@@ -41,7 +46,7 @@ export class WasiDataDir implements DataFiles {
 
     /** {@inheritDoc DataFiles.list} */
     list(directory: string): string[] {
-        const folder = this.root.openAt({ symlinkFollow: true }, directory, { directory: true }, { read: true });
+        const folder = this.root.openAt({ symlinkFollow: true }, directory || '.', { directory: true }, { read: true });
         try {
             const entries = folder.readDirectory();
             const names: string[] = [];
@@ -78,50 +83,61 @@ export class WasiDataDir implements DataFiles {
 
     /** {@inheritDoc DataFiles.writeFile} */
     writeFile(path: string, content: Uint8Array): void {
-        const temp = `${path}.tmp`;
-        const file = this.root.openAt({}, temp, { create: true, truncate: true }, { write: true });
-        try {
-            for (let offset = 0; offset < content.length; ) {
-                const written = file.write(content.subarray(offset), offset);
-                if (written === 0) throw new Error(`could not write ${path}`);
-                offset += written;
-            }
-        } catch (err) {
-            disposeWasiResource(file);
-            this.root.unlinkFileAt(temp);
-            throw err;
-        }
-        disposeWasiResource(file);
-        this.root.renameAt(temp, this.root, path);
+        atomicWrite(this.root, path, content);
     }
 
     /** {@inheritDoc DataFiles.createDirectory} */
     createDirectory(path: string): void {
+        if (path.startsWith('/')) throw new TypeError('Data paths must be relative');
         const parts = path.split('/').filter(Boolean);
         for (let i = 1; i <= parts.length; i++) {
             try {
                 this.root.createDirectoryAt(parts.slice(0, i).join('/'));
             } catch (err) {
-                if (wasiErrorCode(err) !== 'exist') throw err;
+                if (wasiErrorCode(err) !== 'exist' || this.stat(parts.slice(0, i).join('/'))?.kind !== 'directory') {
+                    throw err;
+                }
             }
         }
     }
 
     /** {@inheritDoc DataFiles.remove} */
     remove(path: string): void {
-        const kind = this.stat(path)?.kind;
-        if (kind === 'directory') this.root.removeDirectoryAt(path);
-        else if (kind) this.root.unlinkFileAt(path);
+        try {
+            // Inspect the entry itself so dangling links and links to directories can be removed.
+            const { type } = this.root.statAt({}, path);
+            if (type === 'directory') this.root.removeDirectoryAt(path);
+            else this.root.unlinkFileAt(path);
+        } catch (error) {
+            if (wasiErrorCode(error) !== 'no-entry') throw error;
+        }
     }
 
     /** {@inheritDoc DataFiles.open} */
     open(path: string): RandomAccessFile {
         const file = this.root.openAt({ symlinkFollow: true }, path, {}, { read: true });
-        const { size } = file.stat();
-        return {
-            size,
-            read: (offset, length) => file.read(length, offset)[0],
-            close: () => disposeWasiResource(file)
-        };
+        try {
+            const { size, type } = file.stat();
+            if (type !== 'regular-file') throw new Error(`${path} is not a regular file`);
+            let closed = false;
+            return {
+                size,
+                read: (offset, length) => {
+                    if (closed) throw new Error('File is closed');
+                    if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(length) || length < 0) {
+                        throw new RangeError('Read offset and length must be nonnegative safe integers');
+                    }
+                    return file.read(length, offset)[0];
+                },
+                close: () => {
+                    if (closed) return;
+                    closed = true;
+                    disposeWasiResource(file);
+                }
+            };
+        } catch (error) {
+            disposeWasiResource(file);
+            throw error;
+        }
     }
 }

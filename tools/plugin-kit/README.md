@@ -6,4 +6,9 @@ The scheduling helpers accept whole, nonnegative tick counts; repeating periods 
 one tick. `cancelTask` cancels either delayed or repeating tasks and releases their callbacks.
 Delayed callbacks are also released before they run, and failed scheduling retains no callback.
 
+`WasiDataDir.writeFile` replaces files through an exclusively created temporary sibling. Failed
+writes and renames clean up that sibling without replacing the original error. Directory creation
+checks that existing entries are directories; removing a symlink removes the link itself.
+Random-access file handles reject invalid read ranges and can be closed more than once.
+
 An internal package of [pumpkin-plugins](../../README.md): it is not published to npm, and the plugins in this repo use it as a workspace dependency. See [the docs](../../docs/code-style.md) for how it is used.
