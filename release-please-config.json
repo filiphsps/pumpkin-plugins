@@ -17,8 +17,7 @@
             "release-as": "0.0.1"
         },
         "packages/distant-horizons-support-pumpkin": {
-            "component": "distant-horizons-support-pumpkin",
-            "release-as": "0.0.1"
+            "component": "distant-horizons-support-pumpkin"
         },
         "packages/dynamic-lights-pumpkin": {
             "component": "dynamic-lights-pumpkin"
