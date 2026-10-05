@@ -59,6 +59,61 @@ function fixture() {
     return { files, settings, sessions, peer, peers, sent, request, ids, reads: () => reads };
 }
 describe('DH sessions', () => {
+    it('checks unloaded sections before sampling and reports rejection instead of a static queue', () => {
+        const f = fixture();
+        f.peer.terrain.prepare = () => {
+            throw new Error('Chunk 3, 3 is not loaded');
+        };
+        f.sessions.receive(f.peer, f.request());
+        f.sessions.receive(f.peer, f.request(2));
+        f.sessions.tick(f.peers);
+        expect(f.reads()).toBe(0);
+        expect(f.sessions.status()).toContain('1 pending');
+        expect(f.sessions.status()).toContain('1 worker tick(s), 0 served, 1 rejected');
+        expect(f.sessions.status()).toContain('Chunk 3, 3 is not loaded');
+        f.sessions.tick(f.peers);
+        expect(f.sessions.status()).toContain('0 pending');
+        expect(f.ids()).toEqual([6, 6]);
+    });
+    it('shows capture progress and distinguishes cancellations from completed work', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 64;
+        f.sessions.receive(f.peer, f.request());
+        f.sessions.tick(f.peers);
+        expect(f.sessions.status()).toContain('Capturing world 0, 0: 1.6%');
+        f.sessions.receive(f.peer, packet(5).int(1).finish());
+        expect(f.sessions.status()).toContain('1 cancelled');
+        expect(f.sessions.status()).not.toContain('Capturing');
+        f.settings.blocks_per_tick = 16384;
+        f.sessions.receive(f.peer, f.request(2));
+        f.sessions.tick(f.peers);
+        expect(f.sessions.status()).toContain('1 served');
+    });
+    it('drains two full-height captures at the default tick budget instead of scanning empty sky', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 2048;
+        f.settings.packets_per_tick = 2;
+        f.peer.terrain = {
+            minY: 0,
+            height: 384,
+            prepare: () => {},
+            top: () => 3,
+            sample: (_x, y) => ({
+                mapping: `minecraft:plains_DH-BSW_minecraft:${y > 3 ? 'air' : 'stone'}`,
+                sky: 15,
+                block: 0
+            })
+        };
+        f.sessions.receive(f.peer, f.request());
+        f.sessions.receive(f.peer, f.request(2, 'world', 1));
+        expect(f.sessions.status()).toContain('2 pending');
+        for (let tick = 0; tick < 40; tick++) f.sessions.tick(f.peers);
+        expect(f.sessions.status()).toContain('0 pending');
+        expect(f.sessions.status()).toContain('2 served');
+        expect(f.sessions.status()).toContain('0 queued packet(s)');
+        expect(f.files.list('cache')).toHaveLength(2);
+        expect(f.ids().filter((id) => id === 8)).toHaveLength(2);
+    });
     it('captures loaded terrain, sends split data and reuses the persisted capture', () => {
         const f = fixture();
         f.sessions.receive(f.peer, f.request());

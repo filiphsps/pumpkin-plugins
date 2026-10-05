@@ -53,6 +53,11 @@ export class Sessions {
     private readonly requests: Request[] = [];
     private readonly revisions = new Map<string, number>();
     private buffer = 1;
+    private ticks = 0;
+    private served = 0;
+    private rejected = 0;
+    private cancelled = 0;
+    private lastFailure = '';
     constructor(
         private readonly settings: Settings,
         private readonly cache: LodCache,
@@ -97,12 +102,17 @@ export class Sessions {
         if (message.type === 'cancel') {
             const index = this.requests.findIndex((r) => r.name === peer.name && r.tracker === message.tracker);
             const request = this.requests[index];
-            if (request) this.drop(request);
+            if (request) {
+                this.cancelled++;
+                this.drop(request);
+            }
             return;
         }
         if (message.type !== 'request') return;
         const failure = this.validate(peer, client, message);
         if (failure) {
+            this.rejected++;
+            this.lastFailure = failure.reason;
             peer.send(reject(message.tracker, failure.reason, failure.kind));
             return;
         }
@@ -120,6 +130,7 @@ export class Sessions {
     }
     /** Advances sampling and transfers within global per-tick budgets. */
     tick(peers: Peers): void {
+        this.ticks++;
         for (const [name, client] of this.clients) {
             if (
                 !peers.withPeer(name, (peer) => {
@@ -135,7 +146,9 @@ export class Sessions {
                     const client = this.clients.get(peer.name);
                     if (client?.packets.length) return;
                     if (!client || this.validate(peer, client, { ...request, type: 'request' }, false)) {
-                        peer.send(reject(request.tracker, 'Request no longer in range', 1));
+                        this.rejected++;
+                        this.lastFailure = 'Request no longer in range';
+                        peer.send(reject(request.tracker, this.lastFailure, 1));
                         this.drop(request);
                         return;
                     }
@@ -148,6 +161,7 @@ export class Sessions {
                             return;
                         }
                         request.fallback = cached;
+                        peer.terrain.prepare?.(request.section);
                         request.builder = new LodBuilder(request.section, peer.terrain.minY, peer.terrain.height);
                     }
                     if (request.builder.step(peer.terrain, this.settings.blocks_per_tick)) {
@@ -159,6 +173,8 @@ export class Sessions {
                     if (request.fallback && (this.revisions.get(request.key) ?? 0) === request.revision)
                         this.complete(request, request.fallback);
                     else {
+                        this.rejected++;
+                        this.lastFailure = String(err);
                         peer.send(
                             reject(
                                 request.tracker,
@@ -200,7 +216,12 @@ export class Sessions {
     }
     /** Describes current queues for the operator command. */
     status(): string {
-        return `${this.clients.size} DH client(s), ${this.requests.length} pending LOD request(s). Distant chunk generation is unavailable in the pinned Pumpkin API.`;
+        const request = this.requests[0];
+        const progress = request?.builder
+            ? ` Capturing ${request.level} ${request.section.x}, ${request.section.z}: ${(request.builder.progress() * 100).toFixed(1)}%.`
+            : '';
+        const packets = [...this.clients.values()].reduce((sum, client) => sum + client.packets.length, 0);
+        return `${this.clients.size} DH client(s), ${this.requests.length} pending LOD request(s). ${this.ticks} worker tick(s), ${this.served} served, ${this.rejected} rejected, ${this.cancelled} cancelled, ${packets} queued packet(s).${progress}${this.lastFailure ? ` Last rejection: ${this.lastFailure}.` : ''} Distant chunk generation is unavailable in the pinned Pumpkin API.`;
     }
     private announce(peer: Peer): void {
         this.left(peer.name);
@@ -217,6 +238,7 @@ export class Sessions {
     private complete(request: Request, value: CachedLod): void {
         const client = this.clients.get(request.name);
         if (client) {
+            this.served++;
             const packets =
                 request.timestamp !== undefined && value.updated <= request.timestamp
                     ? [unchanged(request.tracker)]

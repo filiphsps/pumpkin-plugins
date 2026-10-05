@@ -104,10 +104,11 @@ The plugin builds 64 by 64 block LOD sections from chunks already loaded by Pump
 including material changes, caves, biomes and lighting. It saves completed sections in
 `plugins/data/DistantHorizonsSupportPumpkin/cache/` so they can be served again after chunks
 unload or the server restarts. All 16 chunks in a section must be available during capture.
-Unavailable sections without a cache entry receive a retryable request rejection.
+The plugin checks all 16 chunks before sampling, so unavailable sections without a cache entry
+receive a retryable request rejection immediately.
 
 Sampling and transfers run within the configured tick budgets. An uncached section may take
-many ticks to complete. Sections with more than 131,072 material segments are rejected to
+many ticks to complete. Air above the heightmap is collapsed without reading every empty block. Sections with more than 131,072 material segments are rejected to
 bound memory use. The cache evicts old entries once `support.cache_entries` is reached.
 
 Cached sections are refreshed on requests after `support.refresh_seconds` when their chunks
@@ -120,6 +121,16 @@ changing its height. Vanilla world heights are assumed unless overridden in `[wo
 Protocol fixtures, terrain and session unit tests, and real-server loading, settings and
 command tests cover this implementation. Rendering with an actual DH client remains to
 be verified.
+
+### Diagnosing pending requests
+
+`/dhs status` includes worker ticks, capture progress, served/rejected/cancelled request counts,
+queued transfer packets and the last rejection reason. Counts are cumulative since plugin load.
+Two pending requests can persist while the client continually submits new sections. Increasing
+worker ticks and capture progress show that the worker is advancing; increasing rejections with
+`Chunk ... is not loaded` mean that the requested sections cannot be captured yet. Previously
+captured sections can still be served from cache. If worker ticks stay at zero, the worker is not
+being dispatched. Increasing cancellations indicate that the client is discarding requests.
 
 ## Attribution and license
 

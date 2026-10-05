@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { builtPluginPath, type PumpkinInstance, startPumpkin } from '@pumpkin-plugins/test-harness';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { info } from '../src/info.ts';
 
 describe(info.name, () => {
@@ -23,6 +23,16 @@ describe(info.name, () => {
         expect(config).toContain('blocks_per_tick = 2048');
         server.command('dhs status');
         await server.waitForLog(/0 DH client\(s\), 0 pending LOD request\(s\)/);
+        // A successful load alone does not prove that the worker's event is being dispatched.
+        await vi.waitFor(
+            async () => {
+                const from = server.lines.length;
+                server.command('dhs status');
+                const line = await server.waitForLog(/worker tick\(s\)/, 1000, from);
+                expect(line).toMatch(/[1-9][0-9]* worker tick\(s\)/);
+            },
+            { timeout: 5000, interval: 100 }
+        );
         expect(server.errors()).toEqual([]);
     });
     it('keeps an existing configuration value on a real server restart', async () => {

@@ -19,6 +19,10 @@ export interface Terrain {
     minY: number;
     height: number;
     sample(x: number, y: number, z: number): Sample;
+    /** Checks all required chunks before a capture spends ticks sampling them. */
+    prepare?(section: Section): void;
+    /** Heightmap bound for the highest non-air block; absent adapters scan the whole column. */
+    top?(x: number, z: number): number;
 }
 interface Point {
     id: number;
@@ -51,6 +55,19 @@ export class LodBuilder {
             const x = this.section.x * 64 + Math.floor(this.column / 64);
             const z = this.section.z * 64 + (this.column % 64);
             const sample = terrain.sample(x, this.minY + this.y, z);
+            let span = 1;
+            if (
+                this.y === this.height - 1 &&
+                terrain.top &&
+                /_DH-BSW_minecraft:(?:air|void_air)$/.test(sample.mapping)
+            ) {
+                const top = terrain.top(x, z);
+                if (!Number.isInteger(top)) throw new Error('Invalid terrain heightmap');
+                // Keep a block above the heightmap bound: hosts may report either the surface or first air Y.
+                const ceiling = Math.max(0, Math.min(this.height - 1, top - this.minY + 1));
+                span = Math.max(1, this.y - ceiling);
+            }
+            const start = this.y - span + 1;
             let id = this.ids.get(sample.mapping);
             if (id === undefined) {
                 id = this.mappings.length;
@@ -61,19 +78,24 @@ export class LodBuilder {
             this.columns[this.column] = column;
             const previous = column[column.length - 1];
             if (previous?.id === id) {
-                previous.start = this.y;
-                previous.height++;
+                previous.start = start;
+                previous.height += span;
             } else {
                 // Bound guest memory even for custom worlds with alternating blocks at every height.
                 if (++this.points > 131072) throw new RangeError('LOD section is too complex');
-                column.push({ id, start: this.y, height: 1, sky: sample.sky, block: sample.block });
+                column.push({ id, start, height: span, sky: sample.sky, block: sample.block });
             }
-            if (--this.y < 0) {
+            this.y -= span;
+            if (this.y < 0) {
                 this.y = this.height - 1;
                 this.column++;
             }
         }
         return this.column === 4096;
+    }
+    /** Fraction of the section already sampled, including the current column. */
+    progress(): number {
+        return (this.column * this.height + this.height - 1 - this.y) / (4096 * this.height);
     }
     /** Encodes DH's supported v1 DTO with uncompressed blobs and exact packed datapoints. */
     finish(now: number): Uint8Array {

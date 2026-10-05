@@ -50,6 +50,35 @@ describe('Pumpkin terrain adapter', () => {
         ).toThrow('callback failure');
         for (const handle of [chunk, border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
     });
+    it('checks all chunks before block reads and releases acquired chunks when the last one is missing', () => {
+        const values = defaultValues(schema);
+        const chunks = Array.from({ length: 15 }, () => ({ [Symbol.dispose]: vi.fn() }));
+        const getChunk = vi.fn(() => chunks[getChunk.mock.calls.length - 1]);
+        const border = { getCenterX: () => 0, getCenterZ: () => 0, getSize: () => 60000000, [Symbol.dispose]: vi.fn() };
+        const world = {
+            getName: () => 'world',
+            getDimension: () => 'minecraft:overworld',
+            getMinY: () => -64,
+            getWorldBorder: () => border,
+            getChunk,
+            [Symbol.dispose]: vi.fn()
+        };
+        const java = { [Symbol.dispose]: vi.fn() };
+        const player = {
+            asJava: () => java,
+            getWorld: () => world,
+            getName: () => 'Alice',
+            getPosition: () => [0, 64, 0]
+        };
+        expect(() =>
+            withPlayer(player as unknown as Player, { ...values.support, worlds: values.worlds }, (peer) => {
+                peer.terrain.prepare?.({ high: 0, low: 6, detail: 6, x: -1, z: -2 });
+            })
+        ).toThrow('Chunk -1, -5 is not loaded');
+        expect(getChunk).toHaveBeenCalledTimes(16);
+        expect(getChunk).toHaveBeenNthCalledWith(1, -4, -8);
+        for (const handle of [...chunks, border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
     it('releases the Java handle when acquiring the world fails', () => {
         const values = defaultValues(schema);
         const java = { [Symbol.dispose]: vi.fn() };

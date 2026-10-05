@@ -49,6 +49,24 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
             terrain: {
                 minY,
                 height,
+                prepare: (section) => {
+                    for (let x = section.x * 4; x < section.x * 4 + 4; x++) {
+                        for (let z = section.z * 4; z < section.z * 4 + 4; z++) {
+                            const key = `${x}:${z}`;
+                            if (chunks.has(key)) continue;
+                            const chunk = terrainWorld.getChunk(x, z);
+                            if (!chunk) throw new Error(`Chunk ${x}, ${z} is not loaded`);
+                            chunks.set(key, chunk);
+                        }
+                    }
+                },
+                top: (x, z) => {
+                    const chunkX = Math.floor(x / 16),
+                        chunkZ = Math.floor(z / 16);
+                    const chunk = chunks.get(`${chunkX}:${chunkZ}`);
+                    if (!chunk) throw new Error('Terrain was not prepared');
+                    return chunk.getTopBlockY(x - chunkX * 16, z - chunkZ * 16);
+                },
                 sample: (x, y, z) => {
                     const chunkX = Math.floor(x / 16),
                         chunkZ = Math.floor(z / 16),

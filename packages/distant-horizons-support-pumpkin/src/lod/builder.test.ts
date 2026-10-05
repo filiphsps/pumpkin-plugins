@@ -53,6 +53,27 @@ describe('LOD builder', () => {
         expect(input.timestamp()).toBe(100);
         input.end();
     });
+    it('collapses air above the heightmap within the read budget and preserves the complete DTO', () => {
+        const baseline = new LodBuilder(section, -64, 384);
+        const fast = new LodBuilder(section, -64, 384);
+        let reads = 0;
+        const sample = (_x: number, y: number, _z: number) => {
+            reads++;
+            return { mapping: `minecraft:plains_DH-BSW_minecraft:${y > -62 ? 'air' : 'stone'}`, sky: 15, block: 0 };
+        };
+        baseline.step({ minY: -64, height: 384, sample }, 4096 * 384);
+        const expected = baseline.finish(100);
+        reads = 0;
+        const terrain = { minY: -64, height: 384, sample, top: () => -62 };
+        expect(fast.step(terrain, 2048)).toBe(false);
+        expect(reads).toBe(2048);
+        expect(fast.progress()).toBeGreaterThan(0.05);
+        let ticks = 1;
+        while (!fast.step(terrain, 2048)) ticks++;
+        expect(ticks).toBeLessThan(20);
+        expect(reads).toBeLessThan(4096 * 10);
+        expect(fast.finish(100)).toEqual(expected);
+    });
     it('keeps caves and material changes instead of flattening a column', () => {
         const builder = new LodBuilder(section, 0, 3);
         expect(
