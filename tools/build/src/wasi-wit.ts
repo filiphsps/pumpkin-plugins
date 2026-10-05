@@ -71,16 +71,19 @@ export async function ensureWasiWit(options: WasiWitOptions): Promise<string> {
             }
             const actual = sha256(bytes);
             if (actual !== hash) throw new BuildError(`${rel} from ${url} has hash ${actual}, expected ${hash}`);
-            writeAtomically(path.join(dir, rel), bytes);
+            writeAtomically(path.join(dir, rel), bytes, options.cacheDir);
         })
     );
     return dir;
 }
 
-function writeAtomically(file: string, bytes: Uint8Array): void {
+function writeAtomically(file: string, bytes: Uint8Array, stagingDirectory: string): void {
     const parent = path.dirname(file);
     fs.mkdirSync(parent, { recursive: true });
-    const temporaryDirectory = fs.mkdtempSync(path.join(parent, '.wasi-wit-'));
+    // Keep staging outside the shared WIT tree: concurrent builds copy that tree into jco's
+    // input directory, and must not observe a temporary directory while it is being removed.
+    fs.mkdirSync(stagingDirectory, { recursive: true });
+    const temporaryDirectory = fs.mkdtempSync(path.join(stagingDirectory, '.wasi-wit-'));
     const temporary = path.join(temporaryDirectory, path.basename(file));
     try {
         fs.writeFileSync(temporary, bytes);

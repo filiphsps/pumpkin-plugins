@@ -72,6 +72,28 @@ describe('ensureWasiWit', () => {
         expect(fs.readdirSync(path.join(dir, 'io')).filter((name) => name.startsWith('.wasi-wit-'))).toEqual([]);
     });
 
+    it('keeps atomic staging directories outside the WIT tree while filling the cache', async () => {
+        const cache = tmp();
+        const wit = path.join(cache, 'wasi-wit', lock.version);
+        const watched = ['io', 'clocks'].map((folder) => path.join(wit, folder));
+        for (const folder of watched) fs.mkdirSync(folder, { recursive: true });
+
+        const stagingEvents: string[] = [];
+        const watchers = watched.map((folder) =>
+            fs.watch(folder, (_event, filename) => {
+                if (filename?.toString().startsWith('.wasi-wit-')) stagingEvents.push(filename.toString());
+            })
+        );
+        try {
+            await ensureWasiWit({ cacheDir: cache, lock, fetchFile: server().fetchFile });
+            await new Promise((resolve) => setTimeout(resolve, 10));
+        } finally {
+            for (const watcher of watchers) watcher.close();
+        }
+
+        expect(stagingEvents).toEqual([]);
+    });
+
     it('replaces a cached file that was damaged, and only that one', async () => {
         const cache = tmp();
         const dir = await ensureWasiWit({ cacheDir: cache, lock, fetchFile: server().fetchFile });
