@@ -22,20 +22,41 @@ export interface PluginBuildConfig {
  * @throws {BuildError} When the key is missing or names a capability that doesn't exist.
  */
 export function readPluginConfig(pluginDir: string): PluginBuildConfig {
-    const pkg = JSON.parse(fs.readFileSync(path.join(pluginDir, 'package.json'), 'utf8'));
-    const config = pkg.pumpkinPlugin;
-    if (!config) throw new BuildError('package.json needs a "pumpkinPlugin" key');
+    let pkg: unknown;
+    try {
+        pkg = JSON.parse(fs.readFileSync(path.join(pluginDir, 'package.json'), 'utf8'));
+    } catch (error) {
+        if (error instanceof SyntaxError) throw new BuildError(`package.json is not valid JSON (${error.message})`);
+        throw error;
+    }
+    if (!isRecord(pkg)) throw new BuildError('package.json must contain an object');
 
-    const wasi: string[] = config.wasi ?? [];
-    for (const name of wasi) {
+    const config = pkg.pumpkinPlugin;
+    if (!isRecord(config)) throw new BuildError('package.json needs a "pumpkinPlugin" object');
+
+    if (typeof pkg.version !== 'string' || pkg.version.length === 0) {
+        throw new BuildError('package.json needs a non-empty "version" string');
+    }
+
+    const entry = optionalRelativePath(config.entry, 'entry');
+    const output = optionalRelativePath(config.output, 'output');
+
+    const wasiValue = config.wasi === undefined ? [] : config.wasi;
+    if (!Array.isArray(wasiValue)) throw new BuildError('"pumpkinPlugin.wasi" must be an array of capability names');
+    const wasi: Capability[] = [];
+    for (const name of wasiValue) {
+        if (typeof name !== 'string') {
+            throw new BuildError('"pumpkinPlugin.wasi" must contain only capability names');
+        }
         if (!isCapability(name)) {
             throw new BuildError(`unknown wasi capability "${name}" (known: ${Object.keys(CAPABILITIES).join(', ')})`);
         }
+        wasi.push(name);
     }
     return {
-        entry: config.entry,
-        output: config.output,
-        wasi: wasi as Capability[],
+        entry,
+        output,
+        wasi,
         version: pkg.version
     };
 }
@@ -50,5 +71,33 @@ export function requireBuildFields(config: PluginBuildConfig): { entry: string; 
     if (!config.entry || !config.output) {
         throw new BuildError('package.json needs "pumpkinPlugin": { "entry": ..., "output": ... } to build');
     }
-    return { entry: config.entry, output: config.output };
+    return {
+        entry: requiredRelativePath(config.entry, 'entry'),
+        output: requiredRelativePath(config.output, 'output')
+    };
+}
+
+function optionalRelativePath(value: unknown, name: string): string | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value !== 'string') throw new BuildError(`"pumpkinPlugin.${name}" must be a relative path`);
+    return requiredRelativePath(value, name);
+}
+
+function requiredRelativePath(value: unknown, name: string): string {
+    if (typeof value !== 'string') throw new BuildError(`"pumpkinPlugin.${name}" must be a relative path`);
+    const normalized = path.posix.normalize(value.replaceAll('\\', '/'));
+    if (
+        value.length === 0 ||
+        path.isAbsolute(value) ||
+        path.win32.isAbsolute(value) ||
+        normalized === '..' ||
+        normalized.startsWith('../')
+    ) {
+        throw new BuildError(`"pumpkinPlugin.${name}" must be a path inside the package`);
+    }
+    return value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -10,7 +10,7 @@ afterEach(() => {
     for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-function packageWith(pkg: Record<string, unknown>): string {
+function packageWith(pkg: unknown): string {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'build-config-'));
     dirs.push(dir);
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(pkg));
@@ -41,6 +41,33 @@ describe('readPluginConfig', () => {
             'unknown wasi capability "network" (known: http, filesystem, sockets, udp)'
         );
     });
+
+    it('rejects malformed package data with a build error', () => {
+        expect(() => readPluginConfig(packageWith([]))).toThrow('package.json must contain an object');
+        expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: [] }))).toThrow(
+            'package.json needs a "pumpkinPlugin" object'
+        );
+        expect(() => readPluginConfig(packageWith({ version: 1, pumpkinPlugin: {} }))).toThrow(
+            'package.json needs a non-empty "version" string'
+        );
+        expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { wasi: 'http' } }))).toThrow(
+            '"pumpkinPlugin.wasi" must be an array of capability names'
+        );
+        expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { wasi: [null] } }))).toThrow(
+            '"pumpkinPlugin.wasi" must contain only capability names'
+        );
+    });
+
+    it('rejects invalid build paths before resolving them against the package', () => {
+        for (const entry of [42, '', '../outside.ts', '/tmp/plugin.ts', 'C:\\outside.ts']) {
+            expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { entry } }))).toThrow(
+                '"pumpkinPlugin.entry"'
+            );
+        }
+        expect(() =>
+            readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { output: '../outside.wasm' } }))
+        ).toThrow('"pumpkinPlugin.output"');
+    });
 });
 
 describe('requireBuildFields', () => {
@@ -54,5 +81,14 @@ describe('requireBuildFields', () => {
     it('asks for both when either is missing, so libraries can still generate types', () => {
         expect(() => requireBuildFields({ entry: 'a', wasi: [], version: '0.0.0' })).toThrow(/entry.*output/);
         expect(() => requireBuildFields({ wasi: [], version: '0.0.0' })).toThrow(BuildError);
+    });
+
+    it('validates fields supplied directly to a full build', () => {
+        expect(() =>
+            requireBuildFields({ entry: '../outside.ts', output: 'build/plugin.wasm', wasi: [], version: '0' })
+        ).toThrow('"pumpkinPlugin.entry"');
+        expect(() =>
+            requireBuildFields({ entry: 'src/plugin.ts', output: 1 as never, wasi: [], version: '0' })
+        ).toThrow('"pumpkinPlugin.output"');
     });
 });
