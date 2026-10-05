@@ -71,9 +71,21 @@ export async function ensureWasiWit(options: WasiWitOptions): Promise<string> {
             }
             const actual = sha256(bytes);
             if (actual !== hash) throw new BuildError(`${rel} from ${url} has hash ${actual}, expected ${hash}`);
-            fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
-            fs.writeFileSync(path.join(dir, rel), bytes);
+            writeAtomically(path.join(dir, rel), bytes);
         })
     );
     return dir;
+}
+
+function writeAtomically(file: string, bytes: Uint8Array): void {
+    const parent = path.dirname(file);
+    fs.mkdirSync(parent, { recursive: true });
+    const temporaryDirectory = fs.mkdtempSync(path.join(parent, '.wasi-wit-'));
+    const temporary = path.join(temporaryDirectory, path.basename(file));
+    try {
+        fs.writeFileSync(temporary, bytes);
+        fs.renameSync(temporary, file);
+    } finally {
+        fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+    }
 }

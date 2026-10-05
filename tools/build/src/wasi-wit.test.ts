@@ -59,6 +59,19 @@ describe('ensureWasiWit', () => {
         expect(again.urls).toEqual([]);
     });
 
+    it('leaves complete cache files when concurrent builds fill an empty cache', async () => {
+        const cache = tmp();
+        const { fetchFile } = server();
+
+        await Promise.all(Array.from({ length: 8 }, () => ensureWasiWit({ cacheDir: cache, lock, fetchFile })));
+
+        const dir = path.join(cache, 'wasi-wit', lock.version);
+        for (const [file, content] of Object.entries(FILES)) {
+            expect(fs.readFileSync(path.join(dir, file), 'utf8')).toBe(content);
+        }
+        expect(fs.readdirSync(path.join(dir, 'io')).filter((name) => name.startsWith('.wasi-wit-'))).toEqual([]);
+    });
+
     it('replaces a cached file that was damaged, and only that one', async () => {
         const cache = tmp();
         const dir = await ensureWasiWit({ cacheDir: cache, lock, fetchFile: server().fetchFile });
