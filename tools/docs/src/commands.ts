@@ -43,10 +43,12 @@ export const errorLine = (text: string): CommandLine => ({ text, tone: 'error' }
 export class CommandFailed extends Error {}
 
 /** What runs a command. It returns the lines to send back to whoever ran it, or throws `CommandFailed`. */
-export type CommandHandler = () => readonly CommandLine[];
+export type CommandHandler<Sender = unknown> = (sender: Sender) => readonly CommandLine[];
 
 /** One handler for every runnable command of a tree. A missing or misspelled path is a compile error. */
-export type CommandHandlers<T extends CommandTree> = { readonly [P in CommandPath<T>]: CommandHandler };
+export type CommandHandlers<T extends CommandTree, Sender = unknown> = {
+    readonly [P in CommandPath<T>]: CommandHandler<Sender>;
+};
 
 /** A runnable command, flattened out of a tree. */
 export interface FlatCommand {
