@@ -41,7 +41,8 @@ export interface PrepareWitOptions {
  */
 export function prepareWit(options: PrepareWitOptions): string {
     if (options.interfaces.length === 0) return options.apiWit;
-    if (options.interfaces.length > 0 && !options.wasiWit) {
+    const { wasiWit } = options;
+    if (!wasiWit) {
         throw new BuildError('the WASI WIT files are needed but were not provided');
     }
 
@@ -51,11 +52,9 @@ export function prepareWit(options: PrepareWitOptions): string {
     try {
         retryTransientCopy(() => fs.cpSync(options.apiWit, temporary, { recursive: true }));
 
-        if (options.interfaces.length > 0 && options.wasiWit) {
-            retryTransientCopy(() => fs.cpSync(options.wasiWit, path.join(temporary, 'deps'), { recursive: true }));
-            const pluginWit = path.join(temporary, 'plugin.wit');
-            fs.writeFileSync(pluginWit, injectWasiImports(fs.readFileSync(pluginWit, 'utf8'), options.interfaces));
-        }
+        retryTransientCopy(() => fs.cpSync(wasiWit, path.join(temporary, 'deps'), { recursive: true }));
+        const pluginWit = path.join(temporary, 'plugin.wit');
+        fs.writeFileSync(pluginWit, injectWasiImports(fs.readFileSync(pluginWit, 'utf8'), options.interfaces));
         fs.rmSync(options.target, { recursive: true, force: true });
         fs.renameSync(temporary, options.target);
     } catch (error) {
