@@ -31,6 +31,7 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
     const temporaryDir = fs.mkdtempSync(path.join(outputDir, '.pumpkin-build-'));
     const bundle = path.join(temporaryDir, 'bundle.js');
     const component = path.join(temporaryDir, 'plugin.wasm');
+    let preserveTemporaryDir = false;
     try {
         await esbuild.build({
             entryPoints: [options.entry],
@@ -59,14 +60,21 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
             { stdio: 'inherit' }
         );
         const size = fs.statSync(component).size;
-        publishComponent(component, output, temporaryDir);
+        publishComponent(component, output, temporaryDir, () => {
+            preserveTemporaryDir = true;
+        });
         return size;
     } finally {
-        fs.rmSync(temporaryDir, { recursive: true, force: true });
+        if (!preserveTemporaryDir) fs.rmSync(temporaryDir, { recursive: true, force: true });
     }
 }
 
-function publishComponent(component: string, output: string, temporaryDir: string): void {
+function publishComponent(
+    component: string,
+    output: string,
+    temporaryDir: string,
+    preserveForRecovery: () => void
+): void {
     try {
         fs.renameSync(component, output);
     } catch (error) {
@@ -82,7 +90,11 @@ function publishComponent(component: string, output: string, temporaryDir: strin
             try {
                 fs.renameSync(previous, output);
             } catch (restoreError) {
-                throw new AggregateError([publishError, restoreError], `could not publish or restore ${output}`);
+                preserveForRecovery();
+                throw new AggregateError(
+                    [publishError, restoreError],
+                    `could not publish or restore ${output}; previous artifact preserved at ${previous}`
+                );
             }
             throw publishError;
         }

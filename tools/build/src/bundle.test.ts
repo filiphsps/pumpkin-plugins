@@ -111,6 +111,38 @@ describe('bundlePlugin', () => {
         expect(rename).toHaveBeenCalledTimes(4);
     });
 
+    it('preserves a recovery copy if publishing and restoring both fail', async () => {
+        const { output } = buildAt();
+        fs.writeFileSync(output, 'known-good artifact');
+        const rename = vi.mocked(fs.renameSync);
+        const actualRename = rename.getMockImplementation();
+        if (!actualRename) throw new Error('missing real rename implementation');
+        rename
+            .mockImplementationOnce(() => {
+                throw Object.assign(new Error('access denied'), { code: 'EACCES' });
+            })
+            .mockImplementationOnce((source, destination) => actualRename(source, destination))
+            .mockImplementationOnce(() => {
+                throw Object.assign(new Error('disk full'), { code: 'ENOSPC' });
+            })
+            .mockImplementationOnce(() => {
+                throw Object.assign(new Error('read only filesystem'), { code: 'EROFS' });
+            });
+
+        const failure: unknown = await bundlePlugin({
+            entry: 'src/plugin.ts',
+            output,
+            witDir: 'wit',
+            version: '1.0.0'
+        }).catch((error: unknown) => error);
+
+        expect(failure).toBeInstanceOf(AggregateError);
+        const message = (failure as AggregateError).message;
+        const recoveryPath = message.split('previous artifact preserved at ')[1];
+        expect(recoveryPath).toBeDefined();
+        expect(fs.readFileSync(recoveryPath ?? '', 'utf8')).toBe('known-good artifact');
+    });
+
     it('uses separate temporary bundles for concurrent builds', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-build-'));
         dirs.push(dir);
