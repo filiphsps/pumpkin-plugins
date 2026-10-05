@@ -66,6 +66,21 @@ describe('PlayerSync', () => {
         expect(player.floats(SATURATION)).toEqual([4.5]);
     });
 
+    it('syncs players when QuickJS handles have no explicit disposal method', () => {
+        const { player, server, sync } = setup();
+        Object.defineProperty(player, Symbol.dispose, { value: undefined });
+        const world = player.getWorld();
+        const java = player.asJava();
+        if (java === undefined) throw new Error('Expected a Java client');
+        Object.defineProperty(world, Symbol.dispose, { value: undefined });
+        Object.defineProperty(java, Symbol.dispose, { value: undefined });
+        player.getWorld = () => world;
+        player.asJava = () => java;
+
+        expect(() => sync.tick(server.host)).not.toThrow();
+        expect(player.channels).toEqual([SATURATION, EXHAUSTION, REGENERATION]);
+    });
+
     it('releases every handle the host handed out, so the resource table does not grow', () => {
         const { player, server, sync } = setup();
 

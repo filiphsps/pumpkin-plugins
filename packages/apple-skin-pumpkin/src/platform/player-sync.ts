@@ -2,6 +2,7 @@ import type { JavaPlayer, Player } from 'pumpkin:plugin/player@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { colorLogValue, type Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import { bool, float32be } from '@pumpkin-plugins/plugin-kit/payload';
+import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { EXHAUSTION_CHANNEL, NATURAL_REGENERATION_CHANNEL, SATURATION_CHANNEL } from '../payload.ts';
 import { SyncTracker } from '../sync.ts';
 
@@ -60,9 +61,8 @@ export class PlayerSync {
                     this.sendRegeneration(player, id, java);
                 });
             } finally {
-                // Every handle the host hands out is ours to release. Keeping them would grow the
-                // server's resource table by one entry per player per tick.
-                player[Symbol.dispose]();
+                // Release handles when the runtime exposes explicit disposal.
+                disposeWasiResource(player);
             }
         }
         this.sent.retain(online);
@@ -98,7 +98,7 @@ export class PlayerSync {
                 `${tag} ${colorLogValue(player.getName(), 'cyan')}: natural regeneration is ${rule.val ? 'on' : 'off'} in ${colorLogValue(world.getName(), 'cyan')}.`
             );
         } finally {
-            world[Symbol.dispose]();
+            disposeWasiResource(world);
         }
     }
 
@@ -109,7 +109,7 @@ export class PlayerSync {
         try {
             send(java);
         } finally {
-            java[Symbol.dispose]();
+            disposeWasiResource(java);
         }
         return true;
     }
