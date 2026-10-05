@@ -38,5 +38,7 @@ describe('cacheDir', () => {
         expect(cacheDir(path.join(root, 'packages/a'))).toBe(path.join(root, '.cache'));
         process.env.PUMPKIN_PLUGINS_CACHE_DIR = '/somewhere/else';
         expect(cacheDir(path.join(root, 'packages/a'))).toBe('/somewhere/else');
+        process.env.PUMPKIN_PLUGINS_CACHE_DIR = '';
+        expect(cacheDir(path.join(root, 'packages/a'))).toBe(path.join(root, '.cache'));
     });
 });

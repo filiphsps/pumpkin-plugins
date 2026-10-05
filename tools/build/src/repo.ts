@@ -19,5 +19,5 @@ export function findRepoRoot(from: string): string {
  * @returns The cache folder. It may not exist yet.
  */
 export function cacheDir(from: string): string {
-    return process.env.PUMPKIN_PLUGINS_CACHE_DIR ?? path.join(findRepoRoot(from), '.cache');
+    return process.env.PUMPKIN_PLUGINS_CACHE_DIR || path.join(findRepoRoot(from), '.cache');
 }
