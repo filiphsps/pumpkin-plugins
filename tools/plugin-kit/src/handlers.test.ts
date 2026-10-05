@@ -22,4 +22,14 @@ describe('HandlerRegistry', () => {
         expect(registry.take(id)).toBe('once');
         expect(registry.get(id)).toBeUndefined();
     });
+    it.each([-1, 0.5, NaN, Infinity, 0x1_0000_0000])('rejects invalid first id %s', (id) => {
+        expect(() => new HandlerRegistry(id)).toThrow(RangeError);
+    });
+
+    it('fails before overflowing the host u32 id space', () => {
+        const registry = new HandlerRegistry<string>(0xffff_ffff);
+        expect(registry.add('last')).toBe(0xffff_ffff);
+        expect(() => registry.add('overflow')).toThrow('Handler ids exhausted');
+        expect(registry.get(0xffff_ffff)).toBe('last');
+    });
 });

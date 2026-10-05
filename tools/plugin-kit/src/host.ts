@@ -15,8 +15,15 @@ export const hostLogger: Logger = {
 
 // The base `Plugin` class can't be used for these: its scheduler calls pass `BigInt` where the
 // runtime needs numbers, and its handler maps are private. Ids start far above the ones it hands out.
-const tasks = new HandlerRegistry<(server: Server) => void>(900_000);
-const delayedTasks = new HandlerRegistry<(server: Server) => void>(905_000);
+interface ScheduledHandler {
+    run: (server: Server) => void;
+    repeating: boolean;
+    taskId?: number;
+}
+
+// One registry prevents delayed and repeating handler ids from overlapping.
+const tasks = new HandlerRegistry<ScheduledHandler>(900_000);
+const taskHandlers = new Map<number, number>();
 const commandHandlers = new HandlerRegistry<(sender: CommandSender) => number>(910_000);
 
 /**
@@ -26,7 +33,8 @@ const commandHandlers = new HandlerRegistry<(sender: CommandSender) => number>(9
  * @returns The scheduler's task id, for `cancelTask`.
  */
 export function scheduleRepeating(periodTicks: number, run: (server: Server) => void): number {
-    return scheduler.scheduleRepeatingTask(tasks.add(run), periodTicks, periodTicks);
+    validateTicks(periodTicks, 1);
+    return schedule(run, true, (id) => scheduler.scheduleRepeatingTask(id, periodTicks, periodTicks));
 }
 
 /**
@@ -36,15 +44,19 @@ export function scheduleRepeating(periodTicks: number, run: (server: Server) => 
  * @returns The scheduler's task id, for `cancelTask`.
  */
 export function scheduleDelayed(delayTicks: number, run: (server: Server) => void): number {
-    return scheduler.scheduleDelayedTask(delayedTasks.add(run), delayTicks);
+    validateTicks(delayTicks, 0);
+    return schedule(run, false, (id) => scheduler.scheduleDelayedTask(id, delayTicks));
 }
 
 /**
- * Stops a repeating task.
- * @param taskId - The id `scheduleRepeating` returned.
+ * Stops a delayed or repeating task and releases its callback.
+ * @param taskId - The id returned by either scheduling helper.
  */
 export function cancelTask(taskId: number): void {
     scheduler.cancelTask(taskId);
+    const handlerId = taskHandlers.get(taskId);
+    if (handlerId !== undefined) tasks.take(handlerId);
+    taskHandlers.delete(taskId);
 }
 
 /**
@@ -62,14 +74,14 @@ export function onCommand(handler: (sender: CommandSender) => number): number {
  * @returns False when the id belongs to the API package's own scheduler.
  */
 export function runTask(id: number, server: Server): boolean {
-    const delayedTask = delayedTasks.take(id);
-    if (delayedTask !== undefined) {
-        delayedTask(server);
-        return true;
+    const handler = tasks.get(id);
+    if (!handler) return false;
+    if (!handler.repeating) {
+        tasks.take(id);
+        if (handler.taskId !== undefined) taskHandlers.delete(handler.taskId);
     }
-    const task = tasks.get(id);
-    task?.(server);
-    return task !== undefined;
+    handler.run(server);
+    return true;
 }
 
 /**
@@ -81,4 +93,24 @@ export function runTask(id: number, server: Server): boolean {
  */
 export function runCommand(id: number, sender: CommandSender, _args: ConsumedArgs): number | undefined {
     return commandHandlers.get(id)?.(sender);
+}
+
+function validateTicks(ticks: number, minimum: number): void {
+    if (!Number.isSafeInteger(ticks) || ticks < minimum) {
+        throw new RangeError(`Ticks must be a safe integer greater than or equal to ${minimum}`);
+    }
+}
+
+function schedule(run: (server: Server) => void, repeating: boolean, submit: (handlerId: number) => number): number {
+    const handler: ScheduledHandler = { run, repeating };
+    const id = tasks.add(handler);
+    try {
+        const taskId = submit(id);
+        handler.taskId = taskId;
+        taskHandlers.set(taskId, id);
+        return taskId;
+    } catch (error) {
+        tasks.take(id);
+        throw error;
+    }
 }

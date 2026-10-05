@@ -8,6 +8,9 @@ export class HandlerRegistry<F> {
 
     /** Creates a registry whose ids start at `firstId`. */
     constructor(firstId: number) {
+        if (!Number.isInteger(firstId) || firstId < 0 || firstId > 0xffff_ffff) {
+            throw new RangeError('Handler ids must be unsigned 32-bit integers');
+        }
         this.nextId = firstId;
     }
 
@@ -17,6 +20,7 @@ export class HandlerRegistry<F> {
      * @returns Its id.
      */
     add(handler: F): number {
+        if (this.nextId > 0xffff_ffff) throw new RangeError('Handler ids exhausted');
         const id = this.nextId++;
         this.handlers.set(id, handler);
         return id;
