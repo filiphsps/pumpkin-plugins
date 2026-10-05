@@ -52,6 +52,7 @@
         "access": "public"
     },
     "scripts": {
+        "typecheck": "pumpkin-plugins-build --types-only && tsc --noEmit",
         "test": "vitest run"
     },
     "dependencies": {
@@ -60,6 +61,15 @@
         "@pumpkinmc/pumpkin-api-ts": "catalog:"
     },
     "devDependencies": {
+        "@pumpkin-plugins/build": "workspace:*",
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
         "vitest": "catalog:"
+    },
+    "pumpkinPlugin": {
+        "wasi": [
+            "filesystem",
+            "http"
+        ]
     }
 }

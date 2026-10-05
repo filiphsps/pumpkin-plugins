@@ -22,6 +22,8 @@ componentizer that produces 55 MB plugins and can't run the WASI socket code.
 
 Types go to a separate directory so `build` and `typecheck` can run in parallel without touching the
 same files. Run `pnpm typecheck` once after a fresh checkout so your editor finds the types.
+The shared `plugin-kit` package does the same for its own source, generating declarations for its
+filesystem imports in its ignored `build/types/` directory.
 
 `PUMPKIN_API_DIR` points the tool at a different `pumpkin-api-ts` checkout.
 
