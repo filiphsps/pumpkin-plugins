@@ -16,6 +16,10 @@
             "component": "bedrock-addon-manager",
             "release-as": "0.0.1"
         },
+        "packages/distant-horizons-support-pumpkin": {
+            "component": "distant-horizons-support-pumpkin",
+            "release-as": "0.0.1"
+        },
         "packages/dynamic-lights-pumpkin": {
             "component": "dynamic-lights-pumpkin"
         },

@@ -12,6 +12,7 @@ Monorepo for [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) plugins written in
 | --- | --- | --- |
 | [AppleSkinPumpkin](packages/apple-skin-pumpkin) | AppleSkin server-side support | MIT |
 | [BedrockAddonManager](packages/bedrock-addon-manager) | Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and adds them to what connecting players are offered, using each pack's own manifest. | MIT |
+| [DistantHorizonsSupportPumpkin](packages/distant-horizons-support-pumpkin) | Unofficial Distant Horizons server support for Pumpkin | [GPL-3.0-or-later](packages/distant-horizons-support-pumpkin/LICENSE) |
 | [DynamicLightsPumpkin](packages/dynamic-lights-pumpkin) | Server-driven dynamic lights for held items and nearby entities | MIT |
 | [UPnPumpkin](packages/upnpumpkin) | Opens ports on your router with UPnP and NAT-PMP so players can reach the server from the internet, and lets other plugins ask for the same. | MIT |
 
