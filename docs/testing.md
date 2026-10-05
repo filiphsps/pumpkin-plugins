@@ -9,7 +9,9 @@ Each plugin has two vitest projects, set up by `definePluginVitestConfig()` from
 | `integration` | `test/**/*.itest.ts` | `pnpm test:integration`. Builds first, then runs against a real Pumpkin. Test files and up to four package suites run concurrently. |
 
 Run one plugin's integration tests with
-`pnpm exec turbo run test:integration --filter=@pumpkin-plugins/<folder>`.
+`pnpm exec turbo run test:integration --filter=@pumpkin-plugins/<folder>`. To run only changed
+packages and their dependents locally, compare with the base branch, for example
+`pnpm exec turbo run test:integration --filter='...[origin/master]'`.
 
 ## Integration tests
 
@@ -45,7 +47,8 @@ await server.stop();
 Servers are killed on exit, so a crashed test run doesn't leave processes holding ports.
 Each test file owns its server instances and temporary directories, so Vitest can run files in
 parallel. The root command runs up to four package suites at a time to reduce total server startup
-time without starting every package's servers simultaneously.
+time without starting every package's servers simultaneously. CI also reuses the WASM files from its
+build job, avoiding a second plugin build in the integration job.
 
 Ports come from 20000 to 30000, below the range the operating system hands out for connections
 (32768 up on Linux, 49152 on macOS and Windows), so nothing that connects while a server is starting

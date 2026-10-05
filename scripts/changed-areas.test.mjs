@@ -71,7 +71,7 @@ describe('changed-areas', () => {
         const base = change(dir, { 'docs/guide.md': '# Guide\n\nMore.\n' });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=false\n');
+        assert.equal(result.outputs, 'code=false\nintegration_scope=all\nintegration_extra=\n');
         assert.match(result.log, /Nothing but docs/);
     });
 
@@ -80,7 +80,7 @@ describe('changed-areas', () => {
         const base = change(dir, { 'docs/diagram.png': 'not really a png\n', LICENSE: 'MIT\n\nmore\n' });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=false\n');
+        assert.equal(result.outputs, 'code=false\nintegration_scope=all\nintegration_extra=\n');
     });
 
     it('runs the code jobs for a change to a source file', () => {
@@ -88,8 +88,27 @@ describe('changed-areas', () => {
         const base = change(dir, { 'packages/plug/src/index.ts': 'export const a = 1;\n' });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=true\n');
+        assert.equal(result.outputs, 'code=true\nintegration_scope=affected\nintegration_extra=\n');
         assert.match(result.log, /Code: packages\/plug\/src\/index\.ts/);
+    });
+
+    it('runs all integration suites for changes outside plugin runtime packages', () => {
+        const dir = repo({ 'scripts/check.mjs': 'export {};\n' });
+        const base = change(dir, { 'scripts/check.mjs': 'export const changed = true;\n' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(result.outputs, 'code=true\nintegration_scope=all\nintegration_extra=\n');
+    });
+
+    it('includes bedrock-addon-manager when UPnPumpkin changes', () => {
+        const dir = repo({ 'packages/upnpumpkin/src/plugin.ts': 'export {};\n' });
+        const base = change(dir, { 'packages/upnpumpkin/src/plugin.ts': 'export const changed = true;\n' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=true\nintegration_scope=affected\nintegration_extra=@pumpkin-plugins/bedrock-addon-manager\n'
+        );
     });
 
     it('runs the code jobs when one file among documentation changes', () => {
@@ -100,7 +119,7 @@ describe('changed-areas', () => {
         });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=true\n');
+        assert.equal(result.outputs, 'code=true\nintegration_scope=all\nintegration_extra=\n');
         assert.match(result.log, /Code: \.github\/workflows\/ci\.yml/);
     });
 
@@ -109,7 +128,7 @@ describe('changed-areas', () => {
         const base = change(dir, { 'packages/plug/src/index.ts': null, 'docs/guide.md': null });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=true\n');
+        assert.equal(result.outputs, 'code=true\nintegration_scope=affected\nintegration_extra=\n');
     });
 
     it('fails on a base it cannot resolve instead of reporting no changes', () => {
@@ -131,6 +150,6 @@ describe('changed-areas', () => {
         const base = change(dir, { 'packages/plug/src/index.ts': 'export const a = 1;\n' });
         const result = run(dir, base);
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=true\n');
+        assert.equal(result.outputs, 'code=true\nintegration_scope=affected\nintegration_extra=\n');
     });
 });

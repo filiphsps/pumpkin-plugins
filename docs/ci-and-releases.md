@@ -14,7 +14,7 @@ cache) is the composite action in `.github/common/bootstrap`.
 | 🧪 Test | code changes | Unit tests, and the tests of the repo checks and agent hooks (`pnpm test:scripts`) |
 | 📝 Docs and config | always | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after lint and typecheck | Builds every plugin and uploads them as an artifact |
-| 🎃 Integration | code changes, after build | Runs the integration tests against the pinned Pumpkin release (downloaded and checksum-verified); server logs are uploaded on failure |
+| 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin with `pnpm gen` and typechecks, builds and integration-tests it |
 | 🚢 Release | code changes, on `master` pushes, after the checks | Runs release-please |
 | 📝 Prepare release PR | per created or updated release PR | Keeps every release PR's READMEs and `release-as` pins current |
@@ -29,8 +29,10 @@ tests or ships reads those, so a change touching only them skips lint, typecheck
 integration and the generator. A docs commit costs a checkout, the docs job and the commit lint
 instead of the whole suite.
 
-Everything else is a change to code and runs everything, including changes under `tools/`,
-`scripts/` and `.github/`, and deletions. Biome, the type checker and the tests read none of the
+Everything else is a change to code and runs the code jobs, including changes under `tools/`,
+`scripts/` and `.github/`, and deletions. Integration tests narrow to changed plugin packages and
+their dependents when all code changes are within plugin or runtime-tool packages; repo-level
+changes run the full integration suite. Biome, the type checker and the tests read none of the
 documentation files, so a docs-only change cannot fail them.
 
 Two jobs never skip. `📝 Docs and config` is what keeps the docs true, so it has to run on the

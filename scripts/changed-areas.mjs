@@ -23,9 +23,28 @@ if (diff.status !== 0) {
 
 const changed = diff.stdout.split('\n').filter((file) => file.length > 0);
 const code = changed.filter((file) => !DOCS.some((isDocs) => isDocs.test(file)));
+const integrationScope =
+    code.length > 0 &&
+    code.every((file) =>
+        /^(packages\/[^/]+|tools\/(build|config|plugin-kit|port-mapping|test-harness|upnpumpkin-api))(?:\/|$)/.test(
+            file
+        )
+    )
+        ? 'affected'
+        : 'all';
+const integrationExtra = code.some((file) => file.startsWith('packages/upnpumpkin/'))
+    ? '@pumpkin-plugins/bedrock-addon-manager'
+    : '';
 
 console.log(`${changed.length} changed file(s) between ${base} and ${head}`);
 if (code.length) console.log(`Code: ${code.join(', ')}`);
 else console.log('Nothing but docs, so the code jobs are skipped.');
+console.log(`Integration scope: ${integrationScope}`);
+if (integrationExtra) console.log(`Additional integration package: ${integrationExtra}`);
 
-if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `code=${code.length > 0}\n`);
+if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(
+        process.env.GITHUB_OUTPUT,
+        `code=${code.length > 0}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n`
+    );
+}

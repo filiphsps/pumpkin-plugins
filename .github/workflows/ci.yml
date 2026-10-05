@@ -27,6 +27,8 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             code: ${{ steps.classify.outputs.code }}
+            integration_scope: ${{ steps.classify.outputs.integration_scope }}
+            integration_extra: ${{ steps.classify.outputs.integration_extra }}
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -160,6 +162,16 @@ jobs:
                   name: plugins
                   path: dist/
 
+            - name: 📦 Upload plugin builds for integration tests
+              uses: actions/upload-artifact@v7.0.1
+              with:
+                  retention-days: 1
+                  overwrite: true
+                  compression-level: 0
+                  if-no-files-found: error
+                  name: plugin-wasm
+                  path: packages/*/build/*.wasm
+
     integration:
         name: 🎃 Integration (real Pumpkin)
         needs: [changes, build]
@@ -169,14 +181,34 @@ jobs:
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
+              with:
+                  fetch-depth: 0
 
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
+            - name: 📥 Download plugin builds
+              uses: actions/download-artifact@v8.0.1
+              with:
+                  name: plugin-wasm
+                  path: packages/
+
             - name: 🎃 Integration tests
-              run: pnpm run test:integration
               env:
+                  BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+                  INTEGRATION_SCOPE: ${{ needs.changes.outputs.integration_scope }}
+                  INTEGRATION_EXTRA: ${{ needs.changes.outputs.integration_extra }}
                   PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/pumpkin-logs
+              run: |
+                  if [ "$INTEGRATION_SCOPE" = affected ]; then
+                      filters=(--filter="...[$BASE_SHA]")
+                      if [ -n "$INTEGRATION_EXTRA" ]; then
+                          filters+=(--filter="$INTEGRATION_EXTRA")
+                      fi
+                      pnpm exec turbo run test:integration --concurrency=4 --only "${filters[@]}"
+                  else
+                      pnpm exec turbo run test:integration --concurrency=4 --only
+                  fi
 
             - name: 📤 Upload server logs
               if: failure()
