@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.2](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.0.1...upnpumpkin-v0.0.2) (2026-10-05)
+
+
+### Features
+
+* **plugin-kit:** support delayed server callbacks ([08efcf6](https://github.com/filiphsps/pumpkin-plugins/commit/08efcf6f363dfb7a27943c55daa62bf3a06c3745))
+
+
+### Bug Fixes
+
+* **upnpumpkin:** isolate the WASI socket adapter ([7bc81b5](https://github.com/filiphsps/pumpkin-plugins/commit/7bc81b5de494b9f4e3eb10de61122cbeedf1a67b))
+* **upnpumpkin:** limit port requests per plugin ([bbb8174](https://github.com/filiphsps/pumpkin-plugins/commit/bbb81744832b6b782bfcbfe29b915d67f11b2daa))
+* **upnpumpkin:** only turn off asking for ports, not giving them back ([904489d](https://github.com/filiphsps/pumpkin-plugins/commit/904489d7a15445fc028c9af872aa24ad9f9f6138))
+
 ## 0.0.1 (2026-10-04)
 
 
