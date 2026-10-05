@@ -5,7 +5,7 @@ import type {
     ItemDespawnEventData,
     ItemMergeEventData,
     ItemSpawnEventData,
-    PlayerChangeWorldEventData,
+    PlayerChangedWorldEventData,
     PlayerDropItemEventData,
     PlayerItemHeldEventData,
     PlayerJoinEventData,
@@ -21,18 +21,19 @@ import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
 import { cancelTask, runCommand, scheduleDelayed, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
 import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
+import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
 import { registerCommands } from './commands/register.ts';
 import { loadPluginConfig } from './config/load.ts';
 import { info } from './info.ts';
 import { type BlockPosition, ClientLightTracker } from './lights/client-light.ts';
 import { DroppedItemLightLevels } from './lights/dropped-items.ts';
-import { EntityLightTracker, type VisibleEntityLight } from './lights/entity-lights.ts';
+import { EntityLightTracker } from './lights/entity-lights.ts';
 import { HeldItemLightLevels } from './lights/held-items.ts';
 import { LightJournal } from './lights/journal.ts';
 import { PlayerLightPreferences } from './lights/player-preferences.ts';
-import { findClientLightPosition } from './platform/client-light-position.ts';
 import { resolveClientLightStates } from './platform/client-light-states.ts';
+import { readEntityLights, readHeldLight } from './platform/player-lights.ts';
 import { PumpkinLightWorld } from './platform/pumpkin-light-world.ts';
 
 /** The plugin. Pumpkin creates it once and calls `onLoad` when the server starts. */
@@ -45,6 +46,9 @@ class DynamicLightsPumpkin extends PluginBase {
     private preferences: PlayerLightPreferences | undefined;
     private entityTask: number | undefined;
     private readonly playerBlockPositions = new Map<string, BlockPosition>();
+    private readonly playerWorlds = new Map<string, string>();
+    private readonly pendingSyncs = new Map<string, number>();
+    private readonly delayedTasks = new Set<number>();
 
     constructor() {
         super(info, __PLUGIN_VERSION__);
@@ -84,42 +88,55 @@ class DynamicLightsPumpkin extends PluginBase {
         }
 
         this.registerEvent(ctx, 'player-join-event', (_server, event: PlayerJoinEventData) => {
-            this.syncPlayer(event.player);
-            const playerName = event.player.getName();
-            scheduleDelayed(2, (server) => {
-                const player = server.getPlayerByName(playerName);
-                if (player !== undefined) this.syncPlayer(player);
-            });
+            this.forgetPlayer(event.player.getName());
+            this.deferPlayerSync(event.player.getName(), 2);
         });
         this.registerEvent(ctx, 'player-leave-event', (_server, event: PlayerLeaveEventData) => {
             const playerName = event.player.getName();
-            this.playerBlockPositions.delete(playerName);
-            this.tracker?.remove(playerName, event.player);
-            this.entityTracker?.remove(playerName, event.player);
+            this.forgetPlayer(playerName);
+            const pending = this.pendingSyncs.get(playerName);
+            if (pending !== undefined) cancelTask(pending);
+            if (pending !== undefined) this.delayedTasks.delete(pending);
+            this.pendingSyncs.delete(playerName);
         });
         this.registerEvent(ctx, 'player-item-held-event', (_server, event: PlayerItemHeldEventData) => {
-            this.syncPlayer(event.player);
+            this.deferPlayerSync(event.player.getName());
         });
         this.registerEvent(ctx, 'player-swap-hands-event', (_server, event: PlayerSwapHandsEventData) => {
-            this.syncPlayer(event.player);
+            this.deferPlayerSync(event.player.getName());
         });
+        for (const eventType of [
+            'block-place-event',
+            'player-item-consume-event',
+            'player-bucket-empty-event',
+            'player-bucket-fill-event',
+            'inventory-click-event',
+            'inventory-close-event',
+            'inventory-creative-event',
+            'inventory-drag-event'
+        ] as const) {
+            this.registerEvent(ctx, eventType, (_server, event) => this.deferPlayerSync(event.player.getName()));
+        }
         this.registerEvent(ctx, 'player-move-event', (_server, event: PlayerMoveEventData) => {
             this.syncMovedPlayer(event.player, event.toPosition);
         });
         this.registerEvent(ctx, 'player-teleport-event', (_server, event: PlayerTeleportEventData) => {
-            this.syncPlayer(event.player, event.toPosition);
+            this.deferPlayerSync(event.player.getName());
         });
-        this.registerEvent(ctx, 'player-change-world-event', (_server, event: PlayerChangeWorldEventData) => {
-            this.syncPlayer(event.player, event.position);
+        this.registerEvent(ctx, 'player-changed-world-event', (_server, event: PlayerChangedWorldEventData) => {
+            this.forgetPlayer(event.player.getName());
+            this.deferPlayerSync(event.player.getName());
         });
         this.registerEvent(ctx, 'player-respawn-event', (_server, event: PlayerRespawnEventData) => {
-            this.syncPlayer(event.player, event.position);
+            this.forgetPlayer(event.player.getName());
+            this.deferPlayerSync(event.player.getName());
         });
         this.registerEvent(ctx, 'player-drop-item-event', (_server, event: PlayerDropItemEventData) => {
+            this.deferPlayerSync(event.player.getName());
             const level = this.lightLevels?.level(event.itemName) ?? 0;
             if (level === 0) return;
             const playerName = event.player.getName();
-            scheduleDelayed(1, (server) => this.recordPlayerDrop(server, playerName, level));
+            this.defer((server) => this.recordPlayerDrop(server, playerName, level));
         });
         this.registerEvent(ctx, 'item-spawn-event', (_server, event: ItemSpawnEventData) => {
             this.droppedItemLevels?.recordSpawn(event.entityId, event.itemName);
@@ -134,35 +151,60 @@ class DynamicLightsPumpkin extends PluginBase {
             this.droppedItemLevels?.remove(event.entityId);
         });
         this.registerEvent(ctx, 'server-load-event', (server: Server) => {
-            const recovered = journal.recover(server.getAllWorlds().map((world) => new PumpkinLightWorld(world)));
+            const worlds = server.getAllWorlds();
+            let recovered: number;
+            try {
+                recovered = journal.recover(worlds.map((world) => new PumpkinLightWorld(world)));
+            } finally {
+                for (const world of worlds) disposeWasiResource(world);
+            }
             if (recovered > 0)
                 logging.log(
                     'warn',
                     `${colorLogValue(info.name, 'cyan')} restored ${colorLogValue(String(recovered), 'yellow')} stale temporary light level${recovered === 1 ? '' : 's'}`
                 );
-            for (const player of server.getAllPlayers()) this.syncPlayer(player);
+            const players = server.getAllPlayers();
+            try {
+                for (const player of players) this.syncPlayer(player);
+            } finally {
+                for (const player of players) disposeWasiResource(player);
+            }
         });
     }
 
     /** Drops tracked client overrides before Pumpkin unloads the plugin. */
-    protected override onPluginUnload(_ctx: Context): void {
-        this.tracker?.clear();
+    protected override onPluginUnload(ctx: Context): void {
+        for (const task of this.delayedTasks) cancelTask(task);
+        this.delayedTasks.clear();
+        this.pendingSyncs.clear();
         if (this.entityTask !== undefined) cancelTask(this.entityTask);
+        this.entityTask = undefined;
+        const server = ctx.getServer();
+        try {
+            const players = server.getAllPlayers();
+            try {
+                for (const player of players) this.tracker?.reset(player.getName(), player);
+            } finally {
+                for (const player of players) disposeWasiResource(player);
+            }
+        } finally {
+            disposeWasiResource(server);
+        }
+        this.tracker?.clear();
+        this.playerBlockPositions.clear();
+        this.playerWorlds.clear();
     }
 
-    private syncPlayer(player: PlayerJoinEventData['player'], precisePosition = player.getPosition()): void {
+    private syncPlayer(player: PlayerJoinEventData['player']): void {
         const playerName = player.getName();
-        const position = toBlockPosition(precisePosition);
-        this.playerBlockPositions.set(playerName, position);
         if (!this.preferences?.isEnabled(playerName)) {
-            this.tracker?.remove(playerName, player);
+            this.tracker?.reset(playerName, player);
             return;
         }
-        const rightItem = player.getItemInHand('right');
-        const leftItem = player.getItemInHand('left');
-        const level = this.lightLevels?.levelForHands(rightItem?.getRegistryKey(), leftItem?.getRegistryKey()) ?? 0;
-        const lightPosition = level === 0 ? position : findClientLightPosition(player.getWorld(), position);
-        this.tracker?.sync(playerName, player, lightPosition ?? position, lightPosition === undefined ? 0 : level);
+        const light = readHeldLight(player, this.lightLevels);
+        this.observeWorld(playerName, light.worldId);
+        this.playerBlockPositions.set(playerName, light.position);
+        this.tracker?.sync(playerName, player, light.lightPosition, light.level);
     }
 
     private syncMovedPlayer(player: PlayerJoinEventData['player'], precisePosition: [number, number, number]): void {
@@ -170,35 +212,70 @@ class DynamicLightsPumpkin extends PluginBase {
         const [x, y, z] = precisePosition;
         const previous = this.playerBlockPositions.get(playerName);
         if (previous?.x === Math.floor(x) && previous.y === Math.floor(y) && previous.z === Math.floor(z)) return;
-        this.syncPlayer(player, precisePosition);
+        this.deferPlayerSync(playerName);
+    }
+
+    private deferPlayerSync(playerName: string, delay = 1): void {
+        if (this.pendingSyncs.has(playerName)) return;
+        const task = this.defer((server) => {
+            this.pendingSyncs.delete(playerName);
+            const player = server.getPlayerByName(playerName);
+            if (player == null) return;
+            try {
+                this.syncPlayer(player);
+            } finally {
+                disposeWasiResource(player);
+            }
+        }, delay);
+        this.pendingSyncs.set(playerName, task);
+    }
+
+    private defer(run: (server: Server) => void, delay = 1): number {
+        const task = scheduleDelayed(delay, (server) => {
+            this.delayedTasks.delete(task);
+            run(server);
+        });
+        this.delayedTasks.add(task);
+        return task;
+    }
+
+    private forgetPlayer(playerName: string): void {
+        this.tracker?.forget(playerName);
+        this.playerBlockPositions.delete(playerName);
+        this.playerWorlds.delete(playerName);
+    }
+
+    private observeWorld(playerName: string, worldId: string): void {
+        if (this.playerWorlds.get(playerName) !== worldId) this.forgetPlayer(playerName);
+        this.playerWorlds.set(playerName, worldId);
     }
 
     private syncEntityLights(server: Server): void {
-        if (this.entityLevels.size === 0) return;
         const players = server.getAllPlayers();
-        if (players.length === 0) return;
-        for (const player of players) {
-            const playerName = player.getName();
-            if (!this.preferences?.isEnabled(playerName)) {
-                this.entityTracker?.remove(playerName, player);
-                continue;
-            }
-            const visible: VisibleEntityLight[] = [];
-            const world = player.getWorld();
-            for (const entity of player.asEntity().getNearbyEntities(15, 15, 15)) {
-                const entityId = entity.getId();
-                const level = this.droppedItemLevels?.level(entityId) ?? this.entityLevels.get(entity.getType()) ?? 0;
-                if (level === 0) continue;
-                const position = findClientLightPosition(world, toBlockPosition(entity.getPosition()));
-                if (position !== undefined) visible.push({ entityId, position, level });
-            }
-            this.entityTracker?.sync(playerName, player, visible);
+        try {
+            for (const player of players) this.syncPlayerEntities(player);
+        } finally {
+            for (const player of players) disposeWasiResource(player);
         }
+    }
+
+    private syncPlayerEntities(player: PlayerJoinEventData['player']): void {
+        const playerName = player.getName();
+        if (!this.preferences?.isEnabled(playerName)) {
+            this.entityTracker?.remove(playerName, player);
+            return;
+        }
+        const lights = readEntityLights(
+            player,
+            (entity) => this.droppedItemLevels?.level(entity.getId()) ?? this.entityLevels.get(entity.getType()) ?? 0
+        );
+        this.observeWorld(playerName, lights.worldId);
+        this.entityTracker?.sync(playerName, player, lights.visible);
     }
 
     private recordPlayerDrop(server: Server, playerName: string, level: number): void {
         const player = server.getPlayerByName(playerName);
-        if (player === undefined) return;
+        if (player == null) return;
         const [playerX, playerY, playerZ] = player.getPosition();
         const candidates = player
             .asEntity()
@@ -220,19 +297,14 @@ class DynamicLightsPumpkin extends PluginBase {
         const enabled = this.preferences?.toggle(player.getName()) ?? true;
         if (enabled) this.syncPlayer(player);
         else {
-            this.tracker?.remove(player.getName(), player);
-            this.entityTracker?.remove(player.getName(), player);
+            this.tracker?.reset(player.getName(), player);
         }
         return enabled;
     }
 }
 
-function toBlockPosition([x, y, z]: [number, number, number]): BlockPosition {
-    return { x: Math.floor(x), y: Math.floor(y), z: Math.floor(z) };
-}
-
 function sourceLevels(sources: Record<string, { light_level?: number }>): Record<string, number> {
-    const levels: Record<string, number> = {};
+    const levels: Record<string, number> = Object.create(null);
     for (const [item, source] of Object.entries(sources)) {
         if (source.light_level !== undefined) levels[item] = source.light_level;
     }
