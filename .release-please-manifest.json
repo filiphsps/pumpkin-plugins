@@ -1,6 +1,6 @@
 {
     "packages/apple-skin-pumpkin": "0.0.2",
     "packages/bedrock-addon-manager": "0.0.0",
-    "packages/dynamic-lights-pumpkin": "0.0.1",
+    "packages/dynamic-lights-pumpkin": "0.0.2",
     "packages/upnpumpkin": "0.0.2"
 }
