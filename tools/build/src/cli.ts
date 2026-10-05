@@ -16,6 +16,9 @@ import { prepareWit } from './wit.ts';
  * @param pluginDir - The package to build.
  */
 export async function run(args: string[], pluginDir: string): Promise<void> {
+    const unknownArgument = args.find((arg) => arg !== '--types-only');
+    if (unknownArgument) throw new BuildError(`unknown argument "${unknownArgument}" (supported: --types-only)`);
+
     const config = readPluginConfig(pluginDir);
     const buildDir = path.join(pluginDir, 'build');
     const apiRoot = process.env.PUMPKIN_API_DIR
