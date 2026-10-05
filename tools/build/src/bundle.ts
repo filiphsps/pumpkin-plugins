@@ -25,8 +25,12 @@ export interface BundleOptions {
  * @returns The size of the component in bytes.
  */
 export async function bundlePlugin(options: BundleOptions): Promise<number> {
-    fs.mkdirSync(path.dirname(options.output), { recursive: true });
-    const bundle = path.join(path.dirname(options.output), 'bundle.tmp.js');
+    const output = path.resolve(options.output);
+    const outputDir = path.dirname(output);
+    fs.mkdirSync(outputDir, { recursive: true });
+    const temporaryDir = fs.mkdtempSync(path.join(outputDir, '.pumpkin-build-'));
+    const bundle = path.join(temporaryDir, 'bundle.js');
+    const component = path.join(temporaryDir, 'plugin.wasm');
     try {
         await esbuild.build({
             entryPoints: [options.entry],
@@ -50,12 +54,47 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                 bundle,
                 '--opt-size',
                 '--output',
-                options.output
+                component
             ],
             { stdio: 'inherit' }
         );
-        return fs.statSync(options.output).size;
+        const size = fs.statSync(component).size;
+        publishComponent(component, output, temporaryDir);
+        return size;
     } finally {
-        fs.rmSync(bundle, { force: true });
+        fs.rmSync(temporaryDir, { recursive: true, force: true });
     }
+}
+
+function publishComponent(component: string, output: string, temporaryDir: string): void {
+    try {
+        fs.renameSync(component, output);
+    } catch (error) {
+        if (!isReplaceError(error) || !fs.existsSync(output)) throw error;
+        const existing = fs.lstatSync(output);
+        if (!existing.isFile() && !existing.isSymbolicLink()) throw error;
+
+        const previous = path.join(temporaryDir, 'previous.wasm');
+        fs.renameSync(output, previous);
+        try {
+            fs.renameSync(component, output);
+        } catch (publishError) {
+            try {
+                fs.renameSync(previous, output);
+            } catch (restoreError) {
+                throw new AggregateError([publishError, restoreError], `could not publish or restore ${output}`);
+            }
+            throw publishError;
+        }
+        fs.rmSync(previous, { force: true });
+    }
+}
+
+function isReplaceError(error: unknown): boolean {
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error.code === 'EEXIST' || error.code === 'EPERM' || error.code === 'EACCES')
+    );
 }
