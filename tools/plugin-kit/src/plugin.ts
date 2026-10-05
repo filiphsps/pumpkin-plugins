@@ -28,8 +28,8 @@ export abstract class PluginBase extends Plugin {
     /** Registers the API's pending events, logs the load and runs the plugin's load hook. */
     onLoad(ctx: Context): void {
         super.onLoad(ctx);
-        hostLogger.info(`${this.info.name} ${this.version} loaded`);
         this.onPluginLoad(ctx);
+        hostLogger.info(`${this.info.name} ${this.version} loaded`);
     }
 
     /** Runs the plugin's unload hook after the API's unload handler. */

@@ -57,7 +57,7 @@ class ExamplePlugin extends PluginBase {
 }
 
 describe('PluginBase', () => {
-    beforeEach(() => vi.clearAllMocks());
+    beforeEach(() => vi.resetAllMocks());
 
     it('builds metadata from info and the package version', () => {
         expect(new ExamplePlugin().metadata()).toEqual({
@@ -107,5 +107,16 @@ describe('PluginBase', () => {
         expect(calls.runTask).toHaveBeenNthCalledWith(2, 1, server);
         expect(calls.apiHandleTask).toHaveBeenCalledTimes(1);
         expect(calls.apiHandleTask).toHaveBeenCalledWith(1, server);
+    });
+    it('only logs a successful load after the plugin hook completes', () => {
+        const plugin = new ExamplePlugin();
+        calls.pluginLoad.mockImplementationOnce(() => {
+            throw new Error('setup failed');
+        });
+        expect(() => plugin.onLoad({} as Context)).toThrow('setup failed');
+        expect(calls.info).not.toHaveBeenCalled();
+        plugin.onLoad({} as Context);
+        expect(calls.info).toHaveBeenCalledOnce();
+        expect(calls.pluginLoad.mock.invocationCallOrder[1]).toBeLessThan(calls.info.mock.invocationCallOrder[0]);
     });
 });
