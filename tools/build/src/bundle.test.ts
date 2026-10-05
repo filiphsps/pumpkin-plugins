@@ -5,6 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 vi.mock('esbuild', () => ({ build: vi.fn() }));
+vi.mock('node:fs', async (importOriginal) => {
+    const original = await importOriginal<typeof import('node:fs')>();
+    return { ...original, renameSync: vi.fn(original.renameSync) };
+});
 
 import { execFileSync } from 'node:child_process';
 import { build } from 'esbuild';
@@ -65,6 +69,21 @@ describe('bundlePlugin', () => {
 
         expect(fs.readFileSync(output, 'utf8')).toBe('known-good artifact');
         expect(fs.readdirSync(path.dirname(output))).toEqual(['plugin.wasm']);
+    });
+
+    it('replaces an existing artifact when rename cannot overwrite it directly', async () => {
+        const { output } = buildAt();
+        fs.writeFileSync(output, 'old artifact');
+        const rename = vi.mocked(fs.renameSync).mockImplementationOnce(() => {
+            throw Object.assign(new Error('access denied'), { code: 'EACCES' });
+        });
+
+        const size = await bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0' });
+
+        expect(size).toBe(Buffer.byteLength('component'));
+        expect(fs.readFileSync(output, 'utf8')).toBe('component');
+        expect(fs.readdirSync(path.dirname(output))).toEqual(['plugin.wasm']);
+        expect(rename).toHaveBeenCalledTimes(3);
     });
 
     it('uses separate temporary bundles for concurrent builds', async () => {
