@@ -21,6 +21,8 @@ export interface TableNode<F extends Fields = Fields> {
     readonly entryName: string;
     /** An entry name used in the commented example. */
     readonly exampleKey: string;
+    /** Entries written into a fresh configuration file. Users may remove them afterwards. */
+    readonly defaults?: TableValues<F>;
     /** The settings every entry may have. They are all optional. */
     readonly fields: F;
 }
@@ -54,6 +56,7 @@ export function table<F extends Fields>(options: {
     description: string;
     entryName: string;
     exampleKey: string;
+    defaults?: TableValues<F>;
     fields: F;
 }): TableNode<F> {
     return { node: 'table', ...options };
@@ -91,14 +94,14 @@ export type ConfigValues<S> = S extends ConfigSchema<infer N> ? { [K in keyof N]
 /**
  * The values of a config file with nothing configured.
  * @param schema - The config schema.
- * @returns Every setting at its default and every table empty.
+ * @returns Every setting at its default, including any initial table entries.
  */
 export function defaultValues<S extends ConfigSchema>(schema: S): ConfigValues<S> {
     const values: Record<string, unknown> = {};
     for (const [name, node] of Object.entries(schema.nodes)) {
         values[name] =
             node.node === 'table'
-                ? {}
+                ? { ...(node.defaults ?? {}) }
                 : Object.fromEntries(Object.entries(node.fields).map(([key, f]) => [key, f.default]));
     }
     return values as ConfigValues<S>;
