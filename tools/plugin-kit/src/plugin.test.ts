@@ -38,6 +38,7 @@ vi.mock('./host.ts', () => ({
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { registerPluginWithUpdates } from '@pumpkin-plugins/update-check';
+import { colorLogValue } from './logger.ts';
 import { handleTask, PluginBase, registerPlugin } from './plugin.ts';
 
 const info = { name: 'ExamplePlugin', description: 'An example plugin.' };
@@ -78,7 +79,9 @@ describe('PluginBase', () => {
         plugin.onUnload(ctx);
 
         expect(calls.apiLoad).toHaveBeenCalledWith(ctx);
-        expect(calls.info).toHaveBeenCalledWith('ExamplePlugin 1.2.3 loaded');
+        expect(calls.info).toHaveBeenCalledWith(
+            `${colorLogValue('ExamplePlugin', 'cyan')} ${colorLogValue('1.2.3', 'green')} loaded`
+        );
         expect(calls.pluginLoad).toHaveBeenCalledWith(ctx);
         expect(calls.apiUnload).toHaveBeenCalledWith(ctx);
         expect(calls.pluginUnload).toHaveBeenCalledWith(ctx);
