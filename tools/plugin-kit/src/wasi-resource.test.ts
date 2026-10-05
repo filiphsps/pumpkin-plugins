@@ -18,6 +18,11 @@ describe('disposeWasiResource', () => {
         expect(drop).toHaveBeenCalledOnce();
     });
 
+    it('accepts absent optional resources from QuickJS and generated JS bindings', () => {
+        expect(() => disposeWasiResource(null)).not.toThrow();
+        expect(() => disposeWasiResource(undefined)).not.toThrow();
+    });
+
     it('does nothing when the runtime exposes neither cleanup method', () => {
         expect(() => disposeWasiResource({})).not.toThrow();
     });
