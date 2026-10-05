@@ -1,3 +1,4 @@
+import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { FakeIgd, FakeNetwork } from '@pumpkin-plugins/port-mapping/testing';
 import {
@@ -39,7 +40,7 @@ describe('PortForwarder', () => {
         const { files, log, forwarder, settle, keys } = setup();
         forwarder.start();
         expect(files.text(CONFIG_FILE)).toContain('[java]');
-        expect(log.of('info')).toContain('Created config.toml with the default settings.');
+        expect(log.of('info')).toContain(`Created ${colorLogValue('config.toml', 'cyan')} with the default settings.`);
 
         settle(() => keys().length === 2);
         expect(keys()).toEqual(['tcp:25565', 'udp:19132']);
@@ -102,7 +103,9 @@ describe('PortForwarder', () => {
                 status: { kind: 'open', via: 'upnp', address: '93.184.216.34', port: 8123 }
             });
             expect(keys()).toEqual(['tcp:8123']);
-            expect(log.of('info')).toContain('BedrockAddonManager asked for TCP port 8123 to be opened (Packs).');
+            expect(log.of('info')).toContain(
+                `${colorLogValue('BedrockAddonManager', 'cyan')} asked for TCP port ${colorLogValue('8123', 'yellow')} to be opened (Packs).`
+            );
         });
 
         it("keeps each plugin's keys apart", () => {

@@ -1,5 +1,5 @@
 import type { DataFiles } from '@pumpkin-plugins/plugin-kit/files';
-import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
+import { colorLogValue, type Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import {
     formatIpv4,
     type MappingSpec,
@@ -160,7 +160,7 @@ export class PortForwarder {
                 }
                 if (!known)
                     this.log.info(
-                        `${sender} asked for ${request.protocol.toUpperCase()} port ${request.port} to be opened (${request.description}).`
+                        `${colorLogValue(sender, 'cyan')} asked for ${request.protocol.toUpperCase()} port ${colorLogValue(String(request.port), 'yellow')} to be opened (${request.description}).`
                     );
                 this.requests.set(key, { sender, spec: request, lastSeen: this.net.now() });
                 return { ok: true, status: toStatus(this.mapper.request(key, request)) };
@@ -223,7 +223,7 @@ export class PortForwarder {
             if (now - lastSeen < REQUEST_TTL_MS) continue;
             this.requests.delete(key);
             this.mapper?.release(key);
-            this.log.info(`${sender} stopped asking, so its port was closed.`);
+            this.log.info(`${colorLogValue(sender, 'cyan')} stopped asking, so its port was closed.`);
         }
     }
 }
