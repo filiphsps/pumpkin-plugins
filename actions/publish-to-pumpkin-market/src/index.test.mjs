@@ -35,9 +35,9 @@ function run(dir, env = {}) {
 
 function inputs(extra = {}) {
     return {
-        INPUT_PLUGIN_NAME: 'Published plugin',
+        'INPUT_PLUGIN-NAME': 'Published plugin',
         INPUT_VERSION: '1.2.3',
-        INPUT_WASM_FILE: 'plugin.wasm',
+        'INPUT_WASM-FILE': 'plugin.wasm',
         ...extra
     };
 }
@@ -75,7 +75,7 @@ describe('publish-to-market action', () => {
         });
         try {
             const dir = fixture();
-            const result = await run(dir, inputs({ INPUT_API_TOKEN: 'test-token', INPUT_API_URL: market.url }));
+            const result = await run(dir, inputs({ 'INPUT_API-TOKEN': 'test-token', 'INPUT_API-URL': market.url }));
             assert.equal(result.status, 1);
             assert.match(result.stderr, /no Market listing named/);
         } finally {
@@ -94,7 +94,7 @@ describe('publish-to-market action', () => {
             const dir = fixture();
             const result = await run(
                 dir,
-                inputs({ INPUT_API_TOKEN: 'test-token', INPUT_API_URL: market.url, INPUT_WARN: 'true' })
+                inputs({ 'INPUT_API-TOKEN': 'test-token', 'INPUT_API-URL': market.url, INPUT_WARN: 'true' })
             );
             assert.equal(result.status, 0, result.stderr);
             assert.match(result.stdout, /::warning .*no Market listing named/);
@@ -112,7 +112,7 @@ describe('publish-to-market action', () => {
         });
         try {
             const dir = fixture();
-            const result = await run(dir, inputs({ INPUT_API_TOKEN: 'test-token', INPUT_API_URL: market.url }));
+            const result = await run(dir, inputs({ 'INPUT_API-TOKEN': 'test-token', 'INPUT_API-URL': market.url }));
             assert.equal(result.status, 1);
             assert.match(result.stderr, /has not been published yet/);
         } finally {
@@ -131,7 +131,7 @@ describe('publish-to-market action', () => {
             const dir = fixture();
             const result = await run(
                 dir,
-                inputs({ INPUT_API_TOKEN: 'test-token', INPUT_API_URL: market.url, INPUT_WARN: 'true' })
+                inputs({ 'INPUT_API-TOKEN': 'test-token', 'INPUT_API-URL': market.url, INPUT_WARN: 'true' })
             );
             assert.equal(result.status, 0, result.stderr);
             assert.match(result.stdout, /::warning .*has not been published yet/);
@@ -165,10 +165,10 @@ describe('publish-to-market action', () => {
             const result = await run(
                 dir,
                 inputs({
-                    INPUT_API_TOKEN: 'test-token',
-                    INPUT_API_URL: market.url,
+                    'INPUT_API-TOKEN': 'test-token',
+                    'INPUT_API-URL': market.url,
                     INPUT_TRACK: 'beta',
-                    INPUT_RELEASE_NOTES: '## Fixed\n\n- Kept the ports open.',
+                    'INPUT_RELEASE-NOTES': '## Fixed\n\n- Kept the ports open.',
                     GITHUB_STEP_SUMMARY: summaryFile
                 })
             );
@@ -205,7 +205,7 @@ describe('publish-to-market action', () => {
         });
         try {
             const dir = fixture();
-            const result = await run(dir, inputs({ INPUT_API_TOKEN: 'test-token', INPUT_API_URL: market.url }));
+            const result = await run(dir, inputs({ 'INPUT_API-TOKEN': 'test-token', 'INPUT_API-URL': market.url }));
             assert.equal(result.status, 1);
             assert.match(result.stderr, /Market update for Published plugin failed \(503\): try again/);
         } finally {
@@ -215,7 +215,7 @@ describe('publish-to-market action', () => {
 
     it('fails when the WASM path does not exist', async () => {
         const dir = fixture();
-        const result = await run(dir, inputs({ INPUT_WASM_FILE: 'missing.wasm' }));
+        const result = await run(dir, inputs({ 'INPUT_WASM-FILE': 'missing.wasm' }));
         assert.equal(result.status, 1);
         assert.match(result.stderr, /WASM file not found/);
     });

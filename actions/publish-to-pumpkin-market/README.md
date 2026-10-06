@@ -1,7 +1,8 @@
 # Publish to Pumpkin Market
 
 Upload an existing Pumpkin plugin `.wasm` build to its existing Pumpkin Market listing. This
-composite action does not build the plugin or create a listing.
+JavaScript action does not build the plugin or create a listing. It runs directly on GitHub Actions'
+Node 24 runtime and needs no setup step.
 
 ```yaml
 steps:
@@ -34,8 +35,8 @@ action changes. The action runs locally in this repository's release workflow fr
 | `release-notes` | No | Empty | Notes saved in the Market version metadata |
 | `warn` | No | `false` | If `true`, missing credentials or an unavailable listing emits a warning and succeeds; otherwise it fails |
 
-The runner needs Node 20 or newer. Listing lookup follows PPM: try the direct plugin endpoint, then
-search a limited result set and require a case-insensitive exact name match. An empty token, missing
+Listing lookup follows PPM: try the direct plugin endpoint, then search a limited result set and
+require a case-insensitive exact name match. An empty token, missing
 listing, or unpublished listing fails by default. Set `warn: true` to emit a warning and skip the
 upload; API errors always fail the action. Successful and skipped uploads are added to the GitHub
 Actions step summary when one is available.

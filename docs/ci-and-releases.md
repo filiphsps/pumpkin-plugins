@@ -243,7 +243,7 @@ and the agent hooks, using fixtures and throwaway repos. See "Docs match the cod
 
 ## Publishing to market.pumpkinmc.org
 
-The reusable composite action lives in
+The reusable JavaScript action lives in
 [`actions/publish-to-pumpkin-market/`](../actions/publish-to-pumpkin-market/README.md); each action
 in this monorepo has its own directory, metadata and README. Other repositories can use a published
 version with
@@ -251,7 +251,7 @@ version with
 The action accepts the exact Pumpkin plugin name, version, `.wasm` path, optional track and release
 notes, a Market API token, and an optional API URL. It calls `PUT /api/plugins/<id>` with bearer
 authentication and multipart `wasm` and `metadata` fields, using the file it receives without
-rebuilding it. The runner needs Node 20 or newer.
+rebuilding it. It runs directly on GitHub Actions' Node 24 runtime.
 
 In this repo, the `market` job downloads the `.wasm` produced by the build job, resolves the plugin's
 canonical name from `src/info.ts`, and passes the per-plugin Release Please version and changelog to

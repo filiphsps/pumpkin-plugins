@@ -1,17 +1,18 @@
-// Composite action entry point for action.yml. It uploads an existing build without rebuilding it.
+// JavaScript action entry point. It uploads an existing build without rebuilding it.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const input = (name) => process.env[`INPUT_${name}`] ?? '';
-const pluginName = input('PLUGIN_NAME').trim();
-const version = input('VERSION').trim();
-const wasmFile = input('WASM_FILE').trim();
-const token = input('API_TOKEN').trim();
-const marketUrl = (input('API_URL').trim() || 'https://market.pumpkinmc.org').replace(/\/+$/, '');
-const track = input('TRACK').trim() || 'stable';
-const releaseNotes = input('RELEASE_NOTES').trim();
-const warnOnUnavailable = input('WARN').trim().toLowerCase() === 'true';
+// GitHub preserves hyphens in INPUT_* names, matching @actions/core.
+const input = (name) => process.env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] ?? '';
+const pluginName = input('plugin-name').trim();
+const version = input('version').trim();
+const wasmFile = input('wasm-file').trim();
+const token = input('api-token').trim();
+const marketUrl = (input('api-url').trim() || 'https://market.pumpkinmc.org').replace(/\/+$/, '');
+const track = input('track').trim() || 'stable';
+const releaseNotes = input('release-notes').trim();
+const warnOnUnavailable = input('warn').trim().toLowerCase() === 'true';
 
 try {
     await publish();
