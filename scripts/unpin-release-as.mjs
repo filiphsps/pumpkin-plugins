@@ -1,4 +1,4 @@
-// Removes the "release-as" pin from release-please-config.json for every plugin that has a version
+// Removes the "release-as" pin from release-please-config.json for every plugin or action that has a version
 // past its first release. Run it on a release PR branch: release-please only writes versions,
 // changelogs and the manifest, so the pin would otherwise reach master, fail the release config
 // check, and take the release and attach jobs down with it, leaving the release untagged with no
@@ -13,9 +13,13 @@ const config = JSON.parse(fs.readFileSync(file, 'utf8'));
 const retired = [];
 for (const [dir, entry] of Object.entries(config.packages ?? {})) {
     if (entry['release-as'] === undefined) continue;
-    const manifest = path.join(root, dir, 'package.json');
-    if (!fs.existsSync(manifest)) continue;
-    const { version } = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+    const versionFile = dir.startsWith('actions/')
+        ? path.join(root, dir, 'version.txt')
+        : path.join(root, dir, 'package.json');
+    if (!fs.existsSync(versionFile)) continue;
+    const version = dir.startsWith('actions/')
+        ? fs.readFileSync(versionFile, 'utf8').trim()
+        : JSON.parse(fs.readFileSync(versionFile, 'utf8')).version;
     // Still on its starting version, so the pin is what makes its first release 0.0.1.
     if (version === '0.0.0') continue;
     config.packages[dir] = Object.fromEntries(Object.entries(entry).filter(([key]) => key !== 'release-as'));
@@ -23,7 +27,7 @@ for (const [dir, entry] of Object.entries(config.packages ?? {})) {
 }
 
 if (!retired.length) {
-    console.log('No plugin is past its first release, so every "release-as" stays.');
+    console.log('No plugin or action is past its first release, so every "release-as" stays.');
 } else {
     fs.writeFileSync(file, `${JSON.stringify(config, null, 4)}\n`);
     console.log(`Removed "release-as" from ${retired.join(', ')}`);

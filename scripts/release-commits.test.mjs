@@ -126,6 +126,22 @@ describe('bundled release commits', () => {
         assert.deepEqual(scoped['packages/plugin'], [history[0]]);
     });
 
+    it('leaves action release strategies to Release Please without fetching plugin history', async () => {
+        let fetchedHistory = false;
+        const github = {
+            async *mergeCommitIterator() {
+                fetchedHistory = true;
+                yield null;
+            }
+        };
+        const plugin = bundledChangesPlugin(github, 'master', packages, {});
+        const strategies = { 'actions/publish-action': {} };
+        const commits = { 'actions/publish-action': ['simple strategy commits'] };
+        assert.equal(await plugin.preconfigure(strategies, commits, {}), strategies);
+        assert.equal(fetchedHistory, false);
+        assert.deepEqual(commits['actions/publish-action'], ['simple strategy commits']);
+    });
+
     it('rejects truncated initial-release histories rather than quietly omitting changes', async () => {
         const github = {
             async *mergeCommitIterator() {

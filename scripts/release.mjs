@@ -37,12 +37,17 @@ if (
     throw new Error('--component requires --dry-run or --pull-requests-only');
 }
 const load = () => Manifest.fromManifest(github, branch, 'release-please-config.json', '.release-please-manifest.json');
-const outputs = { paths_released: '[]', prs: '[]' };
+const outputs = { paths_released: '[]', action_paths_released: '[]', prs: '[]' };
 
 if (!args.includes('--dry-run') && !args.includes('--pull-requests-only')) {
     const manifest = await load();
     const releases = (await manifest.createReleases()).filter(Boolean);
-    outputs.paths_released = JSON.stringify(releases.map((release) => release.path));
+    outputs.paths_released = JSON.stringify(
+        releases.filter((release) => !release.path.startsWith('actions/')).map((release) => release.path)
+    );
+    outputs.action_paths_released = JSON.stringify(
+        releases.filter((release) => release.path.startsWith('actions/')).map((release) => release.path)
+    );
     for (const release of releases) {
         outputs[`${release.path}--release_created`] = true;
         for (const [name, value] of Object.entries(release)) {

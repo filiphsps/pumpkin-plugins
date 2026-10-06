@@ -27,6 +27,7 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             code: ${{ steps.classify.outputs.code }}
+            actions: ${{ steps.classify.outputs.actions }}
             integration_scope: ${{ steps.classify.outputs.integration_scope }}
             integration_extra: ${{ steps.classify.outputs.integration_extra }}
         steps:
@@ -279,7 +280,25 @@ jobs:
     release:
         name: 🚢 Release
         needs: [changes, build, test, docs, integration]
-        if: needs.changes.outputs.code == 'true' && github.event_name == 'push'
+        if: >-
+            ${{
+              always() &&
+              github.event_name == 'push' &&
+              needs.changes.result == 'success' &&
+              needs.docs.result == 'success' &&
+              (
+                (
+                  needs.changes.outputs.code == 'true' &&
+                  needs.build.result == 'success' &&
+                  needs.test.result == 'success' &&
+                  needs.integration.result == 'success'
+                ) ||
+                (
+                  needs.changes.outputs.code != 'true' &&
+                  needs.changes.outputs.actions != '[]'
+                )
+              )
+            }}
         timeout-minutes: 10
         runs-on: ubuntu-latest
         permissions:
@@ -288,6 +307,7 @@ jobs:
             pull-requests: write
         outputs:
             paths_released: ${{ steps.release.outputs.paths_released }}
+            action_paths_released: ${{ steps.release.outputs.action_paths_released }}
             all: ${{ toJSON(steps.release.outputs) }}
             prs: ${{ steps.release.outputs.prs }}
         steps:
@@ -330,10 +350,9 @@ jobs:
             - name: 📝 Regenerate READMEs
               run: pnpm run readme
 
-            # The pin that forces a first release to 0.0.1 also pins every release after it, and
-            # master fails the release config check while it is there, which takes the release and
-            # attach jobs with it. Drop it on the PR, so the merge push can tag and attach.
-            - name: 🎉 Retire release-as for released plugins
+            # The first-release pin forces version 0.0.1, then must be removed before merge so the
+            # release config check passes and Release Please can handle subsequent versions.
+            - name: 🎉 Retire first-release pins
               run: |
                   node scripts/unpin-release-as.mjs
                   if [ -z "$(git status --porcelain -- release-please-config.json)" ]; then
@@ -343,7 +362,7 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
                   git add -- release-please-config.json
-                  git commit -m "chore: let release-please bump the released plugins"
+                  git commit -m "chore: retire first-release pins"
                   git push
 
             - name: 💾 Commit READMEs to the release PR
@@ -412,7 +431,6 @@ jobs:
             matrix:
                 path: ${{ fromJSON(needs.release.outputs.paths_released) }}
         env:
-            MARKET_API_TOKEN: ${{ secrets.MARKET_API_TOKEN }}
             TAG: ${{ fromJSON(needs.release.outputs.all)[format('{0}--tag_name', matrix.path)] }}
             MARKET_RELEASE_NOTES: ${{ fromJSON(needs.release.outputs.all)[format('{0}--body', matrix.path)] }}
         steps:
@@ -429,7 +447,24 @@ jobs:
                   name: plugins
                   path: dist/
 
-            # A plugin needs a listing before its releases can be uploaded. The script warns and
-            # succeeds when there is no matching listing, so GitHub releases remain unaffected.
-            - name: 🛒 Publish to market.pumpkinmc.org
-              run: node scripts/publish-to-market.mjs "${{ matrix.path }}" "$TAG" "dist/$(basename "${{ matrix.path }}").wasm"
+            - name: 🧾 Resolve Market action inputs
+              id: market
+              env:
+                  PLUGIN_DIRECTORY: ${{ matrix.path }}
+                  RELEASE_TAG: ${{ env.TAG }}
+              run: |
+                  echo "plugin_name=$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")" >> "$GITHUB_OUTPUT"
+                  echo "version=${RELEASE_TAG##*-v}" >> "$GITHUB_OUTPUT"
+                  echo "wasm_file=dist/$(basename "$PLUGIN_DIRECTORY").wasm" >> "$GITHUB_OUTPUT"
+
+            # Missing credentials or a not-yet-published listing produce a warning and leave the
+            # GitHub release intact. API failures still fail this job so it can be retried.
+            - name: 🛒 Publish to Pumpkin Market
+              uses: ./actions/publish-to-pumpkin-market
+              with:
+                  plugin-name: ${{ steps.market.outputs.plugin_name }}
+                  version: ${{ steps.market.outputs.version }}
+                  wasm-file: ${{ steps.market.outputs.wasm_file }}
+                  api-token: ${{ secrets.MARKET_API_TOKEN }}
+                  release-notes: ${{ env.MARKET_RELEASE_NOTES }}
+                  warn: true

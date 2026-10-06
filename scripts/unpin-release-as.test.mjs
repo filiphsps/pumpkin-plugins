@@ -14,10 +14,9 @@ afterEach(() => {
 });
 
 /**
- * Writes a release-please config and the plugin folders it names, where each plugin's `package.json`
- * is at the given version. Returns the path and a reader for the config it wrote.
+ * Writes a release-please config and plugin/action version files. Returns the path and a reader.
  */
-function repo(versions) {
+function repo(versions, actionVersions = {}) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'unpin-'));
     dirs.push(dir);
     const packages = {};
@@ -28,6 +27,11 @@ function repo(versions) {
             path.join(dir, 'packages', name, 'package.json'),
             `${JSON.stringify({ name, version }, null, 4)}\n`
         );
+    }
+    for (const [name, version] of Object.entries(actionVersions)) {
+        packages[`actions/${name}`] = { component: name, 'release-type': 'simple', 'release-as': '0.0.1' };
+        fs.mkdirSync(path.join(dir, 'actions', name), { recursive: true });
+        fs.writeFileSync(path.join(dir, 'actions', name, 'version.txt'), `${version}\n`);
     }
     const config = { 'release-type': 'node', packages };
     fs.writeFileSync(path.join(dir, 'release-please-config.json'), `${JSON.stringify(config, null, 4)}\n`);
@@ -51,6 +55,17 @@ describe('unpin-release-as', () => {
         assert.match(result.out, /Removed "release-as" from packages\/plug \(at 0\.0\.1\)/);
     });
 
+    it('removes the pin from a released action using its version.txt', () => {
+        const { dir, read } = repo({}, { 'publish-action': '0.0.1' });
+        const result = run(dir);
+        assert.ok(result.ok, result.out);
+        assert.deepEqual(read().packages['actions/publish-action'], {
+            component: 'publish-action',
+            'release-type': 'simple'
+        });
+        assert.match(result.out, /actions\/publish-action \(at 0\.0\.1\)/);
+    });
+
     it('leaves the pin on a plugin still at its starting version', () => {
         const { dir, read } = repo({ released: '0.0.3', waiting: '0.0.0' });
         const result = run(dir);
@@ -61,6 +76,17 @@ describe('unpin-release-as', () => {
             'release-as': '0.0.1'
         });
         assert.match(result.out, /No plugin is past its first release|packages\/released/);
+    });
+
+    it('leaves first-release pins on unreleased actions', () => {
+        const { dir, read } = repo({}, { waiting: '0.0.0' });
+        const result = run(dir);
+        assert.ok(result.ok, result.out);
+        assert.deepEqual(read().packages['actions/waiting'], {
+            component: 'waiting',
+            'release-type': 'simple',
+            'release-as': '0.0.1'
+        });
     });
 
     it('changes nothing when there is nothing to retire', () => {

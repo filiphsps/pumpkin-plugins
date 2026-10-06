@@ -61,10 +61,12 @@ export function releaseCommits(commits, paths, lastReleaseSha) {
 export function bundledChangesPlugin(github, branch, packages, releasedVersions, maxCommits = 500) {
     return {
         async preconfigure(strategies, commitsByPath, releasesByPath) {
+            const pluginPaths = Object.keys(strategies).filter((path) => path.startsWith('packages/'));
+            if (pluginPaths.length === 0) return strategies;
             const commits = [];
             const boundaries = new Set();
             let initialRelease = false;
-            for (const path of Object.keys(strategies)) {
+            for (const path of pluginPaths) {
                 const sha = releasesByPath[path]?.sha;
                 if (sha) boundaries.add(sha);
                 else if (releasedVersions[path]?.toString() === '0.0.0') initialRelease = true;
@@ -81,7 +83,7 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
                 boundaries.delete(commit.sha);
                 if (!initialRelease && boundaries.size === 0) break;
             }
-            for (const path of Object.keys(strategies)) {
+            for (const path of pluginPaths) {
                 commitsByPath[path] = releaseCommits(commits, bundledPaths(packages, path), releasesByPath[path]?.sha);
             }
             return strategies;

@@ -26,6 +26,9 @@ function run(args) {
                     createReleases: async () => { record('release'); published = true; return [{
                         path: 'packages/plugin', tagName: 'plugin-v1.0.0',
                         notes: 'Features\\n\\n* Added update checks', url: 'https://example.com/release'
+                    }, {
+                        path: 'actions/publish-action', tagName: 'publish-action-v0.0.1',
+                        notes: 'Features\\n\\n* Add warning mode', url: 'https://example.com/action-release'
                     }]; },
                     createPullRequests: async () => {
                         record('update-pr');
@@ -81,6 +84,7 @@ it('updates PRs without publishing when pull-requests-only is requested', () => 
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(result.calls, ['update-pr']);
     assert.match(result.output, /paths_released<<[^\n]+\n\[\]\n/);
+    assert.match(result.output, /action_paths_released<<[^\n]+\n\[\]\n/);
     assert.match(result.output, /"headBranchName":"release-branch"/);
 });
 
@@ -89,8 +93,11 @@ it('preserves workflow tag and multiline release-note outputs for assets and Mar
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(result.calls, ['release', 'update-pr']);
     assert.match(result.output, /paths_released<<[^\n]+\n\["packages\/plugin"\]\n/);
+    assert.match(result.output, /action_paths_released<<[^\n]+\n\["actions\/publish-action"\]\n/);
     assert.match(result.output, /packages\/plugin--tag_name<<[^\n]+\nplugin-v1\.0\.0\n/);
     assert.match(result.output, /packages\/plugin--body<<[^\n]+\nFeatures\n\n\* Added update checks\n/);
+    assert.match(result.output, /actions\/publish-action--tag_name<<[^\n]+\npublish-action-v0\.0\.1\n/);
+    assert.match(result.output, /actions\/publish-action--body<<[^\n]+\nFeatures\n\n\* Add warning mode\n/);
 });
 
 it('reloads release state after publishing before preparing the remaining PRs', () => {

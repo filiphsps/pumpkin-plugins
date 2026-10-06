@@ -24,6 +24,11 @@
         },
         "packages/upnpumpkin": {
             "component": "upnpumpkin"
+        },
+        "actions/publish-to-pumpkin-market": {
+            "component": "publish-to-pumpkin-market",
+            "release-type": "simple",
+            "release-as": "0.0.1"
         }
     },
     "changelog-sections": [

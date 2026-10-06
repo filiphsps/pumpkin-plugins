@@ -294,6 +294,31 @@ describe('check-release-config', () => {
             packages: { 'packages/plug': { component: 'plug', ...(releaseAs ? { 'release-as': releaseAs } : {}) } }
         }
     });
+    const withAction = (
+        base = files(),
+        { manifest = '0.0.0', releaseAs = '0.0.1', releaseType = 'simple', version = '0.0.0' } = {}
+    ) => ({
+        ...base,
+        'actions/publish-action/action.yml': 'name: Publish\n',
+        'actions/publish-action/README.md': '# Publish action\n',
+        'actions/publish-action/CHANGELOG.md': '# Changelog\n',
+        'actions/publish-action/version.txt': `${version}\n`,
+        '.release-please-manifest.json': {
+            ...base['.release-please-manifest.json'],
+            'actions/publish-action': manifest
+        },
+        'release-please-config.json': {
+            ...base['release-please-config.json'],
+            packages: {
+                ...base['release-please-config.json'].packages,
+                'actions/publish-action': {
+                    component: 'publish-action',
+                    'release-type': releaseType,
+                    ...(releaseAs ? { 'release-as': releaseAs } : {})
+                }
+            }
+        }
+    });
 
     it('passes for an unreleased plugin that is set to release 0.0.1', () => {
         const result = run('check-release-config.mjs', repo(files()));
@@ -328,6 +353,35 @@ describe('check-release-config', () => {
             run('check-release-config.mjs', repo(files({ manifest: '0.0.0', version: '0.0.5' }))).out,
             /must match/
         );
+    });
+
+    it('registers actions as simple release components with matching version.txt entries', () => {
+        const result = run('check-release-config.mjs', repo(withAction()));
+        assert.ok(result.ok, result.out);
+        assert.match(result.out, /1 plugin and 1 action/);
+
+        const wrongType = run('check-release-config.mjs', repo(withAction(files(), { releaseType: 'node' })));
+        assert.match(wrongType.out, /needs "release-type": "simple"/);
+
+        const wrongVersion = run('check-release-config.mjs', repo(withAction(files(), { version: '0.0.2' })));
+        assert.match(wrongVersion.out, /version\.txt is "0\.0\.2"/);
+    });
+
+    it('requires and retires the first-release pin for actions', () => {
+        const noPin = run('check-release-config.mjs', repo(withAction(files(), { releaseAs: null })));
+        assert.match(noPin.out, /actions\/publish-action has not been released yet.*release-as/);
+
+        const released = run(
+            'check-release-config.mjs',
+            repo(withAction(files(), { manifest: '0.0.1', version: '0.0.1' }))
+        );
+        assert.match(released.out, /actions\/publish-action is released.*remove "release-as"/);
+
+        const releasedWithoutPin = run(
+            'check-release-config.mjs',
+            repo(withAction(files(), { manifest: '0.0.1', releaseAs: null, version: '0.0.1' }))
+        );
+        assert.ok(releasedWithoutPin.ok, releasedWithoutPin.out);
     });
 
     it('requires independent release PRs that refresh even when release notes are unchanged', () => {

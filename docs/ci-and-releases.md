@@ -1,36 +1,38 @@
 # CI and releases
 
-Everything is in `.github/workflows/ci.yml`. The shared setup (pnpm, Node, install, Turborepo
-cache) is the composite action in `.github/common/bootstrap`.
+The plugin and release jobs are in `.github/workflows/ci.yml`; action tests have their own
+`.github/workflows/actions.yml`, scoped to changes under `actions/`. The shared setup (pnpm, Node,
+install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 
 ## Jobs
 
 | Job | Runs | What |
 | --- | --- | --- |
-| 🔍 Changed files | always | Works out whether the change can affect a build, a test or a plugin, which is what the code jobs below wait for |
+| 🔍 Changed files | always | Separates plugin/repository code from changed action directories and documentation |
 | 💬 Commit messages | PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
-| 🧪 Test | code changes | Unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and the tests of the repo checks and agent hooks (`pnpm test:scripts`) |
+| 🧪 Test | plugin or repository code changes | Unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
+| 🧪 Action tests | action code changes | `.github/workflows/actions.yml` tests only the changed action directory |
 | 📝 Docs and config | always | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after lint and typecheck | Builds every plugin and uploads them as an artifact |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin with `pnpm gen` and typechecks, builds and integration-tests it |
-| 🚢 Release | code changes, on `master` pushes, after the checks | Runs release-please |
-| 📝 Prepare release PR | per created or updated release PR | Keeps every release PR's READMEs and `release-as` pins current |
+| 🚢 Release | plugin or action release changes, on `master` pushes | Runs release-please; action releases create a versioned tag and GitHub release without a plugin artifact |
+| 📝 Prepare release PR | per created or updated release PR | Keeps plugin READMEs and first-release pins for plugins and actions current |
 | 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, uploads the `.wasm`, then updates an existing Market listing |
 
 ## Running only what a change needs
 
-`scripts/changed-areas.mjs`, in the `🔍 Changed files` job, diffs the change against what came
-before it (the base of the pull request, or the push's `before` commit) and calls a changed file
-documentation when it ends in `.md`, sits under `docs/`, or is the `LICENSE`. Nothing that builds,
-tests or ships reads those, so a change touching only them skips lint, typecheck, tests, the build,
-integration and the generator. A docs commit costs a checkout, the docs job and the commit lint
-instead of the whole suite.
+`scripts/changed-areas.mjs` diffs the change against what came before it (the pull request base or
+the push's `before` commit). Markdown, `docs/` and `LICENSE` changes are documentation. Changes
+under `actions/{name}/` are reported separately from plugin and repository code. An action-only
+change skips the plugin build, integration suites and repository test jobs; the Actions workflow
+tests only that action when its code changes. README, changelog and version-file-only changes skip
+action tests. A docs-only change skips the code jobs and action tests.
 
-Everything else is a change to code and runs the code jobs, including changes under `tools/`,
-`scripts/` and `.github/`, and deletions. Integration tests narrow to changed plugin packages and
+Everything else outside `actions/` is a change to repository code and runs the code jobs, including
+changes under `tools/`, `scripts/` and `.github/`, and deletions. Integration tests narrow to changed plugin packages and
 their dependents when all code changes are within plugin or runtime-tool packages; repo-level
 changes run the full integration suite. Biome, the type checker and the tests read none of the
 documentation files, so a docs-only change cannot fail them.
@@ -38,9 +40,9 @@ documentation files, so a docs-only change cannot fail them.
 Two jobs never skip. `📝 Docs and config` is what keeps the docs true, so it has to run on the
 commits that change them. `💬 Commit messages` is cheap and belongs on every pull request.
 
-Skipping the release job on a docs-only push costs nothing. release-please only releases a plugin
-with releasable changes to its code or bundled dependencies, and merging a release PR is a commit of its own
-that bumps `package.json`, so the push that has to release is never a docs-only change.
+On a push, the release job waits for plugin checks when plugin/repository code changed, or for the
+docs/config check when only actions changed. Release Please only releases a component with
+releasable changes, so running it for changed action code does not create an empty release.
 
 Know this before narrowing a job further: a skipped job takes every job that needs it with it, so no
 job can be gated on less than the jobs below it. Gating `📋 Lint` without `🔨 Build` would leave a
@@ -61,13 +63,17 @@ Changes to the dependency catalog or shared TypeScript configuration count for e
 ## Releases
 
 On `master`, once the checks pass, [release-please](https://github.com/googleapis/release-please)
-keeps an independent release PR up to date for each plugin with releasable conventional commits.
-Merging one:
+keeps an independent release PR up to date for each plugin or action with releasable conventional
+commits. Merging a plugin release PR:
 
 - bumps each changed plugin's version and changelog,
 - tags it `<folder>-v<version>` and creates its GitHub release,
 - attaches `<folder>.wasm` and `<folder>.wasm.sha256`, taken from the artifact the build job made
   in the same run.
+
+Merging an action release PR updates its `version.txt` and `CHANGELOG.md`, tags it
+`<folder>-v<version>`, and creates a GitHub release. Action releases do not run plugin packaging,
+attach WebAssembly files, or publish to Pumpkin Market.
 
 The merge of a release PR is a commit of its own, so the push it triggers starts a run while the run
 for the commit before the merge can still be going. Whichever reaches the release job first creates
@@ -84,9 +90,9 @@ a later release run can miss the previous release and recreate its changelog. Th
 keeps `force-tag-creation` enabled, and the repository check enforces it.
 
 Each time release-please creates or updates release PRs, a separate matrix job prepares every returned
-PR branch. It regenerates the READMEs
-and pushes a `docs: update generated READMEs` commit to the PR branch, so they are current when the
-release merges. The same run retires the `release-as` pin of any plugin the PR releases (see below).
+PR branch. It regenerates plugin READMEs and pushes a `docs: update generated READMEs` commit to the
+PR branch, so they are current when the release merges. The same run retires the `release-as` pin of
+any plugin or action the PR releases (see below).
 release-please rewrites its branch on every update, so those commits are re-added each time.
 
 Release PRs refresh on every release run, even when their release notes are unchanged.
@@ -110,7 +116,7 @@ To preview without changing GitHub, set `GITHUB_REPOSITORY` and `RELEASE_PLEASE_
 pnpm --package=release-please@17.11.2 dlx -c 'node scripts/release.mjs --dry-run "$(command -v release-please)"'
 ```
 
-Add `--component=<folder>` to preview one plugin. `--pull-requests-only` updates release PRs without
+Add `--component=<name>` to preview one plugin or action. `--pull-requests-only` updates release PRs without
 creating tags or GitHub releases.
 
 ## Signing
@@ -177,6 +183,26 @@ both automatically. If you ever create a plugin by hand, do these three things:
    `bump-patch-for-minor-pre-major`, so after the first release a `feat` or `fix` bumps the patch
    while a plugin is below 1.0.0, and only a breaking change bumps the minor.
 
+## Registering an action for releases
+
+Each directory under `actions/` with an `action.yml` or `action.yaml` is an independent release
+component. Register it under `packages` in `release-please-config.json` with its folder as the
+component, the `simple` release strategy, and a first-release pin:
+
+```json
+"actions/my-action": {
+  "component": "my-action",
+  "release-type": "simple",
+  "release-as": "0.0.1"
+}
+```
+
+Add `actions/my-action/version.txt` with `0.0.0`, a `CHANGELOG.md`, and the same path at version
+`0.0.0` in `.release-please-manifest.json`. Release Please updates the version file and changelog;
+the repository check enforces that the action version, manifest and config stay aligned. Its tag is
+`my-action-v<version>`. The release PR job removes `release-as` after the first version is set,
+just as it does for plugins.
+
 ## Repo checks
 
 `pnpm check` runs three scripts, each of which says exactly what is wrong. CI runs it in the
@@ -185,7 +211,7 @@ generator and the checks can't drift:
 
 | Script | Fails when |
 | --- | --- |
-| `scripts/check-release-config.mjs` | a plugin is missing from either release-please file, `component` isn't the folder name, the manifest and `package.json` versions disagree, an unreleased plugin lacks `release-as: 0.0.1`, or a released one still has it |
+| `scripts/check-release-config.mjs` | a plugin or action is missing from either release-please file, an action is not using the `simple` strategy, `component` isn't the folder name, the manifest and package/version file disagree, an unreleased component lacks `release-as: 0.0.1`, or a released one still has it |
 | `scripts/package-metadata.mjs` | a `package.json` lacks the license, author, contributors, homepage, repository, bugs, funding or a short description, or a library lacks `sideEffects`, `module`, `types`, `files` and `publishConfig`. `--fix` writes everything but the description |
 | `scripts/check-docs.mjs` | a package has no README, a link, heading or path in the docs doesn't exist, a `pnpm` command isn't a script, a doc page isn't in the docs index, a root script isn't documented, or a CI job isn't in the table above |
 
@@ -196,16 +222,29 @@ and throwaway repos. See "Docs match the code" in
 
 ## Publishing to market.pumpkinmc.org
 
-After the GitHub release assets are attached, the `market` job uploads the exact `.wasm` from the
-build artifact to the matching existing Market listing. It calls `PUT /api/plugins/<id>`
-with bearer authentication and multipart `wasm` and `metadata` fields. The metadata sets the
-release version, stable track and the per-plugin Release Please changelog. Builds aren't
-byte-reproducible, so it must upload the build artifact rather than rebuild.
+The reusable composite action lives in
+[`actions/publish-to-pumpkin-market/`](../actions/publish-to-pumpkin-market/README.md); each action
+in this monorepo has its own directory, metadata and README. Other repositories can use a published
+version with
+`uses: filiphsps/pumpkin-plugins/actions/publish-to-pumpkin-market@publish-to-pumpkin-market-v0.0.1`.
+The action accepts the exact Pumpkin plugin name, version, `.wasm` path, optional track and release
+notes, a Market API token, and an optional API URL. It calls `PUT /api/plugins/<id>` with bearer
+authentication and multipart `wasm` and `metadata` fields, using the file it receives without
+rebuilding it. The runner needs Node 20 or newer.
 
-The job identifies a listing by its exact Pumpkin plugin name from `src/info.ts`. It never creates a
-listing: listing metadata and review happen in Market. If the plugin is not listed, has not yet
-been published there, or the token is not configured, the job emits a warning and succeeds so the
-GitHub release is unaffected. Other Market API failures fail the job and can be retried.
+In this repo, the `market` job downloads the `.wasm` produced by the build job, resolves the plugin's
+canonical name from `src/info.ts`, and passes the per-plugin Release Please version and changelog to
+the action using its local path. Builds aren't byte-reproducible, so the job must upload the artifact
+rather than rebuild.
+
+The action looks up the canonical plugin name using PPM's flow: try the direct plugin endpoint, then
+search a limited result set and require an exact name match. It never creates a listing: listing
+metadata and review happen in Market. If the plugin is not listed, has not yet been published there,
+or the token is not configured, the action fails by default. Set `warn: true` to emit a warning and
+continue; this repository opts into that mode so GitHub releases remain independent of Market
+listing and credential availability. Other Market API failures always fail the job and can be
+retried. See the
+[action README](../actions/publish-to-pumpkin-market/README.md#inputs) for its complete input list.
 
 ## GitHub settings
 

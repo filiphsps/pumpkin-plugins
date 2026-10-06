@@ -1,4 +1,4 @@
-// Fails if a plugin under packages/ isn't set up for releases, and says exactly what to add.
+// Fails if a plugin or action isn't set up for releases, and says exactly what to add.
 // See "Registering a plugin for releases" in docs/ci-and-releases.md.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -7,6 +7,7 @@ const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirnam
 const read = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
 const config = read('release-please-config.json');
 const manifest = read('.release-please-manifest.json');
+const problems = [];
 
 const plugins = fs
     .readdirSync(path.join(root, 'packages'), { withFileTypes: true })
@@ -17,13 +18,41 @@ const plugins = fs
             fs.existsSync(path.join(root, 'packages', d.name, 'package.json'))
     )
     .map((d) => `packages/${d.name}`);
+const actions = fs.existsSync(path.join(root, 'actions'))
+    ? fs
+          .readdirSync(path.join(root, 'actions'), { withFileTypes: true })
+          .filter(
+              (d) =>
+                  d.isDirectory() &&
+                  !d.name.startsWith('_') &&
+                  (fs.existsSync(path.join(root, 'actions', d.name, 'action.yml')) ||
+                      fs.existsSync(path.join(root, 'actions', d.name, 'action.yaml')))
+          )
+          .map((d) => `actions/${d.name}`)
+    : [];
+for (const dir of actions) {
+    for (const file of ['README.md', 'CHANGELOG.md', 'version.txt']) {
+        if (!fs.existsSync(path.join(root, dir, file))) problems.push(`${dir}/${file} is missing`);
+    }
+}
+const components = new Map([
+    ...plugins.map((dir) => [dir, { type: 'plugin', version: read(`${dir}/package.json`).version }]),
+    ...actions.map((dir) => [
+        dir,
+        {
+            type: 'action',
+            version: fs.existsSync(path.join(root, dir, 'version.txt'))
+                ? fs.readFileSync(path.join(root, dir, 'version.txt'), 'utf8').trim()
+                : ''
+        }
+    ])
+]);
 
 const FIRST_VERSION_BASE = '0.0.0';
 const FIRST_RELEASE = '0.0.1';
 
-const problems = [];
 if (config['separate-pull-requests'] !== true) {
-    problems.push('release-please-config.json needs "separate-pull-requests": true for independent plugin releases');
+    problems.push('release-please-config.json needs "separate-pull-requests": true for independent component releases');
 }
 if (config['always-update'] !== true) {
     problems.push('release-please-config.json needs "always-update": true so remaining release PRs follow master');
@@ -33,9 +62,8 @@ if (config['force-tag-creation'] !== true) {
         'release-please-config.json needs "force-tag-creation": true so the next run finds the previous release'
     );
 }
-for (const dir of plugins) {
+for (const [dir, { type, version }] of components) {
     const name = path.basename(dir);
-    const version = read(`${dir}/package.json`).version;
 
     const entry = config.packages?.[dir];
     if (!entry) {
@@ -47,8 +75,11 @@ for (const dir of plugins) {
             `${dir} needs "component": "${name}" in release-please-config.json (it becomes the tag prefix, ${name}-v<version>)`
         );
     }
+    if (type === 'action' && entry?.['release-type'] !== 'simple') {
+        problems.push(`${dir} needs "release-type": "simple" in release-please-config.json`);
+    }
 
-    // The first release of every plugin is 0.0.1. `release-as` forces that whatever the first commits are
+    // The first release of every component is 0.0.1. `release-as` forces that whatever the first commits are
     // (a breaking change would otherwise make it 0.1.0), but it also pins every later release, so it
     // has to go as soon as the plugin has been released.
     const releaseAs = entry?.['release-as'];
@@ -66,19 +97,22 @@ for (const dir of plugins) {
         problems.push(`${dir} is not in .release-please-manifest.json. Add "${dir}": "${version}"`);
     } else if (manifest[dir] !== version) {
         problems.push(
-            `.release-please-manifest.json has "${dir}": "${manifest[dir]}" but ${dir}/package.json is "${version}". They must match: release-please updates both on every release`
+            `.release-please-manifest.json has "${dir}": "${manifest[dir]}" but ${type === 'action' ? `${dir}/version.txt` : `${dir}/package.json`} is "${version}". They must match: release-please updates both on every release`
         );
     }
 }
 for (const dir of Object.keys(config.packages ?? {})) {
-    if (!plugins.includes(dir)) problems.push(`release-please-config.json lists ${dir}, which is not a package`);
+    if (!components.has(dir)) problems.push(`release-please-config.json lists ${dir}, which is not a plugin or action`);
 }
 for (const dir of Object.keys(manifest)) {
-    if (!plugins.includes(dir)) problems.push(`.release-please-manifest.json lists ${dir}, which is not a package`);
+    if (!components.has(dir))
+        problems.push(`.release-please-manifest.json lists ${dir}, which is not a plugin or action`);
 }
 
 if (problems.length) {
     console.error(problems.map((p) => `- ${p}`).join('\n'));
     process.exit(1);
 }
-console.log(`Release config covers ${plugins.length} plugin(s): ${plugins.join(', ')}`);
+console.log(
+    `Release config covers ${plugins.length} plugin${plugins.length === 1 ? '' : 's'} and ${actions.length} action${actions.length === 1 ? '' : 's'}: ${[...components.keys()].join(', ')}`
+);
