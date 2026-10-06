@@ -4,5 +4,5 @@
     "packages/distant-horizons-support-pumpkin": "0.0.2",
     "packages/dynamic-lights-pumpkin": "0.0.4",
     "packages/upnpumpkin": "0.0.3",
-    "actions/publish-to-pumpkin-market": "0.0.0"
+    "actions/publish-to-pumpkin-market": "0.0.1"
 }
