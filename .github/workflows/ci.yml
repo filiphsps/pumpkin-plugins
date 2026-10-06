@@ -353,7 +353,7 @@ jobs:
             paths_released: ${{ steps.release.outputs.paths_released }}
             action_paths_released: ${{ steps.release.outputs.action_paths_released }}
             all: ${{ toJSON(steps.release.outputs) }}
-            prs: ${{ steps.release.outputs.prs }}
+            prs: ${{ steps.release-prs.outputs.prs }}
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -368,8 +368,19 @@ jobs:
                   RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
               run: pnpm --package=release-please@17.11.2 dlx -c 'node scripts/release.mjs "$(command -v release-please)"'
 
+            - name: 📋 Find open release PRs to prepare
+              id: release-prs
+              env:
+                  GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+                  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+              run: |
+                  prefix="release-please--branches--${DEFAULT_BRANCH}--components--"
+                  prs="$(gh pr list --state open --base "$DEFAULT_BRANCH" --limit 1000 --json headRefName \
+                      | jq --compact-output --arg prefix "$prefix" '[.[] | select(.headRefName | startswith($prefix))]')"
+                  echo "prs=$prs" >> "$GITHUB_OUTPUT"
+
     release-pr:
-        name: 📝 Prepare release PR ${{ matrix.pr.headBranchName }}
+        name: 📝 Prepare release PR ${{ matrix.pr.headRefName }}
         needs: [release]
         if: ${{ needs.release.outputs.prs != '' && needs.release.outputs.prs != '[]' }}
         timeout-minutes: 10
@@ -385,7 +396,7 @@ jobs:
             - name: 🕶️ Checkout release PR branch
               uses: actions/checkout@v7.0.1
               with:
-                  ref: ${{ matrix.pr.headBranchName }}
+                  ref: ${{ matrix.pr.headRefName }}
                   token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
             - name: 🚀 Bootstrap

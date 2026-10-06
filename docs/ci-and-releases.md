@@ -20,7 +20,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin and action, checks release registration and READMEs, tests the action, then typechecks, builds and integration-tests the plugin |
 | 🚢 Release | plugin or action release changes, on `master` pushes | Runs release-please; action releases create a versioned tag and GitHub release without a plugin artifact |
-| 📝 Prepare release PR | per created or updated release PR | Keeps plugin READMEs, action README examples and first-release pins for plugins and actions current |
+| 📝 Prepare release PR | all open release PRs on release runs | Keeps plugin READMEs, action README examples and first-release pins for plugins and actions current |
 | 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs the exact build artifact, uploads it, then updates an existing Market listing |
 | 🧹 Cleanup artifacts | after successful consumers | Deletes integration and release handoff artifacts after their last use |
 
@@ -99,10 +99,11 @@ Release Please creates a tag immediately, including while a GitHub release is a 
 a later release run can miss the previous release and recreate its changelog. The release config
 keeps `force-tag-creation` enabled, and the repository check enforces it.
 
-Each time release-please creates or updates release PRs, a separate matrix job prepares every returned
-PR branch. It regenerates plugin READMEs and updates the versioned example tag in every action README
-from that action's Release Please manifest entry. For an action that has not had its first release,
-the README uses its `release-as` version instead of `0.0.0`. The job pushes a
+After each Release Please run, a separate matrix job finds every open component release PR and
+prepares its branch, including branches Release Please did not return as changed. It regenerates
+plugin READMEs and updates the versioned example tag in every action README from that action's
+Release Please manifest entry. For an action that has not had its first release, the README uses its
+`release-as` version instead of `0.0.0`. The job pushes a
 `docs: update generated READMEs` commit to the PR branch, so examples are current when the release
 merges. The same run retires the `release-as` pin of any plugin or action the PR releases (see below).
 release-please rewrites its branch on every update, so those commits are re-added each time.
