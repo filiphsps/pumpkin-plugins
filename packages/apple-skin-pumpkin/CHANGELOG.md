@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.4](https://github.com/filiphsps/pumpkin-plugins/compare/apple-skin-pumpkin-v0.0.3...apple-skin-pumpkin-v0.0.4) (2026-10-06)
+
+
+### Features
+
+* **actions:** add signing action and generated catalog ([43e941c](https://github.com/filiphsps/pumpkin-plugins/commit/43e941ce09f5f5d3457f87f3cd7ad88bdaea4da4))
+* **testing:** add workspace coverage reports ([8db42a8](https://github.com/filiphsps/pumpkin-plugins/commit/8db42a870f5bc2526890f3144b80308dc9bab006))
+
+
+### Bug Fixes
+
+* **build:** preserve artifact backup on rollback failure ([0f30c46](https://github.com/filiphsps/pumpkin-plugins/commit/0f30c4625a7a66c6e3442a648ca5c1aabbbecf44))
+* **build:** retain type backup on rollback failure ([4bbeea0](https://github.com/filiphsps/pumpkin-plugins/commit/4bbeea03110d06372df608fc46e008ca991aee3a))
+
 ## [0.0.3](https://github.com/filiphsps/pumpkin-plugins/compare/apple-skin-pumpkin-v0.0.2...apple-skin-pumpkin-v0.0.3) (2026-10-05)
 
 
