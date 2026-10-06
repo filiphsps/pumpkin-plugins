@@ -1,8 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
+import { MemoryFiles } from '@pumpkin-plugins/plugin-kit/testing';
 import { builtPluginPath, type PumpkinInstance, startPumpkin } from '@pumpkin-plugins/test-harness';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { info } from '../src/info.ts';
+import { LodCache } from '../src/lod/cache.ts';
 
 describe(info.name, () => {
     let server: PumpkinInstance;
@@ -62,6 +64,40 @@ describe(info.name, () => {
             expect(config).toContain('memory_cache_entries = 512');
             expect(config).toContain('disk_cache_entries = 512');
             expect(config).not.toMatch(/^cache_entries =/m);
+            expect(custom.errors()).toEqual([]);
+        } finally {
+            await custom.stop();
+        }
+    });
+    it('finds and clears persisted LOD entries through Pumpkin’s data folder', async () => {
+        const files = new MemoryFiles();
+        const cache = new LodCache(files, 0, 4096);
+        const key = 'integration-world:0:0';
+        cache.put(key, { updated: 1234, data: new Uint8Array(64).fill(7) });
+        const fileName = files.list('cache')[0];
+        if (!fileName) throw new Error('Cache fixture was not persisted');
+        const content = files.readFile(`cache/${fileName}`);
+        const custom = await startPumpkin({
+            name: 'distant-horizons-disk-cache',
+            plugins: [builtPluginPath(process.cwd())],
+            files: {
+                [`plugins/data/${info.name}/config.toml`]: '[support]\nmemory_cache_entries = 0\n',
+                [`plugins/data/${info.name}/cache/${fileName}`]: content
+            }
+        });
+        try {
+            await custom.waitForLog(new RegExp(`Loaded ${info.name}`));
+            const cachePath = path.join(custom.pluginDataDir(info.name), 'cache', fileName);
+            expect(new Uint8Array(await readFile(cachePath))).toEqual(content);
+
+            const statusFrom = custom.lines.length;
+            custom.command('dhs cache status');
+            await custom.waitForLog(/Disk cache: 1\/4096 entries, \d+ bytes\./, 5000, statusFrom);
+
+            const clearFrom = custom.lines.length;
+            custom.command('dhs cache disk clear');
+            await custom.waitForLog(/Cleared 1 disk cache entries\./, 5000, clearFrom);
+            await expect(readFile(cachePath)).rejects.toMatchObject({ code: 'ENOENT' });
             expect(custom.errors()).toEqual([]);
         } finally {
             await custom.stop();

@@ -177,12 +177,16 @@ describe('DH sessions', () => {
         expect(f.reads()).toBe(4096);
         expect(f.ids().at(-1)).toBe(8);
         expect(f.ids()).toContain(10);
+        const diskCache = new LodCache(f.files, 0, f.settings.disk_cache_entries);
+        const restarted = new Sessions(f.settings, diskCache, new MemoryLogger(), () => 1000);
         f.sent.length = 0;
-        f.sessions.receive(f.peer, f.request(2, 'world', 0, 1000));
-        f.sessions.tick(f.peers);
+        restarted.receive(f.peer, packet(3).string(f.peer.dimension).finish());
+        f.sent.length = 0;
+        restarted.receive(f.peer, f.request(2));
+        restarted.tick(f.peers);
         expect(f.reads()).toBe(4096);
-        expect(f.ids()).toEqual([8]);
-        expect(f.sent[0]?.at(-1)).toBe(0);
+        expect(f.ids()).toContain(10);
+        expect(f.ids().at(-1)).toBe(8);
         expect(f.files.list('cache')).toHaveLength(1);
     });
     it('falls back to a saved capture when an expired section is no longer loaded', () => {
