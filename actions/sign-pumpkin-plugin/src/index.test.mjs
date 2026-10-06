@@ -36,11 +36,11 @@ function run(dir, inputs = {}) {
         cwd: dir,
         env: {
             ...process.env,
-            INPUT_PLUGIN_NAME: 'TestPlugin',
+            'INPUT_PLUGIN-NAME': 'TestPlugin',
             INPUT_VERSION: '1.2.3',
-            INPUT_WASM_FILE: 'plugin.wasm',
-            INPUT_DEVELOPER_NAME: 'Test Developer',
-            INPUT_SIGNING_KEY: SEED,
+            'INPUT_WASM-FILE': 'plugin.wasm',
+            'INPUT_DEVELOPER-NAME': 'Test Developer',
+            'INPUT_SIGNING-KEY': SEED,
             INPUT_WARN: 'false',
             ...inputs
         },
@@ -82,10 +82,10 @@ describe('sign-pumpkin-plugin action', () => {
         );
 
         const result = run(dir, {
-            INPUT_PLUGIN_NAME: '',
+            'INPUT_PLUGIN-NAME': '',
             INPUT_VERSION: '',
-            INPUT_WASM_FILE: '',
-            INPUT_PLUGINS_MANIFEST: 'plugins.json'
+            'INPUT_WASM-FILE': '',
+            'INPUT_PLUGINS-MANIFEST': 'plugins.json'
         });
 
         assert.ok(result.ok, result.out);
@@ -110,10 +110,10 @@ describe('sign-pumpkin-plugin action', () => {
         fs.writeFileSync(path.join(dir, 'plugins.json'), JSON.stringify([{}]));
 
         const result = run(dir, {
-            INPUT_PLUGIN_NAME: '',
+            'INPUT_PLUGIN-NAME': '',
             INPUT_VERSION: '',
-            INPUT_WASM_FILE: '',
-            INPUT_PLUGINS_MANIFEST: 'plugins.json'
+            'INPUT_WASM-FILE': '',
+            'INPUT_PLUGINS-MANIFEST': 'plugins.json'
         });
 
         assert.equal(result.ok, false);
@@ -124,7 +124,7 @@ describe('sign-pumpkin-plugin action', () => {
     it('fails on an empty key by default without changing the file', () => {
         const { dir, wasmFile, original } = fixture();
 
-        const result = run(dir, { INPUT_SIGNING_KEY: '' });
+        const result = run(dir, { 'INPUT_SIGNING-KEY': '' });
         assert.equal(result.ok, false);
         assert.match(result.out, /signing-key input is empty/);
         assert.deepEqual(fs.readFileSync(wasmFile), original);
@@ -133,7 +133,7 @@ describe('sign-pumpkin-plugin action', () => {
     it('warns and leaves the file unchanged when an empty key is explicitly optional', () => {
         const { dir, wasmFile, original } = fixture();
 
-        const result = run(dir, { INPUT_SIGNING_KEY: '', INPUT_WARN: 'true' });
+        const result = run(dir, { 'INPUT_SIGNING-KEY': '', INPUT_WARN: 'true' });
         assert.ok(result.ok, result.out);
         assert.match(result.out, /::warning title=Plugin is unsigned::/);
         assert.deepEqual(fs.readFileSync(wasmFile), original);
@@ -142,7 +142,7 @@ describe('sign-pumpkin-plugin action', () => {
     it('rejects a malformed key without changing the file', () => {
         const { dir, wasmFile, original } = fixture();
 
-        const result = run(dir, { INPUT_SIGNING_KEY: 'not-a-key', INPUT_WARN: 'true' });
+        const result = run(dir, { 'INPUT_SIGNING-KEY': 'not-a-key', INPUT_WARN: 'true' });
         assert.equal(result.ok, false);
         assert.match(result.out, /invalid signing key/);
         assert.deepEqual(fs.readFileSync(wasmFile), original);
