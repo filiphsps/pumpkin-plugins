@@ -67,4 +67,4 @@ jobs:
             - name: 🧪 Test action
               env:
                   ACTION_NAME: ${{ matrix.action }}
-              run: node --test actions/"$ACTION_NAME"/test/*.test.mjs
+              run: node --test actions/"$ACTION_NAME"/src/*.test.mjs

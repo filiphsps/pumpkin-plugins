@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 
 const testDir = import.meta.dirname;
-const publisher = path.resolve(testDir, '..', 'publish-to-market.mjs');
+const publisher = path.resolve(testDir, 'index.mjs');
 const dirs = [];
 afterEach(() => {
     for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });

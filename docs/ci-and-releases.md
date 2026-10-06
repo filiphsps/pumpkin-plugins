@@ -13,7 +13,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
 | 🧪 Test | plugin or repository code changes | Unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
-| 🧪 Action tests | action code changes | `.github/workflows/actions.yml` tests only the changed action directory |
+| 🧪 Action tests | action code changes | `.github/workflows/actions.yml` tests only the changed action, with `*.test.*` files co-located in `actions/{name}/src/` |
 | 📝 Docs and config | always | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after lint and typecheck | Builds every plugin and uploads them as an artifact |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
@@ -28,8 +28,9 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 the push's `before` commit). Markdown, `docs/` and `LICENSE` changes are documentation. Changes
 under `actions/{name}/` are reported separately from plugin and repository code. An action-only
 change skips the plugin build, integration suites and repository test jobs; the Actions workflow
-tests only that action when its code changes. README, changelog and version-file-only changes skip
-action tests. A docs-only change skips the code jobs and action tests.
+tests only that action when its code changes. Action tests live beside their implementation in
+`actions/{name}/src/*.test.mjs`. README, changelog and version-file-only changes skip action tests.
+A docs-only change skips the code jobs and action tests.
 
 Everything else outside `actions/` is a change to repository code and runs the code jobs, including
 changes under `tools/`, `scripts/` and `.github/`, and deletions. Integration tests narrow to changed plugin packages and

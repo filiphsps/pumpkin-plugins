@@ -46,4 +46,4 @@ runs:
               INPUT_TRACK: ${{ inputs.track }}
               INPUT_RELEASE_NOTES: ${{ inputs.release-notes }}
               INPUT_WARN: ${{ inputs.warn }}
-          run: node "$GITHUB_ACTION_PATH/publish-to-market.mjs"
+          run: node "$GITHUB_ACTION_PATH/src/index.mjs"
