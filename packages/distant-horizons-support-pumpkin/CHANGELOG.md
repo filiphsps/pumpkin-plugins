@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.0.2](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.1...distant-horizons-support-pumpkin-v0.0.2) (2026-10-06)
+
+
+### Features
+
+* **distant-horizons:** add cache commands ([a2b2706](https://github.com/filiphsps/pumpkin-plugins/commit/a2b2706edff0b8c5596c9846ffcfa53aaf8818b1))
+* **distant-horizons:** split cache tiers ([46c3a52](https://github.com/filiphsps/pumpkin-plugins/commit/46c3a521d05b6d43d2f1be5b2e138b54c887d913))
+* **testing:** add workspace coverage reports ([8db42a8](https://github.com/filiphsps/pumpkin-plugins/commit/8db42a870f5bc2526890f3144b80308dc9bab006))
+
+
+### Bug Fixes
+
+* **build:** preserve artifact backup on rollback failure ([0f30c46](https://github.com/filiphsps/pumpkin-plugins/commit/0f30c4625a7a66c6e3442a648ca5c1aabbbecf44))
+* **build:** retain type backup on rollback failure ([4bbeea0](https://github.com/filiphsps/pumpkin-plugins/commit/4bbeea03110d06372df608fc46e008ca991aee3a))
+* **distant-horizons:** handle negative limits ([4345e01](https://github.com/filiphsps/pumpkin-plugins/commit/4345e01f059c883f19a5a9d1c0b57fce7857a70f))
+* **lint:** clear warnings from checks ([42fe3f3](https://github.com/filiphsps/pumpkin-plugins/commit/42fe3f3d95f9ca4dbe00d4645eeb98ab33435b34))
+
+
+### Performance Improvements
+
+* **distant-horizons-support:** speed up cached LOD transfers ([8810a58](https://github.com/filiphsps/pumpkin-plugins/commit/8810a58b968c5fc3dde273902a5d203530205965))
+
 ## 0.0.1 (2026-10-05)
 
 
