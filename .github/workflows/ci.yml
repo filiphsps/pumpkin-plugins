@@ -111,7 +111,7 @@ jobs:
               run: pnpm run coverage
 
             - name: ☂️ Upload coverage
-              uses: codecov/codecov-action@v7.0.0
+              uses: codecov/codecov-action@v7.1.1
               with:
                   directory: .
                   flags: unittests
