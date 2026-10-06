@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.5](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.0.4...upnpumpkin-v0.0.5) (2026-10-06)
+
+
+### Features
+
+* **actions:** add signing action and generated catalog ([43e941c](https://github.com/filiphsps/pumpkin-plugins/commit/43e941ce09f5f5d3457f87f3cd7ad88bdaea4da4))
+
 ## [0.0.4](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.0.3...upnpumpkin-v0.0.4) (2026-10-06)
 
 
