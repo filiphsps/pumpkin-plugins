@@ -5,7 +5,7 @@ This action signs files in place; it does not build the plugins.
 
 ```yaml
 steps:
-  - uses: filiphsps/pumpkin-plugins/actions/sign-pumpkin-plugin@sign-pumpkin-plugin-v0.0.1
+  - uses: filiphsps/pumpkin-plugins/actions/sign-pumpkin-plugin@sign-pumpkin-plugin-v0.0.2
     with:
       plugin-name: MyPlugin
       version: 1.2.3
