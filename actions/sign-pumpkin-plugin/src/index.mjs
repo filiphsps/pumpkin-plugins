@@ -10,6 +10,7 @@ const wasmFile = input('WASM_FILE').trim();
 const developerName = input('DEVELOPER_NAME').trim();
 const signingKey = input('SIGNING_KEY').trim();
 const warnOnMissingKey = input('WARN').trim().toLowerCase() === 'true';
+const pluginsManifest = input('PLUGINS_MANIFEST').trim();
 
 try {
     signRelease();
@@ -20,16 +21,47 @@ try {
 }
 
 function signRelease() {
-    if (!pluginName) throw new Error('plugin-name is required');
-    if (!version) throw new Error('version is required');
-    if (!wasmFile) throw new Error('wasm-file is required');
     if (!developerName) throw new Error('developer-name is required');
 
-    const file = path.resolve(process.cwd(), wasmFile);
+    if (pluginsManifest) {
+        if (pluginName || version || wasmFile) {
+            throw new Error('plugins-manifest cannot be combined with plugin-name, version, or wasm-file');
+        }
+        const manifestFile = path.resolve(process.cwd(), pluginsManifest);
+        const plugins = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+        if (!Array.isArray(plugins) || plugins.length === 0) {
+            throw new Error(`plugins-manifest must contain a non-empty JSON array: ${manifestFile}`);
+        }
+        for (const [index, plugin] of plugins.entries()) {
+            if (!plugin || typeof plugin !== 'object' || Array.isArray(plugin)) {
+                throw new Error(`plugins-manifest entry ${index + 1} must be an object`);
+            }
+            const name = plugin['plugin-name'];
+            const pluginVersion = plugin.version;
+            const fileName = plugin['wasm-file'];
+            if (typeof name !== 'string' || typeof pluginVersion !== 'string' || typeof fileName !== 'string') {
+                throw new Error(
+                    `plugins-manifest entry ${index + 1} must include string plugin-name, version, and wasm-file fields`
+                );
+            }
+            signPlugin(name, pluginVersion, fileName);
+        }
+        return;
+    }
+
+    signPlugin(pluginName, version, wasmFile);
+}
+
+function signPlugin(name, pluginVersion, fileName) {
+    if (!name) throw new Error('plugin-name is required (or provide plugins-manifest)');
+    if (!pluginVersion) throw new Error('version is required (or provide plugins-manifest)');
+    if (!fileName) throw new Error('wasm-file is required (or provide plugins-manifest)');
+
+    const file = path.resolve(process.cwd(), fileName);
     if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`WASM file not found: ${file}`);
 
     if (!signingKey) {
-        const message = `${pluginName} ${version} was not signed because the signing-key input is empty.`;
+        const message = `${name} ${pluginVersion} was not signed because the signing-key input is empty.`;
         if (!warnOnMissingKey) throw new Error(message);
         console.log(`::warning title=Plugin is unsigned::${escapeWorkflowCommand(message)}`);
         return;
@@ -41,8 +73,8 @@ function signRelease() {
         {
             marketplace_url: '',
             plugin_id: 0,
-            plugin_name: pluginName,
-            version,
+            plugin_name: name,
+            version: pluginVersion,
             dev_id: 0,
             dev_name: developerName,
             is_paid: false,
@@ -55,7 +87,7 @@ function signRelease() {
     const verification = verifyWasm(signed);
     if (!verification.valid || verification.publicKeyHex !== publicKey) {
         throw new Error(
-            `Signed ${pluginName} ${version} failed signature verification: ${verification.error ?? 'unexpected public key'}`
+            `Signed ${name} ${pluginVersion} failed signature verification: ${verification.error ?? 'unexpected public key'}`
         );
     }
 
@@ -66,7 +98,7 @@ function signRelease() {
         fs.writeFileSync(checksumFile, `${checksum}  ${path.basename(file)}\n`);
     }
 
-    console.log(`Signed ${pluginName} ${version} with Ed25519 public key ${publicKey}.`);
+    console.log(`Signed ${name} ${pluginVersion} with Ed25519 public key ${publicKey}.`);
 }
 
 function escapeWorkflowCommand(value) {

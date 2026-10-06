@@ -21,7 +21,7 @@ ship a plugin build or another action.
 | Action | Description |
 | --- | --- |
 | [Publish to Pumpkin Market](actions/publish-to-pumpkin-market) | Upload a released Pumpkin plugin WebAssembly file to its existing Market listing |
-| [Sign Pumpkin plugin](actions/sign-pumpkin-plugin) | Sign a Pumpkin plugin WebAssembly file with its Ed25519 release metadata |
+| [Sign Pumpkin plugin](actions/sign-pumpkin-plugin) | Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata |
 
 **Plugins**
 
@@ -72,7 +72,7 @@ pnpm test
 | `pnpm test:integration` | Build, then run the tests against a real Pumpkin server (`PUMPKIN_BIN` picks the binary, see [Testing](docs/testing.md)) |
 | `pnpm readme` | Regenerate plugin READMEs and the action and package tables above |
 | `pnpm check` | Release config, package metadata and docs against the code (see [Code style](docs/code-style.md)) |
-| `pnpm package` | Collect the built plugins into `dist/<plugin>.wasm` with checksums, signed when `PLUGIN_SIGNING_KEY` is set (see [CI and releases](docs/ci-and-releases.md)) |
+| `pnpm package` | Collect the built plugins into `dist/<plugin>.wasm` with checksums; signing is handled separately by the reusable action (see [CI and releases](docs/ci-and-releases.md)) |
 
 Tasks run through [Turborepo](https://turborepo.dev), so unchanged packages come from the cache.
 

@@ -16,7 +16,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 🧪 Test | plugin or repository code changes | Unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
 | 🧪 Action tests | action code changes | `.github/workflows/actions.yml` tests only the changed action, with `*.test.*` files co-located in `actions/{name}/src/` |
 | 📝 Docs and config | always | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
-| 🔨 Build | code changes, after lint and typecheck | Builds, signs and verifies every plugin before uploading artifacts for integration and releases |
+| 🔨 Build | code changes, after lint and typecheck | Builds and collects every plugin, then signs and verifies them with the reusable action before upload |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin and action, checks release registration and READMEs, tests the action, then typechecks, builds and integration-tests the plugin |
 | 🚢 Release | plugin or action release changes, on `master` pushes | Runs release-please; action releases create a versioned tag and GitHub release without a plugin artifact |
@@ -138,21 +138,22 @@ Pumpkin can check a plugin's integrity: a signed `.wasm` carries two custom sect
 signature over the code plus the metadata, and the public key). Pumpkin loads unsigned plugins with
 a warning unless `allow_unsigned = false` is set in its config. Signing is optional here.
 
-`pnpm package` (`scripts/collect-plugins.mjs`) signs every plugin when the `PLUGIN_SIGNING_KEY`
-environment variable is set. CI always prepares a key before packaging: pushes use the repository
-secret when available, while pull requests and pushes without the secret use an ephemeral key. CI
-verifies each signature and uses the signed files for integration tests. The ephemeral key is only
-for checks; release jobs never receive it. The release workflow uses the reusable
-[`sign-pumpkin-plugin` action](../actions/sign-pumpkin-plugin/README.md) after checking that the
-release tag points to the commit that produced the build. That step requires the repository key and
-fails if it is missing; it uploads the signed `.wasm` and refreshed `.sha256` to the GitHub release
-and Pumpkin Market.
+`pnpm package` (`scripts/collect-plugins.mjs`) only copies built plugins into `dist/` and writes
+checksums; it does not sign files or warn when they are unsigned. CI always prepares a key and uses
+the reusable [`sign-pumpkin-plugin` action](../actions/sign-pumpkin-plugin/README.md) to sign every
+collected plugin from a metadata manifest. Pushes use the repository secret when available, while
+pull requests and pushes without the secret use an ephemeral key. CI verifies each signature and
+uses the signed files for integration tests. The ephemeral key is only for checks; release jobs
+never receive it. Release jobs use the same action to sign the exact build artifact after checking
+that the release tag points to the commit that produced the build. It uploads the signed `.wasm`
+and refreshed `.sha256` to the GitHub release and Pumpkin Market.
 
 | Situation | Result |
 | --- | --- |
-| `PLUGIN_SIGNING_KEY` is a valid key | `pnpm package` signs its outputs; CI uses the repository key on pushes and the release action signs the published artifact |
-| Not set or empty | Local `pnpm package` warns and collects unsigned files. CI uses a run-only key; release signing fails rather than publishing unsigned files |
-| Set but not 64 hex characters | Signing fails: a misconfigured key must not silently ship unsigned |
+| Local `pnpm package` | Always collects unsigned files without a warning, regardless of the key environment variable |
+| CI push with a valid repository key | Signs the build and release artifacts with the repository key |
+| CI pull request or push without a key | Signs build artifacts with a run-only key; release signing still requires the repository key |
+| Signing action receives a malformed key | Fails rather than silently shipping unsigned files |
 
 To set it up:
 

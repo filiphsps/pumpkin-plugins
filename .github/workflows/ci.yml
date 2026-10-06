@@ -170,8 +170,15 @@ jobs:
                   fi
                   echo "PLUGIN_SIGNING_KEY=$PLUGIN_SIGNING_KEY" >> "$GITHUB_ENV"
 
-            - name: 📦 Collect and sign plugins
-              run: node scripts/collect-plugins.mjs
+            - name: 📦 Collect plugin artifacts
+              run: node scripts/collect-plugins.mjs --manifest "$RUNNER_TEMP/plugins.json"
+
+            - name: 🔏 Sign collected plugins
+              uses: ./actions/sign-pumpkin-plugin
+              with:
+                  plugins-manifest: ${{ runner.temp }}/plugins.json
+                  developer-name: Filiph Sandström
+                  signing-key: ${{ env.PLUGIN_SIGNING_KEY }}
 
             - name: 🔎 Install verified signed plugins for integration tests
               run: node scripts/install-signed-plugin-builds.mjs

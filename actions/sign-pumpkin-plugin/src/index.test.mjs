@@ -68,6 +68,59 @@ describe('sign-pumpkin-plugin action', () => {
         );
     });
 
+    it('signs every file listed in a plugins manifest', () => {
+        const { dir, wasmFile, original } = fixture();
+        const secondWasmFile = path.join(dir, 'second.wasm');
+        fs.writeFileSync(secondWasmFile, original);
+        fs.writeFileSync(`${secondWasmFile}.sha256`, 'stale checksum\n');
+        fs.writeFileSync(
+            path.join(dir, 'plugins.json'),
+            JSON.stringify([
+                { 'plugin-name': 'TestPlugin', version: '1.2.3', 'wasm-file': 'plugin.wasm' },
+                { 'plugin-name': 'SecondPlugin', version: '4.5.6', 'wasm-file': 'second.wasm' }
+            ])
+        );
+
+        const result = run(dir, {
+            INPUT_PLUGIN_NAME: '',
+            INPUT_VERSION: '',
+            INPUT_WASM_FILE: '',
+            INPUT_PLUGINS_MANIFEST: 'plugins.json'
+        });
+
+        assert.ok(result.ok, result.out);
+        for (const [file, expectedName, expectedVersion] of [
+            [wasmFile, 'TestPlugin', '1.2.3'],
+            [secondWasmFile, 'SecondPlugin', '4.5.6']
+        ]) {
+            const signed = fs.readFileSync(file);
+            const verification = verifyWasm(signed);
+            assert.ok(verification.valid, verification.error);
+            assert.equal(verification.metadata?.plugin_name, expectedName);
+            assert.equal(verification.metadata?.version, expectedVersion);
+            assert.equal(
+                fs.readFileSync(`${file}.sha256`, 'utf8'),
+                `${createHash('sha256').update(signed).digest('hex')}  ${path.basename(file)}\n`
+            );
+        }
+    });
+
+    it('rejects invalid manifest entries without changing the files', () => {
+        const { dir, wasmFile, original } = fixture();
+        fs.writeFileSync(path.join(dir, 'plugins.json'), JSON.stringify([{}]));
+
+        const result = run(dir, {
+            INPUT_PLUGIN_NAME: '',
+            INPUT_VERSION: '',
+            INPUT_WASM_FILE: '',
+            INPUT_PLUGINS_MANIFEST: 'plugins.json'
+        });
+
+        assert.equal(result.ok, false);
+        assert.match(result.out, /must include string plugin-name, version, and wasm-file fields/);
+        assert.deepEqual(fs.readFileSync(wasmFile), original);
+    });
+
     it('fails on an empty key by default without changing the file', () => {
         const { dir, wasmFile, original } = fixture();
 

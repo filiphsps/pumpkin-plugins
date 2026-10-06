@@ -1,7 +1,7 @@
 # Sign Pumpkin plugin
 
-Add Pumpkin's Ed25519 signature and release metadata to an existing plugin `.wasm` file. This
-action signs the file in place; it does not build the plugin.
+Add Pumpkin's Ed25519 signature and release metadata to one or more existing plugin `.wasm` files.
+This action signs files in place; it does not build the plugins.
 
 ```yaml
 steps:
@@ -24,13 +24,26 @@ output before writing it. Existing signing sections are replaced. If a sibling
 `.mjs` entrypoint loads the shared TypeScript signer with Node 24's built-in type stripping, so it
 does not need a separate build or bundle step.
 
+For CI jobs that need to sign multiple plugins, provide a JSON array manifest instead of the three
+single-plugin inputs:
+
+```json
+[
+  { "plugin-name": "MyPlugin", "version": "1.2.3", "wasm-file": "dist/my-plugin.wasm" }
+]
+```
+
+The action signs each entry and refreshes any adjacent checksums. `developer-name` and
+`signing-key` still apply to every entry.
+
 ## Inputs
 
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
-| `plugin-name` | Yes | | Exact Pumpkin plugin name embedded in the signature metadata |
-| `version` | Yes | | Plugin version, without a leading `v` |
-| `wasm-file` | Yes | | `.wasm` path, relative to the workspace or absolute |
+| `plugin-name` | Single-file mode | | Exact Pumpkin plugin name embedded in the signature metadata |
+| `version` | Single-file mode | | Plugin version, without a leading `v` |
+| `wasm-file` | Single-file mode | | `.wasm` path, relative to the workspace or absolute |
+| `plugins-manifest` | Batch mode | | Path to a JSON array with `plugin-name`, `version`, and `wasm-file` for each plugin |
 | `developer-name` | Yes | | Developer name embedded in the signature metadata |
 | `signing-key` | No | | 32-byte Ed25519 secret seed as 64 hexadecimal characters |
 | `warn` | No | `false` | If `true`, an empty key emits a warning and leaves the file unchanged; otherwise it fails |
