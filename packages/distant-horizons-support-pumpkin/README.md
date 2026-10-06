@@ -52,7 +52,9 @@ Settings live in `plugins/data/DistantHorizonsSupportPumpkin/config.toml`. The p
 | `support.requests_per_player` | integer | `2` | Maximum pending requests per player. |
 | `support.pending_requests` | integer | `16` | Maximum pending requests across all players. |
 | `support.blocks_per_tick` | integer | `2048` | Maximum block samples per server tick across all LOD requests. |
-| `support.packets_per_tick` | integer | `2` | Maximum 30 KB transfer packets sent per server tick across all players. |
+| `support.packets_per_tick` | integer | `2` | Maximum 30 KB transfer packets for newly captured LODs per server tick across all players. |
+| `support.cached_requests_per_tick` | integer | `8` | Maximum cached LOD requests checked per server tick across all players. |
+| `support.cached_packets_per_tick` | integer | `64` | Maximum 30 KB transfer packets for cached LODs per server tick across all players. |
 | `support.memory_cache_entries` | integer | `128` | Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited. |
 | `support.disk_cache_entries` | integer | `4096` | Maximum LOD sections cached on disk. Set to 0 to disable; any negative value means unlimited. |
 | `support.refresh_seconds` | integer | `30` | Rebuild cached sections after this age when all their chunks are loaded. |
@@ -82,8 +84,14 @@ pending_requests = 16
 # Maximum block samples per server tick across all LOD requests.
 blocks_per_tick = 2048
 
-# Maximum 30 KB transfer packets sent per server tick across all players.
+# Maximum 30 KB transfer packets for newly captured LODs per server tick across all players.
 packets_per_tick = 2
+
+# Maximum cached LOD requests checked per server tick across all players.
+cached_requests_per_tick = 8
+
+# Maximum 30 KB transfer packets for cached LODs per server tick across all players.
+cached_packets_per_tick = 64
 
 # Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited.
 memory_cache_entries = 128
@@ -115,8 +123,10 @@ unload or the server restarts. All 16 chunks in a section must be available duri
 The plugin checks all 16 chunks before sampling, so unavailable sections without a cache entry
 receive a retryable request rejection immediately.
 
-Sampling and transfers run within the configured tick budgets. An uncached section may take
-many ticks to complete. Air above the heightmap is collapsed without reading every empty block. Sections with more than 131,072 material segments are rejected to
+Sampling and transfers run within the configured tick budgets. Cached LOD transfers use
+`support.cached_packets_per_tick`; newly captured LODs use `support.packets_per_tick`. An uncached
+section may take many ticks to complete. Air above the heightmap is collapsed without reading every
+empty block. Sections with more than 131,072 material segments are rejected to
 bound memory use. Memory and disk cache limits are independent: `support.memory_cache_entries`
 defaults to 128 and `support.disk_cache_entries` defaults to 4096. Set either limit to `0` to
 disable that cache tier; any negative value makes it unlimited. Existing `support.cache_entries`

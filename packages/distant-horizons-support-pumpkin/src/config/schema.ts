@@ -48,10 +48,23 @@ export const schema = defineConfig('DistantHorizonsSupportPumpkin', {
                 max: 16384
             }),
             packets_per_tick: int({
-                description: 'Maximum 30 KB transfer packets sent per server tick across all players.',
+                description:
+                    'Maximum 30 KB transfer packets for newly captured LODs per server tick across all players.',
                 default: 2,
                 min: 1,
                 max: 16
+            }),
+            cached_requests_per_tick: int({
+                description: 'Maximum cached LOD requests checked per server tick across all players.',
+                default: 8,
+                min: 1,
+                max: 32
+            }),
+            cached_packets_per_tick: int({
+                description: 'Maximum 30 KB transfer packets for cached LODs per server tick across all players.',
+                default: 64,
+                min: 1,
+                max: 256
             }),
             memory_cache_entries: cacheLimit(
                 'Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited.',

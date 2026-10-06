@@ -189,6 +189,77 @@ describe('DH sessions', () => {
         expect(f.ids().at(-1)).toBe(8);
         expect(f.files.list('cache')).toHaveLength(1);
     });
+    it('drains disk-cached transfers within the separately configured fast budget', () => {
+        const f = fixture();
+        f.settings.packets_per_tick = 1;
+        f.settings.cached_packets_per_tick = 5;
+        const diskCache = new LodCache(f.files, 0, f.settings.disk_cache_entries);
+        diskCache.put('world:0:0', { updated: 1000, data: new Uint8Array(90_001).fill(7) });
+        const restarted = new Sessions(f.settings, diskCache, new MemoryLogger(), () => 1000);
+        restarted.receive(f.peer, packet(3).string(f.peer.dimension).finish());
+        f.sent.length = 0;
+
+        restarted.receive(f.peer, f.request());
+        restarted.tick(f.peers);
+
+        expect(f.reads()).toBe(0);
+        expect(f.ids()).toEqual([10, 10, 10, 10, 8]);
+        expect(restarted.status()).toContain('0 queued packet(s)');
+    });
+    it('serves cached requests from multiple players in one tick within both configured limits', () => {
+        const f = fixture();
+        f.settings.cached_requests_per_tick = 2;
+        f.settings.cached_packets_per_tick = 4;
+        const diskCache = new LodCache(f.files, 0, f.settings.disk_cache_entries);
+        diskCache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
+        diskCache.put('world:1:0', { updated: 1000, data: new Uint8Array(64).fill(2) });
+        diskCache.put('world:2:0', { updated: 1000, data: new Uint8Array(64).fill(3) });
+        const sessions = new Sessions(f.settings, diskCache, new MemoryLogger(), () => 1000);
+        const bobSent: Uint8Array[] = [];
+        const bob: Peer = { ...f.peer, name: 'Bob', send: (bytes) => bobSent.push(bytes) };
+        const carolSent: Uint8Array[] = [];
+        const carol: Peer = { ...f.peer, name: 'Carol', send: (bytes) => carolSent.push(bytes) };
+        const peers = {
+            withPeer: (name: string, use: (peer: Peer) => void) => {
+                const peer =
+                    name === f.peer.name ? f.peer : name === bob.name ? bob : name === carol.name ? carol : undefined;
+                if (!peer) return false;
+                use(peer);
+                return true;
+            }
+        };
+        sessions.receive(f.peer, packet(3).string(f.peer.dimension).finish());
+        sessions.receive(bob, packet(3).string(bob.dimension).finish());
+        sessions.receive(carol, packet(3).string(carol.dimension).finish());
+        f.sent.length = 0;
+        bobSent.length = 0;
+        carolSent.length = 0;
+
+        sessions.receive(f.peer, f.request(1));
+        sessions.receive(bob, f.request(2, 'world', 1));
+        sessions.receive(carol, f.request(3, 'world', 2));
+        sessions.tick(peers);
+
+        const ids = (sent: Uint8Array[]) =>
+            sent.map((bytes) => {
+                const reader = new Reader(bytes);
+                reader.short();
+                return reader.short();
+            });
+        expect(f.reads()).toBe(0);
+        expect(ids(f.sent)).toEqual([10, 8]);
+        expect(ids(bobSent)).toEqual([10, 8]);
+        expect(carolSent).toHaveLength(0);
+        expect(sessions.status()).toContain('1 pending LOD request(s)');
+        expect(sessions.status()).toContain('2 served');
+
+        f.settings.cached_requests_per_tick = 3;
+        sessions.tick(peers);
+
+        expect(ids(carolSent)).toEqual([10, 8]);
+        expect(sessions.status()).toContain('0 pending LOD request(s)');
+        expect(sessions.status()).toContain('3 served');
+    });
     it('falls back to a saved capture when an expired section is no longer loaded', () => {
         const f = fixture();
         f.sessions.receive(f.peer, f.request());

@@ -34,7 +34,11 @@ interface Client {
     distance: number;
     concurrency: number;
     disabled: boolean;
-    packets: Uint8Array[];
+    packets: QueuedPacket[];
+}
+interface QueuedPacket {
+    bytes: Uint8Array;
+    cached: boolean;
 }
 interface Request {
     name: string;
@@ -45,6 +49,8 @@ interface Request {
     timestamp?: number;
     builder?: LodBuilder;
     fallback?: CachedLod;
+    cacheChecked?: boolean;
+    cached?: CachedLod | null;
     revision: number;
 }
 /** Runs bounded LOD work, keeping client state separate from short-lived Pumpkin handles. */
@@ -139,12 +145,19 @@ export class Sessions {
             )
                 this.left(name);
         }
-        const request = this.requests[0];
-        if (request) {
+        let cacheChecks = 0;
+        let builderStepped = false;
+        let cachedQueued = [...this.clients.values()].reduce(
+            (sum, client) => sum + client.packets.filter((packet) => packet.cached).length,
+            0
+        );
+        for (const request of [...this.requests]) {
+            if (!this.requests.includes(request)) continue;
+            const queuedClient = this.clients.get(request.name);
+            if (!queuedClient || queuedClient.packets.length) continue;
             const found = peers.withPeer(request.name, (peer) => {
                 try {
                     const client = this.clients.get(peer.name);
-                    if (client?.packets.length) return;
                     if (!client || this.validate(peer, client, { ...request, type: 'request' }, false)) {
                         this.rejected++;
                         this.lastFailure = 'Request no longer in range';
@@ -155,14 +168,26 @@ export class Sessions {
                     if ((this.revisions.get(request.key) ?? 0) !== request.revision)
                         throw new Error('Terrain changed while building; retry this request');
                     if (!request.builder) {
-                        const cached = this.cache.get(request.key);
+                        if (!request.cacheChecked) {
+                            if (cacheChecks >= this.settings.cached_requests_per_tick) return;
+                            request.cached = this.cache.get(request.key) ?? null;
+                            request.cacheChecked = true;
+                            cacheChecks++;
+                        }
+                        const cached = request.cached ?? undefined;
                         if (cached && this.now() - cached.updated < this.settings.refresh_seconds * 1000) {
-                            this.complete(request, cached);
+                            if (cachedQueued < this.settings.cached_packets_per_tick)
+                                cachedQueued += this.complete(request, cached, true);
                             return;
                         }
                         request.fallback = cached;
+                        if (builderStepped) return;
+                        builderStepped = true;
                         peer.terrain.prepare?.(request.section);
                         request.builder = new LodBuilder(request.section, peer.terrain.minY, peer.terrain.height);
+                    } else {
+                        if (builderStepped) return;
+                        builderStepped = true;
                     }
                     if (request.builder.step(peer.terrain, this.settings.blocks_per_tick)) {
                         const captured = { updated: this.now(), data: request.builder.finish(this.now()) };
@@ -171,7 +196,7 @@ export class Sessions {
                     }
                 } catch (err) {
                     if (request.fallback && (this.revisions.get(request.key) ?? 0) === request.revision)
-                        this.complete(request, request.fallback);
+                        cachedQueued += this.complete(request, request.fallback, true);
                     else {
                         this.rejected++;
                         this.lastFailure = String(err);
@@ -189,15 +214,17 @@ export class Sessions {
             if (!found) this.left(request.name);
         }
         let remaining = this.settings.packets_per_tick;
+        let cachedRemaining = this.settings.cached_packets_per_tick;
         for (const [name, client] of this.clients) {
-            if (remaining <= 0) break;
+            if (remaining <= 0 && cachedRemaining <= 0) break;
             peers.withPeer(name, (peer) => {
-                while (remaining > 0 && client.packets.length) {
-                    const bytes = client.packets.shift();
-                    if (bytes) {
-                        peer.send(bytes);
-                        remaining--;
-                    }
+                while (client.packets.length) {
+                    const packet = client.packets[0];
+                    if (!packet || (packet.cached ? cachedRemaining <= 0 : remaining <= 0)) break;
+                    client.packets.shift();
+                    peer.send(packet.bytes);
+                    if (packet.cached) cachedRemaining--;
+                    else remaining--;
                 }
             });
         }
@@ -235,18 +262,21 @@ export class Sessions {
         peer.send(levelInit(peer.dimension, this.settings.server_key, peer.level, this.now()));
         peer.send(sessionConfig(this.settings.render_distance, this.settings.requests_per_player));
     }
-    private complete(request: Request, value: CachedLod): void {
+    private complete(request: Request, value: CachedLod, cached = false): number {
         const client = this.clients.get(request.name);
+        let packetCount = 0;
         if (client) {
             this.served++;
             const packets =
                 request.timestamp !== undefined && value.updated <= request.timestamp
                     ? [unchanged(request.tracker)]
                     : transfer(request.tracker, this.buffer++, value.data);
-            client.packets.push(...packets);
+            client.packets.push(...packets.map((bytes) => ({ bytes, cached })));
+            packetCount = packets.length;
         }
         this.drop(request);
         if (!this.requests.some((r) => r.key === request.key)) this.revisions.delete(request.key);
+        return cached ? packetCount : 0;
     }
     private drop(request: Request): void {
         const index = this.requests.indexOf(request);

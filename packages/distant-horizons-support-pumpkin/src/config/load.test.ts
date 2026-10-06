@@ -9,8 +9,12 @@ describe('DH settings', () => {
         const initial = readSettings(files, log);
         expect(initial.render_distance).toBe(128);
         expect(initial.blocks_per_tick).toBe(2048);
+        expect(initial.cached_requests_per_tick).toBe(8);
+        expect(initial.cached_packets_per_tick).toBe(64);
         expect(initial.memory_cache_entries).toBe(128);
         expect(initial.disk_cache_entries).toBe(4096);
+        expect(files.text('config.toml')).toContain('cached_requests_per_tick = 8');
+        expect(files.text('config.toml')).toContain('cached_packets_per_tick = 64');
         files.put(
             'config.toml',
             '[support]\nrender_distance = 256\nserver_key = "my-server"\n[worlds.custom]\nheight = 512\n'
@@ -20,6 +24,8 @@ describe('DH settings', () => {
         expect(settings.server_key).toBe('my-server');
         expect(settings.worlds.custom?.height).toBe(512);
         expect(files.text('config.toml')).toContain('blocks_per_tick = 2048');
+        expect(files.text('config.toml')).toContain('cached_requests_per_tick = 8');
+        expect(files.text('config.toml')).toContain('cached_packets_per_tick = 64');
     });
     it('copies a legacy cache limit into both new limits and uses each default when it is absent', () => {
         const files = new MemoryFiles(),

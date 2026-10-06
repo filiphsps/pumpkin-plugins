@@ -23,6 +23,8 @@ describe(info.name, () => {
         const config = await readFile(path.join(server.pluginDataDir(info.name), 'config.toml'), 'utf8');
         expect(config).toContain('render_distance = 128');
         expect(config).toContain('blocks_per_tick = 2048');
+        expect(config).toContain('cached_requests_per_tick = 8');
+        expect(config).toContain('cached_packets_per_tick = 64');
         expect(config).toContain('memory_cache_entries = 128');
         expect(config).toContain('disk_cache_entries = 4096');
         server.command('dhs status');
