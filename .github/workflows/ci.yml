@@ -254,6 +254,7 @@ jobs:
               if: failure()
               uses: actions/upload-artifact@v7.0.1
               with:
+                  retention-days: 1
                   name: pumpkin-logs
                   path: ${{ runner.temp }}/pumpkin-logs
                   if-no-files-found: ignore
@@ -295,6 +296,7 @@ jobs:
               if: failure()
               uses: actions/upload-artifact@v7.0.1
               with:
+                  retention-days: 1
                   name: generator-pumpkin-logs
                   path: ${{ runner.temp }}/pumpkin-logs
                   if-no-files-found: ignore
@@ -537,3 +539,43 @@ jobs:
                   api-token: ${{ secrets.MARKET_API_TOKEN }}
                   release-notes: ${{ env.MARKET_RELEASE_NOTES }}
                   warn: true
+
+    cleanup:
+        name: 🧹 Cleanup artifacts
+        needs: [build, integration, release, assets, market]
+        if: >-
+            ${{
+              always() &&
+              needs.build.result == 'success' &&
+              (needs.integration.result == 'success' || needs.integration.result == 'skipped') &&
+              (needs.release.result == 'success' || needs.release.result == 'skipped') &&
+              (needs.assets.result == 'success' || needs.assets.result == 'skipped') &&
+              (needs.market.result == 'success' || needs.market.result == 'skipped') &&
+              (
+                github.event_name != 'pull_request' ||
+                (
+                  github.actor != 'dependabot[bot]' &&
+                  github.event.pull_request.head.repo.full_name == github.repository
+                )
+              )
+            }}
+        timeout-minutes: 5
+        runs-on: ubuntu-latest
+        permissions:
+            actions: write
+        steps:
+            - name: 🧹 Delete artifacts after their last consumer
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  artifact_ids="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+                      --jq '.artifacts[] | select(.name == "plugins" or .name == "plugin-wasm" or .name == "update-check-fixture" or (.name | startswith("release-"))) | .id')"
+                  if [ -z "$artifact_ids" ]; then
+                      echo "No temporary artifacts to delete"
+                      exit 0
+                  fi
+                  while IFS= read -r artifact_id; do
+                      [ -z "$artifact_id" ] && continue
+                      gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id"
+                      echo "Deleted temporary artifact $artifact_id"
+                  done <<< "$artifact_ids"
