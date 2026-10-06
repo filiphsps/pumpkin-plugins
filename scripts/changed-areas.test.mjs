@@ -71,8 +71,11 @@ describe('changed-areas', () => {
         const base = change(dir, { 'docs/guide.md': '# Guide\n\nMore.\n' });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=false\nintegration_scope=all\nintegration_extra=\n');
-        assert.match(result.log, /Nothing but docs/);
+        assert.equal(
+            result.outputs,
+            'code=false\nactions=[]\nactions_to_test=[]\nintegration_scope=all\nintegration_extra=\n'
+        );
+        assert.match(result.log, /No plugin or repository code/);
     });
 
     it('counts anything under docs/ and the LICENSE as documentation', () => {
@@ -80,7 +83,10 @@ describe('changed-areas', () => {
         const base = change(dir, { 'docs/diagram.png': 'not really a png\n', LICENSE: 'MIT\n\nmore\n' });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=false\nintegration_scope=all\nintegration_extra=\n');
+        assert.equal(
+            result.outputs,
+            'code=false\nactions=[]\nactions_to_test=[]\nintegration_scope=all\nintegration_extra=\n'
+        );
     });
 
     it('runs the code jobs for a change to a source file', () => {
@@ -88,7 +94,10 @@ describe('changed-areas', () => {
         const base = change(dir, { 'packages/plug/src/index.ts': 'export const a = 1;\n' });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=true\nintegration_scope=affected\nintegration_extra=\n');
+        assert.equal(
+            result.outputs,
+            'code=true\nactions=[]\nactions_to_test=[]\nintegration_scope=affected\nintegration_extra=\n'
+        );
         assert.match(result.log, /Code: packages\/plug\/src\/index\.ts/);
     });
 
@@ -97,7 +106,10 @@ describe('changed-areas', () => {
         const base = change(dir, { 'scripts/check.mjs': 'export const changed = true;\n' });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=true\nintegration_scope=all\nintegration_extra=\n');
+        assert.equal(
+            result.outputs,
+            'code=true\nactions=[]\nactions_to_test=[]\nintegration_scope=all\nintegration_extra=\n'
+        );
     });
 
     it('includes bedrock-addon-manager when UPnPumpkin changes', () => {
@@ -107,7 +119,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nintegration_scope=affected\nintegration_extra=@pumpkin-plugins/bedrock-addon-manager\n'
+            'code=true\nactions=[]\nactions_to_test=[]\nintegration_scope=affected\nintegration_extra=@pumpkin-plugins/bedrock-addon-manager\n'
         );
     });
 
@@ -119,7 +131,10 @@ describe('changed-areas', () => {
         });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=true\nintegration_scope=all\nintegration_extra=\n');
+        assert.equal(
+            result.outputs,
+            'code=true\nactions=[]\nactions_to_test=[]\nintegration_scope=all\nintegration_extra=\n'
+        );
         assert.match(result.log, /Code: \.github\/workflows\/ci\.yml/);
     });
 
@@ -128,7 +143,10 @@ describe('changed-areas', () => {
         const base = change(dir, { 'packages/plug/src/index.ts': null, 'docs/guide.md': null });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=true\nintegration_scope=affected\nintegration_extra=\n');
+        assert.equal(
+            result.outputs,
+            'code=true\nactions=[]\nactions_to_test=[]\nintegration_scope=affected\nintegration_extra=\n'
+        );
     });
 
     it('fails on a base it cannot resolve instead of reporting no changes', () => {
@@ -150,6 +168,50 @@ describe('changed-areas', () => {
         const base = change(dir, { 'packages/plug/src/index.ts': 'export const a = 1;\n' });
         const result = run(dir, base);
         assert.ok(result.ok, result.log);
-        assert.equal(result.outputs, 'code=true\nintegration_scope=affected\nintegration_extra=\n');
+        assert.equal(
+            result.outputs,
+            'code=true\nactions=[]\nactions_to_test=[]\nintegration_scope=affected\nintegration_extra=\n'
+        );
+    });
+
+    it('skips plugin code jobs and reports only the changed action', () => {
+        const dir = repo({ 'actions/one/action.yml': 'name: One\n', 'actions/two/action.yml': 'name: Two\n' });
+        const base = change(dir, { 'actions/two/action.yml': 'name: Two\ndescription: Updated\n' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=false\nactions=["two"]\nactions_to_test=["two"]\nintegration_scope=all\nintegration_extra=\n'
+        );
+        assert.match(result.log, /Actions to test: two/);
+    });
+
+    it('reports changed actions separately when they change with plugin code', () => {
+        const dir = repo({
+            'actions/one/action.yml': 'name: One\n',
+            'actions/two/action.yml': 'name: Two\n',
+            'packages/plug/src/index.ts': 'export {};\n'
+        });
+        const base = change(dir, {
+            'actions/two/action.yml': 'name: Two\ndescription: Updated\n',
+            'packages/plug/src/index.ts': 'export const changed = true;\n'
+        });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=true\nactions=["two"]\nactions_to_test=["two"]\nintegration_scope=affected\nintegration_extra=\n'
+        );
+    });
+
+    it('does not test an action when only its Release Please version file changes', () => {
+        const dir = repo({ 'actions/one/action.yml': 'name: One\n', 'actions/one/version.txt': '0.0.0\n' });
+        const base = change(dir, { 'actions/one/version.txt': '0.0.1\n' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=false\nactions=["one"]\nactions_to_test=[]\nintegration_scope=all\nintegration_extra=\n'
+        );
     });
 });

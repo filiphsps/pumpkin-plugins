@@ -1,7 +1,6 @@
-// Works out whether a change can affect a build, a test or a plugin, and prints it as the `code`
-// GitHub Actions output that the workflow gates the code jobs on. A change that touches only
-// documentation can't break any of them, so a docs commit shouldn't have to run the suite. See the
-// Jobs table in docs/ci-and-releases.md.
+// Classifies changed files for CI: plugin/repo code, action directories, and documentation. Plugin
+// code jobs and action tests have separate gates, so action-only changes don't run Pumpkin suites.
+// See the Jobs table in docs/ci-and-releases.md.
 import { spawnSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 
@@ -22,7 +21,12 @@ if (diff.status !== 0) {
 }
 
 const changed = diff.stdout.split('\n').filter((file) => file.length > 0);
-const code = changed.filter((file) => !DOCS.some((isDocs) => isDocs.test(file)));
+const isDocs = (file) => DOCS.some((pattern) => pattern.test(file));
+const actionPaths = changed.filter((file) => !isDocs(file) && /^actions\/[^/]+\//.test(file));
+const actions = [...new Set(actionPaths.map((file) => file.split('/')[1]))].sort();
+const actionCodePaths = actionPaths.filter((file) => !file.endsWith('/version.txt'));
+const actionsToTest = [...new Set(actionCodePaths.map((file) => file.split('/')[1]))].sort();
+const code = changed.filter((file) => !isDocs(file) && !/^actions\/[^/]+\//.test(file));
 const integrationScope =
     code.length > 0 &&
     code.every((file) =>
@@ -38,13 +42,15 @@ const integrationExtra = code.some((file) => file.startsWith('packages/upnpumpki
 
 console.log(`${changed.length} changed file(s) between ${base} and ${head}`);
 if (code.length) console.log(`Code: ${code.join(', ')}`);
-else console.log('Nothing but docs, so the code jobs are skipped.');
+else console.log('No plugin or repository code, so the plugin code jobs are skipped.');
+if (actions.length) console.log(`Changed actions: ${actions.join(', ')}`);
+if (actionsToTest.length) console.log(`Actions to test: ${actionsToTest.join(', ')}`);
 console.log(`Integration scope: ${integrationScope}`);
 if (integrationExtra) console.log(`Additional integration package: ${integrationExtra}`);
 
 if (process.env.GITHUB_OUTPUT) {
     appendFileSync(
         process.env.GITHUB_OUTPUT,
-        `code=${code.length > 0}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n`
+        `code=${code.length > 0}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n`
     );
 }

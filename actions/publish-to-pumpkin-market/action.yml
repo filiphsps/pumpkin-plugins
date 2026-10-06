@@ -1,0 +1,49 @@
+name: Publish to Pumpkin Market
+description: Upload a released Pumpkin plugin WebAssembly file to its existing Market listing
+author: Filiph Sandström
+branding:
+    icon: upload-cloud
+    color: orange
+inputs:
+    plugin-name:
+        description: Exact Pumpkin plugin name used by its Market listing
+        required: true
+    version:
+        description: Plugin version to publish, without a leading v
+        required: true
+    wasm-file:
+        description: Path to the plugin .wasm file
+        required: true
+    api-token:
+        description: Market API token with plugins:update and plugins:versions:upload scopes
+        required: false
+    api-url:
+        description: Pumpkin Market base URL
+        required: false
+        default: https://market.pumpkinmc.org
+    track:
+        description: Release track
+        required: false
+        default: stable
+    release-notes:
+        description: Release notes to include in Market version metadata
+        required: false
+        default: ''
+    warn:
+        description: Warn instead of failing when credentials or the Market listing are unavailable
+        required: false
+        default: 'false'
+runs:
+    using: composite
+    steps:
+        - shell: bash
+          env:
+              INPUT_PLUGIN_NAME: ${{ inputs.plugin-name }}
+              INPUT_VERSION: ${{ inputs.version }}
+              INPUT_WASM_FILE: ${{ inputs.wasm-file }}
+              INPUT_API_TOKEN: ${{ inputs.api-token }}
+              INPUT_API_URL: ${{ inputs.api-url }}
+              INPUT_TRACK: ${{ inputs.track }}
+              INPUT_RELEASE_NOTES: ${{ inputs.release-notes }}
+              INPUT_WARN: ${{ inputs.warn }}
+          run: node "$GITHUB_ACTION_PATH/publish-to-market.mjs"
