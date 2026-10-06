@@ -1,0 +1,17 @@
+# {{ displayName }}
+
+{{ description }}
+
+```yaml
+steps:
+  - uses: filiphsps/pumpkin-plugins/actions/{{ name }}@{{ name }}-v0.0.1
+```
+
+The version reference above is this action's first Release Please tag. Action releases are
+independent from plugin releases and other actions.
+
+## Development
+
+Add inputs and outputs in `action.yml`, implement the behavior in `src/index.mjs`, and cover it with
+tests in `src/*.test.mjs`. The action runs on GitHub's Node 24 runtime and needs no separate build
+step.

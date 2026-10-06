@@ -17,7 +17,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 📝 Docs and config | always | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after lint and typecheck | Builds every plugin and uploads them as an artifact |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
-| 🧬 Generator | code changes, after lint | Generates a throwaway plugin with `pnpm gen` and typechecks, builds and integration-tests it |
+| 🧬 Generator | code changes, after lint | Generates a throwaway plugin and action, checks release registration and READMEs, tests the action, then typechecks, builds and integration-tests the plugin |
 | 🚢 Release | plugin or action release changes, on `master` pushes | Runs release-please; action releases create a versioned tag and GitHub release without a plugin artifact |
 | 📝 Prepare release PR | per created or updated release PR | Keeps plugin READMEs, action README examples and first-release pins for plugins and actions current |
 | 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs the exact build artifact, uploads it, then updates an existing Market listing |
@@ -191,7 +191,8 @@ both automatically. If you ever create a plugin by hand, do these three things:
 ## Registering an action for releases
 
 Each directory under `actions/` with an `action.yml` or `action.yaml` is an independent release
-component. Register it under `packages` in `release-please-config.json` with its folder as the
+component. Use `pnpm gen:action` to create the standard action files and register the action. If you
+create one by hand, register it under `packages` in `release-please-config.json` with its folder as the
 component, the `simple` release strategy, and a first-release pin:
 
 ```json

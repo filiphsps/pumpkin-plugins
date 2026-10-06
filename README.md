@@ -61,6 +61,7 @@ pnpm test
 | Command | |
 | --- | --- |
 | `pnpm gen` | Create a new plugin (see below) |
+| `pnpm gen:action` | Create a new GitHub Action (see [Creating an action](docs/creating-an-action.md)) |
 | `pnpm build` | Build every plugin to `packages/*/build/*.wasm` |
 | `pnpm lint` | Biome (lint, formatting, import order) and the JSDoc check (`pnpm lint:fix` applies fixes) |
 | `pnpm lint:commits` | Check the last commit message against Conventional Commits, the way CI does |
@@ -89,4 +90,5 @@ prompts: `pnpm gen --args my-plugin MyPlugin "Does a thing"`. See
 ## Documentation
 
 See [`docs/`](docs/README.md): creating a plugin, how plugins describe themselves and how the
-READMEs are generated, plugin config, code style, building, testing, port forwarding, and CI and releases.
+READMEs are generated, creating an action, plugin config, code style, building, testing, port
+forwarding, and CI and releases.

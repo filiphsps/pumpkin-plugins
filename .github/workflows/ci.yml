@@ -257,10 +257,16 @@ jobs:
             - name: 🧬 Generate a sample plugin
               run: pnpm gen --args ci-sample CiSample "Generator smoke test"
 
+            - name: 🧬 Generate a sample action
+              run: pnpm gen:action --args ci-sample-action "CI Sample Action" "Generator smoke test action"
+
             - name: 🏷️ It is registered and documented
               run: |
                   pnpm run check
                   pnpm run readme:check
+
+            - name: 🧪 Test the generated action
+              run: node --test actions/ci-sample-action/src/*.test.mjs
 
             - name: 🎃 Typecheck, build and load it on a real Pumpkin
               run: pnpm exec turbo run typecheck build test:integration --filter=@pumpkin-plugins/ci-sample

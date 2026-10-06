@@ -27,6 +27,7 @@
     ],
     "scripts": {
         "gen": "turbo gen plugin",
+        "gen:action": "turbo gen action",
         "lint": "biome check . && eslint .",
         "lint:fix": "biome check --write . && eslint --fix .",
         "lint:commits": "commitlint --from HEAD~1",
