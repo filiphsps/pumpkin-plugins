@@ -1,0 +1,29 @@
+name: Sign Pumpkin plugin
+description: Sign a Pumpkin plugin WebAssembly file with its Ed25519 release metadata
+author: Filiph Sandström
+branding:
+    icon: lock
+    color: purple
+inputs:
+    plugin-name:
+        description: Exact Pumpkin plugin name to embed in the signed metadata
+        required: true
+    version:
+        description: Plugin version to embed, without a leading v
+        required: true
+    wasm-file:
+        description: Path to the plugin .wasm file to sign
+        required: true
+    developer-name:
+        description: Developer name to embed in the signed metadata
+        required: true
+    signing-key:
+        description: 32-byte Ed25519 secret seed as 64 hexadecimal characters
+        required: false
+    warn:
+        description: Warn and leave the file unchanged when signing-key is empty instead of failing
+        required: false
+        default: 'false'
+runs:
+    using: node24
+    main: src/index.mjs

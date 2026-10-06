@@ -140,6 +140,45 @@ describe('root README', () => {
         expect(run(dir, 'root', '--check').status).toBe(0);
     });
 
+    it('lists action metadata and detects changes without writing in check mode', () => {
+        put(
+            'actions/sign/action.yml',
+            'name: Sign plugin\ndescription: Add the plugin release signature\nruns:\n  using: node24\n'
+        );
+        put('actions/sign/README.md', '# Sign plugin\n');
+        put('actions/not-an-action/README.md', '# Not an action\n');
+
+        expect(run(dir, 'root').stdout).toContain('README.md: updated');
+        const generated = read('README.md');
+        expect(generated).toContain('**Actions**');
+        expect(generated).toContain('| [Sign plugin](actions/sign) | Add the plugin release signature |');
+        expect(generated.indexOf('**Actions**')).toBeLessThan(generated.indexOf('**Plugins**'));
+        expect(generated).not.toContain('not-an-action');
+        expect(run(dir, 'root', '--check').status).toBe(0);
+
+        put(
+            'actions/sign/action.yml',
+            'name: Sign plugin\ndescription: Verify the plugin release signature\nruns:\n  using: node24\n'
+        );
+        expect(run(dir, 'root', '--check').status).toBe(1);
+        expect(read('README.md')).toBe(generated);
+        expect(run(dir, 'root').status).toBe(0);
+        expect(read('README.md')).toContain('| [Sign plugin](actions/sign) | Verify the plugin release signature |');
+    });
+
+    it('supports quoted and folded action metadata and reports missing metadata', () => {
+        put('actions/quoted/action.yaml', "name: \"A: B\"\ndescription: 'Action with a ''quote'''\n");
+        put('actions/folded/action.yml', 'name: Folded\ndescription: >-\n  Action with\n  folded words\n');
+        expect(run(dir, 'root').status).toBe(0);
+        expect(read('README.md')).toContain("| [A: B](actions/quoted) | Action with a 'quote' |");
+        expect(read('README.md')).toContain('| [Folded](actions/folded) | Action with folded words |');
+
+        put('actions/broken/action.yml', 'name: Broken\nruns:\n  using: node24\n');
+        const result = run(dir, 'root');
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain('is missing its top-level description');
+    });
+
     it.each(['LICENSE', 'LICENSE.md', 'license.txt'])(
         'links local %s files in both tables and detects their removal',
         (file) => {

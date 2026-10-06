@@ -28,6 +28,11 @@
         "actions/publish-to-pumpkin-market": {
             "component": "publish-to-pumpkin-market",
             "release-type": "simple"
+        },
+        "actions/sign-pumpkin-plugin": {
+            "component": "sign-pumpkin-plugin",
+            "release-type": "simple",
+            "release-as": "0.0.1"
         }
     },
     "changelog-sections": [

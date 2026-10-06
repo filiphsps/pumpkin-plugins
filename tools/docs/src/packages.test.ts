@@ -8,7 +8,11 @@ describe('renderPackagesBlock', () => {
                 { dir: 'packages/b-plugin', name: 'BPlugin', description: 'B | pipes', license: 'MIT' },
                 { dir: 'packages/a-plugin', name: 'APlugin', description: 'A', license: 'MIT' }
             ],
-            [{ dir: 'tools/build', name: '@x/build', description: 'Builds', license: 'MIT' }]
+            [{ dir: 'tools/build', name: '@x/build', description: 'Builds', license: 'MIT' }],
+            [
+                { dir: 'actions/zeta', name: 'Zeta', description: 'Second action' },
+                { dir: 'actions/alpha', name: 'Alpha', description: 'First action' }
+            ]
         );
         const plugins = out.split('**Tools**')[0];
         expect(plugins.indexOf('[APlugin](packages/a-plugin)')).toBeLessThan(
@@ -16,6 +20,9 @@ describe('renderPackagesBlock', () => {
         );
         expect(out).toContain('| Plugin | Description | License |');
         expect(out).toContain('| Package | Description | License |');
+        expect(out).toContain('| Action | Description |');
+        expect(out.indexOf('[Alpha](actions/alpha)')).toBeLessThan(out.indexOf('[Zeta](actions/zeta)'));
+        expect(out).toContain('| [Alpha](actions/alpha) | First action |');
         expect(out).toContain('| [BPlugin](packages/b-plugin) | B \\| pipes | MIT |');
         expect(out).toContain('| [@x/build](tools/build) | Builds | MIT |');
     });

@@ -20,7 +20,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin with `pnpm gen` and typechecks, builds and integration-tests it |
 | 🚢 Release | plugin or action release changes, on `master` pushes | Runs release-please; action releases create a versioned tag and GitHub release without a plugin artifact |
 | 📝 Prepare release PR | per created or updated release PR | Keeps plugin READMEs, action README examples and first-release pins for plugins and actions current |
-| 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, uploads the `.wasm`, then updates an existing Market listing |
+| 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs the exact build artifact, uploads it, then updates an existing Market listing |
 
 ## Running only what a change needs
 
@@ -129,14 +129,16 @@ signature over the code plus the metadata, and the public key). Pumpkin loads un
 a warning unless `allow_unsigned = false` is set in its config. Signing is optional here.
 
 `pnpm package` (`scripts/collect-plugins.mjs`) signs every plugin when the `PLUGIN_SIGNING_KEY`
-environment variable is set; the CI `build` job passes it from the repository secret of the same
-name. The `.sha256` next to each `.wasm` is of the signed file, so it matches what is released.
+environment variable is set. The release workflow instead uses the reusable
+[`sign-pumpkin-plugin` action](../actions/sign-pumpkin-plugin/README.md) after checking that the
+release tag points to the commit that produced the build. It signs each released plugin once, then
+uploads the same `.wasm` and refreshed `.sha256` to the GitHub release and Pumpkin Market.
 
 | Situation | Result |
 | --- | --- |
-| `PLUGIN_SIGNING_KEY` is a valid key | Plugins are signed |
-| Not set or empty (forks, local runs) | Plugins are collected unsigned and a warning annotation (`::warning title=Plugins are unsigned`) is shown; the build doesn't fail |
-| Set but not 64 hex characters | The step fails: a misconfigured secret must not silently ship unsigned |
+| `PLUGIN_SIGNING_KEY` is a valid key | `pnpm package` signs its outputs; the release action signs each released artifact |
+| Not set or empty | `pnpm package` collects unsigned files with a warning. The action fails by default; the release workflow sets `warn: true` so unsigned releases remain possible with a warning |
+| Set but not 64 hex characters | Signing fails: a misconfigured key must not silently ship unsigned |
 
 To set it up:
 

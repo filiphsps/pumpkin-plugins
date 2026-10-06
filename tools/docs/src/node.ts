@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { applyBlocks } from './blocks.ts';
 import type { PluginInfo } from './info.ts';
-import { type PackageRow, ROOT_NOTE, renderPackagesBlock } from './packages.ts';
+import { type ActionRow, type PackageRow, ROOT_NOTE, renderPackagesBlock } from './packages.ts';
 import { renderBlocks } from './sections.ts';
 
 /** What happened to a README. `stale` is only reported when checking: nothing was written. */
@@ -88,8 +88,68 @@ async function rows(root: string, group: 'packages' | 'tools'): Promise<PackageR
     return out;
 }
 
+function actionScalar(contents: string, key: 'name' | 'description', file: string): string {
+    const lines = contents.split(/\r?\n/);
+    const index = lines.findIndex((entry) => new RegExp(`^${key}:`).test(entry));
+    if (index < 0) throw new Error(`${file} is missing its top-level ${key}`);
+
+    const value = lines[index].slice(key.length + 1).trim();
+    let parsed: string;
+    const block = value.match(/^([>|])(?:[+-][1-9]?|[1-9][+-]?|[+-])?(?:\s+#.*)?$/);
+    if (block) {
+        const body: string[] = [];
+        for (const line of lines.slice(index + 1)) {
+            if (!line.trim()) {
+                if (body.length) body.push('');
+                continue;
+            }
+            const indent = line.match(/^ */)?.[0].length ?? 0;
+            if (!indent) break;
+            body.push(line.slice(indent));
+        }
+        parsed = body.join(block[1] === '>' ? ' ' : '\n').trim();
+    } else if (value.startsWith('"')) {
+        const match = value.match(/^((?:"(?:[^"\\]|\\.)*"))(?:\s+#.*)?$/);
+        if (!match) throw new Error(`${file} needs a single-line ${key} value`);
+        try {
+            parsed = JSON.parse(match[1]) as string;
+        } catch {
+            throw new Error(`${file} has an invalid quoted ${key}`);
+        }
+    } else if (value.startsWith("'")) {
+        const match = value.match(/^'((?:[^']|'')*)'(?:\s+#.*)?$/);
+        if (!match) throw new Error(`${file} needs a single-line ${key} value`);
+        parsed = match[1].replace(/''/g, "'");
+    } else {
+        parsed = value.replace(/\s+#.*$/, '').trim();
+    }
+    if (!parsed.trim()) throw new Error(`${file} has an empty ${key}`);
+    return parsed;
+}
+
+function actionRows(root: string): ActionRow[] {
+    const base = path.join(root, 'actions');
+    if (!fs.existsSync(base)) return [];
+    const out: ActionRow[] = [];
+    for (const entry of fs.readdirSync(base, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const dir = path.join(base, entry.name);
+        const metadata = ['action.yml', 'action.yaml']
+            .map((file) => path.join(dir, file))
+            .find((file) => fs.existsSync(file));
+        if (!metadata) continue;
+        const contents = fs.readFileSync(metadata, 'utf8');
+        out.push({
+            dir: `actions/${entry.name}`,
+            name: actionScalar(contents, 'name', metadata),
+            description: actionScalar(contents, 'description', metadata)
+        });
+    }
+    return out;
+}
+
 /**
- * Refreshes the package tables in the repo's root README.
+ * Refreshes the actions, plugin and tool tables in the repo's root README.
  * @param root - The repository root.
  * @param check - Only report whether the README is out of date, without writing.
  * @returns What happened to the README.
@@ -101,6 +161,6 @@ export async function generateRootReadme(root: string, check = false): Promise<S
     if (!existing.includes('<!-- docs:begin packages -->')) {
         throw new Error(`${file} needs a <!-- docs:begin packages --> / <!-- docs:end packages --> block`);
     }
-    const block = renderPackagesBlock(await rows(root, 'packages'), await rows(root, 'tools'));
+    const block = renderPackagesBlock(await rows(root, 'packages'), await rows(root, 'tools'), actionRows(root));
     return write(file, existing, applyBlocks(existing, { packages: block }, file, ROOT_NOTE), check);
 }

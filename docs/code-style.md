@@ -76,7 +76,7 @@ is fixed.
 
 A change that makes a doc wrong is not finished until the doc is fixed, and the checks keep it honest:
 
-- `pnpm readme:check` fails when a generated block (the plugin READMEs, the package tables) is stale.
+- `pnpm readme:check` fails when a generated block (the plugin READMEs or root action/package tables) is stale.
 - `pnpm check` runs `scripts/check-docs.mjs`, which fails when a README is missing from a package, a
   link, heading or repo path in the docs doesn't exist, a `pnpm` command isn't a script, a page isn't in
   the docs index, a root script isn't documented, or a CI job isn't in the CI table.
