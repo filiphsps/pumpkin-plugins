@@ -2,16 +2,15 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { publicKeyOf, signWasm, verifyWasm } from '../../../tools/signing/src/index.ts';
+import { getInput } from './utils.mjs';
 
-// GitHub preserves hyphens in INPUT_* environment variable names, matching @actions/core.
-const input = (name) => process.env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] ?? '';
-const pluginName = input('plugin-name').trim();
-const version = input('version').trim();
-const wasmFile = input('wasm-file').trim();
-const developerName = input('developer-name').trim();
-const signingKey = input('signing-key').trim();
-const warnOnMissingKey = input('warn').trim().toLowerCase() === 'true';
-const pluginsManifest = input('plugins-manifest').trim();
+const pluginName = getInput('plugin-name').trim();
+const version = getInput('version').trim();
+const wasmFile = getInput('wasm-file').trim();
+const developerName = getInput('developer-name').trim();
+const signingKey = getInput('signing-key').trim();
+const warnOnMissingKey = getInput('warn').trim().toLowerCase() === 'true';
+const pluginsManifest = getInput('plugins-manifest').trim();
 
 try {
     signRelease();

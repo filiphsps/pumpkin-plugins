@@ -218,6 +218,20 @@ component, the `simple` release strategy, and a first-release pin:
 }
 ```
 
+> [!IMPORTANT]
+> **Preserve hyphens in GitHub Action input names.** The runner maps `plugin-name` to the environment
+> variable `INPUT_PLUGIN-NAME`: it uppercases input names and replaces spaces with underscores, but
+> keeps hyphens. In JavaScript actions, use the standard `getInput()` helper generated in
+> `src/utils.mjs` and pass the input name exactly as declared, such as `getInput('plugin-name')`.
+> Do not pass `PLUGIN_NAME` or normalize hyphens to underscores; required inputs will appear empty.
+> Action tests must use the runner's hyphenated environment keys (for example,
+> `'INPUT_PLUGIN-NAME'`) so this behavior stays covered.
+
+Use a JavaScript action (`runs.using: node24`) when the implementation can run on GitHub's built-in
+Node runtime. Consumers do not need `actions/setup-node` or a local Node installation for that
+action. Use a composite action when it needs to orchestrate workflow steps or support other runner
+steps.
+
 Add `actions/my-action/version.txt` with `0.0.0`, a `CHANGELOG.md`, and the same path at version
 `0.0.0` in `.release-please-manifest.json`. Release Please updates the version file and changelog;
 the repository check enforces that the action version, manifest and config stay aligned. Its tag is

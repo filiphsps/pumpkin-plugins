@@ -2,17 +2,16 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { getInput } from './utils.mjs';
 
-// GitHub preserves hyphens in INPUT_* names, matching @actions/core.
-const input = (name) => process.env[`INPUT_${name.replace(/ /g, '_').toUpperCase()}`] ?? '';
-const pluginName = input('plugin-name').trim();
-const version = input('version').trim();
-const wasmFile = input('wasm-file').trim();
-const token = input('api-token').trim();
-const marketUrl = (input('api-url').trim() || 'https://market.pumpkinmc.org').replace(/\/+$/, '');
-const track = input('track').trim() || 'stable';
-const releaseNotes = input('release-notes').trim();
-const warnOnUnavailable = input('warn').trim().toLowerCase() === 'true';
+const pluginName = getInput('plugin-name').trim();
+const version = getInput('version').trim();
+const wasmFile = getInput('wasm-file').trim();
+const token = getInput('api-token').trim();
+const marketUrl = (getInput('api-url').trim() || 'https://market.pumpkinmc.org').replace(/\/+$/, '');
+const track = getInput('track').trim() || 'stable';
+const releaseNotes = getInput('release-notes').trim();
+const warnOnUnavailable = getInput('warn').trim().toLowerCase() === 'true';
 
 try {
     await publish();
