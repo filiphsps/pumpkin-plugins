@@ -18,7 +18,9 @@ for all three values; the display name defaults to a title-cased folder name.
 
 1. `actions/<folder>/action.yml`, a Node 24 JavaScript action that runs `src/index.mjs` without a
    compilation or bundling step.
-2. `src/index.mjs` with a runnable placeholder and `src/index.test.mjs` with a co-located smoke test.
+2. `src/index.mjs` with a runnable placeholder, `src/index.test.mjs` with a co-located smoke test,
+   and `src/utils.mjs`/`src/utils.test.mjs` with `getInput()` and a regression test for GitHub's
+   input environment-name rules.
 3. A `README.md`, `CHANGELOG.md` and `version.txt`, initialized to `0.0.0`.
 4. Entries in `release-please-config.json` and `.release-please-manifest.json`. The action's first
    release is pinned to `0.0.1`, and later releases get independent `<folder>-v<version>` tags.
@@ -28,7 +30,9 @@ The generator formats the files after creating them. It does not commit anything
 
 ## Next steps
 
-- Add inputs and outputs to `action.yml`.
+- Add inputs and outputs to `action.yml`. Read their values with `getInput('input-name')` from
+  `src/utils.mjs`; GitHub preserves hyphens in names such as `INPUT_PLUGIN-NAME`. See the warning in
+  [CI and releases](ci-and-releases.md#registering-an-action-for-releases).
 - Implement the action in `src/index.mjs` and cover its behavior in `src/*.test.mjs`. Action tests
   live beside their implementation and CI runs tests only for the changed action.
 - Update the generated README with usage and input documentation, then run `pnpm readme` to refresh

@@ -21,6 +21,7 @@ User instructions take precedence over this file.
 | Task | Skill to read | Documentation |
 | --- | --- | --- |
 | Create a plugin | [pumpkin-new-plugin](.agents/skills/pumpkin-new-plugin/SKILL.md) | [Creating a plugin](docs/creating-a-plugin.md) |
+| Create a GitHub Action | [pumpkin-new-action](.agents/skills/pumpkin-new-action/SKILL.md) | [Creating an action](docs/creating-an-action.md) |
 | Call Pumpkin or WASI, change permissions or lifecycle behavior | [pumpkin-plugin-api](.agents/skills/pumpkin-plugin-api/SKILL.md) | [Runtime caveats](docs/building.md#runtime-caveats) |
 | Change settings, commands, metadata or generated READMEs | [pumpkin-plugin-contracts](.agents/skills/pumpkin-plugin-contracts/SKILL.md) | [Config](docs/plugin-config.md), [Plugin info](docs/plugin-info-and-readmes.md) |
 | Add tests, choose affected suites, debug server failures | [pumpkin-testing](.agents/skills/pumpkin-testing/SKILL.md) | [Testing](docs/testing.md) |
