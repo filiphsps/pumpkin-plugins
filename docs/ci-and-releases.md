@@ -15,7 +15,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 🧪 Test | plugin or repository code changes | Unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
 | 🧪 Action tests | action code changes | `.github/workflows/actions.yml` tests only the changed action, with `*.test.*` files co-located in `actions/{name}/src/` |
 | 📝 Docs and config | always | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
-| 🔨 Build | code changes, after lint and typecheck | Builds every plugin and uploads them as an artifact |
+| 🔨 Build | code changes, after lint and typecheck | Builds, signs and verifies every plugin before uploading artifacts for integration and releases |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin and action, checks release registration and READMEs, tests the action, then typechecks, builds and integration-tests the plugin |
 | 🚢 Release | plugin or action release changes, on `master` pushes | Runs release-please; action releases create a versioned tag and GitHub release without a plugin artifact |
@@ -130,15 +130,19 @@ signature over the code plus the metadata, and the public key). Pumpkin loads un
 a warning unless `allow_unsigned = false` is set in its config. Signing is optional here.
 
 `pnpm package` (`scripts/collect-plugins.mjs`) signs every plugin when the `PLUGIN_SIGNING_KEY`
-environment variable is set. The release workflow instead uses the reusable
+environment variable is set. CI always prepares a key before packaging: pushes use the repository
+secret when available, while pull requests and pushes without the secret use an ephemeral key. CI
+verifies each signature and uses the signed files for integration tests. The ephemeral key is only
+for checks; release jobs never receive it. The release workflow uses the reusable
 [`sign-pumpkin-plugin` action](../actions/sign-pumpkin-plugin/README.md) after checking that the
-release tag points to the commit that produced the build. It signs each released plugin once, then
-uploads the same `.wasm` and refreshed `.sha256` to the GitHub release and Pumpkin Market.
+release tag points to the commit that produced the build. That step requires the repository key and
+fails if it is missing; it uploads the signed `.wasm` and refreshed `.sha256` to the GitHub release
+and Pumpkin Market.
 
 | Situation | Result |
 | --- | --- |
-| `PLUGIN_SIGNING_KEY` is a valid key | `pnpm package` signs its outputs; the release action signs each released artifact |
-| Not set or empty | `pnpm package` collects unsigned files with a warning. The action fails by default; the release workflow sets `warn: true` so unsigned releases remain possible with a warning |
+| `PLUGIN_SIGNING_KEY` is a valid key | `pnpm package` signs its outputs; CI uses the repository key on pushes and the release action signs the published artifact |
+| Not set or empty | Local `pnpm package` warns and collects unsigned files. CI uses a run-only key; release signing fails rather than publishing unsigned files |
 | Set but not 64 hex characters | Signing fails: a misconfigured key must not silently ship unsigned |
 
 To set it up:
@@ -262,8 +266,9 @@ These aren't done by the workflows:
 3. Optional: add a PAT or GitHub App token as the `RELEASE_PLEASE_TOKEN` secret. Without it, CI
    doesn't run on the release PR, because GitHub doesn't trigger workflows for events created with
    `GITHUB_TOKEN`. That includes the README commit.
-4. Optional: add the Ed25519 signing key as the `PLUGIN_SIGNING_KEY` secret (see [Signing](#signing)).
-   Without it, plugins are released unsigned.
+4. Add the Ed25519 signing key as the `PLUGIN_SIGNING_KEY` secret (see [Signing](#signing)).
+   Non-release checks use an ephemeral key, but the release workflow requires this secret to publish
+   signed artifacts.
 5. For market publishing: create a Market API key with the `plugins:update` and
    `plugins:versions:upload` scopes, then add it as the `MARKET_API_TOKEN` repository secret. Keep
    the key out of the repository and chat messages.

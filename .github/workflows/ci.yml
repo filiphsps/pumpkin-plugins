@@ -155,8 +155,26 @@ jobs:
             - name: 🔨 Build All
               run: pnpm run build
 
-            - name: 📦 Collect plugins
-              run: pnpm run package
+            # Fork PRs cannot access repository secrets. Sign their CI artifacts with a run-only
+            # key so the build and integration artifacts are always signed without exposing the
+            # repository release key.
+            - name: 🔏 Prepare signing key
+              env:
+                  PLUGIN_SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY }}
+              run: |
+                  PLUGIN_SIGNING_KEY="$(printf '%s' "$PLUGIN_SIGNING_KEY" | tr -d '[:space:]')"
+                  if [ "$GITHUB_EVENT_NAME" != "push" ] || [ -z "$PLUGIN_SIGNING_KEY" ]; then
+                      PLUGIN_SIGNING_KEY="$(node --input-type=module -e 'import { generateKeyPair } from "@pumpkin-plugins/signing"; process.stdout.write(generateKeyPair().secretKeyHex);')"
+                      echo "::add-mask::$PLUGIN_SIGNING_KEY"
+                      echo "::warning title=Ephemeral signing key::This run uses a run-only key; its signed artifacts are for CI and cannot be published."
+                  fi
+                  echo "PLUGIN_SIGNING_KEY=$PLUGIN_SIGNING_KEY" >> "$GITHUB_ENV"
+
+            - name: 📦 Collect and sign plugins
+              run: node scripts/collect-plugins.mjs
+
+            - name: 🔎 Install verified signed plugins for integration tests
+              run: node scripts/install-signed-plugin-builds.mjs
 
             - name: 📦 Upload build artifact
               uses: actions/upload-artifact@v7.0.1
@@ -447,7 +465,6 @@ jobs:
                   wasm-file: ${{ steps.plugin.outputs.wasm_file }}
                   developer-name: Filiph Sandström
                   signing-key: ${{ secrets.PLUGIN_SIGNING_KEY }}
-                  warn: true
 
             - name: 📦 Prepare signed release artifact
               env:
