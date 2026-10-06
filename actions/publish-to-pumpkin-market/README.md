@@ -6,7 +6,7 @@ Node 24 runtime and needs no setup step.
 
 ```yaml
 steps:
-  - uses: filiphsps/pumpkin-plugins/actions/publish-to-pumpkin-market@publish-to-pumpkin-market-v0.0.1
+  - uses: filiphsps/pumpkin-plugins/actions/publish-to-pumpkin-market@publish-to-pumpkin-market-v0.0.2
     with:
       plugin-name: MyPlugin
       version: 1.2.3
