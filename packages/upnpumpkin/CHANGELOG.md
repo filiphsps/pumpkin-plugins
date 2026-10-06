@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.4](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.0.3...upnpumpkin-v0.0.4) (2026-10-06)
+
+
+### Features
+
+* **config:** support migrated field values ([b519ebe](https://github.com/filiphsps/pumpkin-plugins/commit/b519ebe84bfa1d2c6685807b44d85a4d3d0860bb))
+* **testing:** add workspace coverage reports ([8db42a8](https://github.com/filiphsps/pumpkin-plugins/commit/8db42a870f5bc2526890f3144b80308dc9bab006))
+
+
+### Bug Fixes
+
+* **build:** preserve artifact backup on rollback failure ([0f30c46](https://github.com/filiphsps/pumpkin-plugins/commit/0f30c4625a7a66c6e3442a648ca5c1aabbbecf44))
+* **build:** retain type backup on rollback failure ([4bbeea0](https://github.com/filiphsps/pumpkin-plugins/commit/4bbeea03110d06372df608fc46e008ca991aee3a))
+* **config:** parse full-range TOML integers ([7027d76](https://github.com/filiphsps/pumpkin-plugins/commit/7027d76f1f5adce59e29e62973008eedfcbe914f))
+
 ## [0.0.3](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.0.2...upnpumpkin-v0.0.3) (2026-10-05)
 
 
