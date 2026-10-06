@@ -6,7 +6,6 @@ import { pathToFileURL } from 'node:url';
 
 const REPOSITORY = 'Pumpkin-MC/Pumpkin';
 const RELEASES_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
-const BUILD_TIMEOUT_MS = 10 * 60 * 1000;
 
 /** Returns the Pumpkin release asset name for a platform. */
 export function assetName(platform, arch) {
@@ -154,22 +153,15 @@ function fileHash(file) {
 
 function watchBuildOutputs(plugins, serverPluginsDir) {
     const previousHashes = new Map(plugins.map((plugin) => [plugin.name, fileHash(plugin.outputPath)]));
-    const initialChanges = new Set();
     const watchers = [];
     const timers = new Map();
-    let initialResolve;
-    let initialReject;
-    let initialTimeout;
     let rejectFailure;
-    let initialComplete = false;
     const failure = new Promise((_, reject) => {
         rejectFailure = reject;
     });
     failure.catch(() => {});
 
     const fail = (error) => {
-        clearTimeout(initialTimeout);
-        initialReject?.(error);
         rejectFailure(error);
     };
 
@@ -180,11 +172,6 @@ function watchBuildOutputs(plugins, serverPluginsDir) {
             if (hash === previousHashes.get(plugin.name)) return;
             previousHashes.set(plugin.name, hash);
             if (!hash) return;
-            if (!initialComplete) {
-                initialChanges.add(plugin.name);
-                if (initialChanges.size === plugins.length) initialResolve?.();
-                return;
-            }
             copyPluginBuild(plugin, serverPluginsDir);
             console.log(`Copied ${plugin.name}.wasm into the server plugins folder; Pumpkin should hot-reload it.`);
         } catch (error) {
@@ -211,33 +198,10 @@ function watchBuildOutputs(plugins, serverPluginsDir) {
     }
 
     return {
-        waitForInitialBuild(timeoutMs) {
-            if (initialChanges.size === plugins.length) return Promise.resolve();
-            return new Promise((resolve, reject) => {
-                initialResolve = resolve;
-                initialReject = reject;
-                initialTimeout = setTimeout(() => {
-                    const missing = plugins
-                        .filter((plugin) => !initialChanges.has(plugin.name))
-                        .map((plugin) => plugin.name);
-                    reject(new Error(`Timed out waiting for initial plugin builds: ${missing.join(', ')}`));
-                }, timeoutMs);
-                initialResolve = () => {
-                    clearTimeout(initialTimeout);
-                    resolve();
-                };
-            });
-        },
-        startReloads() {
-            initialComplete = true;
-        },
         failure,
         close() {
-            clearTimeout(initialTimeout);
             for (const timer of timers.values()) clearTimeout(timer);
             for (const watcher of watchers) watcher.close();
-            // Prevent any pending watcher error from trying to reject a completed startup.
-            initialReject = undefined;
         }
     };
 }
@@ -252,8 +216,8 @@ function createServerDirectory(serverDir) {
     return pluginsDir;
 }
 
-function spawnChild(command, args, options) {
-    const child = spawn(command, args, options);
+function spawnChild(command, args, options, spawnImpl = spawn) {
+    const child = spawnImpl(command, args, options);
     const done = new Promise((resolve, reject) => {
         child.once('error', reject);
         child.once('exit', (code, signal) => resolve({ code, signal }));
@@ -265,18 +229,39 @@ function pnpmCommand() {
     return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 }
 
+/** Starts Turbo's one-shot build for all workspace plugins. */
+export function startInitialBuild(root, spawnImpl = spawn) {
+    return spawnChild(
+        pnpmCommand(),
+        ['exec', 'turbo', 'run', 'build', '--ui=stream', '--log-order=stream'],
+        {
+            cwd: root,
+            stdio: 'inherit',
+            shell: process.platform === 'win32'
+        },
+        spawnImpl
+    );
+}
+
 /** Starts a server running all workspace plugins and watches builds for live updates. */
-export async function runDev({ root = path.resolve(import.meta.dirname, '..') } = {}) {
+export async function runDev({
+    root = path.resolve(import.meta.dirname, '..'),
+    spawnImpl = spawn,
+    resolveBinary = resolvePumpkinBinary
+} = {}) {
     const plugins = listPluginBuilds(root);
     if (plugins.length === 0) throw new Error('No plugin packages with pumpkinPlugin.output were found');
 
     const serverDir = path.join(root, '.cache', 'pumpkin-dev');
     const serverPluginsDir = createServerDirectory(serverDir);
-    const outputs = watchBuildOutputs(plugins, serverPluginsDir);
-    const buildTimeout = Number(process.env.PUMPKIN_DEV_BUILD_TIMEOUT_MS) || BUILD_TIMEOUT_MS;
+    let outputs;
     let turbo;
     let server;
     let shuttingDown = false;
+    let resolveShutdown;
+    const shutdown = new Promise((resolve) => {
+        resolveShutdown = resolve;
+    });
 
     const stopChildren = (signal = 'SIGTERM') => {
         if (shuttingDown) return;
@@ -287,6 +272,7 @@ export async function runDev({ root = path.resolve(import.meta.dirname, '..') } 
     const handleSignal = (signal) => {
         process.exitCode = signal === 'SIGINT' ? 130 : 143;
         stopChildren(signal);
+        resolveShutdown();
     };
     const onInterrupt = () => handleSignal('SIGINT');
     const onTerminate = () => handleSignal('SIGTERM');
@@ -295,26 +281,37 @@ export async function runDev({ root = path.resolve(import.meta.dirname, '..') } 
 
     try {
         console.log('Building every plugin, then launching the latest stable Pumpkin release.');
-        const initialBuild = outputs.waitForInitialBuild(buildTimeout);
-        turbo = spawnChild(pnpmCommand(), ['exec', 'turbo', 'watch', 'build', '--ui=stream', '--log-order=stream'], {
-            cwd: root,
-            stdio: 'inherit',
-            shell: process.platform === 'win32'
+        const initialBuild = startInitialBuild(root, spawnImpl);
+        turbo = initialBuild;
+        const buildResult = initialBuild.done.then(({ code, signal }) => {
+            if (!shuttingDown && (code !== 0 || signal)) {
+                throw new Error(`turbo run build exited (${signal ?? code ?? 'unknown status'})`);
+            }
         });
-        const turboExit = turbo.done.then(({ code, signal }) => {
-            if (!shuttingDown) throw new Error(`turbo watch build exited (${signal ?? code ?? 'unknown status'})`);
-        });
-        const startup = Promise.all([initialBuild, resolvePumpkinBinary({ root })]);
-        const startupResult = await Promise.race([startup, turboExit, outputs.failure]);
+        const startup = Promise.all([buildResult, resolveBinary({ root })]);
+        const startupResult = await Promise.race([startup, shutdown]);
         if (shuttingDown) return;
         const [, resolvedBinary] = startupResult;
 
         for (const plugin of plugins) copyPluginBuild(plugin, serverPluginsDir);
-        outputs.startReloads();
+        outputs = watchBuildOutputs(plugins, serverPluginsDir);
+        turbo = spawnChild(
+            pnpmCommand(),
+            ['exec', 'turbo', 'watch', 'build', '--ui=stream', '--log-order=stream'],
+            {
+                cwd: root,
+                stdio: 'inherit',
+                shell: process.platform === 'win32'
+            },
+            spawnImpl
+        );
+        const turboExit = turbo.done.then(({ code, signal }) => {
+            if (!shuttingDown) throw new Error(`turbo watch build exited (${signal ?? code ?? 'unknown status'})`);
+        });
 
         const { binary: serverBinary, release } = resolvedBinary;
         console.log(`Starting Pumpkin ${release} with ${plugins.length} plugins in ${serverDir}`);
-        server = spawnChild(serverBinary, [], { cwd: serverDir, stdio: 'inherit' });
+        server = spawnChild(serverBinary, [], { cwd: serverDir, stdio: 'inherit' }, spawnImpl);
         const serverResult = await Promise.race([
             server.done,
             turboExit.then(() => new Promise(() => {})),
@@ -324,7 +321,7 @@ export async function runDev({ root = path.resolve(import.meta.dirname, '..') } 
     } finally {
         process.removeListener('SIGINT', onInterrupt);
         process.removeListener('SIGTERM', onTerminate);
-        outputs.close();
+        outputs?.close();
         stopChildren('SIGTERM');
     }
 }

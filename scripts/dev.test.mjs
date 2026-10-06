@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -10,7 +11,8 @@ import {
     listPluginBuilds,
     parseChecksums,
     releaseAsset,
-    resolvePumpkinBinary
+    resolvePumpkinBinary,
+    runDev
 } from './dev.mjs';
 
 const tempDirs = [];
@@ -163,5 +165,71 @@ describe('copyPluginBuild', () => {
         assert.equal(fs.readFileSync(target, 'utf8'), 'built bytes');
         assert.equal(fs.readFileSync(external, 'utf8'), 'leave this alone');
         assert.equal(fs.lstatSync(target).isSymbolicLink(), false);
+    });
+});
+
+describe('runDev', () => {
+    it('starts the server when cached plugin outputs do not change during the initial build', async () => {
+        const root = tempDir();
+        const packageDir = path.join(root, 'packages', 'plugin');
+        const output = path.join(packageDir, 'build', 'plugin.wasm');
+        fs.mkdirSync(packageDir, { recursive: true });
+        fs.writeFileSync(
+            path.join(packageDir, 'package.json'),
+            JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } })
+        );
+        fs.mkdirSync(path.dirname(output), { recursive: true });
+        fs.writeFileSync(output, 'cached build');
+        const calls = [];
+        const spawnImpl = (command, args, options) => {
+            const child = new EventEmitter();
+            child.kill = () => {};
+            calls.push({ command, args, options });
+            if (args.includes('run') || command === '/fake/pumpkin') {
+                process.nextTick(() => child.emit('exit', 0, null));
+            }
+            return child;
+        };
+
+        await runDev({
+            root,
+            spawnImpl,
+            resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' })
+        });
+
+        assert.deepEqual(calls[0].args, ['exec', 'turbo', 'run', 'build', '--ui=stream', '--log-order=stream']);
+        assert.equal(calls.at(-1).command, '/fake/pumpkin');
+        assert.equal(
+            fs.readFileSync(path.join(root, '.cache', 'pumpkin-dev', 'plugins', 'plugin.wasm'), 'utf8'),
+            'cached build'
+        );
+    });
+
+    it('reports an initial Turbo build failure without starting Pumpkin', async () => {
+        const root = tempDir();
+        const packageDir = path.join(root, 'packages', 'plugin');
+        fs.mkdirSync(path.join(packageDir, 'build'), { recursive: true });
+        fs.writeFileSync(
+            path.join(packageDir, 'package.json'),
+            JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } })
+        );
+        const calls = [];
+        const spawnImpl = (command, args) => {
+            const child = new EventEmitter();
+            child.kill = () => {};
+            calls.push({ command, args });
+            process.nextTick(() => child.emit('exit', 1, null));
+            return child;
+        };
+
+        await assert.rejects(
+            runDev({
+                root,
+                spawnImpl,
+                resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' })
+            }),
+            /turbo run build exited \(1\)/
+        );
+        assert.equal(calls.length, 1);
     });
 });
