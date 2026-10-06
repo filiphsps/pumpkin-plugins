@@ -19,7 +19,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin with `pnpm gen` and typechecks, builds and integration-tests it |
 | 🚢 Release | plugin or action release changes, on `master` pushes | Runs release-please; action releases create a versioned tag and GitHub release without a plugin artifact |
-| 📝 Prepare release PR | per created or updated release PR | Keeps plugin READMEs and first-release pins for plugins and actions current |
+| 📝 Prepare release PR | per created or updated release PR | Keeps plugin READMEs, action README examples and first-release pins for plugins and actions current |
 | 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, uploads the `.wasm`, then updates an existing Market listing |
 
 ## Running only what a change needs
@@ -90,9 +90,11 @@ a later release run can miss the previous release and recreate its changelog. Th
 keeps `force-tag-creation` enabled, and the repository check enforces it.
 
 Each time release-please creates or updates release PRs, a separate matrix job prepares every returned
-PR branch. It regenerates plugin READMEs and pushes a `docs: update generated READMEs` commit to the
-PR branch, so they are current when the release merges. The same run retires the `release-as` pin of
-any plugin or action the PR releases (see below).
+PR branch. It regenerates plugin READMEs and updates the versioned example tag in every action README
+from that action's Release Please manifest entry. For an action that has not had its first release,
+the README uses its `release-as` version instead of `0.0.0`. The job pushes a
+`docs: update generated READMEs` commit to the PR branch, so examples are current when the release
+merges. The same run retires the `release-as` pin of any plugin or action the PR releases (see below).
 release-please rewrites its branch on every update, so those commits are re-added each time.
 
 Release PRs refresh on every release run, even when their release notes are unchanged.
@@ -216,8 +218,8 @@ generator and the checks can't drift:
 | `scripts/check-docs.mjs` | a package has no README, a link, heading or path in the docs doesn't exist, a `pnpm` command isn't a script, a doc page isn't in the docs index, a root script isn't documented, or a CI job isn't in the table above |
 
 `pnpm test:scripts` runs the tests of those three, `scripts/unpin-release-as.mjs`,
-`scripts/changed-areas.mjs`, the bundled release commit selector, and the agent hooks, using fixtures
-and throwaway repos. See "Docs match the code" in
+`scripts/update-action-readmes.mjs`, `scripts/changed-areas.mjs`, the bundled release commit selector,
+and the agent hooks, using fixtures and throwaway repos. See "Docs match the code" in
 [Code style](code-style.md).
 
 ## Publishing to market.pumpkinmc.org
