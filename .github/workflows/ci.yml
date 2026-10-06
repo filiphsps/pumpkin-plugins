@@ -24,7 +24,7 @@ jobs:
     changes:
         name: 🔍 Changed files
         timeout-minutes: 5
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         outputs:
             code: ${{ steps.classify.outputs.code }}
             actions: ${{ steps.classify.outputs.actions }}
@@ -50,7 +50,7 @@ jobs:
         name: 💬 Commit messages
         if: github.event_name == 'pull_request'
         timeout-minutes: 5
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         permissions:
             contents: read
             pull-requests: read
@@ -68,7 +68,7 @@ jobs:
         needs: [changes]
         if: needs.changes.outputs.code == 'true'
         timeout-minutes: 15
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -84,7 +84,7 @@ jobs:
         needs: [changes]
         if: needs.changes.outputs.code == 'true'
         timeout-minutes: 15
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -100,7 +100,7 @@ jobs:
         needs: [changes]
         if: needs.changes.outputs.code == 'true'
         timeout-minutes: 15
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -124,7 +124,7 @@ jobs:
     docs:
         name: 📝 Docs and config
         timeout-minutes: 10
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -144,7 +144,7 @@ jobs:
         needs: [changes, lint, typecheck]
         if: needs.changes.outputs.code == 'true'
         timeout-minutes: 25
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -224,7 +224,7 @@ jobs:
         needs: [changes, build]
         if: needs.changes.outputs.code == 'true'
         timeout-minutes: 60
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -277,7 +277,7 @@ jobs:
         needs: [changes, lint]
         if: needs.changes.outputs.code == 'true'
         timeout-minutes: 60
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -337,7 +337,7 @@ jobs:
               )
             }}
         timeout-minutes: 10
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         permissions:
             contents: write
             issues: write
@@ -366,7 +366,7 @@ jobs:
         needs: [release]
         if: ${{ needs.release.outputs.prs != '' && needs.release.outputs.prs != '[]' }}
         timeout-minutes: 10
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         permissions:
             contents: write
         strategy:
@@ -422,7 +422,7 @@ jobs:
         needs: [release]
         if: ${{ needs.release.outputs.paths_released != '[]' }}
         timeout-minutes: 10
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         permissions:
             contents: write
         strategy:
@@ -509,7 +509,7 @@ jobs:
         needs: [release, assets]
         if: ${{ needs.release.outputs.paths_released != '[]' }}
         timeout-minutes: 10
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         strategy:
             fail-fast: false
             matrix:
@@ -573,7 +573,7 @@ jobs:
               )
             }}
         timeout-minutes: 5
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         permissions:
             actions: write
         steps:

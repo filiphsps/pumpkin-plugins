@@ -2,7 +2,8 @@
 
 The plugin and release jobs are in `.github/workflows/ci.yml`; action tests have their own
 `.github/workflows/actions.yml`, scoped to changes under `actions/`. The shared setup (pnpm, Node,
-install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
+install, Turborepo cache) is the composite action in `.github/common/bootstrap`. Workflow jobs use
+`ubuntu-24.04` to keep their runner image stable as `ubuntu-latest` migrates to Ubuntu 26.
 
 ## Jobs
 
