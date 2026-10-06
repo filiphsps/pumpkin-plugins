@@ -177,6 +177,7 @@ jobs:
               run: node scripts/install-signed-plugin-builds.mjs
 
             - name: 📦 Upload build artifact
+              id: upload-signed-plugins
               uses: actions/upload-artifact@v7.0.1
               with:
                   retention-days: 1
@@ -185,6 +186,18 @@ jobs:
                   if-no-files-found: error
                   name: plugins
                   path: dist/
+
+            - name: 📝 Add signed plugins to the job summary
+              env:
+                  ARTIFACT_URL: ${{ steps.upload-signed-plugins.outputs.artifact-url }}
+              run: |
+                  {
+                      echo "### Signed plugin artifacts"
+                      echo
+                      echo "[Download signed plugin files]($ARTIFACT_URL)"
+                      echo
+                      echo "Available for one day."
+                  } >> "$GITHUB_STEP_SUMMARY"
 
             - name: 📦 Upload plugin builds for integration tests
               uses: actions/upload-artifact@v7.0.1
@@ -569,7 +582,7 @@ jobs:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   artifact_ids="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
-                      --jq '.artifacts[] | select(.name == "plugins" or .name == "plugin-wasm" or .name == "update-check-fixture" or (.name | startswith("release-"))) | .id')"
+                      --jq '.artifacts[] | select(.name == "plugin-wasm" or .name == "update-check-fixture" or (.name | startswith("release-"))) | .id')"
                   if [ -z "$artifact_ids" ]; then
                       echo "No temporary artifacts to delete"
                       exit 0

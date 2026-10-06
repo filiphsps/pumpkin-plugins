@@ -21,13 +21,14 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 🚢 Release | plugin or action release changes, on `master` pushes | Runs release-please; action releases create a versioned tag and GitHub release without a plugin artifact |
 | 📝 Prepare release PR | per created or updated release PR | Keeps plugin READMEs, action README examples and first-release pins for plugins and actions current |
 | 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs the exact build artifact, uploads it, then updates an existing Market listing |
-| 🧹 Cleanup artifacts | after successful consumers | Deletes build, integration and release handoff artifacts after their last use |
+| 🧹 Cleanup artifacts | after successful consumers | Deletes integration and release handoff artifacts after their last use |
 
-Successful runs delete the signed plugin artifacts, integration fixture and per-release handoff
-artifacts after all consumers finish. If an artifact consumer fails, cleanup is skipped so the
-artifacts remain available for a rerun; all workflow artifacts expire after one day. Fork and
-Dependabot pull requests use read-only tokens, so their artifacts expire after one day instead of
-being deleted by the workflow.
+The signed `plugins` build artifact remains available in the run summary, with a direct download
+link in the build job summary, for one day. Successful runs delete the integration fixture and
+per-release handoff artifacts after all consumers finish. If an artifact consumer fails, cleanup is
+skipped so its handoff artifacts remain available for a rerun. Fork and Dependabot pull requests use
+read-only tokens, so their temporary artifacts expire after one day instead of being deleted by the
+workflow.
 
 ## Running only what a change needs
 
