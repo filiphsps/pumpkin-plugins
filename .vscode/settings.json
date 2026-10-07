@@ -33,6 +33,8 @@
         "upnpumpkin",
         "vitepress",
         "vitest",
-        "WASI"
+        "WASI",
+        "worktree",
+        "Xaero's"
     ]
 }
