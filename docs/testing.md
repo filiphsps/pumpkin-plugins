@@ -9,10 +9,11 @@ Each plugin has two vitest projects, set up by `definePluginVitestConfig()` from
 | `integration` | `test/**/*.itest.ts` | `pnpm test:integration`. Builds first, then runs against a real Pumpkin. Test files and up to four package suites run concurrently. |
 
 Run `pnpm coverage` from the repository root to run every package's unit tests with Vitest's V8
-coverage provider. Each package writes an LCOV report to `coverage/lcov.info`; source files are
-included even when no test imports them. CI uploads these reports to Codecov. Coverage measures
-TypeScript executed in the test process; integration tests verify compiled WASM behavior but do not
-collect guest-code coverage.
+coverage provider, then the GitHub Action tests with c8. Each package writes an LCOV report to
+`coverage/lcov.info`; action coverage is combined under `coverage/actions/lcov.info`. CI uploads
+these reports to Codecov. Coverage measures source files executed in the test process; integration
+tests verify compiled WASM behavior but do not collect guest-code coverage. The Actions workflow
+also tests changed actions under c8 and uploads their coverage to Codecov.
 
 Run one plugin's integration tests with
 `pnpm exec turbo run test:integration --filter=@pumpkin-plugins/<folder>`. To run only changed

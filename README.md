@@ -61,7 +61,7 @@ pnpm test
 | `pnpm lint:commits` | Check the last commit message against Conventional Commits, the way CI does |
 | `pnpm typecheck` | Typecheck every package |
 | `pnpm test` | Unit tests |
-| `pnpm coverage` | Unit tests with V8 coverage; writes LCOV reports under each package's `coverage/` directory |
+| `pnpm coverage` | Unit tests with V8 coverage; writes LCOV reports under package and action coverage directories |
 | `pnpm test:scripts` | Tests of the repo checks and release scripts in `scripts/` |
 | `pnpm test:integration` | Build, then run the tests against a real Pumpkin server (`PUMPKIN_BIN` picks the binary, see [Testing](docs/testing.md)) |
 | `pnpm readme` | Regenerate plugin READMEs and the action and package tables above |

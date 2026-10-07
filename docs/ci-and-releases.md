@@ -15,8 +15,8 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 💬 Commit messages | code, action, or generated README changes on PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
-| 🧪 Test | plugin or repository code changes | Unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
-| 🧪 Action tests | action code changes | `.github/workflows/actions.yml` tests only the changed action, with `*.test.*` files co-located in `actions/{name}/src/` |
+| 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
+| 🧪 Action tests | action code changes | `.github/workflows/actions.yml` lints and tests only the changed action, then uploads its c8 coverage to Codecov; tests live in `actions/{name}/src/*.test.mjs` |
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after lint and typecheck | Builds and collects every plugin, then signs and verifies them with the reusable action before upload |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |

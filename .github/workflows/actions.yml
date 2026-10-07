@@ -76,4 +76,11 @@ jobs:
             - name: 🧪 Test action
               env:
                   ACTION_NAME: ${{ matrix.action }}
-              run: node --test actions/"$ACTION_NAME"/src/*.test.mjs
+              run: pnpm exec c8 --reporter=lcov --reporter=text --reports-dir=coverage/actions node --test actions/"$ACTION_NAME"/src/*.test.mjs
+
+            - name: ☂️ Upload action coverage
+              uses: codecov/codecov-action@v7.1.1
+              with:
+                  directory: .
+                  flags: actions
+                  token: ${{ secrets.CODECOV_TOKEN }}
