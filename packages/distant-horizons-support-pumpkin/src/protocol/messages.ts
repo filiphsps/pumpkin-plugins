@@ -21,10 +21,22 @@ export interface Section {
     x: number;
     z: number;
 }
+/** Settings exchanged in a DH session configuration message. */
+export interface SessionConfiguration {
+    generationPlan: number;
+    generationDistance: number;
+    generationRate: number;
+    realTimeUpdates: boolean;
+    realTimeDistance: number;
+    syncEnabled: boolean;
+    syncDistance: number;
+    syncRate: number;
+    bandwidthKbps: number;
+}
 /** Client messages accepted by the server. */
 export type Message =
     | { type: 'init'; dimension: string }
-    | { type: 'config'; disabled: boolean; distance: number; concurrency: number; sync: boolean }
+    | { type: 'config'; config: SessionConfiguration }
     | { type: 'request'; tracker: number; level: string; section: Section; timestamp?: number }
     | { type: 'cancel'; tracker: number }
     | { type: 'close' };
@@ -46,21 +58,42 @@ export function decode(data: Uint8Array): Message {
     let message: Message;
     if (id === 3) message = { type: 'init', dimension: input.string() };
     else if (id === 4) {
-        const plan = input.byte();
-        if (plan > 3) throw new RangeError('Invalid generator plan');
-        const distance = input.int();
+        const generationPlan = input.byte();
+        if (generationPlan > 3) throw new RangeError('Invalid generator plan');
+        const generationDistance = input.int();
         input.int();
         input.int();
         input.int();
-        const concurrency = input.int();
-        input.bool();
-        input.int();
-        const sync = input.bool();
-        input.int();
-        input.int();
-        input.int();
-        if (distance < 0 || concurrency < 0) throw new RangeError('Invalid DH client limits');
-        message = { type: 'config', disabled: plan === 3, distance, concurrency, sync };
+        const generationRate = input.int();
+        const realTimeUpdates = input.bool();
+        const realTimeDistance = input.int();
+        const syncEnabled = input.bool();
+        const syncDistance = input.int();
+        const syncRate = input.int();
+        const bandwidthKbps = input.int();
+        if (
+            generationDistance < 0 ||
+            generationRate < 0 ||
+            realTimeDistance < 0 ||
+            syncDistance < 0 ||
+            syncRate < 0 ||
+            bandwidthKbps < 0
+        )
+            throw new RangeError('Invalid DH client limits');
+        message = {
+            type: 'config',
+            config: {
+                generationPlan,
+                generationDistance,
+                generationRate,
+                realTimeUpdates,
+                realTimeDistance,
+                syncEnabled,
+                syncDistance,
+                syncRate,
+                bandwidthKbps
+            }
+        };
     } else if (id === 7) {
         const tracker = input.int();
         const level = input.string();
@@ -84,30 +117,30 @@ export function packet(id: number): Writer {
 export function levelInit(dimension: string, server: string, level: string, now: number): Uint8Array {
     return packet(2).string(dimension).string(server).string(level).timestamp(now).finish();
 }
-/** Advertises the generation and login-sync request rates allowed by this server. */
-export function sessionConfig(
-    distance: number,
-    generationRequestsPerSecond: number,
-    syncRequestsPerSecond: number
-): Uint8Array {
+/** Encodes the negotiated settings for one DH client session. */
+export function sessionConfig(config: SessionConfiguration): Uint8Array {
     return packet(4)
-        .byte(2)
-        .int(distance)
+        .byte(config.generationPlan)
+        .int(config.generationDistance)
         .int(0)
         .int(0)
         .int(0)
-        .int(generationRequestsPerSecond)
-        .bool(false)
-        .int(0)
-        .bool(true)
-        .int(distance)
-        .int(syncRequestsPerSecond)
-        .int(0)
+        .int(config.generationRate)
+        .bool(config.realTimeUpdates)
+        .int(config.realTimeDistance)
+        .bool(config.syncEnabled)
+        .int(config.syncDistance)
+        .int(config.syncRate)
+        .int(config.bandwidthKbps)
         .finish();
 }
 /** Rejects a request using the client's typed exception response. */
 export function reject(tracker: number, reason: string, kind = 2): Uint8Array {
     return packet(6).int(tracker).int(kind).string(reason).finish();
+}
+/** Closes a DH session with a client-readable reason. */
+export function closeSession(reason: string): Uint8Array {
+    return packet(1).string(reason).finish();
 }
 /** Responds to an unchanged update-only request. */
 export function unchanged(tracker: number): Uint8Array {
@@ -117,15 +150,23 @@ export function unchanged(tracker: number): Uint8Array {
 export function transfer(tracker: number, buffer: number, lod: Uint8Array): Uint8Array[] {
     const packets: Uint8Array[] = [];
     for (let offset = 0; offset < lod.length; offset += TRANSFER_PACKET_BYTES) {
-        const part = lod.subarray(offset, offset + TRANSFER_PACKET_BYTES);
-        packets.push(
-            packet(10)
-                .int(buffer)
-                .blob(part)
-                .bool(offset === 0)
-                .finish()
-        );
+        packets.push(transferFragment(buffer, lod, offset));
     }
-    packets.push(packet(8).int(tracker).bool(true).int(buffer).int(0).finish());
+    packets.push(transferResponse(tracker, buffer));
     return packets;
+}
+
+/** Encodes one bounded transfer fragment. */
+export function transferFragment(buffer: number, lod: Uint8Array, offset: number): Uint8Array {
+    const part = lod.subarray(offset, offset + TRANSFER_PACKET_BYTES);
+    return packet(10)
+        .int(buffer)
+        .blob(part)
+        .bool(offset === 0)
+        .finish();
+}
+
+/** Encodes the response that completes a transfer after all fragments. */
+export function transferResponse(tracker: number, buffer: number): Uint8Array {
+    return packet(8).int(tracker).bool(true).int(buffer).int(0).finish();
 }

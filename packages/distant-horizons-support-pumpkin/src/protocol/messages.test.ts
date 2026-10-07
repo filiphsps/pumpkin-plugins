@@ -40,10 +40,33 @@ describe('Distant Horizons protocol', () => {
         expect(() => new Reader(new Uint8Array([0, 2, 192, 128])).string()).toThrow('UTF-8');
         expect(() => decode(new Writer().short(15).short(3).string('world').finish())).toThrow('protocol');
     });
-    it('uses the released client session configuration order', () => {
-        const bytes = sessionConfig(128, 20, 50);
+    it('encodes negotiated generation and sync limits independently', () => {
+        const bytes = sessionConfig({
+            generationPlan: 2,
+            generationDistance: 128,
+            generationRate: 20,
+            realTimeUpdates: false,
+            realTimeDistance: 0,
+            syncEnabled: true,
+            syncDistance: 128,
+            syncRate: 50,
+            bandwidthKbps: 0
+        });
         expect(bytes.length).toBe(43);
-        expect(decode(bytes)).toEqual({ type: 'config', disabled: false, distance: 128, concurrency: 20, sync: true });
+        expect(decode(bytes)).toEqual({
+            type: 'config',
+            config: {
+                generationPlan: 2,
+                generationDistance: 128,
+                generationRate: 20,
+                realTimeUpdates: false,
+                realTimeDistance: 0,
+                syncEnabled: true,
+                syncDistance: 128,
+                syncRate: 50,
+                bandwidthKbps: 0
+            }
+        });
         const input = new Reader(bytes);
         input.short();
         input.short();
@@ -58,6 +81,37 @@ describe('Distant Horizons protocol', () => {
         expect(input.int()).toBe(50);
         expect(input.int()).toBe(0);
         input.end();
+    });
+    it('preserves the independent client request, update, sync, and bandwidth settings', () => {
+        const bytes = packet(4)
+            .byte(1)
+            .int(96)
+            .int(12)
+            .int(-8)
+            .int(128)
+            .int(17)
+            .bool(true)
+            .int(64)
+            .bool(false)
+            .int(48)
+            .int(23)
+            .int(500)
+            .finish();
+
+        expect(decode(bytes)).toEqual({
+            type: 'config',
+            config: {
+                generationPlan: 1,
+                generationDistance: 96,
+                generationRate: 17,
+                realTimeUpdates: true,
+                realTimeDistance: 64,
+                syncEnabled: false,
+                syncDistance: 48,
+                syncRate: 23,
+                bandwidthKbps: 500
+            }
+        });
     });
     it('splits data before sending its tracked response', () => {
         const bytes = new Uint8Array(60001).fill(9);

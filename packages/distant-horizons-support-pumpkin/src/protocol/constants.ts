@@ -16,3 +16,5 @@ export const SECTION_CHUNKS_PER_SIDE = SECTION_SIZE_BLOCKS / CHUNK_SIZE_BLOCKS;
 export const SECTION_CHUNK_COUNT = SECTION_CHUNKS_PER_SIDE ** 2;
 /** Maximum payload size for one DH transfer packet. */
 export const TRANSFER_PACKET_BYTES = 30_000;
+/** Maximum complete DH fragment message, including protocol and fragment fields. */
+export const MAX_TRANSFER_MESSAGE_BYTES = TRANSFER_PACKET_BYTES + 13;
