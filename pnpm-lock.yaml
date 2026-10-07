@@ -460,6 +460,40 @@ importers:
         specifier: 'catalog:'
         version: 5.0.3(@types/node@24.19.1)(@vitest/coverage-v8@5.0.3)(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.6.1)(yaml@2.9.1))
 
+  packages/waypoints:
+    dependencies:
+      '@pumpkin-plugins/plugin-kit':
+        specifier: workspace:*
+        version: link:../../tools/plugin-kit
+      '@pumpkinmc/pumpkin-api-ts':
+        specifier: 'catalog:'
+        version: https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz
+      fflate:
+        specifier: 0.8.3
+        version: 0.8.3
+    devDependencies:
+      '@pumpkin-plugins/build':
+        specifier: workspace:*
+        version: link:../../tools/build
+      '@pumpkin-plugins/docs':
+        specifier: workspace:*
+        version: link:../../tools/docs
+      '@pumpkin-plugins/test-harness':
+        specifier: workspace:*
+        version: link:../../tools/test-harness
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 5.0.3(vitest@5.0.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@types/node@24.19.1)(@vitest/coverage-v8@5.0.3)(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.6.1)(yaml@2.9.1))
+
   tools/build:
     dependencies:
       '@bytecodealliance/jco':

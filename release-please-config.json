@@ -9,18 +9,6 @@
     "include-component-in-tag": true,
     "include-v-in-tag": true,
     "packages": {
-        "packages/apple-skin-pumpkin": {
-            "component": "apple-skin-pumpkin"
-        },
-        "packages/distant-horizons-support-pumpkin": {
-            "component": "distant-horizons-support-pumpkin"
-        },
-        "packages/dynamic-lights-pumpkin": {
-            "component": "dynamic-lights-pumpkin"
-        },
-        "packages/upnpumpkin": {
-            "component": "upnpumpkin"
-        },
         "actions/publish-to-pumpkin-market": {
             "component": "publish-to-pumpkin-market",
             "release-type": "simple"
@@ -36,6 +24,22 @@
         "actions/verify-pumpkin-plugin": {
             "component": "verify-pumpkin-plugin",
             "release-type": "simple"
+        },
+        "packages/apple-skin-pumpkin": {
+            "component": "apple-skin-pumpkin"
+        },
+        "packages/distant-horizons-support-pumpkin": {
+            "component": "distant-horizons-support-pumpkin"
+        },
+        "packages/dynamic-lights-pumpkin": {
+            "component": "dynamic-lights-pumpkin"
+        },
+        "packages/upnpumpkin": {
+            "component": "upnpumpkin"
+        },
+        "packages/waypoints": {
+            "component": "waypoints",
+            "release-as": "0.0.1"
         }
     },
     "changelog-sections": [
