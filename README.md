@@ -19,6 +19,7 @@ component overviews, and generated API references.
 | [Publish to Pumpkin Market](actions/publish-to-pumpkin-market) | Upload a released Pumpkin plugin WebAssembly file to its existing Market listing |
 | [Sign Pumpkin plugin](actions/sign-pumpkin-plugin) | Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata |
 | [Update Pumpkin Market Listing](actions/update-pumpkin-market-listing) | Update Pumpkin Market listing metadata from a JSON file or direct inputs |
+| [Verify Pumpkin plugin](actions/verify-pumpkin-plugin) | Verify signatures on Pumpkin plugin WebAssembly files |
 
 **Plugins**
 

@@ -1,0 +1,35 @@
+name: "Verify Pumpkin plugin"
+description: "Verify signatures on Pumpkin plugin WebAssembly files"
+author: Filiph Sandström
+inputs:
+    wasm-file:
+        description: Path to one signed Pumpkin plugin .wasm file; use this or plugins-manifest
+        required: false
+    plugins-manifest:
+        description: JSON manifest of plugin-name, version, and wasm-file entries to verify; use this or wasm-file
+        required: false
+    expected-public-key:
+        description: Expected 32-byte Ed25519 public key as 64 hexadecimal characters; pins the trusted signer
+        required: false
+    plugin-name:
+        description: Single-file mode; fail unless the signed metadata contains this exact plugin name
+        required: false
+    version:
+        description: Single-file mode; fail unless the signed metadata contains this exact version
+        required: false
+outputs:
+    verified-count:
+        description: Number of files successfully verified
+    plugin-name:
+        description: Single-file mode; plugin name from the signed metadata
+    version:
+        description: Single-file mode; version from the signed metadata
+    developer-name:
+        description: Single-file mode; developer name from the signed metadata
+    public-key:
+        description: Single-file mode; public key embedded in the signature
+    issued-at:
+        description: Single-file mode; signing timestamp from the signed metadata
+runs:
+    using: node24
+    main: src/index.mjs
