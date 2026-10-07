@@ -268,6 +268,7 @@ describe('DH protocol contracts', () => {
             () => now,
             () => now
         );
+        f.settings.cached_packets_per_tick = 1;
         f.cache.put('world:0:0', { updated: 0, data: new Uint8Array(60_000).fill(1) });
         f.sessions.receive(f.peer, clientConfig({ bandwidthKbps: 1 }));
         f.sent.length = 0;
@@ -276,24 +277,176 @@ describe('DH protocol contracts', () => {
         f.sessions.tick(f.peers);
         expect(f.sent).toHaveLength(0);
 
-        now = 31_000;
+        now = 19_999;
+        f.sessions.tick(f.peers);
+        expect(f.sent).toHaveLength(0);
+
+        now = 20_000;
         f.sessions.tick(f.peers);
         expect(f.ids()).toEqual([10]);
+        expect(readFragment(f.sent[0] ?? new Uint8Array()).data).toHaveLength(19_987);
 
         f.sessions.receive(f.peer, clientConfig({ bandwidthKbps: 2 }));
         f.sent.length = 0;
 
-        now = 46_006;
+        now = 35_006;
         f.sessions.tick(f.peers);
         expect(f.ids()).toEqual([]);
 
-        now = 46_007;
+        now = 35_007;
         f.sessions.tick(f.peers);
         expect(f.ids()).toEqual([10]);
+        expect(readFragment(f.sent[0] ?? new Uint8Array()).data).toHaveLength(30_000);
 
-        now = 46_016;
+        now = 45_032;
+        f.sent.length = 0;
+        f.sessions.tick(f.peers);
+        expect(f.ids()).toEqual([10]);
+        expect(readFragment(f.sent[0] ?? new Uint8Array()).data).toHaveLength(10_013);
+
+        now = 45_033;
         f.sessions.tick(f.peers);
         expect(f.ids()).toEqual([10, 8]);
+    });
+
+    it('resizes a buffered fragment before sending after a bandwidth decrease', () => {
+        let now = 0;
+        const f = fixture(
+            () => now,
+            () => now
+        );
+        f.cache.put('world:0:0', { updated: 0, data: new Uint8Array(60_000).fill(1) });
+        f.sessions.receive(f.peer, clientConfig({ bandwidthKbps: 2 }));
+        f.sent.length = 0;
+        f.sessions.receive(f.peer, f.request());
+
+        f.sessions.tick(f.peers);
+        now = 10_000;
+        f.sessions.tick(f.peers);
+        expect(f.sent).toHaveLength(0);
+
+        f.sessions.receive(f.peer, clientConfig({ bandwidthKbps: 1 }));
+        f.sent.length = 0;
+        f.sessions.tick(f.peers);
+
+        expect(f.ids()).toEqual([10]);
+        expect(readFragment(f.sent[0] ?? new Uint8Array()).data).toHaveLength(19_987);
+    });
+
+    it('keeps competing clients assembling large responses before receiver timeout', () => {
+        let now = 0;
+        const f = fixture(
+            () => now,
+            () => now
+        );
+        f.settings.refresh_seconds = 3600;
+        f.cache.put('world:0:0', { updated: 0, data: new Uint8Array(60_000).fill(1) });
+        f.cache.put('world:1:0', { updated: 0, data: new Uint8Array(60_000).fill(2) });
+        const bobSent: Uint8Array[] = [];
+        const bob: Peer = { ...f.peer, name: 'Bob', send: (bytes) => bobSent.push(bytes) };
+        const peers = {
+            withPeer: (name: string, use: (peer: Peer) => void) => {
+                const peer = name === f.peer.name ? f.peer : name === bob.name ? bob : undefined;
+                if (!peer) return false;
+                use(peer);
+                return true;
+            }
+        };
+        f.sessions.receive(bob, packet(3).string(bob.dimension).finish());
+        f.sessions.receive(f.peer, clientConfig({ bandwidthKbps: 1 }));
+        f.sessions.receive(bob, clientConfig({ bandwidthKbps: 1 }));
+        f.sent.length = 0;
+        bobSent.length = 0;
+        f.sessions.receive(f.peer, f.request(1));
+        f.sessions.receive(bob, f.request(2, 'world', 1));
+
+        const buffers = new Map<number, { lastAccess: number; chunks: Uint8Array[] }>();
+        const completed = new Map<number, Uint8Array>();
+        const expired: number[] = [];
+        const receive = (messages: Uint8Array[], at: number) => {
+            for (const message of messages) {
+                const input = new Reader(message);
+                input.short();
+                const id = input.short();
+                if (id === 10) {
+                    const buffer = input.int();
+                    const length = input.int();
+                    const data = input.bytes(length);
+                    const first = input.bool();
+                    input.end();
+                    let current = buffers.get(buffer);
+                    if (current && at - current.lastAccess >= 30_000) {
+                        buffers.delete(buffer);
+                        expired.push(buffer);
+                        current = undefined;
+                    }
+                    if (first) current = { lastAccess: at, chunks: [] };
+                    if (!current) throw new Error('DH receiver buffer expired before the next fragment');
+                    current.lastAccess = at;
+                    current.chunks.push(data);
+                    buffers.set(buffer, current);
+                } else if (id === 8) {
+                    const tracker = input.int();
+                    expect(input.bool()).toBe(true);
+                    const buffer = input.int();
+                    input.int();
+                    input.end();
+                    const result = buffers.get(buffer);
+                    if (!result || at - result.lastAccess >= 30_000) {
+                        throw new Error('DH receiver had no complete buffer when the final response arrived');
+                    }
+                    completed.set(tracker, concat(result.chunks));
+                }
+            }
+            messages.length = 0;
+        };
+
+        for (now = 0; now <= 70_000; now += 50) {
+            f.sessions.tick(peers);
+            receive(f.sent, now);
+            receive(bobSent, now);
+        }
+
+        expect(expired).toEqual([]);
+        expect(completed.get(1)).toEqual(new Uint8Array(60_000).fill(1));
+        expect(completed.get(2)).toEqual(new Uint8Array(60_000).fill(2));
+    });
+
+    it('cancels an active transfer and releases its retained payload and send lock', () => {
+        let now = 0;
+        const f = fixture(
+            () => now,
+            () => now
+        );
+        f.settings.cached_packets_per_tick = 1;
+        f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(60_000).fill(1) });
+        f.cache.put('world:1:0', { updated: 1000, data: new Uint8Array(64).fill(2) });
+        f.sessions.receive(f.peer, clientConfig({ bandwidthKbps: 1 }));
+        f.sent.length = 0;
+        f.sessions.receive(f.peer, f.request(1));
+        f.sessions.receive(f.peer, f.request(2, 'world', 1));
+        f.sessions.tick(f.peers);
+        expect(f.sessions.status()).toContain('2 response(s)');
+
+        now = 20_000;
+        f.sessions.tick(f.peers);
+        expect(f.ids()).toEqual([10]);
+        expect(f.sessions.status()).toContain('60064 logical queued response bytes retained');
+
+        f.sessions.receive(f.peer, packet(5).int(1).finish());
+        expect(f.sessions.status()).toContain('1 cancelled');
+        expect(f.sessions.status()).toContain('64 logical queued response bytes retained');
+
+        now = 20_076;
+        f.sessions.tick(f.peers);
+        expect(f.ids()).toEqual([10]);
+        now = 20_077;
+        f.sessions.tick(f.peers);
+        expect(f.ids()).toEqual([10, 10]);
+        expect(readFragment(f.sent[1] ?? new Uint8Array()).data).toEqual(new Uint8Array(64).fill(2));
+        now = 20_094;
+        f.sessions.tick(f.peers);
+        expect(f.ids()).toEqual([10, 10, 8]);
     });
 
     it('rotates transfer service so a small response finishes beside a large response', () => {
@@ -328,7 +481,7 @@ describe('DH protocol contracts', () => {
         expect(f.sessions.status()).toContain('1 served');
     });
 
-    it('continues the transfer lane whose packet budget remains available', () => {
+    it('finishes one response before continuing a different packet-budget lane', () => {
         const f = fixture();
         f.settings.packets_per_tick = 1;
         f.settings.cached_packets_per_tick = 1;
@@ -338,8 +491,14 @@ describe('DH protocol contracts', () => {
 
         f.sessions.tick(f.peers);
 
-        expect(f.ids()).toEqual([10, 10]);
+        expect(f.ids()).toEqual([10]);
         expect(f.sessions.status()).toContain('2 response(s)');
+
+        f.sent.length = 0;
+        f.sessions.tick(f.peers);
+
+        expect(f.ids()).toEqual([8, 10]);
+        expect(f.sessions.status()).toContain('1 served');
     });
 });
 
@@ -878,3 +1037,25 @@ describe('DH sessions', () => {
         expect(f.sessions.status()).toContain('0 Distant Horizons client');
     });
 });
+
+function readFragment(bytes: Uint8Array): { buffer: number; data: Uint8Array; first: boolean } {
+    const input = new Reader(bytes);
+    input.short();
+    if (input.short() !== 10) throw new Error('Expected a DH LOD fragment');
+    const buffer = input.int();
+    const length = input.int();
+    const data = input.bytes(length);
+    const first = input.bool();
+    input.end();
+    return { buffer, data, first };
+}
+
+function concat(chunks: Uint8Array[]): Uint8Array {
+    const result = new Uint8Array(chunks.reduce((length, chunk) => length + chunk.length, 0));
+    let offset = 0;
+    for (const chunk of chunks) {
+        result.set(chunk, offset);
+        offset += chunk.length;
+    }
+    return result;
+}

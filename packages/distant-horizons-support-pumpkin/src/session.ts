@@ -48,6 +48,7 @@ interface Client {
     config: SessionConfiguration;
     byteCredit: ByteCredit;
     packets: QueuedPacket[];
+    activeTransfer?: QueuedPacket;
 }
 interface QueuedPacket {
     bytes?: Uint8Array;
@@ -154,6 +155,8 @@ export class Sessions {
             const config = this.negotiateConfiguration(message.config);
             client.config = config;
             client.byteCredit.setRate(config.bandwidthKbps, this.now());
+            for (const response of client.packets) response.cursor?.setBandwidthRate(config.bandwidthKbps);
+            client.activeTransfer ??= client.packets.find((response) => response.cursor?.hasInFlightBuffer);
             if (config.generationPlan === 3) this.rejectPendingRequestClass(peer, false);
             if (!config.syncEnabled) this.rejectPendingRequestClass(peer, true);
             peer.send(sessionConfig(config));
@@ -171,6 +174,17 @@ export class Sessions {
                     `${logTag} Cancelled DH request ${ansi.named.number(request.tracker)} from ${ansi.named.name(peer.name)} for ${lodLocation(request.level, request.section.x, request.section.z)}.`
                 );
                 this.drop(request);
+            } else {
+                const responseIndex = client.packets.findIndex((response) => response.lod.tracker === message.tracker);
+                const response = client.packets[responseIndex];
+                if (responseIndex >= 0 && response) {
+                    this.cancelled++;
+                    if (client.activeTransfer === response) client.activeTransfer = undefined;
+                    client.packets.splice(responseIndex, 1);
+                    this.log.debug(
+                        `${logTag} Cancelled queued DH response ${ansi.named.number(message.tracker)} from ${ansi.named.name(peer.name)} for ${lodLocation(response.lod.level, response.lod.section.x, response.lod.section.z)}.`
+                    );
+                }
             }
             return;
         }
@@ -358,12 +372,15 @@ export class Sessions {
                 let response: QueuedPacket | undefined;
                 let bytes: Uint8Array | undefined;
                 const now = this.now();
-                for (let index = 0; index < client.packets.length; index++) {
-                    const candidate = client.packets[index];
+                if (client.activeTransfer && !client.packets.includes(client.activeTransfer)) {
+                    client.activeTransfer = undefined;
+                }
+                const candidates = client.activeTransfer ? [client.activeTransfer] : client.packets;
+                for (const candidate of candidates) {
                     if (!candidate || (candidate.cached ? cachedRemaining <= 0 : remaining <= 0)) continue;
                     const candidateBytes = candidate.cursor?.peek() ?? candidate.bytes;
                     if (!candidateBytes || !client.byteCredit.canSend(candidateBytes.length, now)) continue;
-                    responseIndex = index;
+                    responseIndex = client.packets.indexOf(candidate);
                     response = candidate;
                     bytes = candidateBytes;
                     break;
@@ -373,6 +390,8 @@ export class Sessions {
                 client.byteCredit.consume(bytes.length);
                 this.dhPacketBytesSent += bytes.length;
                 response.cursor?.advance();
+                if (response.cursor?.hasInFlightBuffer) client.activeTransfer = response;
+                else if (client.activeTransfer === response) client.activeTransfer = undefined;
                 if (!response.cursor || response.cursor.done) {
                     client.packets.splice(responseIndex, 1);
                     this.served++;
@@ -380,11 +399,12 @@ export class Sessions {
                         level,
                         section,
                         tracker,
-                        packetCount,
+                        packetCount: originalPacketCount,
                         dataBytes,
                         cached,
                         unchanged: noChange
                     } = response.lod;
+                    const packetCount = response.cursor?.packetCount ?? originalPacketCount;
                     const label = noChange ? 'unchanged LOD response' : cached ? 'cached LOD' : 'captured LOD';
                     this.log.debug(
                         `${logTag} Sent ${label} to ${ansi.named.name(peer.name)} for ${lodLocation(level, section.x, section.z)} (request ${ansi.named.number(tracker)}, ${ansi.named.number(packetCount)} packet(s), ${ansi.named.number(dataBytes)} bytes).`
@@ -566,7 +586,9 @@ export class Sessions {
         const client = this.clients.get(request.name);
         if (client) {
             const isUnchanged = request.timestamp !== undefined && value.updated <= request.timestamp;
-            const cursor = isUnchanged ? undefined : new TransferCursor(request.tracker, this.buffer++, value.data);
+            const cursor = isUnchanged
+                ? undefined
+                : new TransferCursor(request.tracker, this.buffer++, value.data, client.config.bandwidthKbps);
             const lod = {
                 level: request.level,
                 section: request.section,
