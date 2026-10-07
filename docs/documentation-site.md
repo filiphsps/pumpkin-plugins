@@ -24,12 +24,16 @@ its `docs/` folder. Put navigation settings under `navigation`:
 navigation:
     category: Compatibility
     type: card
+    icon: artwork/plugin-mark.svg
 ```
 
 `category` is optional; without it, the item appears in its menu's general group. `type` is optional
 and defaults to a regular link. Use `card` for a self-contained card or `spotlight` for a wide editorial
 row. The `navigation` namespace keeps menu settings separate from other documentation settings that
-may be added later.
+may be added later. An icon path is relative to the component root, alongside `docs.yml`. Without an
+explicit `icon`, the site automatically uses `icon.svg`, `icon.png`, `icon.webp`, `logo.svg`, `logo.png`, or
+`logo.webp` from the component root when present, falling back to its `docs/` folder. Discovered icons
+are included in the built site automatically. Items without artwork keep the same alignment.
 
 Add a category to a hand-written guide's frontmatter with `navigation.category`; `navigation.type`
 can also select `card` or `spotlight`. These categories are editorial labels and belong beside their

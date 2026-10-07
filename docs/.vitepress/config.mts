@@ -47,6 +47,7 @@ const rewrites: Record<string, string> = {
     'docs/index.md': 'index.md',
     'docs/README.md': 'guides/index.md'
 };
+const navigationAssets = new Map<string, string>();
 
 for (const file of walkMarkdown(path.join(repoRoot, 'docs'))) {
     const relative = path.relative(repoRoot, file).split(path.sep).join('/');
@@ -185,6 +186,17 @@ function components(group: string, hasPackageJson = false): Component[] {
         const menuItemType = menuItemTypeOf(docsConfig) ?? menuItemTypeOf(customIndexFrontmatter);
         const category = categoryOf(docsConfig) ?? categoryOf(customIndexFrontmatter);
         const readmeRoute = fs.existsSync(readme) ? `/${group}/${slug}/README` : undefined;
+        const iconCandidates = ['icon.svg', 'icon.png', 'icon.webp', 'logo.svg', 'logo.png', 'logo.webp'];
+        const docsNavigation = navigationMetadata(docsConfig);
+        const configuredIcon =
+            typeof docsNavigation.icon === 'string' ? path.resolve(source, docsNavigation.icon) : undefined;
+        const conventionalIcon = [source, docsDirectory]
+            .flatMap((directory) => iconCandidates.map((filename) => path.join(directory, filename)))
+            .find((file) => fs.existsSync(file));
+        const iconFile = configuredIcon && fs.existsSync(configuredIcon) ? configuredIcon : conventionalIcon;
+        const iconPath = iconFile ? path.relative(repoRoot, iconFile).split(path.sep).join('/') : undefined;
+        if (iconPath && iconFile) navigationAssets.set(iconPath, iconFile);
+        const icon = iconPath ? `/${iconPath}` : undefined;
         const apiDirectory =
             group === 'packages'
                 ? path.join(repoRoot, 'docs/api/plugins', slug)
@@ -212,6 +224,7 @@ function components(group: string, hasPackageJson = false): Component[] {
                 description,
                 overview,
                 category,
+                icon,
                 menuItemType,
                 readme: readmeRoute,
                 apiReference,
@@ -504,6 +517,18 @@ const themeConfig = {
 
 export default defineConfig({
     srcDir: '..',
+    vite: {
+        plugins: [
+            {
+                name: 'component-navigation-assets',
+                generateBundle() {
+                    for (const [fileName, file] of navigationAssets) {
+                        this.emitFile({ type: 'asset', fileName, source: fs.readFileSync(file) });
+                    }
+                }
+            }
+        ]
+    },
     transformPageData(pageData) {
         if (typeof pageData.frontmatter.editLink !== 'string') {
             pageData.frontmatter.editLink = `${repoUrl}/edit/master/${pageData.filePath}`;
