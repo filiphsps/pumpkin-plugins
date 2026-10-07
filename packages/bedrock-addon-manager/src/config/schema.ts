@@ -34,7 +34,7 @@ export const configSchema = defineConfig('BedrockAddonManager', {
             port: int({ description: 'Port to listen on.', default: 8123, min: 1, max: 65535 }),
             public_url: httpUrl({
                 description:
-                    'Base URL Bedrock clients download packs from, without a trailing slash, for example "https://packs.example.com". The plugin only speaks plain HTTP: put a reverse proxy in front of it for HTTPS. Left empty, the address that `port_forwarding` makes reachable is used, else "http://127.0.0.1:<port>", which only works for players on the server machine.',
+                    'Base URL Bedrock clients download packs from, without a trailing slash, for example "https://packs.example.com". The plugin only speaks plain HTTP: put a reverse proxy in front of it for HTTPS. Left empty, the address that `port_forwarding` makes reachable is used, else a loopback URL using the configured port, which only works for players on the server machine.',
                 default: '',
                 allowEmpty: true
             }),

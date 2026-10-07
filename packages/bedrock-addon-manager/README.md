@@ -58,7 +58,7 @@ Settings live in `plugins/data/BedrockAddonManager/config.toml`. The plugin crea
 | `web.enabled` | boolean | `true` | Serve the packs over HTTP. Turn this off if the packs are hosted elsewhere and every pack has a download_url override. |
 | `web.bind` | string | `"0.0.0.0"` | IPv4 address to listen on. |
 | `web.port` | integer | `8123` | Port to listen on. |
-| `web.public_url` | string | `""` | Base URL Bedrock clients download packs from, without a trailing slash, for example "https://packs.example.com". The plugin only speaks plain HTTP: put a reverse proxy in front of it for HTTPS. Left empty, the address that `port_forwarding` makes reachable is used, else "http://127.0.0.1:<port>", which only works for players on the server machine. |
+| `web.public_url` | string | `""` | Base URL Bedrock clients download packs from, without a trailing slash, for example "https://packs.example.com". The plugin only speaks plain HTTP: put a reverse proxy in front of it for HTTPS. Left empty, the address that `port_forwarding` makes reachable is used, else a loopback URL using the configured port, which only works for players on the server machine. |
 | `web.port_forwarding` | boolean | `true` | When `public_url` is empty and `bind` is "0.0.0.0", ask the UPnPumpkin plugin to open `port` on your router (UPnP or NAT-PMP) and use the public address it gets. Nothing is opened when this machine already has a public address, or when UPnPumpkin is not installed. Set to false to turn this off. |
 | `packs.directory` | string | `"packs"` | Folder inside this plugin's data folder that is scanned for .mcpack and .mcaddon files. |
 | `packs.force` | boolean | `false` | Make Bedrock clients download the packs before they can join. |
@@ -95,8 +95,8 @@ port = 8123
 
 # Base URL Bedrock clients download packs from, without a trailing slash, for example
 # "https://packs.example.com". The plugin only speaks plain HTTP: put a reverse proxy in front of it
-# for HTTPS. Left empty, the address that `port_forwarding` makes reachable is used, else
-# "http://127.0.0.1:<port>", which only works for players on the server machine.
+# for HTTPS. Left empty, the address that `port_forwarding` makes reachable is used, else a loopback
+# URL using the configured port, which only works for players on the server machine.
 public_url = ""
 
 # When `public_url` is empty and `bind` is "0.0.0.0", ask the UPnPumpkin plugin to open `port` on

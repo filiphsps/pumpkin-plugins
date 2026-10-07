@@ -2,10 +2,28 @@ name: CI
 
 on:
     pull_request:
+        paths-ignore:
+            - '**/*.md'
+            - '**/*.mdx'
+            - docs/**
+            - packages/*/docs/**
+            - tools/*/docs/**
+            - actions/*/docs/**
+            - .github/workflows/docs.yml
+            - LICENSE
     push:
         branches:
             - master
             - main
+        paths-ignore:
+            - '**/*.md'
+            - '**/*.mdx'
+            - docs/**
+            - packages/*/docs/**
+            - tools/*/docs/**
+            - actions/*/docs/**
+            - .github/workflows/docs.yml
+            - LICENSE
 
 concurrency:
     group: ci-${{ github.ref }}
@@ -28,6 +46,7 @@ jobs:
         outputs:
             code: ${{ steps.classify.outputs.code }}
             actions: ${{ steps.classify.outputs.actions }}
+            generated_readmes: ${{ steps.classify.outputs.generated_readmes }}
             integration_scope: ${{ steps.classify.outputs.integration_scope }}
             integration_extra: ${{ steps.classify.outputs.integration_extra }}
         steps:
@@ -53,7 +72,16 @@ jobs:
 
     commits:
         name: 💬 Commit messages
-        if: github.event_name == 'pull_request'
+        needs: [changes]
+        if: >-
+            ${{
+              github.event_name == 'pull_request' &&
+              (
+                needs.changes.outputs.code == 'true' ||
+                needs.changes.outputs.actions != '[]' ||
+                needs.changes.outputs.generated_readmes == 'true'
+              )
+            }}
         timeout-minutes: 5
         runs-on: ubuntu-24.04
         permissions:
@@ -128,6 +156,13 @@ jobs:
 
     docs:
         name: 📝 Docs and config
+        needs: [changes]
+        if: >-
+            ${{
+              needs.changes.outputs.code == 'true' ||
+              needs.changes.outputs.actions != '[]' ||
+              needs.changes.outputs.generated_readmes == 'true'
+            }}
         timeout-minutes: 10
         runs-on: ubuntu-24.04
         steps:

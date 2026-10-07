@@ -16,3 +16,6 @@ dist/
 # Turborepo local cache
 .turbo/
 coverage/
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+api/tools/

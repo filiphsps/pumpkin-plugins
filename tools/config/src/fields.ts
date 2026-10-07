@@ -30,7 +30,8 @@ export interface Field<T> {
 /** The settings of a section or table entry, by key. */
 export type Fields = Record<string, Field<unknown>>;
 
-interface BaseOptions<T> {
+/** Options shared by the config field builders. */
+export interface BaseOptions<T> {
     /** What the setting does. */
     description: string;
     /** Value used when the setting is absent. Leave out to make the setting optional. */

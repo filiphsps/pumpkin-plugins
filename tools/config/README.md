@@ -2,4 +2,4 @@
 
 Declares a plugin's settings as a schema and derives the default `config.toml`, the validation, the upgrades and the README table from it.
 
-An internal package of [pumpkin-plugins](../../README.md): it is not published to npm, and the plugins in this repo use it as a workspace dependency. See [the docs](../../docs/plugin-config.md) for how it is used.
+An internal package of [pumpkin-plugins](https://github.com/filiphsps/pumpkin-plugins): it is not published to npm, and the plugins in this repo use it as a workspace dependency. See [the docs](../../docs/plugin-config.md) for how it is used.

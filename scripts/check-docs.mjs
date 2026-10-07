@@ -29,10 +29,23 @@ function markdownFiles(dir) {
 }
 
 const packages = [...packageDirs('packages'), ...packageDirs('tools')];
+const actions = exists('actions')
+    ? fs
+          .readdirSync(path.join(root, 'actions'), { withFileTypes: true })
+          .filter(
+              (entry) =>
+                  entry.isDirectory() &&
+                  (exists('actions', entry.name, 'action.yml') || exists('actions', entry.name, 'action.yaml'))
+          )
+          .map((entry) => `actions/${entry.name}`)
+    : [];
 const docs = [
     ...(exists('README.md') ? ['README.md'] : []),
     ...markdownFiles('docs'),
     ...packages.map((p) => `${p}/README.md`).filter((p) => exists(p)),
+    ...packages.flatMap((p) => markdownFiles(`${p}/docs`)),
+    ...actions.map((p) => `${p}/README.md`).filter((p) => exists(p)),
+    ...actions.flatMap((p) => markdownFiles(`${p}/docs`)),
     ...markdownFiles('.github'),
     ...(exists('AGENTS.md') ? ['AGENTS.md'] : []),
     ...markdownFiles('.agents')
@@ -49,6 +62,11 @@ for (const dir of packages) {
     const text = read(dir, 'README.md');
     if (!text.startsWith('# ')) problems.push(`${dir}/README.md must start with a "# " title`);
     if (dir.startsWith('tools/') && !text.includes(name)) problems.push(`${dir}/README.md should mention ${name}`);
+}
+for (const dir of actions) {
+    if (!exists(dir, 'README.md')) {
+        problems.push(`${dir}/README.md is missing. Every action needs an overview and usage instructions`);
+    }
 }
 
 // 2. Relative links point at files that exist, and at headings that exist.
@@ -83,14 +101,21 @@ for (const file of docs) {
 const code = (text) => [...text.matchAll(/```[\s\S]*?```|`[^`\n]*`/g)].map((m) => m[0]).join('\n');
 
 // Example names the docs use for a plugin that doesn't exist.
-const PLACEHOLDERS = ['my-plugin'];
+const PLACEHOLDERS = ['my-plugin', 'my-action'];
 
 // 3. Repo paths in code spans exist.
-const PATH_IN_CODE = /`((?:packages|tools|scripts|docs|\.github|\.agents)\/[\w./@-]+)`/g;
+const PATH_IN_CODE = /`((?:packages|tools|actions|scripts|docs|\.github|\.agents)\/[\w./@-]+)`/g;
 for (const file of docs) {
     for (const match of read(file).matchAll(PATH_IN_CODE)) {
         const target = (match[1] ?? '').replace(/[.,;:]+$/, '');
         if (PLACEHOLDERS.some((name) => target.includes(`/${name}`))) continue;
+        if (
+            target.startsWith('actions/') &&
+            !actions.some((action) => target === action || target.startsWith(`${action}/`)) &&
+            !target.slice('actions/'.length).includes('/')
+        ) {
+            continue;
+        }
         if (!exists(target)) problems.push(`${file} mentions ${target}, which does not exist`);
     }
 }

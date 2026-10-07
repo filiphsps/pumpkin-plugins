@@ -12,13 +12,16 @@
         "itest",
         "mcaddon",
         "mcpack",
+        "nojekyll",
         "outgoingdatagram",
         "pollable",
         "pumpkinmc",
         "Speedport",
         "SSDP",
+        "unmatch",
         "upnp",
         "upnpumpkin",
+        "vitepress",
         "WASI"
     ]
 }

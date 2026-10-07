@@ -31,6 +31,7 @@ export default [
             '**/dist/**',
             '**/.turbo/**',
             '**/.cache/**',
+            '**/.vitepress/cache/**',
             'turbo/generators/templates/**'
         ]
     },

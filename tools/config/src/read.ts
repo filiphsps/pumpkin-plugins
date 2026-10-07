@@ -48,7 +48,10 @@ const entryPath = (table: string, key: string) => `${table}.${JSON.stringify(key
  * @param raw - The parsed TOML document.
  * @returns The typed values and the issues found.
  */
-export function readConfig<S extends ConfigSchema>(schema: S, raw: Table): ReadResult<ConfigValues<S>> {
+export function readConfig<S extends ConfigSchema>(
+    schema: S,
+    raw: Record<string, unknown>
+): ReadResult<ConfigValues<S>> {
     const issues: Issue[] = [];
     const values: Record<string, unknown> = defaultValues(schema);
 

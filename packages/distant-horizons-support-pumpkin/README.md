@@ -164,7 +164,7 @@ originally developed by Jim C K Flaten and the upstream contributors. It is not 
 Distant Horizons Team release or endorsed by that team.
 
 Adapted protocol and LOD code retains its upstream copyright notices. This plugin is licensed
-under [GPL-3.0-or-later](LICENSE). The other packages in this repository retain their own licenses.
+under [GPL-3.0-or-later](https://github.com/filiphsps/pumpkin-plugins/blob/master/packages/distant-horizons-support-pumpkin/LICENSE). The other packages in this repository retain their own licenses.
 The protocol 16 format follows [Distant Horizons core 3.3.4](https://gitlab.com/distant-horizons-team/distant-horizons-core/-/tree/3.3.4),
 Copyright (C) 2020 James Seibel, originally under [LGPL-3.0-only](LICENSE.LESSER.txt).
 The initial server-plugin reference revision is `56a01110579b94c9946130092500c00df7c31925`.

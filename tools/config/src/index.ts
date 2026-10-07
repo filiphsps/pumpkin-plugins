@@ -1,5 +1,6 @@
 export { describeConfig } from './describe.ts';
 export {
+    type BaseOptions,
     bool,
     type Field,
     type Fields,

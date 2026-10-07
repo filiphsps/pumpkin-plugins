@@ -2,7 +2,7 @@
 
 The repo keeps agent instructions, skills and executable checks separate:
 
-- [AGENTS.md](../AGENTS.md) holds the shared rules and routes tasks to relevant docs and skills.
+- [AGENTS.md](https://github.com/filiphsps/pumpkin-plugins/blob/master/AGENTS.md) holds the shared rules and routes tasks to relevant docs and skills.
 - `.agents/skills/` holds focused workflows. An agent can discover them or read the linked `SKILL.md`
   directly. They don't install hooks or grant permission for external actions.
 - `.agents/hooks/` holds client-neutral Node scripts. Nothing in this folder runs automatically just
@@ -39,7 +39,7 @@ include deleted files. Checks never apply lint fixes. Use scoped `pnpm exec biom
 
 Markdown-only package edits skip package tests. `tools/build/src/` is source, not generated output.
 Real-server tests are deliberately separate; see [Testing](testing.md) and
-[the testing skill](../.agents/skills/pumpkin-testing/SKILL.md).
+[the testing skill](https://github.com/filiphsps/pumpkin-plugins/blob/master/.agents/skills/pumpkin-testing/SKILL.md).
 
 The default run may report failures in somebody else's dirty files. Preserve their work and either
 report the failure or use explicit paths for your own validation. Passing these fast checks does not

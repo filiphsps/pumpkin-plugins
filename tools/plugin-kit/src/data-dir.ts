@@ -28,7 +28,7 @@ export class WasiDataDir implements DataFiles {
         return mount ? new WasiDataDir(mount[0]) : undefined;
     }
 
-    /** {@inheritDoc DataFiles.stat} */
+    /** Describes a path, or returns undefined when nothing is there. */
     stat(path: string): FileInfo | undefined {
         try {
             const stat = this.root.statAt({ symlinkFollow: true }, path);
@@ -44,7 +44,7 @@ export class WasiDataDir implements DataFiles {
         }
     }
 
-    /** {@inheritDoc DataFiles.list} */
+    /** Names of the entries in a folder. */
     list(directory: string): string[] {
         const folder = this.root.openAt({ symlinkFollow: true }, directory || '.', { directory: true }, { read: true });
         try {
@@ -63,7 +63,7 @@ export class WasiDataDir implements DataFiles {
         }
     }
 
-    /** {@inheritDoc DataFiles.readFile} */
+    /** Reads a whole file. */
     readFile(path: string): Uint8Array {
         const file = this.open(path);
         try {
@@ -81,12 +81,12 @@ export class WasiDataDir implements DataFiles {
         }
     }
 
-    /** {@inheritDoc DataFiles.writeFile} */
+    /** Writes a file, replacing any existing one in a single step so readers never see half a file. */
     writeFile(path: string, content: Uint8Array): void {
         atomicWrite(this.root, path, content);
     }
 
-    /** {@inheritDoc DataFiles.createDirectory} */
+    /** Creates a folder and any missing parents. Does nothing if it already exists. */
     createDirectory(path: string): void {
         if (path.startsWith('/')) throw new TypeError('Data paths must be relative');
         const parts = path.split('/').filter(Boolean);
@@ -101,7 +101,7 @@ export class WasiDataDir implements DataFiles {
         }
     }
 
-    /** {@inheritDoc DataFiles.remove} */
+    /** Deletes a file or an empty folder. Does nothing if it doesn't exist. */
     remove(path: string): void {
         try {
             // Inspect the entry itself so dangling links and links to directories can be removed.
@@ -113,7 +113,7 @@ export class WasiDataDir implements DataFiles {
         }
     }
 
-    /** {@inheritDoc DataFiles.open} */
+    /** Opens a file for random-access reads. */
     open(path: string): RandomAccessFile {
         const file = this.root.openAt({ symlinkFollow: true }, path, {}, { read: true });
         try {

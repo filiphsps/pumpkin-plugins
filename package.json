@@ -40,6 +40,15 @@
         "test:integration": "turbo run test:integration --concurrency=4",
         "readme": "turbo run readme && pumpkin-plugins-docs root",
         "readme:check": "turbo run readme:check && pumpkin-plugins-docs root --check",
+        "dev:docs": "pnpm run docs:api && vitepress dev docs",
+        "docs": "pnpm run docs:build",
+        "docs:build": "pnpm run docs:api && pnpm run docs:site",
+        "docs:site": "vitepress build docs",
+        "docs:api": "pnpm run docs:types && typedoc",
+        "docs:types": "concurrently --kill-others-on-fail --success all \"pnpm:docs:types:*\"",
+        "docs:types:plugin-kit": "pnpm --filter @pumpkin-plugins/plugin-kit typecheck",
+        "docs:types:update-check": "pnpm --filter @pumpkin-plugins/update-check typecheck",
+        "docs:preview": "vitepress preview docs",
         "check": "node scripts/check-release-config.mjs && node scripts/package-metadata.mjs && node scripts/check-docs.mjs",
         "package": "turbo run build && node scripts/collect-plugins.mjs"
     },
@@ -50,11 +59,16 @@
         "@pumpkin-plugins/signing": "workspace:*",
         "@turbo/gen": "2.11.7",
         "commitlint": "21.2.3",
+        "concurrently": "10.0.5",
         "eslint": "10.12.0",
         "eslint-plugin-jsdoc": "65.1.0",
-        "typescript": "catalog:",
         "turbo": "2.11.7",
-        "typescript-eslint": "8.71.1"
+        "typedoc": "0.28.20",
+        "typedoc-plugin-markdown": "4.13.1",
+        "typedoc-vitepress-theme": "1.1.4",
+        "typescript": "catalog:",
+        "typescript-eslint": "8.71.1",
+        "vitepress": "1.6.4"
     },
     "devEngines": {
         "packageManager": {

@@ -1,7 +1,9 @@
 # CI and releases
 
 The plugin and release jobs are in `.github/workflows/ci.yml`; action tests have their own
-`.github/workflows/actions.yml`, scoped to changes under `actions/`. The shared setup (pnpm, Node,
+`.github/workflows/actions.yml`, scoped to action code. The documentation site has its own
+`.github/workflows/docs.yml`, which checks and publishes the VitePress site and mirrors it to
+`gh-pages`. The shared setup (pnpm, Node,
 install, Turborepo cache) is the composite action in `.github/common/bootstrap`. Workflow jobs use
 `ubuntu-24.04` to keep their runner image stable as `ubuntu-latest` migrates to Ubuntu 26.
 
@@ -9,13 +11,13 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 
 | Job | Runs | What |
 | --- | --- | --- |
-| 🔍 Changed files | always | Separates plugin/repository code from changed action directories and documentation |
-| 💬 Commit messages | PRs | Lints every commit with `commitlint.config.mjs` |
+| 🔍 Changed files | CI-triggering changes | Separates plugin/repository code from changed action directories and documentation; detects generated README refresh commits |
+| 💬 Commit messages | code, action, or generated README changes on PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
 | 🧪 Test | plugin or repository code changes | Unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
 | 🧪 Action tests | action code changes | `.github/workflows/actions.yml` tests only the changed action, with `*.test.*` files co-located in `actions/{name}/src/` |
-| 📝 Docs and config | always | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
+| 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after lint and typecheck | Builds and collects every plugin, then signs and verifies them with the reusable action before upload |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin and action, checks release registration and READMEs, tests the action, then typechecks, builds and integration-tests the plugin |
@@ -34,12 +36,14 @@ workflow.
 ## Running only what a change needs
 
 `scripts/changed-areas.mjs` diffs the change against what came before it (the pull request base or
-the push's `before` commit). Markdown, `docs/` and `LICENSE` changes are documentation. Changes
-under `actions/{name}/` are reported separately from plugin and repository code. An action-only
+the push's `before` commit). Markdown, `docs/`, component-level `docs/` folders and `LICENSE`
+changes are documentation. Changes under `actions/{name}/` are reported separately from plugin and repository code. An action-only
 change skips the plugin build, integration suites and repository test jobs; the Actions workflow
 tests only that action when its code changes. Action tests live beside their implementation in
 `actions/{name}/src/*.test.mjs`. README, changelog and version-file-only changes skip action tests.
-A docs-only change skips the code jobs and action tests.
+A docs-only change triggers the separate Docs workflow, which checks the docs and builds the site;
+GitHub's path filters skip the main CI workflow and the Actions workflow. Mixed changes still run the
+relevant code or action checks.
 
 Everything else outside `actions/` is a change to repository code and runs the code jobs, including
 changes under `tools/`, `scripts/` and `.github/`, and deletions. Integration tests narrow to changed plugin packages and
@@ -47,8 +51,11 @@ their dependents when all code changes are within plugin or runtime-tool package
 changes run the full integration suite. Biome, the type checker and the tests read none of the
 documentation files, so a docs-only change cannot fail them.
 
-Two jobs never skip. `📝 Docs and config` is what keeps the docs true, so it has to run on the
-commits that change them. `💬 Commit messages` is cheap and belongs on every pull request.
+The main CI `📝 Docs and config` job runs for code and action changes, and for the automatic
+`docs: update generated READMEs` commit. Release PRs also change version and changelog files, so
+GitHub continues to trigger CI as the README refresh commit is added. The classifier recognizes that
+commit and reruns the repository checks that validate the generated README. Ordinary docs-only PRs
+skip the main CI workflow entirely.
 
 On a push, the release job waits for plugin checks when plugin/repository code changed, or for the
 docs/config check when only actions changed. Release Please only releases a component with

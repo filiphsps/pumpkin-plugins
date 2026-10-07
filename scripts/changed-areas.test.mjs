@@ -20,7 +20,7 @@ const git = (dir, ...args) =>
     });
 
 /** Writes files (path to text, or null to delete it) and commits them. */
-function commit(dir, files) {
+function commit(dir, files, message = 'change') {
     for (const [file, content] of Object.entries(files)) {
         const target = path.join(dir, file);
         if (content === null) {
@@ -31,7 +31,7 @@ function commit(dir, files) {
         fs.writeFileSync(target, content);
     }
     git(dir, 'add', '-A');
-    git(dir, 'commit', '-q', '--no-gpg-sign', '-m', 'change');
+    git(dir, 'commit', '-q', '--no-gpg-sign', '-m', message);
 }
 
 /** Commits a change and returns the sha to diff it against. */
@@ -73,7 +73,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\nintegration_scope=all\nintegration_extra=\n'
+            'code=false\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n'
         );
         assert.match(result.log, /No plugin or repository code/);
     });
@@ -85,7 +85,29 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\nintegration_scope=all\nintegration_extra=\n'
+            'code=false\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n'
+        );
+    });
+
+    it('classifies nested component docs assets as documentation', () => {
+        const dir = repo({ 'packages/plug/src/index.ts': 'export {};' });
+        const base = change(dir, { 'packages/plug/docs/diagram.png': 'diagram' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=false\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n'
+        );
+    });
+
+    it('does not schedule action tests for action-local docs assets', () => {
+        const dir = repo({ 'actions/one/src/index.mjs': 'export {};' });
+        const base = change(dir, { 'actions/one/docs/diagram.png': 'diagram' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=false\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n'
         );
     });
 
@@ -96,7 +118,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\nintegration_scope=affected\nintegration_extra=\n'
+            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n'
         );
         assert.match(result.log, /Code: packages\/plug\/src\/index\.ts/);
     });
@@ -108,7 +130,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\nintegration_scope=all\nintegration_extra=\n'
+            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n'
         );
     });
 
@@ -119,7 +141,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\nintegration_scope=affected\nintegration_extra=@pumpkin-plugins/bedrock-addon-manager\n'
+            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=@pumpkin-plugins/bedrock-addon-manager\n'
         );
     });
 
@@ -133,7 +155,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\nintegration_scope=all\nintegration_extra=\n'
+            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n'
         );
         assert.match(result.log, /Code: \.github\/workflows\/ci\.yml/);
     });
@@ -145,7 +167,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\nintegration_scope=affected\nintegration_extra=\n'
+            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n'
         );
     });
 
@@ -170,7 +192,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\nintegration_scope=affected\nintegration_extra=\n'
+            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n'
         );
     });
 
@@ -181,7 +203,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=["two"]\nactions_to_test=["two"]\nintegration_scope=all\nintegration_extra=\n'
+            'code=false\nactions=["two"]\nactions_to_test=["two"]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n'
         );
         assert.match(result.log, /Actions to test: two/);
     });
@@ -200,7 +222,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=["two"]\nactions_to_test=["two"]\nintegration_scope=affected\nintegration_extra=\n'
+            'code=true\nactions=["two"]\nactions_to_test=["two"]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n'
         );
     });
 
@@ -211,7 +233,20 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=["one"]\nactions_to_test=[]\nintegration_scope=all\nintegration_extra=\n'
+            'code=false\nactions=["one"]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n'
         );
+    });
+
+    it('detects the generated README commit that should rerun CI documentation checks', () => {
+        const dir = repo({ 'packages/plug/README.md': '# Plug\n' });
+        const base = git(dir, 'rev-parse', 'HEAD').trim();
+        commit(dir, { 'packages/plug/README.md': '# Plug\n\nGenerated docs.\n' }, 'docs: update generated READMEs');
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=false\nactions=[]\nactions_to_test=[]\ngenerated_readmes=true\nintegration_scope=all\nintegration_extra=\n'
+        );
+        assert.match(result.log, /Generated README update commit detected/);
     });
 });

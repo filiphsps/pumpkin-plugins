@@ -8,4 +8,5 @@ export { NAT_PMP_PORT, NatPmpGateway } from './natpmp.ts';
 export type { Connection, Datagram, DatagramSocket, Dial, Network } from './network.ts';
 export { SSDP_ADDRESS } from './ssdp.ts';
 export { type Settled, type Steps, Task, type TaskState } from './task.ts';
+export type { ControlPoint } from './upnp.ts';
 export { UpnpGateway } from './upnp.ts';

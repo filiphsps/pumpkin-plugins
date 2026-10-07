@@ -19,5 +19,5 @@ checks with an injected synchronous JSON request function, which is useful for d
 `requestMarketJson` transport blocks and must not be called during plugin loading or server ticks.
 `marketplaceUrl` overrides the Market base URL for registration and direct version checks.
 
-An internal package of [pumpkin-plugins](../../README.md): it is not published to npm, and plugins
+An internal package of [pumpkin-plugins](https://github.com/filiphsps/pumpkin-plugins): it is not published to npm, and plugins
 in this repo can use it as a workspace dependency.

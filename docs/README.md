@@ -2,6 +2,8 @@
 
 | Page | What it covers |
 | --- | --- |
+| [Home](index.md) | Documentation site landing page |
+| [Documentation site](documentation-site.md) | Adding component guides, generated API reference, local preview, and publishing |
 | [Creating a plugin](creating-a-plugin.md) | The `pnpm gen` generator, what it creates, and what to do next |
 | [Creating an action](creating-an-action.md) | The `pnpm gen:action` generator and the action files and release setup it creates |
 | [Plugin info and READMEs](plugin-info-and-readmes.md) | How a plugin describes itself in `src/info.ts` and how the READMEs are generated |

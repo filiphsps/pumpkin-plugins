@@ -4,12 +4,16 @@ on:
     pull_request:
         paths:
             - 'actions/**'
+            - '!actions/**/*.md'
+            - '!actions/**/docs/**'
     push:
         branches:
             - master
             - main
         paths:
             - 'actions/**'
+            - '!actions/**/*.md'
+            - '!actions/**/docs/**'
 
 concurrency:
     group: actions-${{ github.ref }}

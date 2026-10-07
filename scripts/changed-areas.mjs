@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 
 /** A changed file matching any of these is documentation, which nothing that builds or tests reads. */
-const DOCS = [/\.md$/, /^docs\//, /^LICENSE$/];
+const DOCS = [/\.md$/, /^docs\//, /^LICENSE$/, /^(packages|tools|actions)\/[^/]+\/docs(?:\/|$)/];
 
 const [base, head = 'HEAD'] = process.argv.slice(2);
 if (!base) {
@@ -21,6 +21,12 @@ if (diff.status !== 0) {
 }
 
 const changed = diff.stdout.split('\n').filter((file) => file.length > 0);
+const commitLog = spawnSync('git', ['log', '--format=%s', `${base}..${head}`], { encoding: 'utf8' });
+if (commitLog.status !== 0) {
+    console.error(`Could not read commits between ${base} and ${head}: ${commitLog.stderr.trim()}`);
+    process.exit(1);
+}
+const generatedReadmes = commitLog.stdout.split('\n').includes('docs: update generated READMEs');
 const isDocs = (file) => DOCS.some((pattern) => pattern.test(file));
 const actionPaths = changed.filter((file) => !isDocs(file) && /^actions\/[^/]+\//.test(file));
 const actions = [...new Set(actionPaths.map((file) => file.split('/')[1]))].sort();
@@ -46,11 +52,12 @@ else console.log('No plugin or repository code, so the plugin code jobs are skip
 if (actions.length) console.log(`Changed actions: ${actions.join(', ')}`);
 if (actionsToTest.length) console.log(`Actions to test: ${actionsToTest.join(', ')}`);
 console.log(`Integration scope: ${integrationScope}`);
+if (generatedReadmes) console.log('Generated README update commit detected.');
 if (integrationExtra) console.log(`Additional integration package: ${integrationExtra}`);
 
 if (process.env.GITHUB_OUTPUT) {
     appendFileSync(
         process.env.GITHUB_OUTPUT,
-        `code=${code.length > 0}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n`
+        `code=${code.length > 0}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\ngenerated_readmes=${generatedReadmes}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n`
     );
 }
