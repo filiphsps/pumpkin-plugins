@@ -159,6 +159,70 @@ describe('Pumpkin terrain adapter', () => {
         expect(getChunk).toHaveBeenNthCalledWith(1, -4, -8);
         for (const handle of [...chunks, border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
     });
+
+    it.each([
+        [0, 0, 0],
+        [7, 1, 3],
+        [15, 3, 3]
+    ])('rejects a null host chunk at lookup %i without sampling or leaking handles', (missingAt, chunkX, chunkZ) => {
+        const values = defaultValues(schema),
+            settings = { ...values.support, worlds: values.worlds };
+        const chunks = Array.from({ length: 16 }, () => ({ [Symbol.dispose]: vi.fn() }));
+        let lookup = 0;
+        const getChunk = vi.fn(() => {
+            const index = lookup++;
+            const chunk = chunks[index];
+            if (index === missingAt) return null;
+            if (!chunk) throw new Error(`Chunk lookup ${index} was outside the test fixture`);
+            return chunk;
+        });
+        const getBlockStateId = vi.fn(() => 0);
+        const border = {
+            getCenterX: () => 0,
+            getCenterZ: () => 0,
+            getSize: () => 60_000_000,
+            [Symbol.dispose]: vi.fn()
+        };
+        const world = {
+            getName: () => 'world',
+            getDimension: () => 'minecraft:overworld',
+            getMinY: () => -64,
+            getWorldBorder: () => border,
+            getChunk,
+            getBlockStateId,
+            [Symbol.dispose]: vi.fn()
+        };
+        const java = { [Symbol.dispose]: vi.fn() };
+        const player = {
+            asJava: () => java,
+            getWorld: () => world,
+            getName: () => 'Alice',
+            getPosition: () => [0, 64, 0]
+        };
+
+        withPlayer(player as unknown as Player, settings, (peer) => {
+            expect(
+                peer.terrain.prepare?.({
+                    originX: 0,
+                    originZ: 0,
+                    width: 64,
+                    depth: 64,
+                    minY: -64,
+                    height: 384
+                })
+            ).toMatchObject({
+                status: 'unavailable',
+                reason: expect.stringContaining(`Chunk ${chunkX}, ${chunkZ} is not loaded`)
+            });
+        });
+
+        expect(getChunk).toHaveBeenCalledTimes(missingAt + 1);
+        expect(getBlockStateId).not.toHaveBeenCalled();
+        for (const chunk of chunks.slice(0, missingAt)) expect(chunk[Symbol.dispose]).toHaveBeenCalledOnce();
+        for (const chunk of chunks.slice(missingAt)) expect(chunk[Symbol.dispose]).not.toHaveBeenCalled();
+        for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
+
     it('releases the Java handle when acquiring the world fails', () => {
         const values = defaultValues(schema);
         const java = { [Symbol.dispose]: vi.fn() };

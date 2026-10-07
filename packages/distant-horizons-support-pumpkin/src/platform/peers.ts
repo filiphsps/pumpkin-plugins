@@ -64,7 +64,11 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                     for (let z = firstChunkZ; z <= lastChunkZ; z++) {
                         const result = acquireChunk(
                             { x, z },
-                            () => terrainWorld.getChunk(x, z),
+                            () => {
+                                // Generated types say undefined for WIT option-none; QuickJS lifts it as null.
+                                const chunk = terrainWorld.getChunk(x, z);
+                                return chunk ?? undefined;
+                            },
                             chunkLoader,
                             terrainGenerator
                         );
