@@ -9,7 +9,7 @@ on the documentation site.
 
 ```yaml
 steps:
-  - uses: filiphsps/pumpkin-plugins/actions/publish-to-pumpkin-market@publish-to-pumpkin-market-v0.0.3
+  - uses: filiphsps/pumpkin-plugins/actions/publish-to-pumpkin-market@publish-to-pumpkin-market-v0.0.5
     with:
       plugin-name: MyPlugin
       version: 1.2.3
