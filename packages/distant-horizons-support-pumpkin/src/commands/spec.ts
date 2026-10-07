@@ -6,19 +6,41 @@ export const commands = defineCommands('DistantHorizonsSupportPumpkin', {
         description: 'Inspect Distant Horizons support',
         permission: 'DistantHorizonsSupportPumpkin:command.dhs',
         subcommands: {
-            status: { description: 'Show connected DH clients and pending requests' },
+            status: {
+                description: 'Show connected DH clients and pending requests',
+                permission: 'DistantHorizonsSupportPumpkin:command.dhs.status'
+            },
             cache: {
                 description: 'Manage cached LOD terrain',
+                permission: 'DistantHorizonsSupportPumpkin:command.dhs.cache',
                 subcommands: {
-                    status: { description: 'Show memory and disk cache usage' },
-                    clear: { description: 'Clear both cache tiers' },
+                    status: {
+                        description: 'Show memory and disk cache usage',
+                        permission: 'DistantHorizonsSupportPumpkin:command.dhs.cache.status'
+                    },
+                    clear: {
+                        description: 'Clear both cache tiers',
+                        permission: 'DistantHorizonsSupportPumpkin:command.dhs.cache.clear'
+                    },
                     memory: {
                         description: 'Manage the in-memory cache',
-                        subcommands: { clear: { description: 'Clear the in-memory cache' } }
+                        permission: 'DistantHorizonsSupportPumpkin:command.dhs.cache.memory',
+                        subcommands: {
+                            clear: {
+                                description: 'Clear the in-memory cache',
+                                permission: 'DistantHorizonsSupportPumpkin:command.dhs.cache.memory.clear'
+                            }
+                        }
                     },
                     disk: {
                         description: 'Manage the disk cache',
-                        subcommands: { clear: { description: 'Clear the disk cache' } }
+                        permission: 'DistantHorizonsSupportPumpkin:command.dhs.cache.disk',
+                        subcommands: {
+                            clear: {
+                                description: 'Clear the disk cache',
+                                permission: 'DistantHorizonsSupportPumpkin:command.dhs.cache.disk.clear'
+                            }
+                        }
                     }
                 }
             }

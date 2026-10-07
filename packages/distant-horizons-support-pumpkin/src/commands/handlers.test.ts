@@ -26,6 +26,13 @@ describe('the /dhs commands', () => {
         const { host, root } = setup();
         expect(host.usages(root).sort()).toEqual((info.commands ?? []).map((command) => command.usage).sort());
         expect(info.commands).toEqual(commandInfos(commands));
+        expect(info.commands.map((command) => command.permission)).toEqual([
+            'DistantHorizonsSupportPumpkin:command.dhs.status',
+            'DistantHorizonsSupportPumpkin:command.dhs.cache.status',
+            'DistantHorizonsSupportPumpkin:command.dhs.cache.clear',
+            'DistantHorizonsSupportPumpkin:command.dhs.cache.memory.clear',
+            'DistantHorizonsSupportPumpkin:command.dhs.cache.disk.clear'
+        ]);
     });
 
     it('reports both cache tiers and their configured limits', () => {
