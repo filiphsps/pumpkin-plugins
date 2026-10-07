@@ -6,6 +6,9 @@
 Unofficial Distant Horizons server support for Pumpkin
 <!-- docs:end summary -->
 
+Read the [Distant Horizons guide](https://filiphsps.github.io/pumpkin-plugins/packages/distant-horizons-support-pumpkin/docs/)
+and [API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/distant-horizons-support-pumpkin/) on the documentation site.
+
 ## Installation
 
 Put `distant-horizons-support-pumpkin.wasm` from the plugin's GitHub release in your server's `plugins/` folder and restart. Hot reload cannot ask for permissions, so the first load needs a restart.

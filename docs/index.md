@@ -9,8 +9,8 @@ hero:
           text: Browse the guides
           link: /guides/
         - theme: alt
-          text: Tools API
-          link: /api/tools/
+          text: Browse the API reference
+          link: /api/
 features:
     - title: Plugin guides
       details: Installation, settings, and practical guides for each Pumpkin plugin.

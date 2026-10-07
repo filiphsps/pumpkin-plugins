@@ -6,6 +6,9 @@
 AppleSkin server-side support
 <!-- docs:end summary -->
 
+See the [AppleSkinPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/apple-skin-pumpkin/)
+on the documentation site.
+
 ## Installation
 
 Put `apple-skin-pumpkin.wasm` from the plugin's GitHub release in your server's `plugins/` folder and restart. Hot reload cannot ask for permissions, so the first load needs a restart.

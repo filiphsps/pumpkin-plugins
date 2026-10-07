@@ -6,6 +6,9 @@
 Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and adds them to what connecting players are offered, using each pack's own manifest.
 <!-- docs:end summary -->
 
+See the [BedrockAddonManager API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/bedrock-addon-manager/)
+on the documentation site.
+
 ## Installation
 
 Put `bedrock-addon-manager.wasm` from the plugin's GitHub release in your server's `plugins/` folder and restart. Hot reload cannot ask for permissions, so the first load needs a restart.

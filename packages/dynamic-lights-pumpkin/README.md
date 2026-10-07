@@ -6,6 +6,9 @@
 Server-driven dynamic lights for held items and nearby entities
 <!-- docs:end summary -->
 
+See the [DynamicLightsPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/dynamic-lights-pumpkin/)
+on the documentation site.
+
 ## Installation
 
 Put `dynamic-lights-pumpkin.wasm` from the plugin's GitHub release in your server's `plugins/` folder and restart. Hot reload cannot ask for permissions, so the first load needs a restart.

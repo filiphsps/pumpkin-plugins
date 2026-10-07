@@ -3,6 +3,9 @@
 Add Pumpkin's Ed25519 signature and release metadata to one or more existing plugin `.wasm` files.
 This action signs files in place; it does not build the plugins.
 
+See the [Sign Pumpkin plugin reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/sign-pumpkin-plugin/)
+on the documentation site.
+
 ```yaml
 steps:
   - uses: filiphsps/pumpkin-plugins/actions/sign-pumpkin-plugin@sign-pumpkin-plugin-v0.0.2

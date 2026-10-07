@@ -3,6 +3,9 @@
 Update an existing Pumpkin Market listing from a JSON metadata file, direct inputs, or both. The
 action does not read `info.ts`, build or upload a WASM file, create listings, or upload screenshots.
 
+See the [Update Pumpkin Market Listing reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/update-pumpkin-market-listing/)
+on the documentation site.
+
 ```yaml
 steps:
   - uses: filiphsps/pumpkin-plugins/actions/update-pumpkin-market-listing@update-pumpkin-market-listing-v0.0.1

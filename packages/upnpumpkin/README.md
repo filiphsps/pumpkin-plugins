@@ -6,6 +6,9 @@
 Opens ports on your router with UPnP and NAT-PMP so players can reach the server from the internet, and lets other plugins ask for the same.
 <!-- docs:end summary -->
 
+See the [UPnPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/upnpumpkin/)
+on the documentation site.
+
 ## Installation
 
 Put `upnpumpkin.wasm` from the plugin's GitHub release in your server's `plugins/` folder and restart. Hot reload cannot ask for permissions, so the first load needs a restart.
