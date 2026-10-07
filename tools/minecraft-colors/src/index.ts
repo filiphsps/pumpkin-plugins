@@ -26,21 +26,23 @@ const FORMATS = {
 } as const;
 
 const NAMED_COLORS = {
-    value: { color: 'gold' },
+    error: { color: 'darkRed', format: 'bold' },
+    identifier: { color: 'yellow' },
     name: { color: 'darkAqua' },
     namespace: { color: 'darkGreen' },
-    version: { color: 'green' },
-    url: { color: 'darkAqua' },
+    number: { color: 'blue' },
     permission: { color: 'yellow', format: 'bold' },
     port: { color: 'yellow' },
+    url: { color: 'darkAqua' },
     uuid: { color: 'yellow' },
-    identifier: { color: 'yellow' }
+    value: { color: 'gold' },
+    version: { color: 'green' }
 } as const satisfies Record<string, { color: keyof typeof COLORS; format?: keyof typeof FORMATS }>;
 
 type MinecraftColor = keyof typeof COLORS;
 type MinecraftFormat = keyof typeof FORMATS;
 type MinecraftNamedRole = keyof typeof NAMED_COLORS;
-type MinecraftFormatter = ((text: string) => string) & {
+type MinecraftFormatter = ((text: string | number) => string) & {
     readonly [Key in MinecraftColor | MinecraftFormat]: MinecraftFormatter;
 } & {
     hex(color: string): MinecraftFormatter;
@@ -54,7 +56,9 @@ interface FormatterState {
 }
 
 function createFormatter(state: FormatterState = { formats: [] }): MinecraftFormatter {
-    const formatter = ((text: string) => {
+    const formatter = ((text: string | number) => {
+        text = String(text);
+
         if (state.colorPrefix === undefined && state.formats.length === 0) return text;
 
         const formatCodes = (Object.keys(FORMATS) as MinecraftFormat[])
@@ -115,7 +119,7 @@ Object.defineProperty(color, 'named', {
 /** Returns an ASCII table previewing every legacy color in normal and bold text. */
 export function colorTable(): string {
     const colors = Object.keys(COLORS) as MinecraftColor[];
-    const nameWidth = Math.max(...colors.map((colorName) => colorName.length));
+    const nameWidth = Math.max(...colors.map((color) => color.length));
     const header = `Color${' '.repeat(nameWidth - 'Color'.length)} | Bold`;
     const divider = `${'-'.repeat(nameWidth)}-+-${'-'.repeat(nameWidth)}`;
     const rows = colors.map((colorName) => {
