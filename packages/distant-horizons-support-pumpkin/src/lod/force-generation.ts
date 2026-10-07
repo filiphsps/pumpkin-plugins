@@ -5,7 +5,7 @@ import { PLUGIN_NAME } from '../name.ts';
 import { SECTION_DETAIL, SECTION_SIZE_BLOCKS } from '../protocol/constants.ts';
 import type { Section } from '../protocol/messages.ts';
 import { LodBuilder } from './builder.ts';
-import type { LodCache } from './cache.ts';
+import type { CacheRecoveryBackup, LodCache } from './cache.ts';
 import {
     iterateLodSectionsWithin,
     type LodSectionBounds,
@@ -42,6 +42,11 @@ export interface ForcedLodStart {
     centerZ: number;
     radius: number;
     sections: number;
+}
+/** One selected cached section exported safely before an operator recovery job. */
+export interface ForcedLodRecovery {
+    start: ForcedLodStart;
+    backup: CacheRecoveryBackup;
 }
 
 interface ForcedSection {
@@ -89,10 +94,47 @@ export class ForcedLodGeneration {
         const { memoryLimit, diskLimit, memoryEntries, diskEntries } = this.cache.stats();
         if (memoryLimit === 0 && diskLimit === 0) throw new Error('Both LOD cache tiers are disabled.');
 
+        const selection = this.validateSelection(peer, blockX, blockZ, radius, memoryEntries + diskEntries);
+        return this.begin(peer, blockX, blockZ, radius, selection);
+    }
+
+    /** Backs up, removes and rebuilds one explicitly selected cached LOD section. */
+    recover(peer: ForcedLodPeer, blockX: number, blockZ: number): ForcedLodRecovery {
+        if (this.job) throw new Error('A forced LOD generation job is already running.');
+        if (!Number.isSafeInteger(blockX) || !Number.isSafeInteger(blockZ)) {
+            throw new RangeError('Block coordinates must be safe integers.');
+        }
+        const { memoryLimit, diskLimit, memoryEntries, diskEntries } = this.cache.stats();
+        if (memoryLimit === 0 && diskLimit === 0) throw new Error('Both LOD cache tiers are disabled.');
+
+        const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
+        const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
+        const key = sectionKey(peer.level, centerX, centerZ);
+        if (!this.cache.has(key)) throw new Error('No cached LOD section exists at the selected coordinates.');
+        const selection = this.validateSelection(peer, blockX, blockZ, 0, memoryEntries + diskEntries, key);
+        const prepared = peer.terrain.prepare?.(this.region({ x: centerX, z: centerZ }, peer.terrain));
+        if (prepared?.status !== 'ready') {
+            const reason = prepared && 'reason' in prepared ? ` ${prepared.reason}` : '';
+            throw new Error(
+                `Cache recovery deferred until all section chunks are loaded; the selected cache entry is preserved.${reason}`
+            );
+        }
+
+        const backup = this.cache.backupAndRemove(key);
+        if (!backup) throw new Error('Selected cache entry could not be backed up; it was preserved.');
+        return { start: this.begin(peer, blockX, blockZ, 0, selection), backup };
+    }
+
+    private begin(
+        peer: ForcedLodPeer,
+        blockX: number,
+        blockZ: number,
+        radius: number,
+        selection: { bounds: LodSectionBounds; inBorderSections: number }
+    ): ForcedLodStart {
         const sections = (radius * 2 + 1) ** 2;
         const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
         const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
-        const selection = this.validateSelection(peer, blockX, blockZ, radius, memoryEntries + diskEntries);
 
         this.job = {
             owner: peer.name,
@@ -314,7 +356,8 @@ export class ForcedLodGeneration {
         blockX: number,
         blockZ: number,
         radius: number,
-        maxCachedSections: number
+        maxCachedSections: number,
+        ignoredCachedKey?: string
     ): { bounds: LodSectionBounds; inBorderSections: number } {
         const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
         const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
@@ -337,7 +380,8 @@ export class ForcedLodGeneration {
         let alreadyGenerated = 0;
         for (let x = minX; x <= maxX; x++) {
             for (let z = minZ; z <= maxZ; z++) {
-                if (this.cache.get(sectionKey(peer.level, x, z))) alreadyGenerated++;
+                const key = sectionKey(peer.level, x, z);
+                if (key !== ignoredCachedKey && this.cache.get(key)) alreadyGenerated++;
             }
         }
         if (alreadyGenerated === inBorderSections) {

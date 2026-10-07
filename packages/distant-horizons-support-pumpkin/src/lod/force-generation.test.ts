@@ -181,6 +181,48 @@ describe('forced LOD generation', () => {
         expect(f.samples()).toBe(8192);
     });
 
+    it('backs up and rebuilds one selected checksum-valid legacy empty capture', () => {
+        const f = fixture();
+        const suspect = new Uint8Array(64);
+        const unrelated = new Uint8Array(64).fill(9);
+        f.cache.put('world:0:0', { updated: 1, data: suspect });
+        f.cache.put('world:1:0', { updated: 2, data: unrelated });
+        f.peer.terrain.prepare = () => ({ status: 'ready' });
+        expect(f.cache.get('world:0:0')?.data).toEqual(suspect);
+
+        const recovery = f.generation.recover(f.peer, 32, 32);
+
+        expect(recovery.start.sections).toBe(1);
+        expect(recovery.backup.key).toBe('world:0:0');
+        expect(f.cache.get('world:0:0')).toBeUndefined();
+        expect(f.cache.get('world:1:0')?.data).toEqual(unrelated);
+        f.generation.tick(f.peers);
+
+        expect(f.cache.get('world:0:0')?.updated).toBe(1234);
+        expect(f.cache.get('world:0:0')?.data).not.toEqual(suspect);
+        expect(f.cache.get('world:1:0')?.data).toEqual(unrelated);
+        expect(f.files.stat(recovery.backup.dataPath)?.kind).toBe('file');
+        expect(f.files.stat(recovery.backup.manifestPath)?.kind).toBe('file');
+    });
+
+    it('defers selected cache recovery until terrain is loaded without removing the entry', () => {
+        const f = fixture();
+        const suspect = new Uint8Array(64).fill(3);
+        const unrelated = new Uint8Array(64).fill(9);
+        f.cache.put('world:0:0', { updated: 1, data: suspect });
+        f.cache.put('world:1:0', { updated: 2, data: unrelated });
+        f.peer.terrain.prepare = () => ({ status: 'unavailable', reason: 'Chunk 0, 0 is not loaded' });
+
+        expect(() => f.generation.recover(f.peer, 32, 32)).toThrow(
+            'recovery deferred until all section chunks are loaded'
+        );
+
+        expect(f.cache.get('world:0:0')?.data).toEqual(suspect);
+        expect(f.cache.get('world:1:0')?.data).toEqual(unrelated);
+        expect(f.files.stat('cache-recovery')).toBeUndefined();
+        expect(f.generation.status()).toBeUndefined();
+    });
+
     it('counts sections outside the world border once and builds the in-border sections', () => {
         const f = fixture();
         f.peer.insideBorder = (x, z) => x >= 0 && z >= 0;
