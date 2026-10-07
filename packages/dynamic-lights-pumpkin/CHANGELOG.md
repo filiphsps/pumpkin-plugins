@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.5](https://github.com/filiphsps/pumpkin-plugins/compare/dynamic-lights-pumpkin-v0.0.4...dynamic-lights-pumpkin-v0.0.5) (2026-10-07)
+
+
+### Features
+
+* **actions:** add signing action and generated catalog ([43e941c](https://github.com/filiphsps/pumpkin-plugins/commit/43e941ce09f5f5d3457f87f3cd7ad88bdaea4da4))
+* **plugin-kit:** support hierarchical command permissions ([854f5cc](https://github.com/filiphsps/pumpkin-plugins/commit/854f5cc2233559bcaa34b2ecb0a19bec88a9f774))
+
 ## [0.0.4](https://github.com/filiphsps/pumpkin-plugins/compare/dynamic-lights-pumpkin-v0.0.3...dynamic-lights-pumpkin-v0.0.4) (2026-10-06)
 
 
