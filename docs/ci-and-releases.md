@@ -280,6 +280,8 @@ continue; this repository opts into that mode so GitHub releases remain independ
 listing and credential availability. Other Market API failures always fail the job and can be
 retried. See the
 [action README](../actions/publish-to-pumpkin-market/README.md#inputs) for its complete input list.
+The listing metadata API and its observed behavior are documented in
+[Pumpkin Market API](pumpkin-market-api.md).
 
 ## GitHub settings
 
