@@ -14,8 +14,9 @@ vi.mock('pumpkin:plugin/command@0.1.0', () => {
             public names: string[],
             public description?: string
         ) {}
+        children: Node[] = [];
         // biome-ignore lint/suspicious/noThenProperty: mirrors the host command nodes.
-        then = vi.fn();
+        then = vi.fn((node: Node) => this.children.push(node));
         executeWithHandlerId = vi.fn();
     }
     return { Command: Node, CommandNode: { literal: (name: string) => new Node([name]) } };
@@ -30,7 +31,13 @@ const tree = defineCommands('Demo', {
 function context() {
     const registerCommand = vi.fn();
     const registerPermission = vi.fn();
-    return { ctx: { registerCommand, registerPermission } as unknown as Context, registerCommand, registerPermission };
+    const server = {};
+    return {
+        ctx: { registerCommand, registerPermission, getServer: () => server } as unknown as Context,
+        registerCommand,
+        registerPermission,
+        server
+    };
 }
 beforeEach(() => {
     vi.resetAllMocks();
@@ -38,7 +45,7 @@ beforeEach(() => {
 });
 
 describe('registerCommands', () => {
-    it('registers a shared permission once with the default operator level', () => {
+    it('registers shared permission nodes once with the default operator level', () => {
         const { ctx, registerCommand, registerPermission } = context();
         registerCommands(ctx, tree, { first: () => [], second: () => [] });
         expect(registerPermission).toHaveBeenCalledExactlyOnceWith({
@@ -54,20 +61,84 @@ describe('registerCommands', () => {
         ]);
     });
 
-    it('supports permission defaults and sends plain and error replies', () => {
+    it('supports per-command public defaults and sends plain and error replies', () => {
+        const publicTree = defineCommands('Demo', {
+            first: {
+                description: 'First command',
+                permission: 'Demo:command.first',
+                defaultPermission: { tag: 'allow' }
+            },
+            second: { description: 'Second command', permission: 'Demo:command.second' }
+        });
         const { ctx, registerPermission } = context();
-        registerCommands(
-            ctx,
-            tree,
-            { first: () => ['plain', errorLine('error')], second: () => [] },
-            { defaultPermission: { tag: 'allow' } }
-        );
+        registerCommands(ctx, publicTree, { first: () => ['plain', errorLine('error')], second: () => [] });
         expect(registerPermission.mock.calls[0][0].default).toEqual({ tag: 'allow' });
         const sendMessage = vi.fn();
         const sender = { sendMessage } as unknown as CommandSender;
         expect(host.onCommand.mock.calls[0][0](sender)).toBe(1);
         expect(sendMessage.mock.calls.map(([component]) => component.line)).toEqual(['plain', 'error']);
         expect(host.color).toHaveBeenCalledExactlyOnceWith('red');
+    });
+
+    it('checks each nested command with its own permission while registering waterfall nodes', () => {
+        const nested = defineCommands('Demo', {
+            demo: {
+                description: 'Manage demo',
+                permission: 'Demo:command.demo',
+                subcommands: {
+                    public: {
+                        description: 'Public listing',
+                        permission: 'Demo:command.demo.public',
+                        defaultPermission: { tag: 'allow' }
+                    },
+                    cache: {
+                        description: 'Manage cache',
+                        permission: 'Demo:command.demo.cache',
+                        subcommands: {
+                            clear: { description: 'Clear cache', permission: 'Demo:command.demo.cache.clear' }
+                        }
+                    }
+                }
+            }
+        });
+        const { ctx, registerCommand, registerPermission, server } = context();
+        registerCommands(ctx, nested, { 'demo public': () => [], 'demo cache clear': () => [] });
+
+        expect(registerPermission.mock.calls.map(([permission]) => permission.node)).toEqual([
+            'Demo:command.demo',
+            'Demo:command.demo.public',
+            'Demo:command.demo.cache',
+            'Demo:command.demo.cache.clear',
+            'Demo:command._access'
+        ]);
+        expect(registerPermission.mock.calls[0][0].children).toEqual([
+            { node: 'Demo:command.demo.public', value: true },
+            { node: 'Demo:command.demo.cache', value: true }
+        ]);
+        expect(registerPermission.mock.calls[2][0].children).toEqual([
+            { node: 'Demo:command.demo.cache.clear', value: true }
+        ]);
+        expect(registerCommand.mock.calls[0][1]).toBe('Demo:command._access');
+
+        const root = registerCommand.mock.calls[0][0] as {
+            children: unknown[];
+        };
+        expect(root.children).toHaveLength(2);
+        const publicCommand = host.onCommand.mock.calls[0][0];
+        const hasPermission = vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false);
+        expect(publicCommand?.({ hasPermission })).toBe(1);
+        let failure: unknown;
+        try {
+            publicCommand?.({ hasPermission });
+        } catch (error) {
+            failure = error;
+        }
+        expect(failure).toMatchObject({
+            tag: 'command-failed',
+            val: { line: 'You do not have permission to use this command.' }
+        });
+        expect(hasPermission).toHaveBeenNthCalledWith(1, server, 'Demo:command.demo.public');
+        expect(hasPermission).toHaveBeenNthCalledWith(2, server, 'Demo:command.demo.public');
     });
 
     it('turns CommandFailed into the host command error result', () => {

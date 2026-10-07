@@ -27,8 +27,8 @@ describe('renderSections', () => {
         expect(s.summary).toBe('Does demo things.');
         expect(s.permissions).toContain('| `fs.read.data` | Read packs \\| and config |');
         expect(s.permissions).toContain('| `http.outbound` | Check Pumpkin Market for plugin updates. |');
-        expect(s.commands).toContain('| `/demo list` | List things | `Demo:list` |');
-        expect(s.commands).toContain('| `/demo help` | Help | none |');
+        expect(s.commands).toContain('| `/demo list` | List things | `Demo:list` | operators (level 3) |');
+        expect(s.commands).toContain('| `/demo help` | Help | none | operators (level 3) |');
         expect(s.config).toContain('`plugins/data/Demo/config.toml`');
         expect(s.config).toContain('| `web.port` | integer | `8123` | HTTP port |');
         expect(s.config).toContain('| `token` | string | none | No default |');

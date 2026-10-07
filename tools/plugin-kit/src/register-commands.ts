@@ -2,15 +2,11 @@ import { Command, CommandNode, type CommandSender } from 'pumpkin:plugin/command
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { PermissionDefault } from 'pumpkin:plugin/permission@0.1.0';
 import { TextComponent } from 'pumpkin:plugin/text@0.1.0';
-import type { CommandHandlers, CommandTree } from '@pumpkin-plugins/docs';
+import { type CommandHandlers, type CommandTree, commandPermissionInfos } from '@pumpkin-plugins/docs';
 import { buildCommands, type CommandHost } from './commands.ts';
 import { onCommand } from './host.ts';
 
-/** Options that control how a plugin's commands are registered. */
-export interface RegisterCommandsOptions {
-    /** Permission default used for every node, which is operator level three by default. */
-    readonly defaultPermission?: PermissionDefault;
-}
+const COMMAND_ACCESS_PERMISSION_SUFFIX = ':command._access';
 
 function text(line: string, tone?: 'error'): TextComponent {
     const component = TextComponent.text(line);
@@ -19,19 +15,17 @@ function text(line: string, tone?: 'error'): TextComponent {
 }
 
 /**
- * Registers a plugin's commands and their permissions with the server. Operators of level 3 and
- * the console may use them by default.
+ * Registers a plugin's commands, permissions and per-subcommand permission checks.
  * @param ctx - The plugin context.
  * @param tree - The commands, from `defineCommands`.
  * @param handlers - What runs each command: the lines to send back, or a thrown `CommandFailed`.
- * @param options - Permission behavior for the registered command nodes.
  */
 export function registerCommands<T extends CommandTree>(
     ctx: Context,
     tree: T,
-    handlers: CommandHandlers<T, CommandSender>,
-    options: RegisterCommandsOptions = {}
+    handlers: CommandHandlers<T, CommandSender>
 ): void {
+    const server = ctx.getServer();
     const host: CommandHost<CommandSender> = {
         root: (name, description) => new Command([name], description),
         literal: (name) => CommandNode.literal(name),
@@ -44,20 +38,38 @@ export function registerCommands<T extends CommandTree>(
         fail: (message) => {
             // The host's error type for a command that failed. The runtime takes a thrown value as the `err` of the result.
             throw { tag: 'command-failed', val: text(message, 'error') };
-        }
+        },
+        hasPermission: (sender, permission) => sender.hasPermission(server, permission)
     };
 
+    for (const permission of commandPermissionInfos(tree)) {
+        ctx.registerPermission({
+            node: permission.node,
+            description: permission.description,
+            default: permission.defaultPermission as PermissionDefault,
+            children: permission.children
+        });
+    }
+
     const registered = new Set<string>();
+    const registerAccessPermission = (permission: string): void => {
+        if (registered.has(permission)) return;
+        registered.add(permission);
+        ctx.registerPermission({
+            node: permission,
+            description: 'Access registered plugin commands',
+            default: { tag: 'allow' },
+            children: []
+        });
+    };
+
     for (const { name, permission, node } of buildCommands<CommandSender, T>(host, tree, handlers)) {
-        if (!registered.has(permission)) {
-            registered.add(permission);
-            ctx.registerPermission({
-                node: permission,
-                description: `Use the /${name} command`,
-                default: options.defaultPermission ?? { tag: 'op', val: 'three' },
-                children: []
-            });
-        }
-        ctx.registerCommand(node as Command, permission);
+        const spec = tree[name];
+        const hasSubcommands = spec.subcommands && Object.keys(spec.subcommands).length > 0;
+        const rootPermission = hasSubcommands
+            ? permission.slice(0, permission.indexOf(':')) + COMMAND_ACCESS_PERMISSION_SUFFIX
+            : permission;
+        if (hasSubcommands) registerAccessPermission(rootPermission);
+        ctx.registerCommand(node as Command, rootPermission);
     }
 }

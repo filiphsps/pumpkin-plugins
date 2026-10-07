@@ -40,6 +40,38 @@ describe('buildCommands', () => {
         );
     });
 
+    it('checks each declared nested permission before running its command', () => {
+        const tree = defineCommands('Demo', {
+            demo: {
+                description: 'Manage demo',
+                permission: 'Demo:command.demo',
+                subcommands: {
+                    list: { description: 'List', permission: 'Demo:command.demo.list' },
+                    cache: {
+                        description: 'Manage cache',
+                        permission: 'Demo:command.demo.cache',
+                        subcommands: {
+                            clear: { description: 'Clear', permission: 'Demo:command.demo.cache.clear' }
+                        }
+                    }
+                }
+            }
+        });
+        const host = new FakeCommandHost();
+        const [built] = buildCommands(host, tree, { 'demo list': () => [], 'demo cache clear': () => [] });
+        const root = built?.node as FakeNode;
+        const hasPermission = vi.spyOn(host, 'hasPermission');
+        host.run(root, ['demo', 'list']);
+        host.run(root, ['demo', 'cache', 'clear']);
+        expect(hasPermission.mock.calls.map(([, permission]) => permission)).toEqual([
+            'Demo:command.demo.list',
+            'Demo:command.demo.cache.clear'
+        ]);
+
+        hasPermission.mockReturnValue(false);
+        expect(() => host.run(root, ['demo', 'list'])).toThrow(FakeCommandFailure);
+    });
+
     it('sends what a handler returns back to the sender, line by line', () => {
         const host = new FakeCommandHost();
         const [demo, ping] = buildCommands(host, tree, handlers).map((c) => c.node as FakeNode);

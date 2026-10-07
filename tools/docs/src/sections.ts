@@ -1,3 +1,4 @@
+import type { CommandPermissionDefault } from './commands.ts';
 import { type PluginInfo, pluginPermissions } from './info.ts';
 import { code, table } from './markdown.ts';
 
@@ -49,9 +50,24 @@ function renderPermissions(info: PluginInfo): string {
 function renderCommands({ commands = [] }: PluginInfo): string {
     if (commands.length === 0) return 'This plugin registers no commands.';
     return table(
-        ['Command', 'Description', 'Permission'],
-        commands.map((c) => [code(c.usage), c.description, c.permission ? code(c.permission) : 'none'])
+        ['Command', 'Description', 'Permission', 'Default access'],
+        commands.map((c) => [
+            code(c.usage),
+            c.description,
+            c.permission ? code(c.permission) : 'none',
+            renderCommandPermissionDefault(c.defaultPermission)
+        ])
     );
+}
+
+function renderCommandPermissionDefault(permission: CommandPermissionDefault | undefined): string {
+    if (!permission) return 'operators (level 3)';
+    if (permission.tag === 'allow') return 'everyone';
+    if (permission.tag === 'op') {
+        const level = { zero: '0', one: '1', two: '2', three: '3', four: '4' }[permission.val];
+        return `operators (level ${level})`;
+    }
+    return 'nobody';
 }
 
 function renderConfig({ name, config }: PluginInfo): string {

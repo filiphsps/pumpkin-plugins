@@ -5,5 +5,5 @@ import { commands } from './spec.ts';
 
 /** Registers `/dynamiclights` for all players by default. */
 export function registerCommands(ctx: Context, toggler: PlayerLightToggler): void {
-    register(ctx, commands, commandHandlers(toggler), { defaultPermission: { tag: 'allow' } });
+    register(ctx, commands, commandHandlers(toggler));
 }

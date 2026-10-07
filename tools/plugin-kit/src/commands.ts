@@ -28,6 +28,8 @@ export interface CommandHost<Sender> {
     reply(sender: Sender, line: string, tone?: 'error'): void;
     /** Makes the running command fail with a message, the way the server reports a failed command. Never returns. */
     fail(text: string): never;
+    /** Checks whether a sender has a command permission. */
+    hasPermission(sender: Sender, permission: string): boolean;
 }
 
 /** A command ready to be registered with the server. */
@@ -66,22 +68,26 @@ export function buildCommands<Sender, T extends CommandTree>(
     // Validate before allocating host nodes or callbacks, so a missing late handler leaves no partial tree.
     for (const { path } of flattenCommands(tree)) handlerFor(path.join(' '));
 
-    const fill = (node: CommandNodeLike, subs: SubcommandTree, path: string[]): void => {
+    const fill = (node: CommandNodeLike, subs: SubcommandTree, path: string[], permission: string): void => {
         for (const [name, spec] of Object.entries(subs)) {
             const child = host.literal(name);
             const here = [...path, name];
+            const herePermission = spec.permission ?? permission;
             const nested = spec.subcommands && Object.keys(spec.subcommands).length > 0;
-            if (nested && spec.subcommands) fill(child, spec.subcommands, here);
-            else attach(child, here);
+            if (nested && spec.subcommands) fill(child, spec.subcommands, here, herePermission);
+            else attach(child, here, herePermission, true);
             node.then(child);
         }
     };
 
-    const attach = (node: CommandNodeLike, path: string[]): void => {
+    const attach = (node: CommandNodeLike, path: string[], permission: string, checkPermission: boolean): void => {
         const key = path.join(' ') as CommandPath<T>;
         const handler = handlerFor(key);
         node.executeWithHandlerId(
             host.onRun((sender) => {
+                if (checkPermission && !host.hasPermission(sender, permission)) {
+                    host.fail('You do not have permission to use this command.');
+                }
                 let lines: readonly CommandLine[];
                 try {
                     lines = handler(sender);
@@ -100,8 +106,8 @@ export function buildCommands<Sender, T extends CommandTree>(
     return Object.entries(tree).map(([name, spec]) => {
         const node = host.root(name, spec.description);
         const nested = spec.subcommands && Object.keys(spec.subcommands).length > 0;
-        if (nested && spec.subcommands) fill(node, spec.subcommands, [name]);
-        else attach(node, [name]);
+        if (nested && spec.subcommands) fill(node, spec.subcommands, [name], spec.permission);
+        else attach(node, [name], spec.permission, false);
         return { name, description: spec.description, permission: spec.permission, node };
     });
 }

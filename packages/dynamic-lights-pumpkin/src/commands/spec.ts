@@ -7,6 +7,7 @@ export const COMMAND_PERMISSION = 'DynamicLightsPumpkin:command.dynamiclights' a
 export const commands = defineCommands('DynamicLightsPumpkin', {
     dynamiclights: {
         description: 'Toggle dynamic lights for yourself',
-        permission: COMMAND_PERMISSION
+        permission: COMMAND_PERMISSION,
+        defaultPermission: { tag: 'allow' }
     }
 });

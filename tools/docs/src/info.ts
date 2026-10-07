@@ -2,13 +2,23 @@
 // file free of Pumpkin and WASI imports so Node can load it directly.
 import type { PumpkinPermission } from './permissions.ts';
 
-export type { CommandPath, CommandSpec, CommandTree, FlatCommand, SubcommandSpec, SubcommandTree } from './commands.ts';
+export type {
+    CommandPath,
+    CommandPermissionDefault,
+    CommandPermissionInfo,
+    CommandSpec,
+    CommandTree,
+    FlatCommand,
+    SubcommandSpec,
+    SubcommandTree
+} from './commands.ts';
 export {
     CommandFailed,
     type CommandHandler,
     type CommandHandlers,
     type CommandLine,
     commandInfos,
+    commandPermissionInfos,
     defineCommands,
     errorLine,
     flattenCommands
@@ -31,6 +41,8 @@ export interface CommandInfo<Node extends string = string> {
     description: string;
     /** Permission node required to run it, if any. */
     permission?: Node;
+    /** Who may run the command by default. */
+    defaultPermission?: import('./commands.ts').CommandPermissionDefault;
 }
 
 /** One setting of the plugin's config file, as a row of the README table. */

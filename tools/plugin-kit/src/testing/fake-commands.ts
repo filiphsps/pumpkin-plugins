@@ -54,6 +54,10 @@ export class FakeCommandHost implements CommandHost<FakeSender> {
         throw new FakeCommandFailure(text);
     }
 
+    hasPermission(_sender: FakeSender, _permission: string): boolean {
+        return true;
+    }
+
     /** Runs the command at the end of `path` (the words after `/`) and returns what it sent back. */
     run(root: FakeNode, path: string[]): string[] {
         return this.runAs(root, path).lines;

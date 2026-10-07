@@ -76,7 +76,12 @@ export const commands = defineCommands(PLUGIN_NAME, {
     myplugin: {
         description: 'Manage MyPlugin',
         permission: `${PLUGIN_NAME}:command.myplugin`,
-        subcommands: { reload: { description: 'Reload the config' } }
+        subcommands: {
+            reload: {
+                description: 'Reload the config',
+                permission: `${PLUGIN_NAME}:command.myplugin.reload`
+            }
+        }
     }
 });
 ```
@@ -91,11 +96,18 @@ registerCommands(ctx, commands, {
 ```
 
 - `info.commands` is `commandInfos(commands)`: one README row per runnable command (`/myplugin
-  reload`), taken from the declaration.
+  reload`), including its permission and default access, taken from the declaration.
+- A subcommand can declare its own `permission`; otherwise it inherits the nearest parent's node.
+  Use dotted paths such as `${PLUGIN_NAME}:command.myplugin.reload` to create a waterfall. A parent
+  permission grants its child nodes through Pumpkin's permission tree.
+- Permissions default to operators at level 3 and the console. Set `defaultPermission: { tag:
+  'allow' }` on a command to make it usable by everyone, or `{ tag: 'deny' }` to deny it by default.
+  The setting is per permission node, so a read-only subcommand can be public while `reload` stays
+  operator-only.
 - The handlers are typed against the declaration (`CommandHandlers`): a command without a handler, or
   a handler for a command that doesn't exist, doesn't compile.
-- `registerCommands` registers the permission nodes (operators of level 3 and the console by
-  default) and builds the command tree. The tree is built by `buildCommands` in
+- `registerCommands` registers the permission nodes and checks each runnable subcommand against its
+  declared permission. The tree is built by `buildCommands` in
   `@pumpkin-plugins/plugin-kit/commands`, which takes the host's command classes as an interface;
   a plugin's tests run it against `FakeCommandHost` and compare what it registers with
   `info.commands` (see `src/commands/handlers.test.ts` in a plugin).
