@@ -33,7 +33,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 ## Plugins
 
 - [AppleSkinPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/apple-skin-pumpkin/README.md): AppleSkin server-side support
-- [BedrockAddonManager](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/README.md): Serves Bedrock resource packs to Pumpkin players
+- [BedrockAddonManager](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/README.md): Serves Bedrock packs over HTTP; Pumpkin can't send them to players yet
 - [Distant Horizons support](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/index.md): Unofficial Distant Horizons server support for Pumpkin
 - [Distant Horizons support README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/README.md): Additional component overview and usage details.
 - [Distant Horizons support: Install and connect](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/setup.md): Before installing, check the generated Compatibility and terrain reference for the supported Distant Horizons release and protocol.
@@ -58,7 +58,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Publish to Pumpkin Market](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/publish-to-pumpkin-market/README.md): Upload a released Pumpkin plugin WebAssembly file to its existing Market listing
 - [Sign Pumpkin plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/sign-pumpkin-plugin/README.md): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
 - [Update Pumpkin Market Listing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/update-pumpkin-market-listing/README.md): Update Pumpkin Market listing metadata from a JSON file or direct inputs
-- [Verify Pumpkin plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/verify-pumpkin-plugin/README.md): Verify signatures on Pumpkin plugin WebAssembly files
+- [Verify Pumpkin plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/verify-pumpkin-plugin/README.md): Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks
 
 ## API reference
 
@@ -68,7 +68,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Actions reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/): Generated API and action contract documentation.
 - [Scripts reference](https://filiphsps.github.io/pumpkin-plugins/api/scripts/): Generated API and action contract documentation.
 - [AppleSkinPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/apple-skin-pumpkin/): AppleSkin server-side support
-- [BedrockAddonManager API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/bedrock-addon-manager/): Serves Bedrock resource packs to Pumpkin players
+- [BedrockAddonManager API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/bedrock-addon-manager/): Serves Bedrock packs over HTTP; Pumpkin can't send them to players yet
 - [Distant Horizons support API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/distant-horizons-support-pumpkin/): Unofficial Distant Horizons server support for Pumpkin
 - [DynamicLightsPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/dynamic-lights-pumpkin/): Server-side dynamic lights for held light sources
 - [UPnPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/upnpumpkin/): Opens router ports for Pumpkin with UPnP and NAT-PMP
@@ -84,4 +84,4 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Publish to Pumpkin Market API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/publish-to-pumpkin-market/): Upload a released Pumpkin plugin WebAssembly file to its existing Market listing
 - [Sign Pumpkin plugin API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/sign-pumpkin-plugin/): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
 - [Update Pumpkin Market Listing API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/update-pumpkin-market-listing/): Update Pumpkin Market listing metadata from a JSON file or direct inputs
-- [Verify Pumpkin plugin API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/verify-pumpkin-plugin/): Verify signatures on Pumpkin plugin WebAssembly files
+- [Verify Pumpkin plugin API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/verify-pumpkin-plugin/): Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks
