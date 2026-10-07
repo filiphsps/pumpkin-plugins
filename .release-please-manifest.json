@@ -1,6 +1,6 @@
 {
     "packages/apple-skin-pumpkin": "0.0.4",
-    "packages/distant-horizons-support-pumpkin": "0.0.4",
+    "packages/distant-horizons-support-pumpkin": "0.0.3",
     "packages/dynamic-lights-pumpkin": "0.0.5",
     "packages/upnpumpkin": "0.0.5",
     "actions/publish-to-pumpkin-market": "0.0.3",
