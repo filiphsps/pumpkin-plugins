@@ -8,8 +8,8 @@ sections, and each component's navigation links to its reference.
 
 Create Markdown files under the component's `docs/` folder. For example, a plugin can have an
 `index.md` plus additional pages such as `configuration.md`; tools and actions use the same layout.
-The site discovers each file and adds it under that component's navigation. Relative links are
-checked by `pnpm check`.
+The site discovers each file and adds it to that component's sidebar and reference links. Relative
+links are checked by `pnpm check`.
 
 The component README serves as the overview when there is no custom `docs/index.md`. If a custom
 index exists, it becomes the component landing page and the README remains available as a separate

@@ -153,9 +153,56 @@ function referenceItems(items: Component[]): DefaultTheme.NavItemWithLink[] {
     return items.flatMap((item) => (item.apiReference ? [{ text: item.title, link: item.apiReference }] : []));
 }
 
-function typedocSidebar(directory: string) {
+type SidebarItem = DefaultTheme.SidebarItem;
+
+function typedocSidebar(directory: string, depth = 0): SidebarItem[] {
     const sidebarPath = path.join(directory, 'typedoc-sidebar.json');
-    return fs.existsSync(sidebarPath) ? JSON.parse(fs.readFileSync(sidebarPath, 'utf8')) : [];
+    if (!fs.existsSync(sidebarPath)) return [];
+    const items = JSON.parse(fs.readFileSync(sidebarPath, 'utf8')) as SidebarItem[];
+    return items.map((item) => ({
+        ...item,
+        ...(item.items ? { collapsed: depth > 0, items: collapseSidebar(item.items, depth + 1) } : {})
+    }));
+}
+
+function collapseSidebar(items: SidebarItem[], depth: number): SidebarItem[] {
+    return items.map((item) => ({
+        ...item,
+        ...(item.items ? { collapsed: depth > 0, items: collapseSidebar(item.items, depth + 1) } : {})
+    }));
+}
+
+function componentSidebar(item: Component, siblings: Component[], groupName: string): SidebarItem[] {
+    const pages = [
+        { text: 'Overview', link: item.overview },
+        ...(item.readme && item.readme !== item.overview ? [{ text: 'README', link: item.readme }] : []),
+        ...item.customDocs
+            .filter((doc) => !doc.file.endsWith('/index.md') && doc.route !== item.overview)
+            .map(({ title, route }) => ({ text: title, link: route })),
+        ...(item.apiReference ? [{ text: 'API reference', link: item.apiReference }] : [])
+    ];
+    const otherItems = siblings
+        .filter((sibling) => sibling.slug !== item.slug)
+        .map((sibling) => ({ text: sibling.title, link: sibling.overview }));
+    return [
+        { text: item.title, collapsed: false, items: pages },
+        ...(otherItems.length ? [{ text: `Other ${groupName}`, collapsed: true, items: otherItems }] : [])
+    ];
+}
+
+function documentationSidebar(item: Component, apiItems: SidebarItem[], extra: SidebarItem[] = []): SidebarItem[] {
+    const docs = [
+        { text: 'Component overview', link: item.overview },
+        ...(item.readme && item.readme !== item.overview ? [{ text: 'README', link: item.readme }] : []),
+        ...item.customDocs
+            .filter((doc) => !doc.file.endsWith('/index.md') && doc.route !== item.overview)
+            .map(({ title, route }) => ({ text: title, link: route }))
+    ];
+    return [
+        { text: 'Component documentation', collapsed: false, items: docs },
+        ...extra,
+        ...(apiItems.length ? [{ text: 'API reference', collapsed: false, items: apiItems }] : [])
+    ];
 }
 
 const apiSidebar = [
@@ -165,7 +212,15 @@ const apiSidebar = [
     { text: 'Scripts', link: '/api/scripts/', items: typedocSidebar(path.join(repoRoot, 'docs/api/scripts')) }
 ];
 
-const apiSidebars: Record<string, unknown> = {
+const apiNav: DefaultTheme.NavItemWithLink[] = [
+    { text: 'Overview', link: '/api/' },
+    { text: 'Plugins', link: '/api/plugins/' },
+    { text: 'Tools', link: '/api/tools/' },
+    { text: 'Actions', link: '/api/actions/' },
+    { text: 'Scripts', link: '/api/scripts/' }
+];
+
+const apiSidebars: Record<string, SidebarItem[]> = {
     '/api/': [{ text: 'Reference', link: '/api/', items: apiSidebar }],
     '/api/plugins/': [{ text: 'Plugins', link: '/api/plugins/', items: referenceItems(plugins) }],
     '/api/tools/': [{ text: 'Tools', link: '/api/tools/', items: referenceItems(tools) }],
@@ -176,36 +231,49 @@ const apiSidebars: Record<string, unknown> = {
 for (const item of [...plugins, ...tools]) {
     if (!item.apiReference) continue;
     const apiDirectory = path.join(repoRoot, 'docs', item.apiReference.slice(1));
-    apiSidebars[item.apiReference] = typedocSidebar(apiDirectory);
+    apiSidebars[item.apiReference] = documentationSidebar(item, typedocSidebar(apiDirectory));
 }
 
 for (const item of actions) {
     if (!item.apiReference) continue;
     const codeRoute = `${item.apiReference}code/`;
-    apiSidebars[item.apiReference] = [
-        {
-            text: item.title,
-            link: item.apiReference,
-            items: [
-                { text: 'Inputs', link: `${item.apiReference}#inputs` },
-                { text: 'Outputs', link: `${item.apiReference}#outputs` },
-                { text: 'Implementation reference', link: `${item.apiReference}#implementation-reference` },
-                { text: 'JSDoc reference', link: codeRoute }
-            ]
-        }
+    const actionSections = [
+        { text: 'Inputs', link: `${item.apiReference}#inputs` },
+        { text: 'Outputs', link: `${item.apiReference}#outputs` },
+        { text: 'Implementation reference', link: `${item.apiReference}#implementation-reference` },
+        { text: 'JSDoc reference', link: codeRoute }
     ];
-    apiSidebars[codeRoute] = typedocSidebar(path.join(repoRoot, 'docs', item.apiReference.slice(1), 'code'));
+    apiSidebars[item.apiReference] = documentationSidebar(
+        item,
+        [],
+        [{ text: 'Action reference', collapsed: false, items: actionSections }]
+    );
+    apiSidebars[codeRoute] = documentationSidebar(
+        item,
+        typedocSidebar(path.join(repoRoot, 'docs', item.apiReference.slice(1), 'code')),
+        [{ text: 'Action contract', link: item.apiReference }]
+    );
 }
 
 const scriptsSidebar = typedocSidebar(path.join(repoRoot, 'docs/api/scripts'));
-if (scriptsSidebar.length) apiSidebars['/api/scripts/'] = scriptsSidebar;
+if (scriptsSidebar.length) {
+    apiSidebars['/api/scripts/'] = [
+        { text: 'Reference', link: '/api/', items: apiNav },
+        { text: 'Script helpers', collapsed: false, items: scriptsSidebar }
+    ];
+}
 
-const apiNav: DefaultTheme.NavItemWithLink[] = [
-    { text: 'Overview', link: '/api/' },
-    { text: 'Plugins', link: '/api/plugins/' },
-    { text: 'Tools', link: '/api/tools/' },
-    { text: 'Actions', link: '/api/actions/' },
-    { text: 'Scripts', link: '/api/scripts/' }
+const componentSidebars: Record<string, SidebarItem[]> = {};
+for (const item of plugins) componentSidebars[`/packages/${item.slug}/`] = componentSidebar(item, plugins, 'plugins');
+for (const item of tools) componentSidebars[`/tools/${item.slug}/`] = componentSidebar(item, tools, 'tools');
+for (const item of actions) componentSidebars[`/actions/${item.slug}/`] = componentSidebar(item, actions, 'actions');
+
+const guideSidebar: SidebarItem[] = [
+    { text: 'Guides', collapsed: false, items: guideItems.map(({ text, link }) => ({ text, link })) },
+    { text: 'Plugins', collapsed: true, items: plugins.map((item) => ({ text: item.title, link: item.overview })) },
+    { text: 'Tools', collapsed: true, items: tools.map((item) => ({ text: item.title, link: item.overview })) },
+    { text: 'Actions', collapsed: true, items: actions.map((item) => ({ text: item.title, link: item.overview })) },
+    { text: 'API reference', link: '/api/' }
 ];
 
 export default defineConfig({
@@ -239,10 +307,15 @@ export default defineConfig({
             { text: 'Reference', items: apiNav }
         ],
         sidebar: {
-            '/packages/': componentItems(plugins),
-            '/tools/': componentItems(tools),
-            '/actions/': componentItems(actions),
-            '/guides/': [{ text: 'Guides', items: guideItems }],
+            '/packages/': plugins.map((item) => ({ text: item.title, link: item.overview })),
+            '/tools/': tools.map((item) => ({ text: item.title, link: item.overview })),
+            '/actions/': actions.map((item) => ({ text: item.title, link: item.overview })),
+            '/guides/': guideSidebar,
+            '/api/': [{ text: 'Reference', link: '/api/', items: apiSidebar }],
+            '/api/plugins/': [{ text: 'Plugins', link: '/api/plugins/', items: referenceItems(plugins) }],
+            '/api/tools/': [{ text: 'Tools', link: '/api/tools/', items: referenceItems(tools) }],
+            '/api/actions/': [{ text: 'Actions', link: '/api/actions/', items: referenceItems(actions) }],
+            ...componentSidebars,
             ...apiSidebars
         },
         editLink: {
