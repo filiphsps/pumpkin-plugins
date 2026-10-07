@@ -579,7 +579,7 @@ jobs:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
 
-            # The publisher imports src/info.ts to use the canonical Pumpkin plugin name.
+            # The publisher resolves the canonical plugin name from the package's info module.
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
@@ -602,6 +602,7 @@ jobs:
             # Missing credentials or a not-yet-published listing produce a warning and leave the
             # GitHub release intact. API failures still fail this job so it can be retried.
             - name: 🛒 Publish to Pumpkin Market
+              id: publish
               uses: ./actions/publish-to-pumpkin-market
               with:
                   plugin-name: ${{ steps.market.outputs.plugin_name }}
@@ -610,6 +611,22 @@ jobs:
                   api-token: ${{ secrets.MARKET_API_TOKEN }}
                   release-notes: ${{ env.MARKET_RELEASE_NOTES }}
                   warn: true
+
+            - name: 🧾 Generate Market description and commands
+              if: steps.publish.outputs.status == 'success'
+              env:
+                  PLUGIN_DIRECTORY: ${{ matrix.path }}
+                  METADATA_FILE: ${{ runner.temp }}/market-listing-metadata.json
+              run: node scripts/market-plugin-metadata.mjs "$PLUGIN_DIRECTORY" > "$METADATA_FILE"
+
+            - name: 📝 Update Pumpkin Market listing metadata
+              if: steps.publish.outputs.status == 'success'
+              uses: ./actions/update-pumpkin-market-listing
+              with:
+                  plugin-id: ${{ steps.publish.outputs.listing-id }}
+                  metadata-file: ${{ runner.temp }}/market-listing-metadata.json
+                  api-token: ${{ secrets.MARKET_API_TOKEN }}
+                  update-mode: patch
 
     cleanup:
         name: 🧹 Cleanup artifacts

@@ -23,7 +23,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin and action, checks release registration and READMEs, tests the action, then typechecks, builds and integration-tests the plugin |
 | 🚢 Release | plugin or action release changes, on `master` pushes | Runs release-please; action releases create a versioned tag and GitHub release without a plugin artifact |
 | 📝 Prepare release PR | all open release PRs on release runs | Keeps plugin READMEs, action README examples and first-release pins for plugins and actions current |
-| 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs the exact build artifact, uploads it, then updates an existing Market listing |
+| 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs and uploads the exact build artifact, publishes it to an existing Market listing, then syncs its description and commands |
 | 🧹 Cleanup artifacts | after successful consumers | Deletes integration and release handoff artifacts after their last use |
 
 The signed `plugins` build artifact remains available in the run summary, with a direct download
@@ -276,9 +276,12 @@ authentication and multipart `wasm` and `metadata` fields, using the file it rec
 rebuilding it. It runs directly on GitHub Actions' Node 24 runtime.
 
 In this repo, the `market` job downloads the `.wasm` produced by the build job, resolves the plugin's
-canonical name from `src/info.ts`, and passes the per-plugin Release Please version and changelog to
-the action using its local path. Builds aren't byte-reproducible, so the job must upload the artifact
-rather than rebuild.
+canonical name from its info module, and passes the per-plugin Release Please version and changelog
+to the action using its local path. After a successful publish, the job generates localized
+description and command metadata from that module and calls the metadata action with the numeric
+listing ID returned by the publisher. The metadata action sends a patch, so it leaves the listing's
+other fields to the Market listing editor. Builds aren't byte-reproducible, so the job must upload
+the artifact rather than rebuild.
 
 The action looks up the canonical plugin name using PPM's flow: try the direct plugin endpoint, then
 search a limited result set and require an exact name match. It never creates a listing: listing
