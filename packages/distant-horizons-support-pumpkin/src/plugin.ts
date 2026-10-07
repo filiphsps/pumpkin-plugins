@@ -46,7 +46,7 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
             }
         });
         this.registerEvent(ctx, 'player-leave-event', (_server, event: PlayerLeaveEventData) =>
-            sessions.left(event.player.getName())
+            sessions.playerLeft(event.player.getName())
         );
         this.registerEvent(ctx, 'server-tick-end-event', (server) =>
             sessions.tick(serverPeers(server, settings, hostLogger), server.getMspt())

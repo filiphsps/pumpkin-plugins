@@ -97,10 +97,21 @@ describe('DH sessions', () => {
         f.peer.terrain.height = 16;
         f.sessions.forceGenerate(f.peer, 32, 32);
         f.sessions.tick(f.peers);
-        f.sessions.left('Alice');
+        f.sessions.playerLeft('Alice');
         f.sessions.tick(f.peers);
 
         expect(f.sessions.status()).not.toContain('Forced LOD capture');
+        expect(f.reads()).toBe(32768);
+    });
+
+    it('keeps forced work running when only the DH protocol session closes', () => {
+        const f = fixture();
+        f.peer.terrain.height = 16;
+        f.sessions.forceGenerate(f.peer, 32, 32);
+        f.sessions.receive(f.peer, packet(1).string('client leaving').finish());
+
+        expect(f.sessions.status()).toContain('Forced LOD capture for Alice');
+        f.sessions.tick(f.peers);
         expect(f.reads()).toBe(32768);
     });
 

@@ -268,6 +268,10 @@ export class Sessions {
     }
     /** Removes a disconnected client's work and queued transfers. */
     left(name: string): void {
+        this.removeClient(name);
+    }
+    /** Removes a leaving player and cancels their operator capture. */
+    playerLeft(name: string): void {
         this.forcedGeneration.left(name);
         this.removeClient(name);
     }
