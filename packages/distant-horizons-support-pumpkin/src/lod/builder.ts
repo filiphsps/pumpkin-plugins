@@ -2,11 +2,13 @@
  * Adapted from DH Support FullBuilder and Lod. Copyright (C) 2024 Jim C K Flaten.
  * Changes for Pumpkin made in October 2026. SPDX-License-Identifier: GPL-3.0-or-later
  * Free software under GNU GPL version 3 or any later version, WITHOUT ANY WARRANTY.
- * See ../../LICENSE. Protocol 16 DTO layout follows DH core, Copyright (C) 2020
+ * See ../../LICENSE. Protocol DTO layout follows DH core, Copyright (C) 2020
  * James Seibel, originally LGPL-3.0-only; see ../../LICENSE.LESSER.txt.
  */
 import { Writer } from '../protocol/bytes.ts';
+import { SECTION_AREA, SECTION_DETAIL, SECTION_SIZE_BLOCKS } from '../protocol/constants.ts';
 import type { Section } from '../protocol/messages.ts';
+import { MAX_POINTS_PER_SECTION } from './constants.ts';
 
 /** A block and biome mapping with the light above its upper face. */
 export interface Sample {
@@ -32,7 +34,7 @@ interface Point {
     block: number;
 }
 
-/** Incrementally builds the 64x64 columns of an LOD, with a bounded number of block reads. */
+/** Incrementally builds the columns of an LOD, with a bounded number of block reads. */
 export class LodBuilder {
     private column = 0;
     private points = 0;
@@ -45,15 +47,16 @@ export class LodBuilder {
         private readonly minY: number,
         private readonly height: number
     ) {
-        if (section.detail !== 6 || height < 1 || height > 4095) throw new RangeError('Unsupported LOD dimensions');
+        if (section.detail !== SECTION_DETAIL || height < 1 || height > 4095)
+            throw new RangeError('Unsupported LOD dimensions');
         this.y = height - 1;
     }
     /** Reads up to budget blocks; returns true once all columns have been built. */
     step(terrain: Terrain, budget: number): boolean {
         if (terrain.minY !== this.minY || terrain.height !== this.height) throw new Error('World height changed');
-        for (let remaining = budget; remaining > 0 && this.column < 4096; remaining--) {
-            const x = this.section.x * 64 + Math.floor(this.column / 64);
-            const z = this.section.z * 64 + (this.column % 64);
+        for (let remaining = budget; remaining > 0 && this.column < SECTION_AREA; remaining--) {
+            const x = this.section.x * SECTION_SIZE_BLOCKS + Math.floor(this.column / SECTION_SIZE_BLOCKS);
+            const z = this.section.z * SECTION_SIZE_BLOCKS + (this.column % SECTION_SIZE_BLOCKS);
             const sample = terrain.sample(x, this.minY + this.y, z);
             let span = 1;
             if (
@@ -82,7 +85,7 @@ export class LodBuilder {
                 previous.height += span;
             } else {
                 // Bound guest memory even for custom worlds with alternating blocks at every height.
-                if (++this.points > 131072) throw new RangeError('LOD section is too complex');
+                if (++this.points > MAX_POINTS_PER_SECTION) throw new RangeError('LOD section is too complex');
                 column.push({ id, start, height: span, sky: sample.sky, block: sample.block });
             }
             this.y -= span;
@@ -91,11 +94,11 @@ export class LodBuilder {
                 this.column++;
             }
         }
-        return this.column === 4096;
+        return this.column === SECTION_AREA;
     }
     /** Fraction of the section already sampled, including the current column. */
     progress(): number {
-        return (this.column * this.height + this.height - 1 - this.y) / (4096 * this.height);
+        return (this.column * this.height + this.height - 1 - this.y) / (SECTION_AREA * this.height);
     }
     /** Encodes DH's supported v1 DTO with uncompressed blobs and exact packed datapoints. */
     finish(now: number): Uint8Array {
@@ -111,7 +114,7 @@ export class LodBuilder {
         }
         const mappings = new Writer().int(this.mappings.length);
         for (const mapping of this.mappings) mappings.string(mapping);
-        // v1 is intentionally retained: DH 3.3.4 still decodes it and converts its adjacency data.
+        // v1 is intentionally retained: the supported DH client decodes it and converts adjacency data.
         return new Writer()
             .words(this.section.high, this.section.low)
             .int(0)
@@ -120,8 +123,8 @@ export class LodBuilder {
             .int(0)
             .int(0)
             .int(0)
-            .blob(new Uint8Array(4096).fill(9))
-            .blob(new Uint8Array(4096))
+            .blob(new Uint8Array(SECTION_AREA).fill(9))
+            .blob(new Uint8Array(SECTION_AREA))
             .blob(mappings.finish())
             .byte(1)
             .byte(0)

@@ -1,6 +1,6 @@
 /*
  * Adapted from DH Support. Copyright (C) 2024 Jim C K Flaten.
- * Protocol 16 adaptations reference Distant Horizons core, Copyright (C) 2020 James Seibel,
+ * Protocol adaptations reference Distant Horizons core, Copyright (C) 2020 James Seibel,
  * originally under LGPL-3.0-only (see ../../LICENSE.LESSER.txt).
  * Changes for Pumpkin made in October 2026.
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -45,7 +45,7 @@ export class Writer {
     blob(value: Uint8Array): this {
         return this.int(value.length).bytes(value);
     }
-    /** Appends UTF-8 prefixed by its byte length, matching DH protocol 16. */
+    /** Appends UTF-8 prefixed by its byte length, matching the DH protocol. */
     string(value: string): this {
         const out = new Writer();
         for (const character of value) {

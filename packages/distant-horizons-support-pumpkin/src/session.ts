@@ -2,6 +2,7 @@ import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import type { Settings } from './config/schema.ts';
 import { LodBuilder, type Terrain } from './lod/builder.ts';
 import type { CachedLod, LodCache } from './lod/cache.ts';
+import { CHUNK_SIZE_BLOCKS, SECTION_DETAIL, SECTION_SIZE_BLOCKS } from './protocol/constants.ts';
 import {
     decode,
     levelInit,
@@ -236,7 +237,7 @@ export class Sessions {
     }
     /** Invalidates a known changed section and cancels its obsolete captures. */
     changed(level: string, x: number, z: number): void {
-        const key = sectionKey(level, Math.floor(x / 64), Math.floor(z / 64));
+        const key = sectionKey(level, Math.floor(x / SECTION_SIZE_BLOCKS), Math.floor(z / SECTION_SIZE_BLOCKS));
         this.cache.remove(key);
         // Only running requests need a revision; this map stays bounded by the request limit.
         if (this.requests.some((r) => r.key === key)) this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
@@ -298,14 +299,15 @@ export class Sessions {
     ): { reason: string; kind: number } | undefined {
         if (request.level !== peer.level || client.level !== peer.level) return { reason: 'Wrong world', kind: 2 };
         if (client.disabled) return { reason: 'LOD requests disabled by client', kind: 2 };
-        if (request.section.detail !== 6) return { reason: 'Request block-detail sections', kind: 3 };
-        const x = request.section.x * 64,
-            z = request.section.z * 64,
-            range = client.distance * 16;
+        if (request.section.detail !== SECTION_DETAIL) return { reason: 'Request block-detail sections', kind: 3 };
+        const x = request.section.x * SECTION_SIZE_BLOCKS,
+            z = request.section.z * SECTION_SIZE_BLOCKS,
+            range = client.distance * CHUNK_SIZE_BLOCKS;
         if (
-            Math.max(Math.abs(x + 32 - peer.x), Math.abs(z + 32 - peer.z)) > range ||
+            Math.max(Math.abs(x + SECTION_SIZE_BLOCKS / 2 - peer.x), Math.abs(z + SECTION_SIZE_BLOCKS / 2 - peer.z)) >
+                range ||
             !peer.insideBorder(x, z) ||
-            !peer.insideBorder(x + 63, z + 63)
+            !peer.insideBorder(x + SECTION_SIZE_BLOCKS - 1, z + SECTION_SIZE_BLOCKS - 1)
         )
             return { reason: 'Section outside request range or world border', kind: 1 };
         // Backpressure includes transfers: don't let repeated requests build an unbounded byte queue.

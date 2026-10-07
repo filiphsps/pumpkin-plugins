@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Reader, Writer } from './bytes.ts';
 import { decode, levelInit, packet, readSection, sessionConfig, transfer } from './messages.ts';
 
-describe('DH protocol 16', () => {
+describe('Distant Horizons protocol', () => {
     it('encodes a UTF-8 level announcement with a millisecond timestamp', () => {
         const data = levelInit('minecraft:overworld', 'server', 'world', 4294967297);
         const input = new Reader(data);

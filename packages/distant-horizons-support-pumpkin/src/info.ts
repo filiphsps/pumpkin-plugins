@@ -1,6 +1,14 @@
 import { commandInfos, type PluginInfo } from '@pumpkin-plugins/docs';
 import { commands } from './commands/spec.ts';
 import { configInfo } from './config/schema.ts';
+import { MAX_POINTS_PER_SECTION } from './lod/constants.ts';
+import {
+    DH_VERSION,
+    PROTOCOL,
+    SECTION_CHUNK_COUNT,
+    SECTION_SIZE_BLOCKS,
+    TRANSFER_PACKET_BYTES
+} from './protocol/constants.ts';
 
 /**
  * What the plugin is and offers. Feeds both its Pumpkin metadata and its generated README. Declare
@@ -15,5 +23,21 @@ export const info = {
         { name: 'fs.write.data', reason: 'Write settings and persist captured LOD terrain.' }
     ],
     commands: commandInfos(commands),
-    config: configInfo
+    config: configInfo,
+    blocks: {
+        compatibility: [
+            `Targets Distant Horizons **${DH_VERSION}**, using network protocol ${PROTOCOL} on Java Edition.`,
+            'Bedrock players do not open DH sessions. Install the Distant Horizons client mod separately.',
+            'A client using another DH protocol is disconnected with an incompatibility message.',
+            `The protocol format follows [Distant Horizons core ${DH_VERSION}](https://gitlab.com/distant-horizons-team/distant-horizons-core/-/tree/${DH_VERSION}).`
+        ].join(' '),
+        terrain: [
+            `The plugin builds LOD sections covering ${SECTION_SIZE_BLOCKS} × ${SECTION_SIZE_BLOCKS} blocks`,
+            `across ${SECTION_CHUNK_COUNT} server chunks.`,
+            `All ${SECTION_CHUNK_COUNT} chunks must already be loaded by Pumpkin before a capture can start.`,
+            'The plugin cannot load or generate distant chunks.',
+            `Captures are limited to ${MAX_POINTS_PER_SECTION} material segments per section,`,
+            `and transfer packets carry at most ${TRANSFER_PACKET_BYTES} bytes.`
+        ].join(' ')
+    }
 } satisfies PluginInfo<'DistantHorizonsSupportPumpkin'>;

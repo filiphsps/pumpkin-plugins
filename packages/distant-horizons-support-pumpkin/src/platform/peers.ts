@@ -5,6 +5,7 @@ import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import type { Settings } from '../config/schema.ts';
 import type { Sample } from '../lod/builder.ts';
+import { CHUNK_SIZE_BLOCKS, SECTION_CHUNKS_PER_SIDE } from '../protocol/constants.ts';
 import { CHANNEL } from '../protocol/messages.ts';
 import type { Peer, Peers } from '../session.ts';
 
@@ -50,8 +51,16 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                 minY,
                 height,
                 prepare: (section) => {
-                    for (let x = section.x * 4; x < section.x * 4 + 4; x++) {
-                        for (let z = section.z * 4; z < section.z * 4 + 4; z++) {
+                    for (
+                        let x = section.x * SECTION_CHUNKS_PER_SIDE;
+                        x < (section.x + 1) * SECTION_CHUNKS_PER_SIDE;
+                        x++
+                    ) {
+                        for (
+                            let z = section.z * SECTION_CHUNKS_PER_SIDE;
+                            z < (section.z + 1) * SECTION_CHUNKS_PER_SIDE;
+                            z++
+                        ) {
                             const key = `${x}:${z}`;
                             if (chunks.has(key)) continue;
                             const chunk = terrainWorld.getChunk(x, z);
@@ -61,15 +70,15 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                     }
                 },
                 top: (x, z) => {
-                    const chunkX = Math.floor(x / 16),
-                        chunkZ = Math.floor(z / 16);
+                    const chunkX = Math.floor(x / CHUNK_SIZE_BLOCKS),
+                        chunkZ = Math.floor(z / CHUNK_SIZE_BLOCKS);
                     const chunk = chunks.get(`${chunkX}:${chunkZ}`);
                     if (!chunk) throw new Error('Terrain was not prepared');
-                    return chunk.getTopBlockY(x - chunkX * 16, z - chunkZ * 16);
+                    return chunk.getTopBlockY(x - chunkX * CHUNK_SIZE_BLOCKS, z - chunkZ * CHUNK_SIZE_BLOCKS);
                 },
                 sample: (x, y, z) => {
-                    const chunkX = Math.floor(x / 16),
-                        chunkZ = Math.floor(z / 16),
+                    const chunkX = Math.floor(x / CHUNK_SIZE_BLOCKS),
+                        chunkZ = Math.floor(z / CHUNK_SIZE_BLOCKS),
                         key = `${chunkX}:${chunkZ}`;
                     let chunk = chunks.get(key);
                     if (!chunk) {
@@ -77,7 +86,11 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                         if (!chunk) throw new Error('Chunk is not loaded');
                         chunks.set(key, chunk);
                     }
-                    const pos = { x: x - chunkX * 16, y, z: z - chunkZ * 16 },
+                    const pos = {
+                            x: x - chunkX * CHUNK_SIZE_BLOCKS,
+                            y,
+                            z: z - chunkZ * CHUNK_SIZE_BLOCKS
+                        },
                         column = `${x}:${z}`;
                     const id = chunk.getBlockStateId(pos);
                     if (column !== lastColumn) {

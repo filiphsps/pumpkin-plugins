@@ -5,6 +5,7 @@ import { builtPluginPath, type PumpkinInstance, startPumpkin } from '@pumpkin-pl
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { info } from '../src/info.ts';
 import { LodCache } from '../src/lod/cache.ts';
+import { PROTOCOL } from '../src/protocol/messages.ts';
 
 describe(info.name, () => {
     let server: PumpkinInstance;
@@ -19,7 +20,7 @@ describe(info.name, () => {
     });
     it('loads, installs settings, and reports supported capabilities through its command', async () => {
         await server.waitForLog(new RegExp(`Loaded ${info.name}`));
-        await server.waitForLog(/serving DH protocol 16 from loaded chunks and cached terrain/);
+        await server.waitForLog(new RegExp(`serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain`));
         const config = await readFile(path.join(server.pluginDataDir(info.name), 'config.toml'), 'utf8');
         expect(config).toContain('render_distance = 128');
         expect(config).toContain('blocks_per_tick = 2048');

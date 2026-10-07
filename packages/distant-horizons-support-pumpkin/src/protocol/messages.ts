@@ -1,6 +1,6 @@
 /*
  * Adapted from DH Support. Copyright (C) 2024 Jim C K Flaten.
- * Protocol 16 adaptations reference Distant Horizons core, Copyright (C) 2020 James Seibel,
+ * Protocol adaptations reference Distant Horizons core, Copyright (C) 2020 James Seibel,
  * originally under LGPL-3.0-only (see ../../LICENSE.LESSER.txt).
  * Changes for Pumpkin made in October 2026.
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -8,12 +8,12 @@
  * Distributed WITHOUT ANY WARRANTY; see ../../LICENSE.
  */
 import { Reader, Writer } from './bytes.ts';
+import { PROTOCOL, TRANSFER_PACKET_BYTES } from './constants.ts';
 
+export * from './constants.ts';
 /** Plugin channel shared with the released DH client. */
 export const CHANNEL = 'distant_horizons:msg';
-/** Network protocol used by DH 3.3.4, verified at core tag 3.3.4. */
-export const PROTOCOL = 16;
-/** Coordinates of a DH block-detail section, covering 64 by 64 blocks. */
+/** Coordinates of a DH block-detail section. */
 export interface Section {
     high: number;
     low: number;
@@ -112,8 +112,8 @@ export function unchanged(tracker: number): Uint8Array {
 /** Splits an LOD payload before the response points the client at its buffer. */
 export function transfer(tracker: number, buffer: number, lod: Uint8Array): Uint8Array[] {
     const packets: Uint8Array[] = [];
-    for (let offset = 0; offset < lod.length; offset += 30000) {
-        const part = lod.subarray(offset, offset + 30000);
+    for (let offset = 0; offset < lod.length; offset += TRANSFER_PACKET_BYTES) {
+        const part = lod.subarray(offset, offset + TRANSFER_PACKET_BYTES);
         packets.push(
             packet(10)
                 .int(buffer)

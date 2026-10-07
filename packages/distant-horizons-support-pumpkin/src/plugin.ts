@@ -19,10 +19,10 @@ import { readSettings } from './config/load.ts';
 import { info } from './info.ts';
 import { LodCache } from './lod/cache.ts';
 import { serverPeers, withPlayer } from './platform/peers.ts';
-import { CHANNEL } from './protocol/messages.ts';
+import { CHANNEL, PROTOCOL } from './protocol/messages.ts';
 import { Sessions } from './session.ts';
 
-/** Serves DH protocol 16 requests from loaded chunks and previously captured terrain. */
+/** Serves Distant Horizons requests from loaded chunks and previously captured terrain. */
 class DistantHorizonsSupportPumpkin extends PluginBase {
     constructor() {
         super(info, __PLUGIN_VERSION__);
@@ -69,7 +69,7 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
             }
         });
         hostLogger.info(
-            'DistantHorizonsSupportPumpkin: serving DH protocol 16 from loaded chunks and cached terrain. Distant chunk generation is unavailable; see the plugin README TODO.'
+            `DistantHorizonsSupportPumpkin: serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain. Distant chunk generation is unavailable; see the plugin README TODO.`
         );
     }
 }
