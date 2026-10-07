@@ -40,6 +40,7 @@
     },
     "dependencies": {
         "@pumpkin-plugins/config": "workspace:*",
+        "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkinmc/pumpkin-api-ts": "catalog:",
         "fflate": "0.8.3"

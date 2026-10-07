@@ -17,9 +17,9 @@ import type {
 } from 'pumpkin:plugin/event@0.1.0';
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
 import { cancelTask, runCommand, scheduleDelayed, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
-import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
@@ -58,16 +58,16 @@ class DynamicLightsPumpkin extends PluginBase {
     protected onPluginLoad(ctx: Context): void {
         const clientLightStates = resolveClientLightStates();
         if (clientLightStates === undefined) {
-            logging.log('error', `${colorLogValue(info.name, 'cyan')} could not resolve Minecraft light block states`);
+            logging.log('error', `${ansi.named.name(info.name)} could not resolve Minecraft light block states`);
             return;
         }
         const files = WasiDataDir.open();
         if (files === undefined) {
-            logging.log('error', `${colorLogValue(info.name, 'cyan')} needs its data-folder permissions to run`);
+            logging.log('error', `${ansi.named.name(info.name)} needs its data-folder permissions to run`);
             return;
         }
         const config = loadPluginConfig(files, (level, message) =>
-            logging.log(level, `${colorLogValue(info.name, 'cyan')}: ${message}`)
+            logging.log(level, `${ansi.named.name(info.name)}: ${message}`)
         );
         const journal = new LightJournal(files);
         this.preferences = new PlayerLightPreferences(files);
@@ -80,7 +80,7 @@ class DynamicLightsPumpkin extends PluginBase {
         if (config.entities.enabled) {
             logging.log(
                 'info',
-                `${colorLogValue(info.name, 'cyan')} entity lights enabled for ${colorLogValue(String(this.entityLevels.size), 'yellow')} type${this.entityLevels.size === 1 ? '' : 's'} every ${colorLogValue(String(config.entities.refresh_interval_ticks), 'yellow')} ticks`
+                `${ansi.named.name(info.name)} entity lights enabled for ${ansi.named.number(this.entityLevels.size)} type${this.entityLevels.size === 1 ? '' : 's'} every ${ansi.named.number(config.entities.refresh_interval_ticks)} ticks`
             );
             this.entityTask = scheduleRepeating(config.entities.refresh_interval_ticks, (server) =>
                 this.syncEntityLights(server)
@@ -183,7 +183,7 @@ class DynamicLightsPumpkin extends PluginBase {
             if (recovered > 0)
                 logging.log(
                     'warn',
-                    `${colorLogValue(info.name, 'cyan')} restored ${colorLogValue(String(recovered), 'yellow')} stale temporary light level${recovered === 1 ? '' : 's'}`
+                    `${ansi.named.name(info.name)} restored ${ansi.named.number(recovered)} stale temporary light level${recovered === 1 ? '' : 's'}`
                 );
             const players = server.getAllPlayers();
             try {
