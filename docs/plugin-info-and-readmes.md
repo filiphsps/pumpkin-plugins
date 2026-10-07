@@ -161,8 +161,8 @@ what it is for, and a link to the doc that covers it), and `pnpm check` fails wh
 ## When it runs
 
 - `pnpm readme` regenerates everything locally. `pnpm readme:check` fails if anything is stale.
-- CI only checks that generation succeeds, so contributors don't have to commit regenerated
-  READMEs.
+- CI checks that generated content is current. Contributors should run `pnpm readme` and commit the
+  generated README changes with the source change.
 - Each time release-please creates or updates the release PR, the release job regenerates the
   READMEs and commits them to the PR branch. See [CI and releases](ci-and-releases.md).
 - `pnpm gen` generates the new plugin's README and updates the root table straight away.

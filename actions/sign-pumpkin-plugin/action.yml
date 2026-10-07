@@ -6,22 +6,22 @@ branding:
     color: purple
 inputs:
     plugin-name:
-        description: Exact Pumpkin plugin name to embed in the signed metadata
+        description: Single-file mode; exact plugin name embedded in the signature metadata
         required: false
     version:
-        description: Plugin version to embed, without a leading v
+        description: Single-file mode; plugin version embedded without a leading v
         required: false
     wasm-file:
-        description: Path to the plugin .wasm file to sign
+        description: Single-file mode; path to the plugin .wasm file to sign
         required: false
     plugins-manifest:
-        description: Optional JSON array of plugin-name, version, and wasm-file entries to sign in one run
+        description: Batch mode; JSON array of plugin-name, version, and wasm-file entries instead of single-file inputs
         required: false
     developer-name:
-        description: Developer name to embed in the signed metadata
+        description: Developer name embedded in signed metadata; required in either mode
         required: true
     signing-key:
-        description: 32-byte Ed25519 secret seed as 64 hexadecimal characters
+        description: 32-byte Ed25519 secret seed as 64 hexadecimal characters; required unless warn is true
         required: false
     warn:
         description: Warn and leave the file unchanged when signing-key is empty instead of failing

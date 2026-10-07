@@ -108,11 +108,12 @@ keeps `force-tag-creation` enabled, and the repository check enforces it.
 
 After each Release Please run, a separate matrix job finds every open component release PR and
 prepares its branch, including branches Release Please did not return as changed. It regenerates
-plugin READMEs and updates the versioned example tag in every action README from that action's
-Release Please manifest entry. For an action that has not had its first release, the README uses its
-`release-as` version instead of `0.0.0`. The job pushes a
-`docs: update generated READMEs` commit to the PR branch, so examples are current when the release
-merges. The same run retires the `release-as` pin of any plugin or action the PR releases (see below).
+plugin READMEs, generates every action README's input/output tables from its `action.yml`, and
+updates the versioned example tag from that action's Release Please manifest entry. For an action
+that has not had its first release, the README uses its `release-as` version instead of `0.0.0`. The
+job pushes a `docs: update generated READMEs` commit to the PR branch, so examples are current when
+the release merges. The same run retires the `release-as` pin of any plugin or action the PR releases
+(see below).
 release-please rewrites its branch on every update, so those commits are re-added each time.
 
 Release PRs refresh on every release run, even when their release notes are unchanged.

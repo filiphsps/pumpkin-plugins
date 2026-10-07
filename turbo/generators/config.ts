@@ -212,6 +212,13 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                 () =>
                     run(
                         root,
+                        'node',
+                        ['scripts/sync-action-readmes.mjs'],
+                        'Generated action README input/output tables'
+                    ),
+                () =>
+                    run(
+                        root,
                         'pnpm',
                         ['exec', 'pumpkin-plugins-docs', 'root'],
                         'Updated the actions table in README.md'

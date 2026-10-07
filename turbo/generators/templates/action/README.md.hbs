@@ -1,6 +1,6 @@
-# {{ displayName }}
+# {{{ displayName }}}
 
-{{ description }}
+{{{ description }}}
 
 ```yaml
 steps:
@@ -10,9 +10,20 @@ steps:
 The version reference above is this action's first Release Please tag. Action releases are
 independent from plugin releases and other actions.
 
+## Inputs
+
+<!-- action-inputs:start -->
+<!-- action-inputs:end -->
+
+## Outputs
+
+<!-- action-outputs:start -->
+<!-- action-outputs:end -->
+
 ## Development
 
 Add inputs and outputs in `action.yml`, implement the behavior in `src/index.mjs`, and cover it with
-tests in `src/*.test.mjs`. Read inputs with `getInput()` from `src/utils.mjs` so hyphenated input
-names keep matching GitHub's runner environment. The action runs on GitHub's Node 24 runtime and
-needs no separate build step.
+tests in `src/*.test.mjs`. Input and output tables are generated from `action.yml`; run `pnpm readme`
+after changing the action metadata. Read inputs with `getInput()` and write outputs with
+`setOutput()` from `src/utils.mjs` so values use GitHub's runner environment and output-file format.
+The action runs on GitHub's Node 24 runtime and needs no separate build step.

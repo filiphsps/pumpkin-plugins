@@ -38,15 +38,23 @@ The action signs each entry and refreshes any adjacent checksums. `developer-nam
 
 ## Inputs
 
+<!-- action-inputs:start -->
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
-| `plugin-name` | Single-file mode | | Exact Pumpkin plugin name embedded in the signature metadata |
-| `version` | Single-file mode | | Plugin version, without a leading `v` |
-| `wasm-file` | Single-file mode | | `.wasm` path, relative to the workspace or absolute |
-| `plugins-manifest` | Batch mode | | Path to a JSON array with `plugin-name`, `version`, and `wasm-file` for each plugin |
-| `developer-name` | Yes | | Developer name embedded in the signature metadata |
-| `signing-key` | No | | 32-byte Ed25519 secret seed as 64 hexadecimal characters |
-| `warn` | No | `false` | If `true`, an empty key emits a warning and leaves the file unchanged; otherwise it fails |
+| `plugin-name` | No |  | Single-file mode; exact plugin name embedded in the signature metadata |
+| `version` | No |  | Single-file mode; plugin version embedded without a leading v |
+| `wasm-file` | No |  | Single-file mode; path to the plugin .wasm file to sign |
+| `plugins-manifest` | No |  | Batch mode; JSON array of plugin-name, version, and wasm-file entries instead of single-file inputs |
+| `developer-name` | Yes |  | Developer name embedded in signed metadata; required in either mode |
+| `signing-key` | No |  | 32-byte Ed25519 secret seed as 64 hexadecimal characters; required unless warn is true |
+| `warn` | No | `false` | Warn and leave the file unchanged when signing-key is empty instead of failing |
+<!-- action-inputs:end -->
+
+## Outputs
+
+<!-- action-outputs:start -->
+This action has no outputs.
+<!-- action-outputs:end -->
 
 An empty key can be skipped with `warn: true`, which is useful for forks and repositories that
 release unsigned plugins. A malformed key, missing file, or failed signature verification always
