@@ -5,5 +5,5 @@
     "packages/upnpumpkin": "0.0.5",
     "actions/publish-to-pumpkin-market": "0.0.2",
     "actions/sign-pumpkin-plugin": "0.0.2",
-    "actions/update-pumpkin-market-listing": "0.0.0"
+    "actions/update-pumpkin-market-listing": "0.0.1"
 }
