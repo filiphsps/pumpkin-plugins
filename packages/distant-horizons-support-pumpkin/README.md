@@ -39,6 +39,10 @@ Pumpkin asks for these on the server console the first time the plugin loads.
 | `/dhs cache clear` | Clear both cache tiers | `DistantHorizonsSupportPumpkin:command.dhs.cache.clear` | operators (level 3) |
 | `/dhs cache memory clear` | Clear the in-memory cache | `DistantHorizonsSupportPumpkin:command.dhs.cache.memory.clear` | operators (level 3) |
 | `/dhs cache disk clear` | Clear the disk cache | `DistantHorizonsSupportPumpkin:command.dhs.cache.disk.clear` | operators (level 3) |
+| `/dhs map here` | Show cached LOD sections around your position (default radius 4 sections) | `DistantHorizonsSupportPumpkin:command.dhs.map.here` | operators (level 3) |
+| `/dhs map here-radius <radius>` | Show cached LOD sections around your position with radius 0–16 sections | `DistantHorizonsSupportPumpkin:command.dhs.map.here-radius` | operators (level 3) |
+| `/dhs map at <x> <z>` | Show cached LOD sections around block coordinates in your current world (default radius 4 sections) | `DistantHorizonsSupportPumpkin:command.dhs.map.at` | operators (level 3) |
+| `/dhs map at-radius <x> <z> <radius>` | Show cached LOD sections at block coordinates with radius 0–16 sections | `DistantHorizonsSupportPumpkin:command.dhs.map.at-radius` | operators (level 3) |
 <!-- docs:end commands -->
 
 ## Configuration
@@ -54,7 +58,7 @@ Settings live in `plugins/data/DistantHorizonsSupportPumpkin/config.toml`. The p
 | `support.render_distance` | integer | `128` | Maximum LOD request radius in chunks, limited by the world border. |
 | `support.requests_per_player` | integer | `2` | Maximum pending requests per player. |
 | `support.pending_requests` | integer | `16` | Maximum pending requests across all players. |
-| `support.blocks_per_tick` | integer | `8192` | Maximum block samples per server tick across all LOD requests. |
+| `support.blocks_per_tick` | integer | `8192` | Maximum block samples per server tick across all LOD requests. Actual work adapts to server MSPT. |
 | `support.packets_per_tick` | integer | `2` | Maximum transfer packets for newly captured LODs per server tick across all players. |
 | `support.cached_requests_per_tick` | integer | `8` | Maximum cached LOD requests checked per server tick across all players. |
 | `support.cached_packets_per_tick` | integer | `64` | Maximum transfer packets for cached LODs per server tick across all players. |
@@ -84,7 +88,7 @@ requests_per_player = 2
 # Maximum pending requests across all players.
 pending_requests = 16
 
-# Maximum block samples per server tick across all LOD requests.
+# Maximum block samples per server tick across all LOD requests. Actual work adapts to server MSPT.
 blocks_per_tick = 8192
 
 # Maximum transfer packets for newly captured LODs per server tick across all players.
@@ -137,7 +141,16 @@ cache limits are independent; their current defaults and how to disable them are
 [Configuration](#configuration) section. When upgrading from earlier versions, the former shared
 cache limit is copied to both cache limits.
 
-The generated [Commands](#commands) section lists cache inspection and clearing commands.
+The generated [Commands](#commands) section lists cache inspection, clearing and LOD map commands.
+Run `/dhs map here` to see cached sections around your current position, or `/dhs map at <x> <z>`
+to inspect block coordinates in your current world. The radius commands accept 0–16 sections; each
+map cell is one 64 × 64 block LOD section (four by four server chunks). These commands need a player
+so the plugin can resolve the current world.
+
+The configured `blocks_per_tick` is the maximum capture batch. Actual block samples adapt to Pumpkin's
+rolling MSPT and the measured cost of previous steps, leaving 5 ms of tick headroom. Sampling pauses
+at 45 MSPT and resumes when the server has room again. Cached LOD transfers continue while sampling
+is paused. `/dhs status` reports the current sample budget and MSPT.
 
 Cached sections are refreshed after their configured age when their chunks are loaded. Otherwise the
 last cached capture is returned. Block placement and breaking invalidate the affected server cache;
@@ -148,8 +161,9 @@ an override is configured.
 
 ### Diagnosing pending requests
 
-`/dhs status` includes worker ticks, capture progress, served/rejected/cancelled request counts,
-queued transfer packets and the last rejection reason. Counts are cumulative since plugin load.
+`/dhs status` includes worker ticks, capture progress, the adaptive sample budget and server MSPT,
+served/rejected/cancelled request counts, queued transfer packets and the last rejection reason.
+Counts are cumulative since plugin load.
 Two pending requests can persist while the client continually submits new sections. Increasing
 worker ticks and capture progress show that the worker is advancing; increasing rejections with
 `Chunk ... is not loaded` mean that the requested sections cannot be captured yet. Previously
