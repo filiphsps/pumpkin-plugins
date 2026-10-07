@@ -10,8 +10,8 @@ The repo keeps agent instructions, skills and executable checks separate:
 - [AGENTS.md](https://github.com/filiphsps/pumpkin-plugins/blob/master/AGENTS.md) holds the shared rules and routes tasks to relevant docs and skills.
 - `.agents/skills/` holds focused workflows. An agent can discover them or read the linked `SKILL.md`
   directly. They don't install hooks or grant permission for external actions.
-- `.agents/hooks/` holds client-neutral Node scripts. Nothing in this folder runs automatically just
-  because it is called a hook. A client must invoke it, or the agent must run it as instructed.
+- `.agents/hooks/` holds client-neutral Node scripts. A client or agent must invoke them; they do not
+  run automatically.
 
 There is no client-specific hook configuration in this repo. The portable runner inspects git status,
 so shell writes, deletions and renames are included alongside edits made through dedicated tools.

@@ -14,8 +14,7 @@ import { data as members } from './.vitepress/team.data.ts';
     <VPTeamPageTitle>
         <template #title>The people behind Pumpkin Plugins</template>
         <template #lead>
-            Built by the community. Meet the contributors who help develop our plugins,
-            tools, actions, and documentation.
+            These contributors help develop our plugins, tools, actions, and documentation.
         </template>
     </VPTeamPageTitle>
     <VPTeamMembers class="team-contributors" :members="members" />

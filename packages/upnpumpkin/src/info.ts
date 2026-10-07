@@ -4,11 +4,11 @@ import { commands } from './commands/spec.ts';
 import { configInfo } from './config/schema.ts';
 import { PLUGIN_NAME } from './name.ts';
 
-/** What the plugin is, what it needs and what it offers. Feeds both its Pumpkin metadata and its README. */
+/** Plugin metadata used by Pumpkin and the generated README. */
 export const info = {
     name: PLUGIN_NAME,
     description:
-        'Opens ports on your router with UPnP and NAT-PMP so players can reach the server from the internet, and lets other plugins ask for the same.',
+        'Opens server ports on the router with UPnP or NAT-PMP so players can connect from the internet. Other plugins can request port mappings through UPnPumpkin.',
     permissions: [
         { name: 'fs.read.data', reason: 'Read the plugin config in its data folder.' },
         { name: 'fs.write.data', reason: 'Create and update the config.' },

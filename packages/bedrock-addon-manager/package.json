@@ -2,7 +2,7 @@
     "name": "@pumpkin-plugins/bedrock-addon-manager",
     "version": "0.0.0",
     "private": true,
-    "description": "Serves Bedrock resource packs to Pumpkin players",
+    "description": "Serves Bedrock packs over HTTP; Pumpkin can't send them to players yet",
     "license": "MIT",
     "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
     "contributors": [

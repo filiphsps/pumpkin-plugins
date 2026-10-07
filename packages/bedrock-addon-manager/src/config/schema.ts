@@ -35,13 +35,13 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
             port: int({ description: 'Port to listen on.', default: 8123, min: 1, max: 65535 }),
             public_url: httpUrl({
                 description:
-                    'Base URL Bedrock clients download packs from, without a trailing slash, for example "https://packs.example.com". The plugin only speaks plain HTTP: put a reverse proxy in front of it for HTTPS. Left empty, the address that `port_forwarding` makes reachable is used, else a loopback URL using the configured port, which only works for players on the server machine.',
+                    'Base URL Bedrock clients should use to download packs, without a trailing slash; for example "https://packs.example.com". The plugin serves plain HTTP. Put a reverse proxy in front of it for HTTPS. When empty, the plugin uses the public address reported by UPnPumpkin if forwarding succeeds, or a loopback URL on the configured port otherwise. A loopback URL works only for players on the server machine.',
                 default: '',
                 allowEmpty: true
             }),
             port_forwarding: bool({
                 description:
-                    'When `public_url` is empty and `bind` is "0.0.0.0", ask the UPnPumpkin plugin to open `port` on your router (UPnP or NAT-PMP) and use the public address it gets. Nothing is opened when this machine already has a public address, or when UPnPumpkin is not installed. Set to false to turn this off.',
+                    'When `public_url` is empty and `bind` is "0.0.0.0", ask UPnPumpkin to open `port` on your router (UPnP or NAT-PMP) and use the public address it returns. No port is opened when this machine already has a public address or UPnPumpkin is not installed. Set to false to disable forwarding.',
                 default: true
             })
         }
@@ -54,14 +54,15 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
                 default: 'packs'
             }),
             force: bool({
-                description: 'Make Bedrock clients download the packs before they can join.',
+                description:
+                    'Make pack downloads required before players can join. This currently has no effect because Pumpkin does not support pack delivery.',
                 default: false
             })
         }
     }),
     overrides: table({
         description:
-            'Per-pack overrides, keyed by file name (for a pack from a .mcaddon, the name /baddon list shows). Every setting is optional. Packs are listed by order (lowest first, default 0), then by file name.',
+            'Per-pack overrides, keyed by file name. For packs extracted from a `.mcaddon`, use the name shown by `/baddon list`. All settings are optional. Packs are ordered by `order` (lowest first, default 0), then by file name.',
         entryName: 'file',
         exampleKey: 'My Pack.mcpack',
         fields: {

@@ -107,11 +107,10 @@ Actions import shared runtime helpers from `actions/common/src/`. Each action ta
 snapshot of those files, so changes to a shared helper must also include releasable changes under
 each consuming action directory to publish the updated helper with those actions.
 
-The merge of a release PR is a commit of its own, so the push it triggers starts a run while the run
-for the commit before the merge can still be going. Whichever reaches the release job first creates
-the tag and the release, which is usually the older run, and the artifact it holds was built from an
-earlier commit. The attach job therefore resolves the tag first and refuses to upload unless it
-points at the commit that run built, which leaves the release to the run for the released commit.
+The merge of a release PR is its own commit, so its push can start a run while the previous commit's
+run is still active. The older run may create the tag and release first, using an artifact built from
+the previous commit. The attach job checks that the tag points to the commit built by its run. It
+skips the older run's artifact, leaving the released commit's run to upload the files.
 
 Push workflow runs are not canceled when a newer commit arrives. This lets release-please finish
 creating a tag and updating its release PR before the next push run reads that state. Pull request

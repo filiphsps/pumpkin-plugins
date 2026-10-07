@@ -1,5 +1,5 @@
 name: "Verify Pumpkin plugin"
-description: "Verify signatures on Pumpkin plugin WebAssembly files"
+description: "Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks"
 author: Filiph Sandström
 inputs:
     wasm-file:

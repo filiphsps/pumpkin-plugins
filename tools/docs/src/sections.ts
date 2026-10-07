@@ -74,7 +74,7 @@ function renderConfig({ name, config }: PluginInfo): string {
     if (!config) return 'This plugin has no configuration file.';
     const options = config.options ?? [];
     return [
-        `Settings live in ${code(`plugins/data/${name}/${config.file}`)}. The plugin creates the file when it is missing and keeps it in step with its settings: new options are added and removed ones dropped, and your values are kept.`,
+        `Settings live in ${code(`plugins/data/${name}/${config.file}`)}. The plugin creates the file if needed, adds settings from the schema and removes settings no longer defined there. Values for existing settings are preserved.`,
         ...(options.length === 0
             ? []
             : [

@@ -26,8 +26,8 @@ export const info = {
 ```
 
 `permissions`, `commands` and `config` are optional. Plugins pass this object and the injected
-package version to `PluginBase` from `@pumpkin-plugins/plugin-kit/plugin`. It builds Pumpkin
-metadata from the same object, so the README can't drift from what the plugin actually asks for.
+package version to `PluginBase` from `@pumpkin-plugins/plugin-kit/plugin`. The helper builds both
+Pumpkin metadata and README content from the same object, keeping them in sync.
 The shared metadata helper also adds `http.outbound` for the automatic Pumpkin Market update check;
 it appears in the generated README even though plugins don't repeat it in `info.permissions`:
 
@@ -122,9 +122,8 @@ registerCommands(ctx, commands, {
 - A command with subcommands only groups them; only the leaves are runnable and listed. Commands with
   arguments aren't declared this way yet.
 
-Descriptions are plain strings in the one declaration, so turning them into message keys for
-translation later means changing that file and the two places that read it, not hunting through the
-code.
+Descriptions live as plain strings in one declaration. If you later move to message keys for
+translation, update that file and its two consumers.
 
 ## Generated README blocks
 

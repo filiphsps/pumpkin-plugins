@@ -19,17 +19,17 @@ component overviews, and generated API references.
 | [Publish to Pumpkin Market](actions/publish-to-pumpkin-market) | Upload a released Pumpkin plugin WebAssembly file to its existing Market listing |
 | [Sign Pumpkin plugin](actions/sign-pumpkin-plugin) | Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata |
 | [Update Pumpkin Market Listing](actions/update-pumpkin-market-listing) | Update Pumpkin Market listing metadata from a JSON file or direct inputs |
-| [Verify Pumpkin plugin](actions/verify-pumpkin-plugin) | Verify signatures on Pumpkin plugin WebAssembly files |
+| [Verify Pumpkin plugin](actions/verify-pumpkin-plugin) | Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks |
 
 **Plugins**
 
 | Plugin | Description | License |
 | --- | --- | --- |
 | [AppleSkinPumpkin](packages/apple-skin-pumpkin) | AppleSkin server-side support | MIT |
-| [BedrockAddonManager](packages/bedrock-addon-manager) | Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and adds them to what connecting players are offered, using each pack's own manifest. | MIT |
+| [BedrockAddonManager](packages/bedrock-addon-manager) | Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and reads their manifests. Pumpkin does not yet expose an API for sending packs to players. | MIT |
 | [DistantHorizonsSupportPumpkin](packages/distant-horizons-support-pumpkin) | Unofficial Distant Horizons server support for Pumpkin | [GPL-3.0-or-later](packages/distant-horizons-support-pumpkin/LICENSE) |
 | [DynamicLightsPumpkin](packages/dynamic-lights-pumpkin) | Server-driven dynamic lights for held items and nearby entities | MIT |
-| [UPnPumpkin](packages/upnpumpkin) | Opens ports on your router with UPnP and NAT-PMP so players can reach the server from the internet, and lets other plugins ask for the same. | MIT |
+| [UPnPumpkin](packages/upnpumpkin) | Opens server ports on the router with UPnP or NAT-PMP so players can connect from the internet. Other plugins can request port mappings through UPnPumpkin. | MIT |
 
 **Tools**
 
@@ -99,9 +99,7 @@ See [Creating an action](docs/creating-an-action.md).
 
 ## Documentation
 
-The [public documentation site](https://filiphsps.github.io/pumpkin-plugins/) brings together
-component overviews, guides, and generated API references. The Markdown sources are indexed in
-[`docs/README.md`](docs/README.md).
+The Markdown source pages are listed in [`docs/README.md`](docs/README.md).
 
 ## GitHub Actions
 

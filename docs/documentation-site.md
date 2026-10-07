@@ -6,9 +6,9 @@ navigation:
 # Documentation site
 
 The VitePress site combines the hand-written guides in `docs/`, component READMEs, component-level
-guides, and generated API references. The navigation groups items by category metadata stored with
-their docs; names and descriptions still come from package manifests, action metadata, and guide
-introductions. On phones, the same sections open as compact accordions in the navigation screen.
+guides, and generated API references. Navigation groups pages by category metadata stored with their
+docs. Names and descriptions come from package manifests, action metadata, and guide introductions.
+On phones, the same sections open as compact accordions in the navigation screen.
 
 ## Add a component guide
 
@@ -45,7 +45,7 @@ of its `docs/index.md`. It also remains a regular link in its category. A featur
 the card treatment, and can use `navigation.type: spotlight` to show as a wide row instead. The title
 and description still come from the page heading and package manifest.
 
-The component README serves as the overview when there is no custom `docs/index.md`. If a custom
+The component README is the overview when no custom `docs/index.md` exists. If a custom
 index exists, it becomes the component landing page and the README remains available as a separate
 **README** entry.
 

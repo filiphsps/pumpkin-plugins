@@ -1,6 +1,7 @@
 # Verify Pumpkin plugin
 
-Verify signatures on Pumpkin plugin WebAssembly files
+Verifies the Ed25519 signature on one or more `.wasm` files. You can also check the embedded plugin
+name and version or pin the expected public key.
 
 See the [Verify Pumpkin plugin reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/verify-pumpkin-plugin/)
 on the documentation site.

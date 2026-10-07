@@ -1,8 +1,8 @@
 # Publish to Pumpkin Market
 
-Upload an existing Pumpkin plugin `.wasm` build to its existing Pumpkin Market listing. Select the
-listing by its exact name or numeric/public ID. This JavaScript action does not build the plugin or
-create a listing. It runs directly on GitHub Actions' Node 24 runtime and needs no setup step.
+Upload a built Pumpkin plugin `.wasm` file to a Market listing that already exists. Select the
+listing by its exact name or numeric/public ID. The action runs on GitHub Actions' Node 24 runtime
+and needs no setup step; it does not build the plugin or create a listing.
 
 See the [Publish to Pumpkin Market reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/publish-to-pumpkin-market/)
 on the documentation site.
