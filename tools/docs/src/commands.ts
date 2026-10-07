@@ -9,19 +9,40 @@ export type CommandPermissionDefault =
 /** Operators of level three and the console may use commands by default. */
 export const DEFAULT_COMMAND_PERMISSION: CommandPermissionDefault = { tag: 'op', val: 'three' };
 
-/** A subcommand: what it does, and optionally more subcommands below it. */
-export interface SubcommandSpec<Node extends string = string> {
+interface CommandSpecMetadata<Node extends string> {
     /** Shown in the README and in the game's command help. */
     description: string;
     /** Permission node for this path. Omit it to inherit the nearest parent's node. */
     permission?: Node;
     /** Who may use this path by default. Omit it to inherit the nearest parent's default. */
     defaultPermission?: CommandPermissionDefault;
-    /** Required arguments that follow this leaf command. */
-    arguments?: readonly CommandArgumentSpec[];
-    /** Subcommands below this one. A command with subcommands only groups them. */
-    subcommands?: SubcommandTree<Node>;
 }
+
+type CommandBehavior<Node extends string> =
+    | {
+          /** Subcommands below this one. A command with subcommands only groups them. */
+          subcommands?: SubcommandTree<Node>;
+          arguments?: never;
+          argumentVariants?: never;
+      }
+    | {
+          /** Required arguments that follow this leaf command. */
+          arguments: readonly CommandArgumentSpec[];
+          subcommands?: never;
+          argumentVariants?: never;
+      }
+    | {
+          /** Positional argument forms; the command itself remains runnable without arguments. */
+          argumentVariants: readonly [
+              readonly [CommandArgumentSpec, ...CommandArgumentSpec[]],
+              ...Array<readonly [CommandArgumentSpec, ...CommandArgumentSpec[]]>
+          ];
+          subcommands?: never;
+          arguments?: never;
+      };
+
+/** A subcommand: what it does, and optionally more subcommands below it. */
+export type SubcommandSpec<Node extends string = string> = CommandSpecMetadata<Node> & CommandBehavior<Node>;
 
 /** An integer or string argument supported by the shared command helpers. */
 export type CommandArgumentSpec =
@@ -39,10 +60,10 @@ export type CommandArgumentValues<Arguments extends readonly CommandArgumentSpec
 export type SubcommandTree<Node extends string = string> = { readonly [name: string]: SubcommandSpec<Node> };
 
 /** A command the plugin registers: the first word typed after `/`. */
-export interface CommandSpec<Node extends string = string> extends SubcommandSpec<Node> {
+export type CommandSpec<Node extends string = string> = Omit<CommandSpecMetadata<Node>, 'permission'> & {
     /** Permission node for this command or group. Pumpkin requires it to start with the plugin's name. */
     permission: Node;
-}
+} & CommandBehavior<Node>;
 
 /** The plugin's commands by name. */
 export type CommandTree<Node extends string = string> = { readonly [name: string]: CommandSpec<Node> };
@@ -57,14 +78,23 @@ type ArgumentUsage<Arguments extends readonly CommandArgumentSpec[]> = Arguments
 type HandlerEntries<T extends SubcommandTree, Sender, Prefix extends string = ''> = {
     [K in keyof T & string]: T[K] extends { readonly subcommands: infer Nested extends SubcommandTree }
         ? HandlerEntries<Nested, Sender, AppendPath<Prefix, K>>
-        : T[K] extends { readonly arguments: infer Arguments extends readonly CommandArgumentSpec[] }
-          ? {
-                [Path in `${AppendPath<Prefix, K>}${ArgumentUsage<Arguments>}`]: (
+        : T[K] extends {
+                readonly argumentVariants: infer Variants extends readonly (readonly CommandArgumentSpec[])[];
+            }
+          ? { [Path in AppendPath<Prefix, K>]: (sender: Sender) => readonly CommandLine[] } & {
+                [Variant in Variants[number] as `${AppendPath<Prefix, K>}${ArgumentUsage<Variant>}`]: (
                     sender: Sender,
-                    args: CommandArgumentValues<Arguments>
+                    args: CommandArgumentValues<Variant>
                 ) => readonly CommandLine[];
             }
-          : { [Path in AppendPath<Prefix, K>]: (sender: Sender) => readonly CommandLine[] };
+          : T[K] extends { readonly arguments: infer Arguments extends readonly CommandArgumentSpec[] }
+            ? {
+                  [Path in `${AppendPath<Prefix, K>}${ArgumentUsage<Arguments>}`]: (
+                      sender: Sender,
+                      args: CommandArgumentValues<Arguments>
+                  ) => readonly CommandLine[];
+              }
+            : { [Path in AppendPath<Prefix, K>]: (sender: Sender) => readonly CommandLine[] };
 }[keyof T & string];
 type UnionToIntersection<Values> = (Values extends unknown ? (value: Values) => void : never) extends (
     value: infer Intersection
@@ -136,6 +166,55 @@ export function defineCommands<const Name extends string, const T extends Comman
  */
 export function flattenCommands(tree: CommandTree): FlatCommand[] {
     const out: FlatCommand[] = [];
+    const appendLeaf = (
+        spec: SubcommandSpec,
+        path: string[],
+        permission: string,
+        defaultPermission: CommandPermissionDefault
+    ): void => {
+        if (spec.argumentVariants !== undefined) {
+            if (spec.argumentVariants.length === 0) {
+                throw new Error(`Command /${path.join(' ')} must declare at least one argument variant.`);
+            }
+            const variants = new Set<string>();
+            for (const arguments_ of spec.argumentVariants) {
+                if (arguments_.length === 0) {
+                    throw new Error(`Command /${path.join(' ')} cannot declare an empty argument variant.`);
+                }
+                validateArguments(arguments_);
+                const key = arguments_.map(({ name }) => name).join(' ');
+                if (variants.has(key)) throw new Error(`Duplicate argument variant for /${path.join(' ')}: ${key}.`);
+                variants.add(key);
+            }
+            out.push({
+                path,
+                usage: usageFor(path, []),
+                description: spec.description,
+                permission,
+                defaultPermission,
+                arguments: []
+            });
+            for (const arguments_ of spec.argumentVariants) {
+                out.push({
+                    path,
+                    usage: usageFor(path, arguments_),
+                    description: spec.description,
+                    permission,
+                    defaultPermission,
+                    arguments: arguments_
+                });
+            }
+            return;
+        }
+        out.push({
+            path,
+            usage: usageFor(path, spec.arguments),
+            description: spec.description,
+            permission,
+            defaultPermission,
+            arguments: spec.arguments ?? []
+        });
+    };
     const walk = (
         subs: SubcommandTree,
         path: string[],
@@ -144,36 +223,35 @@ export function flattenCommands(tree: CommandTree): FlatCommand[] {
     ): void => {
         for (const [name, spec] of Object.entries(subs)) {
             const here = [...path, name];
+            validateSpec(spec, here);
             const herePermission = spec.permission ?? permission;
             const hereDefault = spec.defaultPermission ?? defaultPermission;
             if (spec.subcommands && Object.keys(spec.subcommands).length > 0) {
                 walk(spec.subcommands, here, herePermission, hereDefault);
             } else {
-                out.push({
-                    path: here,
-                    usage: usageFor(here, spec.arguments),
-                    description: spec.description,
-                    permission: herePermission,
-                    defaultPermission: hereDefault,
-                    arguments: spec.arguments ?? []
-                });
+                appendLeaf(spec, here, herePermission, hereDefault);
             }
         }
     };
     for (const [name, spec] of Object.entries(tree)) {
+        validateSpec(spec, [name]);
         if (spec.subcommands && Object.keys(spec.subcommands).length > 0)
             walk(spec.subcommands, [name], spec.permission, spec.defaultPermission ?? DEFAULT_COMMAND_PERMISSION);
-        else
-            out.push({
-                path: [name],
-                usage: usageFor([name], spec.arguments),
-                description: spec.description,
-                permission: spec.permission,
-                defaultPermission: spec.defaultPermission ?? DEFAULT_COMMAND_PERMISSION,
-                arguments: spec.arguments ?? []
-            });
+        else appendLeaf(spec, [name], spec.permission, spec.defaultPermission ?? DEFAULT_COMMAND_PERMISSION);
     }
     return out;
+}
+
+function validateSpec(spec: SubcommandSpec, path: string[]): void {
+    if (spec.arguments !== undefined && spec.argumentVariants !== undefined) {
+        throw new Error(`Command /${path.join(' ')} cannot declare both arguments and argument variants.`);
+    }
+    if (spec.subcommands !== undefined && spec.argumentVariants !== undefined) {
+        throw new Error(`Command /${path.join(' ')} cannot declare argument variants and subcommands.`);
+    }
+    if (spec.subcommands !== undefined && spec.arguments !== undefined) {
+        throw new Error(`Command /${path.join(' ')} cannot combine arguments with subcommands.`);
+    }
 }
 
 function usageFor(path: string[], arguments_: readonly CommandArgumentSpec[] | undefined): string {

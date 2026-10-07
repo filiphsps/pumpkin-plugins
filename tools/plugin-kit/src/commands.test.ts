@@ -208,6 +208,83 @@ describe('buildCommands', () => {
         });
     });
 
+    it('runs the command itself and several argument variants with shared prefixes', () => {
+        const argumentTree = defineCommands('Demo', {
+            locate: {
+                description: 'Find cached terrain',
+                permission: 'Demo:command.locate',
+                argumentVariants: [
+                    [{ name: 'radius', type: 'integer', min: 0, max: 16 }],
+                    [
+                        { name: 'x', type: 'integer' },
+                        { name: 'z', type: 'integer' }
+                    ],
+                    [
+                        { name: 'x', type: 'integer' },
+                        { name: 'z', type: 'integer' },
+                        { name: 'radius', type: 'integer', min: 0, max: 16 }
+                    ]
+                ]
+            }
+        });
+        const host = new FakeCommandHost();
+        const [root] = buildCommands(host, argumentTree, {
+            locate: () => ['default'],
+            'locate <radius>': (_sender, { radius }) => [`radius:${radius}`],
+            'locate <x> <z>': (_sender, { x, z }) => [`position:${x},${z}`],
+            'locate <x> <z> <radius>': (_sender, { x, z, radius }) => [`position:${x},${z};radius:${radius}`]
+        });
+        const node = root?.node as FakeNode;
+
+        expect(host.usages(node)).toEqual([
+            '/locate',
+            '/locate <radius>',
+            '/locate <x> <z>',
+            '/locate <x> <z> <radius>'
+        ]);
+        expect(host.run(node, ['locate'])).toEqual(['default']);
+        expect(host.run(node, ['locate', '<radius>'], { radius: 5 })).toEqual(['radius:5']);
+        expect(host.run(node, ['locate', '<x>', '<z>'], { x: -8, z: 13 })).toEqual(['position:-8,13']);
+        expect(host.run(node, ['locate', '<x>', '<z>', '<radius>'], { x: -8, z: 13, radius: 4 })).toEqual([
+            'position:-8,13;radius:4'
+        ]);
+
+        expect(node.children).toHaveLength(2);
+        expect(node.children[1]?.children).toHaveLength(1);
+        expect(node.children[1]?.children[0]?.argument).toEqual({ name: 'z', type: 'integer' });
+    });
+
+    it('rejects conflicting shared argument prefixes before creating host nodes', () => {
+        const invalidTree = defineCommands('Demo', {
+            locate: {
+                description: 'Find cached terrain',
+                permission: 'Demo:command.locate',
+                argumentVariants: [
+                    [
+                        { name: 'position', type: 'integer' },
+                        { name: 'z', type: 'integer' }
+                    ],
+                    [
+                        { name: 'position', type: 'string', mode: 'single-word' },
+                        { name: 'z', type: 'integer' },
+                        { name: 'radius', type: 'integer' }
+                    ]
+                ]
+            }
+        });
+        const host = new FakeCommandHost();
+        const root = vi.spyOn(host, 'root');
+
+        expect(() =>
+            buildCommands(host, invalidTree, {
+                locate: () => [],
+                'locate <position> <z>': () => [],
+                'locate <position> <z> <radius>': () => []
+            })
+        ).toThrow('Conflicting argument definitions for <position> on /locate.');
+        expect(root).not.toHaveBeenCalled();
+    });
+
     it('rejects greedy strings before creating any command nodes unless they are final', () => {
         const invalidTree = defineCommands('Demo', {
             talk: {

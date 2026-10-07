@@ -134,6 +134,33 @@ registerCommands(ctx, commands, {
   }
   ```
 
+  Use `argumentVariants` when one command should run with no arguments and also accept several
+  positional forms. The same declaration powers its typed handlers, host command tree and README:
+
+  ```ts
+  locate: {
+      description: 'Find a location',
+      permission: `${PLUGIN_NAME}:command.locate`,
+      argumentVariants: [
+          [{ name: 'radius', type: 'integer', min: 0, max: 16 }],
+          [
+              { name: 'x', type: 'integer' },
+              { name: 'z', type: 'integer' }
+          ],
+          [
+              { name: 'x', type: 'integer' },
+              { name: 'z', type: 'integer' },
+              { name: 'radius', type: 'integer', min: 0, max: 16 }
+          ]
+      ]
+  }
+  ```
+
+  This declares `/locate`, `/locate <radius>`, `/locate <x> <z>` and
+  `/locate <x> <z> <radius>`. `CommandHandlers` requires a handler for each form and infers the
+  argument object for each one. Variants cannot be combined with fixed `arguments` or literal
+  `subcommands`; shared argument prefixes become one branch in the registered command tree.
+
   Integers can specify signed 32-bit `min` and `max` bounds. Strings support `single-word`,
   `quotable`, and `greedy` modes; a greedy string must be the final argument. Argument handlers
   receive a second parameter with inferred values, for example `(sender, { x, name })`. Commands

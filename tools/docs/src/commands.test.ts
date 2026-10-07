@@ -2,11 +2,14 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
     type CommandHandlers,
     type CommandPath,
+    type CommandTree,
     commandInfos,
     commandPermissionInfos,
     defineCommands,
     flattenCommands
 } from './commands.ts';
+
+const dynamicCommandTree = (tree: unknown): CommandTree => tree as CommandTree;
 
 const commands = defineCommands('Demo', {
     demo: {
@@ -285,6 +288,75 @@ describe('types', () => {
         };
         expect(Object.keys(typed)).toEqual(['map at <x> <z> <world> <label> <tail>']);
     });
+
+    it('supports a runnable command with several positional argument variants', () => {
+        const overloaded = defineCommands('Demo', {
+            locate: {
+                description: 'Locate cached terrain',
+                permission: 'Demo:command.locate',
+                argumentVariants: [
+                    [{ name: 'radius', type: 'integer', min: 0, max: 16 }],
+                    [
+                        { name: 'x', type: 'integer' },
+                        { name: 'z', type: 'integer' }
+                    ],
+                    [
+                        { name: 'x', type: 'integer' },
+                        { name: 'z', type: 'integer' },
+                        { name: 'radius', type: 'integer', min: 0, max: 16 }
+                    ]
+                ]
+            }
+        });
+
+        expect(flattenCommands(overloaded).map(({ usage }) => usage)).toEqual([
+            '/locate',
+            '/locate <radius>',
+            '/locate <x> <z>',
+            '/locate <x> <z> <radius>'
+        ]);
+        expect(commandInfos(overloaded).map(({ usage }) => usage)).toEqual([
+            '/locate',
+            '/locate <radius>',
+            '/locate <x> <z>',
+            '/locate <x> <z> <radius>'
+        ]);
+
+        const typed: CommandHandlers<typeof overloaded> = {
+            locate: () => ['default'],
+            'locate <radius>': (_sender, args) => [String(args.radius)],
+            'locate <x> <z>': (_sender, args) => [String(args.x + args.z)],
+            'locate <x> <z> <radius>': (_sender, args) => [String(args.x + args.z + args.radius)]
+        };
+        expect(Object.keys(typed)).toHaveLength(4);
+    });
+
+    it('rejects incompatible command shapes while preserving runtime validation for dynamic trees', () => {
+        defineCommands('Demo', {
+            // @ts-expect-error one command cannot declare fixed arguments and argument variants
+            locate: {
+                description: 'Locate',
+                permission: 'Demo:command.locate',
+                arguments: [{ name: 'x', type: 'integer' }],
+                argumentVariants: [[{ name: 'z', type: 'integer' }]]
+            }
+        });
+
+        defineCommands('Demo', {
+            // @ts-expect-error argument variants cannot be combined with subcommands
+            locate: {
+                description: 'Locate',
+                permission: 'Demo:command.locate',
+                argumentVariants: [[{ name: 'x', type: 'integer' }]],
+                subcommands: { nearby: { description: 'Nearby' } }
+            }
+        });
+
+        defineCommands('Demo', {
+            // @ts-expect-error every variant must have at least one argument
+            locate: { description: 'Locate', permission: 'Demo:command.locate', argumentVariants: [[]] }
+        });
+    });
 });
 
 describe('argument usage', () => {
@@ -319,5 +391,46 @@ describe('argument usage', () => {
                 }
             })
         ).toThrow('Greedy string argument message must be the final argument.');
+    });
+
+    it('rejects empty or conflicting argument variants', () => {
+        expect(() =>
+            flattenCommands(
+                dynamicCommandTree({
+                    locate: {
+                        description: 'Locate',
+                        permission: 'Demo:command.locate',
+                        argumentVariants: []
+                    }
+                })
+            )
+        ).toThrow('Command /locate must declare at least one argument variant.');
+        expect(() =>
+            flattenCommands(
+                dynamicCommandTree({
+                    locate: {
+                        description: 'Locate',
+                        permission: 'Demo:command.locate',
+                        arguments: [{ name: 'x', type: 'integer' }],
+                        argumentVariants: [[{ name: 'z', type: 'integer' }]]
+                    }
+                })
+            )
+        ).toThrow('Command /locate cannot declare both arguments and argument variants.');
+    });
+
+    it('rejects arguments on a command that also has subcommands', () => {
+        expect(() =>
+            flattenCommands(
+                dynamicCommandTree({
+                    locate: {
+                        description: 'Locate',
+                        permission: 'Demo:command.locate',
+                        arguments: [{ name: 'radius', type: 'integer' }],
+                        subcommands: { nearby: { description: 'Nearby' } }
+                    }
+                })
+            )
+        ).toThrow('Command /locate cannot combine arguments with subcommands.');
     });
 });
