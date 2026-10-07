@@ -1,7 +1,7 @@
 import { CommandFailed, commandInfos, defineCommands, errorLine } from '@pumpkin-plugins/docs';
 import { describe, expect, it, vi } from 'vitest';
 import { buildCommands } from './commands.ts';
-import { FakeCommandFailure, FakeCommandHost, type FakeNode } from './testing/fake-commands.ts';
+import { FakeCommandFailure, FakeCommandHost, FakeNode } from './testing/fake-commands.ts';
 
 const tree = defineCommands('Demo', {
     demo: {
@@ -22,6 +22,16 @@ const handlers = {
 };
 
 describe('buildCommands', () => {
+    it('models Pumpkin consuming a child node when its parent takes ownership with then', () => {
+        const parent = new FakeNode('parent');
+        const child = new FakeNode('child');
+
+        parent.then(child);
+
+        expect(parent.children).toEqual([child]);
+        expect(() => child.executeWithHandlerId(1)).toThrow('already been consumed');
+    });
+
     it('builds one root per command, with its description and permission', () => {
         const built = buildCommands(new FakeCommandHost(), tree, handlers);
         expect(built.map(({ name, description, permission }) => ({ name, description, permission }))).toEqual([
@@ -157,5 +167,64 @@ describe('buildCommands', () => {
         const [, ping] = buildCommands(host, tree, handlers);
         expect(() => host.run(ping.node as FakeNode, ['wrong'])).toThrow('/wrong is not runnable');
         expect(() => host.run(ping.node as FakeNode, [])).toThrow('is not runnable');
+    });
+
+    it('builds argument nodes after literals and passes their values to typed handlers', () => {
+        const argumentTree = defineCommands('Demo', {
+            locate: {
+                description: 'Find a location',
+                permission: 'Demo:command.locate',
+                subcommands: {
+                    at: {
+                        description: 'Look up coordinates',
+                        arguments: [
+                            { name: 'x', type: 'integer', min: -30_000_000, max: 30_000_000 },
+                            { name: 'z', type: 'integer', min: -30_000_000, max: 30_000_000 }
+                        ]
+                    }
+                }
+            }
+        });
+        const host = new FakeCommandHost();
+        let received: unknown;
+        const [root] = buildCommands(host, argumentTree, {
+            'locate at <x> <z>': (_sender, args) => {
+                received = args;
+                return [`${args.x},${args.z}`];
+            }
+        });
+
+        expect(host.usages(root?.node as FakeNode)).toEqual(['/locate at <x> <z>']);
+        expect(host.run(root?.node as FakeNode, ['locate', 'at', '<x>', '<z>'], { x: -8, z: 13 })).toEqual(['-8,13']);
+        expect(received).toEqual({ x: -8, z: 13 });
+        const locate = root?.node as FakeNode;
+        const at = locate.children[0];
+        expect(at?.children[0]?.argument).toEqual({ name: 'x', type: 'integer', min: -30_000_000, max: 30_000_000 });
+        expect(at?.children[0]?.children[0]?.argument).toEqual({
+            name: 'z',
+            type: 'integer',
+            min: -30_000_000,
+            max: 30_000_000
+        });
+    });
+
+    it('rejects greedy strings before creating any command nodes unless they are final', () => {
+        const invalidTree = defineCommands('Demo', {
+            talk: {
+                description: 'Talk',
+                permission: 'Demo:command.talk',
+                arguments: [
+                    { name: 'message', type: 'string', mode: 'greedy' },
+                    { name: 'suffix', type: 'integer' }
+                ]
+            }
+        });
+        const host = new FakeCommandHost();
+        const root = vi.spyOn(host, 'root');
+
+        expect(() => buildCommands(host, invalidTree, { 'talk <message> <suffix>': () => [] })).toThrow(
+            'Greedy string argument message must be the final argument.'
+        );
+        expect(root).not.toHaveBeenCalled();
     });
 });

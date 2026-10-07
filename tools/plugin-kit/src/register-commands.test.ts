@@ -6,20 +6,44 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const host = vi.hoisted(() => ({ onCommand: vi.fn(), color: vi.fn() }));
 vi.mock('./host.ts', () => ({ onCommand: host.onCommand }));
 vi.mock('pumpkin:plugin/text@0.1.0', () => ({
-    TextComponent: { text: (line: string) => ({ line, colorNamed: host.color }) }
+    TextComponent: {
+        text: (line: string) => ({ line, colorNamed: host.color }),
+        fromLegacyString: (line: string) => ({ line, colorNamed: host.color })
+    }
 }));
 vi.mock('pumpkin:plugin/command@0.1.0', () => {
     class Node {
+        private consumed = false;
+
         constructor(
             public names: string[],
             public description?: string
         ) {}
         children: Node[] = [];
         // biome-ignore lint/suspicious/noThenProperty: mirrors the host command nodes.
-        then = vi.fn((node: Node) => this.children.push(node));
-        executeWithHandlerId = vi.fn();
+        then = vi.fn((node: Node) => {
+            this.assertAvailable();
+            node.consume();
+            this.children.push(node);
+        });
+        executeWithHandlerId = vi.fn((_id: number) => this.assertAvailable());
+
+        private consume() {
+            this.assertAvailable();
+            this.consumed = true;
+        }
+
+        private assertAvailable() {
+            if (this.consumed) throw new Error('Command node has already been consumed by a parent.');
+        }
     }
-    return { Command: Node, CommandNode: { literal: (name: string) => new Node([name]) } };
+    return {
+        Command: Node,
+        CommandNode: {
+            literal: (name: string) => new Node([name]),
+            argument: (name: string, type: unknown) => Object.assign(new Node([`<${name}>`]), { argumentType: type })
+        }
+    };
 });
 
 import { registerCommands } from './register-commands.ts';
@@ -183,5 +207,76 @@ describe('registerCommands', () => {
         }
         expect(failure).toMatchObject({ tag: 'command-failed', val: { line: 'denied' } });
         expect(host.color).toHaveBeenCalledExactlyOnceWith('red');
+    });
+
+    it('builds and decodes declared integer and string arguments before running the handler', () => {
+        const argumentTree = defineCommands('Demo', {
+            locate: {
+                description: 'Find a location',
+                permission: 'Demo:command.locate',
+                arguments: [
+                    { name: 'x', type: 'integer', min: -30_000_000, max: 30_000_000 },
+                    { name: 'name', type: 'string', mode: 'quotable' }
+                ]
+            }
+        });
+        const { ctx, registerCommand } = context();
+        const args = {
+            getValue: vi.fn((name: string) =>
+                name === 'x'
+                    ? { tag: 'num', val: { tag: 'ok', val: { tag: 'int32', val: -17 } } }
+                    : { tag: 'simple', val: 'spawn point' }
+            ),
+            [Symbol.dispose]: vi.fn()
+        };
+        registerCommands(ctx, argumentTree, {
+            'locate <x> <name>': (_sender, received) => [`${received.x}:${received.name}`]
+        });
+
+        const commandNode = registerCommand.mock.calls[0]?.[0] as {
+            children: { argumentType?: unknown; children: { argumentType?: unknown }[] }[];
+        };
+        expect(commandNode.children[0]?.argumentType).toEqual({ tag: 'integer', val: [-30_000_000, 30_000_000] });
+        expect(commandNode.children[0]?.children[0]?.argumentType).toEqual({ tag: 'string', val: 'quotable' });
+
+        const sendMessage = vi.fn();
+        const sender = { sendMessage } as unknown as CommandSender;
+        const callback = host.onCommand.mock.calls[0]?.[0] as (
+            sender: CommandSender,
+            consumedArgs: typeof args
+        ) => number;
+        expect(callback(sender, args as never)).toBe(1);
+        expect(sendMessage.mock.calls.map(([component]) => component.line)).toEqual(['-17:spawn point']);
+        expect(args.getValue.mock.calls).toEqual([['x'], ['name']]);
+        expect(args[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
+
+    it('reports malformed argument variants and releases consumed args', () => {
+        const argumentTree = defineCommands('Demo', {
+            count: {
+                description: 'Count blocks',
+                permission: 'Demo:command.count',
+                arguments: [{ name: 'amount', type: 'integer' }]
+            }
+        });
+        const { ctx } = context();
+        registerCommands(ctx, argumentTree, { 'count <amount>': (_sender, args) => [String(args.amount)] });
+        const args = { getValue: () => ({ tag: 'bool', val: true }), [Symbol.dispose]: vi.fn() };
+        const callback = host.onCommand.mock.calls[0]?.[0] as (
+            sender: CommandSender,
+            consumedArgs: typeof args
+        ) => number;
+
+        let failure: unknown;
+        try {
+            callback({} as CommandSender, args as never);
+        } catch (error) {
+            failure = error;
+        }
+        expect(failure).toMatchObject({
+            tag: 'command-failed',
+            val: { line: 'Argument amount must be an integer.' }
+        });
+        expect(args[Symbol.dispose]).toHaveBeenCalledOnce();
     });
 });

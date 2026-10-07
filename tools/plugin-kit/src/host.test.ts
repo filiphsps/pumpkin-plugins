@@ -1,3 +1,4 @@
+import type { CommandSender, ConsumedArgs } from 'pumpkin:plugin/command@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -111,5 +112,24 @@ describe('host scheduling', () => {
         const { scheduleRepeating } = await import('./host.ts');
         expect(() => scheduleRepeating(0, vi.fn())).toThrow(RangeError);
         expect(host.repeating).not.toHaveBeenCalled();
+    });
+});
+
+describe('command handler dispatch', () => {
+    it('passes the consumed argument resource through to the registered callback', async () => {
+        const { onCommand, runCommand } = await import('./host.ts');
+        const sender = {} as CommandSender;
+        const args = { getValue: vi.fn((_name: string) => ({ tag: 'simple', val: 'x' })) } as unknown as ConsumedArgs;
+        const run = vi.fn(() => 1);
+        const id = onCommand((receivedSender, receivedArgs) => {
+            expect(receivedSender).toBe(sender);
+            expect(receivedArgs).toBe(args);
+            receivedArgs.getValue('x');
+            return run();
+        });
+
+        expect(runCommand(id, sender, args)).toBe(1);
+        expect(args.getValue).toHaveBeenCalledTimes(1);
+        expect(run).toHaveBeenCalledOnce();
     });
 });

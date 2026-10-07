@@ -24,7 +24,7 @@ interface ScheduledHandler {
 // One registry prevents delayed and repeating handler ids from overlapping.
 const tasks = new HandlerRegistry<ScheduledHandler>(900_000);
 const taskHandlers = new Map<number, number>();
-const commandHandlers = new HandlerRegistry<(sender: CommandSender) => number>(910_000);
+const commandHandlers = new HandlerRegistry<(sender: CommandSender, args: ConsumedArgs) => number>(910_000);
 
 /**
  * Runs a function every `periodTicks` game ticks, starting after the same delay.
@@ -64,7 +64,7 @@ export function cancelTask(taskId: number): void {
  * @param handler - Receives the sender and returns the command's success count.
  * @returns The id to give to `executeWithHandlerId`.
  */
-export function onCommand(handler: (sender: CommandSender) => number): number {
+export function onCommand(handler: (sender: CommandSender, args: ConsumedArgs) => number): number {
     return commandHandlers.add(handler);
 }
 
@@ -88,11 +88,11 @@ export function runTask(id: number, server: Server): boolean {
  * Runs one of this plugin's command handlers.
  * @param id - The handler id the host passed back.
  * @param sender - Who ran the command.
- * @param _args - The consumed arguments, unused because the commands take none.
+ * @param args - The consumed arguments from Pumpkin.
  * @returns The success count, or undefined when the id belongs to the API package.
  */
-export function runCommand(id: number, sender: CommandSender, _args: ConsumedArgs): number | undefined {
-    return commandHandlers.get(id)?.(sender);
+export function runCommand(id: number, sender: CommandSender, args: ConsumedArgs): number | undefined {
+    return commandHandlers.get(id)?.(sender, args);
 }
 
 function validateTicks(ticks: number, minimum: number): void {

@@ -1,15 +1,22 @@
-import { Command, CommandNode, type CommandSender } from 'pumpkin:plugin/command@0.1.0';
+import { type Arg, Command, CommandNode, type CommandSender, type ConsumedArgs } from 'pumpkin:plugin/command@0.1.0';
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { PermissionDefault } from 'pumpkin:plugin/permission@0.1.0';
 import { TextComponent } from 'pumpkin:plugin/text@0.1.0';
-import { type CommandHandlers, type CommandTree, commandPermissionInfos } from '@pumpkin-plugins/docs';
+import {
+    type CommandArgumentSpec,
+    CommandFailed,
+    type CommandHandlers,
+    type CommandTree,
+    commandPermissionInfos
+} from '@pumpkin-plugins/docs';
 import { buildCommands, type CommandHost } from './commands.ts';
 import { onCommand } from './host.ts';
+import { disposeWasiResource } from './wasi-resource.ts';
 
 const COMMAND_ACCESS_PERMISSION_SUFFIX = ':command._access';
 
 function text(line: string, tone?: 'error'): TextComponent {
-    const component = TextComponent.text(line);
+    const component = TextComponent.fromLegacyString(line);
     if (tone === 'error') component.colorNamed('red');
     return component;
 }
@@ -29,10 +36,20 @@ export function registerCommands<T extends CommandTree>(
     const host: CommandHost<CommandSender> = {
         root: (name, description) => new Command([name], description),
         literal: (name) => CommandNode.literal(name),
-        onRun: (run) =>
-            onCommand((sender) => {
-                run(sender);
-                return 1;
+        argument: (spec) => CommandNode.argument(spec.name, argumentType(spec)),
+        onRun: (run, arguments_) =>
+            onCommand((sender, consumed) => {
+                try {
+                    run(sender, decodeArguments(arguments_, consumed));
+                    return 1;
+                } catch (err) {
+                    if (err instanceof CommandFailed) {
+                        throw { tag: 'command-failed', val: text(err.message, 'error') };
+                    }
+                    throw err;
+                } finally {
+                    disposeWasiResource(consumed);
+                }
             }),
         reply: (sender, line, tone) => sender.sendMessage(text(line, tone)),
         fail: (message) => {
@@ -72,4 +89,49 @@ export function registerCommands<T extends CommandTree>(
         if (hasSubcommands) registerAccessPermission(rootPermission);
         ctx.registerCommand(node as Command, rootPermission);
     }
+}
+
+function argumentType(spec: CommandArgumentSpec) {
+    if (spec.type === 'integer') {
+        return {
+            tag: 'integer' as const,
+            val: [spec.min, spec.max] as [number | undefined, number | undefined]
+        };
+    }
+    return { tag: 'string' as const, val: spec.mode };
+}
+
+function decodeArguments(
+    specs: readonly CommandArgumentSpec[],
+    consumed: ConsumedArgs
+): Readonly<Record<string, number | string>> {
+    const values: Record<string, number | string> = {};
+    for (const spec of specs) {
+        let argument: Arg;
+        try {
+            argument = consumed.getValue(spec.name);
+        } catch {
+            throw new CommandFailed(`Argument ${spec.name} is missing or invalid.`);
+        }
+
+        if (spec.type === 'integer') {
+            if (argument.tag !== 'num' || argument.val.tag !== 'ok' || argument.val.val.tag !== 'int32') {
+                throw new CommandFailed(`Argument ${spec.name} must be an integer.`);
+            }
+            const value = argument.val.val.val;
+            if (
+                !Number.isSafeInteger(value) ||
+                (spec.min !== undefined && value < spec.min) ||
+                (spec.max !== undefined && value > spec.max)
+            ) {
+                throw new CommandFailed(`Argument ${spec.name} is outside its allowed range.`);
+            }
+            values[spec.name] = value;
+            continue;
+        }
+
+        if (argument.tag !== 'simple') throw new CommandFailed(`Argument ${spec.name} must be ${spec.mode} text.`);
+        values[spec.name] = argument.val;
+    }
+    return values;
 }
