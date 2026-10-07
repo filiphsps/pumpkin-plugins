@@ -42,6 +42,46 @@ describe('renderSections', () => {
         expect(s.config).toBe('This plugin has no configuration file.');
     });
 
+    it('renders every command permission default', () => {
+        const operatorLevels = [
+            ['zero', '0'],
+            ['one', '1'],
+            ['two', '2'],
+            ['three', '3'],
+            ['four', '4']
+        ] as const;
+        const commands: NonNullable<PluginInfo['commands']> = [
+            {
+                usage: '/public',
+                description: 'Public',
+                permission: 'Demo:command.public',
+                defaultPermission: { tag: 'allow' }
+            },
+            ...operatorLevels.map(([val], index) => ({
+                usage: `/operator${index}`,
+                description: `Operator ${index}`,
+                permission: `Demo:command.operator${index}` as `${string}:${string}`,
+                defaultPermission: { tag: 'op' as const, val }
+            })),
+            {
+                usage: '/denied',
+                description: 'Denied',
+                permission: 'Demo:command.denied' as `${string}:${string}`,
+                defaultPermission: { tag: 'deny' }
+            }
+        ];
+
+        const rendered = renderSections({ name: 'Demo', description: 'd', commands }).commands;
+
+        expect(rendered).toContain('| `/public` | Public | `Demo:command.public` | everyone |');
+        operatorLevels.forEach(([, level], index) => {
+            expect(rendered).toContain(
+                `| \`/operator${index}\` | Operator ${index} | \`Demo:command.operator${index}\` | operators (level ${level}) |`
+            );
+        });
+        expect(rendered).toContain('| `/denied` | Denied | `Demo:command.denied` | nobody |');
+    });
+
     it('leaves out the options table when a config has none', () => {
         const s = renderSections({ ...full, config: { file: 'c.toml', defaultContents: 'x = 1\n' } });
         expect(s.config).not.toContain('| Option |');

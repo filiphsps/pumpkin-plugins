@@ -104,6 +104,7 @@ describe('commandInfos', () => {
                         description: 'Manage cache',
                         permission: 'Demo:command.demo.cache',
                         subcommands: {
+                            inspect: { description: 'Inspect cache without a separate permission' },
                             clear: {
                                 description: 'Clear cache',
                                 permission: 'Demo:command.demo.cache.clear'
@@ -120,6 +121,12 @@ describe('commandInfos', () => {
                 description: 'List things',
                 permission: 'Demo:command.demo.list',
                 defaultPermission: { tag: 'allow' }
+            },
+            {
+                usage: '/demo cache inspect',
+                description: 'Inspect cache without a separate permission',
+                permission: 'Demo:command.demo.cache',
+                defaultPermission: { tag: 'op', val: 'three' }
             },
             {
                 usage: '/demo cache clear',
@@ -157,6 +164,42 @@ describe('commandInfos', () => {
                 children: []
             }
         ]);
+    });
+
+    it('deduplicates a permission reused by sibling commands', () => {
+        const tree = defineCommands('Demo', {
+            demo: {
+                description: 'Manage demo',
+                permission: 'Demo:command.demo',
+                subcommands: {
+                    first: { description: 'First', permission: 'Demo:command.demo.shared' },
+                    second: { description: 'Second', permission: 'Demo:command.demo.shared' }
+                }
+            }
+        });
+
+        const permissions = commandPermissionInfos(tree);
+        expect(permissions.map(({ node }) => node)).toEqual(['Demo:command.demo', 'Demo:command.demo.shared']);
+        expect(permissions[0]?.children).toEqual([{ node: 'Demo:command.demo.shared', value: true }]);
+    });
+
+    it('rejects conflicting defaults for a shared permission', () => {
+        const tree = defineCommands('Demo', {
+            first: {
+                description: 'First',
+                permission: 'Demo:command.shared',
+                defaultPermission: { tag: 'allow' }
+            },
+            second: {
+                description: 'Second',
+                permission: 'Demo:command.shared',
+                defaultPermission: { tag: 'deny' }
+            }
+        });
+
+        expect(() => commandPermissionInfos(tree)).toThrow(
+            'conflicting defaults for command permission Demo:command.shared'
+        );
     });
 });
 

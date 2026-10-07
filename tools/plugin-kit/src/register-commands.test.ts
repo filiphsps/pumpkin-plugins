@@ -141,6 +141,32 @@ describe('registerCommands', () => {
         expect(hasPermission).toHaveBeenNthCalledWith(2, server, 'Demo:command.demo.public');
     });
 
+    it('registers the shared root-access permission once for multiple command groups', () => {
+        const grouped = defineCommands('Demo', {
+            first: {
+                description: 'First group',
+                permission: 'Demo:command.first',
+                subcommands: { status: { description: 'First status' } }
+            },
+            second: {
+                description: 'Second group',
+                permission: 'Demo:command.second',
+                subcommands: { status: { description: 'Second status' } }
+            }
+        });
+        const { ctx, registerCommand, registerPermission } = context();
+
+        registerCommands(ctx, grouped, { 'first status': () => [], 'second status': () => [] });
+
+        expect(
+            registerPermission.mock.calls.filter(([permission]) => permission.node === 'Demo:command._access')
+        ).toHaveLength(1);
+        expect(registerCommand.mock.calls.map(([, permission]) => permission)).toEqual([
+            'Demo:command._access',
+            'Demo:command._access'
+        ]);
+    });
+
     it('turns CommandFailed into the host command error result', () => {
         const { ctx } = context();
         registerCommands(ctx, tree, {
