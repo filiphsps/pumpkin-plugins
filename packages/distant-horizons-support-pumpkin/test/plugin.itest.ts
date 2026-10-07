@@ -42,6 +42,9 @@ describe(info.name, () => {
         const mapFrom = server.lines.length;
         server.command('dhs map at-radius 0 0 0');
         await server.waitForLog(/Run this command as a player so the current world is known/, 5000, mapFrom);
+        const generateFrom = server.lines.length;
+        server.command('dhs generate at 0 0');
+        await server.waitForLog(/Run this command as a Java player so the current world is known/, 5000, generateFrom);
         // A successful load alone does not prove that the worker's event is being dispatched.
         await vi.waitFor(
             async () => {
