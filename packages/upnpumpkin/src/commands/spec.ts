@@ -10,8 +10,14 @@ export const commands = defineCommands(PLUGIN_NAME, {
         description: 'Manage port forwarding',
         permission: COMMAND_PERMISSION,
         subcommands: {
-            status: { description: 'Show the router that was found and every port that is open or being opened' },
-            reload: { description: 'Reload `config.toml` and update the open ports' }
+            status: {
+                description: 'Show the router that was found and every port that is open or being opened',
+                permission: `${COMMAND_PERMISSION}.status`
+            },
+            reload: {
+                description: 'Reload `config.toml` and update the open ports',
+                permission: `${COMMAND_PERMISSION}.reload`
+            }
         }
     }
 });

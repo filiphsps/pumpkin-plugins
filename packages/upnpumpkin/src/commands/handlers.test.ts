@@ -28,7 +28,9 @@ describe('the /upnp commands', () => {
         const { host, root } = setup();
         expect(host.usages(root).sort()).toEqual((info.commands ?? []).map((c) => c.usage).sort());
         expect(info.commands).toEqual(commandInfos(commands));
-        expect(new Set(info.commands.map((c) => c.permission))).toEqual(new Set([COMMAND_PERMISSION]));
+        expect(new Set(info.commands.map((c) => c.permission))).toEqual(
+            new Set([`${COMMAND_PERMISSION}.status`, `${COMMAND_PERMISSION}.reload`])
+        );
     });
 
     it('status reports the ports that were asked for', () => {
