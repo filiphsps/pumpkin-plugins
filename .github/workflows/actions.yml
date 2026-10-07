@@ -30,7 +30,7 @@ jobs:
     changes:
         name: 🔍 Changed actions
         timeout-minutes: 5
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         outputs:
             actions: ${{ steps.classify.outputs.actions_to_test }}
         steps:
@@ -56,7 +56,7 @@ jobs:
         needs: [changes]
         if: needs.changes.outputs.actions != '[]'
         timeout-minutes: 15
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         strategy:
             fail-fast: false
             matrix:
