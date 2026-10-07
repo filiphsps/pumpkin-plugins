@@ -52,11 +52,21 @@ describe(info.name, () => {
         server.command('dhs cache clear');
         await server.waitForLog(/Cleared 0 in-memory and 0 disk cache entries/, 5000, cacheClearFrom);
         const mapFrom = server.lines.length;
-        server.command('dhs map 0 0 0');
-        await server.waitForLog(/Run this command as a player so the current world is known/, 5000, mapFrom);
+        server.command('dhs map 32');
+        const mapReply = await server.waitForLog(
+            /Run this command as a player so the current world is known/,
+            5000,
+            mapFrom
+        );
+        expect(mapReply).not.toContain('Syntax error:');
         const generateFrom = server.lines.length;
         server.command('dhs generate 0 0');
-        await server.waitForLog(/Run this command as a Java player so the current world is known/, 5000, generateFrom);
+        const generateReply = await server.waitForLog(
+            /Run this command as a Java player so the current world is known/,
+            5000,
+            generateFrom
+        );
+        expect(generateReply).not.toContain('Syntax error:');
         // A successful load alone does not prove that the worker's event is being dispatched.
         await vi.waitFor(
             async () => {

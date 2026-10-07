@@ -167,9 +167,12 @@ describe('the /dhs commands', () => {
         expect(sender.lines[0]).toContain('center section 1, 0');
     });
 
-    it('requires player context for map commands', () => {
+    it('replies cleanly when the map command is run from the console', () => {
         const { host, root } = setup();
-        expect(() => host.run(root, ['dhs', 'map'])).toThrow('Run this command as a player');
+        const sender = host.runAs(root, ['dhs', 'map', '<radius>'], { radius: 32 });
+
+        expect(sender.errors).toEqual(['Run this command as a player so the current world is known.']);
+        expect(sender.lines).toEqual(sender.errors);
     });
 
     it('starts forced captures at the player or block coordinates with the selected radius', () => {
@@ -213,7 +216,9 @@ describe('the /dhs commands', () => {
         const sender = { lines: [], errors: [], asPlayer: () => player };
         f.host.runAs(f.root, ['dhs', 'generate'], {}, sender as never);
         expect(() => f.host.runAs(f.root, ['dhs', 'generate'], {}, sender as never)).toThrow('already running');
-        expect(() => f.host.run(f.root, ['dhs', 'generate'])).toThrow('Run this command as a Java player');
+        const consoleSender = f.host.runAs(f.root, ['dhs', 'generate']);
+        expect(consoleSender.errors).toEqual(['Run this command as a Java player so the current world is known.']);
+        expect(consoleSender.lines).toEqual(consoleSender.errors);
     });
 
     it('rejects radii larger than either command limit', () => {

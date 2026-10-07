@@ -1,5 +1,5 @@
 import type { CommandSender } from 'pumpkin:plugin/command@0.1.0';
-import { CommandFailed, type CommandHandlers } from '@pumpkin-plugins/docs';
+import { CommandFailed, type CommandHandlers, type CommandLine, errorLine } from '@pumpkin-plugins/docs';
 import { color } from '@pumpkin-plugins/minecraft-colors';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import prettyBytes from 'pretty-bytes';
@@ -61,12 +61,12 @@ function generateLODs(
     sender: CommandSender,
     radius: number,
     coordinates?: readonly [x: number, z: number]
-): string[] {
+): CommandLine[] {
     if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_GENERATION_RADIUS) {
         throw new CommandFailed(`Radius must be between 0 and ${MAX_LOD_GENERATION_RADIUS} LOD sections.`);
     }
     const player = sender.asPlayer();
-    if (!player) throw new CommandFailed('Run this command as a Java player so the current world is known.');
+    if (!player) return [errorLine('Run this command as a Java player so the current world is known.')];
 
     try {
         let started: ForcedLodStart | undefined;
@@ -94,12 +94,12 @@ function showMap(
     sender: CommandSender,
     radius: number,
     coordinates?: readonly [x: number, z: number]
-): string[] {
+): CommandLine[] {
     if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_MAP_RADIUS) {
         throw new CommandFailed(`Radius must be between 0 and ${MAX_LOD_MAP_RADIUS} LOD sections.`);
     }
     const player = sender.asPlayer();
-    if (!player) throw new CommandFailed('Run this command as a player so the current world is known.');
+    if (!player) return [errorLine('Run this command as a player so the current world is known.')];
     let world: ReturnType<typeof player.getWorld> | undefined;
     try {
         world = player.getWorld();
