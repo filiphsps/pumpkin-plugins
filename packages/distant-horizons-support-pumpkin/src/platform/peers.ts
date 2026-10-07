@@ -1,5 +1,6 @@
 import type { Player } from 'pumpkin:plugin/player@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
+import { TextComponent } from 'pumpkin:plugin/text@0.1.0';
 import { blockStateToInfo } from 'pumpkin:plugin/world@0.1.0';
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
@@ -114,6 +115,14 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
             dimension,
             x: position[0],
             z: position[2],
+            report: (message) => {
+                const component = TextComponent.text(message);
+                try {
+                    player.sendSystemMessage(component, false);
+                } finally {
+                    disposeWasiResource(component);
+                }
+            },
             send: (bytes) => java.sendCustomPayload(CHANNEL, bytes),
             insideBorder: (x, z) => Math.abs(x + 0.5 - borderX) <= radius && Math.abs(z + 0.5 - borderZ) <= radius,
             terrain

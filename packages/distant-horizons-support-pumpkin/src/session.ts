@@ -1,8 +1,10 @@
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
-import { AdaptiveWorkBudget, type TerrainAccess, type TerrainSource } from '@pumpkin-plugins/terrain';
+import { AdaptiveWorkBudget, type TerrainSource } from '@pumpkin-plugins/terrain';
 import type { Settings } from './config/schema.ts';
 import { LodBuilder } from './lod/builder.ts';
 import type { CachedLod, LodCache } from './lod/cache.ts';
+import { ForcedLodGeneration, type ForcedLodPeer, type ForcedLodStart } from './lod/force-generation.ts';
+import { sectionKey } from './lod/generation.ts';
 import { PLUGIN_NAME } from './name.ts';
 import { CHUNK_SIZE_BLOCKS, SECTION_DETAIL, SECTION_SIZE_BLOCKS } from './protocol/constants.ts';
 import {
@@ -18,14 +20,10 @@ import {
 } from './protocol/messages.ts';
 
 /** A Java player snapshot and terrain access, valid only during an adapter callback. */
-export interface Peer {
-    name: string;
-    level: string;
+export interface Peer extends ForcedLodPeer {
     dimension: string;
     x: number;
     z: number;
-    terrain: TerrainAccess;
-    insideBorder(x: number, z: number): boolean;
     send(bytes: Uint8Array): void;
 }
 /** Obtains fresh host handles for one player, releasing them after the callback. */
@@ -62,6 +60,7 @@ export class Sessions {
     private readonly requests: Request[] = [];
     private readonly revisions = new Map<string, number>();
     private readonly workBudget = new AdaptiveWorkBudget({ initialUnits: 8192 });
+    private readonly forcedGeneration: ForcedLodGeneration;
     private buffer = 1;
     private ticks = 0;
     private served = 0;
@@ -76,7 +75,13 @@ export class Sessions {
         private readonly log: Logger,
         private readonly now = Date.now,
         private readonly measureNow = Date.now
-    ) {}
+    ) {
+        this.forcedGeneration = new ForcedLodGeneration(cache, log, now);
+    }
+    /** Starts a cache-refreshing capture that takes priority over ordinary DH work. */
+    forceGenerate(peer: Peer, blockX: number, blockZ: number, radius = 0): ForcedLodStart {
+        return this.forcedGeneration.start(peer, blockX, blockZ, radius);
+    }
     /** Accepts and validates a DH packet from a Java player. */
     receive(peer: Peer, bytes: Uint8Array): void {
         let message: Message;
@@ -152,16 +157,21 @@ export class Sessions {
             )
                 this.left(name);
         }
+        const forcedWork = this.forcedGeneration.tick(peers);
+        if (forcedWork) {
+            this.lastBlocksBudget = 0;
+            this.lastServerMspt = serverMspt;
+        }
         let cacheChecks = 0;
         let builderStepped = false;
-        const blocksBudget = this.workBudget.next(serverMspt, this.settings.blocks_per_tick);
+        const blocksBudget = forcedWork ? 0 : this.workBudget.next(serverMspt, this.settings.blocks_per_tick);
         this.lastBlocksBudget = blocksBudget;
-        this.lastServerMspt = serverMspt;
+        if (!forcedWork) this.lastServerMspt = serverMspt;
         let cachedQueued = [...this.clients.values()].reduce(
             (sum, client) => sum + client.packets.filter((packet) => packet.cached).length,
             0
         );
-        for (const request of [...this.requests]) {
+        for (const request of forcedWork ? [] : [...this.requests]) {
             if (!this.requests.includes(request)) continue;
             const queuedClient = this.clients.get(request.name);
             if (!queuedClient || queuedClient.packets.length) continue;
@@ -258,15 +268,20 @@ export class Sessions {
     }
     /** Removes a disconnected client's work and queued transfers. */
     left(name: string): void {
-        this.clients.delete(name);
-        this.cancelRequests(name);
+        this.forcedGeneration.left(name);
+        this.removeClient(name);
     }
     /** Invalidates a known changed section and cancels its obsolete captures. */
     changed(level: string, x: number, z: number): void {
         const key = sectionKey(level, Math.floor(x / SECTION_SIZE_BLOCKS), Math.floor(z / SECTION_SIZE_BLOCKS));
         this.cache.remove(key);
+        this.forcedGeneration.changed(level, x, z);
         // Only running requests need a revision; this map stays bounded by the request limit.
         if (this.requests.some((r) => r.key === key)) this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
+    }
+    private removeClient(name: string): void {
+        this.clients.delete(name);
+        this.cancelRequests(name);
     }
     /** Describes current queues for the operator command. */
     status(): string {
@@ -276,10 +291,11 @@ export class Sessions {
             : '';
         const packets = [...this.clients.values()].reduce((sum, client) => sum + client.packets.length, 0);
         const budget = ` Capture budget ${this.lastBlocksBudget}/${this.settings.blocks_per_tick} block samples/tick at ${this.lastServerMspt.toFixed(1)} MSPT.`;
-        return `${this.clients.size} DH client(s), ${this.requests.length} pending LOD request(s). ${this.ticks} worker tick(s), ${this.served} served, ${this.rejected} rejected, ${this.cancelled} cancelled, ${packets} queued packet(s).${progress}${budget}${this.lastFailure ? ` Last rejection: ${this.lastFailure}.` : ''} Distant chunk generation is unavailable in the pinned Pumpkin API.`;
+        const forced = this.forcedGeneration.status();
+        return `${this.clients.size} DH client(s), ${this.requests.length} pending LOD request(s). ${this.ticks} worker tick(s), ${this.served} served, ${this.rejected} rejected, ${this.cancelled} cancelled, ${packets} queued packet(s).${progress}${forced ? ` ${forced}` : ''}${budget}${this.lastFailure ? ` Last rejection: ${this.lastFailure}.` : ''} Distant chunk generation is unavailable in the pinned Pumpkin API.`;
     }
     private announce(peer: Peer): void {
-        this.left(peer.name);
+        this.removeClient(peer.name);
         this.clients.set(peer.name, {
             level: peer.level,
             distance: this.settings.render_distance,
@@ -350,6 +366,8 @@ export class Sessions {
     }
 }
 
+export { sectionKey } from './lod/generation.ts';
+
 function measureTerrainSource(source: TerrainSource): { source: TerrainSource; samples: () => number } {
     let samples = 0;
     const measured: TerrainSource = {
@@ -362,8 +380,4 @@ function measureTerrainSource(source: TerrainSource): { source: TerrainSource; s
     };
     if (source.top) measured.top = source.top.bind(source);
     return { source: measured, samples: () => samples };
-}
-/** Stable cache key scoped to the world name and signed section coordinates. */
-export function sectionKey(level: string, x: number, z: number): string {
-    return `${level}:${x}:${z}`;
 }

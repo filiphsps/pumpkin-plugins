@@ -16,6 +16,7 @@ function fixture(measureNow = () => 1000) {
     const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries),
         sessions = new Sessions(settings, cache, log, () => 1000, measureNow);
     const sent: Uint8Array[] = [];
+    const reports: string[] = [];
     let reads = 0;
     const peer: Peer = {
         name: 'Alice',
@@ -34,7 +35,8 @@ function fixture(measureNow = () => 1000) {
             }
         },
         insideBorder: () => true,
-        send: (bytes) => sent.push(bytes)
+        send: (bytes) => sent.push(bytes),
+        report: (message) => reports.push(message)
     };
     const peers = {
         withPeer: (name: string, use: (p: Peer) => void) => {
@@ -59,9 +61,49 @@ function fixture(measureNow = () => 1000) {
             r.short();
             return r.short();
         });
-    return { files, settings, sessions, peer, peers, sent, request, ids, reads: () => reads };
+    return { files, settings, sessions, peer, peers, sent, reports, request, ids, reads: () => reads };
 }
 describe('DH sessions', () => {
+    it('runs forced captures at their fixed budget ahead of DH capture work', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 64;
+        f.peer.terrain.height = 16;
+        f.sessions.receive(f.peer, f.request());
+
+        expect(f.sessions.forceGenerate(f.peer, 32, 32)).toEqual({
+            centerX: 0,
+            centerZ: 0,
+            radius: 0,
+            sections: 1,
+            skippedOutsideBorder: 0
+        });
+        f.sessions.tick(f.peers);
+        expect(f.reads()).toBe(32768);
+        expect(f.sessions.status()).toContain('Forced LOD capture for Alice: 50%');
+        expect(f.reports.at(-1)).toContain('50%');
+
+        f.sessions.tick(f.peers);
+        expect(f.reads()).toBe(65536);
+        expect(f.sessions.status()).not.toContain('Forced LOD capture');
+        expect(f.reports.at(-1)).toContain('complete: 1 built, 0 skipped');
+
+        f.sessions.tick(f.peers);
+        expect(f.reads()).toBe(65536);
+        expect(f.sessions.status()).toContain('1 served');
+    });
+
+    it('cancels forced work when its owner disconnects', () => {
+        const f = fixture();
+        f.peer.terrain.height = 16;
+        f.sessions.forceGenerate(f.peer, 32, 32);
+        f.sessions.tick(f.peers);
+        f.sessions.left('Alice');
+        f.sessions.tick(f.peers);
+
+        expect(f.sessions.status()).not.toContain('Forced LOD capture');
+        expect(f.reads()).toBe(32768);
+    });
+
     it('checks unloaded sections before sampling and reports rejection instead of a static queue', () => {
         const f = fixture();
         f.peer.terrain.prepare = () => ({ status: 'unavailable', reason: 'Chunk 3, 3 is not loaded' });

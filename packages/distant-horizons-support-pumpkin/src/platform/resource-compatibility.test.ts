@@ -7,6 +7,7 @@ import { withPlayer } from './peers.ts';
 vi.mock('pumpkin:plugin/world@0.1.0', () => ({
     blockStateToInfo: () => ({ name: 'minecraft:stone', properties: [] })
 }));
+vi.mock('pumpkin:plugin/text@0.1.0', () => ({ TextComponent: { text: (value: string) => ({ value }) } }));
 
 describe('QuickJS resource compatibility', () => {
     it('serves terrain when host resources expose no Symbol.dispose method', () => {

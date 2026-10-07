@@ -3,9 +3,11 @@ import { MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
-    lookup: vi.fn(() => ({ name: 'minecraft:stone', properties: [] as [string, string][] }))
+    lookup: vi.fn(() => ({ name: 'minecraft:stone', properties: [] as [string, string][] })),
+    text: vi.fn((value: string) => ({ value, [Symbol.dispose]: vi.fn() }))
 }));
 vi.mock('pumpkin:plugin/world@0.1.0', () => ({ blockStateToInfo: state.lookup }));
+vi.mock('pumpkin:plugin/text@0.1.0', () => ({ TextComponent: { text: state.text } }));
 
 import type { Player } from 'pumpkin:plugin/player@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
@@ -56,11 +58,13 @@ describe('Pumpkin terrain adapter', () => {
             [Symbol.dispose]: vi.fn()
         };
         const java = { sendCustomPayload: vi.fn(), [Symbol.dispose]: vi.fn() };
+        const sendSystemMessage = vi.fn();
         const player = {
             asJava: () => java,
             getWorld: () => world,
             getName: () => 'Alice',
-            getPosition: () => [0, 64, 0]
+            getPosition: () => [0, 64, 0],
+            sendSystemMessage
         };
         expect(() =>
             withPlayer(player as unknown as Player, settings, (peer) => {
@@ -68,6 +72,10 @@ describe('Pumpkin terrain adapter', () => {
                 expect(peer.insideBorder(6, 0)).toBe(false);
                 expect(peer.insideBorder(-5, 0)).toBe(true);
                 expect(peer.insideBorder(-6, 0)).toBe(false);
+                peer.report('Forced LOD capture 10%.');
+                const component = state.text.mock.results[0]?.value;
+                expect(sendSystemMessage).toHaveBeenCalledWith(component, false);
+                expect(component?.[Symbol.dispose]).toHaveBeenCalledOnce();
                 expect(peer.terrain.sample(-1, 64, -17).material).toBe(
                     'minecraft:old_growth_pine_taiga_DH-BSW_minecraft:oak_log_STATE_{axis:y}{waterlogged:false}'
                 );
