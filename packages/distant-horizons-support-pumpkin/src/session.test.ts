@@ -186,6 +186,19 @@ describe('DH protocol contracts', () => {
         expect(f.sessions.status()).toContain('1 served');
     });
 
+    it('does not write client-supplied control characters into debug logs', () => {
+        const f = fixture();
+        const dimension = 'minecraft:the_nether\n\u001b[2Jforged log line';
+
+        f.sessions.receive(f.peer, packet(3).string(dimension).finish());
+
+        const message = f.log.of('debug').at(-1) ?? '';
+        const plain = message.replace(/\u001b\[[0-9;]*m/g, '');
+        expect(message).not.toContain(dimension);
+        expect(message.split('\n')).toHaveLength(1);
+        expect(plain).not.toMatch(/[\u0000-\u001f\u007f-\u009f]/);
+    });
+
     it('continues cached delivery while forced capture work is active', () => {
         const f = fixture();
         f.peer.terrain.height = 16;
