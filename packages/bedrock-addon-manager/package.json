@@ -39,6 +39,7 @@
         "readme:check": "pumpkin-plugins-docs --check"
     },
     "dependencies": {
+        "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@pumpkinmc/pumpkin-api-ts": "catalog:",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "fflate": "0.8.3"

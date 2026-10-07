@@ -1,5 +1,5 @@
 import { defaultValues } from '@pumpkin-plugins/config';
-import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import { makeMcpack, manifestJson, noise } from '../../test/fixtures.ts';
@@ -27,7 +27,7 @@ describe('PackIndex', () => {
 
         expect(index.entries.map((e) => [e.fileName, e.uuid])).toEqual([['a.mcpack', uuid(1)]]);
         expect(log.of('info')).toEqual([
-            `Found ${colorLogValue('1', 'yellow')} Bedrock pack: ${colorLogValue('a.mcpack', 'cyan')} (${colorLogValue(uuid(1), 'yellow')} v${colorLogValue('1.0.0', 'green')}).`
+            `Found ${ansi.named.number('1')} Bedrock pack: ${ansi.named.name('a.mcpack')} (${ansi.named.uuid(uuid(1))} v${ansi.named.version('1.0.0')}).`
         ]);
     });
 
@@ -35,7 +35,7 @@ describe('PackIndex', () => {
         const { log, settings, index } = setup();
         index.refresh(settings);
         expect(log.of('info')).toEqual([
-            `No packs in ${colorLogValue('packs/', 'cyan')}. Put .mcpack or .mcaddon files there and run /baddon reload.`
+            `No packs in ${ansi.named.name('packs/')}. Put .mcpack or .mcaddon files there and run /baddon reload.`
         ]);
     });
 

@@ -1,4 +1,4 @@
-import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import type { Config } from '../config/schema.ts';
 import type { DataFiles, RandomAccessFile } from '../platform/files.ts';
 import type { Logger } from '../platform/logger.ts';
@@ -37,18 +37,15 @@ export class PackIndex {
 
         if (built.entries.length === 0) {
             this.log.info(
-                `No packs in ${colorLogValue(`${directory}/`, 'cyan')}. Put .mcpack or .mcaddon files there and run /baddon reload.`
+                `No packs in ${ansi.named.name(`${directory}/`)}. Put .mcpack or .mcaddon files there and run /baddon reload.`
             );
             return;
         }
         const list = built.entries
-            .map(
-                (e) =>
-                    `${colorLogValue(e.fileName, 'cyan')} (${colorLogValue(e.uuid, 'yellow')} v${colorLogValue(e.version, 'green')})`
-            )
+            .map((e) => `${ansi.named.name(e.fileName)} (${ansi.named.uuid(e.uuid)} v${ansi.named.version(e.version)})`)
             .join(', ');
         this.log.info(
-            `Found ${colorLogValue(String(built.entries.length), 'yellow')} Bedrock pack${built.entries.length === 1 ? '' : 's'}: ${list}.`
+            `Found ${ansi.named.number(built.entries.length)} Bedrock pack${built.entries.length === 1 ? '' : 's'}: ${list}.`
         );
     }
 

@@ -1,4 +1,4 @@
-import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { describe, expect, it, vi } from 'vitest';
 import { FakeServer } from '../test/fake-server.ts';
 import { FakeUpnpumpkin } from '../test/fake-upnpumpkin.ts';
@@ -49,7 +49,7 @@ describe('PackManager', () => {
         expect(files.stat('packs')?.kind).toBe('directory');
         expect(manager.entries.map((e) => e.fileName)).toEqual(['a.mcpack']);
         expect(server.started).toEqual([{ bind: '0.0.0.0', port: 8123 }]);
-        expect(log.of('info')).toContain(`Serving packs on ${colorLogValue('http://0.0.0.0:8123/packs/', 'cyan')}.`);
+        expect(log.of('info')).toContain(`Serving packs on ${ansi.named.url('http://0.0.0.0:8123/packs/')}.`);
     });
 
     it('creates the packs folder when it is missing', () => {
@@ -67,7 +67,7 @@ describe('PackManager', () => {
 
         manager.start();
 
-        expect(log.of('error')).toEqual([`Could not scan ${colorLogValue('packs/', 'cyan')}: permission denied`]);
+        expect(log.of('error')).toEqual([`Could not scan ${ansi.named.name('packs/')}: permission denied`]);
         expect(server.started).toEqual([{ bind: '0.0.0.0', port: 8123 }]);
     });
 
@@ -76,7 +76,7 @@ describe('PackManager', () => {
         files.put('packs/a.mcpack', pack(1));
         manager.start();
         expect(log.of('warn')).toEqual([
-            `web.public_url is not set, so clients are told to download packs from ${colorLogValue('http://127.0.0.1:8123', 'cyan')}, which only works for players on this machine. Set it to the address players can reach.`
+            `web.public_url is not set, so clients are told to download packs from ${ansi.named.url('http://127.0.0.1:8123')}, which only works for players on this machine. Set it to the address players can reach.`
         ]);
     });
 
@@ -133,7 +133,7 @@ describe('PackManager', () => {
             wait(1000);
             expect(urls(manager)).toEqual(['http://93.184.216.34:8123/packs/a.mcpack']);
             expect(log.of('info')).toContain(
-                `Opened port ${colorLogValue('8123', 'yellow')} on the router (upnp): clients download packs from ${colorLogValue('http://93.184.216.34:8123', 'cyan')}.`
+                `Opened port ${ansi.named.port('8123')} on the router (upnp): clients download packs from ${ansi.named.url('http://93.184.216.34:8123')}.`
             );
             expect(log.of('warn')).toEqual([]);
         });
@@ -154,7 +154,7 @@ describe('PackManager', () => {
             manager.start();
             expect(urls(manager)).toEqual(['http://93.184.216.99:8123/packs/a.mcpack']);
             expect(log.of('info')).toContain(
-                `This machine has a public address, so clients download packs from ${colorLogValue('http://93.184.216.99:8123', 'cyan')}.`
+                `This machine has a public address, so clients download packs from ${ansi.named.url('http://93.184.216.99:8123')}.`
             );
         });
 
@@ -165,7 +165,7 @@ describe('PackManager', () => {
             manager.start();
             expect(urls(manager)).toEqual(['http://127.0.0.1:8123/packs/a.mcpack']);
             expect(log.of('warn')).toEqual([
-                `Could not make port ${colorLogValue('8123', 'yellow')} reachable from the internet: no router answered the search. Clients are told to download packs from ${colorLogValue('http://127.0.0.1:8123', 'cyan')}, which only works for players on this machine. Open the port yourself and set web.public_url, or set web.port_forwarding = false.`
+                `Could not make port ${ansi.named.port('8123')} reachable from the internet: no router answered the search. Clients are told to download packs from ${ansi.named.url('http://127.0.0.1:8123')}, which only works for players on this machine. Open the port yourself and set web.public_url, or set web.port_forwarding = false.`
             ]);
         });
 
@@ -283,13 +283,13 @@ describe('PackManager', () => {
         files.put('packs/a.mcpack', pack(1));
         manager.start();
         expect(log.of('info')).toContain(
-            `Offering ${colorLogValue('1', 'yellow')} Bedrock pack to players who join from now on (not connected to the server yet, so players are not sent them).`
+            `Offering ${ansi.named.number('1')} Bedrock pack to players who join from now on (not connected to the server yet, so players are not sent them).`
         );
 
         files.put('packs/b.mcpack', pack(2));
         manager.reload();
         expect(log.of('info')).toContain(
-            `Offering ${colorLogValue('2', 'yellow')} Bedrock packs to players who join from now on (not connected to the server yet, so players are not sent them).`
+            `Offering ${ansi.named.number('2')} Bedrock packs to players who join from now on (not connected to the server yet, so players are not sent them).`
         );
     });
 
