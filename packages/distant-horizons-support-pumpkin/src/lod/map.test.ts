@@ -45,15 +45,16 @@ describe('LOD map', () => {
         expect(renderLodMap(cache, 'overworld', 0, 0, 0).map(plain).join('\n')).toContain('64 blocks');
     });
 
-    it('keeps the maximum map radius bounded by downsampling the display', () => {
+    it('keeps the maximum map radius chat-sized by downsampling the display', () => {
         const { cache, lod } = setup();
         lod('overworld', 16_384, -16_384);
 
         const lines = renderLodMap(cache, 'overworld', 0, 0, 16_384);
 
-        expect(lines).toHaveLength(67);
-        expect([...(plain(lines[1]) ?? '')]).toHaveLength(65);
+        expect(lines).toHaveLength(23);
+        expect([...(plain(lines[1]) ?? '')]).toHaveLength(21);
         expect(lines.join('\n')).toContain('downsampled');
+        expect(lines.join('\n')).toContain('21×21');
         expect(lines.join('\n')).toContain('§a█');
     });
 });

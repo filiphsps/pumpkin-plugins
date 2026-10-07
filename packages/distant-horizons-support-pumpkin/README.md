@@ -159,8 +159,8 @@ The generated [Commands](#commands) section lists cache inspection, clearing and
 Run `/dhs map` to see cached sections around your current position, or `/dhs map <x> <z>` to inspect
 block coordinates in your current world. Add `<radius>` after the command or coordinates to set the
 radius, up to 16_384 sections. Each map cell is one 64 × 64 block LOD section (four by four server
-chunks) for views up to radius 32; larger views are downsampled to 65 × 65 cells. These commands
-need a player so the plugin can resolve the current world.
+chunks) for views up to radius 10; larger views are downsampled to 21 × 21 cells to fit in Minecraft
+chat. These commands need a player so the plugin can resolve the current world.
 
 Use `/dhs generate` or `/dhs generate <x> <z>` to force a capture into the cache. Add `<radius>`
 after the command or coordinates to set the radius, up to 16_384 sections. Sections already in the

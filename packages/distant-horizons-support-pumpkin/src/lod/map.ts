@@ -5,7 +5,7 @@ import { DEFAULT_LOD_MAP_RADIUS, MAX_LOD_MAP_RADIUS } from './map-constants.ts';
 
 export { DEFAULT_LOD_MAP_RADIUS, MAX_LOD_MAP_RADIUS };
 
-const MAX_DISPLAY_RADIUS = 32;
+const MAX_DISPLAY_RADIUS = 10;
 
 /** Renders cached LOD sections around a block position; the center cell represents its containing section. */
 export function renderLodMap(cache: LodCache, level: string, blockX: number, blockZ: number, radius: number): string[] {
@@ -33,7 +33,7 @@ export function renderLodMap(cache: LodCache, level: string, blockX: number, blo
 
     lines.push(
         radius > displayRadius
-            ? '§a█ built  §8□ empty  §e◆ built center  §8◇ empty center (map downsampled to 65×65 cells)'
+            ? '§a█ built  §8□ empty  §e◆ built center  §8◇ empty center (map downsampled to 21×21 cells)'
             : '§a█ built  §8□ empty  §e◆ built center  §8◇ empty center (one cell = 64 blocks / 4×4 chunks)'
     );
     return lines;
