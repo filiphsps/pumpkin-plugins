@@ -95,9 +95,9 @@ commits. Merging a plugin release PR:
   in the same run.
 
 If GitHub rejects release creation because the tag already belongs to an immutable release, the
-runner treats that release PR as already published and skips its artifact outputs. Other release
-PRs in the same run can still publish, and open release PRs are still prepared; other API errors
-remain failures.
+runner treats that release PR as already published, changes its label from pending to tagged, and
+skips its artifact outputs. This lets release-please prepare later release PRs. Other release PRs in
+the same run can still publish; other API errors remain failures.
 
 Merging an action release PR updates its `version.txt` and `CHANGELOG.md`, tags it
 `<folder>-v<version>`, and creates a GitHub release. Action releases do not run plugin packaging,

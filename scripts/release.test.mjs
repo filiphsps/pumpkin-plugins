@@ -18,7 +18,11 @@ function run(args, overrides = {}) {
             let published = false;
             module.exports = {
                 VERSION: '17.11.2',
-                GitHub: { create: async () => ({ repository: { defaultBranch: 'master' } }) },
+                GitHub: { create: async () => ({
+                    repository: { defaultBranch: 'master' },
+                    removeIssueLabels: async (labels, number) => record('remove:' + labels.join(',') + ':' + number),
+                    addIssueLabels: async (labels, number) => record('add:' + labels.join(',') + ':' + number)
+                }) },
                 Manifest: { fromManifest: async () => {
                     const latestReleasePublished = published;
                     const releaseItems = [{
@@ -33,11 +37,12 @@ function run(args, overrides = {}) {
                         : [{ error: process.env.RELEASE_ERROR, releases: releaseItems }];
                     return {
                     plugins: [], releasedVersions: {}, commitSearchDepth: 500,
+                    labels: ['autorelease: pending'], releaseLabels: ['autorelease: tagged'],
                     createReleases: async function () {
                         record('release');
                         const releases = [];
                         for (const group of releaseGroups) {
-                            releases.push(...await this.createReleasesForPullRequest(group));
+                            releases.push(...await this.createReleasesForPullRequest(group, { number: 52 }));
                         }
                         published = true;
                         return releases;
@@ -138,7 +143,12 @@ it('preserves workflow tag and multiline release-note outputs for assets and Mar
 it('continues release PR preparation when GitHub reports an immutable release for the tag', () => {
     const result = run([], { RELEASE_ERROR: 'immutable' });
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(result.calls, ['release', 'update-pr']);
+    assert.deepEqual(result.calls, [
+        'release',
+        'remove:autorelease: pending:52',
+        'add:autorelease: tagged:52',
+        'update-pr'
+    ]);
     assert.match(result.output, /paths_released<<[^\n]+\n\[\]\n/);
     assert.doesNotMatch(result.output, /packages\/plugin--release_created/);
 });
@@ -146,7 +156,12 @@ it('continues release PR preparation when GitHub reports an immutable release fo
 it('preserves other releases when one release PR already has an immutable tag', () => {
     const result = run([], { RELEASE_ERROR: 'immutable-with-success' });
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(result.calls, ['release', 'update-pr']);
+    assert.deepEqual(result.calls, [
+        'release',
+        'remove:autorelease: pending:52',
+        'add:autorelease: tagged:52',
+        'update-pr'
+    ]);
     assert.match(result.output, /paths_released<<[^\n]+\n\["packages\/plugin"\]\n/);
     assert.match(result.output, /packages\/plugin--tag_name<<[^\n]+\nplugin-v1\.0\.0\n/);
 });

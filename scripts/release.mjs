@@ -57,7 +57,14 @@ if (!args.includes('--dry-run') && !args.includes('--pull-requests-only')) {
             return await createReleasesForPullRequest(...releaseArgs);
         } catch (error) {
             if (!isImmutableReleaseConflict(error)) throw error;
-            console.warn('GitHub already has an immutable release for this release PR; skipping its artifact outputs.');
+            const pullRequest = releaseArgs[1];
+            if (pullRequest?.number && !manifest.skipLabeling) {
+                await github.removeIssueLabels(manifest.labels, pullRequest.number);
+                await github.addIssueLabels(manifest.releaseLabels, pullRequest.number);
+            }
+            console.warn(
+                'GitHub already has an immutable release for this release PR; marking it tagged and skipping its artifact outputs.'
+            );
             return [];
         }
     };
