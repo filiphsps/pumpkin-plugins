@@ -28,7 +28,9 @@ packages and their dependents locally, compare with the base branch, for example
 ## Integration tests
 
 `@pumpkin-plugins/test-harness` starts the real server binary per test file, in a temp directory, on
-free ports, with plugin permission prompts and telemetry off:
+free ports, with plugin permission prompts and telemetry off. The harness sets `RUST_LOG=info` for
+Pumpkin so startup and plugin INFO logs remain available to readiness checks and assertions even
+when the calling shell uses a stricter filter:
 
 ```ts
 // packages/<folder>/test/my.itest.ts

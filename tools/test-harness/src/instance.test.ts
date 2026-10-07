@@ -8,6 +8,7 @@ const made: string[] = [];
 const realBinary = process.env.PUMPKIN_BIN;
 const realLogDir = process.env.PUMPKIN_TEST_LOG_DIR;
 const realKeepDir = process.env.PUMPKIN_KEEP_DIR;
+const realRustLog = process.env.RUST_LOG;
 
 afterEach(() => {
     if (realBinary === undefined) delete process.env.PUMPKIN_BIN;
@@ -16,6 +17,8 @@ afterEach(() => {
     else process.env.PUMPKIN_TEST_LOG_DIR = realLogDir;
     if (realKeepDir === undefined) delete process.env.PUMPKIN_KEEP_DIR;
     else process.env.PUMPKIN_KEEP_DIR = realKeepDir;
+    if (realRustLog === undefined) delete process.env.RUST_LOG;
+    else process.env.RUST_LOG = realRustLog;
     for (const dir of made.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -24,9 +27,11 @@ afterEach(() => {
  * on its first `failures` runs and comes up after that, the way a real one does when something else
  * took the port. Every run appends its number and the port it was given to a file of its own.
  * @param failures - How many runs should report the port as taken.
+ * @param errorLines - Extra server errors to print after startup.
+ * @param printRustLog - Whether to print the child's `RUST_LOG` value.
  * @returns A reader for the Java port each run was given.
  */
-function fakePumpkin(failures: number, errorLines: string[] = []): () => string[] {
+function fakePumpkin(failures: number, errorLines: string[] = [], printRustLog = false): () => string[] {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-pumpkin-'));
     made.push(dir);
     const file = path.join(dir, 'runs');
@@ -35,6 +40,7 @@ function fakePumpkin(failures: number, errorLines: string[] = []): () => string[
         `#!/usr/bin/env node
 import * as fs from 'node:fs';
 const file = ${JSON.stringify(file)};
+if (${printRustLog}) console.log('fake RUST_LOG=' + process.env.RUST_LOG);
 const seen = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\\n').filter(Boolean) : [];
 const count = seen.length + 1;
 const port = fs.readFileSync('pumpkin.toml', 'utf8').match(/127\\.0\\.0\\.1:(\\d+)/)?.[1];
@@ -60,6 +66,18 @@ process.stdin.resume();
 }
 
 describe('startPumpkin', () => {
+    it('keeps INFO readiness logs visible when the parent filters them out', async () => {
+        process.env.RUST_LOG = 'warn';
+        fakePumpkin(0, [], true);
+
+        const server = await startPumpkin();
+        try {
+            expect(server.logs()).toContain('fake RUST_LOG=info');
+        } finally {
+            await server.stop();
+        }
+    });
+
     it('starts again on other ports when the server loses one to another process', async () => {
         const ports = fakePumpkin(1);
         const server = await startPumpkin({ name: 'port-taken' });

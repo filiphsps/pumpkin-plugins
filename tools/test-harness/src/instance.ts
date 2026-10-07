@@ -67,7 +67,12 @@ export class PumpkinInstance {
         const bin = await resolvePumpkinBinary();
         for (let attempt = 1; ; attempt++) {
             const server = await prepareServerDir(options);
-            const child = spawn(bin, [], { cwd: server.dir, stdio: 'pipe' });
+            const child = spawn(bin, [], {
+                cwd: server.dir,
+                stdio: 'pipe',
+                // Tests use INFO startup and plugin logs as observable readiness and behavior signals.
+                env: { ...process.env, RUST_LOG: 'info' }
+            });
             const instance = new PumpkinInstance(child, server, options.name ?? 'pumpkin');
             try {
                 await instance.waitForLog(READY, options.readyTimeoutMs ?? 90_000);
