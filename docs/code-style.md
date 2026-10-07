@@ -32,10 +32,11 @@ says what the thing is for, not what its name says.
 
 ## Console log colors
 
-Use `colorLogValue` from `@pumpkin-plugins/plugin-kit/logger` to color a few useful values in console
-messages. Keep the surrounding message plain and color only values that help someone scan it, such
-as names and URLs in cyan, versions in green, and ports, UUIDs or other identifiers in yellow. Do
-not add ANSI escape sequences directly at log call sites.
+Use `color.named` from [`@pumpkin-plugins/minecraft-colors`](../tools/minecraft-colors/README.md)
+as the source of truth for which color belongs to a value. For console output, use `colorLogValue`
+from `@pumpkin-plugins/plugin-kit/logger`; it applies ANSI colors and supports cyan, green and
+yellow. Map the palette's dark aqua to cyan, green/dark green to green, and gold/yellow to yellow.
+Keep the surrounding message plain and do not add ANSI escape sequences directly at log call sites.
 
 Keep this palette aligned with the Pumpkin server version pinned in
 [`tools/test-harness/src/pumpkin-version.ts`](../tools/test-harness/src/pumpkin-version.ts). Pumpkin

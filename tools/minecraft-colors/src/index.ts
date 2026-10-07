@@ -25,13 +25,28 @@ const FORMATS = {
     italic: 'o'
 } as const;
 
+const NAMED_COLORS = {
+    value: { color: 'gold' },
+    name: { color: 'darkAqua' },
+    namespace: { color: 'darkGreen' },
+    version: { color: 'green' },
+    url: { color: 'darkAqua' },
+    permission: { color: 'yellow', format: 'bold' },
+    port: { color: 'yellow' },
+    uuid: { color: 'yellow' },
+    identifier: { color: 'yellow' }
+} as const satisfies Record<string, { color: keyof typeof COLORS; format?: keyof typeof FORMATS }>;
+
 type MinecraftColor = keyof typeof COLORS;
 type MinecraftFormat = keyof typeof FORMATS;
+type MinecraftNamedRole = keyof typeof NAMED_COLORS;
 type MinecraftFormatter = ((text: string) => string) & {
     readonly [Key in MinecraftColor | MinecraftFormat]: MinecraftFormatter;
 } & {
     hex(color: string): MinecraftFormatter;
 };
+type NamedFormatters = { readonly [Role in MinecraftNamedRole]: MinecraftFormatter };
+type MinecraftColorApi = MinecraftFormatter & { readonly named: NamedFormatters };
 
 interface FormatterState {
     colorPrefix?: string;
@@ -79,4 +94,35 @@ function createFormatter(state: FormatterState = { formats: [] }): MinecraftForm
 }
 
 /** Formats strings with Minecraft's legacy color and text style codes. */
-export const minecraft = createFormatter();
+export const color = createFormatter() as MinecraftColorApi;
+
+Object.defineProperty(color, 'named', {
+    value: Object.fromEntries(
+        Object.entries(NAMED_COLORS).map(([role, definition]) => {
+            const formats = 'format' in definition ? [definition.format] : [];
+            return [
+                role,
+                createFormatter({
+                    colorPrefix: `§${COLORS[definition.color]}`,
+                    formats
+                })
+            ];
+        })
+    ),
+    enumerable: true
+});
+
+/** Returns an ASCII table previewing every legacy color in normal and bold text. */
+export function colorTable(): string {
+    const colors = Object.keys(COLORS) as MinecraftColor[];
+    const nameWidth = Math.max(...colors.map((colorName) => colorName.length));
+    const header = `Color${' '.repeat(nameWidth - 'Color'.length)} | Bold`;
+    const divider = `${'-'.repeat(nameWidth)}-+-${'-'.repeat(nameWidth)}`;
+    const rows = colors.map((colorName) => {
+        const sample = color[colorName](colorName);
+        const boldSample = color[colorName].bold(colorName);
+        return `${sample}${' '.repeat(nameWidth - colorName.length)} | ${boldSample}`;
+    });
+
+    return [header, divider, ...rows].join('\n');
+}
