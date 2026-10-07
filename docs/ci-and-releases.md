@@ -94,6 +94,11 @@ commits. Merging a plugin release PR:
 - attaches `<folder>.wasm` and `<folder>.wasm.sha256`, taken from the artifact the build job made
   in the same run.
 
+If GitHub rejects release creation because the tag already belongs to an immutable release, the
+runner treats that release PR as already published and skips its artifact outputs. Other release
+PRs in the same run can still publish, and open release PRs are still prepared; other API errors
+remain failures.
+
 Merging an action release PR updates its `version.txt` and `CHANGELOG.md`, tags it
 `<folder>-v<version>`, and creates a GitHub release. Action releases do not run plugin packaging,
 attach WebAssembly files, or publish to Pumpkin Market.

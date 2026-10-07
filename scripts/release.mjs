@@ -38,8 +38,29 @@ if (
 const load = () => Manifest.fromManifest(github, branch, 'release-please-config.json', '.release-please-manifest.json');
 const outputs = { paths_released: '[]', action_paths_released: '[]', prs: '[]' };
 
+function isImmutableReleaseConflict(error) {
+    return (
+        error?.status === 422 &&
+        Array.isArray(error.body?.errors) &&
+        error.body.errors.some(
+            (problem) =>
+                problem.field === 'tag_name' && problem.message?.includes('tag_name was used by an immutable release')
+        )
+    );
+}
+
 if (!args.includes('--dry-run') && !args.includes('--pull-requests-only')) {
     const manifest = await load();
+    const createReleasesForPullRequest = manifest.createReleasesForPullRequest.bind(manifest);
+    manifest.createReleasesForPullRequest = async (...releaseArgs) => {
+        try {
+            return await createReleasesForPullRequest(...releaseArgs);
+        } catch (error) {
+            if (!isImmutableReleaseConflict(error)) throw error;
+            console.warn('GitHub already has an immutable release for this release PR; skipping its artifact outputs.');
+            return [];
+        }
+    };
     const releases = (await manifest.createReleases()).filter(Boolean);
     outputs.paths_released = JSON.stringify(
         releases.filter((release) => !release.path.startsWith('actions/')).map((release) => release.path)
