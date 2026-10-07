@@ -8,7 +8,7 @@ on the documentation site.
 
 ```yaml
 steps:
-  - uses: filiphsps/pumpkin-plugins/actions/sign-pumpkin-plugin@sign-pumpkin-plugin-v0.0.2
+  - uses: filiphsps/pumpkin-plugins/actions/sign-pumpkin-plugin@sign-pumpkin-plugin-v0.0.3
     with:
       plugin-name: MyPlugin
       version: 1.2.3
