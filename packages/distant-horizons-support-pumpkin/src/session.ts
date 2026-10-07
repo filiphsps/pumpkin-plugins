@@ -400,7 +400,17 @@ export class Sessions {
         const budget = forced
             ? ` Forced budget up to ${FORCE_BLOCK_SAMPLES_PER_TICK} block samples/tick; ordinary DH sampling paused.`
             : ` Capture budget ${this.lastBlocksBudget}/${this.settings.blocks_per_tick} block samples/tick at ${this.lastServerMspt.toFixed(1)} MSPT.`;
-        return `${this.clients.size} DH client(s), ${this.requests.length} pending LOD request(s). ${this.ticks} worker tick(s), ${this.served} served, ${this.rejected} rejected, ${this.cancelled} cancelled, ${packets} queued packet(s).${progress}${forced ? ` ${forced}` : ''}${budget}${this.lastFailure ? ` Last rejection: ${this.lastFailure}.` : ''} Distant chunk generation is unavailable in the pinned Pumpkin API.`;
+        const lines = [
+            `${this.clients.size} Distant Horizons client(s), ${this.requests.length} pending LOD request(s).`,
+            `${this.ticks} worker tick(s), ${this.served} served, ${this.rejected} rejected, ${this.cancelled} cancelled.`,
+            `${packets} queued packet(s), ${this.refreshes.size} background cache refresh(es).`
+        ];
+        if (progress) lines.push(progress.trim());
+        if (forced) lines.push(forced);
+        lines.push(budget.trim());
+        if (this.lastFailure) lines.push(`Last rejection: ${this.lastFailure}.`);
+        lines.push('Distant chunk generation is unavailable in the pinned Pumpkin API.');
+        return lines.join('\n');
     }
     private scheduleRefresh(request: Request): void {
         if (this.refreshes.has(request.key) || this.refreshes.size >= this.settings.pending_requests) return;

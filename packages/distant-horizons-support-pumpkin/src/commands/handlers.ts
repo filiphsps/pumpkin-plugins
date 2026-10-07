@@ -17,7 +17,7 @@ export function commandHandlers(
     settings: Settings
 ): CommandHandlers<typeof commands, CommandSender> {
     return {
-        'dhs status': () => [sessions.status()],
+        'dhs status': () => sessions.status().split('\n'),
         'dhs cache status': () => {
             const stats = cache.stats();
             return [

@@ -32,8 +32,18 @@ describe(info.name, () => {
         expect(config).toContain('disk_cache_entries = 4096');
         const statusFrom = server.lines.length;
         server.command('dhs status');
-        const status = await server.waitForLog(/0 DH client\(s\), 0 pending LOD request\(s\)/, 5000, statusFrom);
-        expect(status).toMatch(/Capture budget \d+\/8192 block samples\/tick at \d+(?:\.\d+)? MSPT/);
+        const status = await server.waitForLog(
+            /0 Distant Horizons client\(s\), 0 pending LOD request\(s\)/,
+            5000,
+            statusFrom
+        );
+        expect(status).toContain('pending LOD request(s)');
+        const budget = await server.waitForLog(
+            /Capture budget \d+\/8192 block samples\/tick at \d+(?:\.\d+)? MSPT/,
+            5000,
+            statusFrom
+        );
+        expect(budget).toMatch(/Capture budget \d+\/8192 block samples\/tick at \d+(?:\.\d+)? MSPT/);
         const cacheStatusFrom = server.lines.length;
         server.command('dhs cache status');
         await server.waitForLog(/Memory cache: 0\/128 entries/, 5000, cacheStatusFrom);

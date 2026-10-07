@@ -217,4 +217,16 @@ describe('the /dhs commands', () => {
             'Radius must be between 0 and 16384 LOD sections.'
         );
     });
+
+    it('sends status details as separate chat-sized lines', () => {
+        const { host, root } = setup();
+        const status = host.run(root, ['dhs', 'status']).map((line) => line.replace(/§./g, ''));
+
+        expect(status).toHaveLength(5);
+        expect(status[0]).toContain('0 Distant Horizons client(s), 0 pending LOD request(s)');
+        expect(status.some((line) => line.includes('Capture budget 8192/8192 block samples/tick at 0.0 MSPT'))).toBe(
+            true
+        );
+        expect(status.every((line) => line.length <= 120)).toBe(true);
+    });
 });

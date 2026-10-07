@@ -249,7 +249,7 @@ describe('DH sessions', () => {
         f.sessions.tick(f.peers);
 
         expect(f.reads()).toBe(64);
-        expect(f.sessions.status()).toContain('0 DH client(s), 0 pending LOD request(s)');
+        expect(f.sessions.status()).toContain('0 Distant Horizons client(s), 0 pending LOD request(s)');
     });
     it('drains two full-height captures at the default tick budget instead of scanning empty sky', () => {
         const f = fixture();
@@ -504,7 +504,7 @@ describe('DH sessions', () => {
         expect(f.ids()).toEqual([6]);
         expect(f.files.list('cache')).toHaveLength(0);
         f.sessions.left('Alice');
-        expect(f.sessions.status()).toContain('0 DH client');
+        expect(f.sessions.status()).toContain('0 Distant Horizons client');
     });
     it('enforces work and transfer budgets and prevents obsolete captures after changes', () => {
         const f = fixture();
@@ -537,6 +537,6 @@ describe('DH sessions', () => {
         f.sent.length = 0;
         f.sessions.receive(f.peer, new Uint8Array([0]));
         expect(f.ids()).toEqual([1]);
-        expect(f.sessions.status()).toContain('0 DH client');
+        expect(f.sessions.status()).toContain('0 Distant Horizons client');
     });
 });
