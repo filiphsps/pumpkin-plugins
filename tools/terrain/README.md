@@ -4,6 +4,8 @@ MIT-licensed terrain capture primitives and chunk access contracts for Pumpkin p
 
 `TerrainCapture` samples rectangular regions within a caller-provided per-step budget, groups material runs into columns, and can skip empty blocks above a height bound.
 
+`AdaptiveWorkBudget` scales an incremental work limit using rolling server MSPT and measured work cost, while honoring a caller-provided ceiling. It is suitable for terrain capture or other shared server-side workloads that should use spare tick time and back off under load.
+
 `ChunkLoader` and `TerrainGenerator` define provider interfaces. `acquireChunk` checks already-loaded chunks, requests saved chunk loading, and requests generation when the saved chunk is missing or loading is unavailable. Exported unavailable providers make platforms without these capabilities explicit.
 
 This package is internal to the repository and is not published to npm. See the
