@@ -137,7 +137,8 @@ Settings live in `plugins/data/UPnPumpkin/config.toml`. The plugin creates the f
 | `plugins.allow_requests` | boolean | `true` | Let other plugins ask for ports to be opened, for example BedrockAddonManager for its pack downloads. They are closed again when the plugin stops asking. |
 | `plugins.max_requests_per_plugin` | integer | `16` | How many ports each plugin may keep open at once. Every plugin has its own limit. |
 
-A fresh install gets this file:
+<details>
+<summary>A fresh install gets this file:</summary>
 
 ```toml
 # UPnPumpkin configuration.
@@ -195,4 +196,5 @@ allow_requests = true
 # How many ports each plugin may keep open at once. Every plugin has its own limit.
 max_requests_per_plugin = 16
 ```
+</details>
 <!-- docs:end config -->

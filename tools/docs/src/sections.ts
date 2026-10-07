@@ -90,10 +90,12 @@ function renderConfig({ name, config }: PluginInfo): string {
                   )
               ]),
         '',
-        'A fresh install gets this file:',
+        '<details>',
+        '<summary>A fresh install gets this file:</summary>',
         '',
         '```toml',
         config.defaultContents.replace(/\n+$/, ''),
-        '```'
+        '```',
+        '</details>'
     ].join('\n');
 }

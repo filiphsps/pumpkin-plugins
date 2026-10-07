@@ -71,7 +71,8 @@ Settings live in `plugins/data/DistantHorizonsSupportPumpkin/config.toml`. The p
 | `support.refresh_seconds` | integer | `30` | Rebuild cached sections after this age when all their chunks are loaded. |
 | `worlds."<world>".height` | integer | none | World height in blocks above its minimum Y. |
 
-A fresh install gets this file:
+<details>
+<summary>A fresh install gets this file:</summary>
 
 ```toml
 # DistantHorizonsSupportPumpkin configuration.
@@ -119,6 +120,7 @@ refresh_seconds = 30
 # [worlds."world"]
 # height = 384  # World height in blocks above its minimum Y.
 ```
+</details>
 <!-- docs:end config -->
 
 ## Compatibility and terrain

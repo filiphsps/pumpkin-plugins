@@ -77,7 +77,8 @@ Settings live in `plugins/data/DynamicLightsPumpkin/config.toml`. The plugin cre
 | `entities.refresh_interval_ticks` | integer | `10` | Ticks between nearby-entity refreshes. Higher values reduce work but make moving lights less smooth. |
 | `entity_sources."<entity type>".light_level` | integer | none | Light emitted by this entity type, from 0 through 15. |
 
-A fresh install gets this file:
+<details>
+<summary>A fresh install gets this file:</summary>
 
 ```toml
 # DynamicLightsPumpkin configuration.
@@ -191,4 +192,5 @@ light_level = 8
 [entity_sources."glow-squid"]
 light_level = 8
 ```
+</details>
 <!-- docs:end config -->

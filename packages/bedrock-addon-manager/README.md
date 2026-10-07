@@ -75,7 +75,8 @@ Settings live in `plugins/data/BedrockAddonManager/config.toml`. The plugin crea
 | `overrides."<file>".content_key` | string | none | Decryption key for an encrypted pack. |
 | `overrides."<file>".content_id` | string | none | Content identifier of the pack. |
 
-A fresh install gets this file:
+<details>
+<summary>A fresh install gets this file:</summary>
 
 ```toml
 # BedrockAddonManager configuration.
@@ -133,4 +134,5 @@ force = false
 # content_key = "..."  # Decryption key for an encrypted pack.
 # content_id = "..."  # Content identifier of the pack.
 ```
+</details>
 <!-- docs:end config -->
