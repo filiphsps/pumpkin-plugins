@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { publicKeyOf, signWasm, verifyWasm } from '../../../tools/signing/src/index.ts';
-import { getInput } from './utils.mjs';
+import { getInput } from '../../common/src/utils.mjs';
 
 const pluginName = getInput('plugin-name').trim();
 const version = getInput('version').trim();

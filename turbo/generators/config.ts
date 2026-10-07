@@ -7,16 +7,7 @@ const KEBAB_CASE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const PASCAL_CASE = /^[A-Z][A-Za-z0-9]*$/;
 // Same limit as scripts/package-metadata.mjs, which checks every package.json.
 const MAX_DESCRIPTION = 70;
-const ACTION_FILES = [
-    'README.md',
-    'CHANGELOG.md',
-    'version.txt',
-    'action.yml',
-    'src/index.mjs',
-    'src/index.test.mjs',
-    'src/utils.mjs',
-    'src/utils.test.mjs'
-];
+const ACTION_FILES = ['README.md', 'CHANGELOG.md', 'version.txt', 'action.yml', 'src/index.mjs', 'src/index.test.mjs'];
 
 const FILES = [
     'README.md',

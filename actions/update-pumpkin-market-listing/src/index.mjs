@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { getInput, setOutput } from './utils.mjs';
+import { getInput, setOutput } from '../../common/src/utils.mjs';
 
 const pluginName = getInput('plugin-name').trim();
 const pluginId = getInput('plugin-id').trim();

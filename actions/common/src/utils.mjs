@@ -12,6 +12,6 @@ export function setOutput(name, value) {
     const outputFile = process.env.GITHUB_OUTPUT;
     if (!outputFile) return;
 
-    const delimiter = `ghadelimiter_${randomUUID()}`;
+    const delimiter = `ghadelimiter_${randomUUID()}`; // cspell:disable-line
     fs.appendFileSync(outputFile, `${name}<<${delimiter}\n${value}\n${delimiter}\n`);
 }

@@ -83,6 +83,6 @@ metadata file when a field needs an explicit empty value.
 
 Add inputs and outputs in `action.yml`, implement the behavior in `src/index.mjs`, and cover it with
 tests in `src/*.test.mjs`. Input and output tables are generated from `action.yml`; run `pnpm readme`
-after changing the action metadata. Read inputs with `getInput()` from `src/utils.mjs` so hyphenated
-input names keep matching GitHub's runner environment. The action runs on GitHub's Node 24 runtime
-and needs no separate build step.
+after changing the action metadata. Read inputs with `getInput()` from
+`../../common/src/utils.mjs` so hyphenated input names keep matching GitHub's runner environment.
+The action runs on GitHub's Node 24 runtime and needs no separate build step.

@@ -8,13 +8,13 @@ import { getInput, setOutput } from './utils.mjs';
 const hyphenatedKey = 'INPUT_ACTION-TEST-HYPHENATED-NAME';
 const underscoreKey = 'INPUT_ACTION_TEST_HYPHENATED_NAME';
 const spacedKey = 'INPUT_ACTION_TEST-SPACED-NAME';
-const outputPath = path.join(os.tmpdir(), `pumpkin-publish-output-${process.pid}`);
-const previousOutput = process.env.GITHUB_OUTPUT;
 const previousValues = new Map([
     [hyphenatedKey, process.env[hyphenatedKey]],
     [underscoreKey, process.env[underscoreKey]],
     [spacedKey, process.env[spacedKey]]
 ]);
+const outputDirs = [];
+const previousOutput = process.env.GITHUB_OUTPUT;
 
 afterEach(() => {
     for (const [key, value] of previousValues) {
@@ -23,10 +23,10 @@ afterEach(() => {
     }
     if (previousOutput === undefined) delete process.env.GITHUB_OUTPUT;
     else process.env.GITHUB_OUTPUT = previousOutput;
-    fs.rmSync(outputPath, { force: true });
+    for (const dir of outputDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-describe('action input utilities', () => {
+describe('shared action utilities', () => {
     it('preserves hyphens in GitHub input environment names', () => {
         process.env[hyphenatedKey] = 'hyphenated value';
         process.env[underscoreKey] = 'wrong underscore value';
@@ -40,13 +40,17 @@ describe('action input utilities', () => {
         assert.equal(getInput('action test-spaced-name'), 'spaced value');
     });
 
-    it('writes outputs using a delimiter-safe GitHub output file entry', () => {
-        process.env.GITHUB_OUTPUT = outputPath;
-        setOutput('listing-name', 'A listing\nwith more than one line');
+    it('writes outputs with a delimiter-safe GitHub output file entry', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'action-utils-'));
+        outputDirs.push(dir);
+        const outputFile = path.join(dir, 'github-output');
+        process.env.GITHUB_OUTPUT = outputFile;
 
-        const output = fs.readFileSync(outputPath, 'utf8');
-        const [, delimiter] = output.match(/^listing-name<<([^\n]+)$/m) ?? [];
-        assert.ok(delimiter);
-        assert.equal(output, `listing-name<<${delimiter}\nA listing\nwith more than one line\n${delimiter}\n`);
+        setOutput('action-test-result', 'first line\nsecond line');
+
+        const contents = fs.readFileSync(outputFile, 'utf8');
+        const match = /^action-test-result<<([^\n]+)\n([\s\S]*?)\n\1\n$/.exec(contents);
+        assert.ok(match, 'output should use the GitHub Actions multiline format');
+        assert.equal(match[2], 'first line\nsecond line');
     });
 });

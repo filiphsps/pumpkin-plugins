@@ -16,7 +16,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
 | 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
-| 🧪 Action tests | action code changes | `.github/workflows/actions.yml` lints and tests only the changed action, then uploads its c8 coverage to Codecov; tests live in `actions/{name}/src/*.test.mjs` |
+| 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or `actions/common/` for shared helpers, then uploads c8 coverage to Codecov |
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after lint and typecheck | Builds and collects every plugin, then signs and verifies them with the reusable action before upload |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
@@ -40,7 +40,8 @@ the push's `before` commit). Markdown, `docs/`, component-level `docs/` folders 
 changes are documentation. Changes under `actions/{name}/` are reported separately from plugin and repository code. An action-only
 change skips the plugin build, integration suites and repository test jobs; the Actions workflow
 tests only that action when its code changes. Action tests live beside their implementation in
-`actions/{name}/src/*.test.mjs`. README, changelog and version-file-only changes skip action tests.
+`actions/{name}/src/*.test.mjs`; shared helper tests live in `actions/common/src/*.test.mjs`. README,
+changelog and version-file-only changes skip action tests.
 A docs-only change triggers the separate Docs workflow, which checks the docs and builds the site;
 GitHub's path filters skip the main CI workflow and the Actions workflow. Mixed changes still run the
 relevant code or action checks.
@@ -91,6 +92,10 @@ commits. Merging a plugin release PR:
 Merging an action release PR updates its `version.txt` and `CHANGELOG.md`, tags it
 `<folder>-v<version>`, and creates a GitHub release. Action releases do not run plugin packaging,
 attach WebAssembly files, or publish to Pumpkin Market.
+
+Actions import shared runtime helpers from `actions/common/src/`. Each action tag contains its own
+snapshot of those files, so changes to a shared helper must also include releasable changes under
+each consuming action directory to publish the updated helper with those actions.
 
 The merge of a release PR is a commit of its own, so the push it triggers starts a run while the run
 for the commit before the merge can still be going. Whichever reaches the release job first creates
@@ -229,8 +234,9 @@ component, the `simple` release strategy, and a first-release pin:
 > [!IMPORTANT]
 > **Preserve hyphens in GitHub Action input names.** The runner maps `plugin-name` to the environment
 > variable `INPUT_PLUGIN-NAME`: it uppercases input names and replaces spaces with underscores, but
-> keeps hyphens. In JavaScript actions, use the standard `getInput()` helper generated in
-> `src/utils.mjs` and pass the input name exactly as declared, such as `getInput('plugin-name')`.
+> keeps hyphens. In JavaScript actions, import the shared `getInput()` helper from
+> `actions/common/src/utils.mjs` and pass the input name exactly as declared, such as
+> `getInput('plugin-name')`.
 > Do not pass `PLUGIN_NAME` or normalize hyphens to underscores; required inputs will appear empty.
 > Action tests must use the runner's hyphenated environment keys (for example,
 > `'INPUT_PLUGIN-NAME'`) so this behavior stays covered.
