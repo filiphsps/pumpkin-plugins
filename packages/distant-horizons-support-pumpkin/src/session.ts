@@ -227,6 +227,7 @@ export class Sessions {
             this.lastServerMspt = serverMspt;
         }
         let cacheChecks = 0;
+        let availabilityChecks = 0;
         let builderStepped = false;
         const blocksBudget = forcedWork ? 0 : this.workBudget.next(serverMspt, this.settings.blocks_per_tick);
         this.lastBlocksBudget = blocksBudget;
@@ -274,6 +275,19 @@ export class Sessions {
                             return;
                         }
                     }
+                    const region = {
+                        originX: request.section.x * SECTION_SIZE_BLOCKS,
+                        originZ: request.section.z * SECTION_SIZE_BLOCKS,
+                        width: SECTION_SIZE_BLOCKS,
+                        depth: SECTION_SIZE_BLOCKS,
+                        minY: peer.terrain.minY,
+                        height: peer.terrain.height
+                    };
+                    if (availabilityChecks >= this.settings.cached_requests_per_tick) return;
+                    availabilityChecks++;
+                    const prepared = peer.terrain.prepare?.(region);
+                    if (prepared?.status === 'pending') return;
+                    if (prepared && prepared.status !== 'ready') throw new Error(prepared.reason);
                     if (
                         !request.builder &&
                         this.captureRequestCount(request.name, request) >= this.settings.requests_per_player
@@ -286,17 +300,6 @@ export class Sessions {
                         return;
                     }
                     builderStepped = true;
-                    const region = {
-                        originX: request.section.x * SECTION_SIZE_BLOCKS,
-                        originZ: request.section.z * SECTION_SIZE_BLOCKS,
-                        width: SECTION_SIZE_BLOCKS,
-                        depth: SECTION_SIZE_BLOCKS,
-                        minY: peer.terrain.minY,
-                        height: peer.terrain.height
-                    };
-                    const prepared = peer.terrain.prepare?.(region);
-                    if (prepared?.status === 'pending') return;
-                    if (prepared && prepared.status !== 'ready') throw new Error(prepared.reason);
                     request.builder ??= new LodBuilder(request.section, peer.terrain.minY, peer.terrain.height);
                     const measured = measureTerrainSource(peer.terrain);
                     const started = this.measureNow();

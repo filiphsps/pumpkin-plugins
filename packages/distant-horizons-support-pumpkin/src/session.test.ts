@@ -344,6 +344,56 @@ describe('DH protocol contracts', () => {
 });
 
 describe('DH sessions', () => {
+    it('rejects unavailable requests at zero capture budget and then serves cached data', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 64;
+        f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
+        let prepareCalls = 0;
+        f.peer.terrain.prepare = () => {
+            prepareCalls++;
+            return { status: 'unavailable', reason: 'Chunk is not loaded' };
+        };
+        let tracker = 1;
+        for (let x = -8; x <= 8; x++) {
+            if (x === 0) continue;
+            f.sessions.receive(f.peer, f.request(tracker++, 'world', x));
+        }
+
+        for (let tick = 0; tick < 600; tick++) f.sessions.tick(f.peers, 45);
+
+        expect(f.sessions.status()).toContain('0 pending LOD request(s)');
+        expect(prepareCalls).toBe(16);
+        expect(f.reads()).toBe(0);
+        expect(f.ids().filter((id) => id === 6)).toHaveLength(16);
+        expect(f.cache.has('world:0:0')).toBe(true);
+
+        f.sent.length = 0;
+        f.sessions.receive(f.peer, f.request(25));
+        f.sessions.tick(f.peers, 45);
+
+        expect(f.ids()).toEqual([10, 8]);
+        expect(prepareCalls).toBe(16);
+    });
+
+    it('rejects a partially built section that becomes unavailable while sampling is suspended', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 64;
+        let available = true;
+        f.peer.terrain.prepare = () =>
+            available ? { status: 'ready' } : { status: 'unavailable', reason: 'Chunk became unloaded' };
+        f.sessions.receive(f.peer, f.request());
+        f.sessions.tick(f.peers, 0);
+        expect(f.reads()).toBe(64);
+        available = false;
+
+        f.sessions.tick(f.peers, 45);
+
+        expect(f.ids()).toContain(6);
+        expect(f.reads()).toBe(64);
+        expect(f.cache.has('world:0:0')).toBe(false);
+        expect(f.sessions.status()).toContain('0 pending LOD request(s)');
+    });
+
     it('runs forced captures at their fixed budget ahead of DH capture work', () => {
         const f = fixture();
         f.settings.blocks_per_tick = 64;
@@ -403,8 +453,8 @@ describe('DH sessions', () => {
         f.sessions.receive(f.peer, f.request(2));
         f.sessions.tick(f.peers);
         expect(f.reads()).toBe(0);
-        expect(f.sessions.status()).toContain('1 pending');
-        expect(f.sessions.status()).toContain('1 worker tick(s), 0 served, 1 rejected');
+        expect(f.sessions.status()).toContain('0 pending');
+        expect(f.sessions.status()).toContain('1 worker tick(s), 0 served, 2 rejected');
         expect(f.sessions.status()).toContain('Chunk 3, 3 is not loaded');
         f.sessions.tick(f.peers);
         expect(f.sessions.status()).toContain('0 pending');
