@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3](https://github.com/filiphsps/pumpkin-plugins/compare/publish-to-pumpkin-market-v0.0.2...publish-to-pumpkin-market-v0.0.3) (2026-10-07)
+
+
+### Features
+
+* **actions:** update Pumpkin Market listing metadata ([6d61c01](https://github.com/filiphsps/pumpkin-plugins/commit/6d61c012d902a4ceadb0cae71c6e6643e549b0f8))
+* **docs:** add grouped responsive navigation ([1fbf8b5](https://github.com/filiphsps/pumpkin-plugins/commit/1fbf8b586393b28132e3eedaf8543429ef9d8544))
+
 ## [0.0.2](https://github.com/filiphsps/pumpkin-plugins/compare/publish-to-pumpkin-market-v0.0.1...publish-to-pumpkin-market-v0.0.2) (2026-10-06)
 
 
