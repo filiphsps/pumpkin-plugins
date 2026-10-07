@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.5](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.3...distant-horizons-support-pumpkin-v0.0.5) (2026-10-07)
+
+
+### chore
+
+* prepare Distant Horizons 0.0.5 recovery release ([fb3712e](https://github.com/filiphsps/pumpkin-plugins/commit/fb3712ed8e34dfcbf34b636d64c45ff43f71de41))
+
+
+### Features
+
+* **docs:** add generated documentation site ([545c749](https://github.com/filiphsps/pumpkin-plugins/commit/545c74944f65e38fb927fcde588fd17848298cf8))
+* **docs:** add grouped responsive navigation ([1fbf8b5](https://github.com/filiphsps/pumpkin-plugins/commit/1fbf8b586393b28132e3eedaf8543429ef9d8544))
+* **docs:** publish plugin icons in navigation ([73655b5](https://github.com/filiphsps/pumpkin-plugins/commit/73655b5ea4b73e107eb4ca13b47bdea07070b727))
+
 ## [0.0.4](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.3...distant-horizons-support-pumpkin-v0.0.4) (2026-10-07)
 
 
