@@ -9,7 +9,7 @@ on each Java Edition client. Bedrock players do not establish Distant Horizons s
 ## Install the server plugin
 
 1. Download the latest
-   [Distant Horizons support release](https://github.com/filiphsps/pumpkin-plugins/releases).
+   [Distant Horizons Support release](https://github.com/filiphsps/pumpkin-plugins/releases).
 2. Put `distant-horizons-support-pumpkin.wasm` in the Pumpkin server's `plugins/` folder.
 3. Start or restart the server. The first load asks for the data-folder permissions listed in the
    generated [Permissions](../README.md#permissions) reference. Approve them from the server

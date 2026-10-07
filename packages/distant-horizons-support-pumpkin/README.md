@@ -77,7 +77,7 @@ A fresh install gets this file:
 # DistantHorizonsSupportPumpkin configuration.
 # Changes apply after a server restart. Invalid files are left untouched.
 
-# Distant Horizons support limits.
+# Distant Horizons Support limits.
 [support]
 
 # Optional globally unique server key. Empty uses the client connection address.

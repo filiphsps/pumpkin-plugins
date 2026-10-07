@@ -14,7 +14,7 @@ import { PLUGIN_NAME } from '../name.ts';
 /** Settings for bounded LOD requests and the identity announced to DH clients. */
 export const schema = defineConfig(PLUGIN_NAME, {
     support: section({
-        description: 'Distant Horizons support limits.',
+        description: 'Distant Horizons Support limits.',
         fields: {
             server_key: str({
                 description: 'Optional globally unique server key. Empty uses the client connection address.',
