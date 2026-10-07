@@ -625,6 +625,7 @@ export default defineConfig({
     ],
     rewrites,
     ignoreDeadLinks: [/README(?:\.md)?$/],
+    head: [['meta', { name: 'google-site-verification', content: 'Ac8kmcoez1w3jlR5BxcQ8mBc5f0gcZ4s40xNXad4804' }]],
     title: 'Pumpkin Plugins',
     description: 'Guides and references for Pumpkin plugins, actions, and developer tools.',
     cleanUrls: true,
