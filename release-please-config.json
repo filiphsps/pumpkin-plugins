@@ -35,8 +35,7 @@
         },
         "actions/verify-pumpkin-plugin": {
             "component": "verify-pumpkin-plugin",
-            "release-type": "simple",
-            "release-as": "0.0.1"
+            "release-type": "simple"
         }
     },
     "changelog-sections": [
