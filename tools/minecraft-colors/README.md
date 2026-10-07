@@ -3,27 +3,32 @@
 Chalk-like formatting for Minecraft strings, with no runtime dependencies.
 
 ```ts
-import { color, colorTable } from '@pumpkin-plugins/minecraft-colors';
+import { ansi, color, colorTable, minecraftColorTable } from '@pumpkin-plugins/minecraft-colors';
 
 `Memory cache: ${color.aqua('100 B')}`;
 color.gold.bold('The server is restarting');
 color.hex('#12abef').underline('Custom color');
 color.named.name('Pumpkin');
 color.named.permission('plugin.manage');
-colorTable(); // Log this string when debugging the palette.
+ansi.named.name('Pumpkin'); // ANSI color for console logs.
+colorTable(); // Log this terminal table when debugging the palette.
+minecraftColorTable(); // Legacy codes for Minecraft text.
 ```
 
-The formatter returns section-sign codes such as `§b100 B`. Named colors use Minecraft's 16 legacy
-colors. `hex()` emits the `§x` RGB format; modifiers are `bold`, `italic`, `underline`,
-`strikethrough` and `obfuscated`. Styled strings end with `§r` to reset their formatting.
+`color` returns section-sign codes such as `§b100 B`, which Pumpkin can parse in chat replies.
+`ansi` returns ANSI terminal codes for console output. Both formatters use Minecraft's 16 legacy
+colors and share the same named roles. `color.hex()` emits the `§x` RGB format; `ansi.hex()` emits
+ANSI true color. Modifiers are `bold`, `italic`, `underline`, `strikethrough` and `obfuscated`.
+Styled strings end with the appropriate reset code for their output format.
 
 Colors and modifiers can be chained in either order. When multiple colors are chained, the last
 color wins. Invalid hex colors throw a `RangeError`.
 
 Use `color.named` for common value roles: `value` is gold, `name` and `url` are dark aqua,
-`namespace` is dark green, `version` is green, and `permission`, `port`, `uuid` and `identifier` are
-yellow. Permissions are bold. `colorTable()` returns a multiline table with every legacy color
-shown in its own color, both normally and in bold; it is intended for debug output.
+`namespace` is dark green, `version` is green, `number` is blue, `permission` is bold yellow,
+`port`, `uuid` and `identifier` are yellow, and `error` is bold dark red. `colorTable()` returns a
+multiline terminal table with every color shown in its own color, both normally and in bold.
+`minecraftColorTable()` returns the same table with Minecraft legacy codes.
 
 Pumpkin's native `TextComponent` API can style components directly with named colors, RGB, gradients
 and rainbow effects. The plugin-kit command helpers parse returned strings with

@@ -25,6 +25,33 @@ const FORMATS = {
     italic: 'o'
 } as const;
 
+const ANSI_COLORS = {
+    black: 30,
+    darkBlue: 34,
+    darkGreen: 32,
+    darkAqua: 36,
+    darkRed: 31,
+    darkPurple: 35,
+    gold: 33,
+    gray: 37,
+    darkGray: 90,
+    blue: 94,
+    green: 92,
+    aqua: 96,
+    red: 91,
+    lightPurple: 95,
+    yellow: 93,
+    white: 97
+} as const satisfies Record<keyof typeof COLORS, number>;
+
+const ANSI_FORMATS = {
+    obfuscated: 8,
+    bold: 1,
+    strikethrough: 9,
+    underline: 4,
+    italic: 3
+} as const satisfies Record<keyof typeof FORMATS, number>;
+
 const NAMED_COLORS = {
     error: { color: 'darkRed', format: 'bold' },
     identifier: { color: 'yellow' },
@@ -42,42 +69,54 @@ const NAMED_COLORS = {
 type MinecraftColor = keyof typeof COLORS;
 type MinecraftFormat = keyof typeof FORMATS;
 type MinecraftNamedRole = keyof typeof NAMED_COLORS;
-type MinecraftFormatter = ((text: string | number) => string) & {
-    readonly [Key in MinecraftColor | MinecraftFormat]: MinecraftFormatter;
+type TextFormatter = ((text: string | number) => string) & {
+    readonly [Key in MinecraftColor | MinecraftFormat]: TextFormatter;
 } & {
-    hex(color: string): MinecraftFormatter;
+    hex(color: string): TextFormatter;
 };
-type NamedFormatters = { readonly [Role in MinecraftNamedRole]: MinecraftFormatter };
-type MinecraftColorApi = MinecraftFormatter & { readonly named: NamedFormatters };
+type NamedFormatters = { readonly [Role in MinecraftNamedRole]: TextFormatter };
+type ColorApi = TextFormatter & { readonly named: NamedFormatters };
+type FormatterOutput = 'minecraft' | 'ansi';
 
 interface FormatterState {
-    colorPrefix?: string;
+    legacyColorPrefix?: string;
+    ansiColorPrefix?: string;
     formats: readonly MinecraftFormat[];
 }
 
-function createFormatter(state: FormatterState = { formats: [] }): MinecraftFormatter {
+function createFormatter(output: FormatterOutput, state: FormatterState = { formats: [] }): TextFormatter {
     const formatter = ((text: string | number) => {
         text = String(text);
 
-        if (state.colorPrefix === undefined && state.formats.length === 0) return text;
+        if (state.legacyColorPrefix === undefined && state.ansiColorPrefix === undefined && state.formats.length === 0)
+            return text;
 
-        const formatCodes = (Object.keys(FORMATS) as MinecraftFormat[])
-            .filter((format) => state.formats.includes(format))
-            .map((format) => `§${FORMATS[format]}`)
-            .join('');
-        return `${state.colorPrefix ?? ''}${formatCodes}${text}§r`;
-    }) as MinecraftFormatter;
+        const formats = (Object.keys(FORMATS) as MinecraftFormat[]).filter((format) => state.formats.includes(format));
+        if (output === 'ansi') {
+            const codes: number[] = formats.map((format) => ANSI_FORMATS[format]);
+            if (state.ansiColorPrefix !== undefined) codes.push(...state.ansiColorPrefix.split(';').map(Number));
+            return `\u001b[${codes.join(';')}m${text}\u001b[0m`;
+        }
+
+        const formatCodes = formats.map((format) => `§${FORMATS[format]}`).join('');
+        return `${state.legacyColorPrefix ?? ''}${formatCodes}${text}§r`;
+    }) as TextFormatter;
 
     for (const color of Object.keys(COLORS) as MinecraftColor[]) {
         Object.defineProperty(formatter, color, {
-            get: () => createFormatter({ ...state, colorPrefix: `§${COLORS[color]}` })
+            get: () =>
+                createFormatter(output, {
+                    ...state,
+                    legacyColorPrefix: `§${COLORS[color]}`,
+                    ansiColorPrefix: String(ANSI_COLORS[color])
+                })
         });
     }
 
     for (const format of Object.keys(FORMATS) as MinecraftFormat[]) {
         Object.defineProperty(formatter, format, {
             get: () =>
-                createFormatter({
+                createFormatter(output, {
                     ...state,
                     formats: state.formats.includes(format) ? state.formats : [...state.formats, format]
                 })
@@ -89,42 +128,62 @@ function createFormatter(state: FormatterState = { formats: [] }): MinecraftForm
             const digits = color.startsWith('#') ? color.slice(1) : color;
             if (!/^[\da-f]{6}$/i.test(digits)) throw new RangeError('Expected a six-digit hex color');
 
-            const colorPrefix = `§x${[...digits.toLowerCase()].map((digit) => `§${digit}`).join('')}`;
-            return createFormatter({ ...state, colorPrefix });
+            const hexDigits = [...digits.toLowerCase()];
+            const legacyColorPrefix = `§x${hexDigits.map((digit) => `§${digit}`).join('')}`;
+            const ansiColorPrefix = `38;2;${parseInt(digits.slice(0, 2), 16)};${parseInt(digits.slice(2, 4), 16)};${parseInt(digits.slice(4, 6), 16)}`;
+            return createFormatter(output, { ...state, legacyColorPrefix, ansiColorPrefix });
         }
     });
 
     return formatter;
 }
 
-/** Formats strings with Minecraft's legacy color and text style codes. */
-export const color = createFormatter() as MinecraftColorApi;
+/** Formats Minecraft strings with legacy section-sign color and text style codes. */
+export const color = createFormatter('minecraft') as ColorApi;
 
-Object.defineProperty(color, 'named', {
-    value: Object.fromEntries(
-        Object.entries(NAMED_COLORS).map(([role, definition]) => {
-            const formats = 'format' in definition ? [definition.format] : [];
-            return [
-                role,
-                createFormatter({
-                    colorPrefix: `§${COLORS[definition.color]}`,
-                    formats
-                })
-            ];
-        })
-    ),
-    enumerable: true
-});
+/** Formats terminal strings with ANSI colors mapped from Minecraft's palette and named roles. */
+export const ansi = createFormatter('ansi') as ColorApi;
 
-/** Returns an ASCII table previewing every legacy color in normal and bold text. */
+function addNamedFormatters(formatter: ColorApi, output: FormatterOutput): void {
+    Object.defineProperty(formatter, 'named', {
+        value: Object.fromEntries(
+            Object.entries(NAMED_COLORS).map(([role, definition]) => {
+                const formats = 'format' in definition ? [definition.format] : [];
+                return [
+                    role,
+                    createFormatter(output, {
+                        legacyColorPrefix: `§${COLORS[definition.color]}`,
+                        ansiColorPrefix: String(ANSI_COLORS[definition.color]),
+                        formats
+                    })
+                ];
+            })
+        ),
+        enumerable: true
+    });
+}
+
+addNamedFormatters(color, 'minecraft');
+addNamedFormatters(ansi, 'ansi');
+
+/** Returns a terminal table previewing every color in normal and bold text. */
 export function colorTable(): string {
+    return makeColorTable(ansi);
+}
+
+/** Returns a table previewing every color with Minecraft's legacy codes. */
+export function minecraftColorTable(): string {
+    return makeColorTable(color);
+}
+
+function makeColorTable(formatter: ColorApi): string {
     const colors = Object.keys(COLORS) as MinecraftColor[];
     const nameWidth = Math.max(...colors.map((color) => color.length));
     const header = `Color${' '.repeat(nameWidth - 'Color'.length)} | Bold`;
     const divider = `${'-'.repeat(nameWidth)}-+-${'-'.repeat(nameWidth)}`;
     const rows = colors.map((colorName) => {
-        const sample = color[colorName](colorName);
-        const boldSample = color[colorName].bold(colorName);
+        const sample = formatter[colorName](colorName);
+        const boldSample = formatter[colorName].bold(colorName);
         return `${sample}${' '.repeat(nameWidth - colorName.length)} | ${boldSample}`;
     });
 
