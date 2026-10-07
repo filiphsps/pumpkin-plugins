@@ -103,7 +103,7 @@ function actionScalar(contents: string, key: 'name' | 'description', file: strin
                 if (body.length) body.push('');
                 continue;
             }
-            const indent = line.match(/^ */)?.[0].length ?? 0;
+            const indent = line.length - line.trimStart().length;
             if (!indent) break;
             body.push(line.slice(indent));
         }
