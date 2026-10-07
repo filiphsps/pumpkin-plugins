@@ -28,8 +28,10 @@ describe(info.name, () => {
         expect(config).toContain('cached_packets_per_tick = 64');
         expect(config).toContain('memory_cache_entries = 128');
         expect(config).toContain('disk_cache_entries = 4096');
+        const statusFrom = server.lines.length;
         server.command('dhs status');
-        await server.waitForLog(/0 DH client\(s\), 0 pending LOD request\(s\)/);
+        const status = await server.waitForLog(/0 DH client\(s\), 0 pending LOD request\(s\)/, 5000, statusFrom);
+        expect(status).toMatch(/Capture budget \d+\/8192 block samples\/tick at \d+(?:\.\d+)? MSPT/);
         const cacheStatusFrom = server.lines.length;
         server.command('dhs cache status');
         await server.waitForLog(/Memory cache: 0\/128 entries/, 5000, cacheStatusFrom);
@@ -37,6 +39,9 @@ describe(info.name, () => {
         const cacheClearFrom = server.lines.length;
         server.command('dhs cache clear');
         await server.waitForLog(/Cleared 0 in-memory and 0 disk cache entries/, 5000, cacheClearFrom);
+        const mapFrom = server.lines.length;
+        server.command('dhs map at-radius 0 0 0');
+        await server.waitForLog(/Run this command as a player so the current world is known/, 5000, mapFrom);
         // A successful load alone does not prove that the worker's event is being dispatched.
         await vi.waitFor(
             async () => {
@@ -55,7 +60,7 @@ describe(info.name, () => {
             plugins: [builtPluginPath(process.cwd())],
             files: {
                 [`plugins/data/${info.name}/config.toml`]:
-                    '[support]\nrender_distance = 256\nserver_key = "integration-test"\ncache_entries = 512\n'
+                    '[support]\nrender_distance = 256\nserver_key = "integration-test"\nblocks_per_tick = 32768\ncache_entries = 512\n'
             }
         });
         try {
@@ -63,7 +68,7 @@ describe(info.name, () => {
             const config = await readFile(path.join(custom.pluginDataDir(info.name), 'config.toml'), 'utf8');
             expect(config).toContain('render_distance = 256');
             expect(config).toContain('server_key = "integration-test"');
-            expect(config).toContain('blocks_per_tick = 8192');
+            expect(config).toContain('blocks_per_tick = 32768');
             expect(config).toContain('memory_cache_entries = 512');
             expect(config).toContain('disk_cache_entries = 512');
             expect(config).not.toMatch(/^cache_entries =/m);
