@@ -1,4 +1,4 @@
-import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { FakeIgd, FakeNetwork } from '@pumpkin-plugins/port-mapping/testing';
 import {
@@ -40,7 +40,7 @@ describe('PortForwarder', () => {
         const { files, log, forwarder, settle, keys } = setup();
         forwarder.start();
         expect(files.text(CONFIG_FILE)).toContain('[java]');
-        expect(log.of('info')).toContain(`Created ${colorLogValue('config.toml', 'cyan')} with the default settings.`);
+        expect(log.of('info')).toContain(`Created ${ansi.named.name('config.toml')} with the default settings.`);
 
         settle(() => keys().length === 2);
         expect(keys()).toEqual(['tcp:25565', 'udp:19132']);
@@ -104,7 +104,7 @@ describe('PortForwarder', () => {
             });
             expect(keys()).toEqual(['tcp:8123']);
             expect(log.of('info')).toContain(
-                `${colorLogValue('BedrockAddonManager', 'cyan')} asked for TCP port ${colorLogValue('8123', 'yellow')} to be opened (Packs).`
+                `${ansi.named.name('BedrockAddonManager')} asked for TCP port ${ansi.named.port('8123')} to be opened (Packs).`
             );
         });
 
@@ -222,9 +222,7 @@ describe('PortForwarder', () => {
             }
             settle(() => keys().length === 1);
             expect(keys()).toEqual(['tcp:2222']);
-            expect(log.of('info')).toContain(
-                `${colorLogValue('Gone', 'cyan')} stopped asking, so its port was closed.`
-            );
+            expect(log.of('info')).toContain(`${ansi.named.name('Gone')} stopped asking, so its port was closed.`);
         });
     });
 

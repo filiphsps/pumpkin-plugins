@@ -1,5 +1,6 @@
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import type { DataFiles } from '@pumpkin-plugins/plugin-kit/files';
-import { colorLogValue, type Logger } from '@pumpkin-plugins/plugin-kit/logger';
+import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import {
     formatIpv4,
     type MappingSpec,
@@ -160,7 +161,7 @@ export class PortForwarder {
                 }
                 if (!known)
                     this.log.info(
-                        `${colorLogValue(sender, 'cyan')} asked for ${request.protocol.toUpperCase()} port ${colorLogValue(String(request.port), 'yellow')} to be opened (${request.description}).`
+                        `${ansi.named.name(sender)} asked for ${request.protocol.toUpperCase()} port ${ansi.named.port(request.port)} to be opened (${request.description}).`
                     );
                 this.requests.set(key, { sender, spec: request, lastSeen: this.net.now() });
                 return { ok: true, status: toStatus(this.mapper.request(key, request)) };
@@ -223,7 +224,7 @@ export class PortForwarder {
             if (now - lastSeen < REQUEST_TTL_MS) continue;
             this.requests.delete(key);
             this.mapper?.release(key);
-            this.log.info(`${colorLogValue(sender, 'cyan')} stopped asking, so its port was closed.`);
+            this.log.info(`${ansi.named.name(sender)} stopped asking, so its port was closed.`);
         }
     }
 }

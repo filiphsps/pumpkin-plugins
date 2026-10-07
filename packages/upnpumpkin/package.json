@@ -40,6 +40,7 @@
     },
     "dependencies": {
         "@pumpkin-plugins/config": "workspace:*",
+        "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/port-mapping": "workspace:*",
         "@pumpkin-plugins/upnpumpkin-api": "workspace:*",
