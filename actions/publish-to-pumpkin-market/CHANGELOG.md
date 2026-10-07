@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.5](https://github.com/filiphsps/pumpkin-plugins/compare/publish-to-pumpkin-market-v0.0.3...publish-to-pumpkin-market-v0.0.5) (2026-10-07)
+
+
+### chore
+
+* prepare Distant Horizons 0.0.5 recovery release ([fb3712e](https://github.com/filiphsps/pumpkin-plugins/commit/fb3712ed8e34dfcbf34b636d64c45ff43f71de41))
+
 ## [0.0.3](https://github.com/filiphsps/pumpkin-plugins/compare/publish-to-pumpkin-market-v0.0.2...publish-to-pumpkin-market-v0.0.3) (2026-10-07)
 
 
