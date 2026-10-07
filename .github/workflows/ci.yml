@@ -249,7 +249,7 @@ jobs:
 
             - name: 📦 Upload build artifact
               id: upload-signed-plugins
-              uses: actions/upload-artifact@v7.0.1
+              uses: actions/upload-artifact@v7.0.2
               with:
                   retention-days: 1
                   overwrite: true
@@ -271,7 +271,7 @@ jobs:
                   } >> "$GITHUB_STEP_SUMMARY"
 
             - name: 📦 Upload plugin builds for integration tests
-              uses: actions/upload-artifact@v7.0.1
+              uses: actions/upload-artifact@v7.0.2
               with:
                   retention-days: 1
                   overwrite: true
@@ -281,7 +281,7 @@ jobs:
                   path: packages/*/build/*.wasm
 
             - name: 📦 Upload update-check fixture
-              uses: actions/upload-artifact@v7.0.1
+              uses: actions/upload-artifact@v7.0.2
               with:
                   retention-days: 1
                   overwrite: true
@@ -336,7 +336,7 @@ jobs:
 
             - name: 📤 Upload server logs
               if: failure()
-              uses: actions/upload-artifact@v7.0.1
+              uses: actions/upload-artifact@v7.0.2
               with:
                   retention-days: 1
                   name: pumpkin-logs
@@ -378,7 +378,7 @@ jobs:
 
             - name: 📤 Upload server logs
               if: failure()
-              uses: actions/upload-artifact@v7.0.1
+              uses: actions/upload-artifact@v7.0.2
               with:
                   retention-days: 1
                   name: generator-pumpkin-logs
@@ -588,7 +588,7 @@ jobs:
                   cp "$WASM_FILE.sha256" signed/
 
             - name: 📤 Upload signed release artifact
-              uses: actions/upload-artifact@v7.0.1
+              uses: actions/upload-artifact@v7.0.2
               with:
                   retention-days: 1
                   overwrite: true
