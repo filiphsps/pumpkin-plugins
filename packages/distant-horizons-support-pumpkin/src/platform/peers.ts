@@ -124,6 +124,12 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                 }
             },
             send: (bytes) => java.sendCustomPayload(CHANNEL, bytes),
+            borderBounds: {
+                minX: borderX - radius,
+                maxX: borderX + radius,
+                minZ: borderZ - radius,
+                maxZ: borderZ + radius
+            },
             insideBorder: (x, z) => Math.abs(x + 0.5 - borderX) <= radius && Math.abs(z + 0.5 - borderZ) <= radius,
             terrain
         });

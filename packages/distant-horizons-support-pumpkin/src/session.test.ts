@@ -34,6 +34,7 @@ function fixture(measureNow = () => 1000) {
                 return { material: 'minecraft:plains_DH-BSW_minecraft:stone', skyLight: 15, blockLight: 0 };
             }
         },
+        borderBounds: { minX: -1_000_000, maxX: 1_000_000, minZ: -1_000_000, maxZ: 1_000_000 },
         insideBorder: () => true,
         send: (bytes) => sent.push(bytes),
         report: (message) => reports.push(message)
@@ -74,8 +75,7 @@ describe('DH sessions', () => {
             centerX: 0,
             centerZ: 0,
             radius: 0,
-            sections: 1,
-            skippedOutsideBorder: 0
+            sections: 1
         });
         f.sessions.tick(f.peers);
         expect(f.reads()).toBe(32768);

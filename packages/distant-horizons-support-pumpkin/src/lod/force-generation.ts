@@ -4,7 +4,7 @@ import { SECTION_DETAIL, SECTION_SIZE_BLOCKS } from '../protocol/constants.ts';
 import type { Section } from '../protocol/messages.ts';
 import { LodBuilder } from './builder.ts';
 import type { LodCache } from './cache.ts';
-import { type LodSectionCoordinate, listLodSectionsAround, sectionKey } from './generation.ts';
+import { iterateLodSectionsAround, type LodSectionCoordinate, sectionKey } from './generation.ts';
 
 /** Maximum block samples a forced capture attempts in one server tick. */
 export const FORCE_BLOCK_SAMPLES_PER_TICK = 32_768;
@@ -14,6 +14,8 @@ export interface ForcedLodPeer {
     name: string;
     level: string;
     terrain: TerrainAccess;
+    /** Inclusive block-center bounds of the world border. */
+    borderBounds: { minX: number; maxX: number; minZ: number; maxZ: number };
     insideBorder(x: number, z: number): boolean;
     report(message: string): void;
 }
@@ -29,13 +31,11 @@ export interface ForcedLodStart {
     centerZ: number;
     radius: number;
     sections: number;
-    skippedOutsideBorder: number;
 }
 
 interface ForcedSection {
     coordinate: LodSectionCoordinate;
     key: string;
-    insideBorder: boolean;
     invalidated: boolean;
     builder?: LodBuilder;
 }
@@ -43,12 +43,17 @@ interface ForcedSection {
 interface ForcedJob extends ForcedLodStart {
     owner: string;
     level: string;
-    targets: ForcedSection[];
-    index: number;
+    coordinates: Generator<LodSectionCoordinate>;
+    scanned: number;
+    current?: ForcedSection;
+    skippedOutsideBorder: number;
+    skippedAlreadyGenerated: number;
     built: number;
     skipped: number;
     lastReportedStep: number;
 }
+
+const MAX_SECTIONS_CHECKED_PER_TICK = 64;
 
 /** Captures operator-requested sections at full work budget without retaining Pumpkin handles. */
 export class ForcedLodGeneration {
@@ -63,47 +68,35 @@ export class ForcedLodGeneration {
     /** Starts one bounded, cache-refreshing job around the selected block position. */
     start(peer: ForcedLodPeer, blockX: number, blockZ: number, radius = 0): ForcedLodStart {
         if (this.job) throw new Error('A forced LOD generation job is already running.');
-        const { memoryLimit, diskLimit } = this.cache.stats();
+        const { memoryLimit, diskLimit, memoryEntries, diskEntries } = this.cache.stats();
         if (memoryLimit === 0 && diskLimit === 0) throw new Error('Both LOD cache tiers are disabled.');
 
-        const coordinates = listLodSectionsAround(blockX, blockZ, radius);
-        const targets = coordinates.map((coordinate) => {
-            const minX = coordinate.x * SECTION_SIZE_BLOCKS;
-            const minZ = coordinate.z * SECTION_SIZE_BLOCKS;
-            const maxX = minX + SECTION_SIZE_BLOCKS - 1;
-            const maxZ = minZ + SECTION_SIZE_BLOCKS - 1;
-            return {
-                coordinate,
-                key: sectionKey(peer.level, coordinate.x, coordinate.z),
-                insideBorder: peer.insideBorder(minX, minZ) && peer.insideBorder(maxX, maxZ),
-                invalidated: false
-            };
-        });
-        const skippedOutsideBorder = targets.filter((target) => !target.insideBorder).length;
-        if (skippedOutsideBorder === targets.length) {
-            throw new Error('No requested LOD sections are inside the world border.');
-        }
-
+        const sections = (radius * 2 + 1) ** 2;
+        const iterator = iterateLodSectionsAround(blockX, blockZ, radius);
+        const first = iterator.next();
+        if (first.done) throw new Error('No LOD sections were selected.');
         const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
         const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
+
+        this.validateSelection(peer, blockX, blockZ, radius, memoryEntries + diskEntries);
+
         this.job = {
             owner: peer.name,
             level: peer.level,
             centerX,
             centerZ,
             radius,
-            sections: targets.length,
-            skippedOutsideBorder,
-            targets,
-            index: 0,
+            sections,
+            coordinates: iterateLodSectionsAround(blockX, blockZ, radius),
+            scanned: 0,
+            skippedOutsideBorder: 0,
+            skippedAlreadyGenerated: 0,
             built: 0,
             skipped: 0,
             lastReportedStep: 0
         };
-        this.log.info(
-            `Started forced LOD capture for ${peer.name}: ${targets.length - skippedOutsideBorder}/${targets.length} sections in ${peer.level}.`
-        );
-        return { centerX, centerZ, radius, sections: targets.length, skippedOutsideBorder };
+        this.log.info(`Started forced LOD capture for ${peer.name}: ${sections} requested sections in ${peer.level}.`);
+        return { centerX, centerZ, radius, sections };
     }
 
     /** Advances the active job, returning true when this tick was reserved for forced work. */
@@ -130,7 +123,7 @@ export class ForcedLodGeneration {
     status(): string | undefined {
         const job = this.job;
         if (!job) return undefined;
-        const target = job.targets[job.index];
+        const target = job.current;
         const partial = target?.builder?.progress() ?? 0;
         const progress = Math.floor(((this.completed(job) + partial) / job.sections) * 100);
         const section = target
@@ -142,7 +135,7 @@ export class ForcedLodGeneration {
     /** Marks an active section obsolete when a block changes during its capture. */
     changed(level: string, x: number, z: number): void {
         const job = this.job;
-        const target = job?.targets[job.index];
+        const target = job?.current;
         if (
             job?.level === level &&
             target?.key === sectionKey(level, Math.floor(x / SECTION_SIZE_BLOCKS), Math.floor(z / SECTION_SIZE_BLOCKS))
@@ -160,16 +153,30 @@ export class ForcedLodGeneration {
 
     private advance(job: ForcedJob, peer: ForcedLodPeer): void {
         let budget = FORCE_BLOCK_SAMPLES_PER_TICK;
-        while (job.index < job.targets.length) {
-            const target = job.targets[job.index];
-            if (!target) break;
-            if (!target.insideBorder) {
-                job.index++;
-                continue;
+        let sectionsChecked = 0;
+        while (sectionsChecked < MAX_SECTIONS_CHECKED_PER_TICK) {
+            let target = job.current;
+            if (!target) {
+                const next = job.coordinates.next();
+                if (next.done) break;
+                job.scanned++;
+                sectionsChecked++;
+                const coordinate = next.value;
+                const key = sectionKey(job.level, coordinate.x, coordinate.z);
+                if (!isInsideBorder(peer, coordinate)) {
+                    job.skippedOutsideBorder++;
+                    continue;
+                }
+                if (this.cache.has(key)) {
+                    job.skippedAlreadyGenerated++;
+                    continue;
+                }
+                target = { coordinate, key, invalidated: false };
+                job.current = target;
             }
             if (target.invalidated) {
                 job.skipped++;
-                job.index++;
+                job.current = undefined;
                 continue;
             }
             if (budget === 0) break;
@@ -198,13 +205,13 @@ export class ForcedLodGeneration {
 
                 this.cache.put(target.key, { updated: this.now(), data: target.builder.finish(this.now()) });
                 job.built++;
-                job.index++;
+                job.current = undefined;
             } catch (err) {
                 this.skip(job, String(err));
             }
         }
 
-        if (job.index === job.targets.length) {
+        if (job.scanned === job.sections && !job.current) {
             this.finish(job, peer);
             return;
         }
@@ -224,12 +231,12 @@ export class ForcedLodGeneration {
 
     private skip(job: ForcedJob, reason: string): void {
         job.skipped++;
-        job.index++;
+        job.current = undefined;
         this.log.debug(`Forced LOD section skipped: ${reason}`);
     }
 
     private reportProgress(job: ForcedJob, peer: ForcedLodPeer): void {
-        const target = job.targets[job.index];
+        const target = job.current;
         const partial = target?.builder?.progress() ?? 0;
         const step = Math.floor(((this.completed(job) + partial) / job.sections) * 10);
         if (step <= job.lastReportedStep || step >= 10) return;
@@ -241,8 +248,24 @@ export class ForcedLodGeneration {
     }
 
     private finish(job: ForcedJob, peer: ForcedLodPeer): void {
+        if (job.built === 0 && job.skipped === 0) {
+            let message: string | undefined;
+            if (job.skippedOutsideBorder === job.sections) {
+                message = 'No requested LOD sections are inside the world border.';
+            } else if (job.skippedAlreadyGenerated + job.skippedOutsideBorder === job.sections) {
+                message = 'All requested LOD sections are already generated.';
+            }
+            if (message) {
+                this.sendReport(peer, message);
+                this.log.info(
+                    `${message} World ${job.level}, center ${job.centerX}, ${job.centerZ}, radius ${job.radius}.`
+                );
+                this.job = undefined;
+                return;
+            }
+        }
         const skipped = this.skipped(job);
-        const message = `Forced LOD capture complete: ${job.built} built, ${skipped} skipped.`;
+        const message = `Forced LOD capture complete: ${job.built} built, ${skipped} skipped (${job.skippedAlreadyGenerated} already generated).`;
         this.sendReport(peer, message);
         this.log.info(`${message} World ${job.level}, center ${job.centerX}, ${job.centerZ}, radius ${job.radius}.`);
         this.job = undefined;
@@ -253,7 +276,43 @@ export class ForcedLodGeneration {
     }
 
     private skipped(job: ForcedJob): number {
-        return job.skipped + job.skippedOutsideBorder;
+        return job.skipped + job.skippedOutsideBorder + job.skippedAlreadyGenerated;
+    }
+
+    private validateSelection(
+        peer: ForcedLodPeer,
+        blockX: number,
+        blockZ: number,
+        radius: number,
+        maxCachedSections: number
+    ): void {
+        const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
+        const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
+        const bounds = peer.borderBounds;
+        const minX = Math.max(centerX - radius, Math.ceil((bounds.minX - 0.5) / SECTION_SIZE_BLOCKS));
+        const maxX = Math.min(
+            centerX + radius,
+            Math.floor((bounds.maxX - SECTION_SIZE_BLOCKS + 0.5) / SECTION_SIZE_BLOCKS)
+        );
+        const minZ = Math.max(centerZ - radius, Math.ceil((bounds.minZ - 0.5) / SECTION_SIZE_BLOCKS));
+        const maxZ = Math.min(
+            centerZ + radius,
+            Math.floor((bounds.maxZ - SECTION_SIZE_BLOCKS + 0.5) / SECTION_SIZE_BLOCKS)
+        );
+        if (minX > maxX || minZ > maxZ) throw new Error('No requested LOD sections are inside the world border.');
+
+        const inBorderSections = (maxX - minX + 1) * (maxZ - minZ + 1);
+        if (inBorderSections > maxCachedSections) return;
+
+        let alreadyGenerated = 0;
+        for (let x = minX; x <= maxX; x++) {
+            for (let z = minZ; z <= maxZ; z++) {
+                if (this.cache.has(sectionKey(peer.level, x, z))) alreadyGenerated++;
+            }
+        }
+        if (alreadyGenerated === inBorderSections) {
+            throw new Error('All requested LOD sections are already generated.');
+        }
     }
 
     private sendReport(peer: ForcedLodPeer, message: string): void {
@@ -263,6 +322,15 @@ export class ForcedLodGeneration {
             this.log.warn(`Could not report forced LOD progress to ${peer.name}: ${String(err)}`);
         }
     }
+}
+
+function isInsideBorder(peer: ForcedLodPeer, coordinate: LodSectionCoordinate): boolean {
+    const minX = coordinate.x * SECTION_SIZE_BLOCKS;
+    const minZ = coordinate.z * SECTION_SIZE_BLOCKS;
+    return (
+        peer.insideBorder(minX, minZ) &&
+        peer.insideBorder(minX + SECTION_SIZE_BLOCKS - 1, minZ + SECTION_SIZE_BLOCKS - 1)
+    );
 }
 
 function section(coordinate: LodSectionCoordinate): Section {

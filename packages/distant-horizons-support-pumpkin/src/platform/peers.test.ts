@@ -68,6 +68,7 @@ describe('Pumpkin terrain adapter', () => {
         };
         expect(() =>
             withPlayer(player as unknown as Player, settings, (peer) => {
+                expect(peer.borderBounds).toEqual({ minX: -4.5, maxX: 5.5, minZ: -5, maxZ: 5 });
                 expect(peer.insideBorder(5, 0)).toBe(true);
                 expect(peer.insideBorder(6, 0)).toBe(false);
                 expect(peer.insideBorder(-5, 0)).toBe(true);

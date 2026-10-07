@@ -3,6 +3,7 @@ import { unavailableChunkLoader, unavailableTerrainGenerator } from '@pumpkin-pl
 import { describe, expect, it } from 'vitest';
 import { LodCache } from './cache.ts';
 import { ForcedLodGeneration, type ForcedLodPeer, type ForcedLodPeers } from './force-generation.ts';
+import { MAX_LOD_GENERATION_RADIUS } from './generation.ts';
 
 function fixture(height = 1) {
     const files = new MemoryFiles();
@@ -23,6 +24,7 @@ function fixture(height = 1) {
                 return { material: 'minecraft:plains_DH-BSW_minecraft:stone', skyLight: 15, blockLight: 0 };
             }
         },
+        borderBounds: { minX: -1_000_000, maxX: 1_000_000, minZ: -1_000_000, maxZ: 1_000_000 },
         insideBorder: () => true,
         report: (message) => reports.push(message)
     };
@@ -42,7 +44,12 @@ describe('forced LOD generation', () => {
         const f = fixture();
         const started = f.generation.start(f.peer, 32, 32);
 
-        expect(started).toEqual({ centerX: 0, centerZ: 0, radius: 0, sections: 1, skippedOutsideBorder: 0 });
+        expect(started).toEqual({
+            centerX: 0,
+            centerZ: 0,
+            radius: 0,
+            sections: 1
+        });
         expect(f.generation.tick(f.peers)).toBe(true);
         expect(f.generation.status()).toBeUndefined();
         expect(f.cache.get('world:0:0')?.updated).toBe(1234);
@@ -79,12 +86,67 @@ describe('forced LOD generation', () => {
         expect(f.reports.at(-1)).toContain('complete: 0 built, 1 skipped');
     });
 
+    it('skips sections already in the LOD cache while generating the remaining sections', () => {
+        const f = fixture();
+        f.cache.put('world:0:0', { updated: 1, data: new Uint8Array(64) });
+
+        const started = f.generation.start(f.peer, 32, 32, 1);
+        f.generation.tick(f.peers);
+
+        expect(started).toMatchObject({ sections: 9 });
+        expect(f.cache.stats().memoryEntries).toBe(9);
+        expect(f.samples()).toBe(8 * 4096);
+        expect(f.reports.at(-1)).toContain('complete: 8 built, 1 skipped (1 already generated)');
+    });
+
+    it('errors when every requested in-border LOD section is already generated', () => {
+        const f = fixture();
+        f.cache.put('world:0:0', { updated: 1, data: new Uint8Array(64) });
+
+        expect(() => f.generation.start(f.peer, 32, 32)).toThrow('All requested LOD sections are already generated.');
+        expect(f.generation.status()).toBeUndefined();
+    });
+
+    it('checks larger selections for an all-cached request before starting work', () => {
+        const f = fixture();
+        for (let x = -8; x <= 8; x++) {
+            for (let z = -8; z <= 8; z++) f.cache.put(`world:${x}:${z}`, { updated: 1, data: new Uint8Array(64) });
+        }
+
+        expect(() => f.generation.start(f.peer, 32, 32, 8)).toThrow(
+            'All requested LOD sections are already generated.'
+        );
+        expect(f.generation.status()).toBeUndefined();
+    });
+
+    it('accepts the maximum radius without materializing its section list', () => {
+        const f = fixture();
+
+        const started = f.generation.start(f.peer, 32, 32, MAX_LOD_GENERATION_RADIUS);
+
+        expect(started.sections).toBe((MAX_LOD_GENERATION_RADIUS * 2 + 1) ** 2);
+        expect(f.generation.status()).toContain('0%');
+        f.generation.left(f.peer.name);
+    });
+
+    it('rejects a maximum-radius selection when its only in-border section is cached', () => {
+        const f = fixture();
+        f.peer.borderBounds = { minX: 0.5, maxX: 63.5, minZ: 0.5, maxZ: 63.5 };
+        f.peer.insideBorder = (x, z) => x >= 0 && x < 64 && z >= 0 && z < 64;
+        f.cache.put('world:0:0', { updated: 1, data: new Uint8Array(64) });
+
+        expect(() => f.generation.start(f.peer, 32, 32, MAX_LOD_GENERATION_RADIUS)).toThrow(
+            'All requested LOD sections are already generated.'
+        );
+    });
+
     it('counts sections outside the world border once and builds the in-border sections', () => {
         const f = fixture();
         f.peer.insideBorder = (x, z) => x >= 0 && z >= 0;
+        f.peer.borderBounds = { minX: 0.5, maxX: 1_000_000, minZ: 0.5, maxZ: 1_000_000 };
         const started = f.generation.start(f.peer, 32, 32, 1);
 
-        expect(started.skippedOutsideBorder).toBe(5);
+        expect(started.sections).toBe(9);
         f.generation.tick(f.peers);
 
         expect(f.cache.has('world:0:0')).toBe(true);
