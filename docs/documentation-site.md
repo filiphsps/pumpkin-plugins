@@ -72,6 +72,16 @@ action to the corresponding source file where TypeDoc can identify one.
 The site shows **Last updated** using Git history. The docs workflow fetches full history so pages
 that were not changed in the latest commit still show their latest edit time.
 
+## llms.txt
+
+The site generates `/llms.txt` during the VitePress build from discovered guide pages, component
+documentation, package and action metadata, and API references. Guide and component links point to
+raw Markdown in the repository; generated API links point to the public docs site. The generated
+build-side copy is gitignored and stored under `docs/`. Update source docs or metadata to
+change its entries; update the generator in `docs/.vitepress/config.mts` to change its structure.
+The shared page head links to the file with `rel="describedby"`, and the development server serves
+the same generated content at `/llms.txt`.
+
 ## Theme
 
 The site uses Pumpkin's `#FF7518` accent. Light-mode text uses a darker orange for contrast;

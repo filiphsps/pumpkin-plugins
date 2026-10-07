@@ -112,18 +112,28 @@ function frontmatterOf(file: string): Record<string, unknown> {
 function descriptionOf(file: string): string {
     const description = frontmatterOf(file).description;
     if (typeof description === 'string') return description;
-    const source = fs.readFileSync(file, 'utf8').replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '');
+    const source = fs
+        .readFileSync(file, 'utf8')
+        .replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '')
+        .replace(/^[ \t]*```[^\n]*\n[\s\S]*?^[ \t]*```[ \t]*$/gm, '')
+        .replace(/^[ \t]*~~~[^\n]*\n[\s\S]*?^[ \t]*~~~[ \t]*$/gm, '');
     const prose = source
         .replace(/^#\s+.+$/m, '')
         .split(/\n\s*\n/)
         .map((paragraph) => paragraph.trim())
-        .find((paragraph) => paragraph && !paragraph.startsWith('#') && !paragraph.startsWith('- '));
-    return (prose ?? '')
+        .find((paragraph) => paragraph && !/^(?:#{1,6}\s|[-*+]\s|\d+[.)]\s|>|\|)/.test(paragraph));
+    const text = (prose ?? '')
         .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
         .replace(/[`*_>#]/g, '')
         .replace(/\s+/g, ' ')
         .trim()
-        .slice(0, 180);
+        .replace(/:\s*$/, '.');
+    const sentenceEnd = text.search(/[.!?](?=\s+[A-Z])/);
+    const summary = sentenceEnd === -1 ? text : text.slice(0, sentenceEnd + 1);
+    if (summary.length <= 180) return summary;
+    const truncated = summary.slice(0, 179);
+    const wordEnd = truncated.lastIndexOf(' ');
+    return `${truncated.slice(0, wordEnd > 0 ? wordEnd : truncated.length).trimEnd()}…`;
 }
 
 function navigationMetadata(value: unknown): Record<string, unknown> {
@@ -285,6 +295,7 @@ const guidePages = walkMarkdown(path.join(repoRoot, 'docs'))
     .map((file) => {
         const relative = path.relative(path.join(repoRoot, 'docs'), file).split(path.sep).join('/');
         return {
+            file,
             text: titleOf(file, path.basename(file, '.md')),
             description: descriptionOf(file),
             link: `/guides/${relative.replace(/\.md$/, '')}`,
@@ -292,6 +303,129 @@ const guidePages = walkMarkdown(path.join(repoRoot, 'docs'))
             type: menuItemTypeOf(frontmatterOf(file))
         };
     });
+
+interface LlmsEntry {
+    text: string;
+    url: string;
+    description?: string;
+}
+
+const githubRepository = /^https:\/\/github\.com\/([^/]+\/[^/]+)$/.exec(repoUrl)?.[1];
+const githubOwner = githubRepository?.split('/')[0];
+const rawRepositoryUrl = githubRepository ? `https://raw.githubusercontent.com/${githubRepository}/master` : undefined;
+const publishedSiteUrl = githubOwner ? new URL(siteBase, `https://${githubOwner}.github.io/`).href : undefined;
+
+function markdownSourceUrl(file: string): string {
+    const relative = path.relative(repoRoot, file).split(path.sep).map(encodeURIComponent).join('/');
+    return rawRepositoryUrl ? `${rawRepositoryUrl}/${relative}` : `${repoUrl}/blob/master/${relative}`;
+}
+
+function publishedPageUrl(route: string): string {
+    const relative = route.replace(/^\/+/, '');
+    return publishedSiteUrl ? new URL(relative, publishedSiteUrl).href : `${siteBase}${relative}`;
+}
+
+function componentOverviewFile(item: Component): string | undefined {
+    const customOverview = item.customDocs.find((doc) => doc.route === item.overview);
+    if (customOverview) return customOverview.file;
+    if (item.readme !== item.overview) return undefined;
+    const readme = path.resolve(repoRoot, `${item.overview.slice(1)}.md`);
+    return fs.existsSync(readme) ? readme : undefined;
+}
+
+function componentLlmsEntries(item: Component): LlmsEntry[] {
+    const entries: LlmsEntry[] = [];
+    const overviewFile = componentOverviewFile(item);
+
+    if (overviewFile) {
+        entries.push({ text: item.title, url: markdownSourceUrl(overviewFile), description: item.description });
+    }
+
+    if (item.readme && item.readme !== item.overview) {
+        const readme = path.resolve(repoRoot, `${item.readme.slice(1)}.md`);
+        if (fs.existsSync(readme)) {
+            entries.push({
+                text: `${item.title} README`,
+                url: markdownSourceUrl(readme),
+                description: 'Additional component overview and usage details.'
+            });
+        }
+    }
+
+    for (const doc of item.customDocs) {
+        if (doc.file === overviewFile) continue;
+        entries.push({
+            text: `${item.title}: ${doc.title}`,
+            url: markdownSourceUrl(doc.file),
+            description: descriptionOf(doc.file)
+        });
+    }
+
+    return entries;
+}
+
+function llmsSection(title: string, entries: LlmsEntry[]): string {
+    if (entries.length === 0) return '';
+    const links = entries.map(({ text, url, description }) => {
+        const label = text.replace(/[\\[\]]/g, '\\$&');
+        const details = description?.trim() ? `: ${description.trim()}` : '';
+        return `- [${label}](${url})${details}`;
+    });
+    return [`## ${title}`, '', ...links].join('\n');
+}
+
+function generateLlmsText(): string {
+    const guideGroups = new Map<string, LlmsEntry[]>();
+    for (const guide of guidePages) {
+        const category = guide.category ?? 'Guides';
+        const entries = guideGroups.get(category) ?? [];
+        entries.push({ text: guide.text, url: markdownSourceUrl(guide.file), description: guide.description });
+        guideGroups.set(category, entries);
+    }
+
+    const docsIndex: LlmsEntry = {
+        text: 'Documentation index',
+        url: markdownSourceUrl(path.join(repoRoot, 'docs/README.md')),
+        description: 'Catalog of guides and documentation pages.'
+    };
+    const categories = [...guideGroups.entries()].sort(([left], [right]) => left.localeCompare(right));
+    const gettingStarted = guideGroups.get('Getting started') ?? [];
+    const sections = [
+        llmsSection('Getting started', [docsIndex, ...gettingStarted]),
+        ...categories
+            .filter(([category]) => category !== 'Getting started')
+            .map(([category, entries]) => llmsSection(category, entries)),
+        llmsSection('Plugins', plugins.flatMap(componentLlmsEntries)),
+        llmsSection('Shared tools', tools.flatMap(componentLlmsEntries)),
+        llmsSection('GitHub Actions', actions.flatMap(componentLlmsEntries)),
+        llmsSection('API reference', [
+            ...apiNav.map(({ text, link }) => ({
+                text: `${text} reference`,
+                url: publishedPageUrl(link),
+                description: 'Generated API and action contract documentation.'
+            })),
+            ...[...plugins, ...tools, ...actions]
+                .filter((item) => item.apiReference)
+                .map((item) => ({
+                    text: `${item.title} API reference`,
+                    url: publishedPageUrl(item.apiReference as string),
+                    description: item.description
+                }))
+        ])
+    ].filter(Boolean);
+    const siteLink = publishedSiteUrl ?? siteBase;
+
+    return [
+        '# Pumpkin Plugins',
+        '',
+        '> TypeScript plugins, shared tools, and GitHub Actions for Pumpkin Minecraft servers.',
+        '',
+        `Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source links below return Markdown from the repository; generated API links point to the [documentation site](${siteLink}). This file is generated from discovered guides, component documentation, package metadata, and API references.`,
+        '',
+        sections.join('\n\n'),
+        ''
+    ].join('\n');
+}
 
 function card(item: Component): MenuCard {
     return {
@@ -600,8 +734,25 @@ export default defineConfig({
     vite: {
         plugins: [
             {
-                name: 'component-navigation-assets',
+                name: 'component-navigation-assets-and-llms',
+                buildStart() {
+                    fs.writeFileSync(path.join(repoRoot, 'docs/llms.txt'), generateLlmsText());
+                },
+                configureServer(server) {
+                    server.middlewares.use((request, response, next) => {
+                        const requestPath = request.url?.split('?')[0];
+                        if (requestPath !== '/llms.txt' && requestPath !== `${siteBase}llms.txt`) {
+                            next();
+                            return;
+                        }
+                        response.setHeader('Content-Type', 'text/plain; charset=utf-8');
+                        response.end(generateLlmsText());
+                    });
+                },
                 generateBundle() {
+                    const llmsText = generateLlmsText();
+                    fs.writeFileSync(path.join(repoRoot, 'docs/llms.txt'), llmsText);
+                    this.emitFile({ type: 'asset', fileName: 'llms.txt', source: llmsText });
                     for (const [fileName, file] of navigationAssets) {
                         this.emitFile({ type: 'asset', fileName, source: fs.readFileSync(file) });
                     }
@@ -625,7 +776,10 @@ export default defineConfig({
     ],
     rewrites,
     ignoreDeadLinks: [/README(?:\.md)?$/],
-    head: [['meta', { name: 'google-site-verification', content: 'Ac8kmcoez1w3jlR5BxcQ8mBc5f0gcZ4s40xNXad4804' }]],
+    head: [
+        ['meta', { name: 'google-site-verification', content: 'Ac8kmcoez1w3jlR5BxcQ8mBc5f0gcZ4s40xNXad4804' }],
+        ['link', { rel: 'describedby', href: `${siteBase}llms.txt` }]
+    ],
     title: 'Pumpkin Plugins',
     description: 'Guides and references for Pumpkin plugins, actions, and developer tools.',
     cleanUrls: true,
