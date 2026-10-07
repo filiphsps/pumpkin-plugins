@@ -84,7 +84,9 @@ describe('bundled release commits', () => {
             commit('old', ['tools/update-check/src/http.ts'])
         ];
         assert.deepEqual(
-            releaseCommits(history, bundledPaths(packages, 'packages/plugin'), 'released').map((entry) => entry.sha),
+            releaseCommits(history, bundledPaths(packages, 'packages/plugin'), 'released', 'plugin').map(
+                (entry) => entry.sha
+            ),
             ['checker', 'shared', 'build', 'catalog']
         );
     });
@@ -93,20 +95,20 @@ describe('bundled release commits', () => {
         const paths = new Set(['tools/update-check']);
         const history = [
             commit('new', ['tools/update-check/src/http.ts']),
-            commit('release-as', [], 'chore: prepare release\n\nRelease-As: 1.0.0'),
+            commit('release-as', [], 'chore(plugin): prepare release\n\nRelease-As: 1.0.0'),
             commit('recent-release', ['packages/other/package.json']),
             commit('older', ['tools/update-check/src/http.ts']),
             commit('old-release', ['packages/plugin/package.json'])
         ];
         assert.deepEqual(
-            releaseCommits(history, paths, 'recent-release').map((entry) => entry.sha),
+            releaseCommits(history, paths, 'recent-release', 'plugin').map((entry) => entry.sha),
             ['new', 'release-as']
         );
         assert.deepEqual(
-            releaseCommits(history, paths, 'old-release').map((entry) => entry.sha),
+            releaseCommits(history, paths, 'old-release', 'plugin').map((entry) => entry.sha),
             ['new', 'release-as', 'older']
         );
-        assert.equal(releaseCommits(history, paths).length, 3);
+        assert.equal(releaseCommits(history, paths, undefined, 'plugin').length, 3);
     });
 
     it('fails closed when history or changed-file metadata is missing', () => {
@@ -175,6 +177,34 @@ describe('bundled release commits', () => {
         assert.equal(releases['packages/plugin'].sha, 'published-0.0.3');
         assert.equal(releases['packages/plugin'].tag.version.toString(), '0.0.3');
         assert.deepEqual(scoped['packages/plugin'], history.slice(0, 2));
+    });
+
+    it('routes an empty Release-As commit only to its matching component', async () => {
+        const history = [
+            commit('plugin-release-as', [], 'chore(plugin): recover release\n\nRelease-As: 0.0.5'),
+            commit('unscoped-release-as', [], 'chore: recover release\n\nRelease-As: 0.0.5'),
+            commit('boundary', ['packages/plugin/package.json'])
+        ];
+        const github = {
+            async *mergeCommitIterator() {
+                yield* history;
+            }
+        };
+        const plugin = bundledChangesPlugin(github, 'master', packages, { 'packages/plugin': '0.0.4' });
+        const strategies = { 'packages/plugin': {}, 'actions/sign-pumpkin-plugin': {} };
+        const commits = {
+            'packages/plugin': [],
+            'actions/sign-pumpkin-plugin': history.slice(0, 2)
+        };
+        const releases = { 'packages/plugin': { tag: {}, sha: 'boundary' } };
+
+        await plugin.preconfigure(strategies, commits, releases);
+
+        assert.deepEqual(
+            commits['packages/plugin'].map((entry) => entry.sha),
+            ['plugin-release-as']
+        );
+        assert.deepEqual(commits['actions/sign-pumpkin-plugin'], []);
     });
 
     it('leaves action release strategies to Release Please without fetching plugin history', async () => {

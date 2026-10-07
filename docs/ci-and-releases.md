@@ -152,7 +152,8 @@ If a manifest version has no matching GitHub release or tag, the helper uses the
 release for that plugin with a lower version as the history boundary. It fails if no such release
 exists or if it cannot fetch enough history, rather than publishing incomplete notes. Increase
 `commit-search-depth` in the release configuration if needed. Changelogs stay generated; do not edit
-them by hand.
+them by hand. Empty version-only `Release-As` commits need a conventional-commit scope matching the
+component so only that release is affected.
 
 To preview without changing GitHub, set `GITHUB_REPOSITORY` and `GITHUB_TOKEN`, then run:
 

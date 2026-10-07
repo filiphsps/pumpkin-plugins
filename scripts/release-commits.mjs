@@ -43,8 +43,18 @@ function shippedFile(file, paths) {
     return [...paths].some((path) => file.startsWith(`${path}/`));
 }
 
+function hasReleaseAs(commit) {
+    return /(?:^|\n)Release-As:\s*\S+/.test(commit.message ?? '');
+}
+
+function releaseAsTargetsComponent(commit, component) {
+    if (!hasReleaseAs(commit)) return true;
+    const scope = /^[\w-]+(?:\(([^)]+)\))?!?:/.exec(commit.message ?? '')?.[1];
+    return scope === component;
+}
+
 /** Selects relevant commits in newest-first order, stopping at this plugin's own previous release. */
-export function releaseCommits(commits, paths, lastReleaseSha) {
+export function releaseCommits(commits, paths, lastReleaseSha, component) {
     const boundary = lastReleaseSha ? commits.findIndex((commit) => commit.sha === lastReleaseSha) : commits.length;
     if (boundary === -1) throw new Error(`Release commit ${lastReleaseSha} is missing from the fetched history`);
     const seen = new Set();
@@ -52,8 +62,8 @@ export function releaseCommits(commits, paths, lastReleaseSha) {
         if (!Array.isArray(commit.files)) throw new Error(`Commit ${commit.sha} has no changed-file list`);
         if (seen.has(commit.sha)) return false;
         seen.add(commit.sha);
-        // Preserve Release Please's support for empty Release-As commits.
-        return commit.files.length === 0 || commit.files.some((file) => shippedFile(file, paths));
+        if (commit.files.length === 0) return hasReleaseAs(commit) && releaseAsTargetsComponent(commit, component);
+        return releaseAsTargetsComponent(commit, component) && commit.files.some((file) => shippedFile(file, paths));
     });
 }
 
@@ -84,6 +94,12 @@ async function previousPublishedRelease(github, currentTag) {
 export function bundledChangesPlugin(github, branch, packages, releasedVersions, maxCommits = 500) {
     return {
         async preconfigure(strategies, commitsByPath, releasesByPath) {
+            for (const path of Object.keys(strategies).filter((path) => path.startsWith('actions/'))) {
+                const component = path.split('/').at(-1);
+                commitsByPath[path] = (commitsByPath[path] ?? []).filter((commit) =>
+                    releaseAsTargetsComponent(commit, component)
+                );
+            }
             const pluginPaths = Object.keys(strategies).filter((path) => path.startsWith('packages/'));
             if (pluginPaths.length === 0) return strategies;
             const commits = [];
@@ -116,7 +132,12 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
                 if (!initialRelease && boundaries.size === 0) break;
             }
             for (const path of pluginPaths) {
-                commitsByPath[path] = releaseCommits(commits, bundledPaths(packages, path), releasesByPath[path]?.sha);
+                commitsByPath[path] = releaseCommits(
+                    commits,
+                    bundledPaths(packages, path),
+                    releasesByPath[path]?.sha,
+                    path.split('/').at(-1)
+                );
             }
             return strategies;
         },
