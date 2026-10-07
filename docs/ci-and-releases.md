@@ -23,7 +23,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
 | 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or `actions/common/` for shared helpers, then uploads c8 coverage to Codecov |
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
-| 🔨 Build | code changes, after lint and typecheck | Builds and collects every plugin, then signs and verifies them with the reusable action before upload |
+| 🔨 Build | code changes, after lint and typecheck | Builds and collects every plugin, then signs with `sign-pumpkin-plugin` and verifies with `verify-pumpkin-plugin` before upload |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin and action, checks release registration and READMEs, tests the action, then typechecks, builds and integration-tests the plugin |
 | 🚢 Release | plugin or action release changes, on `master` pushes | Runs release-please; action releases create a versioned tag and GitHub release without a plugin artifact |
@@ -160,12 +160,14 @@ a warning unless `allow_unsigned = false` is set in its config. Signing is optio
 `pnpm package` (`scripts/collect-plugins.mjs`) only copies built plugins into `dist/` and writes
 checksums; it does not sign files or warn when they are unsigned. CI always prepares a key and uses
 the reusable [`sign-pumpkin-plugin` action](../actions/sign-pumpkin-plugin/README.md) to sign every
-collected plugin from a metadata manifest. Pushes use the repository secret when available, while
-pull requests and pushes without the secret use an ephemeral key. CI verifies each signature and
-uses the signed files for integration tests. The ephemeral key is only for checks; release jobs
-never receive it. Release jobs use the same action to sign the exact build artifact after checking
-that the release tag points to the commit that produced the build. It uploads the signed `.wasm`
-and refreshed `.sha256` to the GitHub release and Pumpkin Market.
+collected plugin from a metadata manifest. It then runs the
+[`verify-pumpkin-plugin` action](../actions/verify-pumpkin-plugin/README.md) against the same
+manifest, pinning verification to the public key derived from that run's signing key. Pushes use the
+repository secret when available, while pull requests and pushes without the secret use an ephemeral
+key. CI uses the verified signed files for integration tests. The ephemeral key is only for checks;
+release jobs never receive it. Release jobs use the signing action to sign the exact build artifact
+after checking that the release tag points to the commit that produced the build. It uploads the
+signed `.wasm` and refreshed `.sha256` to the GitHub release and Pumpkin Market.
 
 | Situation | Result |
 | --- | --- |

@@ -230,6 +230,20 @@ jobs:
                   developer-name: Filiph Sandström
                   signing-key: ${{ env.PLUGIN_SIGNING_KEY }}
 
+            - name: 🔑 Resolve signing public key
+              id: signing-key
+              run: |
+                  node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+                  import { publicKeyOf } from "@pumpkin-plugins/signing";
+                  console.log(`public-key=${publicKeyOf(process.env.PLUGIN_SIGNING_KEY)}`);
+                  NODE
+
+            - name: ✅ Verify signed plugin artifacts
+              uses: ./actions/verify-pumpkin-plugin
+              with:
+                  plugins-manifest: ${{ runner.temp }}/plugins.json
+                  expected-public-key: ${{ steps.signing-key.outputs.public-key }}
+
             - name: 🔎 Install verified signed plugins for integration tests
               run: node scripts/install-signed-plugin-builds.mjs
 
