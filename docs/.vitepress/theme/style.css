@@ -1,7 +1,8 @@
 .vp-doc h1.component-page-title {
     display: flex;
     align-items: center;
-    gap: 16px;
+    flex-wrap: wrap;
+    gap: 12px 16px;
 }
 
 .vp-doc .component-page-title__icon {
@@ -13,6 +14,21 @@
 
 .vp-doc .component-page-title__text {
     min-width: 0;
+}
+
+.vp-doc .component-page-title__version {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.vp-doc .component-page-title__version .VPBadge {
+    margin: 0;
+}
+
+.vp-doc a.component-page-title__version:focus-visible {
+    outline: 2px solid var(--vp-c-brand-1);
+    outline-offset: 4px;
 }
 
 @media (max-width: 767px) {

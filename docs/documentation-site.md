@@ -85,6 +85,11 @@ The lookup requires network access and fails the build if GitHub is unavailable.
 locally if unauthenticated requests are rate limited; the docs workflow supplies its read-only token.
 Only the contributor cards are included in the published site, not the loader or token.
 
+Plugin and action landing pages, READMEs, and API overview pages show native VitePress version badges.
+Versions come from each plugin's package manifest or the action's version file. Badges link to the
+matching release when its tag exists in the checkout; unreleased versions remain linkless. Tag names
+come from the release configuration, and the workflow's full checkout includes the tags.
+
 ## Local commands
 
 Run `pnpm run docs` to generate bindings and the API reference, then build the complete static site.

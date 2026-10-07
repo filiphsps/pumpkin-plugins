@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { type DefaultTheme, defineConfig } from 'vitepress';
@@ -249,6 +250,32 @@ const componentLandingIcons = new Map(
         item.icon ? [[`${item.overview.slice(1)}.md`, item.icon] as const] : []
     )
 );
+const releaseConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, 'release-please-config.json'), 'utf8'));
+const releaseTags = new Set(
+    execFileSync('git', ['tag', '--list'], { cwd: repoRoot, encoding: 'utf8' }).trim().split('\n')
+);
+const componentVersions = new Map<string, { version: string; release?: string }>();
+for (const [group, items] of [
+    ['packages', plugins],
+    ['actions', actions]
+] as const) {
+    for (const item of items) {
+        const directory = `${group}/${item.slug}`;
+        const versionFile = path.join(repoRoot, directory, group === 'packages' ? 'package.json' : 'version.txt');
+        if (!fs.existsSync(versionFile)) continue;
+        const source = fs.readFileSync(versionFile, 'utf8');
+        const version: string = group === 'packages' ? JSON.parse(source).version : source.trim();
+        if (!version) continue;
+        const component = releaseConfig.packages[directory]?.component;
+        const tag = component ? `${component}-v${version}` : undefined;
+        const release = tag && releaseTags.has(tag) ? `${repoUrl}/releases/tag/${encodeURIComponent(tag)}` : undefined;
+        const badge = { version, release };
+        componentVersions.set(`${item.overview.slice(1)}.md`, badge);
+        if (item.readme) componentVersions.set(`${item.readme.slice(1)}.md`, badge);
+        if (item.apiReference) componentVersions.set(`${item.apiReference.slice(1)}index.md`, badge);
+    }
+}
+
 const guidePages = walkMarkdown(path.join(repoRoot, 'docs'))
     .filter(
         (file) =>
@@ -543,9 +570,10 @@ export default defineConfig({
                     }
                 }
             });
-            md.core.ruler.push('component-title-icon', (state) => {
+            md.core.ruler.push('component-title-metadata', (state) => {
                 const icon = componentLandingIcons.get(state.env.relativePath);
-                if (!icon) return;
+                const version = componentVersions.get(state.env.relativePath);
+                if (!icon && !version) return;
                 const heading = state.tokens.findIndex((token) => token.type === 'heading_open' && token.tag === 'h1');
                 if (heading === -1) return;
                 const inline = state.tokens[heading + 1];
@@ -553,10 +581,17 @@ export default defineConfig({
 
                 state.tokens[heading].attrJoin('class', 'component-page-title');
                 const opening = new state.Token('html_inline', '', 0);
-                const src = md.utils.escapeHtml(JSON.stringify(`${siteBase}${icon.slice(1)}`));
-                opening.content = `<img class="component-page-title__icon" :src="${src}" alt="" aria-hidden="true" width="48" height="48"><span class="component-page-title__text">`;
+                const src = icon ? md.utils.escapeHtml(JSON.stringify(`${siteBase}${icon.slice(1)}`)) : undefined;
+                opening.content = `${src ? `<img class="component-page-title__icon" :src="${src}" alt="" aria-hidden="true" width="48" height="48">` : ''}<span class="component-page-title__text">`;
                 const closing = new state.Token('html_inline', '', 0);
                 closing.content = '</span>';
+                if (version) {
+                    const text = md.utils.escapeHtml(`v${version.version}`);
+                    const badge = `<Badge type="info" text="${text}" />`;
+                    closing.content += version.release
+                        ? `<a class="component-page-title__version" href="${md.utils.escapeHtml(version.release)}" aria-label="Release ${text}">${badge}</a>`
+                        : `<span class="component-page-title__version">${badge}</span>`;
+                }
                 inline.children.unshift(opening);
                 inline.children.push(closing);
             });
