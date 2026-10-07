@@ -1,0 +1,10 @@
+# @pumpkin-plugins/terrain
+
+MIT-licensed terrain capture primitives and chunk access contracts for Pumpkin plugins. The package is independent of Pumpkin APIs and wire protocols, so plugins can provide their own host adapters and output encoders.
+
+`TerrainCapture` samples rectangular regions within a caller-provided per-step budget, groups material runs into columns, and can skip empty blocks above a height bound.
+
+`ChunkLoader` and `TerrainGenerator` define provider interfaces. `acquireChunk` checks already-loaded chunks, requests saved chunk loading, and requests generation when the saved chunk is missing or loading is unavailable. Exported unavailable providers make platforms without these capabilities explicit.
+
+This package is internal to the repository and is not published to npm. See the
+[code style guide](../../docs/code-style.md) and [API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/terrain/).

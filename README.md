@@ -41,6 +41,7 @@ component overviews, and generated API references.
 | [@pumpkin-plugins/plugin-kit](tools/plugin-kit) | Host helpers shared by plugins | MIT |
 | [@pumpkin-plugins/port-mapping](tools/port-mapping) | UPnP and NAT-PMP port mapping | MIT |
 | [@pumpkin-plugins/signing](tools/signing) | Ed25519 signing for plugin builds | MIT |
+| [@pumpkin-plugins/terrain](tools/terrain) | Shared terrain capture and access contracts | MIT |
 | [@pumpkin-plugins/test-harness](tools/test-harness) | Runs plugins on a real Pumpkin in vitest | MIT |
 | [@pumpkin-plugins/update-check](tools/update-check) | Check plugin versions against Pumpkin Market | MIT |
 | [@pumpkin-plugins/upnpumpkin-api](tools/upnpumpkin-api) | Asks UPnPumpkin to open a port | MIT |
