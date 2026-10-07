@@ -27,7 +27,12 @@ describe('the /baddon commands', () => {
         const { host, root } = setup();
         expect(host.usages(root).sort()).toEqual((info.commands ?? []).map((c) => c.usage).sort());
         expect(info.commands).toEqual(commandInfos(commands));
-        expect(new Set(info.commands.map((c) => c.permission))).toEqual(new Set([COMMAND_PERMISSION]));
+        expect(new Set(info.commands.map((c) => c.permission))).toEqual(
+            new Set([`${COMMAND_PERMISSION}.list`, `${COMMAND_PERMISSION}.reload`])
+        );
+        expect(info.commands.find((command) => command.usage === '/baddon list')?.defaultPermission).toEqual({
+            tag: 'allow'
+        });
     });
 
     it('list prints the packs found', () => {

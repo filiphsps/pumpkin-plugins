@@ -10,9 +10,14 @@ export const commands = defineCommands(PLUGIN_NAME, {
         description: 'Manage Bedrock resource packs',
         permission: COMMAND_PERMISSION,
         subcommands: {
-            list: { description: 'List the packs found, with the settings each one gets' },
+            list: {
+                description: 'List the packs found, with the settings each one gets',
+                permission: `${COMMAND_PERMISSION}.list`,
+                defaultPermission: { tag: 'allow' }
+            },
             reload: {
-                description: 'Reload `config.toml`, rescan the packs folder and update the packs players are offered'
+                description: 'Reload `config.toml`, rescan the packs folder and update the packs players are offered',
+                permission: `${COMMAND_PERMISSION}.reload`
             }
         }
     }
