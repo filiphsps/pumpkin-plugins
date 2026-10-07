@@ -39,11 +39,11 @@ describe(info.name, () => {
         );
         expect(status).toContain('pending LOD request(s)');
         const budget = await server.waitForLog(
-            /Capture budget \d+\/8192 block samples\/tick at \d+(?:\.\d+)? MSPT/,
+            /Capture budget \d+\/8192 block samples\/tick at \d+(?:\.\d+)? reported MSPT/,
             5000,
             statusFrom
         );
-        expect(budget).toMatch(/Capture budget \d+\/8192 block samples\/tick at \d+(?:\.\d+)? MSPT/);
+        expect(budget).toMatch(/Capture budget \d+\/8192 block samples\/tick at \d+(?:\.\d+)? reported MSPT/);
         const cacheStatusFrom = server.lines.length;
         server.command('dhs cache status');
         await server.waitForLog(/Memory cache: 0\/512 entries/, 5000, cacheStatusFrom);

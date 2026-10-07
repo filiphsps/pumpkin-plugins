@@ -28,28 +28,31 @@ export const schema = defineConfig(PLUGIN_NAME, {
                 description: 'Maximum LOD request radius in chunks, limited by the world border.',
                 default: 128,
                 min: 4,
-                max: 1024
+                max: 4096
             }),
             generation_requests_per_second: int({
-                description: 'Maximum terrain generation requests per second advertised to each DH client.',
+                description:
+                    'Maximum terrain generation requests per second advertised to each DH client. DH uses this for pacing and concurrency; pending_requests also caps it.',
                 default: 20,
                 min: 1,
                 max: 128
             }),
             sync_requests_per_second: int({
-                description: 'Maximum cached LOD synchronization requests per second advertised to each DH client.',
+                description:
+                    'Maximum cached LOD synchronization requests per second advertised to each DH client. DH uses this for pacing and concurrency; pending_requests also caps it.',
                 default: 50,
                 min: 1,
                 max: 256
             }),
             requests_per_player: int({
-                description: 'Maximum pending requests per player.',
+                description:
+                    'Maximum active terrain captures per player. Misses waiting for a slot and cached responses bypass this limit.',
                 default: 2,
                 min: 1,
                 max: 16
             }),
             pending_requests: int({
-                description: 'Maximum pending requests across all players.',
+                description: 'Maximum in-flight DH requests and queued responses across all players.',
                 default: 16,
                 min: 1,
                 max: 1024

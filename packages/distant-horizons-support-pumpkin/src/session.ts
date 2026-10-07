@@ -2,6 +2,8 @@ import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import { AdaptiveWorkBudget, type TerrainSource } from '@pumpkin-plugins/terrain';
 import type { Settings } from './config/schema.ts';
+import { ByteCredit } from './flow/byte-credit.ts';
+import { TransferCursor } from './flow/transfer-cursor.ts';
 import { LodBuilder } from './lod/builder.ts';
 import type { CachedLod, LodCache } from './lod/cache.ts';
 import {
@@ -15,14 +17,15 @@ import { lodLocation } from './lod/location.ts';
 import { PLUGIN_NAME } from './name.ts';
 import { CHUNK_SIZE_BLOCKS, SECTION_DETAIL, SECTION_SIZE_BLOCKS } from './protocol/constants.ts';
 import {
+    closeSession,
     decode,
     levelInit,
     type Message,
     packet,
     reject,
     type Section,
+    type SessionConfiguration,
     sessionConfig,
-    transfer,
     unchanged
 } from './protocol/messages.ts';
 
@@ -41,15 +44,16 @@ export interface Peers {
 }
 interface Client {
     level: string;
-    distance: number;
-    concurrency: number;
-    disabled: boolean;
+    dimension: string;
+    config: SessionConfiguration;
+    byteCredit: ByteCredit;
     packets: QueuedPacket[];
 }
 interface QueuedPacket {
-    bytes: Uint8Array;
+    bytes?: Uint8Array;
+    cursor?: TransferCursor;
     cached: boolean;
-    lod?: {
+    lod: {
         level: string;
         section: Section;
         tracker: number;
@@ -57,6 +61,7 @@ interface QueuedPacket {
         dataBytes: number;
         cached: boolean;
         unchanged: boolean;
+        sync: boolean;
     };
 }
 interface Request {
@@ -88,10 +93,14 @@ export class Sessions {
     private readonly workBudget = new AdaptiveWorkBudget({ initialUnits: 8192 });
     private readonly forcedGeneration: ForcedLodGeneration;
     private buffer = 1;
+    private sendCursor = 0;
+    private requestCursor = 0;
     private ticks = 0;
     private served = 0;
     private rejected = 0;
     private cancelled = 0;
+    private dhPacketBytesSent = 0;
+    private lastHandlerMs = 0;
     private lastFailure = '';
     private lastBlocksBudget = 0;
     private lastServerMspt = 0;
@@ -142,21 +151,15 @@ export class Sessions {
         const client = this.clients.get(peer.name);
         if (!client) return;
         if (message.type === 'config') {
-            client.disabled = message.disabled;
-            client.distance = Math.min(message.distance, this.settings.render_distance);
-            client.concurrency = Math.min(message.concurrency, this.settings.requests_per_player);
+            const config = this.negotiateConfiguration(message.config);
+            client.config = config;
+            client.byteCredit.setRate(config.bandwidthKbps, this.now());
+            if (config.generationPlan === 3) this.rejectPendingRequestClass(peer, false);
+            if (!config.syncEnabled) this.rejectPendingRequestClass(peer, true);
+            peer.send(sessionConfig(config));
             this.log.debug(
-                `${logTag} ${ansi.named.name(peer.name)} configured DH requests: ${message.disabled ? 'disabled' : 'enabled'}, distance ${ansi.named.number(client.distance)}, concurrency ${ansi.named.number(client.concurrency)}.`
+                `${logTag} ${ansi.named.name(peer.name)} configured DH requests: generation ${config.generationPlan === 3 ? 'disabled' : 'enabled'} (${ansi.named.number(config.generationDistance)} chunks, ${ansi.named.number(config.generationRate)}/s), sync ${config.syncEnabled ? 'enabled' : 'disabled'} (${ansi.named.number(config.syncDistance)} chunks, ${ansi.named.number(config.syncRate)}/s), bandwidth ${config.bandwidthKbps === 0 ? 'unlimited' : `${ansi.named.number(config.bandwidthKbps)} KB/s`}.`
             );
-            if (client.disabled) {
-                const pending = this.requests.filter((request) => request.name === peer.name).length;
-                const queued = client.packets.length;
-                this.cancelRequests(peer.name);
-                client.packets = [];
-                this.log.debug(
-                    `${logTag} Dropped ${ansi.named.number(pending)} pending request(s) and ${ansi.named.number(queued)} queued packet(s) for ${ansi.named.name(peer.name)}.`
-                );
-            }
             return;
         }
         if (message.type === 'cancel') {
@@ -172,6 +175,15 @@ export class Sessions {
             return;
         }
         if (message.type !== 'request') return;
+        if (
+            this.requests.some((r) => r.name === peer.name && r.tracker === message.tracker) ||
+            client.packets.some((response) => response.lod.tracker === message.tracker)
+        ) {
+            this.log.debug(
+                `${logTag} Ignored duplicate DH request ${ansi.named.number(message.tracker)} from ${ansi.named.name(peer.name)}.`
+            );
+            return;
+        }
         const failure = this.validate(peer, client, message);
         if (failure) {
             this.rejected++;
@@ -180,12 +192,6 @@ export class Sessions {
                 `${logTag} Rejected DH request ${ansi.named.number(message.tracker)} from ${ansi.named.name(peer.name)} for ${lodLocation(peer.level, message.section.x, message.section.z)}: ${failure.reason}.`
             );
             peer.send(reject(message.tracker, failure.reason, failure.kind));
-            return;
-        }
-        if (this.requests.some((r) => r.name === peer.name && r.tracker === message.tracker)) {
-            this.log.debug(
-                `${logTag} Ignored duplicate DH request ${ansi.named.number(message.tracker)} from ${ansi.named.name(peer.name)}.`
-            );
             return;
         }
         const key = sectionKey(peer.level, message.section.x, message.section.z);
@@ -204,12 +210,13 @@ export class Sessions {
     }
     /** Advances sampling and transfers within global per-tick budgets. */
     tick(peers: Peers, serverMspt = 0): void {
+        const handlerStarted = this.measureNow();
         this.ticks++;
         const refreshesAtStart = [...this.refreshes.values()];
         for (const [name, client] of this.clients) {
             if (
                 !peers.withPeer(name, (peer) => {
-                    if (peer.level !== client.level) this.announce(peer);
+                    if (peer.level !== client.level || peer.dimension !== client.dimension) this.announce(peer);
                 })
             )
                 this.left(name);
@@ -224,11 +231,7 @@ export class Sessions {
         const blocksBudget = forcedWork ? 0 : this.workBudget.next(serverMspt, this.settings.blocks_per_tick);
         this.lastBlocksBudget = blocksBudget;
         if (!forcedWork) this.lastServerMspt = serverMspt;
-        let cachedQueued = [...this.clients.values()].reduce(
-            (sum, client) => sum + client.packets.filter((packet) => packet.cached).length,
-            0
-        );
-        for (const request of forcedWork ? [] : [...this.requests]) {
+        for (const request of this.orderedRequests()) {
             if (!this.requests.includes(request)) continue;
             const queuedClient = this.clients.get(request.name);
             if (!queuedClient) continue;
@@ -263,18 +266,25 @@ export class Sessions {
                                 request.timestamp !== undefined && cached.updated <= request.timestamp;
                             const fresh = this.now() - cached.updated < this.settings.refresh_seconds * 1000;
                             if (clientHasNewerData || fresh) {
-                                if (cachedQueued < this.settings.cached_packets_per_tick)
-                                    cachedQueued += this.complete(request, cached, true);
+                                this.complete(request, cached, true);
                                 return;
                             }
-                            if (cachedQueued >= this.settings.cached_packets_per_tick) return;
                             this.scheduleRefresh(request);
-                            cachedQueued += this.complete(request, cached, true);
+                            this.complete(request, cached, true);
                             return;
                         }
                     }
-                    if (client.packets.length) return;
-                    if (builderStepped || blocksBudget === 0) return;
+                    if (
+                        !request.builder &&
+                        this.captureRequestCount(request.name, request) >= this.settings.requests_per_player
+                    ) {
+                        request.cacheChecked = false;
+                        return;
+                    }
+                    if (builderStepped || blocksBudget === 0) {
+                        if (!request.builder && !request.cached) request.cacheChecked = false;
+                        return;
+                    }
                     builderStepped = true;
                     const region = {
                         originX: request.section.x * SECTION_SIZE_BLOCKS,
@@ -328,34 +338,66 @@ export class Sessions {
             builderStepped = this.refreshOne(peers, refreshesAtStart, blocksBudget);
         let remaining = this.settings.packets_per_tick;
         let cachedRemaining = this.settings.cached_packets_per_tick;
-        for (const [name, client] of this.clients) {
-            if (remaining <= 0 && cachedRemaining <= 0) break;
-            peers.withPeer(name, (peer) => {
-                while (client.packets.length) {
-                    const packet = client.packets[0];
-                    if (!packet || (packet.cached ? cachedRemaining <= 0 : remaining <= 0)) break;
-                    client.packets.shift();
-                    peer.send(packet.bytes);
-                    if (packet.lod) {
-                        const {
-                            level,
-                            section,
-                            tracker,
-                            packetCount,
-                            dataBytes,
-                            cached,
-                            unchanged: noChange
-                        } = packet.lod;
-                        const response = noChange ? 'unchanged LOD response' : cached ? 'cached LOD' : 'captured LOD';
-                        this.log.debug(
-                            `${logTag} Sent ${response} to ${ansi.named.name(peer.name)} for ${lodLocation(level, section.x, section.z)} (request ${ansi.named.number(tracker)}, ${ansi.named.number(packetCount)} packet(s), ${ansi.named.number(dataBytes)} bytes).`
-                        );
-                    }
-                    if (packet.cached) cachedRemaining--;
-                    else remaining--;
+        const names = [...this.clients.keys()];
+        let next = names.length === 0 ? 0 : this.sendCursor % names.length;
+        let idleVisits = 0;
+        while (names.length > 0 && (remaining > 0 || cachedRemaining > 0) && idleVisits < names.length) {
+            const name = names[next] ?? '';
+            next = (next + 1) % names.length;
+            const client = this.clients.get(name);
+            if (!client) {
+                idleVisits++;
+                continue;
+            }
+            let sent = false;
+            const found = peers.withPeer(name, (peer) => {
+                let responseIndex = -1;
+                let response: QueuedPacket | undefined;
+                let bytes: Uint8Array | undefined;
+                const now = this.now();
+                for (let index = 0; index < client.packets.length; index++) {
+                    const candidate = client.packets[index];
+                    if (!candidate || (candidate.cached ? cachedRemaining <= 0 : remaining <= 0)) continue;
+                    const candidateBytes = candidate.cursor?.peek() ?? candidate.bytes;
+                    if (!candidateBytes || !client.byteCredit.canSend(candidateBytes.length, now)) continue;
+                    responseIndex = index;
+                    response = candidate;
+                    bytes = candidateBytes;
+                    break;
                 }
+                if (responseIndex < 0 || !response || !bytes) return;
+                peer.send(bytes);
+                client.byteCredit.consume(bytes.length);
+                this.dhPacketBytesSent += bytes.length;
+                response.cursor?.advance();
+                if (!response.cursor || response.cursor.done) {
+                    client.packets.splice(responseIndex, 1);
+                    this.served++;
+                    const {
+                        level,
+                        section,
+                        tracker,
+                        packetCount,
+                        dataBytes,
+                        cached,
+                        unchanged: noChange
+                    } = response.lod;
+                    const label = noChange ? 'unchanged LOD response' : cached ? 'cached LOD' : 'captured LOD';
+                    this.log.debug(
+                        `${logTag} Sent ${label} to ${ansi.named.name(peer.name)} for ${lodLocation(level, section.x, section.z)} (request ${ansi.named.number(tracker)}, ${ansi.named.number(packetCount)} packet(s), ${ansi.named.number(dataBytes)} bytes).`
+                    );
+                }
+                if (response.cached) cachedRemaining--;
+                else remaining--;
+                sent = true;
             });
+            if (!found) this.left(name);
+            if (sent) {
+                idleVisits = 0;
+                this.sendCursor = next;
+            } else idleVisits++;
         }
+        this.lastHandlerMs = Math.max(0, this.measureNow() - handlerStarted);
     }
     /** Removes a disconnected client's work and queued transfers. */
     left(name: string): void {
@@ -365,7 +407,7 @@ export class Sessions {
         this.removeClient(name);
         if (client) {
             this.log.debug(
-                `${logTag} Removed DH session for ${ansi.named.name(name)}; discarded ${ansi.named.number(pending)} pending request(s) and ${ansi.named.number(queued)} queued packet(s).`
+                `${logTag} Removed DH session for ${ansi.named.name(name)}; discarded ${ansi.named.number(pending)} pending request(s) and ${ansi.named.number(queued)} queued response(s).`
             );
         }
     }
@@ -396,14 +438,25 @@ export class Sessions {
                 ? ` Paused DH capture ${request.level} ${request.section.x}, ${request.section.z}: ${(request.builder.progress() * 100).toFixed(1)}%.`
                 : ` Capturing ${request.level} ${request.section.x}, ${request.section.z}: ${(request.builder.progress() * 100).toFixed(1)}%.`
             : '';
-        const packets = [...this.clients.values()].reduce((sum, client) => sum + client.packets.length, 0);
+        let queuedPackets = 0;
+        let queuedResponses = 0;
+        let queuedBytes = 0;
+        for (const client of this.clients.values()) {
+            for (const response of client.packets) {
+                queuedResponses++;
+                queuedPackets += response.cursor?.remainingPackets ?? 1;
+                queuedBytes += response.cursor?.retainedBytes ?? response.bytes?.length ?? 0;
+            }
+        }
         const budget = forced
-            ? ` Forced budget up to ${FORCE_BLOCK_SAMPLES_PER_TICK} block samples/tick; ordinary DH sampling paused.`
-            : ` Capture budget ${this.lastBlocksBudget}/${this.settings.blocks_per_tick} block samples/tick at ${this.lastServerMspt.toFixed(1)} MSPT.`;
+            ? ` Forced budget up to ${FORCE_BLOCK_SAMPLES_PER_TICK} block samples/tick; ordinary capture sampling paused while cache delivery continues.`
+            : ` Capture budget ${this.lastBlocksBudget}/${this.settings.blocks_per_tick} block samples/tick at ${this.lastServerMspt.toFixed(1)} reported MSPT.`;
         const lines = [
             `${this.clients.size} Distant Horizons client(s), ${this.requests.length} pending LOD request(s).`,
             `${this.ticks} worker tick(s), ${this.served} served, ${this.rejected} rejected, ${this.cancelled} cancelled.`,
-            `${packets} queued packet(s), ${this.refreshes.size} background cache refresh(es).`
+            `${queuedPackets} queued packet(s) across ${queuedResponses} response(s); ${queuedBytes} logical queued response bytes retained.`,
+            `${this.dhPacketBytesSent} DH packet bytes sent; ${this.refreshes.size} background cache refresh(es).`,
+            `Last DH tick-end handler: ${this.lastHandlerMs} ms; Pumpkin MSPT excludes this handler on the pinned server.`
         ];
         if (progress) lines.push(progress.trim());
         if (forced) lines.push(forced);
@@ -482,51 +535,48 @@ export class Sessions {
             this.revisions.delete(key);
     }
     private announce(peer: Peer): void {
-        this.removeClient(peer.name);
+        const existing = this.clients.get(peer.name);
+        if (existing?.level === peer.level && existing.dimension === peer.dimension) {
+            peer.send(levelInit(peer.dimension, this.settings.server_key, peer.level, this.now()));
+            peer.send(sessionConfig(existing.config));
+            return;
+        }
+        if (existing) {
+            peer.send(closeSession('World changed; restarting the Distant Horizons session.'));
+            this.removeClient(peer.name);
+        }
+        const config = this.serverConfiguration();
         this.clients.set(peer.name, {
             level: peer.level,
-            distance: this.settings.render_distance,
-            concurrency: this.settings.requests_per_player,
-            disabled: false,
+            dimension: peer.dimension,
+            config,
+            byteCredit: new ByteCredit(config.bandwidthKbps, this.now()),
             packets: []
         });
         peer.send(levelInit(peer.dimension, this.settings.server_key, peer.level, this.now()));
-        peer.send(
-            sessionConfig(
-                this.settings.render_distance,
-                this.settings.generation_requests_per_second,
-                this.settings.sync_requests_per_second
-            )
-        );
+        peer.send(sessionConfig(config));
         this.log.debug(
-            `${logTag} Established DH session with ${ansi.named.name(peer.name)} in ${ansi.named.identifier(peer.dimension)} / ${ansi.named.identifier(peer.level)} (distance ${ansi.named.number(this.settings.render_distance)}, generation rate ${ansi.named.number(this.settings.generation_requests_per_second)}/s, sync rate ${ansi.named.number(this.settings.sync_requests_per_second)}/s).`
+            `${logTag} Established DH session with ${ansi.named.name(peer.name)} in ${ansi.named.identifier(peer.dimension)} / ${ansi.named.identifier(peer.level)} (generation distance ${ansi.named.number(config.generationDistance)} chunks at ${ansi.named.number(config.generationRate)}/s, sync distance ${ansi.named.number(config.syncDistance)} chunks at ${ansi.named.number(config.syncRate)}/s).`
         );
     }
-    private complete(request: Request, value: CachedLod, cached = false): number {
+    private complete(request: Request, value: CachedLod, cached = false): void {
         const client = this.clients.get(request.name);
-        let packetCount = 0;
         if (client) {
-            this.served++;
             const isUnchanged = request.timestamp !== undefined && value.updated <= request.timestamp;
-            const packets = isUnchanged
-                ? [unchanged(request.tracker)]
-                : transfer(request.tracker, this.buffer++, value.data);
+            const cursor = isUnchanged ? undefined : new TransferCursor(request.tracker, this.buffer++, value.data);
             const lod = {
                 level: request.level,
                 section: request.section,
                 tracker: request.tracker,
-                packetCount: packets.length,
+                packetCount: cursor?.packetCount ?? 1,
                 dataBytes: value.data.length,
                 cached,
-                unchanged: isUnchanged
+                unchanged: isUnchanged,
+                sync: request.timestamp !== undefined
             };
-            client.packets.push(
-                ...packets.map((bytes, index) => ({ bytes, cached, ...(index === packets.length - 1 ? { lod } : {}) }))
-            );
-            packetCount = packets.length;
+            client.packets.push({ bytes: isUnchanged ? unchanged(request.tracker) : undefined, cursor, cached, lod });
         }
         this.drop(request);
-        return cached ? packetCount : 0;
     }
     private drop(request: Request): void {
         const index = this.requests.indexOf(request);
@@ -540,6 +590,65 @@ export class Sessions {
         for (const [key, refresh] of this.refreshes) if (refresh.name === name) this.refreshes.delete(key);
         for (const key of this.revisions.keys()) this.clearRevisionIfUnused(key);
     }
+    private rejectPendingRequestClass(peer: Peer, sync: boolean): void {
+        for (let i = this.requests.length - 1; i >= 0; i--) {
+            const request = this.requests[i];
+            if (!request || request.name !== peer.name || (request.timestamp !== undefined) !== sync) continue;
+            this.rejected++;
+            this.lastFailure = 'LOD requests disabled by client';
+            peer.send(reject(request.tracker, this.lastFailure, 2));
+            this.drop(request);
+        }
+        for (const key of this.revisions.keys()) this.clearRevisionIfUnused(key);
+    }
+    private orderedRequests(): Request[] {
+        const requests = [...this.requests];
+        if (requests.length === 0) return requests;
+        const offset = this.requestCursor % requests.length;
+        this.requestCursor = (offset + 1) % requests.length;
+        return [...requests.slice(offset), ...requests.slice(0, offset)];
+    }
+    private pendingWorkCount(): number {
+        return (
+            this.requests.length +
+            [...this.clients.values()].reduce((count, client) => count + client.packets.length, 0)
+        );
+    }
+    private captureRequestCount(name: string, except: Request): number {
+        return this.requests.filter(
+            (request) =>
+                request !== except &&
+                request.name === name &&
+                (request.builder !== undefined || (request.cacheChecked === true && request.cached === null))
+        ).length;
+    }
+    private serverConfiguration(): SessionConfiguration {
+        return {
+            generationPlan: 2,
+            generationDistance: this.settings.render_distance,
+            generationRate: Math.min(this.settings.generation_requests_per_second, this.settings.pending_requests),
+            realTimeUpdates: false,
+            realTimeDistance: 0,
+            syncEnabled: true,
+            syncDistance: this.settings.render_distance,
+            syncRate: Math.min(this.settings.sync_requests_per_second, this.settings.pending_requests),
+            bandwidthKbps: 0
+        };
+    }
+    private negotiateConfiguration(request: SessionConfiguration): SessionConfiguration {
+        const server = this.serverConfiguration();
+        return {
+            generationPlan: request.generationPlan,
+            generationDistance: Math.min(request.generationDistance, server.generationDistance),
+            generationRate: Math.min(request.generationRate, server.generationRate),
+            realTimeUpdates: false,
+            realTimeDistance: 0,
+            syncEnabled: request.syncEnabled && server.syncEnabled,
+            syncDistance: Math.min(request.syncDistance, server.syncDistance),
+            syncRate: Math.min(request.syncRate, server.syncRate),
+            bandwidthKbps: request.bandwidthKbps
+        };
+    }
     private validate(
         peer: Peer,
         client: Client,
@@ -547,26 +656,31 @@ export class Sessions {
         capacity = true
     ): { reason: string; kind: number } | undefined {
         if (request.level !== peer.level || client.level !== peer.level) return { reason: 'Wrong world', kind: 2 };
-        if (client.disabled) return { reason: 'LOD requests disabled by client', kind: 2 };
+        const sync = request.timestamp !== undefined;
+        const enabled = sync ? client.config.syncEnabled : client.config.generationPlan !== 3;
+        if (!enabled) return { reason: 'LOD requests disabled by client', kind: 2 };
         if (request.section.detail !== SECTION_DETAIL) return { reason: 'Request block-detail sections', kind: 3 };
         const x = request.section.x * SECTION_SIZE_BLOCKS,
             z = request.section.z * SECTION_SIZE_BLOCKS,
-            range = client.distance * CHUNK_SIZE_BLOCKS;
+            playerX = Math.floor(peer.x),
+            playerZ = Math.floor(peer.z),
+            distance = sync ? client.config.syncDistance : client.config.generationDistance,
+            rate = sync ? client.config.syncRate : client.config.generationRate,
+            range = distance * CHUNK_SIZE_BLOCKS,
+            signedEdgeDistance =
+                Math.max(
+                    Math.abs(x + SECTION_SIZE_BLOCKS / 2 - playerX),
+                    Math.abs(z + SECTION_SIZE_BLOCKS / 2 - playerZ)
+                ) -
+                SECTION_SIZE_BLOCKS / 2;
         if (
-            Math.max(Math.abs(x + SECTION_SIZE_BLOCKS / 2 - peer.x), Math.abs(z + SECTION_SIZE_BLOCKS / 2 - peer.z)) >
-                range ||
+            signedEdgeDistance > range ||
             !peer.insideBorder(x, z) ||
             !peer.insideBorder(x + SECTION_SIZE_BLOCKS - 1, z + SECTION_SIZE_BLOCKS - 1)
         )
             return { reason: 'Section outside request range or world border', kind: 1 };
-        // Backpressure includes transfers: don't let repeated requests build an unbounded byte queue.
-        if (
-            client.concurrency === 0 ||
-            (capacity &&
-                (client.packets.length > 0 ||
-                    this.requests.length >= this.settings.pending_requests ||
-                    this.requests.filter((r) => r.name === peer.name).length >= client.concurrency))
-        )
+        // Wire rates shape client demand; this queue is the server's combined backpressure bound.
+        if (capacity && (rate === 0 || this.pendingWorkCount() >= this.settings.pending_requests))
             return { reason: 'LOD request limit reached', kind: 0 };
         return undefined;
     }

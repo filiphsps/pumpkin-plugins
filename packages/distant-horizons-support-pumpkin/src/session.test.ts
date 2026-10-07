@@ -7,14 +7,14 @@ import { Reader } from './protocol/bytes.ts';
 import { packet } from './protocol/messages.ts';
 import { type Peer, Sessions } from './session.ts';
 
-function fixture(measureNow = () => 1000) {
+function fixture(measureNow = () => 1000, now = () => 1000) {
     const files = new MemoryFiles(),
         log = new MemoryLogger();
     const settings = readSettings(files, log);
     settings.blocks_per_tick = 16384;
     settings.packets_per_tick = 16;
     const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries),
-        sessions = new Sessions(settings, cache, log, () => 1000, measureNow);
+        sessions = new Sessions(settings, cache, log, now, measureNow);
     const sent: Uint8Array[] = [];
     const reports: string[] = [];
     let reads = 0;
@@ -50,7 +50,7 @@ function fixture(measureNow = () => 1000) {
         packet(7)
             .int(tracker)
             .string(level)
-            .words(0, (x << 8) | 6)
+            .words((x & 0x0fff_ffff) >>> 24, (((x & 0x0fff_ffff) << 8) | 6) >>> 0)
             .bool(timestamp !== undefined)
             .bytes(timestamp === undefined ? new Uint8Array() : packet(0).timestamp(timestamp).finish().subarray(4))
             .finish();
@@ -62,8 +62,287 @@ function fixture(measureNow = () => 1000) {
             r.short();
             return r.short();
         });
-    return { files, settings, sessions, peer, peers, sent, reports, request, ids, log, reads: () => reads };
+    return { files, settings, cache, sessions, peer, peers, sent, reports, request, ids, log, reads: () => reads };
 }
+
+function clientConfig(
+    options: {
+        plan?: number;
+        generationDistance?: number;
+        generationRate?: number;
+        realTimeUpdates?: boolean;
+        realTimeDistance?: number;
+        sync?: boolean;
+        syncDistance?: number;
+        syncRate?: number;
+        bandwidthKbps?: number;
+    } = {}
+): Uint8Array {
+    return packet(4)
+        .byte(options.plan ?? 2)
+        .int(options.generationDistance ?? 128)
+        .int(0)
+        .int(0)
+        .int(0)
+        .int(options.generationRate ?? 20)
+        .bool(options.realTimeUpdates ?? false)
+        .int(options.realTimeDistance ?? 0)
+        .bool(options.sync ?? true)
+        .int(options.syncDistance ?? 128)
+        .int(options.syncRate ?? 50)
+        .int(options.bandwidthKbps ?? 0)
+        .finish();
+}
+
+function readSessionConfig(bytes: Uint8Array) {
+    const input = new Reader(bytes);
+    input.short();
+    if (input.short() !== 4) throw new Error('Expected a DH session config packet');
+    const result = {
+        plan: input.byte(),
+        generationDistance: input.int(),
+        generationCenterX: input.int(),
+        generationCenterZ: input.int(),
+        generationMaxRadius: input.int(),
+        generationRate: input.int(),
+        realTimeUpdates: input.bool(),
+        realTimeDistance: input.int(),
+        sync: input.bool(),
+        syncDistance: input.int(),
+        syncRate: input.int(),
+        bandwidthKbps: input.int()
+    };
+    input.end();
+    return result;
+}
+
+describe('DH protocol contracts', () => {
+    it('acknowledges client configuration updates with negotiated request classes', () => {
+        const f = fixture();
+        f.settings.generation_requests_per_second = 19;
+        f.settings.sync_requests_per_second = 10;
+        f.settings.requests_per_player = 16;
+        f.sent.length = 0;
+
+        f.sessions.receive(
+            f.peer,
+            clientConfig({
+                generationDistance: 64,
+                generationRate: 100,
+                sync: true,
+                syncDistance: 256,
+                syncRate: 100,
+                bandwidthKbps: 500
+            })
+        );
+
+        expect(f.ids()).toEqual([4]);
+        expect(readSessionConfig(f.sent[0] ?? new Uint8Array())).toMatchObject({
+            generationDistance: 64,
+            generationRate: 16,
+            sync: true,
+            syncDistance: 128,
+            syncRate: 10,
+            bandwidthKbps: 500
+        });
+    });
+
+    it('serves sync requests while generation is disabled', () => {
+        const f = fixture();
+        f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
+        f.sent.length = 0;
+        f.sessions.receive(f.peer, clientConfig({ plan: 3, sync: true }));
+        f.sent.length = 0;
+
+        f.sessions.receive(f.peer, f.request(7, 'world', 0, 0));
+        f.sessions.tick(f.peers);
+
+        expect(f.ids()).toEqual([10, 8]);
+    });
+
+    it('uses the client nearest-edge distance at positive and negative range boundaries', () => {
+        const f = fixture();
+        f.peer.x = 0;
+        f.peer.z = 0;
+
+        f.sessions.receive(f.peer, f.request(1, 'world', 32));
+        f.sessions.receive(f.peer, f.request(2, 'world', -33));
+
+        expect(f.ids()).toEqual([]);
+        expect(f.sessions.status()).toContain('2 pending LOD request(s)');
+    });
+
+    it('preserves pending trackers and negotiated settings on a matching init', () => {
+        const f = fixture();
+        f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
+        f.sessions.receive(f.peer, f.request(42));
+        f.sessions.receive(f.peer, clientConfig({ generationRate: 7, syncRate: 9 }));
+        f.sessions.receive(f.peer, packet(3).string(f.peer.dimension).finish());
+        f.sent.length = 0;
+
+        f.sessions.tick(f.peers);
+
+        expect(f.ids()).toContain(8);
+        expect(f.sessions.status()).toContain('1 served');
+    });
+
+    it('continues cached delivery while forced capture work is active', () => {
+        const f = fixture();
+        f.peer.terrain.height = 16;
+        f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
+        f.sessions.forceGenerate(f.peer, 96, 32);
+        f.sessions.receive(f.peer, f.request());
+
+        f.sessions.tick(f.peers);
+
+        expect(f.ids()).toEqual([10, 8]);
+        expect(f.reads()).toBeGreaterThan(0);
+    });
+
+    it('delivers a cached request while terrain misses wait with zero capture budget', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 64;
+        f.cache.put('world:2:0', { updated: 1000, data: new Uint8Array(64).fill(3) });
+        f.sessions.receive(f.peer, f.request(1));
+        f.sessions.receive(f.peer, f.request(2, 'world', 1));
+        f.sessions.receive(f.peer, f.request(3, 'world', 2));
+
+        f.sessions.tick(f.peers, 45);
+
+        expect(f.ids()).toEqual([10, 8]);
+        expect(f.reads()).toBe(0);
+        expect(f.sessions.status()).toContain('2 pending LOD request(s)');
+        expect(f.sessions.status()).toContain('1 served');
+    });
+
+    it('lets a cached response bypass a full per-player capture slot', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 64;
+        f.settings.requests_per_player = 1;
+        f.cache.put('world:2:0', { updated: 1000, data: new Uint8Array(64).fill(3) });
+        f.sessions.receive(f.peer, f.request(1));
+        f.sessions.receive(f.peer, f.request(2, 'world', 1));
+        f.sessions.tick(f.peers);
+        f.sessions.tick(f.peers);
+        expect(f.sessions.status()).toContain('2 pending LOD request(s)');
+
+        f.sessions.receive(f.peer, f.request(3, 'world', 2));
+        f.sessions.tick(f.peers);
+
+        expect(f.ids()).toContain(8);
+        expect(f.sessions.status()).toContain('1 served');
+        expect(f.sessions.status()).toContain('2 pending LOD request(s)');
+    });
+
+    it('adopts requests while an earlier response is queued and keeps that transfer on config changes', () => {
+        const f = fixture();
+        f.settings.cached_packets_per_tick = 0;
+        f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
+        f.cache.put('world:1:0', { updated: 1000, data: new Uint8Array(64).fill(2) });
+        f.sessions.receive(f.peer, f.request(10));
+        f.sessions.tick(f.peers);
+        expect(f.sessions.status()).toContain('1 response(s)');
+
+        f.sessions.receive(f.peer, f.request(10));
+        expect(f.sessions.status()).toContain('1 response(s)');
+        expect(f.ids()).toEqual([]);
+
+        f.sessions.receive(f.peer, f.request(11, 'world', 1));
+        expect(f.sessions.status()).toContain('1 pending LOD request(s)');
+        f.sessions.tick(f.peers);
+        expect(f.sessions.status()).toContain('2 response(s)');
+
+        f.sessions.receive(f.peer, clientConfig({ plan: 3 }));
+        expect(f.sessions.status()).toContain('2 response(s)');
+        f.settings.cached_packets_per_tick = 16;
+        f.sessions.tick(f.peers);
+
+        expect(f.ids()).toContain(4);
+        expect(f.ids().filter((id) => id === 8)).toHaveLength(2);
+        expect(f.sessions.status()).toContain('2 served');
+    });
+
+    it('applies and updates the nonzero client bandwidth limit during a transfer', () => {
+        let now = 0;
+        const f = fixture(
+            () => now,
+            () => now
+        );
+        f.cache.put('world:0:0', { updated: 0, data: new Uint8Array(60_000).fill(1) });
+        f.sessions.receive(f.peer, clientConfig({ bandwidthKbps: 1 }));
+        f.sent.length = 0;
+        f.sessions.receive(f.peer, f.request());
+
+        f.sessions.tick(f.peers);
+        expect(f.sent).toHaveLength(0);
+
+        now = 31_000;
+        f.sessions.tick(f.peers);
+        expect(f.ids()).toEqual([10]);
+
+        f.sessions.receive(f.peer, clientConfig({ bandwidthKbps: 2 }));
+        f.sent.length = 0;
+
+        now = 46_006;
+        f.sessions.tick(f.peers);
+        expect(f.ids()).toEqual([]);
+
+        now = 46_007;
+        f.sessions.tick(f.peers);
+        expect(f.ids()).toEqual([10]);
+
+        now = 46_016;
+        f.sessions.tick(f.peers);
+        expect(f.ids()).toEqual([10, 8]);
+    });
+
+    it('rotates transfer service so a small response finishes beside a large response', () => {
+        const f = fixture();
+        f.settings.cached_packets_per_tick = 1;
+        f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(60_000).fill(1) });
+        f.cache.put('world:1:0', { updated: 1000, data: new Uint8Array(64).fill(2) });
+        const bobSent: Uint8Array[] = [];
+        const bob: Peer = { ...f.peer, name: 'Bob', send: (bytes) => bobSent.push(bytes) };
+        const peers = {
+            withPeer: (name: string, use: (peer: Peer) => void) => {
+                const peer = name === f.peer.name ? f.peer : name === bob.name ? bob : undefined;
+                if (!peer) return false;
+                use(peer);
+                return true;
+            }
+        };
+        f.sessions.receive(bob, packet(3).string(bob.dimension).finish());
+        f.sent.length = 0;
+        bobSent.length = 0;
+
+        f.sessions.receive(f.peer, f.request(1));
+        f.sessions.receive(bob, f.request(2, 'world', 1));
+        for (let tick = 0; tick < 4; tick++) f.sessions.tick(peers);
+
+        const ids = bobSent.map((bytes) => {
+            const input = new Reader(bytes);
+            input.short();
+            return input.short();
+        });
+        expect(ids).toContain(8);
+        expect(f.sessions.status()).toContain('1 served');
+    });
+
+    it('continues the transfer lane whose packet budget remains available', () => {
+        const f = fixture();
+        f.settings.packets_per_tick = 1;
+        f.settings.cached_packets_per_tick = 1;
+        f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
+        f.sessions.receive(f.peer, f.request(1));
+        f.sessions.receive(f.peer, f.request(2, 'world', 1));
+
+        f.sessions.tick(f.peers);
+
+        expect(f.ids()).toEqual([10, 10]);
+        expect(f.sessions.status()).toContain('2 response(s)');
+    });
+});
+
 describe('DH sessions', () => {
     it('runs forced captures at their fixed budget ahead of DH capture work', () => {
         const f = fixture();
@@ -81,7 +360,7 @@ describe('DH sessions', () => {
         expect(f.reads()).toBe(32768);
         expect(f.sessions.status()).toContain('Forced LOD capture for Alice: 50%');
         expect(f.sessions.status()).toContain('Forced budget up to 32768 block samples/tick');
-        expect(f.sessions.status()).toContain('ordinary DH sampling paused');
+        expect(f.sessions.status()).toContain('ordinary capture sampling paused');
         expect(f.reports.at(-1)).toContain('50%');
 
         f.sessions.tick(f.peers);
@@ -220,6 +499,7 @@ describe('DH sessions', () => {
         pending.sessions.receive(pending.peer, disabled);
         expect(pending.sessions.status()).toContain('0 pending');
         expect(pending.sessions.status()).not.toContain('Capturing');
+        expect(pending.ids()).toContain(6);
         const readsAfterDisable = pending.reads();
         pending.sessions.tick(pending.peers);
         expect(pending.reads()).toBe(readsAfterDisable);
@@ -230,13 +510,17 @@ describe('DH sessions', () => {
         expect(pending.sessions.status()).toContain('LOD requests disabled by client');
 
         const queued = fixture();
-        queued.settings.packets_per_tick = 0;
+        queued.settings.cached_packets_per_tick = 0;
+        queued.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
         queued.sessions.receive(queued.peer, queued.request());
         queued.sessions.tick(queued.peers);
         expect(queued.sessions.status()).not.toContain('0 queued packet(s)');
 
         queued.sessions.receive(queued.peer, disabled);
-        expect(queued.sessions.status()).toContain('0 queued packet(s)');
+        expect(queued.sessions.status()).toContain('1 response(s)');
+        queued.settings.cached_packets_per_tick = 16;
+        queued.sessions.tick(queued.peers);
+        expect(queued.sessions.status()).toContain('1 served');
     });
     it('drops a pending capture when a client closes its session', () => {
         const f = fixture();
@@ -279,7 +563,7 @@ describe('DH sessions', () => {
         expect(f.ids().filter((id) => id === 8)).toHaveLength(2);
     });
     it('scales capture work with server MSPT and the measured cost of block samples', () => {
-        const times = [0, 5, 5, 10];
+        const times = [0, 0, 0, 0, 5, 5, 5, 5, 10, 10];
         const f = fixture(() => times.shift() ?? 10);
         f.settings.blocks_per_tick = 32768;
         let reads = 0;
@@ -472,7 +756,7 @@ describe('DH sessions', () => {
         expect(f.ids().at(-1)).toBe(8);
         expect(f.sessions.status()).toContain('0 pending');
     });
-    it('rejects wrong worlds, distant terrain, borders and too many requests', () => {
+    it('rejects invalid requests and applies the combined queue capacity', () => {
         const f = fixture();
         f.sessions.receive(f.peer, f.request(1, 'other'));
         expect(f.ids()).toEqual([6]);
@@ -484,6 +768,7 @@ describe('DH sessions', () => {
         expect(f.ids()).toEqual([6, 6]);
         f.peer.insideBorder = () => true;
         f.sent.length = 0;
+        f.settings.pending_requests = 2;
         f.sessions.receive(f.peer, f.request(4));
         f.sessions.receive(f.peer, f.request(5));
         f.sessions.receive(f.peer, f.request(6));
@@ -524,7 +809,10 @@ describe('DH sessions', () => {
         f.sessions.tick(f.peers);
         expect(f.sent).toHaveLength(1);
         f.sessions.receive(f.peer, f.request(3));
-        expect(f.ids().at(-1)).toBe(6);
+        expect(f.ids().at(-1)).toBe(10);
+        expect(f.sessions.status()).toContain('1 pending LOD request(s)');
+        for (let tick = 0; tick < 4; tick++) f.sessions.tick(f.peers);
+        expect(f.sessions.status()).toContain('2 served');
     });
     it('resets pending requests on a world change and closes malformed sessions', () => {
         const f = fixture();
@@ -532,7 +820,7 @@ describe('DH sessions', () => {
         f.peer.level = 'world_nether';
         f.peer.dimension = 'minecraft:the_nether';
         f.sessions.tick(f.peers);
-        expect(f.ids()).toEqual([2, 4]);
+        expect(f.ids()).toEqual([1, 2, 4]);
         expect(f.sessions.status()).toContain('0 pending');
         f.sent.length = 0;
         f.sessions.receive(f.peer, new Uint8Array([0]));

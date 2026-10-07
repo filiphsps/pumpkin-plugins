@@ -106,7 +106,7 @@ describe('the /dhs commands', () => {
         expect(status.length).toBeGreaterThan(1);
         expect(status[0]).toContain('§60§r Distant Horizons client(s), §60§r pending LOD request(s)');
         expect(status.find((line) => line.includes('Capture budget'))).toContain(
-            'Capture budget §60§r/§68192§r block samples/tick at §60.0§r MSPT'
+            'Capture budget §60§r/§68192§r block samples/tick at §60.0§r reported MSPT'
         );
         expect(status.every((line) => line.length <= 120)).toBe(true);
     });
@@ -242,9 +242,11 @@ describe('the /dhs commands', () => {
         const { host, root } = setup();
         const status = host.run(root, ['dhs', 'status']).map((line) => line.replace(/§./g, ''));
 
-        expect(status).toHaveLength(5);
+        expect(status).toHaveLength(7);
         expect(status[0]).toContain('0 Distant Horizons client(s), 0 pending LOD request(s)');
-        expect(status.some((line) => line.includes('Capture budget 0/8192 block samples/tick at 0.0 MSPT'))).toBe(true);
+        expect(
+            status.some((line) => line.includes('Capture budget 0/8192 block samples/tick at 0.0 reported MSPT'))
+        ).toBe(true);
         expect(status.every((line) => line.length <= 120)).toBe(true);
     });
 });
