@@ -3,7 +3,12 @@ import { AdaptiveWorkBudget, type TerrainSource } from '@pumpkin-plugins/terrain
 import type { Settings } from './config/schema.ts';
 import { LodBuilder } from './lod/builder.ts';
 import type { CachedLod, LodCache } from './lod/cache.ts';
-import { ForcedLodGeneration, type ForcedLodPeer, type ForcedLodStart } from './lod/force-generation.ts';
+import {
+    FORCE_BLOCK_SAMPLES_PER_TICK,
+    ForcedLodGeneration,
+    type ForcedLodPeer,
+    type ForcedLodStart
+} from './lod/force-generation.ts';
 import { sectionKey } from './lod/generation.ts';
 import { PLUGIN_NAME } from './name.ts';
 import { CHUNK_SIZE_BLOCKS, SECTION_DETAIL, SECTION_SIZE_BLOCKS } from './protocol/constants.ts';
@@ -289,13 +294,17 @@ export class Sessions {
     }
     /** Describes current queues for the operator command. */
     status(): string {
+        const forced = this.forcedGeneration.status();
         const request = this.requests[0];
         const progress = request?.builder
-            ? ` Capturing ${request.level} ${request.section.x}, ${request.section.z}: ${(request.builder.progress() * 100).toFixed(1)}%.`
+            ? forced
+                ? ` Paused DH capture ${request.level} ${request.section.x}, ${request.section.z}: ${(request.builder.progress() * 100).toFixed(1)}%.`
+                : ` Capturing ${request.level} ${request.section.x}, ${request.section.z}: ${(request.builder.progress() * 100).toFixed(1)}%.`
             : '';
         const packets = [...this.clients.values()].reduce((sum, client) => sum + client.packets.length, 0);
-        const budget = ` Capture budget ${this.lastBlocksBudget}/${this.settings.blocks_per_tick} block samples/tick at ${this.lastServerMspt.toFixed(1)} MSPT.`;
-        const forced = this.forcedGeneration.status();
+        const budget = forced
+            ? ` Forced budget up to ${FORCE_BLOCK_SAMPLES_PER_TICK} block samples/tick; ordinary DH sampling paused.`
+            : ` Capture budget ${this.lastBlocksBudget}/${this.settings.blocks_per_tick} block samples/tick at ${this.lastServerMspt.toFixed(1)} MSPT.`;
         return `${this.clients.size} DH client(s), ${this.requests.length} pending LOD request(s). ${this.ticks} worker tick(s), ${this.served} served, ${this.rejected} rejected, ${this.cancelled} cancelled, ${packets} queued packet(s).${progress}${forced ? ` ${forced}` : ''}${budget}${this.lastFailure ? ` Last rejection: ${this.lastFailure}.` : ''} Distant chunk generation is unavailable in the pinned Pumpkin API.`;
     }
     private announce(peer: Peer): void {

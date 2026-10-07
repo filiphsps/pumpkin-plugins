@@ -80,6 +80,8 @@ describe('DH sessions', () => {
         f.sessions.tick(f.peers);
         expect(f.reads()).toBe(32768);
         expect(f.sessions.status()).toContain('Forced LOD capture for Alice: 50%');
+        expect(f.sessions.status()).toContain('Forced budget up to 32768 block samples/tick');
+        expect(f.sessions.status()).toContain('ordinary DH sampling paused');
         expect(f.reports.at(-1)).toContain('50%');
 
         f.sessions.tick(f.peers);
