@@ -1,4 +1,5 @@
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
+import { unavailableChunkLoader, unavailableTerrainGenerator } from '@pumpkin-plugins/terrain';
 import { describe, expect, it } from 'vitest';
 import { readSettings } from './config/load.ts';
 import { LodCache } from './lod/cache.ts';
@@ -25,9 +26,11 @@ function fixture() {
         terrain: {
             minY: 0,
             height: 1,
+            chunkLoader: unavailableChunkLoader,
+            terrainGenerator: unavailableTerrainGenerator,
             sample: () => {
                 reads++;
-                return { mapping: 'minecraft:plains_DH-BSW_minecraft:stone', sky: 15, block: 0 };
+                return { material: 'minecraft:plains_DH-BSW_minecraft:stone', skyLight: 15, blockLight: 0 };
             }
         },
         insideBorder: () => true,
@@ -61,9 +64,7 @@ function fixture() {
 describe('DH sessions', () => {
     it('checks unloaded sections before sampling and reports rejection instead of a static queue', () => {
         const f = fixture();
-        f.peer.terrain.prepare = () => {
-            throw new Error('Chunk 3, 3 is not loaded');
-        };
+        f.peer.terrain.prepare = () => ({ status: 'unavailable', reason: 'Chunk 3, 3 is not loaded' });
         f.sessions.receive(f.peer, f.request());
         f.sessions.receive(f.peer, f.request(2));
         f.sessions.tick(f.peers);
@@ -74,6 +75,24 @@ describe('DH sessions', () => {
         f.sessions.tick(f.peers);
         expect(f.sessions.status()).toContain('0 pending');
         expect(f.ids()).toEqual([6, 6]);
+    });
+    it('waits for terrain preparation and retries before sampling', () => {
+        const f = fixture();
+        let attempts = 0;
+        f.peer.terrain.prepare = () => {
+            attempts++;
+            return attempts === 1 ? { status: 'pending' } : { status: 'ready' };
+        };
+
+        f.sessions.receive(f.peer, f.request());
+        f.sessions.tick(f.peers);
+        expect(f.reads()).toBe(0);
+        expect(f.sessions.status()).toContain('1 pending');
+
+        f.sessions.tick(f.peers);
+        expect(attempts).toBe(2);
+        expect(f.reads()).toBe(4096);
+        expect(f.sessions.status()).toContain('1 served');
     });
     it('shows capture progress and distinguishes cancellations from completed work', () => {
         const f = fixture();
@@ -152,12 +171,14 @@ describe('DH sessions', () => {
         f.peer.terrain = {
             minY: 0,
             height: 384,
-            prepare: () => {},
+            chunkLoader: unavailableChunkLoader,
+            terrainGenerator: unavailableTerrainGenerator,
+            prepare: () => ({ status: 'ready' as const }),
             top: () => 3,
             sample: (_x, y) => ({
-                mapping: `minecraft:plains_DH-BSW_minecraft:${y > 3 ? 'air' : 'stone'}`,
-                sky: 15,
-                block: 0
+                material: `minecraft:plains_DH-BSW_minecraft:${y > 3 ? 'air' : 'stone'}`,
+                skyLight: 15,
+                blockLight: 0
             })
         };
         f.sessions.receive(f.peer, f.request());

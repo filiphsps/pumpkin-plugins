@@ -33,7 +33,7 @@ describe('QuickJS resource compatibility', () => {
         } as unknown as Player;
         expect(
             withPlayer(player, { ...values.support, worlds: values.worlds }, (peer) => {
-                expect(peer.terrain.sample(0, 64, 0).sky).toBe(15);
+                expect(peer.terrain.sample(0, 64, 0).skyLight).toBe(15);
                 peer.send(new Uint8Array([1]));
             })
         ).toBe(true);

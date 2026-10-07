@@ -1,6 +1,7 @@
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
+import type { TerrainAccess } from '@pumpkin-plugins/terrain';
 import type { Settings } from './config/schema.ts';
-import { LodBuilder, type Terrain } from './lod/builder.ts';
+import { LodBuilder } from './lod/builder.ts';
 import type { CachedLod, LodCache } from './lod/cache.ts';
 import { PLUGIN_NAME } from './name.ts';
 import { CHUNK_SIZE_BLOCKS, SECTION_DETAIL, SECTION_SIZE_BLOCKS } from './protocol/constants.ts';
@@ -23,7 +24,7 @@ export interface Peer {
     dimension: string;
     x: number;
     z: number;
-    terrain: Terrain;
+    terrain: TerrainAccess;
     insideBorder(x: number, z: number): boolean;
     send(bytes: Uint8Array): void;
 }
@@ -185,7 +186,16 @@ export class Sessions {
                         request.fallback = cached;
                         if (builderStepped) return;
                         builderStepped = true;
-                        peer.terrain.prepare?.(request.section);
+                        const prepared = peer.terrain.prepare?.({
+                            originX: request.section.x * SECTION_SIZE_BLOCKS,
+                            originZ: request.section.z * SECTION_SIZE_BLOCKS,
+                            width: SECTION_SIZE_BLOCKS,
+                            depth: SECTION_SIZE_BLOCKS,
+                            minY: peer.terrain.minY,
+                            height: peer.terrain.height
+                        });
+                        if (prepared?.status === 'pending') return;
+                        if (prepared && prepared.status !== 'ready') throw new Error(prepared.reason);
                         request.builder = new LodBuilder(request.section, peer.terrain.minY, peer.terrain.height);
                     } else {
                         if (builderStepped) return;

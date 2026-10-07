@@ -40,6 +40,7 @@
     },
     "dependencies": {
         "@pumpkin-plugins/plugin-kit": "workspace:*",
+        "@pumpkin-plugins/terrain": "workspace:*",
         "@pumpkinmc/pumpkin-api-ts": "catalog:"
     },
     "devDependencies": {

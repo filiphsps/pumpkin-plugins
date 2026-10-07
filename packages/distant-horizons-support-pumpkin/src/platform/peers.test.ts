@@ -53,7 +53,7 @@ describe('Pumpkin terrain adapter', () => {
                 expect(peer.insideBorder(6, 0)).toBe(false);
                 expect(peer.insideBorder(-5, 0)).toBe(true);
                 expect(peer.insideBorder(-6, 0)).toBe(false);
-                expect(peer.terrain.sample(-1, 64, -17).mapping).toBe(
+                expect(peer.terrain.sample(-1, 64, -17).material).toBe(
                     'minecraft:old_growth_pine_taiga_DH-BSW_minecraft:oak_log_STATE_{axis:y}{waterlogged:false}'
                 );
                 expect(world.getChunk).toHaveBeenCalledWith(-1, -2);
@@ -85,11 +85,23 @@ describe('Pumpkin terrain adapter', () => {
             getName: () => 'Alice',
             getPosition: () => [0, 64, 0]
         };
-        expect(() =>
+        expect(
             withPlayer(player as unknown as Player, { ...values.support, worlds: values.worlds }, (peer) => {
-                peer.terrain.prepare?.({ high: 0, low: 6, detail: 6, x: -1, z: -2 });
+                expect(
+                    peer.terrain.prepare?.({
+                        originX: -64,
+                        originZ: -128,
+                        width: 64,
+                        depth: 64,
+                        minY: -64,
+                        height: 384
+                    })
+                ).toMatchObject({
+                    status: 'unavailable',
+                    reason: expect.stringContaining('Chunk -1, -5 is not loaded')
+                });
             })
-        ).toThrow('Chunk -1, -5 is not loaded');
+        ).toBe(true);
         expect(getChunk).toHaveBeenCalledTimes(16);
         expect(getChunk).toHaveBeenNthCalledWith(1, -4, -8);
         for (const handle of [...chunks, border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();

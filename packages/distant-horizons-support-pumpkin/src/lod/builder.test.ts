@@ -13,10 +13,10 @@ describe('LOD builder', () => {
             sample: (_x: number, y: number, _z: number) => {
                 reads++;
                 return {
-                    mapping:
+                    material:
                         y === -62 ? 'minecraft:plains_DH-BSW_minecraft:air' : 'minecraft:plains_DH-BSW_minecraft:stone',
-                    sky: y === -62 ? 15 : 4,
-                    block: 2
+                    skyLight: y === -62 ? 15 : 4,
+                    blockLight: 2
                 };
             }
         };
@@ -59,7 +59,11 @@ describe('LOD builder', () => {
         let reads = 0;
         const sample = (_x: number, y: number, _z: number) => {
             reads++;
-            return { mapping: `minecraft:plains_DH-BSW_minecraft:${y > -62 ? 'air' : 'stone'}`, sky: 15, block: 0 };
+            return {
+                material: `minecraft:plains_DH-BSW_minecraft:${y > -62 ? 'air' : 'stone'}`,
+                skyLight: 15,
+                blockLight: 0
+            };
         };
         baseline.step({ minY: -64, height: 384, sample }, 4096 * 384);
         const expected = baseline.finish(100);
@@ -78,7 +82,11 @@ describe('LOD builder', () => {
         const builder = new LodBuilder(section, 0, 3);
         expect(
             builder.step(
-                { minY: 0, height: 3, sample: (_x, y) => ({ mapping: y === 1 ? 'air' : 'stone', sky: 0, block: 0 }) },
+                {
+                    minY: 0,
+                    height: 3,
+                    sample: (_x, y) => ({ material: y === 1 ? 'air' : 'stone', skyLight: 0, blockLight: 0 })
+                },
                 12288
             )
         ).toBe(true);
@@ -96,7 +104,7 @@ describe('LOD builder', () => {
         const terrain = {
             minY: 0,
             height: 33,
-            sample: (_x: number, y: number) => ({ mapping: y % 2 ? 'stone' : 'air', sky: 0, block: 0 })
+            sample: (_x: number, y: number) => ({ material: y % 2 ? 'stone' : 'air', skyLight: 0, blockLight: 0 })
         };
         expect(() => builder.step(terrain, 4096 * 33)).toThrow('too complex');
     });
