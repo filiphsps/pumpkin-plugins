@@ -69,6 +69,9 @@ metadata, or `typedoc.json` instead.
 VitePress adds an **Edit this page on GitHub** link to Markdown pages. Generated API pages link that
 action to the corresponding source file where TypeDoc can identify one.
 
+The site shows **Last updated** using Git history. The docs workflow fetches full history so pages
+that were not changed in the latest commit still show their latest edit time.
+
 ## Local commands
 
 Run `pnpm run docs` to generate bindings and the API reference, then build the complete static site.

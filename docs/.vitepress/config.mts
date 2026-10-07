@@ -514,6 +514,7 @@ const themeConfig = {
         text: 'Edit this page on GitHub',
         pattern: ({ frontmatter }: { frontmatter: Record<string, unknown> }) => frontmatter.editLink as string
     },
+    lastUpdated: { text: 'Last updated' },
     search: { provider: 'local' as const },
     socialLinks: [{ icon: 'github' as const, link: repoUrl }],
     footer: {
@@ -577,5 +578,6 @@ export default defineConfig({
     description: 'Guides and references for Pumpkin plugins, actions, and developer tools.',
     cleanUrls: true,
     base: siteBase,
+    lastUpdated: true,
     themeConfig
 });
