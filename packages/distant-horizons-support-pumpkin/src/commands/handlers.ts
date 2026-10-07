@@ -31,15 +31,15 @@ export function commandHandlers(
         },
         'dhs cache memory clear': () => [`Cleared ${cache.clearMemory()} in-memory cache entries.`],
         'dhs cache disk clear': () => [`Cleared ${cache.clearDisk()} disk cache entries.`],
-        'dhs map here': (sender) => showMap(cache, sender, DEFAULT_LOD_MAP_RADIUS),
-        'dhs map here-radius <radius>': (sender, { radius }) => showMap(cache, sender, radius),
-        'dhs map at <x> <z>': (sender, { x, z }) => showMap(cache, sender, DEFAULT_LOD_MAP_RADIUS, [x, z]),
-        'dhs map at-radius <x> <z> <radius>': (sender, { x, z, radius }) => showMap(cache, sender, radius, [x, z]),
-        'dhs generate here': (sender) => generateLods(sessions, settings, sender, DEFAULT_LOD_GENERATION_RADIUS),
-        'dhs generate here-radius <radius>': (sender, { radius }) => generateLods(sessions, settings, sender, radius),
-        'dhs generate at <x> <z>': (sender, { x, z }) =>
+        'dhs map': (sender) => showMap(cache, sender, DEFAULT_LOD_MAP_RADIUS),
+        'dhs map <radius>': (sender, { radius }) => showMap(cache, sender, radius),
+        'dhs map <x> <z>': (sender, { x, z }) => showMap(cache, sender, DEFAULT_LOD_MAP_RADIUS, [x, z]),
+        'dhs map <x> <z> <radius>': (sender, { x, z, radius }) => showMap(cache, sender, radius, [x, z]),
+        'dhs generate': (sender) => generateLods(sessions, settings, sender, DEFAULT_LOD_GENERATION_RADIUS),
+        'dhs generate <radius>': (sender, { radius }) => generateLods(sessions, settings, sender, radius),
+        'dhs generate <x> <z>': (sender, { x, z }) =>
             generateLods(sessions, settings, sender, DEFAULT_LOD_GENERATION_RADIUS, [x, z]),
-        'dhs generate at-radius <x> <z> <radius>': (sender, { x, z, radius }) =>
+        'dhs generate <x> <z> <radius>': (sender, { x, z, radius }) =>
             generateLods(sessions, settings, sender, radius, [x, z])
     };
 }
@@ -66,7 +66,8 @@ function generateLods(
         if (!found) throw new CommandFailed('Run this command as a Java player so terrain access is available.');
         if (!started) throw new CommandFailed('Could not start forced LOD capture.');
         return [
-            `Started forced LOD capture at section ${started.centerX}, ${started.centerZ} (radius ${radius}; ${started.sections - started.skippedOutsideBorder}/${started.sections} sections inside the world border).`,
+            `Started forced LOD capture at section ${started.centerX}, ${started.centerZ} (radius ${radius}; ${started.sections} sections requested).`,
+            'Already-generated LOD sections and sections outside the world border will be skipped.',
             `Capturing at full speed with up to ${FORCE_BLOCK_SAMPLES_PER_TICK.toLocaleString()} block samples per tick. Progress will be reported in chat.`
         ];
     } catch (err) {

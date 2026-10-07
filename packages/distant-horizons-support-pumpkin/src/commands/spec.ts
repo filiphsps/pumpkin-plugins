@@ -5,6 +5,8 @@ import { PLUGIN_NAME } from '../name.ts';
 
 /** Permission node required to use the `/dhs` commands. */
 export const COMMAND_PERMISSION = `${PLUGIN_NAME}:command.dhs` as const;
+const mapRadiusLimit = MAX_LOD_MAP_RADIUS.toLocaleString('en-US').replace(/,/g, '_');
+const generationRadiusLimit = MAX_LOD_GENERATION_RADIUS.toLocaleString('en-US').replace(/,/g, '_');
 
 /** Operator commands for inspecting DH work and managing cached terrain. */
 export const commands = defineCommands(PLUGIN_NAME, {
@@ -51,69 +53,36 @@ export const commands = defineCommands(PLUGIN_NAME, {
                 }
             },
             map: {
-                description: 'Visualize cached LOD sections',
+                description: `Show cached LOD sections at your position or block coordinates (default radius 4; maximum ${mapRadiusLimit} sections)`,
                 permission: `${COMMAND_PERMISSION}.map`,
-                subcommands: {
-                    here: {
-                        description: 'Show cached LOD sections around your position (default radius 4 sections)',
-                        permission: `${COMMAND_PERMISSION}.map.here`
-                    },
-                    'here-radius': {
-                        description: `Show cached LOD sections around your position with radius 0–${MAX_LOD_MAP_RADIUS} sections`,
-                        permission: `${COMMAND_PERMISSION}.map.here-radius`,
-                        arguments: [{ name: 'radius', type: 'integer', min: 0, max: MAX_LOD_MAP_RADIUS }]
-                    },
-                    at: {
-                        description:
-                            'Show cached LOD sections around block coordinates in your current world (default radius 4 sections)',
-                        permission: `${COMMAND_PERMISSION}.map.at`,
-                        arguments: [
-                            { name: 'x', type: 'integer' },
-                            { name: 'z', type: 'integer' }
-                        ]
-                    },
-                    'at-radius': {
-                        description: `Show cached LOD sections at block coordinates with radius 0–${MAX_LOD_MAP_RADIUS} sections`,
-                        permission: `${COMMAND_PERMISSION}.map.at-radius`,
-                        arguments: [
-                            { name: 'x', type: 'integer' },
-                            { name: 'z', type: 'integer' },
-                            { name: 'radius', type: 'integer', min: 0, max: MAX_LOD_MAP_RADIUS }
-                        ]
-                    }
-                }
+                argumentVariants: [
+                    [{ name: 'radius', type: 'integer', min: 0, max: MAX_LOD_MAP_RADIUS }],
+                    [
+                        { name: 'x', type: 'integer' },
+                        { name: 'z', type: 'integer' }
+                    ],
+                    [
+                        { name: 'x', type: 'integer' },
+                        { name: 'z', type: 'integer' },
+                        { name: 'radius', type: 'integer', min: 0, max: MAX_LOD_MAP_RADIUS }
+                    ]
+                ]
             },
             generate: {
-                description: 'Force-build and cache LOD sections at full work speed',
+                description: `Force-build LOD sections at your position or block coordinates (default radius 0; maximum ${generationRadiusLimit} sections)`,
                 permission: `${COMMAND_PERMISSION}.generate`,
-                subcommands: {
-                    here: {
-                        description: 'Force-build the LOD section at your current position',
-                        permission: `${COMMAND_PERMISSION}.generate.here`
-                    },
-                    'here-radius': {
-                        description: `Force-build LOD sections around your position with radius 0–${MAX_LOD_GENERATION_RADIUS}`,
-                        permission: `${COMMAND_PERMISSION}.generate.here-radius`,
-                        arguments: [{ name: 'radius', type: 'integer', min: 0, max: MAX_LOD_GENERATION_RADIUS }]
-                    },
-                    at: {
-                        description: 'Force-build the LOD section at block coordinates in your current world',
-                        permission: `${COMMAND_PERMISSION}.generate.at`,
-                        arguments: [
-                            { name: 'x', type: 'integer' },
-                            { name: 'z', type: 'integer' }
-                        ]
-                    },
-                    'at-radius': {
-                        description: `Force-build LOD sections at block coordinates with radius 0–${MAX_LOD_GENERATION_RADIUS}`,
-                        permission: `${COMMAND_PERMISSION}.generate.at-radius`,
-                        arguments: [
-                            { name: 'x', type: 'integer' },
-                            { name: 'z', type: 'integer' },
-                            { name: 'radius', type: 'integer', min: 0, max: MAX_LOD_GENERATION_RADIUS }
-                        ]
-                    }
-                }
+                argumentVariants: [
+                    [{ name: 'radius', type: 'integer', min: 0, max: MAX_LOD_GENERATION_RADIUS }],
+                    [
+                        { name: 'x', type: 'integer' },
+                        { name: 'z', type: 'integer' }
+                    ],
+                    [
+                        { name: 'x', type: 'integer' },
+                        { name: 'z', type: 'integer' },
+                        { name: 'radius', type: 'integer', min: 0, max: MAX_LOD_GENERATION_RADIUS }
+                    ]
+                ]
             }
         }
     }

@@ -23,10 +23,10 @@ describe('LOD map', () => {
         const lines = renderLodMap(cache, 'overworld', -1, -1, 1);
 
         expect(plain(lines[0])).toContain('center section -1, -1');
-        expect(lines.slice(1, 4).map(plain)).toEqual(['···', '·◆·', '···']);
+        expect(lines.slice(1, 4).map(plain)).toEqual(['□□□', '□◆□', '□□□']);
         expect(plain(lines.at(-1))).toContain('built');
         expect(lines.join('\n')).toContain('§a█');
-        expect(lines.join('\n')).toContain('§8·');
+        expect(lines.join('\n')).toContain('§8□');
     });
 
     it('uses block coordinates for a specific position and floors negative coordinates', () => {
@@ -43,5 +43,17 @@ describe('LOD map', () => {
         const { cache } = setup();
 
         expect(renderLodMap(cache, 'overworld', 0, 0, 0).map(plain).join('\n')).toContain('64 blocks');
+    });
+
+    it('keeps the maximum map radius bounded by downsampling the display', () => {
+        const { cache, lod } = setup();
+        lod('overworld', 16_384, -16_384);
+
+        const lines = renderLodMap(cache, 'overworld', 0, 0, 16_384);
+
+        expect(lines).toHaveLength(67);
+        expect([...(plain(lines[1]) ?? '')]).toHaveLength(65);
+        expect(lines.join('\n')).toContain('downsampled');
+        expect(lines.join('\n')).toContain('§a█');
     });
 });

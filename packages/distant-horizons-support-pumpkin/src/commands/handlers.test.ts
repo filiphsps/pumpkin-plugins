@@ -37,6 +37,7 @@ function setup() {
             terrainGenerator: unavailableTerrainGenerator,
             sample: () => ({ material: 'minecraft:stone', skyLight: 15, blockLight: 0 })
         },
+        borderBounds: { minX: -1_000_000, maxX: 1_000_000, minZ: -1_000_000, maxZ: 1_000_000 },
         insideBorder: () => true,
         report: () => undefined,
         send: () => undefined
@@ -66,22 +67,25 @@ describe('the /dhs commands', () => {
             'DistantHorizonsSupportPumpkin:command.dhs.cache.clear',
             'DistantHorizonsSupportPumpkin:command.dhs.cache.memory.clear',
             'DistantHorizonsSupportPumpkin:command.dhs.cache.disk.clear',
-            'DistantHorizonsSupportPumpkin:command.dhs.map.here',
-            'DistantHorizonsSupportPumpkin:command.dhs.map.here-radius',
-            'DistantHorizonsSupportPumpkin:command.dhs.map.at',
-            'DistantHorizonsSupportPumpkin:command.dhs.map.at-radius',
-            'DistantHorizonsSupportPumpkin:command.dhs.generate.here',
-            'DistantHorizonsSupportPumpkin:command.dhs.generate.here-radius',
-            'DistantHorizonsSupportPumpkin:command.dhs.generate.at',
-            'DistantHorizonsSupportPumpkin:command.dhs.generate.at-radius'
+            'DistantHorizonsSupportPumpkin:command.dhs.map',
+            'DistantHorizonsSupportPumpkin:command.dhs.map',
+            'DistantHorizonsSupportPumpkin:command.dhs.map',
+            'DistantHorizonsSupportPumpkin:command.dhs.map',
+            'DistantHorizonsSupportPumpkin:command.dhs.generate',
+            'DistantHorizonsSupportPumpkin:command.dhs.generate',
+            'DistantHorizonsSupportPumpkin:command.dhs.generate',
+            'DistantHorizonsSupportPumpkin:command.dhs.generate'
         ]);
-        expect(info.commands.map(({ usage }) => usage)).toContain('/dhs map at-radius <x> <z> <radius>');
         expect(info.commands.map(({ usage }) => usage)).toEqual(
             expect.arrayContaining([
-                '/dhs generate here',
-                '/dhs generate here-radius <radius>',
-                '/dhs generate at <x> <z>',
-                '/dhs generate at-radius <x> <z> <radius>'
+                '/dhs map',
+                '/dhs map <radius>',
+                '/dhs map <x> <z>',
+                '/dhs map <x> <z> <radius>',
+                '/dhs generate',
+                '/dhs generate <radius>',
+                '/dhs generate <x> <z>',
+                '/dhs generate <x> <z> <radius>'
             ])
         );
     });
@@ -126,31 +130,31 @@ describe('the /dhs commands', () => {
             asPlayer: () => player
         };
 
-        host.runAs(root, ['dhs', 'map', 'here'], {}, sender as never);
+        host.runAs(root, ['dhs', 'map'], {}, sender as never);
         expect(sender.lines[0]).toContain('center section 1, 0');
         expect(sender.lines.at(-1)).toContain('built');
         expect(sender.lines.join('\n')).toContain('§e◆');
 
         sender.lines.length = 0;
-        host.runAs(root, ['dhs', 'map', 'here-radius', '<radius>'], { radius: 0 }, sender as never);
+        host.runAs(root, ['dhs', 'map', '<radius>'], { radius: 0 }, sender as never);
         expect(sender.lines).toHaveLength(3);
         expect(sender.lines[0]).toContain('center section 1, 0');
 
         sender.lines.length = 0;
-        host.runAs(
-            root,
-            ['dhs', 'map', 'at-radius', '<x>', '<z>', '<radius>'],
-            { x: 64, z: 0, radius: 0 },
-            sender as never
-        );
+        host.runAs(root, ['dhs', 'map', '<x>', '<z>', '<radius>'], { x: 64, z: 0, radius: 0 }, sender as never);
         expect(sender.lines).toHaveLength(3);
         expect(sender.lines[0]).toContain('center section 1, 0');
         expect(sender.lines[1]).toContain('§e◆');
+
+        sender.lines.length = 0;
+        host.runAs(root, ['dhs', 'map', '<x>', '<z>'], { x: 64, z: 0 }, sender as never);
+        expect(sender.lines).toHaveLength(11);
+        expect(sender.lines[0]).toContain('center section 1, 0');
     });
 
     it('requires player context for map commands', () => {
         const { host, root } = setup();
-        expect(() => host.run(root, ['dhs', 'map', 'here'])).toThrow('Run this command as a player');
+        expect(() => host.run(root, ['dhs', 'map'])).toThrow('Run this command as a player');
     });
 
     it('starts forced captures at the player or block coordinates with the selected radius', () => {
@@ -162,31 +166,26 @@ describe('the /dhs commands', () => {
         };
         const sender = { lines: [], errors: [], asPlayer: () => player };
 
-        here.host.runAs(here.root, ['dhs', 'generate', 'here'], {}, sender as never);
+        here.host.runAs(here.root, ['dhs', 'generate'], {}, sender as never);
         expect(sender.lines[0]).toContain('section 1, 0 (radius 0');
         expect(here.sessions.status()).toContain('Forced LOD capture for Alice');
 
         const hereRadius = setup();
-        hereRadius.host.runAs(
-            hereRadius.root,
-            ['dhs', 'generate', 'here-radius', '<radius>'],
-            { radius: 1 },
-            sender as never
-        );
-        expect(sender.lines.at(-2)).toContain('section 1, 0 (radius 1');
+        hereRadius.host.runAs(hereRadius.root, ['dhs', 'generate', '<radius>'], { radius: 1 }, sender as never);
+        expect(sender.lines.at(-3)).toContain('section 1, 0 (radius 1');
 
         const at = setup();
-        at.host.runAs(at.root, ['dhs', 'generate', 'at', '<x>', '<z>'], { x: -64, z: 128 }, sender as never);
-        expect(sender.lines.at(-2)).toContain('section -1, 2 (radius 0');
+        at.host.runAs(at.root, ['dhs', 'generate', '<x>', '<z>'], { x: -64, z: 128 }, sender as never);
+        expect(sender.lines.at(-3)).toContain('section -1, 2 (radius 0');
 
         const atRadius = setup();
         atRadius.host.runAs(
             atRadius.root,
-            ['dhs', 'generate', 'at-radius', '<x>', '<z>', '<radius>'],
+            ['dhs', 'generate', '<x>', '<z>', '<radius>'],
             { x: 64, z: -64, radius: 2 },
             sender as never
         );
-        expect(sender.lines.at(-2)).toContain('section 1, -1 (radius 2');
+        expect(sender.lines.at(-3)).toContain('section 1, -1 (radius 2');
     });
 
     it('requires a Java player and rejects a second active forced capture', () => {
@@ -197,12 +196,12 @@ describe('the /dhs commands', () => {
             [Symbol.dispose]: () => undefined
         };
         const sender = { lines: [], errors: [], asPlayer: () => player };
-        f.host.runAs(f.root, ['dhs', 'generate', 'here'], {}, sender as never);
-        expect(() => f.host.runAs(f.root, ['dhs', 'generate', 'here'], {}, sender as never)).toThrow('already running');
-        expect(() => f.host.run(f.root, ['dhs', 'generate', 'here'])).toThrow('Run this command as a Java player');
+        f.host.runAs(f.root, ['dhs', 'generate'], {}, sender as never);
+        expect(() => f.host.runAs(f.root, ['dhs', 'generate'], {}, sender as never)).toThrow('already running');
+        expect(() => f.host.run(f.root, ['dhs', 'generate'])).toThrow('Run this command as a Java player');
     });
 
-    it('rejects radii larger than the bounded map size', () => {
+    it('rejects radii larger than either command limit', () => {
         const { host, root } = setup();
         const player = {
             getPosition: () => [0, 64, 0],
@@ -211,8 +210,11 @@ describe('the /dhs commands', () => {
         };
         const sender = { lines: [], errors: [], asPlayer: () => player };
 
-        expect(() =>
-            host.run(root, ['dhs', 'map', 'here-radius', '<radius>'], { radius: 17 }, sender as never)
-        ).toThrow('Radius must be between 0 and 16 LOD sections.');
+        expect(() => host.run(root, ['dhs', 'map', '<radius>'], { radius: 16_385 }, sender as never)).toThrow(
+            'Radius must be between 0 and 16384 LOD sections.'
+        );
+        expect(() => host.run(root, ['dhs', 'generate', '<radius>'], { radius: 16_385 })).toThrow(
+            'Radius must be between 0 and 16384 LOD sections.'
+        );
     });
 });

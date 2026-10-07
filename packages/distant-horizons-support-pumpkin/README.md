@@ -39,14 +39,14 @@ Pumpkin asks for these on the server console the first time the plugin loads.
 | `/dhs cache clear` | Clear both cache tiers | `DistantHorizonsSupportPumpkin:command.dhs.cache.clear` | operators (level 3) |
 | `/dhs cache memory clear` | Clear the in-memory cache | `DistantHorizonsSupportPumpkin:command.dhs.cache.memory.clear` | operators (level 3) |
 | `/dhs cache disk clear` | Clear the disk cache | `DistantHorizonsSupportPumpkin:command.dhs.cache.disk.clear` | operators (level 3) |
-| `/dhs map here` | Show cached LOD sections around your position (default radius 4 sections) | `DistantHorizonsSupportPumpkin:command.dhs.map.here` | operators (level 3) |
-| `/dhs map here-radius <radius>` | Show cached LOD sections around your position with radius 0–16 sections | `DistantHorizonsSupportPumpkin:command.dhs.map.here-radius` | operators (level 3) |
-| `/dhs map at <x> <z>` | Show cached LOD sections around block coordinates in your current world (default radius 4 sections) | `DistantHorizonsSupportPumpkin:command.dhs.map.at` | operators (level 3) |
-| `/dhs map at-radius <x> <z> <radius>` | Show cached LOD sections at block coordinates with radius 0–16 sections | `DistantHorizonsSupportPumpkin:command.dhs.map.at-radius` | operators (level 3) |
-| `/dhs generate here` | Force-build the LOD section at your current position | `DistantHorizonsSupportPumpkin:command.dhs.generate.here` | operators (level 3) |
-| `/dhs generate here-radius <radius>` | Force-build LOD sections around your position with radius 0–4 | `DistantHorizonsSupportPumpkin:command.dhs.generate.here-radius` | operators (level 3) |
-| `/dhs generate at <x> <z>` | Force-build the LOD section at block coordinates in your current world | `DistantHorizonsSupportPumpkin:command.dhs.generate.at` | operators (level 3) |
-| `/dhs generate at-radius <x> <z> <radius>` | Force-build LOD sections at block coordinates with radius 0–4 | `DistantHorizonsSupportPumpkin:command.dhs.generate.at-radius` | operators (level 3) |
+| `/dhs map` | Show cached LOD sections at your position or block coordinates (default radius 4; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.map` | operators (level 3) |
+| `/dhs map <radius>` | Show cached LOD sections at your position or block coordinates (default radius 4; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.map` | operators (level 3) |
+| `/dhs map <x> <z>` | Show cached LOD sections at your position or block coordinates (default radius 4; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.map` | operators (level 3) |
+| `/dhs map <x> <z> <radius>` | Show cached LOD sections at your position or block coordinates (default radius 4; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.map` | operators (level 3) |
+| `/dhs generate` | Force-build LOD sections at your position or block coordinates (default radius 0; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.generate` | operators (level 3) |
+| `/dhs generate <radius>` | Force-build LOD sections at your position or block coordinates (default radius 0; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.generate` | operators (level 3) |
+| `/dhs generate <x> <z>` | Force-build LOD sections at your position or block coordinates (default radius 0; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.generate` | operators (level 3) |
+| `/dhs generate <x> <z> <radius>` | Force-build LOD sections at your position or block coordinates (default radius 0; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.generate` | operators (level 3) |
 <!-- docs:end commands -->
 
 ## Configuration
@@ -148,17 +148,20 @@ cache limits are independent; their current defaults and how to disable them are
 cache limit is copied to both cache limits.
 
 The generated [Commands](#commands) section lists cache inspection, clearing and LOD map commands.
-Run `/dhs map here` to see cached sections around your current position, or `/dhs map at <x> <z>`
-to inspect block coordinates in your current world. The radius commands accept 0–16 sections; each
-map cell is one 64 × 64 block LOD section (four by four server chunks). These commands need a player
-so the plugin can resolve the current world.
+Run `/dhs map` to see cached sections around your current position, or `/dhs map <x> <z>` to inspect
+block coordinates in your current world. Add `<radius>` after the command or coordinates to set the
+radius, up to 16_384 sections. Each map cell is one 64 × 64 block LOD section (four by four server
+chunks) for views up to radius 32; larger views are downsampled to 65 × 65 cells. These commands
+need a player so the plugin can resolve the current world.
 
-Use `/dhs generate here` or `/dhs generate at <x> <z>` to force a fresh capture into the cache;
-the `here-radius` and `at-radius` forms accept 0–4 sections. A forced job bypasses the adaptive
-capture budget, takes priority over ordinary LOD sampling and attempts up to 32,768 block samples
-per tick. Progress is reported in chat about every 10%, and `/dhs status` shows the active job.
-Only one forced job can run at a time. This command captures terrain that is already loaded: it does
-not load or generate Minecraft chunks, and sections with unavailable chunks are skipped.
+Use `/dhs generate` or `/dhs generate <x> <z>` to force a capture into the cache. Add `<radius>`
+after the command or coordinates to set the radius, up to 16_384 sections. Sections already in the
+cache are skipped; the command errors when every requested section is already generated. A forced
+job bypasses the adaptive capture budget, takes priority over ordinary LOD sampling and attempts up
+to 32,768 block samples per tick. Progress is reported in chat about every 10%, and `/dhs status`
+shows the active job. Only one forced job can run at a time. This command captures terrain that is
+already loaded: it does not load or generate Minecraft chunks, and sections with unavailable chunks
+are skipped.
 
 The configured `blocks_per_tick` is the maximum capture batch. Actual block samples adapt to Pumpkin's
 rolling MSPT and the measured cost of previous steps, leaving 5 ms of tick headroom. Sampling pauses
