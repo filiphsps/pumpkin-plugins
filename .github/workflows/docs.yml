@@ -122,7 +122,7 @@ jobs:
               uses: actions/checkout@v7.0.1
 
             - name: 📥 Download built site
-              uses: actions/download-artifact@v8.0.1
+              uses: actions/download-artifact@v8.0.2
               with:
                   name: docs-site
                   path: ${{ runner.temp }}/docs-site

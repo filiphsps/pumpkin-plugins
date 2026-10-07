@@ -306,13 +306,13 @@ jobs:
               uses: ./.github/common/bootstrap
 
             - name: 📥 Download plugin builds
-              uses: actions/download-artifact@v8.0.1
+              uses: actions/download-artifact@v8.0.2
               with:
                   name: plugin-wasm
                   path: packages/
 
             - name: 📥 Download update-check fixture
-              uses: actions/download-artifact@v8.0.1
+              uses: actions/download-artifact@v8.0.2
               with:
                   name: update-check-fixture
                   path: tools/update-check/build/
@@ -541,7 +541,7 @@ jobs:
               uses: ./.github/common/bootstrap
 
             - name: 📥 Download build artifact
-              uses: actions/download-artifact@v8.0.1
+              uses: actions/download-artifact@v8.0.2
               with:
                   name: plugins
                   path: dist/
@@ -624,7 +624,7 @@ jobs:
               uses: ./.github/common/bootstrap
 
             - name: 📥 Download build artifact
-              uses: actions/download-artifact@v8.0.1
+              uses: actions/download-artifact@v8.0.2
               with:
                   name: release-${{ env.TAG }}
                   path: dist/
