@@ -110,7 +110,8 @@ registerCommands(ctx, commands, {
   The setting is per permission node, so a read-only subcommand can be public while `reload` stays
   operator-only.
 - The handlers are typed against the declaration (`CommandHandlers`): a command without a handler, or
-  a handler for a command that doesn't exist, doesn't compile.
+  a handler for a command that doesn't exist, doesn't compile. Argument-bearing handlers infer their
+  value types from the declaration.
 - `registerCommands` registers the permission nodes and checks each runnable subcommand against its
   declared permission. The tree is built by `buildCommands` in
   `@pumpkin-plugins/plugin-kit/commands`, which takes the host's command classes as an interface;
@@ -119,8 +120,25 @@ registerCommands(ctx, commands, {
 - A handler returns lines: plain strings, or `errorLine(text)` for a line shown in red. Throwing
   `CommandFailed(message)` makes the command fail the way the server reports a failed command, with
   the message in red.
-- A command with subcommands only groups them; only the leaves are runnable and listed. Commands with
-  arguments aren't declared this way yet.
+- A command with subcommands only groups them; only the leaves are runnable and listed. A leaf can
+  declare `arguments`; `commandInfos(commands)` includes their `<name>` placeholders in the README:
+
+  ```ts
+  locate: {
+      description: 'Find a location',
+      permission: `${PLUGIN_NAME}:command.locate`,
+      arguments: [
+          { name: 'x', type: 'integer', min: -30_000_000, max: 30_000_000 },
+          { name: 'name', type: 'string', mode: 'quotable' }
+      ]
+  }
+  ```
+
+  Integers can specify signed 32-bit `min` and `max` bounds. Strings support `single-word`,
+  `quotable`, and `greedy` modes; a greedy string must be the final argument. Argument handlers
+  receive a second parameter with inferred values, for example `(sender, { x, name })`. Commands
+  without arguments keep the sender-only handler shape. Arguments follow the literal command path;
+  literal subcommands cannot follow an argument node.
 
 Descriptions live as plain strings in one declaration. If you later move to message keys for
 translation, update that file and its two consumers.

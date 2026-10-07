@@ -31,28 +31,32 @@ describe('flattenCommands', () => {
                 usage: '/demo list',
                 description: 'List things',
                 permission: 'Demo:command.demo',
-                defaultPermission: { tag: 'op', val: 'three' }
+                defaultPermission: { tag: 'op', val: 'three' },
+                arguments: []
             },
             {
                 path: ['demo', 'pack', 'add'],
                 usage: '/demo pack add',
                 description: 'Add one',
                 permission: 'Demo:command.demo',
-                defaultPermission: { tag: 'op', val: 'three' }
+                defaultPermission: { tag: 'op', val: 'three' },
+                arguments: []
             },
             {
                 path: ['demo', 'pack', 'drop'],
                 usage: '/demo pack drop',
                 description: 'Drop one',
                 permission: 'Demo:command.demo',
-                defaultPermission: { tag: 'op', val: 'three' }
+                defaultPermission: { tag: 'op', val: 'three' },
+                arguments: []
             },
             {
                 path: ['ping'],
                 usage: '/ping',
                 description: 'Answer',
                 permission: 'Demo:command.ping',
-                defaultPermission: { tag: 'op', val: 'three' }
+                defaultPermission: { tag: 'op', val: 'three' },
+                arguments: []
             }
         ]);
     });
@@ -242,5 +246,78 @@ describe('types', () => {
                 }
             }
         });
+    });
+
+    it('renders typed argument usage and infers each handler argument value', () => {
+        const withArguments = defineCommands('Demo', {
+            map: {
+                description: 'Show cached terrain',
+                permission: 'Demo:command.map',
+                subcommands: {
+                    at: {
+                        description: 'Show terrain at block coordinates',
+                        arguments: [
+                            { name: 'x', type: 'integer', min: -30_000_000, max: 30_000_000 },
+                            { name: 'z', type: 'integer', min: -30_000_000, max: 30_000_000 },
+                            { name: 'world', type: 'string', mode: 'single-word' },
+                            { name: 'label', type: 'string', mode: 'quotable' },
+                            { name: 'tail', type: 'string', mode: 'greedy' }
+                        ]
+                    }
+                }
+            }
+        });
+
+        expect(flattenCommands(withArguments).map(({ usage }) => usage)).toEqual([
+            '/map at <x> <z> <world> <label> <tail>'
+        ]);
+        expect(commandInfos(withArguments)[0]?.usage).toBe('/map at <x> <z> <world> <label> <tail>');
+
+        const typed: CommandHandlers<typeof withArguments> = {
+            'map at <x> <z> <world> <label> <tail>': (_sender, args) => {
+                const inferred: { x: number; z: number; world: string; label: string; tail: string } = args;
+                const xIsNumber: number = args.x;
+                const labelIsString: string = args.label;
+                // @ts-expect-error x is numeric, not text
+                const invalid: string = args.x;
+                return [invalid, String(inferred), String(xIsNumber), labelIsString];
+            }
+        };
+        expect(Object.keys(typed)).toEqual(['map at <x> <z> <world> <label> <tail>']);
+    });
+});
+
+describe('argument usage', () => {
+    it('keeps literal-only command paths unchanged', () => {
+        expect(commandInfos(commands).map(({ usage }) => usage)).toEqual([
+            '/demo list',
+            '/demo pack add',
+            '/demo pack drop',
+            '/ping'
+        ]);
+    });
+
+    it('rejects invalid integer bounds and non-final greedy strings', () => {
+        expect(() =>
+            flattenCommands({
+                locate: {
+                    description: 'Locate',
+                    permission: 'Demo:command.locate',
+                    arguments: [{ name: 'x', type: 'integer', min: 2_147_483_648 }]
+                }
+            })
+        ).toThrow('Integer bounds for x must fit a signed 32-bit value.');
+        expect(() =>
+            flattenCommands({
+                talk: {
+                    description: 'Talk',
+                    permission: 'Demo:command.talk',
+                    arguments: [
+                        { name: 'message', type: 'string', mode: 'greedy' },
+                        { name: 'suffix', type: 'integer' }
+                    ]
+                }
+            })
+        ).toThrow('Greedy string argument message must be the final argument.');
     });
 });
