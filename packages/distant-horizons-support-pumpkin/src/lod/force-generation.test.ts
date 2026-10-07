@@ -36,7 +36,7 @@ function fixture(height = 1) {
         }
     };
     const generation = new ForcedLodGeneration(cache, logger, () => 1234);
-    return { cache, generation, logger, peer, peers, reports, samples: () => samples };
+    return { files, cache, generation, logger, peer, peers, reports, samples: () => samples };
 }
 
 describe('forced LOD generation', () => {
@@ -132,7 +132,7 @@ describe('forced LOD generation', () => {
         const started = f.generation.start(f.peer, 32, 32, MAX_LOD_GENERATION_RADIUS);
 
         expect(started.sections).toBe((MAX_LOD_GENERATION_RADIUS * 2 + 1) ** 2);
-        expect(f.generation.status()).toContain('0%');
+        expect(f.generation.status()).toContain('97244861 skipped');
         f.generation.left(f.peer.name);
     });
 
@@ -145,6 +145,40 @@ describe('forced LOD generation', () => {
         expect(() => f.generation.start(f.peer, 32, 32, MAX_LOD_GENERATION_RADIUS)).toThrow(
             'All requested LOD sections are already generated.'
         );
+    });
+
+    it('finishes a maximum-radius request after visiting its single in-border section', () => {
+        const f = fixture();
+        f.peer.borderBounds = { minX: 0.5, maxX: 63.5, minZ: 0.5, maxZ: 63.5 };
+        f.peer.insideBorder = (x, z) => x >= 0 && x < 64 && z >= 0 && z < 64;
+
+        f.generation.start(f.peer, 32, 32, MAX_LOD_GENERATION_RADIUS);
+        f.generation.tick(f.peers);
+
+        expect(f.cache.has('world:0:0')).toBe(true);
+        expect(f.generation.status()).toBeUndefined();
+        expect(f.samples()).toBe(4096);
+        expect(f.reports.at(-1)).toContain('complete: 1 built, 1073807360 skipped');
+    });
+
+    it('rebuilds corrupt persisted entries instead of treating them as generated', () => {
+        const f = fixture();
+        f.cache.put('world:0:0', { updated: 1, data: new Uint8Array(64).fill(7) });
+        f.cache.put('world:1:0', { updated: 1, data: new Uint8Array(64).fill(9) });
+        const file = f.files.list('cache').find((name) => f.files.readFile(`cache/${name}`).at(-1) === 7);
+        if (!file) throw new Error('Missing persisted test LOD');
+        const path = `cache/${file}`;
+        const corrupted = f.files.readFile(path);
+        corrupted[corrupted.length - 1] = 8;
+        f.files.put(path, corrupted);
+        f.cache.clearMemory();
+        f.peer.borderBounds = { minX: -63.5, maxX: 127.5, minZ: 0.5, maxZ: 63.5 };
+
+        expect(() => f.generation.start(f.peer, 32, 32, 1)).not.toThrow();
+        f.generation.tick(f.peers);
+
+        expect(f.cache.get('world:0:0')?.updated).toBe(1234);
+        expect(f.samples()).toBe(8192);
     });
 
     it('counts sections outside the world border once and builds the in-border sections', () => {

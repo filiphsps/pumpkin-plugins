@@ -6,7 +6,13 @@ import { SECTION_DETAIL, SECTION_SIZE_BLOCKS } from '../protocol/constants.ts';
 import type { Section } from '../protocol/messages.ts';
 import { LodBuilder } from './builder.ts';
 import type { LodCache } from './cache.ts';
-import { iterateLodSectionsAround, type LodSectionCoordinate, sectionKey } from './generation.ts';
+import {
+    iterateLodSectionsWithin,
+    type LodSectionBounds,
+    type LodSectionCoordinate,
+    MAX_LOD_GENERATION_RADIUS,
+    sectionKey
+} from './generation.ts';
 import { lodLocation } from './location.ts';
 
 const logTag = ansi.named.name(PLUGIN_NAME);
@@ -49,6 +55,7 @@ interface ForcedJob extends ForcedLodStart {
     owner: string;
     level: string;
     coordinates: Generator<LodSectionCoordinate>;
+    inBorderSections: number;
     scanned: number;
     current?: ForcedSection;
     skippedOutsideBorder: number;
@@ -73,17 +80,19 @@ export class ForcedLodGeneration {
     /** Starts one bounded, cache-refreshing job around the selected block position. */
     start(peer: ForcedLodPeer, blockX: number, blockZ: number, radius = 0): ForcedLodStart {
         if (this.job) throw new Error('A forced LOD generation job is already running.');
+        if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_GENERATION_RADIUS) {
+            throw new RangeError(`Radius must be between 0 and ${MAX_LOD_GENERATION_RADIUS} LOD sections.`);
+        }
+        if (!Number.isSafeInteger(blockX) || !Number.isSafeInteger(blockZ)) {
+            throw new RangeError('Block coordinates must be safe integers.');
+        }
         const { memoryLimit, diskLimit, memoryEntries, diskEntries } = this.cache.stats();
         if (memoryLimit === 0 && diskLimit === 0) throw new Error('Both LOD cache tiers are disabled.');
 
         const sections = (radius * 2 + 1) ** 2;
-        const iterator = iterateLodSectionsAround(blockX, blockZ, radius);
-        const first = iterator.next();
-        if (first.done) throw new Error('No LOD sections were selected.');
         const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
         const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
-
-        this.validateSelection(peer, blockX, blockZ, radius, memoryEntries + diskEntries);
+        const selection = this.validateSelection(peer, blockX, blockZ, radius, memoryEntries + diskEntries);
 
         this.job = {
             owner: peer.name,
@@ -92,9 +101,10 @@ export class ForcedLodGeneration {
             centerZ,
             radius,
             sections,
-            coordinates: iterateLodSectionsAround(blockX, blockZ, radius),
+            coordinates: iterateLodSectionsWithin(blockX, blockZ, radius, selection.bounds),
+            inBorderSections: selection.inBorderSections,
             scanned: 0,
-            skippedOutsideBorder: 0,
+            skippedOutsideBorder: sections - selection.inBorderSections,
             skippedAlreadyGenerated: 0,
             built: 0,
             skipped: 0,
@@ -175,7 +185,7 @@ export class ForcedLodGeneration {
                     job.skippedOutsideBorder++;
                     continue;
                 }
-                if (this.cache.has(key)) {
+                if (this.cache.get(key)) {
                     job.skippedAlreadyGenerated++;
                     continue;
                 }
@@ -226,7 +236,7 @@ export class ForcedLodGeneration {
             }
         }
 
-        if (job.scanned === job.sections && !job.current) {
+        if (job.scanned === job.inBorderSections && !job.current) {
             this.finish(job, peer);
             return;
         }
@@ -305,7 +315,7 @@ export class ForcedLodGeneration {
         blockZ: number,
         radius: number,
         maxCachedSections: number
-    ): void {
+    ): { bounds: LodSectionBounds; inBorderSections: number } {
         const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
         const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
         const bounds = peer.borderBounds;
@@ -322,17 +332,18 @@ export class ForcedLodGeneration {
         if (minX > maxX || minZ > maxZ) throw new Error('No requested LOD sections are inside the world border.');
 
         const inBorderSections = (maxX - minX + 1) * (maxZ - minZ + 1);
-        if (inBorderSections > maxCachedSections) return;
+        if (inBorderSections > maxCachedSections) return { bounds: { minX, maxX, minZ, maxZ }, inBorderSections };
 
         let alreadyGenerated = 0;
         for (let x = minX; x <= maxX; x++) {
             for (let z = minZ; z <= maxZ; z++) {
-                if (this.cache.has(sectionKey(peer.level, x, z))) alreadyGenerated++;
+                if (this.cache.get(sectionKey(peer.level, x, z))) alreadyGenerated++;
             }
         }
         if (alreadyGenerated === inBorderSections) {
             throw new Error('All requested LOD sections are already generated.');
         }
+        return { bounds: { minX, maxX, minZ, maxZ }, inBorderSections };
     }
 
     private sendReport(peer: ForcedLodPeer, message: string): void {
