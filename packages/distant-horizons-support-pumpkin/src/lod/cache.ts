@@ -18,28 +18,37 @@ export interface LodCacheStats {
 /** Persistent bounded cache; corrupt entries are discarded and rebuilt when terrain is available. */
 export class LodCache {
     private readonly memory = new Map<string, CachedLod>();
+    private readonly diskIndex = new Map<string, { modified: number; size: number }>();
+    private readonly diskOrder: string[] = [];
+    private diskBytes = 0;
     constructor(
         private readonly files: DataFiles,
         private readonly memoryLimit: number,
         private readonly diskLimit: number
     ) {
         files.createDirectory('cache');
+        for (const entry of this.scanDiskFiles()) this.indexDiskFile(entry.name, entry.modified, entry.size);
         this.pruneDisk();
     }
     /** Checks for a stored capture without reading it into memory or changing its cache order. */
     has(key: string): boolean {
         if (this.memory.has(key)) return true;
         if (this.diskLimit === 0) return false;
-        return this.files.stat(this.path(key))?.kind === 'file';
+        return this.diskIndex.has(this.name(key));
     }
     /** Looks up a captured section, without allocating for oversized or corrupt files. */
     get(key: string): CachedLod | undefined {
         let value = this.memory.get(key);
         if (!value) {
             if (this.diskLimit === 0) return undefined;
-            const path = this.path(key);
+            const name = this.name(key);
+            if (!this.diskIndex.has(name)) return undefined;
+            const path = `cache/${name}`;
             const stat = this.files.stat(path);
-            if (!stat) return undefined;
+            if (!stat) {
+                this.removeDiskIndex(name);
+                return undefined;
+            }
             try {
                 if (stat.kind !== 'file' || stat.size > 16 * 1024 * 1024) throw new Error('Invalid cached LOD');
                 const input = new Reader(this.files.readFile(path));
@@ -53,6 +62,7 @@ export class LodCache {
                 value = { updated, data };
             } catch {
                 this.files.remove(path);
+                this.removeDiskIndex(name);
                 return undefined;
             }
         }
@@ -66,9 +76,10 @@ export class LodCache {
     /** Saves a complete capture atomically and evicts entries above their respective limits. */
     put(key: string, value: CachedLod): void {
         if (value.data.length > 16 * 1024 * 1024) throw new Error('LOD exceeds cache size limit');
-        if (this.diskLimit !== 0)
+        if (this.diskLimit !== 0) {
+            const path = this.path(key);
             this.files.writeFile(
-                this.path(key),
+                path,
                 new Writer()
                     .int(0x44485031)
                     .string(key)
@@ -77,6 +88,9 @@ export class LodCache {
                     .blob(value.data)
                     .finish()
             );
+            const stat = this.files.stat(path);
+            if (stat?.kind === 'file') this.indexDiskFile(this.name(key), stat.modified, stat.size);
+        }
         if (this.memoryLimit !== 0) {
             this.memory.delete(key);
             this.memory.set(key, value);
@@ -89,23 +103,18 @@ export class LodCache {
     /** Invalidates a section affected by a known world change. */
     remove(key: string): void {
         this.memory.delete(key);
-        const path = this.path(key);
-        if (this.files.stat(path)) this.files.remove(path);
+        this.removeDiskFile(this.name(key));
     }
     /** Returns cache usage without reading or decoding disk entries. */
     stats(): LodCacheStats {
         let memoryBytes = 0;
         for (const value of this.memory.values()) memoryBytes += value.data.length;
-        const disk = this.diskFiles().reduce(
-            (total, entry) => ({ entries: total.entries + 1, bytes: total.bytes + entry.size }),
-            { entries: 0, bytes: 0 }
-        );
         return {
             memoryEntries: this.memory.size,
             memoryBytes,
             memoryLimit: this.memoryLimit,
-            diskEntries: disk.entries,
-            diskBytes: disk.bytes,
+            diskEntries: this.diskIndex.size,
+            diskBytes: this.diskBytes,
             diskLimit: this.diskLimit
         };
     }
@@ -117,17 +126,20 @@ export class LodCache {
     }
     /** Drops every persisted LOD file and returns how many were removed. */
     clearDisk(): number {
-        const entries = this.diskFiles();
-        for (const entry of entries) this.files.remove(`cache/${entry.name}`);
-        return entries.length;
+        const names = [...this.diskIndex.keys()];
+        for (const name of names) this.removeDiskFile(name);
+        return names.length;
     }
     /** Drops both cache tiers and reports how many entries were removed from each. */
     clear(): { memoryEntries: number; diskEntries: number } {
         return { memoryEntries: this.clearMemory(), diskEntries: this.clearDisk() };
     }
     private path(key: string): string {
+        return `cache/${this.name(key)}`;
+    }
+    private name(key: string): string {
         const bytes = new Writer().string(key).finish();
-        return `cache/${checksum(bytes).toString(16).padStart(8, '0')}${checksum(bytes, 0x12345678).toString(16).padStart(8, '0')}.lod`;
+        return `${checksum(bytes).toString(16).padStart(8, '0')}${checksum(bytes, 0x12345678).toString(16).padStart(8, '0')}.lod`;
     }
     private trimMemory(): void {
         if (this.memoryLimit < 0) return;
@@ -137,7 +149,7 @@ export class LodCache {
             this.memory.delete(first);
         }
     }
-    private diskFiles(): { name: string; modified: number; size: number }[] {
+    private scanDiskFiles(): { name: string; modified: number; size: number }[] {
         return this.files
             .list('cache')
             .filter((name) => /^[0-9a-f]+\.lod$/.test(name))
@@ -151,9 +163,44 @@ export class LodCache {
     }
     private pruneDisk(): void {
         if (this.diskLimit < 0) return;
-        const entries = this.diskFiles().sort((a, b) => a.modified - b.modified);
-        for (const entry of entries.slice(0, Math.max(0, entries.length - this.diskLimit)))
-            this.files.remove(`cache/${entry.name}`);
+        while (this.diskOrder.length > this.diskLimit) {
+            const oldest = this.diskOrder[0];
+            if (oldest === undefined) return;
+            this.removeDiskFile(oldest);
+        }
+    }
+    private indexDiskFile(name: string, modified: number, size: number): void {
+        this.removeDiskIndex(name);
+        this.diskIndex.set(name, { modified, size });
+        this.diskBytes += size;
+        let low = 0;
+        let high = this.diskOrder.length;
+        while (low < high) {
+            const middle = Math.floor((low + high) / 2);
+            const candidateName = this.diskOrder[middle];
+            const candidate = candidateName ? this.diskIndex.get(candidateName) : undefined;
+            if (
+                candidateName !== undefined &&
+                candidate &&
+                (candidate.modified < modified || (candidate.modified === modified && candidateName < name))
+            )
+                low = middle + 1;
+            else high = middle;
+        }
+        this.diskOrder.splice(low, 0, name);
+    }
+    private removeDiskIndex(name: string): void {
+        const entry = this.diskIndex.get(name);
+        if (!entry) return;
+        this.diskIndex.delete(name);
+        this.diskBytes -= entry.size;
+        const index = this.diskOrder.indexOf(name);
+        if (index >= 0) this.diskOrder.splice(index, 1);
+    }
+    private removeDiskFile(name: string): void {
+        if (!this.diskIndex.has(name)) return;
+        this.files.remove(`cache/${name}`);
+        this.removeDiskIndex(name);
     }
 }
 

@@ -4,6 +4,37 @@ import { LodCache } from './cache.ts';
 
 const lod = (updated: number) => ({ updated, data: new Uint8Array(100).fill(updated) });
 describe('LOD cache', () => {
+    it('does not rescan the disk directory when writing after startup', () => {
+        class CountingFiles extends MemoryFiles {
+            listCalls = 0;
+            statCalls = 0;
+            override list(directory: string): string[] {
+                this.listCalls++;
+                return super.list(directory);
+            }
+            override stat(path: string) {
+                this.statCalls++;
+                return super.stat(path);
+            }
+        }
+
+        const files = new CountingFiles();
+        const initial = new LodCache(files, 0, 1000);
+        for (let index = 0; index < 128; index++) initial.put(`section-${index}`, lod(index));
+
+        const restarted = new LodCache(files, 0, 1000);
+        files.listCalls = 0;
+        files.statCalls = 0;
+        expect(restarted.get('missing-section')).toBeUndefined();
+        expect(files.statCalls).toBe(0);
+
+        restarted.put('one-more', lod(129));
+
+        expect(files.listCalls).toBe(0);
+        expect(files.statCalls).toBe(1);
+        expect(restarted.stats().diskEntries).toBe(129);
+    });
+
     it('persists captures across restarts, uses bounded filenames and detects corruption', () => {
         const files = new MemoryFiles(),
             key = `${'w'.repeat(128)}:12:-4`;
