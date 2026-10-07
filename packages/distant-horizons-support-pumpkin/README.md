@@ -145,10 +145,6 @@ can synchronize cached terrain on login. Delete the plugin's cache folder while 
 stopped after replacing a world or changing its height. Vanilla world heights are assumed unless
 an override is configured.
 
-Protocol fixtures, terrain and session unit tests, and real-server loading, settings and
-command tests cover this implementation. Rendering with an actual DH client remains to
-be verified.
-
 ### Diagnosing pending requests
 
 `/dhs status` includes worker ticks, capture progress, served/rejected/cancelled request counts,
