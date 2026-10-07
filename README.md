@@ -38,6 +38,7 @@ component overviews, and generated API references.
 | [@pumpkin-plugins/build](tools/build) | Shared build tool for the plugins | MIT |
 | [@pumpkin-plugins/config](tools/config) | Schema-driven TOML config for plugins | MIT |
 | [@pumpkin-plugins/docs](tools/docs) | README generator for plugins and actions | MIT |
+| [@pumpkin-plugins/minecraft-colors](tools/minecraft-colors) | Chalk-like Minecraft text formatting for plugins | MIT |
 | [@pumpkin-plugins/plugin-kit](tools/plugin-kit) | Host helpers shared by plugins | MIT |
 | [@pumpkin-plugins/port-mapping](tools/port-mapping) | UPnP and NAT-PMP port mapping | MIT |
 | [@pumpkin-plugins/signing](tools/signing) | Ed25519 signing for plugin builds | MIT |
