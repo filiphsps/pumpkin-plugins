@@ -86,12 +86,12 @@ export class NatPmpGateway implements Gateway {
         this.to = { address, port };
     }
 
-    /** {@inheritDoc Gateway.externalAddress} */
+    /** {@inheritDoc gateway!Gateway#externalAddress} */
     *externalAddress(): Steps<Ipv4> {
         return yield* this.ask(externalAddressRequest(), (d) => parseExternalAddress(d.data));
     }
 
-    /** {@inheritDoc Gateway.addMapping} */
+    /** {@inheritDoc gateway!Gateway#addMapping} */
     *addMapping(request: MappingRequest): Steps<MappingResult> {
         const { protocol, internalPort, externalPort, leaseSeconds } = request;
         // NAT-PMP has no permanent mappings; a lifetime of 0 means "delete".
@@ -102,7 +102,7 @@ export class NatPmpGateway implements Gateway {
         return { externalPort: got.externalPort, leaseSeconds: got.lifetime };
     }
 
-    /** {@inheritDoc Gateway.deleteMapping} */
+    /** {@inheritDoc gateway!Gateway#deleteMapping} */
     *deleteMapping(request: MappingRequest): Steps<void> {
         const { protocol, internalPort } = request;
         yield* this.ask(mappingRequest(protocol, internalPort, 0, 0), (d) =>

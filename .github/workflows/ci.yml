@@ -2,28 +2,38 @@ name: CI
 
 on:
     pull_request:
-        paths-ignore:
-            - '**/*.md'
-            - '**/*.mdx'
-            - docs/**
-            - packages/*/docs/**
-            - tools/*/docs/**
-            - actions/*/docs/**
-            - .github/workflows/docs.yml
-            - LICENSE
+        paths:
+            - '**'
+            - '!**/*.md'
+            - '!**/*.mdx'
+            - '!docs/**'
+            - '!packages/*/docs/**'
+            - '!tools/*/docs/**'
+            - '!actions/*/docs/**'
+            - '!.github/workflows/docs.yml'
+            - '!LICENSE'
+            # The generated README commit needs CI's generated_readmes check to run.
+            - 'README.md'
+            - 'packages/*/README.md'
+            - 'actions/*/README.md'
     push:
         branches:
             - master
             - main
-        paths-ignore:
-            - '**/*.md'
-            - '**/*.mdx'
-            - docs/**
-            - packages/*/docs/**
-            - tools/*/docs/**
-            - actions/*/docs/**
-            - .github/workflows/docs.yml
-            - LICENSE
+        paths:
+            - '**'
+            - '!**/*.md'
+            - '!**/*.mdx'
+            - '!docs/**'
+            - '!packages/*/docs/**'
+            - '!tools/*/docs/**'
+            - '!actions/*/docs/**'
+            - '!.github/workflows/docs.yml'
+            - '!LICENSE'
+            # The generated README commit needs CI's generated_readmes check to run.
+            - 'README.md'
+            - 'packages/*/README.md'
+            - 'actions/*/README.md'
 
 concurrency:
     group: ci-${{ github.ref }}

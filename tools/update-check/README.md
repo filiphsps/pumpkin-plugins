@@ -1,7 +1,7 @@
 # @pumpkin-plugins/update-check
 
 Checks a plugin's current version against Pumpkin Market over Pumpkin's WASI HTTP host. The
-registration helper starts a nonblocking request after plugin loading when given a scheduler.
+registration helper starts a non-blocking request after plugin loading when given a scheduler.
 
 ```ts
 import { registerPluginWithUpdates } from '@pumpkin-plugins/update-check';
@@ -15,7 +15,7 @@ handler. The scheduler must run callbacks in a later task, never inline. Automat
 block plugin startup or server ticks. Asynchronous requests stop after 15 seconds and reject bodies
 larger than 64 KiB. A failed update request is logged and does not interrupt plugin loading. `checkMarketUpdate` remains available for direct
 checks with an injected synchronous JSON request function, which is useful for deterministic tests.
-`requestMarketJsonAsync` exposes the same nonblocking transport for direct use. The synchronous
+`requestMarketJsonAsync` exposes the same non-blocking transport for direct use. The synchronous
 `requestMarketJson` transport blocks and must not be called during plugin loading or server ticks.
 `marketplaceUrl` overrides the Market base URL for registration and direct version checks.
 

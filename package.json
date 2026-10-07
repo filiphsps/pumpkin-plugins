@@ -44,10 +44,11 @@
         "docs": "pnpm run docs:build",
         "docs:build": "pnpm run docs:api && pnpm run docs:site",
         "docs:site": "vitepress build docs",
-        "docs:api": "pnpm run docs:types && typedoc",
-        "docs:types": "concurrently --kill-others-on-fail --success all \"pnpm:docs:types:*\"",
+        "docs:api": "pnpm run docs:types && node scripts/generate-api-references.mjs",
+        "docs:types": "concurrently --kill-others-on-fail --success all \"pnpm:docs:types:plugin-kit\" \"pnpm:docs:types:update-check\" && pnpm run docs:types:plugins",
         "docs:types:plugin-kit": "pnpm --filter @pumpkin-plugins/plugin-kit typecheck",
         "docs:types:update-check": "pnpm --filter @pumpkin-plugins/update-check typecheck",
+        "docs:types:plugins": "pnpm --filter './packages/*' --parallel run types",
         "docs:preview": "vitepress preview docs",
         "check": "node scripts/check-release-config.mjs && node scripts/package-metadata.mjs && node scripts/check-docs.mjs",
         "package": "turbo run build && node scripts/collect-plugins.mjs"

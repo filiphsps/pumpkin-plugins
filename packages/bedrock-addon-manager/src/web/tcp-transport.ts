@@ -16,7 +16,7 @@ export class TcpTransport implements Transport {
         private readonly output: OutputStream
     ) {}
 
-    /** {@inheritDoc Transport.read} */
+    /** {@inheritDoc web/session!Transport#read} */
     read(max: number): Uint8Array | null | 'closed' {
         try {
             const bytes = this.input.read(max);
@@ -27,17 +27,17 @@ export class TcpTransport implements Transport {
         }
     }
 
-    /** {@inheritDoc Transport.writable} */
+    /** {@inheritDoc web/session!Transport#writable} */
     writable(): number {
         return this.output.checkWrite();
     }
 
-    /** {@inheritDoc Transport.write} */
+    /** {@inheritDoc web/session!Transport#write} */
     write(bytes: Uint8Array): void {
         this.output.write(bytes);
     }
 
-    /** {@inheritDoc Transport.finish} */
+    /** {@inheritDoc web/session!Transport#finish} */
     finish(): boolean {
         if (this.released) return true;
         try {
@@ -56,7 +56,7 @@ export class TcpTransport implements Transport {
         return true;
     }
 
-    /** {@inheritDoc Transport.abort} */
+    /** {@inheritDoc web/session!Transport#abort} */
     abort(): void {
         this.release();
     }

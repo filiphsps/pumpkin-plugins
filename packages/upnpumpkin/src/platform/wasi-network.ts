@@ -4,15 +4,7 @@ import type { TcpSocket } from 'wasi:sockets/tcp@0.2.3';
 import type { UdpSocket } from 'wasi:sockets/udp@0.2.3';
 import { wasiErrorCode } from '@pumpkin-plugins/plugin-kit/wasi-error';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
-import type {
-    Connection,
-    Datagram,
-    DatagramSocket,
-    Dial,
-    Endpoint,
-    Ipv4,
-    Network
-} from '@pumpkin-plugins/port-mapping';
+import type { Connection, Datagram, DatagramSocket, Dial, Endpoint, Ipv4, Network } from '../port-mapping.ts';
 
 /**
  * The host resources the adapter talks to. `plugin.ts` passes the ones WASI gives a plugin; the
@@ -180,19 +172,20 @@ class WasiDial implements Dial {
 }
 
 /**
- * The `Network` the port mapping code runs on, over WASI UDP and TCP sockets.
+ * The `Network` the port mapping code runs on, over WASI UDP and TCP sockets. A UDP socket lets the
+ * operating system choose the local interface without sending a packet.
  *
  * @param sockets - The host's sockets, from `wasiSockets` on a real server.
  */
 export class WasiNetwork implements Network {
     constructor(private readonly sockets: Sockets) {}
 
-    /** {@inheritDoc Network.now} */
+    /** {@inheritDoc port-mapping!Network#now} */
     now(): number {
         return Date.now();
     }
 
-    /** {@inheritDoc Network.openDatagram} */
+    /** {@inheritDoc port-mapping!Network#openDatagram} */
     openDatagram(): DatagramSocket {
         const socket = this.sockets.udp();
         try {
@@ -205,16 +198,12 @@ export class WasiNetwork implements Network {
         }
     }
 
-    /** {@inheritDoc Network.dial} */
+    /** {@inheritDoc port-mapping!Network#dial} */
     dial(to: Endpoint): Dial {
         return new WasiDial(this.sockets, to);
     }
 
-    /**
-     * {@inheritDoc Network.localAddress}
-     * Found by pointing a UDP socket at the destination: the operating system picks the interface
-     * and tells which address it would send from, without sending anything.
-     */
+    /** {@inheritDoc port-mapping!Network#localAddress} */
     localAddress(toward: Ipv4 = INTERNET): Ipv4 | undefined {
         const socket = this.sockets.udp();
         try {

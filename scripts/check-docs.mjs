@@ -20,6 +20,7 @@ function packageDirs(group) {
 }
 
 function markdownFiles(dir) {
+    if (dir === 'docs/api' || dir.startsWith('docs/api/')) return [];
     if (!exists(dir)) return [];
     return fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((entry) => {
         const rel = `${dir}/${entry.name}`;

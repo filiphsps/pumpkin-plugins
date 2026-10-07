@@ -52,7 +52,7 @@ export class TcpWebServer implements WebServer {
         private readonly now: () => number = Date.now
     ) {}
 
-    /** {@inheritDoc WebServer.start} */
+    /** {@inheritDoc web/server!WebServer#start} */
     start(settings: WebServerSettings): void {
         this.stop();
         const address = parseIpv4(settings.bind);
@@ -77,14 +77,14 @@ export class TcpWebServer implements WebServer {
         this.listener = socket;
     }
 
-    /** {@inheritDoc WebServer.tick} */
+    /** {@inheritDoc web/server!WebServer#tick} */
     tick(): void {
         if (!this.listener) return;
         this.acceptNew(this.listener);
         for (const session of this.sessions) if (!session.tick()) this.sessions.delete(session);
     }
 
-    /** {@inheritDoc WebServer.stop} */
+    /** {@inheritDoc web/server!WebServer#stop} */
     stop(): void {
         for (const session of this.sessions) session.abort();
         this.sessions.clear();

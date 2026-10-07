@@ -151,7 +151,7 @@ export class UpnpGateway implements Gateway {
         this.address = url.endpoint.address;
     }
 
-    /** {@inheritDoc Gateway.externalAddress} */
+    /** {@inheritDoc gateway!Gateway#externalAddress} */
     *externalAddress(): Steps<Ipv4> {
         const fields = yield* this.action('GetExternalIPAddress', []);
         const address = parseIpv4(fields.NewExternalIPAddress ?? '');
@@ -159,7 +159,7 @@ export class UpnpGateway implements Gateway {
         return address;
     }
 
-    /** {@inheritDoc Gateway.addMapping} */
+    /** {@inheritDoc gateway!Gateway#addMapping} */
     *addMapping(request: MappingRequest, internalClient: Ipv4): Steps<MappingResult> {
         let lease = request.leaseSeconds;
         for (let attempt = 0; attempt < 2; attempt++) {
@@ -187,7 +187,7 @@ export class UpnpGateway implements Gateway {
         throw new Error('the router refused the mapping');
     }
 
-    /** {@inheritDoc Gateway.deleteMapping} */
+    /** {@inheritDoc gateway!Gateway#deleteMapping} */
     *deleteMapping(request: MappingRequest): Steps<void> {
         try {
             yield* this.action('DeletePortMapping', [
