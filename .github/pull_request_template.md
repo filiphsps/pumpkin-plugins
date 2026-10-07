@@ -1,9 +1,17 @@
 ## What and why
 
-<!-- A sentence or two. Commits must be conventional commits: `feat(scope): ...`, `fix: ...`. -->
+<!-- Describe the change and why it's needed. Commits must use conventional commit messages, such as `feat(scope): ...` or `fix: ...`. -->
+
+## Tested
+
+<!-- List the commands, scenarios and Pumpkin version you checked. "Not tested" is a valid answer. -->
 
 ## Checklist
 
-- [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm check` pass
-- [ ] The docs and READMEs that describe what I changed are updated (search `docs/` and the READMEs for the names I changed); `pnpm readme` is run if a plugin's info or config changed
-- [ ] A new plugin was created with `pnpm gen`
+- [ ] Based on the current `master`; no other open PR implements the same change
+- [ ] One topic per PR; follow-up work goes in a separate PR
+- [ ] Relevant checks pass, or checks that were not run and any failures are explained under Tested
+- [ ] Docs and READMEs that describe the change are updated; run `pnpm readme` if plugin info or config changed
+- [ ] New plugins were created with `pnpm gen`
+- Depends on: <!-- #PR, or none -->
+- AI-assisted: <!-- yes / no; this is collected for analytics only and does not affect merge decisions. The PR author is responsible for all PR contents. -->
