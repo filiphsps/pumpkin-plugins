@@ -4,6 +4,7 @@ import { type DefaultTheme, defineConfig } from 'vitepress';
 import { parse as parseYaml } from 'yaml';
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
+const siteBase = '/pumpkin-plugins/';
 const repository = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).repository;
 const repoUrl = (typeof repository === 'string' ? repository : repository.url)
     .replace(/^git\+/, '')
@@ -238,6 +239,12 @@ function components(group: string, hasPackageJson = false): Component[] {
 const plugins = components('packages', true);
 const tools = components('tools', true);
 const actions = components('actions');
+const componentLandingIcons = new Map(
+    [...plugins, ...tools, ...actions].flatMap((item) =>
+        item.icon ? [[`${item.overview.slice(1)}.md`, item.icon] as const] : []
+    )
+);
+
 const guidePages = walkMarkdown(path.join(repoRoot, 'docs'))
     .filter(
         (file) =>
@@ -517,6 +524,27 @@ const themeConfig = {
 
 export default defineConfig({
     srcDir: '..',
+    markdown: {
+        config(md) {
+            md.core.ruler.push('component-title-icon', (state) => {
+                const icon = componentLandingIcons.get(state.env.relativePath);
+                if (!icon) return;
+                const heading = state.tokens.findIndex((token) => token.type === 'heading_open' && token.tag === 'h1');
+                if (heading === -1) return;
+                const inline = state.tokens[heading + 1];
+                if (!inline.children) return;
+
+                state.tokens[heading].attrJoin('class', 'component-page-title');
+                const opening = new state.Token('html_inline', '', 0);
+                const src = md.utils.escapeHtml(JSON.stringify(`${siteBase}${icon.slice(1)}`));
+                opening.content = `<img class="component-page-title__icon" :src="${src}" alt="" aria-hidden="true" width="48" height="48"><span class="component-page-title__text">`;
+                const closing = new state.Token('html_inline', '', 0);
+                closing.content = '</span>';
+                inline.children.unshift(opening);
+                inline.children.push(closing);
+            });
+        }
+    },
     vite: {
         plugins: [
             {
@@ -548,6 +576,6 @@ export default defineConfig({
     title: 'Pumpkin Plugins',
     description: 'Guides and references for Pumpkin plugins, actions, and developer tools.',
     cleanUrls: true,
-    base: '/pumpkin-plugins/',
+    base: siteBase,
     themeConfig
 });

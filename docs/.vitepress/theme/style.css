@@ -1,3 +1,32 @@
+.vp-doc h1.component-page-title {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.vp-doc .component-page-title__icon {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 auto;
+    object-fit: contain;
+}
+
+.vp-doc .component-page-title__text {
+    min-width: 0;
+}
+
+@media (max-width: 767px) {
+    .vp-doc h1.component-page-title {
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .vp-doc .component-page-title__icon {
+        width: 40px;
+        height: 40px;
+    }
+}
+
 .site-mega-nav,
 .site-mobile-nav {
     display: none;

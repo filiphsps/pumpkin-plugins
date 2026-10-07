@@ -33,7 +33,8 @@ row. The `navigation` namespace keeps menu settings separate from other document
 may be added later. An icon path is relative to the component root, alongside `docs.yml`. Without an
 explicit `icon`, the site automatically uses `icon.svg`, `icon.png`, `icon.webp`, `logo.svg`, `logo.png`, or
 `logo.webp` from the component root when present, falling back to its `docs/` folder. Discovered icons
-are included in the built site automatically. Items without artwork keep the same alignment.
+are included in the built site automatically and appear beside the title on the component's landing
+page as well as in navigation. Items without artwork keep the same alignment.
 
 Add a category to a hand-written guide's frontmatter with `navigation.category`; `navigation.type`
 can also select `card` or `spotlight`. These categories are editorial labels and belong beside their
