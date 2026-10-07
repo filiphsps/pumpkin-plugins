@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.5](https://github.com/filiphsps/pumpkin-plugins/compare/apple-skin-pumpkin-v0.0.4...apple-skin-pumpkin-v0.0.5) (2026-10-07)
+
+
+### Features
+
+* **docs:** add generated documentation site ([545c749](https://github.com/filiphsps/pumpkin-plugins/commit/545c74944f65e38fb927fcde588fd17848298cf8))
+* **docs:** add grouped responsive navigation ([1fbf8b5](https://github.com/filiphsps/pumpkin-plugins/commit/1fbf8b586393b28132e3eedaf8543429ef9d8544))
+* **docs:** publish plugin icons in navigation ([73655b5](https://github.com/filiphsps/pumpkin-plugins/commit/73655b5ea4b73e107eb4ca13b47bdea07070b727))
+* **plugin-kit:** support hierarchical command permissions ([854f5cc](https://github.com/filiphsps/pumpkin-plugins/commit/854f5cc2233559bcaa34b2ecb0a19bec88a9f774))
+
+
+### Bug Fixes
+
+* **docs:** render spotlight navigation as full-width rows ([be47b28](https://github.com/filiphsps/pumpkin-plugins/commit/be47b282e1ae7db70b7547485cfa2cf40bbc34a2))
+
 ## [0.0.4](https://github.com/filiphsps/pumpkin-plugins/compare/apple-skin-pumpkin-v0.0.3...apple-skin-pumpkin-v0.0.4) (2026-10-06)
 
 
