@@ -19,8 +19,8 @@ function fragment(bytes: Uint8Array) {
 
 describe('DH transfer cursor', () => {
     it('rejects fragment sizes above the protocol maximum', () => {
-        expect(
-            () => transferFragment(1, new Uint8Array(TRANSFER_PACKET_BYTES + 1), 0, TRANSFER_PACKET_BYTES + 1)
+        expect(() =>
+            transferFragment(1, new Uint8Array(TRANSFER_PACKET_BYTES + 1), 0, TRANSFER_PACKET_BYTES + 1)
         ).toThrow('Invalid DH transfer fragment size');
     });
 
