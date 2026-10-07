@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.0.5](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.0.5...upnpumpkin-v0.0.5) (2026-10-07)
+
+
+### chore
+
+* prepare Distant Horizons 0.0.5 recovery release ([fb3712e](https://github.com/filiphsps/pumpkin-plugins/commit/fb3712ed8e34dfcbf34b636d64c45ff43f71de41))
+
+
+### Features
+
+* **docs:** add generated documentation site ([545c749](https://github.com/filiphsps/pumpkin-plugins/commit/545c74944f65e38fb927fcde588fd17848298cf8))
+* **docs:** add grouped responsive navigation ([1fbf8b5](https://github.com/filiphsps/pumpkin-plugins/commit/1fbf8b586393b28132e3eedaf8543429ef9d8544))
+* **docs:** add integrated API references ([4309016](https://github.com/filiphsps/pumpkin-plugins/commit/4309016cd19a7328c7ac1dd7ea3df790573df73d))
+* **docs:** publish plugin icons in navigation ([73655b5](https://github.com/filiphsps/pumpkin-plugins/commit/73655b5ea4b73e107eb4ca13b47bdea07070b727))
+* **plugin-kit:** support hierarchical command permissions ([854f5cc](https://github.com/filiphsps/pumpkin-plugins/commit/854f5cc2233559bcaa34b2ecb0a19bec88a9f774))
+
+
+### Bug Fixes
+
+* **upnpumpkin:** split command permissions ([2dc1caf](https://github.com/filiphsps/pumpkin-plugins/commit/2dc1caf53e5ceea719ec75b89d9711a570e61538))
+
 ## [0.0.5](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.0.4...upnpumpkin-v0.0.5) (2026-10-06)
 
 
