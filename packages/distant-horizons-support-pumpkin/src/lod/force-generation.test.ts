@@ -55,6 +55,13 @@ describe('forced LOD generation', () => {
         expect(f.cache.get('world:0:0')?.updated).toBe(1234);
         expect(f.samples()).toBe(4096);
         expect(f.reports.at(-1)).toContain('complete: 1 built, 0 skipped');
+        expect(
+            f.logger
+                .of('debug')
+                .join('\n')
+                // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI color codes start with the ESC control character.
+                .replace(/\u001b\[[0-9;]*m/g, '')
+        ).toContain('Built forced LOD for Alice at world section 0, 0 (origin 0, 0 blocks)');
     });
 
     it('uses the full forced-work budget and reports partial progress during a capture', () => {

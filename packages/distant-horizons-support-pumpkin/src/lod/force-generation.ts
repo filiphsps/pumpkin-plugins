@@ -1,10 +1,15 @@
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import type { TerrainAccess, TerrainRegion, TerrainSource } from '@pumpkin-plugins/terrain';
+import { PLUGIN_NAME } from '../name.ts';
 import { SECTION_DETAIL, SECTION_SIZE_BLOCKS } from '../protocol/constants.ts';
 import type { Section } from '../protocol/messages.ts';
 import { LodBuilder } from './builder.ts';
 import type { LodCache } from './cache.ts';
 import { iterateLodSectionsAround, type LodSectionCoordinate, sectionKey } from './generation.ts';
+import { lodLocation } from './location.ts';
+
+const logTag = ansi.named.name(PLUGIN_NAME);
 
 /** Maximum block samples a forced capture attempts in one server tick. */
 export const FORCE_BLOCK_SAMPLES_PER_TICK = 32_768;
@@ -141,6 +146,9 @@ export class ForcedLodGeneration {
             target?.key === sectionKey(level, Math.floor(x / SECTION_SIZE_BLOCKS), Math.floor(z / SECTION_SIZE_BLOCKS))
         ) {
             target.invalidated = true;
+            this.log.debug(
+                `${logTag} Invalidated forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(level, target.coordinate.x, target.coordinate.z)} after a block change.`
+            );
         }
     }
 
@@ -175,6 +183,9 @@ export class ForcedLodGeneration {
                 job.current = target;
             }
             if (target.invalidated) {
+                this.log.debug(
+                    `${logTag} Skipped invalidated forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)}.`
+                );
                 job.skipped++;
                 job.current = undefined;
                 continue;
@@ -203,7 +214,11 @@ export class ForcedLodGeneration {
                     continue;
                 }
 
-                this.cache.put(target.key, { updated: this.now(), data: target.builder.finish(this.now()) });
+                const data = target.builder.finish(this.now());
+                this.cache.put(target.key, { updated: this.now(), data });
+                this.log.debug(
+                    `${logTag} Built forced LOD for ${ansi.named.name(peer.name)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)} (${ansi.named.number(data.length)} bytes).`
+                );
                 job.built++;
                 job.current = undefined;
             } catch (err) {
@@ -230,9 +245,14 @@ export class ForcedLodGeneration {
     }
 
     private skip(job: ForcedJob, reason: string): void {
+        const target = job.current;
         job.skipped++;
         job.current = undefined;
-        this.log.debug(`Forced LOD section skipped: ${reason}`);
+        if (target) {
+            this.log.debug(
+                `${logTag} Skipped forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)}: ${reason}.`
+            );
+        }
     }
 
     private reportProgress(job: ForcedJob, peer: ForcedLodPeer): void {
