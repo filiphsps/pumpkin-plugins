@@ -8,7 +8,7 @@ on the documentation site.
 
 ```yaml
 steps:
-  - uses: filiphsps/pumpkin-plugins/actions/update-pumpkin-market-listing@update-pumpkin-market-listing-v0.0.1
+  - uses: filiphsps/pumpkin-plugins/actions/update-pumpkin-market-listing@update-pumpkin-market-listing-v0.0.2
     with:
       plugin-id: ${{ vars.PUMPKIN_MARKET_PLUGIN_ID }}
       metadata-file: .github/market-metadata.json
