@@ -1,3 +1,8 @@
+---
+navigation:
+    category: Plugin development
+---
+
 # Plugin info and READMEs
 
 ## `src/info.ts`

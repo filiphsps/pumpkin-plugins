@@ -1,8 +1,14 @@
+---
+navigation:
+    category: Getting started
+---
+
 # Documentation site
 
 The VitePress site combines the hand-written guides in `docs/`, component READMEs, component-level
-guides, and generated API references. Plugin, tool, and action pages appear in separate navigation
-sections, and each component's navigation links to its reference.
+guides, and generated API references. The navigation groups items by category metadata stored with
+their docs; names and descriptions still come from package manifests, action metadata, and guide
+introductions. On phones, the same sections open as compact accordions in the navigation screen.
 
 ## Add a component guide
 
@@ -10,6 +16,29 @@ Create Markdown files under the component's `docs/` folder. For example, a plugi
 `index.md` plus additional pages such as `configuration.md`; tools and actions use the same layout.
 The site discovers each file and adds it to that component's sidebar and reference links. Relative
 links are checked by `pnpm check`.
+
+For component-specific documentation settings, add a `docs.yml` file at the component root, next to
+its `docs/` folder. Put navigation settings under `navigation`:
+
+```yaml
+navigation:
+    category: Compatibility
+    type: card
+```
+
+`category` is optional; without it, the item appears in its menu's general group. `type` is optional
+and defaults to a regular link. Use `card` for a self-contained card or `spotlight` for a wide editorial
+row. The `navigation` namespace keeps menu settings separate from other documentation settings that
+may be added later.
+
+Add a category to a hand-written guide's frontmatter with `navigation.category`; `navigation.type`
+can also select `card` or `spotlight`. These categories are editorial labels and belong beside their
+docs, not in a second list in the site configuration.
+
+To feature a component in the desktop Plugins menu, add `navigation.featured: true` to the frontmatter
+of its `docs/index.md`. It also remains a regular link in its category. A featured item defaults to
+the card treatment, and can use `navigation.type: spotlight` to show as a wide row instead. The title
+and description still come from the page heading and package manifest.
 
 The component README serves as the overview when there is no custom `docs/index.md`. If a custom
 index exists, it becomes the component landing page and the README remains available as a separate

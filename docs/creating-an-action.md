@@ -1,3 +1,8 @@
+---
+navigation:
+    category: Getting started
+---
+
 # Creating an action
 
 ```sh

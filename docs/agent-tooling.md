@@ -1,3 +1,8 @@
+---
+navigation:
+    category: Repository maintenance
+---
+
 # Agent tooling
 
 The repo keeps agent instructions, skills and executable checks separate:

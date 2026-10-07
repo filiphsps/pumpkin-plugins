@@ -1,3 +1,8 @@
+---
+navigation:
+    category: Plugin development
+---
+
 # Testing
 
 Each plugin has two vitest projects, set up by `definePluginVitestConfig()` from

@@ -1,3 +1,8 @@
+---
+navigation:
+    category: Plugin development
+---
+
 # Plugin config
 
 Plugins that need settings use `@pumpkin-plugins/config` (`tools/config`). A plugin declares its

@@ -1,3 +1,8 @@
+---
+navigation:
+    category: Server operations
+---
+
 # Port forwarding
 
 Players can only reach a server behind a home router when the router forwards the server's ports.

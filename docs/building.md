@@ -1,3 +1,8 @@
+---
+navigation:
+    category: Plugin development
+---
+
 # Building
 
 ## The build tool

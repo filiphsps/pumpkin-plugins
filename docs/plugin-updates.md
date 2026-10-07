@@ -1,3 +1,8 @@
+---
+navigation:
+    category: Server operations
+---
+
 # Checking for plugin updates
 
 Every plugin in this repository checks Pumpkin Market after it loads. Its existing `info.name` and

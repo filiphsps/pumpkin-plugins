@@ -1,3 +1,8 @@
+---
+navigation:
+    category: Server operations
+---
+
 # Pumpkin Market API
 
 This page records the Market API behavior used by this repository's publish action, the Market

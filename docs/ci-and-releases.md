@@ -1,3 +1,8 @@
+---
+navigation:
+    category: Repository maintenance
+---
+
 # CI and releases
 
 The plugin and release jobs are in `.github/workflows/ci.yml`; action tests have their own

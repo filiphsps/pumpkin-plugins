@@ -1,3 +1,8 @@
+---
+navigation:
+    category: Plugin development
+---
+
 # Code style
 
 `pnpm lint` runs two linters, and CI runs the same command.

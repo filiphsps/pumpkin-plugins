@@ -1,3 +1,8 @@
+---
+navigation:
+    category: Getting started
+---
+
 # Creating a plugin
 
 ```sh
