@@ -32,20 +32,18 @@ says what the thing is for, not what its name says.
 
 ## Console log colors
 
-Use `color.named` from [`@pumpkin-plugins/minecraft-colors`](../tools/minecraft-colors/README.md)
-as the source of truth for which color belongs to a value. For console output, use `colorLogValue`
-from `@pumpkin-plugins/plugin-kit/logger`; it applies ANSI colors and supports cyan, green and
-yellow. Map the palette's dark aqua to cyan, green/dark green to green, and gold/yellow to yellow.
-Keep the surrounding message plain and do not add ANSI escape sequences directly at log call sites.
+Use `ansi.named` from [`@pumpkin-plugins/minecraft-colors`](../tools/minecraft-colors/README.md)
+for values in console log messages. It applies terminal colors using the same named roles as
+`color.named`, which formats Minecraft codes for chat replies. Keep the surrounding message plain
+and do not add formatting codes directly at log call sites.
 
 Keep this palette aligned with the Pumpkin server version pinned in
 [`tools/test-harness/src/pumpkin-version.ts`](../tools/test-harness/src/pumpkin-version.ts). Pumpkin
 uses cyan for plugin names, green for versions and bold yellow for permissions in its
 [plugin permission prompt](https://github.com/Pumpkin-MC/Pumpkin/blob/0.2.0%2B26.3-26.51/crates/pumpkin/src/plugin/mod.rs#L493-L504).
 Its [rolling log file layer](https://github.com/Pumpkin-MC/Pumpkin/blob/0.2.0%2B26.3-26.51/crates/pumpkin/src/logging.rs#L281-L335)
-removes ANSI codes before writing files, leaving the console color useful without adding escape
-codes to saved logs. When the pinned server version changes, check these Pumpkin source references
-and update this convention if its palette or log handling changes.
+strips ANSI codes before writing saved logs. When the pinned server version changes, check both
+source references and update the named roles if its palette or log handling changes.
 
 ## Structure
 

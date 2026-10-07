@@ -6,10 +6,10 @@ The scheduling helpers accept whole, nonnegative tick counts; repeating periods 
 one tick. `cancelTask` cancels either delayed or repeating tasks and releases their callbacks.
 Delayed callbacks are also released before they run, and failed scheduling retains no callback.
 
-Use `colorLogValue` from `@pumpkin-plugins/plugin-kit/logger` for a few values worth scanning, such
-as names, filenames, URLs, versions, UUIDs and ports. Follow the
-[console color convention](../../docs/code-style.md#console-log-colors), which links to the pinned
-Pumpkin source for its palette and ANSI handling.
+Use `ansi.named` from `@pumpkin-plugins/minecraft-colors` for log values worth scanning, such as
+names, filenames, URLs, versions, UUIDs and ports. Pick the named role that fits the value and keep
+the surrounding message plain. The `color.named` formatter emits Minecraft codes for chat replies.
+See the [console color convention](../../docs/code-style.md#console-log-colors) for the palette source.
 
 `WasiDataDir.writeFile` replaces files through an exclusively created temporary sibling. Failed
 writes and renames clean up that sibling without replacing the original error. Directory creation
