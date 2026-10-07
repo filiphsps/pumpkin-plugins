@@ -41,6 +41,27 @@ function buildAt(name = 'plugin.wasm'): { dir: string; output: string } {
 }
 
 describe('bundlePlugin', () => {
+    it('defines development mode in plugin bundles', async () => {
+        const { output } = buildAt();
+
+        await bundlePlugin({
+            entry: 'src/plugin.ts',
+            output,
+            witDir: 'wit',
+            version: '1.0.0',
+            developmentMode: true
+        });
+
+        expect(esbuild).toHaveBeenCalledWith(
+            expect.objectContaining({
+                define: {
+                    __PLUGIN_VERSION__: JSON.stringify('1.0.0'),
+                    __PUMPKIN_DEV_MODE__: JSON.stringify(true)
+                }
+            })
+        );
+    });
+
     it('publishes a completed component and returns its size', async () => {
         const { output } = buildAt();
         fs.writeFileSync(output, 'old artifact');

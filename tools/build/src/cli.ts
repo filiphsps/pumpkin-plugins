@@ -60,7 +60,8 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
         entry: path.resolve(pluginDir, entry),
         output: path.resolve(pluginDir, output),
         witDir,
-        version: config.version
+        version: config.version,
+        developmentMode: process.env.PUMPKIN_DEV_MODE === '1'
     });
     console.log(`Built ${output} (${(size / 1024).toFixed(0)} KiB)`);
 }

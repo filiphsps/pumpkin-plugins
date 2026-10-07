@@ -206,13 +206,40 @@ function watchBuildOutputs(plugins, serverPluginsDir) {
     };
 }
 
-function createServerDirectory(serverDir) {
+function configureHotReload(config, hotReload) {
+    const newline = config.includes('\r\n') ? '\r\n' : '\n';
+    const lines = config === '' ? [] : config.split(/\r?\n/);
+    const pluginsStart = lines.findIndex((line) => /^\s*\[plugins\]\s*(?:#.*)?$/.test(line));
+
+    if (pluginsStart === -1) {
+        const section = ['[plugins]', `hot_reload = ${hotReload}`];
+        if (lines.at(-1) === '') lines.splice(lines.length - 1, 0, ...section);
+        else lines.push(...(lines.length > 0 ? ['', ...section] : section));
+    } else {
+        let pluginsEnd = lines.findIndex((line, index) => index > pluginsStart && /^\s*\[/.test(line));
+        if (pluginsEnd === -1) pluginsEnd = lines.length;
+        const hotReloadLine = lines.findIndex(
+            (line, index) => index > pluginsStart && index < pluginsEnd && /^\s*hot_reload\s*=/.test(line)
+        );
+        if (hotReloadLine === -1) {
+            lines.splice(pluginsStart + 1, 0, `hot_reload = ${hotReload}`);
+        } else {
+            const line = lines[hotReloadLine] ?? '';
+            const indentation = line.match(/^\s*/)?.[0] ?? '';
+            const comment = line.match(/\s+#.*$/)?.[0] ?? '';
+            lines[hotReloadLine] = `${indentation}hot_reload = ${hotReload}${comment}`;
+        }
+    }
+
+    return lines.join(newline);
+}
+
+function createServerDirectory(serverDir, hotReload) {
     const pluginsDir = path.join(serverDir, 'plugins');
     fs.mkdirSync(pluginsDir, { recursive: true });
     const configFile = path.join(serverDir, 'pumpkin.toml');
-    if (!fs.existsSync(configFile)) {
-        fs.writeFileSync(configFile, '[plugins]\nhot_reload = true\n');
-    }
+    const config = fs.existsSync(configFile) ? fs.readFileSync(configFile, 'utf8') : '[plugins]\n';
+    fs.writeFileSync(configFile, configureHotReload(config, hotReload));
     return pluginsDir;
 }
 
@@ -230,30 +257,33 @@ function pnpmCommand() {
 }
 
 /** Starts Turbo's one-shot build for all workspace plugins. */
-export function startInitialBuild(root, spawnImpl = spawn) {
+export function startInitialBuild(root, spawnImpl = spawn, env = process.env) {
     return spawnChild(
         pnpmCommand(),
         ['exec', 'turbo', 'run', 'build', '--ui=stream', '--log-order=stream'],
         {
             cwd: root,
             stdio: 'inherit',
-            shell: process.platform === 'win32'
+            shell: process.platform === 'win32',
+            env
         },
         spawnImpl
     );
 }
 
-/** Starts a server running all workspace plugins and watches builds for live updates. */
+/** Starts a server running all workspace plugins with optional build and plugin hot reload. */
 export async function runDev({
     root = path.resolve(import.meta.dirname, '..'),
     spawnImpl = spawn,
-    resolveBinary = resolvePumpkinBinary
+    resolveBinary = resolvePumpkinBinary,
+    hotReload = true
 } = {}) {
     const plugins = listPluginBuilds(root);
     if (plugins.length === 0) throw new Error('No plugin packages with pumpkinPlugin.output were found');
 
     const serverDir = path.join(root, '.cache', 'pumpkin-dev');
-    const serverPluginsDir = createServerDirectory(serverDir);
+    const serverPluginsDir = createServerDirectory(serverDir, hotReload);
+    const devEnv = { ...process.env, PUMPKIN_DEV_MODE: '1' };
     let outputs;
     let turbo;
     let server;
@@ -281,7 +311,7 @@ export async function runDev({
 
     try {
         console.log('Building every plugin, then launching the latest stable Pumpkin release.');
-        const initialBuild = startInitialBuild(root, spawnImpl);
+        const initialBuild = startInitialBuild(root, spawnImpl, devEnv);
         turbo = initialBuild;
         const buildResult = initialBuild.done.then(({ code, signal }) => {
             if (!shuttingDown && (code !== 0 || signal)) {
@@ -294,29 +324,33 @@ export async function runDev({
         const [, resolvedBinary] = startupResult;
 
         for (const plugin of plugins) copyPluginBuild(plugin, serverPluginsDir);
-        outputs = watchBuildOutputs(plugins, serverPluginsDir);
-        turbo = spawnChild(
-            pnpmCommand(),
-            ['exec', 'turbo', 'watch', 'build', '--ui=stream', '--log-order=stream'],
-            {
-                cwd: root,
-                stdio: 'inherit',
-                shell: process.platform === 'win32'
-            },
-            spawnImpl
-        );
-        const turboExit = turbo.done.then(({ code, signal }) => {
-            if (!shuttingDown) throw new Error(`turbo watch build exited (${signal ?? code ?? 'unknown status'})`);
-        });
+        const backgroundTasks = [];
+        if (hotReload) {
+            outputs = watchBuildOutputs(plugins, serverPluginsDir);
+            turbo = spawnChild(
+                pnpmCommand(),
+                ['exec', 'turbo', 'watch', 'build', '--ui=stream', '--log-order=stream'],
+                {
+                    cwd: root,
+                    stdio: 'inherit',
+                    shell: process.platform === 'win32',
+                    env: devEnv
+                },
+                spawnImpl
+            );
+            const turboExit = turbo.done.then(({ code, signal }) => {
+                if (!shuttingDown) throw new Error(`turbo watch build exited (${signal ?? code ?? 'unknown status'})`);
+            });
+            backgroundTasks.push(
+                turboExit.then(() => new Promise(() => {})),
+                outputs.failure
+            );
+        }
 
         const { binary: serverBinary, release } = resolvedBinary;
         console.log(`Starting Pumpkin ${release} with ${plugins.length} plugins in ${serverDir}`);
         server = spawnChild(serverBinary, [], { cwd: serverDir, stdio: 'inherit' }, spawnImpl);
-        const serverResult = await Promise.race([
-            server.done,
-            turboExit.then(() => new Promise(() => {})),
-            outputs.failure
-        ]);
+        const serverResult = await Promise.race([server.done, ...backgroundTasks]);
         if (serverResult && !shuttingDown) process.exitCode = serverResult.code ?? (serverResult.signal ? 1 : 0);
     } finally {
         process.removeListener('SIGINT', onInterrupt);
@@ -327,8 +361,10 @@ export async function runDev({
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-    runDev().catch((error) => {
-        console.error(`pnpm dev: ${error.message}`);
+    const hotReload = !process.argv.includes('--no-hot-reload');
+    const command = hotReload ? 'pnpm dev' : 'pnpm dev:no-hot-reload';
+    runDev({ hotReload }).catch((error) => {
+        console.error(`${command}: ${error.message}`);
         process.exitCode = 1;
     });
 }

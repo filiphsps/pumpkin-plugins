@@ -16,6 +16,8 @@ export interface BundleOptions {
     witDir: string;
     /** Injected as `__PLUGIN_VERSION__`. */
     version: string;
+    /** Whether this is a development build. */
+    developmentMode?: boolean;
 }
 
 /**
@@ -40,7 +42,10 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
             format: 'esm',
             target: 'es2022',
             external: ['pumpkin:plugin/*', 'wasi:*'],
-            define: { __PLUGIN_VERSION__: JSON.stringify(options.version) }
+            define: {
+                __PLUGIN_VERSION__: JSON.stringify(options.version),
+                __PUMPKIN_DEV_MODE__: JSON.stringify(options.developmentMode ?? false)
+            }
         });
         const componentizerPackage = path.dirname(require.resolve('@di-framework/componentize-qjs/package.json'));
         execFileSync(

@@ -15,7 +15,7 @@
         },
         "build": {
             "dependsOn": ["transit"],
-            "env": ["PUMPKIN_API_DIR"],
+            "env": ["PUMPKIN_API_DIR", "PUMPKIN_DEV_MODE"],
             "outputs": ["build/**", "!build/types/**"]
         },
         "typecheck": {

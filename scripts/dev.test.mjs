@@ -180,6 +180,12 @@ describe('runDev', () => {
         );
         fs.mkdirSync(path.dirname(output), { recursive: true });
         fs.writeFileSync(output, 'cached build');
+        const serverDir = path.join(root, '.cache', 'pumpkin-dev');
+        fs.mkdirSync(serverDir, { recursive: true });
+        fs.writeFileSync(
+            path.join(serverDir, 'pumpkin.toml'),
+            '[plugins]\nhot_reload = false # reset\n\n[server]\nname = "test"\n'
+        );
         const calls = [];
         const spawnImpl = (command, args, options) => {
             const child = new EventEmitter();
@@ -198,10 +204,56 @@ describe('runDev', () => {
         });
 
         assert.deepEqual(calls[0].args, ['exec', 'turbo', 'run', 'build', '--ui=stream', '--log-order=stream']);
+        assert.equal(calls[0].options.env.PUMPKIN_DEV_MODE, '1');
+        assert.equal(calls[1].options.env.PUMPKIN_DEV_MODE, '1');
         assert.equal(calls.at(-1).command, '/fake/pumpkin');
+        const config = fs.readFileSync(path.join(serverDir, 'pumpkin.toml'), 'utf8');
+        assert.match(config, /hot_reload = true # reset/);
+        assert.match(config, /\[server\]\nname = "test"/);
         assert.equal(
             fs.readFileSync(path.join(root, '.cache', 'pumpkin-dev', 'plugins', 'plugin.wasm'), 'utf8'),
             'cached build'
+        );
+    });
+
+    it('starts without hot reload or build watchers when disabled', async () => {
+        const root = tempDir();
+        const packageDir = path.join(root, 'packages', 'plugin');
+        const output = path.join(packageDir, 'build', 'plugin.wasm');
+        fs.mkdirSync(path.dirname(output), { recursive: true });
+        fs.writeFileSync(
+            path.join(packageDir, 'package.json'),
+            JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } })
+        );
+        fs.writeFileSync(output, 'cached build');
+        const calls = [];
+        const spawnImpl = (command, args, options) => {
+            const child = new EventEmitter();
+            child.kill = () => {};
+            calls.push({ command, args, options });
+            if (args.includes('run') || command === '/fake/pumpkin') {
+                process.nextTick(() => child.emit('exit', 0, null));
+            }
+            return child;
+        };
+
+        await runDev({
+            root,
+            spawnImpl,
+            hotReload: false,
+            resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' })
+        });
+
+        assert.equal(calls.length, 2);
+        assert.equal(calls[0].options.env.PUMPKIN_DEV_MODE, '1');
+        assert.equal(calls.at(-1).command, '/fake/pumpkin');
+        assert.match(
+            fs.readFileSync(path.join(root, '.cache', 'pumpkin-dev', 'pumpkin.toml'), 'utf8'),
+            /hot_reload = false/
+        );
+        assert.equal(
+            calls.some(({ args }) => args.includes('watch')),
+            false
         );
     });
 

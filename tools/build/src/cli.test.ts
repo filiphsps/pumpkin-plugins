@@ -79,7 +79,8 @@ describe('run arguments', () => {
                 entry: path.join(pluginDir, 'src/plugin.ts'),
                 output: path.join(pluginDir, 'build/plugin.wasm'),
                 witDir: path.join(apiDir, 'wit', 'v0.1'),
-                version: '1.2.3'
+                version: '1.2.3',
+                developmentMode: false
             });
             expect(consoleLog.mock.calls.map(([message]) => message)).toEqual([
                 'Bundling src/plugin.ts...',
@@ -89,6 +90,44 @@ describe('run arguments', () => {
             consoleLog.mockRestore();
             if (realApiDir === undefined) delete process.env.PUMPKIN_API_DIR;
             else process.env.PUMPKIN_API_DIR = realApiDir;
+            fs.rmSync(pluginDir, { recursive: true, force: true });
+            fs.rmSync(apiDir, { recursive: true, force: true });
+        }
+    });
+
+    it('marks bundles created for pnpm dev as development builds', async () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-dev-build-'));
+        const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
+        const realApiDir = process.env.PUMPKIN_API_DIR;
+        const realDevMode = process.env.PUMPKIN_DEV_MODE;
+        fs.writeFileSync(
+            path.join(pluginDir, 'package.json'),
+            JSON.stringify({
+                version: '1.2.3',
+                pumpkinPlugin: { entry: 'src/plugin.ts', output: 'build/plugin.wasm', wasi: [] }
+            })
+        );
+        process.env.PUMPKIN_API_DIR = apiDir;
+        process.env.PUMPKIN_DEV_MODE = '1';
+        vi.mocked(bundlePlugin).mockClear().mockResolvedValue(2048);
+        const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        try {
+            await run([], pluginDir);
+
+            expect(bundlePlugin).toHaveBeenCalledWith({
+                entry: path.join(pluginDir, 'src/plugin.ts'),
+                output: path.join(pluginDir, 'build/plugin.wasm'),
+                witDir: path.join(apiDir, 'wit', 'v0.1'),
+                version: '1.2.3',
+                developmentMode: true
+            });
+        } finally {
+            consoleLog.mockRestore();
+            if (realApiDir === undefined) delete process.env.PUMPKIN_API_DIR;
+            else process.env.PUMPKIN_API_DIR = realApiDir;
+            if (realDevMode === undefined) delete process.env.PUMPKIN_DEV_MODE;
+            else process.env.PUMPKIN_DEV_MODE = realDevMode;
             fs.rmSync(pluginDir, { recursive: true, force: true });
             fs.rmSync(apiDir, { recursive: true, force: true });
         }

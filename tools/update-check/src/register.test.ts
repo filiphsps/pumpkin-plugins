@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const calls = vi.hoisted(() => ({
     log: vi.fn(),
@@ -24,6 +24,20 @@ function fixture(): Plugin {
 
 describe('registerPluginWithUpdates', () => {
     beforeEach(() => vi.resetAllMocks());
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('does not check for updates in development mode', () => {
+        vi.stubGlobal('__PUMPKIN_DEV_MODE__', true);
+        const plugin = fixture();
+        const schedule = vi.fn();
+
+        registerPluginWithUpdates(plugin, info, { schedule });
+        plugin.onLoad?.({} as never);
+
+        expect(schedule).not.toHaveBeenCalled();
+        expect(calls.requestAsync).not.toHaveBeenCalled();
+        expect(calls.log).not.toHaveBeenCalled();
+    });
 
     it('schedules the request and reports a result without blocking plugin loading', () => {
         const plugin = fixture();

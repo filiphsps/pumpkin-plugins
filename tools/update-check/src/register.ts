@@ -15,6 +15,7 @@ export function registerPluginWithUpdates(plugin: Plugin, info: PluginInfo, opti
     const onLoad = plugin.onLoad.bind(plugin);
     plugin.onLoad = (ctx) => {
         onLoad(ctx);
+        if (typeof __PUMPKIN_DEV_MODE__ !== 'undefined' && __PUMPKIN_DEV_MODE__) return;
         try {
             const metadata = plugin.metadata();
             const request = options?.request;
