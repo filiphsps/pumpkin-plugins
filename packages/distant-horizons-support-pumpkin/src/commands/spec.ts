@@ -1,4 +1,5 @@
 import { defineCommands } from '@pumpkin-plugins/docs';
+import { MAX_LOD_GENERATION_RADIUS } from '../lod/generation.ts';
 import { MAX_LOD_MAP_RADIUS } from '../lod/map-constants.ts';
 import { PLUGIN_NAME } from '../name.ts';
 
@@ -78,6 +79,38 @@ export const commands = defineCommands(PLUGIN_NAME, {
                             { name: 'x', type: 'integer' },
                             { name: 'z', type: 'integer' },
                             { name: 'radius', type: 'integer', min: 0, max: MAX_LOD_MAP_RADIUS }
+                        ]
+                    }
+                }
+            },
+            generate: {
+                description: 'Force-build and cache LOD sections at full work speed',
+                permission: `${COMMAND_PERMISSION}.generate`,
+                subcommands: {
+                    here: {
+                        description: 'Force-build the LOD section at your current position',
+                        permission: `${COMMAND_PERMISSION}.generate.here`
+                    },
+                    'here-radius': {
+                        description: `Force-build LOD sections around your position with radius 0–${MAX_LOD_GENERATION_RADIUS}`,
+                        permission: `${COMMAND_PERMISSION}.generate.here-radius`,
+                        arguments: [{ name: 'radius', type: 'integer', min: 0, max: MAX_LOD_GENERATION_RADIUS }]
+                    },
+                    at: {
+                        description: 'Force-build the LOD section at block coordinates in your current world',
+                        permission: `${COMMAND_PERMISSION}.generate.at`,
+                        arguments: [
+                            { name: 'x', type: 'integer' },
+                            { name: 'z', type: 'integer' }
+                        ]
+                    },
+                    'at-radius': {
+                        description: `Force-build LOD sections at block coordinates with radius 0–${MAX_LOD_GENERATION_RADIUS}`,
+                        permission: `${COMMAND_PERMISSION}.generate.at-radius`,
+                        arguments: [
+                            { name: 'x', type: 'integer' },
+                            { name: 'z', type: 'integer' },
+                            { name: 'radius', type: 'integer', min: 0, max: MAX_LOD_GENERATION_RADIUS }
                         ]
                     }
                 }

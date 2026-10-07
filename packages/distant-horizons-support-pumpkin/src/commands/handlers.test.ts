@@ -3,13 +3,19 @@ import { commandInfos } from '@pumpkin-plugins/docs';
 import type { CommandHost } from '@pumpkin-plugins/plugin-kit/commands';
 import { buildCommands } from '@pumpkin-plugins/plugin-kit/commands';
 import { FakeCommandHost, type FakeNode, MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
-import { describe, expect, it } from 'vitest';
+import { unavailableChunkLoader, unavailableTerrainGenerator } from '@pumpkin-plugins/terrain';
+import { describe, expect, it, vi } from 'vitest';
 import { readSettings } from '../config/load.ts';
 import { info } from '../info.ts';
 import { LodCache } from '../lod/cache.ts';
-import { Sessions, sectionKey } from '../session.ts';
+import { type Peer, Sessions, sectionKey } from '../session.ts';
 import { commandHandlers } from './handlers.ts';
 import { commands } from './spec.ts';
+
+const platform = vi.hoisted(() => ({ withPlayer: vi.fn() }));
+vi.mock('../platform/peers.ts', () => ({ withPlayer: platform.withPlayer }));
+
+let activePeer: Peer | undefined;
 
 function setup() {
     const files = new MemoryFiles();
@@ -18,13 +24,35 @@ function setup() {
     const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries);
     cache.put('first', { updated: 1, data: new Uint8Array(100) });
     const sessions = new Sessions(settings, cache, logger);
+    activePeer = {
+        name: 'Alice',
+        level: 'world',
+        dimension: 'minecraft:overworld',
+        x: 70,
+        z: 3,
+        terrain: {
+            minY: 0,
+            height: 1,
+            chunkLoader: unavailableChunkLoader,
+            terrainGenerator: unavailableTerrainGenerator,
+            sample: () => ({ material: 'minecraft:stone', skyLight: 15, blockLight: 0 })
+        },
+        insideBorder: () => true,
+        report: () => undefined,
+        send: () => undefined
+    };
+    platform.withPlayer.mockImplementation((_player: unknown, _settings: unknown, use: (peer: Peer) => void) => {
+        if (!activePeer) return false;
+        use(activePeer);
+        return true;
+    });
     const host = new FakeCommandHost();
     const [root] = buildCommands<CommandSender, typeof commands>(
         host as unknown as CommandHost<CommandSender>,
         commands,
-        commandHandlers(sessions, cache)
+        commandHandlers(sessions, cache, settings)
     );
-    return { cache, host, root: root?.node as FakeNode };
+    return { cache, host, root: root?.node as FakeNode, sessions };
 }
 
 describe('the /dhs commands', () => {
@@ -41,9 +69,21 @@ describe('the /dhs commands', () => {
             'DistantHorizonsSupportPumpkin:command.dhs.map.here',
             'DistantHorizonsSupportPumpkin:command.dhs.map.here-radius',
             'DistantHorizonsSupportPumpkin:command.dhs.map.at',
-            'DistantHorizonsSupportPumpkin:command.dhs.map.at-radius'
+            'DistantHorizonsSupportPumpkin:command.dhs.map.at-radius',
+            'DistantHorizonsSupportPumpkin:command.dhs.generate.here',
+            'DistantHorizonsSupportPumpkin:command.dhs.generate.here-radius',
+            'DistantHorizonsSupportPumpkin:command.dhs.generate.at',
+            'DistantHorizonsSupportPumpkin:command.dhs.generate.at-radius'
         ]);
         expect(info.commands.map(({ usage }) => usage)).toContain('/dhs map at-radius <x> <z> <radius>');
+        expect(info.commands.map(({ usage }) => usage)).toEqual(
+            expect.arrayContaining([
+                '/dhs generate here',
+                '/dhs generate here-radius <radius>',
+                '/dhs generate at <x> <z>',
+                '/dhs generate at-radius <x> <z> <radius>'
+            ])
+        );
     });
 
     it('reports both cache tiers and their configured limits', () => {
@@ -111,6 +151,55 @@ describe('the /dhs commands', () => {
     it('requires player context for map commands', () => {
         const { host, root } = setup();
         expect(() => host.run(root, ['dhs', 'map', 'here'])).toThrow('Run this command as a player');
+    });
+
+    it('starts forced captures at the player or block coordinates with the selected radius', () => {
+        const here = setup();
+        const player = {
+            getPosition: () => [70, 64, 3],
+            getWorld: () => ({ getName: () => 'world', [Symbol.dispose]: () => undefined }),
+            [Symbol.dispose]: () => undefined
+        };
+        const sender = { lines: [], errors: [], asPlayer: () => player };
+
+        here.host.runAs(here.root, ['dhs', 'generate', 'here'], {}, sender as never);
+        expect(sender.lines[0]).toContain('section 1, 0 (radius 0');
+        expect(here.sessions.status()).toContain('Forced LOD capture for Alice');
+
+        const hereRadius = setup();
+        hereRadius.host.runAs(
+            hereRadius.root,
+            ['dhs', 'generate', 'here-radius', '<radius>'],
+            { radius: 1 },
+            sender as never
+        );
+        expect(sender.lines.at(-2)).toContain('section 1, 0 (radius 1');
+
+        const at = setup();
+        at.host.runAs(at.root, ['dhs', 'generate', 'at', '<x>', '<z>'], { x: -64, z: 128 }, sender as never);
+        expect(sender.lines.at(-2)).toContain('section -1, 2 (radius 0');
+
+        const atRadius = setup();
+        atRadius.host.runAs(
+            atRadius.root,
+            ['dhs', 'generate', 'at-radius', '<x>', '<z>', '<radius>'],
+            { x: 64, z: -64, radius: 2 },
+            sender as never
+        );
+        expect(sender.lines.at(-2)).toContain('section 1, -1 (radius 2');
+    });
+
+    it('requires a Java player and rejects a second active forced capture', () => {
+        const f = setup();
+        const player = {
+            getPosition: () => [0, 64, 0],
+            getWorld: () => ({ getName: () => 'world', [Symbol.dispose]: () => undefined }),
+            [Symbol.dispose]: () => undefined
+        };
+        const sender = { lines: [], errors: [], asPlayer: () => player };
+        f.host.runAs(f.root, ['dhs', 'generate', 'here'], {}, sender as never);
+        expect(() => f.host.runAs(f.root, ['dhs', 'generate', 'here'], {}, sender as never)).toThrow('already running');
+        expect(() => f.host.run(f.root, ['dhs', 'generate', 'here'])).toThrow('Run this command as a Java player');
     });
 
     it('rejects radii larger than the bounded map size', () => {

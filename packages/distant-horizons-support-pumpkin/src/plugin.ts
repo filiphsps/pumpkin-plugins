@@ -35,7 +35,7 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
         const settings = readSettings(files, hostLogger);
         const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries);
         const sessions = new Sessions(settings, cache, hostLogger);
-        registerCommands(ctx, commands, commandHandlers(sessions, cache));
+        registerCommands(ctx, commands, commandHandlers(sessions, cache, settings));
         this.registerEvent(ctx, 'player-custom-payload-event', (_server, event: PlayerCustomPayloadEventData) => {
             if (event.channel !== CHANNEL) return;
             try {

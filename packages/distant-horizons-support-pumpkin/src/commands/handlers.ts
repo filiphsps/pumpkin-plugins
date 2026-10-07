@@ -1,13 +1,21 @@
 import type { CommandSender } from 'pumpkin:plugin/command@0.1.0';
 import { CommandFailed, type CommandHandlers } from '@pumpkin-plugins/docs';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
+import type { Settings } from '../config/schema.ts';
 import type { LodCache } from '../lod/cache.ts';
+import { FORCE_BLOCK_SAMPLES_PER_TICK, type ForcedLodStart } from '../lod/force-generation.ts';
+import { DEFAULT_LOD_GENERATION_RADIUS, MAX_LOD_GENERATION_RADIUS } from '../lod/generation.ts';
 import { DEFAULT_LOD_MAP_RADIUS, MAX_LOD_MAP_RADIUS, renderLodMap } from '../lod/map.ts';
+import { withPlayer } from '../platform/peers.ts';
 import type { Sessions } from '../session.ts';
 import type { commands } from './spec.ts';
 
 /** Builds operator handlers for session status and cache management. */
-export function commandHandlers(sessions: Sessions, cache: LodCache): CommandHandlers<typeof commands, CommandSender> {
+export function commandHandlers(
+    sessions: Sessions,
+    cache: LodCache,
+    settings: Settings
+): CommandHandlers<typeof commands, CommandSender> {
     return {
         'dhs status': () => [sessions.status()],
         'dhs cache status': () => {
@@ -26,8 +34,47 @@ export function commandHandlers(sessions: Sessions, cache: LodCache): CommandHan
         'dhs map here': (sender) => showMap(cache, sender, DEFAULT_LOD_MAP_RADIUS),
         'dhs map here-radius <radius>': (sender, { radius }) => showMap(cache, sender, radius),
         'dhs map at <x> <z>': (sender, { x, z }) => showMap(cache, sender, DEFAULT_LOD_MAP_RADIUS, [x, z]),
-        'dhs map at-radius <x> <z> <radius>': (sender, { x, z, radius }) => showMap(cache, sender, radius, [x, z])
+        'dhs map at-radius <x> <z> <radius>': (sender, { x, z, radius }) => showMap(cache, sender, radius, [x, z]),
+        'dhs generate here': (sender) => generateLods(sessions, settings, sender, DEFAULT_LOD_GENERATION_RADIUS),
+        'dhs generate here-radius <radius>': (sender, { radius }) => generateLods(sessions, settings, sender, radius),
+        'dhs generate at <x> <z>': (sender, { x, z }) =>
+            generateLods(sessions, settings, sender, DEFAULT_LOD_GENERATION_RADIUS, [x, z]),
+        'dhs generate at-radius <x> <z> <radius>': (sender, { x, z, radius }) =>
+            generateLods(sessions, settings, sender, radius, [x, z])
     };
+}
+
+function generateLods(
+    sessions: Sessions,
+    settings: Settings,
+    sender: CommandSender,
+    radius: number,
+    coordinates?: readonly [x: number, z: number]
+): string[] {
+    if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_GENERATION_RADIUS) {
+        throw new CommandFailed(`Radius must be between 0 and ${MAX_LOD_GENERATION_RADIUS} LOD sections.`);
+    }
+    const player = sender.asPlayer();
+    if (!player) throw new CommandFailed('Run this command as a Java player so the current world is known.');
+
+    try {
+        let started: ForcedLodStart | undefined;
+        const found = withPlayer(player, settings, (peer) => {
+            const [x, z] = coordinates ?? [Math.floor(peer.x), Math.floor(peer.z)];
+            started = sessions.forceGenerate(peer, x, z, radius);
+        });
+        if (!found) throw new CommandFailed('Run this command as a Java player so terrain access is available.');
+        if (!started) throw new CommandFailed('Could not start forced LOD capture.');
+        return [
+            `Started forced LOD capture at section ${started.centerX}, ${started.centerZ} (radius ${radius}; ${started.sections - started.skippedOutsideBorder}/${started.sections} sections inside the world border).`,
+            `Capturing at full speed with up to ${FORCE_BLOCK_SAMPLES_PER_TICK.toLocaleString()} block samples per tick. Progress will be reported in chat.`
+        ];
+    } catch (err) {
+        if (err instanceof CommandFailed) throw err;
+        throw new CommandFailed(err instanceof Error ? err.message : String(err));
+    } finally {
+        disposeWasiResource(player);
+    }
 }
 
 function showMap(
