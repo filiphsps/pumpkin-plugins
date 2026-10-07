@@ -25,16 +25,16 @@ export function renderLodMap(cache: LodCache, level: string, blockX: number, blo
         for (let column = -displayRadius; column <= displayRadius; column++) {
             const x = centerX + sectionOffset(column);
             const cached = cache.has(sectionKey(level, x, z));
-            if (column === 0 && rowOffset === 0) rowText += cached ? '§e◆' : '§8◇';
-            else rowText += cached ? '§a█' : '§8□';
+            if (column === 0 && rowOffset === 0) rowText += cached ? '§e█' : '§7█';
+            else rowText += cached ? '§a█' : '§8█';
         }
         lines.push(rowText);
     }
 
     lines.push(
         radius > displayRadius
-            ? '§a█ built  §8□ empty  §e◆ built center  §8◇ empty center (map downsampled to 21×21 cells)'
-            : '§a█ built  §8□ empty  §e◆ built center  §8◇ empty center (one cell = 64 blocks / 4×4 chunks)'
+            ? `§a█ built  §8█ empty  Center: §e█ built, §7█ empty (downsampled to ${displayRadius * 2 + 1}×${displayRadius * 2 + 1})`
+            : '§a█ built  §8█ empty  Center: §e█ built, §7█ empty (one cell = 64 blocks / 4×4 chunks)'
     );
     return lines;
 }

@@ -147,8 +147,8 @@ describe('the /dhs commands', () => {
 
         host.runAs(root, ['dhs', 'map'], {}, sender as never);
         expect(sender.lines[0]).toContain('center section 1, 0');
-        expect(sender.lines.at(-1)).toContain('built');
-        expect(sender.lines.join('\n')).toContain('§e◆');
+        expect(sender.lines.join('\n')).toContain('built');
+        expect(sender.lines.join('\n')).toContain('§e█');
 
         sender.lines.length = 0;
         host.runAs(root, ['dhs', 'map', '<radius>'], { radius: 0 }, sender as never);
@@ -159,7 +159,7 @@ describe('the /dhs commands', () => {
         host.runAs(root, ['dhs', 'map', '<x>', '<z>', '<radius>'], { x: 64, z: 0, radius: 0 }, sender as never);
         expect(sender.lines).toHaveLength(3);
         expect(sender.lines[0]).toContain('center section 1, 0');
-        expect(sender.lines[1]).toContain('§e◆');
+        expect(sender.lines[1]).toContain('§e█');
 
         sender.lines.length = 0;
         host.runAs(root, ['dhs', 'map', '<x>', '<z>'], { x: 64, z: 0 }, sender as never);
