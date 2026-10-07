@@ -5,6 +5,7 @@ import { MAX_POINTS_PER_SECTION } from './lod/constants.ts';
 import { PLUGIN_NAME } from './name.ts';
 import {
     DH_VERSION,
+    MAX_TRANSFER_MESSAGE_BYTES,
     PROTOCOL,
     SECTION_CHUNK_COUNT,
     SECTION_SIZE_BLOCKS,
@@ -36,7 +37,8 @@ export const info = {
             `All ${SECTION_CHUNK_COUNT} chunks must remain loaded by Pumpkin while a capture progresses.`,
             'The plugin cannot load or generate distant chunks.',
             `Captures are limited to ${MAX_POINTS_PER_SECTION} material segments per section,`,
-            `and transfer packets carry at most ${TRANSFER_PACKET_BYTES} bytes.`
+            `transfer packets carry at most ${TRANSFER_PACKET_BYTES} data bytes,`,
+            `and a finite client bandwidth bucket can accumulate one ${MAX_TRANSFER_MESSAGE_BYTES}-byte DH fragment message.`
         ].join(' ')
     }
 } satisfies PluginInfo<typeof PLUGIN_NAME>;

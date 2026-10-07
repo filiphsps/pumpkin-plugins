@@ -25,7 +25,16 @@ lists commands for clearing either cache tier or both.
 ## Requests stay queued or progress is slow
 
 Check the plugin's status command from the generated [Commands](../README.md#commands) reference.
-Its output includes worker ticks, pending work, capture progress, served and rejected requests, and
-the last rejection reason. If work advances but cannot keep up, review the per-tick request and
-transfer budgets in the generated [Configuration](../README.md#configuration) reference. Changes
-take effect after a server restart.
+Its output includes pending requests and responses, logical queued response bytes retained, DH packet bytes sent,
+capture progress, completed and rejected requests, and the last rejection reason. `Chunk ... is not
+loaded` means terrain is unavailable to capture; `LOD request limit reached` means the bounded
+queue is full. Cached sections can still be delivered while a forced capture or sampling pause is
+active.
+
+The client ETA includes time waiting since submission and does not measure network throughput. A
+nonzero client bandwidth limit applies to outgoing fragments; a fragment waits until its byte credit
+is available. The bucket burst is capped at one full DH fragment message; zero bandwidth is
+unlimited. Client configuration changes receive negotiated acknowledgements, with generation and
+sync settings handled independently. Review the current queue and transfer settings in the generated
+[Configuration](../README.md#configuration) reference. Those defaults remain provisional pending
+real-runtime measurements.

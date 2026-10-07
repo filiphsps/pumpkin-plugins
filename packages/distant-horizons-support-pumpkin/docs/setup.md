@@ -23,5 +23,10 @@ Pumpkin has already loaded or that the plugin has captured and cached before. Sh
 generation provider interfaces are in place, but Pumpkin's current adapter reports those operations
 as unavailable.
 
+The server negotiates generation and sync request limits independently and acknowledges client
+configuration updates. A nonzero client bandwidth setting limits outgoing server transfers; its
+credit bucket holds at most one full DH fragment message. Zero is unlimited. The generated README
+documents the current bounded queues and their provisional defaults.
+
 Use the generated [Commands](../README.md#commands) reference to check connected clients and cache
 usage after connecting.
