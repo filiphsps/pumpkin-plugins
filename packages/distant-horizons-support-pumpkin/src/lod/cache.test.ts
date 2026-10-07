@@ -18,6 +18,19 @@ describe('LOD cache', () => {
         expect(new LodCache(files, 2, 2).get(key)).toBeUndefined();
         expect(files.list('cache')).toHaveLength(0);
     });
+    it('checks whether a section is cached without reading or promoting disk entries', () => {
+        const files = new MemoryFiles();
+        const cache = new LodCache(files, 1, 2);
+        cache.put('memory-and-disk', lod(1));
+        cache.put('disk-only', lod(2));
+        cache.clearMemory();
+
+        expect(cache.has('memory-and-disk')).toBe(true);
+        expect(cache.has('disk-only')).toBe(true);
+        expect(cache.has('missing')).toBe(false);
+        expect(cache.stats()).toMatchObject({ memoryEntries: 0, diskEntries: 2 });
+        expect(files.reads.size).toBe(0);
+    });
     it('evicts old disk entries and removes invalidated captures', () => {
         const files = new MemoryFiles(),
             cache = new LodCache(files, 2, 2);

@@ -26,6 +26,12 @@ export class LodCache {
         files.createDirectory('cache');
         this.pruneDisk();
     }
+    /** Checks for a stored capture without reading it into memory or changing its cache order. */
+    has(key: string): boolean {
+        if (this.memory.has(key)) return true;
+        if (this.diskLimit === 0) return false;
+        return this.files.stat(this.path(key))?.kind === 'file';
+    }
     /** Looks up a captured section, without allocating for oversized or corrupt files. */
     get(key: string): CachedLod | undefined {
         let value = this.memory.get(key);
