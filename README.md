@@ -69,6 +69,11 @@ pnpm test
 | `pnpm test:integration` | Build, then run the tests against a real Pumpkin server (`PUMPKIN_BIN` picks the binary, see [Testing](docs/testing.md)) |
 | `pnpm readme` | Regenerate plugin READMEs and the action and package tables above |
 | `pnpm check` | Release config, package metadata and docs against the code (see [Code style](docs/code-style.md)) |
+| `pnpm dev:docs` | Generate API references and start the documentation site dev server |
+| `pnpm docs` | Generate API references and build the complete static documentation site |
+| `pnpm docs:api` | Generate the type declarations and API reference pages |
+| `pnpm docs:site` | Build the VitePress site from generated API pages |
+| `pnpm docs:preview` | Preview the last built documentation site |
 | `pnpm package` | Collect the built plugins into `dist/<plugin>.wasm` with checksums; signing is handled separately by the reusable action (see [CI and releases](docs/ci-and-releases.md)) |
 
 Tasks run through [Turborepo](https://turborepo.dev), so unchanged packages come from the cache.
