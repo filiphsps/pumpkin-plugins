@@ -23,6 +23,25 @@ const packages = new Map([
 ]);
 const commit = (sha, files, message = 'fix: ship a change') => ({ sha, files, message });
 
+class TestTagName {
+    constructor(version) {
+        this.component = 'plugin';
+        this.version = {
+            compare: (other) => version.localeCompare(other.toString(), undefined, { numeric: true }),
+            toString: () => version
+        };
+    }
+
+    static parse(tagName) {
+        const match = /^plugin-v(\d+\.\d+\.\d+)$/.exec(tagName);
+        return match ? new TestTagName(match[1]) : undefined;
+    }
+
+    toString() {
+        return `plugin-v${this.version.toString()}`;
+    }
+}
+
 describe('bundled release commits', () => {
     it('ignores leftover directories without manifests and reads named workspace packages', () => {
         const root = mkdtempSync(join(tmpdir(), 'release-packages-'));
@@ -124,6 +143,38 @@ describe('bundled release commits', () => {
             strategies
         );
         assert.deepEqual(scoped['packages/plugin'], [history[0]]);
+    });
+
+    it('falls back to the latest published release below a missing manifest release', async () => {
+        const history = [
+            commit('after-release', ['packages/plugin/src/plugin.ts']),
+            commit('release-0.0.4', ['packages/plugin/package.json'], 'chore(master): release plugin 0.0.4'),
+            commit('published-0.0.3', ['packages/plugin/package.json'], 'chore(master): release plugin 0.0.3'),
+            commit('before-release', ['packages/plugin/src/old.ts'])
+        ];
+        const github = {
+            async *releaseIterator() {
+                yield { tagName: 'plugin-v0.0.3', sha: 'published-0.0.3' };
+            },
+            async *mergeCommitIterator() {
+                yield* history;
+            }
+        };
+        const plugin = bundledChangesPlugin(github, 'master', packages, { 'packages/plugin': '0.0.4' });
+        const strategies = { 'packages/plugin': {} };
+        const scoped = { 'packages/plugin': [] };
+        const releases = {
+            'packages/plugin': {
+                tag: new TestTagName('0.0.4'),
+                sha: ''
+            }
+        };
+
+        await plugin.preconfigure(strategies, scoped, releases);
+
+        assert.equal(releases['packages/plugin'].sha, 'published-0.0.3');
+        assert.equal(releases['packages/plugin'].tag.version.toString(), '0.0.3');
+        assert.deepEqual(scoped['packages/plugin'], history.slice(0, 2));
     });
 
     it('leaves action release strategies to Release Please without fetching plugin history', async () => {

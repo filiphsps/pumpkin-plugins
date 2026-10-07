@@ -148,9 +148,11 @@ which trigger the normal pull-request CI checks.
 changelogs are calculated. Features, fixes and performance improvements appear in the notes.
 After publishing, the runner reloads the manifest before generating PRs. Each plugin's commits
 stop at its own latest release, so refreshing branches does not propose an empty follow-up release.
-The generator fails if it cannot find a previous release or fetch enough history, rather than
-publishing incomplete notes. Increase `commit-search-depth` in the release configuration if needed.
-Changelogs stay generated; do not edit them by hand.
+If a manifest version has no matching GitHub release or tag, the helper uses the latest published
+release for that plugin with a lower version as the history boundary. It fails if no such release
+exists or if it cannot fetch enough history, rather than publishing incomplete notes. Increase
+`commit-search-depth` in the release configuration if needed. Changelogs stay generated; do not edit
+them by hand.
 
 To preview without changing GitHub, set `GITHUB_REPOSITORY` and `GITHUB_TOKEN`, then run:
 

@@ -57,6 +57,29 @@ export function releaseCommits(commits, paths, lastReleaseSha) {
     });
 }
 
+async function previousPublishedRelease(github, currentTag) {
+    if (
+        !currentTag ||
+        typeof currentTag.constructor.parse !== 'function' ||
+        typeof github.releaseIterator !== 'function'
+    )
+        return undefined;
+    let previousRelease;
+    for await (const release of github.releaseIterator()) {
+        let tag;
+        try {
+            tag = currentTag.constructor.parse(release.tagName);
+        } catch {
+            continue;
+        }
+        if (!tag || tag.component !== currentTag.component || tag.version.compare(currentTag.version) >= 0) continue;
+        if (!previousRelease || tag.version.compare(previousRelease.tag.version) > 0) {
+            previousRelease = { ...release, tag };
+        }
+    }
+    return previousRelease;
+}
+
 /** Adds bundled dependency commits before Release Please computes versions, PR bodies and changelogs. */
 export function bundledChangesPlugin(github, branch, packages, releasedVersions, maxCommits = 500) {
     return {
@@ -67,10 +90,19 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
             const boundaries = new Set();
             let initialRelease = false;
             for (const path of pluginPaths) {
-                const sha = releasesByPath[path]?.sha;
-                if (sha) boundaries.add(sha);
+                const release = releasesByPath[path];
+                if (release?.sha) boundaries.add(release.sha);
                 else if (releasedVersions[path]?.toString() === '0.0.0') initialRelease = true;
-                else throw new Error(`Cannot find the previous release commit for ${path}`);
+                else {
+                    const previousRelease = await previousPublishedRelease(github, release?.tag);
+                    if (!previousRelease?.sha) {
+                        throw new Error(
+                            `Cannot find a published release before ${release?.tag ?? releasedVersions[path]} for ${path}`
+                        );
+                    }
+                    releasesByPath[path] = previousRelease;
+                    boundaries.add(previousRelease.sha);
+                }
             }
             // Fetch unfiltered history: normal per-plugin splitting has already discarded tool commits.
             for await (const commit of github.mergeCommitIterator(branch, {
