@@ -1,3 +1,4 @@
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import { AdaptiveWorkBudget, type TerrainSource } from '@pumpkin-plugins/terrain';
 import type { Settings } from './config/schema.ts';
@@ -10,6 +11,7 @@ import {
     type ForcedLodStart
 } from './lod/force-generation.ts';
 import { sectionKey } from './lod/generation.ts';
+import { lodLocation } from './lod/location.ts';
 import { PLUGIN_NAME } from './name.ts';
 import { CHUNK_SIZE_BLOCKS, SECTION_DETAIL, SECTION_SIZE_BLOCKS } from './protocol/constants.ts';
 import {
@@ -23,6 +25,8 @@ import {
     transfer,
     unchanged
 } from './protocol/messages.ts';
+
+const logTag = ansi.named.name(PLUGIN_NAME);
 
 /** A Java player snapshot and terrain access, valid only during an adapter callback. */
 export interface Peer extends ForcedLodPeer {
@@ -45,6 +49,15 @@ interface Client {
 interface QueuedPacket {
     bytes: Uint8Array;
     cached: boolean;
+    lod?: {
+        level: string;
+        section: Section;
+        tracker: number;
+        packetCount: number;
+        dataBytes: number;
+        cached: boolean;
+        unchanged: boolean;
+    };
 }
 interface Request {
     name: string;
@@ -93,6 +106,9 @@ export class Sessions {
         try {
             message = decode(bytes);
         } catch (err) {
+            this.log.debug(
+                `${logTag} Ignoring malformed DH message from ${ansi.named.name(peer.name)}: ${String(err)}.`
+            );
             peer.send(
                 packet(1)
                     .string(`${PLUGIN_NAME}: ${String(err)}`)
@@ -106,7 +122,12 @@ export class Sessions {
             return;
         }
         if (message.type === 'init') {
-            if (message.dimension !== peer.dimension) return;
+            if (message.dimension !== peer.dimension) {
+                this.log.debug(
+                    `${logTag} Ignored DH initialization from ${ansi.named.name(peer.name)} for ${ansi.named.identifier(message.dimension)}; current dimension is ${ansi.named.identifier(peer.dimension)}.`
+                );
+                return;
+            }
             this.announce(peer);
             return;
         }
@@ -116,9 +137,17 @@ export class Sessions {
             client.disabled = message.disabled;
             client.distance = Math.min(message.distance, this.settings.render_distance);
             client.concurrency = Math.min(message.concurrency, this.settings.requests_per_player);
+            this.log.debug(
+                `${logTag} ${ansi.named.name(peer.name)} configured DH requests: ${message.disabled ? 'disabled' : 'enabled'}, distance ${ansi.named.number(client.distance)}, concurrency ${ansi.named.number(client.concurrency)}.`
+            );
             if (client.disabled) {
+                const pending = this.requests.filter((request) => request.name === peer.name).length;
+                const queued = client.packets.length;
                 this.cancelRequests(peer.name);
                 client.packets = [];
+                this.log.debug(
+                    `${logTag} Dropped ${ansi.named.number(pending)} pending request(s) and ${ansi.named.number(queued)} queued packet(s) for ${ansi.named.name(peer.name)}.`
+                );
             }
             return;
         }
@@ -127,6 +156,9 @@ export class Sessions {
             const request = this.requests[index];
             if (request) {
                 this.cancelled++;
+                this.log.debug(
+                    `${logTag} Cancelled DH request ${ansi.named.number(request.tracker)} from ${ansi.named.name(peer.name)} for ${lodLocation(request.level, request.section.x, request.section.z)}.`
+                );
                 this.drop(request);
             }
             return;
@@ -136,11 +168,22 @@ export class Sessions {
         if (failure) {
             this.rejected++;
             this.lastFailure = failure.reason;
+            this.log.debug(
+                `${logTag} Rejected DH request ${ansi.named.number(message.tracker)} from ${ansi.named.name(peer.name)} for ${lodLocation(peer.level, message.section.x, message.section.z)}: ${failure.reason}.`
+            );
             peer.send(reject(message.tracker, failure.reason, failure.kind));
             return;
         }
-        if (this.requests.some((r) => r.name === peer.name && r.tracker === message.tracker)) return;
+        if (this.requests.some((r) => r.name === peer.name && r.tracker === message.tracker)) {
+            this.log.debug(
+                `${logTag} Ignored duplicate DH request ${ansi.named.number(message.tracker)} from ${ansi.named.name(peer.name)}.`
+            );
+            return;
+        }
         const key = sectionKey(peer.level, message.section.x, message.section.z);
+        this.log.debug(
+            `${logTag} Queued DH request ${ansi.named.number(message.tracker)} from ${ansi.named.name(peer.name)} for ${lodLocation(peer.level, message.section.x, message.section.z)}.`
+        );
         this.requests.push({
             name: peer.name,
             tracker: message.tracker,
@@ -186,6 +229,9 @@ export class Sessions {
                     if (!client || this.validate(peer, client, { ...request, type: 'request' }, false)) {
                         this.rejected++;
                         this.lastFailure = 'Request no longer in range';
+                        this.log.debug(
+                            `${logTag} Rejected DH request ${ansi.named.number(request.tracker)} from ${ansi.named.name(peer.name)} for ${lodLocation(request.level, request.section.x, request.section.z)}: ${this.lastFailure}.`
+                        );
                         peer.send(reject(request.tracker, this.lastFailure, 1));
                         this.drop(request);
                         return;
@@ -198,6 +244,9 @@ export class Sessions {
                             request.cached = this.cache.get(request.key) ?? null;
                             request.cacheChecked = true;
                             cacheChecks++;
+                            this.log.debug(
+                                `${logTag} LOD cache ${request.cached ? 'hit' : 'miss'} for ${ansi.named.name(request.name)} at ${lodLocation(request.level, request.section.x, request.section.z)}.`
+                            );
                         }
                         const cached = request.cached ?? undefined;
                         if (cached && this.now() - cached.updated < this.settings.refresh_seconds * 1000) {
@@ -233,6 +282,9 @@ export class Sessions {
                         if (stillLoaded && stillLoaded.status !== 'ready') throw new Error(stillLoaded.reason);
                         const captured = { updated: this.now(), data: request.builder.finish(this.now()) };
                         this.cache.put(request.key, captured);
+                        this.log.debug(
+                            `${logTag} Captured LOD for ${ansi.named.name(request.name)} at ${lodLocation(request.level, request.section.x, request.section.z)} (${ansi.named.number(captured.data.length)} bytes).`
+                        );
                         this.complete(request, captured);
                     }
                     this.workBudget.observe(measured.samples(), this.measureNow() - started);
@@ -265,6 +317,21 @@ export class Sessions {
                     if (!packet || (packet.cached ? cachedRemaining <= 0 : remaining <= 0)) break;
                     client.packets.shift();
                     peer.send(packet.bytes);
+                    if (packet.lod) {
+                        const {
+                            level,
+                            section,
+                            tracker,
+                            packetCount,
+                            dataBytes,
+                            cached,
+                            unchanged: noChange
+                        } = packet.lod;
+                        const response = noChange ? 'unchanged LOD response' : cached ? 'cached LOD' : 'captured LOD';
+                        this.log.debug(
+                            `${logTag} Sent ${response} to ${ansi.named.name(peer.name)} for ${lodLocation(level, section.x, section.z)} (request ${ansi.named.number(tracker)}, ${ansi.named.number(packetCount)} packet(s), ${ansi.named.number(dataBytes)} bytes).`
+                        );
+                    }
                     if (packet.cached) cachedRemaining--;
                     else remaining--;
                 }
@@ -273,7 +340,15 @@ export class Sessions {
     }
     /** Removes a disconnected client's work and queued transfers. */
     left(name: string): void {
+        const client = this.clients.get(name);
+        const pending = this.requests.filter((request) => request.name === name).length;
+        const queued = client?.packets.length ?? 0;
         this.removeClient(name);
+        if (client) {
+            this.log.debug(
+                `${logTag} Removed DH session for ${ansi.named.name(name)}; discarded ${ansi.named.number(pending)} pending request(s) and ${ansi.named.number(queued)} queued packet(s).`
+            );
+        }
     }
     /** Removes a leaving player and cancels their operator capture. */
     playerLeft(name: string): void {
@@ -328,7 +403,18 @@ export class Sessions {
                 request.timestamp !== undefined && value.updated <= request.timestamp
                     ? [unchanged(request.tracker)]
                     : transfer(request.tracker, this.buffer++, value.data);
-            client.packets.push(...packets.map((bytes) => ({ bytes, cached })));
+            const lod = {
+                level: request.level,
+                section: request.section,
+                tracker: request.tracker,
+                packetCount: packets.length,
+                dataBytes: value.data.length,
+                cached,
+                unchanged: request.timestamp !== undefined && value.updated <= request.timestamp
+            };
+            client.packets.push(
+                ...packets.map((bytes, index) => ({ bytes, cached, ...(index === packets.length - 1 ? { lod } : {}) }))
+            );
             packetCount = packets.length;
         }
         this.drop(request);

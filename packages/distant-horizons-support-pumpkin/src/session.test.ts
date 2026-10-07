@@ -62,7 +62,7 @@ function fixture(measureNow = () => 1000) {
             r.short();
             return r.short();
         });
-    return { files, settings, sessions, peer, peers, sent, reports, request, ids, reads: () => reads };
+    return { files, settings, sessions, peer, peers, sent, reports, request, ids, log, reads: () => reads };
 }
 describe('DH sessions', () => {
     it('runs forced captures at their fixed budget ahead of DH capture work', () => {
@@ -326,6 +326,20 @@ describe('DH sessions', () => {
         expect(f.ids()).toContain(10);
         expect(f.ids().at(-1)).toBe(8);
         expect(f.files.list('cache')).toHaveLength(1);
+    });
+    it('logs the location when it sends a generated LOD to a DH client', () => {
+        const f = fixture();
+        f.sessions.receive(f.peer, f.request(17, 'world', 2));
+
+        f.sessions.tick(f.peers);
+
+        expect(
+            f.log
+                .of('debug')
+                .join('\n')
+                // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI color codes start with the ESC control character.
+                .replace(/\u001b\[[0-9;]*m/g, '')
+        ).toContain('Sent captured LOD to Alice for world section 2, 0 (origin 128, 0 blocks)');
     });
     it('drains disk-cached transfers within the separately configured fast budget', () => {
         const f = fixture();
