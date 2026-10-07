@@ -12,10 +12,6 @@
         "packages/apple-skin-pumpkin": {
             "component": "apple-skin-pumpkin"
         },
-        "packages/bedrock-addon-manager": {
-            "component": "bedrock-addon-manager",
-            "release-as": "0.0.1"
-        },
         "packages/distant-horizons-support-pumpkin": {
             "component": "distant-horizons-support-pumpkin"
         },

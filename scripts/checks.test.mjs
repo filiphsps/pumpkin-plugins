@@ -325,6 +325,41 @@ describe('check-release-config', () => {
         assert.ok(result.ok, result.out);
     });
 
+    it('allows a plugin to pause release tracking with a reason', () => {
+        const paused = files();
+        paused['packages/not-ready/package.json'] = { name: 'not-ready', version: '0.0.0' };
+        paused['release-please-paused.json'] = {
+            'packages/not-ready': 'Not ready for its first release'
+        };
+
+        const result = run('check-release-config.mjs', repo(paused));
+        assert.ok(result.ok, result.out);
+        assert.match(result.out, /1 plugin and 0 actions: packages\/plug; 1 paused: packages\/not-ready/);
+    });
+
+    it('rejects a paused plugin that remains tracked or has no reason', () => {
+        const stillTracked = files();
+        stillTracked['release-please-paused.json'] = { 'packages/plug': 'Not ready' };
+        assert.match(
+            run('check-release-config.mjs', repo(stillTracked)).out,
+            /packages\/plug is paused but still listed in release-please-config\.json/
+        );
+
+        const inManifest = files();
+        inManifest['release-please-paused.json'] = { 'packages/plug': 'Not ready' };
+        assert.match(
+            run('check-release-config.mjs', repo(inManifest)).out,
+            /packages\/plug is paused but still listed in \.release-please-manifest\.json/
+        );
+
+        const noReason = files();
+        noReason['release-please-paused.json'] = { 'packages/plug': ' ' };
+        assert.match(
+            run('check-release-config.mjs', repo(noReason)).out,
+            /packages\/plug in release-please-paused\.json needs a non-empty reason/
+        );
+    });
+
     it('requires release-as 0.0.1 until the first release', () => {
         const result = run('check-release-config.mjs', repo(files({ releaseAs: null })));
         assert.match(result.out, /needs "release-as": "0\.0\.1"/);

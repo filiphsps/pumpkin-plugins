@@ -1,4 +1,4 @@
-// Fails if a plugin or action isn't set up for releases, and says exactly what to add.
+// Fails if a plugin or action isn't registered for releases or explicitly paused.
 // See "Registering a plugin for releases" in docs/ci-and-releases.md.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -7,9 +7,16 @@ const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirnam
 const read = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
 const config = read('release-please-config.json');
 const manifest = read('.release-please-manifest.json');
+const pausedPath = path.join(root, 'release-please-paused.json');
+const paused = fs.existsSync(pausedPath) ? read('release-please-paused.json') : {};
 const problems = [];
 
-const plugins = fs
+if (!paused || typeof paused !== 'object' || Array.isArray(paused)) {
+    problems.push('release-please-paused.json must be a JSON object mapping package paths to reasons');
+}
+const pausedEntries = paused && typeof paused === 'object' && !Array.isArray(paused) ? Object.entries(paused) : [];
+
+const discoveredPlugins = fs
     .readdirSync(path.join(root, 'packages'), { withFileTypes: true })
     .filter(
         (d) =>
@@ -18,6 +25,22 @@ const plugins = fs
             fs.existsSync(path.join(root, 'packages', d.name, 'package.json'))
     )
     .map((d) => `packages/${d.name}`);
+const discoveredPluginPaths = new Set(discoveredPlugins);
+const pausedPlugins = new Set();
+for (const [dir, reason] of pausedEntries) {
+    if (!/^packages\/[^/]+$/.test(dir)) problems.push(`${dir} in release-please-paused.json is not a plugin path`);
+    if (!discoveredPluginPaths.has(dir)) problems.push(`${dir} in release-please-paused.json does not exist`);
+    if (typeof reason !== 'string' || !reason.trim()) {
+        problems.push(`${dir} in release-please-paused.json needs a non-empty reason`);
+    }
+    if (Object.hasOwn(config.packages ?? {}, dir)) {
+        problems.push(`${dir} is paused but still listed in release-please-config.json`);
+    }
+    if (Object.hasOwn(manifest, dir))
+        problems.push(`${dir} is paused but still listed in .release-please-manifest.json`);
+    pausedPlugins.add(dir);
+}
+const plugins = discoveredPlugins.filter((dir) => !pausedPlugins.has(dir));
 const actions = fs.existsSync(path.join(root, 'actions'))
     ? fs
           .readdirSync(path.join(root, 'actions'), { withFileTypes: true })
@@ -113,6 +136,7 @@ if (problems.length) {
     console.error(problems.map((p) => `- ${p}`).join('\n'));
     process.exit(1);
 }
+const pausedSummary = pausedPlugins.size ? `; ${pausedPlugins.size} paused: ${[...pausedPlugins].join(', ')}` : '';
 console.log(
-    `Release config covers ${plugins.length} plugin${plugins.length === 1 ? '' : 's'} and ${actions.length} action${actions.length === 1 ? '' : 's'}: ${[...components.keys()].join(', ')}`
+    `Release config covers ${plugins.length} plugin${plugins.length === 1 ? '' : 's'} and ${actions.length} action${actions.length === 1 ? '' : 's'}: ${[...components.keys()].join(', ')}${pausedSummary}`
 );

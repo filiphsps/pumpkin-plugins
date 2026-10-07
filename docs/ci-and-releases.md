@@ -189,8 +189,16 @@ valid, since each file carries the key it was signed with. Only the published pu
 
 ## Registering a plugin for releases
 
-A plugin is only released if it is listed in **both** release-please files. `pnpm gen` adds it to
-both automatically. If you ever create a plugin by hand, do these three things:
+A plugin is tracked only if it is listed in **both** release-please files. `pnpm gen` adds it to both
+automatically. Packages that are not ready to release can stay out of both files and be documented
+in `release-please-paused.json` with a reason. The release config check verifies that paused package
+paths exist and are not tracked. To resume a package, remove it from that file and add it to both
+release-please files.
+
+Pausing an unreleased plugin also avoids the release helper's full-history scan for first releases.
+The plugin remains in the workspace and normal build and test workflows.
+
+If you ever create a plugin by hand, do these three things:
 
 1. Add it to `release-please-config.json`, under `packages`. The `component` must be the folder
    name; it becomes the tag prefix (`my-plugin-v0.0.1`):
@@ -260,7 +268,7 @@ generator and the checks can't drift:
 
 | Script | Fails when |
 | --- | --- |
-| `scripts/check-release-config.mjs` | a plugin or action is missing from either release-please file, an action is not using the `simple` strategy, `component` isn't the folder name, the manifest and package/version file disagree, an unreleased component lacks `release-as: 0.0.1`, or a released one still has it |
+| `scripts/check-release-config.mjs` | a plugin or action is missing from either release-please file, a paused plugin is still tracked, an action is not using the `simple` strategy, `component` isn't the folder name, the manifest and package/version file disagree, an unreleased component lacks `release-as: 0.0.1`, or a released one still has it |
 | `scripts/package-metadata.mjs` | a `package.json` lacks the license, author, contributors, homepage, repository, bugs, funding or a short description, or a library lacks `sideEffects`, `module`, `types`, `files` and `publishConfig`. `--fix` writes everything but the description |
 | `scripts/check-docs.mjs` | a package has no README, a link, heading or path in the docs doesn't exist, a `pnpm` command isn't a script, a doc page isn't in the docs index, a root script isn't documented, or a CI job isn't in the table above |
 
