@@ -72,6 +72,12 @@ action to the corresponding source file where TypeDoc can identify one.
 The site shows **Last updated** using Git history. The docs workflow fetches full history so pages
 that were not changed in the latest commit still show their latest edit time.
 
+## Theme
+
+The site uses Pumpkin's `#FF7518` accent. Light-mode text uses a darker orange for contrast;
+buttons, owner labels, and the home-page title use the primary color. Dark mode uses the primary
+orange for links, with a lighter hover shade.
+
 ## Contributors and versions
 
 The [Team page](team.md) lives at `/team`, with its own header link, and uses VitePress's native team components. Its data loader fetches all pages

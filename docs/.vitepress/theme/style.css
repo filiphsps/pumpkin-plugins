@@ -1,3 +1,24 @@
+/* Pumpkin's orange is the shared accent; text shades adapt to the background. */
+:root {
+    --pumpkin-orange: #ff7518;
+    --vp-c-brand-1: #b94700;
+    --vp-c-brand-2: #cc5200;
+    --vp-c-brand-3: var(--pumpkin-orange);
+    --vp-c-brand-soft: rgb(255 117 24 / 14%);
+    --vp-home-hero-name-color: var(--pumpkin-orange);
+    --vp-button-brand-text: #1b1b1f;
+    --vp-button-brand-hover-text: #1b1b1f;
+    --vp-button-brand-active-text: #1b1b1f;
+    --vp-button-brand-hover-bg: #ff934a;
+    --vp-button-brand-active-bg: #ef6b0d;
+}
+
+.dark {
+    --vp-c-brand-1: var(--pumpkin-orange);
+    --vp-c-brand-2: #ff934a;
+    --vp-c-brand-soft: rgb(255 117 24 / 18%);
+}
+
 .vp-doc h1.component-page-title {
     display: flex;
     align-items: center;
@@ -741,7 +762,7 @@
     padding: 2px 12px;
     border-radius: 6px;
     background: var(--vp-c-brand-3);
-    color: var(--vp-c-white);
+    color: var(--vp-button-brand-text);
     font-size: 14px;
     font-weight: 600;
     line-height: 24px;
