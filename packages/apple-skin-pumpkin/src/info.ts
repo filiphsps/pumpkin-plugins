@@ -1,4 +1,5 @@
 import type { PluginInfo } from '@pumpkin-plugins/docs';
+import { PLUGIN_NAME } from './name.ts';
 
 /**
  * What the plugin is and offers. Feeds both its Pumpkin metadata and its generated README. Declare
@@ -6,8 +7,8 @@ import type { PluginInfo } from '@pumpkin-plugins/docs';
  * what is registered (see docs/plugin-info-and-readmes.md).
  */
 export const info = {
-    name: 'AppleSkinPumpkin',
+    name: PLUGIN_NAME,
     description: 'AppleSkin server-side support',
     permissions: [],
     commands: []
-} satisfies PluginInfo<'AppleSkinPumpkin'>;
+} satisfies PluginInfo<typeof PLUGIN_NAME>;

@@ -10,6 +10,7 @@ import {
     str,
     table
 } from '@pumpkin-plugins/config';
+import { PLUGIN_NAME } from '../name.ts';
 import { httpUrl, ipv4Address, relativeFolder } from './fields.ts';
 
 /** Name of the config file in the plugin's data folder. */
@@ -21,7 +22,7 @@ export const CONFIG_RENDER_OPTIONS: RenderOptions = {
 };
 
 /** Every setting of the plugin. The default file, the validation and the README table all come from this. */
-export const configSchema = defineConfig('BedrockAddonManager', {
+export const configSchema = defineConfig(PLUGIN_NAME, {
     web: section({
         description: 'The web server that serves the packs to Bedrock clients.',
         fields: {

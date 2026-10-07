@@ -14,6 +14,7 @@ const FILES = [
     'package.json',
     'tsconfig.json',
     'vitest.config.ts',
+    'src/name.ts',
     'src/info.ts',
     'src/plugin.ts',
     'test/plugin.itest.ts'

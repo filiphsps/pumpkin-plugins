@@ -5,6 +5,7 @@ import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import type { Settings } from '../config/schema.ts';
 import type { Sample } from '../lod/builder.ts';
+import { PLUGIN_NAME } from '../name.ts';
 import { CHUNK_SIZE_BLOCKS, SECTION_CHUNKS_PER_SIDE } from '../protocol/constants.ts';
 import { CHANNEL } from '../protocol/messages.ts';
 import type { Peer, Peers } from '../session.ts';
@@ -131,7 +132,7 @@ export function serverPeers(server: Server, settings: Settings, log: Logger): Pe
             try {
                 return withPlayer(player, settings, use);
             } catch (err) {
-                log.warn(`DistantHorizonsSupportPumpkin: cannot access player terrain: ${String(err)}`);
+                log.warn(`${PLUGIN_NAME}: cannot access player terrain: ${String(err)}`);
                 return false;
             } finally {
                 disposeWasiResource(player);

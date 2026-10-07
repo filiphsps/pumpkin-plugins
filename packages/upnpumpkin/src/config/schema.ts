@@ -8,6 +8,7 @@ import {
     type RenderOptions,
     section
 } from '@pumpkin-plugins/config';
+import { PLUGIN_NAME } from '../name.ts';
 import { ipv4Endpoint } from './fields.ts';
 
 /** Name of the config file in the plugin's data folder. */
@@ -19,7 +20,7 @@ export const CONFIG_RENDER_OPTIONS: RenderOptions = {
 };
 
 /** Every setting of the plugin. The default file, the validation and the README table all come from this. */
-export const configSchema = defineConfig('UPnPumpkin', {
+export const configSchema = defineConfig(PLUGIN_NAME, {
     router: section({
         description: 'How the router is found and how long it keeps the ports open.',
         fields: {

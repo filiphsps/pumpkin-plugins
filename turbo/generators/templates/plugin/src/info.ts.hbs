@@ -1,4 +1,5 @@
 import type { PluginInfo } from '@pumpkin-plugins/docs';
+import { PLUGIN_NAME } from './name.ts';
 
 /**
  * What the plugin is and offers. Feeds both its Pumpkin metadata and its generated README. Declare
@@ -6,8 +7,8 @@ import type { PluginInfo } from '@pumpkin-plugins/docs';
  * what is registered (see docs/plugin-info-and-readmes.md).
  */
 export const info = {
-    name: {{{ json displayName }}},
+    name: PLUGIN_NAME,
     description: {{{ json description }}},
     permissions: [],
     commands: []
-} satisfies PluginInfo<{{{ json displayName }}}>;
+} satisfies PluginInfo<typeof PLUGIN_NAME>;

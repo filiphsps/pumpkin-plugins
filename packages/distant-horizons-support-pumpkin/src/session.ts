@@ -2,6 +2,7 @@ import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import type { Settings } from './config/schema.ts';
 import { LodBuilder, type Terrain } from './lod/builder.ts';
 import type { CachedLod, LodCache } from './lod/cache.ts';
+import { PLUGIN_NAME } from './name.ts';
 import { CHUNK_SIZE_BLOCKS, SECTION_DETAIL, SECTION_SIZE_BLOCKS } from './protocol/constants.ts';
 import {
     decode,
@@ -79,7 +80,7 @@ export class Sessions {
         } catch (err) {
             peer.send(
                 packet(1)
-                    .string(`DistantHorizonsSupportPumpkin: ${String(err)}`)
+                    .string(`${PLUGIN_NAME}: ${String(err)}`)
                     .finish()
             );
             this.left(peer.name);
@@ -209,7 +210,7 @@ export class Sessions {
                         );
                         this.drop(request);
                     }
-                    this.log.debug(`DistantHorizonsSupportPumpkin: ${String(err)}`);
+                    this.log.debug(`${PLUGIN_NAME}: ${String(err)}`);
                 }
             });
             if (!found) this.left(request.name);

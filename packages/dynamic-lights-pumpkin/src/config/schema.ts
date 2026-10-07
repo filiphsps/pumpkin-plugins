@@ -1,4 +1,5 @@
 import { bool, type ConfigValues, defineConfig, describeConfig, int, section, table } from '@pumpkin-plugins/config';
+import { PLUGIN_NAME } from '../name.ts';
 
 /** Name of the settings file in the plugin data directory. */
 export const CONFIG_FILE = 'config.toml';
@@ -40,7 +41,7 @@ export const DEFAULT_ENTITY_SOURCES = {
 };
 
 /** Every user-configurable dynamic-light source. */
-export const configSchema = defineConfig('DynamicLightsPumpkin', {
+export const configSchema = defineConfig(PLUGIN_NAME, {
     sources: table({
         description:
             'Per-item light levels for held sources, including items that are not blocks such as lava buckets. Set a level to 0 to disable a source.',

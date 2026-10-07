@@ -3,11 +3,12 @@ import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { colorLogValue, type Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import { bool, float32be } from '@pumpkin-plugins/plugin-kit/payload';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
+import { PLUGIN_NAME } from '../name.ts';
 import { EXHAUSTION_CHANNEL, NATURAL_REGENERATION_CHANNEL, SATURATION_CHANNEL } from '../payload.ts';
 import { SyncTracker } from '../sync.ts';
 
 // Pumpkin leaves the logging target out of its default output, so every line names the plugin.
-const tag = colorLogValue('AppleSkinPumpkin', 'cyan');
+const tag = colorLogValue(PLUGIN_NAME, 'cyan');
 
 /**
  * Keeps AppleSkin clients in step with the server's hunger values. Vanilla tells a client about

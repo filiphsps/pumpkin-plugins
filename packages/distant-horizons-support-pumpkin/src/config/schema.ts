@@ -9,9 +9,10 @@ import {
     str,
     table
 } from '@pumpkin-plugins/config';
+import { PLUGIN_NAME } from '../name.ts';
 
 /** Settings for bounded LOD requests and the identity announced to DH clients. */
-export const schema = defineConfig('DistantHorizonsSupportPumpkin', {
+export const schema = defineConfig(PLUGIN_NAME, {
     support: section({
         description: 'Distant Horizons support limits.',
         fields: {

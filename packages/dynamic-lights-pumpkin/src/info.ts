@@ -1,6 +1,7 @@
 import { commandInfos, type PluginInfo } from '@pumpkin-plugins/docs';
 import { commands } from './commands/spec.ts';
 import { configInfo } from './config/schema.ts';
+import { PLUGIN_NAME } from './name.ts';
 
 /**
  * What the plugin is and offers. Feeds both its Pumpkin metadata and its generated README. Declare
@@ -8,7 +9,7 @@ import { configInfo } from './config/schema.ts';
  * what is registered (see docs/plugin-info-and-readmes.md).
  */
 export const info = {
-    name: 'DynamicLightsPumpkin',
+    name: PLUGIN_NAME,
     description: 'Server-driven dynamic lights for held items and nearby entities',
     permissions: [
         { name: 'fs.read.data', reason: 'Read its light-source settings, player preferences and old recovery data.' },
@@ -19,4 +20,4 @@ export const info = {
     ],
     commands: commandInfos(commands),
     config: configInfo
-} satisfies PluginInfo<'DynamicLightsPumpkin'>;
+} satisfies PluginInfo<typeof PLUGIN_NAME>;

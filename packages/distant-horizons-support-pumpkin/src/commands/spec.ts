@@ -1,7 +1,8 @@
 import { defineCommands } from '@pumpkin-plugins/docs';
+import { PLUGIN_NAME } from '../name.ts';
 
 /** Operator commands for inspecting DH work and managing cached terrain. */
-export const commands = defineCommands('DistantHorizonsSupportPumpkin', {
+export const commands = defineCommands(PLUGIN_NAME, {
     dhs: {
         description: 'Inspect Distant Horizons support',
         permission: 'DistantHorizonsSupportPumpkin:command.dhs',

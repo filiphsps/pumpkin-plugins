@@ -18,6 +18,7 @@ import { commands } from './commands/spec.ts';
 import { readSettings } from './config/load.ts';
 import { info } from './info.ts';
 import { LodCache } from './lod/cache.ts';
+import { PLUGIN_NAME } from './name.ts';
 import { serverPeers, withPlayer } from './platform/peers.ts';
 import { CHANNEL, PROTOCOL } from './protocol/messages.ts';
 import { Sessions } from './session.ts';
@@ -30,7 +31,7 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
     /** Loads bounded settings and installs request, tick and world-change handlers. */
     protected onPluginLoad(ctx: Context): void {
         const files = WasiDataDir.open();
-        if (!files) throw new Error('DistantHorizonsSupportPumpkin requires access to its data folder');
+        if (!files) throw new Error(`${PLUGIN_NAME} requires access to its data folder`);
         const settings = readSettings(files, hostLogger);
         const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries);
         const sessions = new Sessions(settings, cache, hostLogger);
@@ -41,7 +42,7 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
                 withPlayer(event.player, settings, (peer) => sessions.receive(peer, event.data));
             } catch (err) {
                 sessions.left(event.player.getName());
-                hostLogger.warn(`DistantHorizonsSupportPumpkin: cannot open DH session: ${String(err)}`);
+                hostLogger.warn(`${PLUGIN_NAME}: cannot open DH session: ${String(err)}`);
             }
         });
         this.registerEvent(ctx, 'player-leave-event', (_server, event: PlayerLeaveEventData) =>
@@ -69,7 +70,7 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
             }
         });
         hostLogger.info(
-            `DistantHorizonsSupportPumpkin: serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain. Distant chunk generation is unavailable; see the plugin README TODO.`
+            `${PLUGIN_NAME}: serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain. Distant chunk generation is unavailable; see the plugin README TODO.`
         );
     }
 }

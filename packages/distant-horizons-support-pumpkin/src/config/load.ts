@@ -1,6 +1,7 @@
 import { loadConfig } from '@pumpkin-plugins/config';
 import type { DataFiles } from '@pumpkin-plugins/plugin-kit/files';
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
+import { PLUGIN_NAME } from '../name.ts';
 import { Reader, Writer } from '../protocol/bytes.ts';
 import { renderOptions, type Settings, schema } from './schema.ts';
 
@@ -20,6 +21,6 @@ export function readSettings(files: DataFiles, log: Logger): Settings {
         },
         renderOptions
     );
-    for (const warning of result.warnings) log.warn(`DistantHorizonsSupportPumpkin: ${warning}`);
+    for (const warning of result.warnings) log.warn(`${PLUGIN_NAME}: ${warning}`);
     return { ...result.values.support, worlds: result.values.worlds };
 }

@@ -2,6 +2,7 @@ import { commandInfos, type PluginInfo } from '@pumpkin-plugins/docs';
 import { commands } from './commands/spec.ts';
 import { configInfo } from './config/schema.ts';
 import { MAX_POINTS_PER_SECTION } from './lod/constants.ts';
+import { PLUGIN_NAME } from './name.ts';
 import {
     DH_VERSION,
     PROTOCOL,
@@ -16,7 +17,7 @@ import {
  * what is registered (see docs/plugin-info-and-readmes.md).
  */
 export const info = {
-    name: 'DistantHorizonsSupportPumpkin',
+    name: PLUGIN_NAME,
     description: 'Unofficial Distant Horizons server support for Pumpkin',
     permissions: [
         { name: 'fs.read.data', reason: 'Read settings and cached LOD terrain.' },
@@ -40,4 +41,4 @@ export const info = {
             `and transfer packets carry at most ${TRANSFER_PACKET_BYTES} bytes.`
         ].join(' ')
     }
-} satisfies PluginInfo<'DistantHorizonsSupportPumpkin'>;
+} satisfies PluginInfo<typeof PLUGIN_NAME>;
