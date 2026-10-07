@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.0.8](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.7...distant-horizons-support-pumpkin-v0.0.8) (2026-10-07)
+
+
+### Features
+
+* **commands:** support positional argument variants ([689de6c](https://github.com/filiphsps/pumpkin-plugins/commit/689de6c52d011449a93ad007409be114e72f7e06))
+* **dh:** add bounded force-capture section planning ([dd6710d](https://github.com/filiphsps/pumpkin-plugins/commit/dd6710dc710143c898cfc838adbb4e01320093b2))
+* **dh:** add force generation commands ([652851c](https://github.com/filiphsps/pumpkin-plugins/commit/652851c46cfeaf3d01e5dfba6983228347f89a58))
+* **dh:** add forced LOD capture worker ([e645f1f](https://github.com/filiphsps/pumpkin-plugins/commit/e645f1fbea096e76b055242c9e24b85fc1e62cca))
+* **dh:** format status as separate chat lines ([425d492](https://github.com/filiphsps/pumpkin-plugins/commit/425d492d79ef45f07ad2c534377e902d5b4b0210))
+* **dh:** log forced LOD generation locations ([e101f5a](https://github.com/filiphsps/pumpkin-plugins/commit/e101f5af11d27db97adb11dc6d303a66e5ee0446))
+* **dh:** prioritize forced capture in sessions ([54e7022](https://github.com/filiphsps/pumpkin-plugins/commit/54e70225c3df2fca29d35a30b15afd46b2a3dcd0))
+* **dh:** trace session LOD requests and sends ([a6bb814](https://github.com/filiphsps/pumpkin-plugins/commit/a6bb8148c6e9d7897855d1fd52c2bef2a147a527))
+* **dh:** use positional map and generate commands ([ad4d506](https://github.com/filiphsps/pumpkin-plugins/commit/ad4d506816fbf5e7628b28974b67055c54bce1bc))
+* **docs:** collapse generated config files in readmes ([a05d1aa](https://github.com/filiphsps/pumpkin-plugins/commit/a05d1aabdfbd22508deb985b4e20b97a0dde6ad0))
+* **minecraft-colors:** add ANSI terminal formatting ([bb6eb16](https://github.com/filiphsps/pumpkin-plugins/commit/bb6eb162ff291855286923f42013ffa9bca005ca))
+* **minecraft-colors:** add more named colors ([8e05b09](https://github.com/filiphsps/pumpkin-plugins/commit/8e05b0917c62766e9faaa528649740e1f399bfe8))
+* **minecraft-colors:** add semantic color presets ([72e3839](https://github.com/filiphsps/pumpkin-plugins/commit/72e3839eee71be8bf5398715b17a761065f8837d))
+* **minecraft-colors:** add string formatting helpers ([b99a342](https://github.com/filiphsps/pumpkin-plugins/commit/b99a3424a264b77ca2394f9d05752c705635341e))
+
+
+### Bug Fixes
+
+* **dev:** skip market checks and add no-reload mode ([f457446](https://github.com/filiphsps/pumpkin-plugins/commit/f457446d8de405594cf8cfdb73b9534f86f2e02b))
+* **dh:** advertise separate request rates ([06b6e4e](https://github.com/filiphsps/pumpkin-plugins/commit/06b6e4e30e29e0c67dd3ce7d41b5dac292b0c6aa))
+* **dh:** cap map output to chat width ([01565e9](https://github.com/filiphsps/pumpkin-plugins/commit/01565e942fa8a891c52eed8f054cdca5bc481d3e))
+* **dh:** clarify forced capture status budget ([84a2ffa](https://github.com/filiphsps/pumpkin-plugins/commit/84a2ffa72cdfeb3f0a0013bdebfc20aea3b8f387))
+* **dh:** report missing player context cleanly ([272f901](https://github.com/filiphsps/pumpkin-plugins/commit/272f901fccfb544734aec53cfbdfe2f1b2d83c12))
+* **dh:** retain forced jobs across DH session closes ([7402113](https://github.com/filiphsps/pumpkin-plugins/commit/7402113d182a319a46707162942a8478d3e8c1b7))
+* **dh:** skip cached sections in large captures ([c7a8588](https://github.com/filiphsps/pumpkin-plugins/commit/c7a8588240f8a818be12cd33a9469158d14c8d36))
+
+
+### Performance Improvements
+
+* **dh:** raise transfer and cache limits ([5afbcc3](https://github.com/filiphsps/pumpkin-plugins/commit/5afbcc39b5ff7742f2b547681a81f5bcbab8b627))
+* **dh:** serve cached LODs before refresh ([39919ab](https://github.com/filiphsps/pumpkin-plugins/commit/39919ab17fda619f0cba7f2ec9fd6a6281fefd09))
+
 ## [0.0.7](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.6...distant-horizons-support-pumpkin-v0.0.7) (2026-10-07)
 
 
