@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3](https://github.com/filiphsps/pumpkin-plugins/compare/sign-pumpkin-plugin-v0.0.2...sign-pumpkin-plugin-v0.0.3) (2026-10-07)
+
+
+### Features
+
+* **actions:** generate action README I/O tables ([9284f6f](https://github.com/filiphsps/pumpkin-plugins/commit/9284f6f3d4f77b30da5f9a40af2ce7ae4d4212f3))
+* **docs:** add grouped responsive navigation ([1fbf8b5](https://github.com/filiphsps/pumpkin-plugins/commit/1fbf8b586393b28132e3eedaf8543429ef9d8544))
+
 ## [0.0.2](https://github.com/filiphsps/pumpkin-plugins/compare/sign-pumpkin-plugin-v0.0.1...sign-pumpkin-plugin-v0.0.2) (2026-10-06)
 
 
