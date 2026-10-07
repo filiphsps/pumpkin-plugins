@@ -39,6 +39,7 @@ export const info = {
             `All ${SECTION_CHUNK_COUNT} chunks must remain loaded by Pumpkin while a capture progresses.`,
             'The plugin cannot load or generate distant chunks.',
             'Chunks absent from Pumpkin are rejected before sampling; genuinely empty loaded terrain remains valid.',
+            'By default, each vertical column uses its surface biome. Set `sample_biomes_3d = true` under that world in `[worlds."<world>"]` to sample cave and other vertical biomes; this adds a biome lookup for each sampled block.',
             `Captures are limited to ${MAX_POINTS_PER_SECTION} material segments per section,`,
             `transfer packets carry at most ${TRANSFER_PACKET_BYTES} data bytes; finite-bandwidth fragments fit within a ${TRANSFER_FRAGMENT_SAFE_WINDOW_MS / 1000}-second credit window including the ${TRANSFER_FRAGMENT_OVERHEAD_BYTES}-byte protocol overhead; a finite client bandwidth bucket can accumulate one ${MAX_TRANSFER_MESSAGE_BYTES}-byte DH fragment message.`
         ].join(' ')

@@ -11,7 +11,7 @@ vi.mock('pumpkin:plugin/text@0.1.0', () => ({ TextComponent: { text: state.text 
 
 import type { Player } from 'pumpkin:plugin/player@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
-import { schema } from '../config/schema.ts';
+import { schema, type Settings } from '../config/schema.ts';
 import { serverPeers, withPlayer } from './peers.ts';
 
 describe('Pumpkin terrain adapter', () => {
@@ -100,6 +100,9 @@ describe('Pumpkin terrain adapter', () => {
                 expect(peer.terrain.sample(-1, 64, -17).material).toBe(
                     'minecraft:old_growth_pine_taiga_DH-BSW_minecraft:oak_log_STATE_{axis:y}{waterlogged:false}'
                 );
+                expect(peer.terrain.sample(-1, 63, -17).material).toBe(
+                    'minecraft:old_growth_pine_taiga_DH-BSW_minecraft:oak_log_STATE_{axis:y}{waterlogged:false}'
+                );
                 expect(world.getBlockStateId).toHaveBeenCalledWith({ x: -1, y: 64, z: -17 });
                 expect(world.getBiome).toHaveBeenCalledWith({ x: -1, y: 80, z: -17 });
                 expect(world.getSkyLight).toHaveBeenCalledWith({ x: -1, y: 65, z: -17 });
@@ -116,6 +119,48 @@ describe('Pumpkin terrain adapter', () => {
                 throw new Error('callback failure');
             })
         ).toThrow('callback failure');
+        for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
+    it('uses the biome at each sampled height when 3D biome sampling is enabled', () => {
+        const values = defaultValues(schema),
+            settings = {
+                ...values.support,
+                worlds: { world: { sample_biomes_3d: true } }
+            } as unknown as Settings;
+        state.lookup
+            .mockReturnValueOnce({ name: 'minecraft:oak_log', properties: [] })
+            .mockReturnValueOnce({ name: 'minecraft:oak_log', properties: [] });
+        const getBiome = vi.fn(({ y }: { y: number }) => (y < 64 ? 'lush-caves' : 'plains'));
+        const getSkyLight = vi.fn(() => 15);
+        const border = { getCenterX: () => 0, getCenterZ: () => 0, getSize: () => 100, [Symbol.dispose]: vi.fn() };
+        const world = {
+            getName: () => 'world',
+            getDimension: () => 'minecraft:overworld',
+            getMinY: () => 0,
+            getWorldBorder: () => border,
+            getBlockStateId: () => 1,
+            getBiome,
+            getTopBlockY: () => 80,
+            getSkyLight,
+            getBlockLight: () => 0,
+            [Symbol.dispose]: vi.fn()
+        };
+        const java = { [Symbol.dispose]: vi.fn() };
+        const player = {
+            asJava: () => java,
+            getWorld: () => world,
+            getName: () => 'Alice',
+            getPosition: () => [0, 64, 0]
+        };
+
+        withPlayer(player as unknown as Player, settings, (peer) => {
+            expect(peer.terrain.sample(0, 64, 0).material).toBe('minecraft:plains_DH-BSW_minecraft:oak_log');
+            expect(peer.terrain.sample(0, 63, 0).material).toBe('minecraft:lush_caves_DH-BSW_minecraft:oak_log');
+        });
+
+        expect(getBiome).toHaveBeenNthCalledWith(1, { x: 0, y: 64, z: 0 });
+        expect(getBiome).toHaveBeenNthCalledWith(2, { x: 0, y: 63, z: 0 });
+        expect(getSkyLight).toHaveBeenCalledTimes(2);
         for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
     });
     it('checks all chunks before block reads and releases acquired chunks when the last one is missing', () => {

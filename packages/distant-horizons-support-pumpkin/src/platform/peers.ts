@@ -49,7 +49,11 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
         let lastColumn = '',
             lastId = -1,
             lastSample: TerrainSample | undefined,
-            biome = '';
+            lastBiome = '',
+            surfaceBiome = '';
+        const sampleBiomes3d = settings.worlds[level]?.sample_biomes_3d === true;
+        const biomeName = (x: number, y: number, z: number) =>
+            `minecraft:${terrainWorld.getBiome({ x, y, z }).replaceAll('-', '_')}`;
         const terrain: TerrainAccess = {
             minY,
             height,
@@ -91,12 +95,20 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                     column = `${x}:${z}`;
                 const id = terrainWorld.getBlockStateId(pos);
                 if (column !== lastColumn) {
-                    const topY = Math.max(minY, Math.min(minY + height - 1, terrainWorld.getTopBlockY(x, z)));
-                    biome = `minecraft:${terrainWorld.getBiome({ ...pos, y: topY }).replaceAll('-', '_')}`;
-                    lastId = -1;
+                    if (!sampleBiomes3d) {
+                        const topY = Math.max(
+                            minY,
+                            Math.min(minY + height - 1, terrainWorld.getTopBlockY(x, z))
+                        );
+                        surfaceBiome = biomeName(x, topY, z);
+                    }
                     lastColumn = column;
+                    lastId = -1;
+                    lastBiome = '';
+                    lastSample = undefined;
                 }
-                if (id === lastId && lastSample) return lastSample;
+                const biome = sampleBiomes3d ? biomeName(x, y, z) : surfaceBiome;
+                if (id === lastId && biome === lastBiome && lastSample) return lastSample;
                 const state = blockStateToInfo(id);
                 if (!state) throw new Error('Unknown block state');
                 const properties = [...state.properties]
@@ -106,6 +118,7 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                 const material = `${biome}_DH-BSW_${state.name}${properties ? `_STATE_${properties}` : ''}`;
                 const lightPos = { x, y: Math.min(minY + height - 1, y + 1), z };
                 lastId = id;
+                lastBiome = biome;
                 lastSample = {
                     material,
                     skyLight: terrainWorld.getSkyLight(lightPos),

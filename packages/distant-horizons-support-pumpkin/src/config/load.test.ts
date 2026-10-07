@@ -74,6 +74,16 @@ describe('DH settings', () => {
         expect(settings.sync_requests_per_second).toBe(100);
         expect(log.of('warn')).toHaveLength(0);
     });
+    it('loads per-world 3D biome sampling when explicitly enabled', () => {
+        const files = new MemoryFiles(),
+            log = new MemoryLogger();
+        files.put('config.toml', '[worlds."world"]\nsample_biomes_3d = true\n');
+
+        const settings = readSettings(files, log);
+
+        expect(settings.worlds.world).toMatchObject({ sample_biomes_3d: true });
+        expect(log.of('warn')).toHaveLength(0);
+    });
     it('treats arbitrarily large negative TOML integers as unlimited', () => {
         const files = new MemoryFiles(),
             log = new MemoryLogger();

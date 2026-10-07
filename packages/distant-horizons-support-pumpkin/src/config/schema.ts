@@ -1,5 +1,6 @@
 import {
     type ConfigValues,
+    bool,
     defineConfig,
     describeConfig,
     type Field,
@@ -100,11 +101,16 @@ export const schema = defineConfig(PLUGIN_NAME, {
     }),
     worlds: table({
         description:
-            'Height overrides for custom dimensions. Vanilla dimensions use their standard heights; unknown dimensions require an override.',
+            'Per-world terrain capture settings. Vanilla dimensions use their standard heights; unknown dimensions require a height override.',
         entryName: 'world',
         exampleKey: 'world',
         fields: {
-            height: int({ description: 'World height in blocks above its minimum Y.', example: 384, min: 1, max: 4095 })
+            height: int({ description: 'World height in blocks above its minimum Y.', example: 384, min: 1, max: 4095 }),
+            sample_biomes_3d: bool({
+                description:
+                    'Sample the biome at every captured height instead of using the surface biome for the whole column. Adds one world lookup per sampled block.',
+                default: false
+            })
         }
     })
 });
