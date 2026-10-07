@@ -1,4 +1,5 @@
 import { defineCommands } from '@pumpkin-plugins/docs';
+import { MAX_LOD_MAP_RADIUS } from '../lod/map-constants.ts';
 import { PLUGIN_NAME } from '../name.ts';
 
 /** Permission node required to use the `/dhs` commands. */
@@ -45,6 +46,39 @@ export const commands = defineCommands(PLUGIN_NAME, {
                                 permission: `${COMMAND_PERMISSION}.cache.disk.clear`
                             }
                         }
+                    }
+                }
+            },
+            map: {
+                description: 'Visualize cached LOD sections',
+                permission: `${COMMAND_PERMISSION}.map`,
+                subcommands: {
+                    here: {
+                        description: 'Show cached LOD sections around your position (default radius 4 sections)',
+                        permission: `${COMMAND_PERMISSION}.map.here`
+                    },
+                    'here-radius': {
+                        description: `Show cached LOD sections around your position with radius 0–${MAX_LOD_MAP_RADIUS} sections`,
+                        permission: `${COMMAND_PERMISSION}.map.here-radius`,
+                        arguments: [{ name: 'radius', type: 'integer', min: 0, max: MAX_LOD_MAP_RADIUS }]
+                    },
+                    at: {
+                        description:
+                            'Show cached LOD sections around block coordinates in your current world (default radius 4 sections)',
+                        permission: `${COMMAND_PERMISSION}.map.at`,
+                        arguments: [
+                            { name: 'x', type: 'integer' },
+                            { name: 'z', type: 'integer' }
+                        ]
+                    },
+                    'at-radius': {
+                        description: `Show cached LOD sections at block coordinates with radius 0–${MAX_LOD_MAP_RADIUS} sections`,
+                        permission: `${COMMAND_PERMISSION}.map.at-radius`,
+                        arguments: [
+                            { name: 'x', type: 'integer' },
+                            { name: 'z', type: 'integer' },
+                            { name: 'radius', type: 'integer', min: 0, max: MAX_LOD_MAP_RADIUS }
+                        ]
                     }
                 }
             }

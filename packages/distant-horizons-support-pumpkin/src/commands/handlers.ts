@@ -1,10 +1,13 @@
-import type { CommandHandlers } from '@pumpkin-plugins/docs';
+import type { CommandSender } from 'pumpkin:plugin/command@0.1.0';
+import { CommandFailed, type CommandHandlers } from '@pumpkin-plugins/docs';
+import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import type { LodCache } from '../lod/cache.ts';
+import { DEFAULT_LOD_MAP_RADIUS, MAX_LOD_MAP_RADIUS, renderLodMap } from '../lod/map.ts';
 import type { Sessions } from '../session.ts';
 import type { commands } from './spec.ts';
 
 /** Builds operator handlers for session status and cache management. */
-export function commandHandlers(sessions: Sessions, cache: LodCache): CommandHandlers<typeof commands> {
+export function commandHandlers(sessions: Sessions, cache: LodCache): CommandHandlers<typeof commands, CommandSender> {
     return {
         'dhs status': () => [sessions.status()],
         'dhs cache status': () => {
@@ -19,8 +22,40 @@ export function commandHandlers(sessions: Sessions, cache: LodCache): CommandHan
             return [`Cleared ${cleared.memoryEntries} in-memory and ${cleared.diskEntries} disk cache entries.`];
         },
         'dhs cache memory clear': () => [`Cleared ${cache.clearMemory()} in-memory cache entries.`],
-        'dhs cache disk clear': () => [`Cleared ${cache.clearDisk()} disk cache entries.`]
+        'dhs cache disk clear': () => [`Cleared ${cache.clearDisk()} disk cache entries.`],
+        'dhs map here': (sender) => showMap(cache, sender, DEFAULT_LOD_MAP_RADIUS),
+        'dhs map here-radius <radius>': (sender, { radius }) => showMap(cache, sender, radius),
+        'dhs map at <x> <z>': (sender, { x, z }) => showMap(cache, sender, DEFAULT_LOD_MAP_RADIUS, [x, z]),
+        'dhs map at-radius <x> <z> <radius>': (sender, { x, z, radius }) => showMap(cache, sender, radius, [x, z])
     };
+}
+
+function showMap(
+    cache: LodCache,
+    sender: CommandSender,
+    radius: number,
+    coordinates?: readonly [x: number, z: number]
+): string[] {
+    if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_MAP_RADIUS) {
+        throw new CommandFailed(`Radius must be between 0 and ${MAX_LOD_MAP_RADIUS} LOD sections.`);
+    }
+    const player = sender.asPlayer();
+    if (!player) throw new CommandFailed('Run this command as a player so the current world is known.');
+    let world: ReturnType<typeof player.getWorld> | undefined;
+    try {
+        world = player.getWorld();
+        const level = world.getName();
+        const [x, z] =
+            coordinates ??
+            (() => {
+                const position = player.getPosition();
+                return [position[0], position[2]] as const;
+            })();
+        return renderLodMap(cache, level, x, z, radius);
+    } finally {
+        disposeWasiResource(world);
+        disposeWasiResource(player);
+    }
 }
 
 function formatLimit(limit: number): string {
