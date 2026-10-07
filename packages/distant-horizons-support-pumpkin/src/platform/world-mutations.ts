@@ -8,22 +8,12 @@ type MutationSessions = Pick<Sessions, 'changedMany'>;
 
 /** Invalidates a grown position when Pumpkin accepts its growth event. */
 export function invalidateBlockGrow(sessions: MutationSessions, event: BlockGrowEventData): void {
-    invalidateMutation(
-        sessions,
-        event.targetWorld,
-        [{ x: event.blockPos.x, z: event.blockPos.z }],
-        event.cancelled
-    );
+    invalidateMutation(sessions, event.targetWorld, [{ x: event.blockPos.x, z: event.blockPos.z }], event.cancelled);
 }
 
 /** Invalidates the changed target of an accepted Pumpkin spread event. */
 export function invalidateBlockSpread(sessions: MutationSessions, event: BlockSpreadEventData): void {
-    invalidateMutation(
-        sessions,
-        event.targetWorld,
-        [{ x: event.targetPos.x, z: event.targetPos.z }],
-        event.cancelled
-    );
+    invalidateMutation(sessions, event.targetWorld, [{ x: event.targetPos.x, z: event.targetPos.z }], event.cancelled);
 }
 
 function invalidateMutation(

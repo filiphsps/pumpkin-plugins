@@ -146,7 +146,9 @@ export class Sessions {
         }
         if (message.type === 'init') {
             if (message.dimension !== peer.dimension) {
-                this.log.debug(`${logTag} Ignored DH initialization for a dimension other than the current player dimension.`);
+                this.log.debug(
+                    `${logTag} Ignored DH initialization for a dimension other than the current player dimension.`
+                );
                 return;
             }
             this.announce(peer);

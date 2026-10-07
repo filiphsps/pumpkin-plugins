@@ -12,7 +12,7 @@ vi.mock('pumpkin:plugin/text@0.1.0', () => ({ TextComponent: { text: state.text 
 
 import type { Player } from 'pumpkin:plugin/player@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
-import { schema, type Settings } from '../config/schema.ts';
+import { type Settings, schema } from '../config/schema.ts';
 import { serverPeers, withPlayer } from './peers.ts';
 
 describe('Pumpkin terrain adapter', () => {
