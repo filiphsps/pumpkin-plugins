@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.0.9](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.8...distant-horizons-support-pumpkin-v0.0.9) (2026-10-07)
+
+
+### Features
+
+* **dh:** add selected cache recovery command ([65a9bce](https://github.com/filiphsps/pumpkin-plugins/commit/65a9bce4bc481a314ec973b660b58ec5a6d01586))
+* **dh:** back up selected cache entries before removal ([e02f7a8](https://github.com/filiphsps/pumpkin-plugins/commit/e02f7a837382f319b02815ada404fac3c30b66fc))
+* **dh:** recover one selected cached section ([3c246d1](https://github.com/filiphsps/pumpkin-plugins/commit/3c246d1c5b08e4ceaeaad34067e3a880799219bc))
+
+
+### Bug Fixes
+
+* **dh:** clip forced LOD generation to world bounds ([6af8d54](https://github.com/filiphsps/pumpkin-plugins/commit/6af8d543309e49954ee73ed00b548cdef488409d))
+* **dh:** fairly pace and bound response queues ([26a1a77](https://github.com/filiphsps/pumpkin-plugins/commit/26a1a77c6ea34f9eeaf98446d3419a44a00df911))
+* **dh:** keep active transfers within receiver timeout ([e6341a7](https://github.com/filiphsps/pumpkin-plugins/commit/e6341a74dfa15bda5fb3f9144e658a821b2b4149))
+* **dh:** normalize nullable host chunk handles ([88c832e](https://github.com/filiphsps/pumpkin-plugins/commit/88c832e9858ddd5ecc7ae1123d6a0bd0e49b88f0))
+* **dh:** preserve complete session configuration ([eb33ab8](https://github.com/filiphsps/pumpkin-plugins/commit/eb33ab8477f22612140646d14b3203e1feae5972))
+* **dh:** reject unavailable requests while capture pauses ([90e63ce](https://github.com/filiphsps/pumpkin-plugins/commit/90e63ceb88f5dff27cb0a30e1ddd7aa227c96231))
+* **dh:** size fragments for the receiver timeout ([53342b6](https://github.com/filiphsps/pumpkin-plugins/commit/53342b62bca495c83e9b43a4cd527fe590b06383))
+* **dh:** validate DH level identities ([758371c](https://github.com/filiphsps/pumpkin-plugins/commit/758371c251c079efe553b7c3617d6e8f406cee22))
+* **terrain:** treat nullable chunks as absent ([936eb0b](https://github.com/filiphsps/pumpkin-plugins/commit/936eb0b24466ed837caa54fb147b7cb3af0c66e3))
+
+
+### Performance Improvements
+
+* **dh:** index persisted LOD cache entries ([47e41e8](https://github.com/filiphsps/pumpkin-plugins/commit/47e41e8ecbf7a9e5b8ff1e9d30c927557b40edb9))
+
 ## [0.0.8](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.7...distant-horizons-support-pumpkin-v0.0.8) (2026-10-07)
 
 
