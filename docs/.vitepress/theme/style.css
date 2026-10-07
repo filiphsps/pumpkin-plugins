@@ -709,3 +709,32 @@
         transition-duration: 0.01ms;
     }
 }
+
+.team-contributors .team-contribution-count {
+    display: block;
+    color: var(--vp-c-text-2);
+    font-size: 14px;
+    line-height: 24px;
+    font-variant-numeric: tabular-nums;
+}
+
+.team-contributors .team-owner-label {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 2px 12px;
+    border-radius: 6px;
+    background: var(--vp-c-brand-3);
+    color: var(--vp-c-white);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 24px;
+}
+
+.team-contributors .VPTeamMembersItem:has(.team-owner-label) .profile {
+    background: var(--vp-c-brand-soft);
+}
+
+.team-contributors .VPTeamMembersItem:has(.team-owner-label) .name {
+    color: var(--vp-c-brand-1);
+}

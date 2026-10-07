@@ -7,10 +7,16 @@ interface Contributor {
     type: string;
     avatar_url: string;
     html_url: string;
+    contributions: number;
+}
+
+interface TeamMember extends DefaultTheme.TeamMember {
+    login: string;
+    contributions: number;
 }
 
 /** Contributor cards generated from the repository's GitHub contributor list. */
-declare const data: DefaultTheme.TeamMember[];
+declare const data: TeamMember[];
 
 /** Exposes the generated cards to the Team page through VitePress. */
 export { data };
@@ -18,7 +24,7 @@ export { data };
 /** Loads human contributors at build time, keeping credentials out of the client bundle. */
 export default {
     watch: ['../../package.json'],
-    async load(): Promise<DefaultTheme.TeamMember[]> {
+    async load(): Promise<TeamMember[]> {
         const manifest = JSON.parse(
             fs.readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8')
         );
@@ -31,7 +37,7 @@ export default {
         // biome-ignore lint/suspicious/noUndeclaredEnvVars: VitePress runs directly through pnpm, outside Turborepo.
         const token = process.env.GITHUB_TOKEN;
         if (token) headers.Authorization = `Bearer ${token}`;
-        const members = new Map<string, DefaultTheme.TeamMember>();
+        const members = new Map<string, TeamMember>();
         for (let page = 1; ; page++) {
             const response = await fetch(
                 `https://api.github.com/repos/${repo}/contributors?per_page=100&page=${page}`,
@@ -68,15 +74,25 @@ export default {
                     );
                 const profile: { name?: string | null } = await profileResponse.json();
                 const name = profile.name?.trim() || contributor.login;
+                const count = contributor.contributions;
+                const owner = contributor.login.toLowerCase() === 'filiphsps';
+                const contributionLabel = `${count.toLocaleString('en-US')} ${count === 1 ? 'contribution' : 'contributions'}`;
                 members.set(contributor.login, {
+                    login: contributor.login,
+                    contributions: count,
                     name,
                     avatar: contributor.avatar_url,
                     title: name === contributor.login ? 'Contributor' : `@${contributor.login}`,
+                    desc: `${owner ? '<span class="team-owner-label">Owner</span>' : ''}<span class="team-contribution-count">${contributionLabel}</span>`,
                     links: [{ icon: 'github', link: contributor.html_url }]
                 });
             }
             if (contributors.length < 100) break;
         }
-        return [...members.values()];
+        return [...members.values()].sort((left, right) => {
+            const ownerOrder =
+                Number(right.login.toLowerCase() === 'filiphsps') - Number(left.login.toLowerCase() === 'filiphsps');
+            return ownerOrder || right.contributions - left.contributions || left.login.localeCompare(right.login);
+        });
     }
 } satisfies LoaderModule;

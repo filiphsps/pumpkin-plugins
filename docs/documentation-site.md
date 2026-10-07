@@ -78,7 +78,9 @@ The [Team page](team.md) lives at `/team`, with its own header link, and uses Vi
 of the repository's GitHub contributor list during site builds and development, excluding accounts
 marked as bots and common automation accounts. Full names come from public GitHub profiles, falling
 back to usernames when no name is set. Avatars and profile links also come from GitHub;
-there is no contributor list to maintain. GitHub may take time to refresh contributor statistics.
+there is no contributor list to maintain. Each card shows GitHub's repository contribution count.
+`filiphsps` is explicitly marked as the owner and always sorted first; other contributors are sorted
+by contribution count. GitHub may take time to refresh contributor statistics.
 The lookup requires network access and fails the build if GitHub is unavailable. Set `GITHUB_TOKEN`
 locally if unauthenticated requests are rate limited; the docs workflow supplies its read-only token.
 Only the contributor cards are included in the published site, not the loader or token.
