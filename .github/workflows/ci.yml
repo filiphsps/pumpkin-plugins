@@ -37,6 +37,11 @@ jobs:
                   # Diffing against the base needs the history behind it, not just the one commit.
                   fetch-depth: 0
 
+            - name: 📥 Fetch comparison base
+              env:
+                  BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+              run: git fetch --no-tags origin "$BASE"
+
             # Everything else keys off this: a change that touches only documentation can't break a
             # build, a test or a plugin, so it skips the jobs that would tell us otherwise.
             - name: 🔍 What the change touches

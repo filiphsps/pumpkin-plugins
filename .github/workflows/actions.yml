@@ -35,6 +35,11 @@ jobs:
               with:
                   fetch-depth: 0
 
+            - name: 📥 Fetch comparison base
+              env:
+                  BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+              run: git fetch --no-tags origin "$BASE"
+
             - name: 🔍 Find changed action code
               id: classify
               env:
