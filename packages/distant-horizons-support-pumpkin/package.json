@@ -1,6 +1,6 @@
 {
     "name": "@pumpkin-plugins/distant-horizons-support-pumpkin",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "private": true,
     "description": "Unofficial Distant Horizons server support for Pumpkin",
     "license": "GPL-3.0-or-later",

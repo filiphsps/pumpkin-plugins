@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.6](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.5...distant-horizons-support-pumpkin-v0.0.6) (2026-10-07)
+
+
+### Features
+
+* **terrain:** add shared terrain capture package ([16abc95](https://github.com/filiphsps/pumpkin-plugins/commit/16abc95313118c77b88f6046b3cc00943f378911))
+
+
+### Bug Fixes
+
+* **dh:** avoid stale chunk handles during LOD capture ([37d2a25](https://github.com/filiphsps/pumpkin-plugins/commit/37d2a25855db83b63ca3dace9b54739795525f5b))
+
 ## [0.0.5](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.3...distant-horizons-support-pumpkin-v0.0.5) (2026-10-07)
 
 
