@@ -358,6 +358,51 @@ describe('DH sessions', () => {
         expect(f.ids()).toEqual([10, 10, 10, 10, 8]);
         expect(restarted.status()).toContain('0 queued packet(s)');
     });
+    it('serves multiple cached LODs for one player in a tick within the cached packet budget', () => {
+        const f = fixture();
+        f.settings.cached_requests_per_tick = 2;
+        f.settings.cached_packets_per_tick = 4;
+        const diskCache = new LodCache(f.files, 0, f.settings.disk_cache_entries);
+        diskCache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
+        diskCache.put('world:1:0', { updated: 1000, data: new Uint8Array(64).fill(2) });
+        const sessions = new Sessions(f.settings, diskCache, new MemoryLogger(), () => 1000);
+        sessions.receive(f.peer, packet(3).string(f.peer.dimension).finish());
+        f.sent.length = 0;
+
+        sessions.receive(f.peer, f.request(1));
+        sessions.receive(f.peer, f.request(2, 'world', 1));
+        sessions.tick(f.peers);
+
+        expect(f.reads()).toBe(0);
+        expect(f.ids()).toEqual([10, 8, 10, 8]);
+        expect(sessions.status()).toContain('2 served');
+        expect(sessions.status()).toContain('0 pending LOD request(s)');
+    });
+    it('serves an expired cached LOD before refreshing it in the background', () => {
+        const f = fixture();
+        f.settings.refresh_seconds = 1;
+        f.settings.blocks_per_tick = 16384;
+        f.peer.terrain.height = 1;
+        let chunksReady = false;
+        f.peer.terrain.prepare = () => (chunksReady ? { status: 'ready' } : { status: 'pending' });
+        const cache = new LodCache(f.files, 0, f.settings.disk_cache_entries);
+        cache.put('world:0:0', { updated: 0, data: new Uint8Array(64).fill(1) });
+        const sessions = new Sessions(f.settings, cache, new MemoryLogger(), () => 1000);
+        sessions.receive(f.peer, packet(3).string(f.peer.dimension).finish());
+        f.sent.length = 0;
+
+        sessions.receive(f.peer, f.request());
+        sessions.tick(f.peers);
+
+        expect(f.ids()).toEqual([10, 8]);
+        expect(f.reads()).toBe(0);
+
+        chunksReady = true;
+        sessions.tick(f.peers);
+
+        expect(f.reads()).toBe(4096);
+        expect(cache.get('world:0:0')?.updated).toBe(1000);
+    });
     it('serves cached requests from multiple players in one tick within both configured limits', () => {
         const f = fixture();
         f.settings.cached_requests_per_tick = 2;

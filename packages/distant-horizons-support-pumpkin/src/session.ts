@@ -67,15 +67,23 @@ interface Request {
     section: Section;
     timestamp?: number;
     builder?: LodBuilder;
-    fallback?: CachedLod;
     cacheChecked?: boolean;
     cached?: CachedLod | null;
     revision: number;
+}
+interface Refresh {
+    name: string;
+    key: string;
+    level: string;
+    section: Section;
+    revision: number;
+    builder?: LodBuilder;
 }
 /** Runs bounded LOD work, keeping client state separate from short-lived Pumpkin handles. */
 export class Sessions {
     private readonly clients = new Map<string, Client>();
     private readonly requests: Request[] = [];
+    private readonly refreshes = new Map<string, Refresh>();
     private readonly revisions = new Map<string, number>();
     private readonly workBudget = new AdaptiveWorkBudget({ initialUnits: 8192 });
     private readonly forcedGeneration: ForcedLodGeneration;
@@ -197,6 +205,7 @@ export class Sessions {
     /** Advances sampling and transfers within global per-tick budgets. */
     tick(peers: Peers, serverMspt = 0): void {
         this.ticks++;
+        const refreshesAtStart = [...this.refreshes.values()];
         for (const [name, client] of this.clients) {
             if (
                 !peers.withPeer(name, (peer) => {
@@ -222,7 +231,7 @@ export class Sessions {
         for (const request of forcedWork ? [] : [...this.requests]) {
             if (!this.requests.includes(request)) continue;
             const queuedClient = this.clients.get(request.name);
-            if (!queuedClient || queuedClient.packets.length) continue;
+            if (!queuedClient) continue;
             const found = peers.withPeer(request.name, (peer) => {
                 try {
                     const client = this.clients.get(peer.name);
@@ -249,13 +258,22 @@ export class Sessions {
                             );
                         }
                         const cached = request.cached ?? undefined;
-                        if (cached && this.now() - cached.updated < this.settings.refresh_seconds * 1000) {
-                            if (cachedQueued < this.settings.cached_packets_per_tick)
-                                cachedQueued += this.complete(request, cached, true);
+                        if (cached) {
+                            const clientHasNewerData =
+                                request.timestamp !== undefined && cached.updated <= request.timestamp;
+                            const fresh = this.now() - cached.updated < this.settings.refresh_seconds * 1000;
+                            if (clientHasNewerData || fresh) {
+                                if (cachedQueued < this.settings.cached_packets_per_tick)
+                                    cachedQueued += this.complete(request, cached, true);
+                                return;
+                            }
+                            if (cachedQueued >= this.settings.cached_packets_per_tick) return;
+                            this.scheduleRefresh(request);
+                            cachedQueued += this.complete(request, cached, true);
                             return;
                         }
-                        request.fallback = cached;
                     }
+                    if (client.packets.length) return;
                     if (builderStepped || blocksBudget === 0) return;
                     builderStepped = true;
                     const region = {
@@ -289,24 +307,25 @@ export class Sessions {
                     }
                     this.workBudget.observe(measured.samples(), this.measureNow() - started);
                 } catch (err) {
-                    if (request.fallback && (this.revisions.get(request.key) ?? 0) === request.revision)
-                        cachedQueued += this.complete(request, request.fallback, true);
-                    else {
-                        this.rejected++;
-                        this.lastFailure = String(err);
-                        peer.send(
-                            reject(
-                                request.tracker,
-                                'Terrain unavailable or changed; only loaded chunks and cached LODs can be served'
-                            )
-                        );
-                        this.drop(request);
-                    }
-                    this.log.debug(`${PLUGIN_NAME}: ${String(err)}`);
+                    const reason = String(err);
+                    this.log.debug(
+                        `${logTag} DH request ${ansi.named.number(request.tracker)} for ${lodLocation(request.level, request.section.x, request.section.z)} failed: ${reason}.`
+                    );
+                    this.rejected++;
+                    this.lastFailure = reason;
+                    peer.send(
+                        reject(
+                            request.tracker,
+                            'Terrain unavailable or changed; only loaded chunks and cached LODs can be served'
+                        )
+                    );
+                    this.drop(request);
                 }
             });
             if (!found) this.left(request.name);
         }
+        if (!forcedWork && !builderStepped && blocksBudget > 0)
+            builderStepped = this.refreshOne(peers, refreshesAtStart, blocksBudget);
         let remaining = this.settings.packets_per_tick;
         let cachedRemaining = this.settings.cached_packets_per_tick;
         for (const [name, client] of this.clients) {
@@ -360,8 +379,9 @@ export class Sessions {
         const key = sectionKey(level, Math.floor(x / SECTION_SIZE_BLOCKS), Math.floor(z / SECTION_SIZE_BLOCKS));
         this.cache.remove(key);
         this.forcedGeneration.changed(level, x, z);
-        // Only running requests need a revision; this map stays bounded by the request limit.
-        if (this.requests.some((r) => r.key === key)) this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
+        // Running requests and background refreshes share revisions to prevent stale writes.
+        if (this.requests.some((request) => request.key === key) || this.refreshes.has(key))
+            this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
     }
     private removeClient(name: string): void {
         this.clients.delete(name);
@@ -381,6 +401,75 @@ export class Sessions {
             ? ` Forced budget up to ${FORCE_BLOCK_SAMPLES_PER_TICK} block samples/tick; ordinary DH sampling paused.`
             : ` Capture budget ${this.lastBlocksBudget}/${this.settings.blocks_per_tick} block samples/tick at ${this.lastServerMspt.toFixed(1)} MSPT.`;
         return `${this.clients.size} DH client(s), ${this.requests.length} pending LOD request(s). ${this.ticks} worker tick(s), ${this.served} served, ${this.rejected} rejected, ${this.cancelled} cancelled, ${packets} queued packet(s).${progress}${forced ? ` ${forced}` : ''}${budget}${this.lastFailure ? ` Last rejection: ${this.lastFailure}.` : ''} Distant chunk generation is unavailable in the pinned Pumpkin API.`;
+    }
+    private scheduleRefresh(request: Request): void {
+        if (this.refreshes.has(request.key) || this.refreshes.size >= this.settings.pending_requests) return;
+        this.refreshes.set(request.key, {
+            name: request.name,
+            key: request.key,
+            level: request.level,
+            section: request.section,
+            revision: request.revision
+        });
+    }
+    private refreshOne(peers: Peers, candidates: Refresh[], blocksBudget: number): boolean {
+        const refresh = candidates.find((candidate) => this.refreshes.get(candidate.key) === candidate);
+        if (!refresh) return false;
+        let stepped = false;
+        const found = peers.withPeer(refresh.name, (peer) => {
+            if (peer.level !== refresh.level || (this.revisions.get(refresh.key) ?? 0) !== refresh.revision) {
+                this.finishRefresh(refresh);
+                return;
+            }
+            try {
+                const region = {
+                    originX: refresh.section.x * SECTION_SIZE_BLOCKS,
+                    originZ: refresh.section.z * SECTION_SIZE_BLOCKS,
+                    width: SECTION_SIZE_BLOCKS,
+                    depth: SECTION_SIZE_BLOCKS,
+                    minY: peer.terrain.minY,
+                    height: peer.terrain.height
+                };
+                const prepared = peer.terrain.prepare?.(region);
+                if (prepared?.status === 'pending') {
+                    this.refreshes.delete(refresh.key);
+                    this.refreshes.set(refresh.key, refresh);
+                    return;
+                }
+                if (prepared && prepared.status !== 'ready') throw new Error(prepared.reason);
+                refresh.builder ??= new LodBuilder(refresh.section, peer.terrain.minY, peer.terrain.height);
+                const measured = measureTerrainSource(peer.terrain);
+                const started = this.measureNow();
+                const complete = refresh.builder.step(measured.source, blocksBudget);
+                stepped = true;
+                this.workBudget.observe(measured.samples(), this.measureNow() - started);
+                if (!complete) return;
+                const stillLoaded = peer.terrain.prepare?.(region);
+                if (stillLoaded?.status === 'pending') return;
+                if (stillLoaded && stillLoaded.status !== 'ready') throw new Error(stillLoaded.reason);
+                const captured = { updated: this.now(), data: refresh.builder.finish(this.now()) };
+                this.cache.put(refresh.key, captured);
+                this.log.debug(
+                    `${logTag} Refreshed cached LOD for ${ansi.named.name(refresh.name)} at ${lodLocation(refresh.level, refresh.section.x, refresh.section.z)} (${ansi.named.number(captured.data.length)} bytes).`
+                );
+                this.finishRefresh(refresh);
+            } catch (err) {
+                this.log.debug(
+                    `${logTag} Background refresh for ${lodLocation(refresh.level, refresh.section.x, refresh.section.z)} failed: ${String(err)}.`
+                );
+                this.finishRefresh(refresh);
+            }
+        });
+        if (!found) this.finishRefresh(refresh);
+        return stepped;
+    }
+    private finishRefresh(refresh: Refresh): void {
+        if (this.refreshes.get(refresh.key) === refresh) this.refreshes.delete(refresh.key);
+        this.clearRevisionIfUnused(refresh.key);
+    }
+    private clearRevisionIfUnused(key: string): void {
+        if (!this.requests.some((request) => request.key === key) && !this.refreshes.has(key))
+            this.revisions.delete(key);
     }
     private announce(peer: Peer): void {
         this.removeClient(peer.name);
@@ -408,10 +497,10 @@ export class Sessions {
         let packetCount = 0;
         if (client) {
             this.served++;
-            const packets =
-                request.timestamp !== undefined && value.updated <= request.timestamp
-                    ? [unchanged(request.tracker)]
-                    : transfer(request.tracker, this.buffer++, value.data);
+            const isUnchanged = request.timestamp !== undefined && value.updated <= request.timestamp;
+            const packets = isUnchanged
+                ? [unchanged(request.tracker)]
+                : transfer(request.tracker, this.buffer++, value.data);
             const lod = {
                 level: request.level,
                 section: request.section,
@@ -419,7 +508,7 @@ export class Sessions {
                 packetCount: packets.length,
                 dataBytes: value.data.length,
                 cached,
-                unchanged: request.timestamp !== undefined && value.updated <= request.timestamp
+                unchanged: isUnchanged
             };
             client.packets.push(
                 ...packets.map((bytes, index) => ({ bytes, cached, ...(index === packets.length - 1 ? { lod } : {}) }))
@@ -427,20 +516,19 @@ export class Sessions {
             packetCount = packets.length;
         }
         this.drop(request);
-        if (!this.requests.some((r) => r.key === request.key)) this.revisions.delete(request.key);
         return cached ? packetCount : 0;
     }
     private drop(request: Request): void {
         const index = this.requests.indexOf(request);
         if (index >= 0) this.requests.splice(index, 1);
-        if (!this.requests.some((r) => r.key === request.key)) this.revisions.delete(request.key);
+        this.clearRevisionIfUnused(request.key);
     }
     private cancelRequests(name: string): void {
         for (let i = this.requests.length - 1; i >= 0; i--) {
             if (this.requests[i]?.name === name) this.requests.splice(i, 1);
         }
-        for (const key of this.revisions.keys())
-            if (!this.requests.some((r) => r.key === key)) this.revisions.delete(key);
+        for (const [key, refresh] of this.refreshes) if (refresh.name === name) this.refreshes.delete(key);
+        for (const key of this.revisions.keys()) this.clearRevisionIfUnused(key);
     }
     private validate(
         peer: Peer,
