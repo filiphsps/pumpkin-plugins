@@ -19,9 +19,10 @@ plugin. This repository's publisher currently tries the direct endpoint first, t
 search and requires a case-insensitive exact name match. A name is not a valid direct path value:
 `GET /plugins/TemporaryAPIExperiment` returned 404, while the search endpoint found the listing.
 
-The existing publisher takes a plugin name. It first tries that value as a direct path, accepts the
-result only if the returned listing name matches, and then falls back to bounded search with an
-exact-name check. The write endpoint itself requires the numeric database ID in its path.
+The current publisher action accepts a plugin name or a numeric/public ID. For a name, it first
+tries that value as a direct path, accepts the result only if the returned listing name matches,
+and then falls back to bounded search with an exact-name check. The write endpoint itself requires
+the numeric database ID in its path.
 
 The public API documentation lists read endpoints, including plugin lookup and download. It does
 not document the developer listing-write endpoint described below.
@@ -62,11 +63,10 @@ action instead uses the Bearer header.
 
 The current `publish-to-pumpkin-market` action uses the same `PUT` URL with a `wasm` file and a
 different `metadata` object: `version`, `track`, and `releaseNotes`. Its README documents the token
-scopes used for version uploads. A metadata-only action should request the narrowest scope that
-supports listing updates; the tests below prove that the supplied token could update the test
-listing, but do not isolate the minimum required scope. The frontend also surfaces a 2FA requirement
-for listing saves and version publishing. Whether API-token writes require the account to have 2FA
-enabled has not been isolated.
+scopes used for version uploads. The test below proves that the supplied token could update the test
+listing, but does not isolate the minimum scope required for metadata changes. The frontend also
+surfaces a 2FA requirement for listing saves and version publishing. Whether API-token writes require
+the account to have 2FA enabled has not been isolated.
 
 ## Partial and full listing updates
 
@@ -85,8 +85,7 @@ Command-row reconciliation is not fully verified. The write endpoint returned su
 arrays, but the available public REST response does not include description or command rows. A
 Bearer-authenticated `GET /api/plugins/{id}` for the unpublished draft returned
 `This plugin is currently offline / draft.` The frontend preserves command IDs, but the backend
-behavior for omitted IDs, omitted commands, and deletion has not been confirmed. A future updater
-must either pass through supplied command IDs or first establish a safe reconciliation strategy.
+behavior for omitted IDs, omitted commands, and deletion has not been confirmed.
 
 ## Tested behavior
 

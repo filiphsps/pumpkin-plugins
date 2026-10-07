@@ -42,6 +42,15 @@ function inputs(extra = {}) {
     };
 }
 
+function readOutputs(file) {
+    return Object.fromEntries(
+        [...fs.readFileSync(file, 'utf8').matchAll(/^([a-z-]+)<<([^\n]+)\n([\s\S]*?)\n\2$/gm)].map((match) => [
+            match[1],
+            match[3]
+        ])
+    );
+}
+
 function server(handler) {
     return new Promise((resolve) => {
         const instance = http.createServer(handler).listen(0, '127.0.0.1', () => {
@@ -52,6 +61,24 @@ function server(handler) {
 }
 
 describe('publish-to-market action', () => {
+    it('requires exactly one of plugin-name or plugin-id', async () => {
+        const dir = fixture();
+        const noSelector = await run(dir, {
+            INPUT_VERSION: '1.2.3',
+            'INPUT_WASM-FILE': 'plugin.wasm',
+            'INPUT_API-TOKEN': 'test-token'
+        });
+        assert.equal(noSelector.status, 1);
+        assert.match(noSelector.stderr, /Set exactly one of plugin-name or plugin-id/);
+
+        const bothSelectors = await run(
+            dir,
+            inputs({ 'INPUT_PLUGIN-ID': 'public-test-id', 'INPUT_API-TOKEN': 'test-token' })
+        );
+        assert.equal(bothSelectors.status, 1);
+        assert.match(bothSelectors.stderr, /Set exactly one of plugin-name or plugin-id/);
+    });
+
     it('fails when the token is absent and warn is not enabled', async () => {
         const dir = fixture();
         const result = await run(dir, inputs());
@@ -61,9 +88,11 @@ describe('publish-to-market action', () => {
 
     it('warns and succeeds when the token is absent and warn is enabled', async () => {
         const dir = fixture();
-        const result = await run(dir, inputs({ INPUT_WARN: 'true' }));
+        const outputFile = path.join(dir, 'outputs.txt');
+        const result = await run(dir, inputs({ INPUT_WARN: 'true', GITHUB_OUTPUT: outputFile }));
         assert.equal(result.status, 0, result.stderr);
         assert.match(result.stdout, /::warning .*api-token input is empty/);
+        assert.deepEqual(readOutputs(outputFile), { status: 'skipped' });
     });
 
     it('fails when the plugin has no market listing and warn is not enabled', async () => {
@@ -92,12 +121,19 @@ describe('publish-to-market action', () => {
         });
         try {
             const dir = fixture();
+            const outputFile = path.join(dir, 'outputs.txt');
             const result = await run(
                 dir,
-                inputs({ 'INPUT_API-TOKEN': 'test-token', 'INPUT_API-URL': market.url, INPUT_WARN: 'true' })
+                inputs({
+                    'INPUT_API-TOKEN': 'test-token',
+                    'INPUT_API-URL': market.url,
+                    INPUT_WARN: 'true',
+                    GITHUB_OUTPUT: outputFile
+                })
             );
             assert.equal(result.status, 0, result.stderr);
             assert.match(result.stdout, /::warning .*no Market listing named/);
+            assert.deepEqual(readOutputs(outputFile), { status: 'skipped' });
         } finally {
             market.instance.close();
         }
@@ -129,12 +165,23 @@ describe('publish-to-market action', () => {
         });
         try {
             const dir = fixture();
+            const outputFile = path.join(dir, 'outputs.txt');
             const result = await run(
                 dir,
-                inputs({ 'INPUT_API-TOKEN': 'test-token', 'INPUT_API-URL': market.url, INPUT_WARN: 'true' })
+                inputs({
+                    'INPUT_API-TOKEN': 'test-token',
+                    'INPUT_API-URL': market.url,
+                    INPUT_WARN: 'true',
+                    GITHUB_OUTPUT: outputFile
+                })
             );
             assert.equal(result.status, 0, result.stderr);
             assert.match(result.stdout, /::warning .*has not been published yet/);
+            assert.deepEqual(readOutputs(outputFile), {
+                'listing-id': '42',
+                'listing-name': 'Published plugin',
+                status: 'skipped'
+            });
         } finally {
             market.instance.close();
         }
@@ -162,6 +209,7 @@ describe('publish-to-market action', () => {
         try {
             const dir = fixture();
             const summaryFile = path.join(dir, 'summary.md');
+            const outputFile = path.join(dir, 'outputs.txt');
             const result = await run(
                 dir,
                 inputs({
@@ -169,7 +217,8 @@ describe('publish-to-market action', () => {
                     'INPUT_API-URL': market.url,
                     INPUT_TRACK: 'beta',
                     'INPUT_RELEASE-NOTES': '## Fixed\n\n- Kept the ports open.',
-                    GITHUB_STEP_SUMMARY: summaryFile
+                    GITHUB_STEP_SUMMARY: summaryFile,
+                    GITHUB_OUTPUT: outputFile
                 })
             );
             assert.equal(result.status, 0, result.stderr);
@@ -186,6 +235,12 @@ describe('publish-to-market action', () => {
             );
             assert.equal(fs.existsSync(summaryFile), true, 'successful publishing should write a CI summary');
             assert.match(result.stdout, /Published Published plugin 1\.2\.3 to Market listing 42/);
+            assert.deepEqual(readOutputs(outputFile), {
+                'listing-id': '42',
+                'listing-name': 'Published plugin',
+                status: 'success',
+                'published-version': '1.2.3'
+            });
         } finally {
             market.instance.close();
         }
@@ -218,5 +273,51 @@ describe('publish-to-market action', () => {
         const result = await run(dir, inputs({ 'INPUT_WASM-FILE': 'missing.wasm' }));
         assert.equal(result.status, 1);
         assert.match(result.stderr, /WASM file not found/);
+    });
+
+    it('publishes through a numeric or public plugin ID without name search', async () => {
+        const requests = [];
+        const market = await server((request, response) => {
+            requests.push(request);
+            if (request.method === 'GET') {
+                response.setHeader('content-type', 'application/json');
+                response.end(
+                    JSON.stringify({ id: 42, public_id: 'public-test-id', name: 'Canonical Plugin', version: '1.0.0' })
+                );
+            } else {
+                let body = '';
+                request.setEncoding('utf8');
+                request.on('data', (chunk) => (body += chunk));
+                request.on('end', () => {
+                    request.body = body;
+                    response.end('{}');
+                });
+            }
+        });
+        try {
+            const dir = fixture();
+            const outputFile = path.join(dir, 'outputs.txt');
+            const result = await run(dir, {
+                'INPUT_PLUGIN-ID': 'public-test-id',
+                INPUT_VERSION: '1.2.3',
+                'INPUT_WASM-FILE': 'plugin.wasm',
+                'INPUT_API-TOKEN': 'test-token',
+                'INPUT_API-URL': market.url,
+                GITHUB_OUTPUT: outputFile
+            });
+
+            assert.equal(result.status, 0, result.stderr);
+            assert.equal(requests.length, 2);
+            assert.equal(requests[0].url, '/api/v1/rest/plugins/public-test-id');
+            assert.equal(requests[1].url, '/api/plugins/42');
+            assert.deepEqual(readOutputs(outputFile), {
+                'listing-id': '42',
+                'listing-name': 'Canonical Plugin',
+                status: 'success',
+                'published-version': '1.2.3'
+            });
+        } finally {
+            market.instance.close();
+        }
     });
 });

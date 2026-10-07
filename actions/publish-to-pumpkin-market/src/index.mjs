@@ -2,9 +2,10 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { getInput } from './utils.mjs';
+import { getInput, setOutput } from './utils.mjs';
 
 const pluginName = getInput('plugin-name').trim();
+const pluginId = getInput('plugin-id').trim();
 const version = getInput('version').trim();
 const wasmFile = getInput('wasm-file').trim();
 const token = getInput('api-token').trim();
@@ -22,7 +23,7 @@ try {
 }
 
 async function publish() {
-    if (!pluginName) throw new Error('plugin-name is required');
+    if (Boolean(pluginName) === Boolean(pluginId)) throw new Error('Set exactly one of plugin-name or plugin-id');
     if (!version) throw new Error('version is required');
     if (!wasmFile) throw new Error('wasm-file is required');
 
@@ -30,16 +31,18 @@ async function publish() {
     if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`WASM file not found: ${file}`);
 
     if (!token) {
-        unavailable(`${pluginName} ${version} was not published because the api-token input is empty.`);
+        unavailable(`${displayPlugin()} ${version} was not published because the api-token input is empty.`);
         return;
     }
 
-    const listing = await findListing(pluginName);
+    const listing = pluginId ? await findListingById(pluginId) : await findListingByName(pluginName);
     if (!listing?.version) {
         const reason = listing
-            ? `Market listing ${listing.id} named ${JSON.stringify(pluginName)} has not been published yet`
-            : `no Market listing named ${JSON.stringify(pluginName)} exists`;
-        unavailable(`${pluginName} ${version} was not published because ${reason}.`);
+            ? `Market listing ${listing.id} named ${JSON.stringify(listing.name)} has not been published yet`
+            : pluginName
+              ? `no Market listing named ${JSON.stringify(pluginName)} exists`
+              : `no Market listing with ID ${JSON.stringify(pluginId)} exists`;
+        unavailable(`${displayPlugin()} ${version} was not published because ${reason}.`, listing);
         return;
     }
 
@@ -54,15 +57,18 @@ async function publish() {
         body: form
     });
     if (!response.ok)
-        throw new Error(`Market update for ${pluginName} failed (${response.status}): ${await response.text()}`);
+        throw new Error(`Market update for ${listing.name} failed (${response.status}): ${await response.text()}`);
 
-    const message = `Published ${pluginName} ${version} to Market listing ${listing.id}.`;
+    setListingOutputs(listing);
+    setOutput('status', 'success');
+    setOutput('published-version', version);
+    const message = `Published ${listing.name} ${version} to Market listing ${listing.id}.`;
     console.log(message);
-    summary(`### 🛒 ${pluginName} ${version}: published to Pumpkin Market\n${message}\n`);
+    summary(`### 🛒 ${listing.name} ${version}: published to Pumpkin Market\n${message}\n`);
 }
 
 /** Retrieves a Market listing directly, then falls back to a bounded exact-name search. */
-async function findListing(name) {
+async function findListingByName(name) {
     const direct = await marketFetch(`${marketUrl}/api/v1/rest/plugins/${encodeURIComponent(name)}`);
     if (direct.ok) {
         const listing = await direct.json();
@@ -81,14 +87,34 @@ async function findListing(name) {
     return matches[0];
 }
 
+/** Resolves a numeric or public Market ID to the listing's numeric database ID. */
+async function findListingById(id) {
+    const response = await marketFetch(`${marketUrl}/api/v1/rest/plugins/${encodeURIComponent(id)}`);
+    if (!response.ok) return undefined;
+    const listing = await response.json();
+    if (!Number.isInteger(listing?.id) || typeof listing.name !== 'string' || !listing.name) return undefined;
+    return listing;
+}
+
 function isExactName(listing, name) {
     return typeof listing?.name === 'string' && listing.name.toLowerCase() === name.toLowerCase();
 }
 
-function unavailable(message) {
+function unavailable(message, listing) {
     if (!warnOnUnavailable) throw new Error(message);
+    if (listing) setListingOutputs(listing);
+    setOutput('status', 'skipped');
     console.log(`::warning title=Not published to Pumpkin Market::${escapeWorkflowCommand(message)}`);
     summary(`### ⚠️ Not published to Pumpkin Market\n${message}\n`);
+}
+
+function displayPlugin() {
+    return pluginName || `Market listing ${JSON.stringify(pluginId)}`;
+}
+
+function setListingOutputs(listing) {
+    setOutput('listing-id', String(listing.id));
+    setOutput('listing-name', listing.name);
 }
 
 function marketFetch(url, options = {}) {

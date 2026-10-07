@@ -1,18 +1,88 @@
 # Update Pumpkin Market Listing
 
-Update Pumpkin Market listing metadata from a JSON file or direct inputs
+Update an existing Pumpkin Market listing from a JSON metadata file, direct inputs, or both. The
+action does not read `info.ts`, build or upload a WASM file, create listings, or upload screenshots.
 
 ```yaml
 steps:
   - uses: filiphsps/pumpkin-plugins/actions/update-pumpkin-market-listing@update-pumpkin-market-listing-v0.0.1
+    with:
+      plugin-id: ${{ vars.PUMPKIN_MARKET_PLUGIN_ID }}
+      metadata-file: .github/market-metadata.json
+      api-token: ${{ secrets.MARKET_API_TOKEN }}
 ```
 
 The version reference above is this action's first Release Please tag. Action releases are
 independent from plugin releases and other actions.
 
+## Metadata sources
+
+The metadata file contains a JSON object using Market field names. Direct inputs can be used alone
+or layered over the file: the file is the base, and each provided direct input overrides its field.
+The `description` input sets the `en-US` entry in `translatedDescriptions` while preserving other
+locales. For example, a patch file can contain:
+
+```json
+{
+  "translatedDescriptions": {
+    "en-US": "A description shown on the Market listing"
+  },
+  "commands": [
+    {
+      "name": "hello",
+      "aliases": ["hi"],
+      "permission": "Example:command.hello",
+      "description": { "en-US": "Say hello" },
+      "display_order": 0
+    }
+  ]
+}
+```
+
+Set exactly one of `plugin-name` and `plugin-id`. Name selection uses the same bounded exact-name
+lookup as the publish action; `plugin-id` accepts a numeric database ID or public ID.
+
+`update-mode: patch` sends only supplied metadata fields. `update-mode: full` requires all Store
+Listing JSON fields: `name`, `category`, `sourceLink`, `youtubeVideoUrl`, `keywords`,
+`translatedDescriptions`, `isEarlyAccess`, and `commands`. Empty direct inputs are omitted; use the
+metadata file when a field needs an explicit empty value.
+
+## Inputs
+
+<!-- action-inputs:start -->
+| Input | Required | Default | Description |
+| --- | --- | --- | --- |
+| `plugin-name` | No |  | Exact listing name; set this or plugin-id, but not both |
+| `plugin-id` | No |  | Numeric database ID or public ID; set this or plugin-name, but not both |
+| `metadata-file` | No |  | Path to a JSON object containing listing metadata; combine with direct inputs if needed |
+| `display-name` | No |  | Listing display name (metadata field name) |
+| `description` | No |  | Default en-US listing description; overrides that locale in translated-descriptions |
+| `category` | No |  | Listing category |
+| `source-link` | No |  | Listing source URL |
+| `youtube-video-url` | No |  | Listing YouTube video URL |
+| `keywords` | No |  | Comma-separated listing search keywords |
+| `translated-descriptions` | No |  | JSON object mapping locale codes to listing descriptions |
+| `is-early-access` | No |  | Whether the listing is marked as early access (true or false) |
+| `commands` | No |  | JSON array of listing commands with names, optional aliases and permissions, localized descriptions, display order, and IDs |
+| `update-mode` | No | `patch` | Metadata validation mode, patch or full; full requires all listing metadata fields |
+| `api-token` | Yes |  | Market API token with listing update permission |
+| `api-url` | No | `https://market.pumpkinmc.org` | Pumpkin Market base URL |
+<!-- action-inputs:end -->
+
+## Outputs
+
+<!-- action-outputs:start -->
+| Output | Description |
+| --- | --- |
+| `listing-id` | Resolved numeric Market database ID |
+| `listing-name` | Canonical Market listing name |
+| `status` | Operation result (success after a completed update) |
+<!-- action-outputs:end -->
+
 ## Development
 
 Add inputs and outputs in `action.yml`, implement the behavior in `src/index.mjs`, and cover it with
-tests in `src/*.test.mjs`. Read inputs with `getInput()` from `src/utils.mjs` so hyphenated input
-names keep matching GitHub's runner environment. The action runs on GitHub's Node 24 runtime and
-needs no separate build step.
+tests in `src/*.test.mjs`. Input and output tables are generated from `action.yml`; run `pnpm readme`
+after changing the action metadata. Read inputs with `getInput()` from `src/utils.mjs` so hyphenated
+input names keep matching GitHub's runner environment. The action runs on GitHub's Node 24 runtime
+and needs no separate build step.

@@ -1,6 +1,64 @@
 name: Update Pumpkin Market Listing
 description: Update Pumpkin Market listing metadata from a JSON file or direct inputs
 author: Filiph Sandström
+branding:
+    icon: edit-3
+    color: orange
+inputs:
+    plugin-name:
+        description: Exact listing name; set this or plugin-id, but not both
+        required: false
+    plugin-id:
+        description: Numeric database ID or public ID; set this or plugin-name, but not both
+        required: false
+    metadata-file:
+        description: Path to a JSON object containing listing metadata; combine with direct inputs if needed
+        required: false
+    display-name:
+        description: Listing display name (metadata field name)
+        required: false
+    description:
+        description: Default en-US listing description; overrides that locale in translated-descriptions
+        required: false
+    category:
+        description: Listing category
+        required: false
+    source-link:
+        description: Listing source URL
+        required: false
+    youtube-video-url:
+        description: Listing YouTube video URL
+        required: false
+    keywords:
+        description: Comma-separated listing search keywords
+        required: false
+    translated-descriptions:
+        description: JSON object mapping locale codes to listing descriptions
+        required: false
+    is-early-access:
+        description: Whether the listing is marked as early access (true or false)
+        required: false
+    commands:
+        description: JSON array of listing commands with names, optional aliases and permissions, localized descriptions, display order, and IDs
+        required: false
+    update-mode:
+        description: Metadata validation mode, patch or full; full requires all listing metadata fields
+        required: false
+        default: patch
+    api-token:
+        description: Market API token with listing update permission
+        required: true
+    api-url:
+        description: Pumpkin Market base URL
+        required: false
+        default: https://market.pumpkinmc.org
+outputs:
+    listing-id:
+        description: Resolved numeric Market database ID
+    listing-name:
+        description: Canonical Market listing name
+    status:
+        description: Operation result (success after a completed update)
 runs:
     using: node24
     main: src/index.mjs

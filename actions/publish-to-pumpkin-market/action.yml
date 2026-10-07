@@ -6,8 +6,11 @@ branding:
     color: orange
 inputs:
     plugin-name:
-        description: Exact Pumpkin plugin name used by its Market listing
-        required: true
+        description: Exact listing name; set this or plugin-id, but not both
+        required: false
+    plugin-id:
+        description: Numeric database ID or public ID; set this or plugin-name, but not both
+        required: false
     version:
         description: Plugin version to publish, without a leading v
         required: true
@@ -15,7 +18,7 @@ inputs:
         description: Path to the plugin .wasm file
         required: true
     api-token:
-        description: Market API token with plugins:update and plugins:versions:upload scopes
+        description: Market API token with plugins:update and plugins:versions:upload scopes; required unless warn is true
         required: false
     api-url:
         description: Pumpkin Market base URL
@@ -33,6 +36,15 @@ inputs:
         description: Warn instead of failing when credentials or the Market listing are unavailable
         required: false
         default: 'false'
+outputs:
+    listing-id:
+        description: Resolved numeric Market database ID
+    listing-name:
+        description: Canonical Market listing name
+    status:
+        description: Operation result (success or skipped)
+    published-version:
+        description: Version successfully published to the listing
 runs:
     using: node24
     main: src/index.mjs
