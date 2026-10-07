@@ -46,6 +46,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [@pumpkin-plugins/build](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/build/README.md): Shared build tool for the plugins
 - [@pumpkin-plugins/config](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/config/README.md): Schema-driven TOML config for plugins
 - [@pumpkin-plugins/docs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/docs/README.md): README generator for plugins and actions
+- [@pumpkin-plugins/minecraft-colors](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/minecraft-colors/README.md): Chalk-like Minecraft text formatting for plugins
 - [@pumpkin-plugins/plugin-kit](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/plugin-kit/README.md): Host helpers shared by plugins
 - [@pumpkin-plugins/port-mapping](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/port-mapping/README.md): UPnP and NAT-PMP port mapping
 - [@pumpkin-plugins/signing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/README.md): Ed25519 signing for plugin builds
@@ -76,6 +77,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [@pumpkin-plugins/build API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/build/): Shared build tool for the plugins
 - [@pumpkin-plugins/config API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/config/): Schema-driven TOML config for plugins
 - [@pumpkin-plugins/docs API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/docs/): README generator for plugins and actions
+- [@pumpkin-plugins/minecraft-colors API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/minecraft-colors/): Chalk-like Minecraft text formatting for plugins
 - [@pumpkin-plugins/plugin-kit API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/plugin-kit/): Host helpers shared by plugins
 - [@pumpkin-plugins/port-mapping API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/port-mapping/): UPnP and NAT-PMP port mapping
 - [@pumpkin-plugins/signing API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/signing/): Ed25519 signing for plugin builds
