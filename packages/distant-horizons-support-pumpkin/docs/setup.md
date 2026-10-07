@@ -18,9 +18,10 @@ on each Java Edition client. Bedrock players do not establish Distant Horizons s
    on first load.
 
 The [generated Configuration](../README.md#configuration) reference shows the current options,
-defaults and example file. Changes apply after a server restart. The plugin does not load or generate
-world chunks: it serves terrain that Pumpkin has already loaded or that the plugin has captured and
-cached before.
+defaults and example file. Changes apply after a server restart. The plugin serves terrain that
+Pumpkin has already loaded or that the plugin has captured and cached before. Shared loading and
+generation provider interfaces are in place, but Pumpkin's current adapter reports those operations
+as unavailable.
 
 Use the generated [Commands](../README.md#commands) reference to check connected clients and cache
 usage after connecting.

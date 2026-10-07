@@ -162,16 +162,17 @@ This is an unofficial Pumpkin adaptation of the
 originally developed by Jim C K Flaten and the upstream contributors. It is not an official
 Distant Horizons Team release or endorsed by that team.
 
-Adapted protocol and LOD code retains its upstream copyright notices. This plugin is licensed
-under [GPL-3.0-or-later](https://github.com/filiphsps/pumpkin-plugins/blob/master/packages/distant-horizons-support-pumpkin/LICENSE). The other packages in this repository retain their own licenses.
+Protocol code that follows upstream implementations retains its upstream copyright notices. This
+plugin is licensed under [GPL-3.0-or-later](https://github.com/filiphsps/pumpkin-plugins/blob/master/packages/distant-horizons-support-pumpkin/LICENSE). The separate
+[`@pumpkin-plugins/terrain`](../../tools/terrain/README.md) package is MIT-licensed and contains
+protocol-neutral terrain capture and chunk-access code; it does not include the DH codec or DTO
+encoder.
 The protocol format follows the Distant Horizons core linked in the generated compatibility
 section, Copyright (C) 2020 James Seibel, originally under [LGPL-3.0-only](LICENSE.LESSER.txt).
 The initial server-plugin reference revision is `56a01110579b94c9946130092500c00df7c31925`.
 
 ## TODO
 
-- [ ] Add chunk loading and terrain generation when Pumpkin exposes those APIs to plugins. The
-  pinned API only has `world.get-chunk(x, z)`, which returns already-loaded chunks. The upstream
-  plugin delegates loading and generation to Bukkit/Paper. Pumpkin needs equivalent APIs so this
-  plugin can load saved terrain, request generation, wait for it to finish and release chunks
-  afterward.
+- [ ] Connect the shared `ChunkLoader` and `TerrainGenerator` providers when Pumpkin exposes those
+  APIs. The current adapter reports loading and generation as unavailable, and waits when a future
+  provider reports pending work.
