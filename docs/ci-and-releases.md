@@ -132,6 +132,13 @@ release merges, preventing conflicts in the shared manifest and release configur
 refreshed PR goes through the README and pin preparation job again. Separate PRs keep a plugin
 that is not ready from being released with one that is.
 
+The release and release-PR preparation jobs authenticate with short-lived GitHub App installation
+tokens. The App is installed on this repository with `contents`, `issues` and `pull-requests` write
+permissions. Actions settings store its Client ID in the `RELEASE_APP_CLIENT_ID` repository variable
+and its private key in the `RELEASE_APP_PRIVATE_KEY` repository secret. Each job mints its own
+repository-scoped token; the release-PR job uses its token to push prepared README and pin updates,
+which trigger the normal pull-request CI checks.
+
 `scripts/release.mjs` runs the pinned Release Please runtime through `pnpm dlx`.
 `scripts/release-commits.mjs` supplies shared commits through its plugin hook before versions and
 changelogs are calculated. Features, fixes and performance improvements appear in the notes.
@@ -141,7 +148,7 @@ The generator fails if it cannot find a previous release or fetch enough history
 publishing incomplete notes. Increase `commit-search-depth` in the release configuration if needed.
 Changelogs stay generated; do not edit them by hand.
 
-To preview without changing GitHub, set `GITHUB_REPOSITORY` and `RELEASE_PLEASE_TOKEN`, then run:
+To preview without changing GitHub, set `GITHUB_REPOSITORY` and `GITHUB_TOKEN`, then run:
 
 ```sh
 pnpm --package=release-please@17.11.2 dlx -c 'node scripts/release.mjs --dry-run "$(command -v release-please)"'
@@ -321,17 +328,17 @@ These aren't done by the workflows:
 
 1. Settings, General, Pull Requests: enable **Allow rebase merging** only. Disable squash and merge
    commits.
-2. Settings, Actions, General: enable **Allow GitHub Actions to create and approve pull requests**.
-3. Optional: add a PAT or GitHub App token as the `RELEASE_PLEASE_TOKEN` secret. Without it, CI
-   doesn't run on the release PR, because GitHub doesn't trigger workflows for events created with
-   `GITHUB_TOKEN`. That includes the README commit.
-4. Add the Ed25519 signing key as the `PLUGIN_SIGNING_KEY` secret (see [Signing](#signing)).
+2. Create and install a GitHub App on this repository with `contents`, `issues` and `pull-requests`
+   write permissions. Add its Client ID as the `RELEASE_APP_CLIENT_ID` Actions variable and its
+   private key as the `RELEASE_APP_PRIVATE_KEY` Actions secret. The release jobs use its
+   installation tokens so release PRs and their updates trigger CI.
+3. Add the Ed25519 signing key as the `PLUGIN_SIGNING_KEY` secret (see [Signing](#signing)).
    Non-release checks use an ephemeral key, but the release workflow requires this secret to publish
    signed artifacts.
-5. For market publishing: create a Market API key with the `plugins:update` and
+4. For market publishing: create a Market API key with the `plugins:update` and
    `plugins:versions:upload` scopes, then add it as the `MARKET_API_TOKEN` repository secret. Keep
    the key out of the repository and chat messages.
-6. Optional: add the Codecov repository upload token as the `CODECOV_TOKEN` Actions secret to publish
+5. Optional: add the Codecov repository upload token as the `CODECOV_TOKEN` Actions secret to publish
    coverage from protected branches and same-repository runs. Public fork pull requests can use
    Codecov's tokenless upload setting. The `codecov.yml` project status compares coverage with the
    base commit and allows a drop of up to 1 percentage point to avoid failing on small fluctuations.

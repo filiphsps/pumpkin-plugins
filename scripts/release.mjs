@@ -24,9 +24,8 @@ const requireRuntime = createRequire(resolve(cliPath));
 const { GitHub, Manifest, VERSION } = requireRuntime('release-please');
 if (VERSION !== '17.11.2') throw new Error(`Expected release-please 17.11.2, received ${VERSION}`);
 const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? '').split('/');
-if (!owner || !repo || !process.env.RELEASE_PLEASE_TOKEN)
-    throw new Error('GITHUB_REPOSITORY and RELEASE_PLEASE_TOKEN are required');
-const github = await GitHub.create({ owner, repo, token: process.env.RELEASE_PLEASE_TOKEN });
+if (!owner || !repo || !process.env.GITHUB_TOKEN) throw new Error('GITHUB_REPOSITORY and GITHUB_TOKEN are required');
+const github = await GitHub.create({ owner, repo, token: process.env.GITHUB_TOKEN });
 const branch = github.repository.defaultBranch;
 const packages = workspacePackages(resolve(import.meta.dirname, '..'));
 if (

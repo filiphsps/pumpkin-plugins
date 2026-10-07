@@ -410,9 +410,7 @@ jobs:
         timeout-minutes: 10
         runs-on: ubuntu-24.04
         permissions:
-            contents: write
-            issues: write
-            pull-requests: write
+            contents: read
         outputs:
             paths_released: ${{ steps.release.outputs.paths_released }}
             action_paths_released: ${{ steps.release.outputs.action_paths_released }}
@@ -425,17 +423,27 @@ jobs:
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
+            - name: 🔑 Create release token
+              id: app-token
+              uses: actions/create-github-app-token@v3.2.0
+              with:
+                  client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+                  permission-contents: write
+                  permission-issues: write
+                  permission-pull-requests: write
+
             - name: 🚢 Release Please with bundled dependency changes
               id: release
               env:
-                  # GITHUB_TOKEN-created PRs do not trigger CI. Use a PAT or app token for that.
-                  RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+                  # App-token-created PRs trigger CI; GITHUB_TOKEN-created PRs do not.
+                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
               run: pnpm --package=release-please@17.11.2 dlx -c 'node scripts/release.mjs "$(command -v release-please)"'
 
             - name: 📋 Find open release PRs to prepare
               id: release-prs
               env:
-                  GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
               run: |
                   prefix="release-please--branches--${DEFAULT_BRANCH}--components--"
@@ -450,18 +458,26 @@ jobs:
         timeout-minutes: 10
         runs-on: ubuntu-24.04
         permissions:
-            contents: write
+            contents: read
         strategy:
             fail-fast: false
             matrix:
                 pr: ${{ fromJSON(needs.release.outputs.prs) }}
         steps:
+            - name: 🔑 Create release PR token
+              id: app-token
+              uses: actions/create-github-app-token@v3.2.0
+              with:
+                  client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+                  permission-contents: write
+
             # Release Please rewrites each PR branch on updates. Prepare every returned PR.
             - name: 🕶️ Checkout release PR branch
               uses: actions/checkout@v7.0.1
               with:
                   ref: ${{ matrix.pr.headRefName }}
-                  token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+                  token: ${{ steps.app-token.outputs.token }}
 
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap

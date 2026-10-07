@@ -55,7 +55,7 @@ function run(args) {
                 env: {
                     ...process.env,
                     GITHUB_REPOSITORY: 'owner/repo',
-                    RELEASE_PLEASE_TOKEN: 'fixture',
+                    GITHUB_TOKEN: 'fixture',
                     GITHUB_OUTPUT: output,
                     CALLS_FILE: calls
                 }
