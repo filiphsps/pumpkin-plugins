@@ -51,6 +51,16 @@ describe('DH settings', () => {
         expect(settings.memory_cache_entries).toBe(-42);
         expect(settings.disk_cache_entries).toBe(-99);
     });
+    it('accepts the development server sample cap without falling back to the default', () => {
+        const files = new MemoryFiles(),
+            log = new MemoryLogger();
+        files.put('config.toml', '[support]\nblocks_per_tick = 32768\n');
+
+        const settings = readSettings(files, log);
+
+        expect(settings.blocks_per_tick).toBe(32768);
+        expect(log.of('warn')).toHaveLength(0);
+    });
     it('treats arbitrarily large negative TOML integers as unlimited', () => {
         const files = new MemoryFiles(),
             log = new MemoryLogger();

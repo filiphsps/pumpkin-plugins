@@ -43,10 +43,11 @@ export const schema = defineConfig(PLUGIN_NAME, {
                 max: 128
             }),
             blocks_per_tick: int({
-                description: 'Maximum block samples per server tick across all LOD requests.',
+                description:
+                    'Maximum block samples per server tick across all LOD requests. Actual work adapts to server MSPT.',
                 default: 8192,
                 min: 64,
-                max: 16384
+                max: 32768
             }),
             packets_per_tick: int({
                 description: 'Maximum transfer packets for newly captured LODs per server tick across all players.',

@@ -1,5 +1,5 @@
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
-import type { TerrainAccess } from '@pumpkin-plugins/terrain';
+import { AdaptiveWorkBudget, type TerrainAccess, type TerrainSource } from '@pumpkin-plugins/terrain';
 import type { Settings } from './config/schema.ts';
 import { LodBuilder } from './lod/builder.ts';
 import type { CachedLod, LodCache } from './lod/cache.ts';
@@ -61,17 +61,21 @@ export class Sessions {
     private readonly clients = new Map<string, Client>();
     private readonly requests: Request[] = [];
     private readonly revisions = new Map<string, number>();
+    private readonly workBudget = new AdaptiveWorkBudget({ initialUnits: 8192 });
     private buffer = 1;
     private ticks = 0;
     private served = 0;
     private rejected = 0;
     private cancelled = 0;
     private lastFailure = '';
+    private lastBlocksBudget = 0;
+    private lastServerMspt = 0;
     constructor(
         private readonly settings: Settings,
         private readonly cache: LodCache,
         private readonly log: Logger,
-        private readonly now = Date.now
+        private readonly now = Date.now,
+        private readonly measureNow = Date.now
     ) {}
     /** Accepts and validates a DH packet from a Java player. */
     receive(peer: Peer, bytes: Uint8Array): void {
@@ -138,7 +142,7 @@ export class Sessions {
         });
     }
     /** Advances sampling and transfers within global per-tick budgets. */
-    tick(peers: Peers): void {
+    tick(peers: Peers, serverMspt = 0): void {
         this.ticks++;
         for (const [name, client] of this.clients) {
             if (
@@ -150,6 +154,9 @@ export class Sessions {
         }
         let cacheChecks = 0;
         let builderStepped = false;
+        const blocksBudget = this.workBudget.next(serverMspt, this.settings.blocks_per_tick);
+        this.lastBlocksBudget = blocksBudget;
+        this.lastServerMspt = serverMspt;
         let cachedQueued = [...this.clients.values()].reduce(
             (sum, client) => sum + client.packets.filter((packet) => packet.cached).length,
             0
@@ -185,7 +192,7 @@ export class Sessions {
                         }
                         request.fallback = cached;
                     }
-                    if (builderStepped) return;
+                    if (builderStepped || blocksBudget === 0) return;
                     builderStepped = true;
                     const region = {
                         originX: request.section.x * SECTION_SIZE_BLOCKS,
@@ -199,14 +206,21 @@ export class Sessions {
                     if (prepared?.status === 'pending') return;
                     if (prepared && prepared.status !== 'ready') throw new Error(prepared.reason);
                     request.builder ??= new LodBuilder(request.section, peer.terrain.minY, peer.terrain.height);
-                    if (request.builder.step(peer.terrain, this.settings.blocks_per_tick)) {
+                    const measured = measureTerrainSource(peer.terrain);
+                    const started = this.measureNow();
+                    const complete = request.builder.step(measured.source, blocksBudget);
+                    if (complete) {
                         const stillLoaded = peer.terrain.prepare?.(region);
-                        if (stillLoaded?.status === 'pending') return;
+                        if (stillLoaded?.status === 'pending') {
+                            this.workBudget.observe(measured.samples(), this.measureNow() - started);
+                            return;
+                        }
                         if (stillLoaded && stillLoaded.status !== 'ready') throw new Error(stillLoaded.reason);
                         const captured = { updated: this.now(), data: request.builder.finish(this.now()) };
                         this.cache.put(request.key, captured);
                         this.complete(request, captured);
                     }
+                    this.workBudget.observe(measured.samples(), this.measureNow() - started);
                 } catch (err) {
                     if (request.fallback && (this.revisions.get(request.key) ?? 0) === request.revision)
                         cachedQueued += this.complete(request, request.fallback, true);
@@ -261,7 +275,8 @@ export class Sessions {
             ? ` Capturing ${request.level} ${request.section.x}, ${request.section.z}: ${(request.builder.progress() * 100).toFixed(1)}%.`
             : '';
         const packets = [...this.clients.values()].reduce((sum, client) => sum + client.packets.length, 0);
-        return `${this.clients.size} DH client(s), ${this.requests.length} pending LOD request(s). ${this.ticks} worker tick(s), ${this.served} served, ${this.rejected} rejected, ${this.cancelled} cancelled, ${packets} queued packet(s).${progress}${this.lastFailure ? ` Last rejection: ${this.lastFailure}.` : ''} Distant chunk generation is unavailable in the pinned Pumpkin API.`;
+        const budget = ` Capture budget ${this.lastBlocksBudget}/${this.settings.blocks_per_tick} block samples/tick at ${this.lastServerMspt.toFixed(1)} MSPT.`;
+        return `${this.clients.size} DH client(s), ${this.requests.length} pending LOD request(s). ${this.ticks} worker tick(s), ${this.served} served, ${this.rejected} rejected, ${this.cancelled} cancelled, ${packets} queued packet(s).${progress}${budget}${this.lastFailure ? ` Last rejection: ${this.lastFailure}.` : ''} Distant chunk generation is unavailable in the pinned Pumpkin API.`;
     }
     private announce(peer: Peer): void {
         this.left(peer.name);
@@ -333,6 +348,20 @@ export class Sessions {
             return { reason: 'LOD request limit reached', kind: 0 };
         return undefined;
     }
+}
+
+function measureTerrainSource(source: TerrainSource): { source: TerrainSource; samples: () => number } {
+    let samples = 0;
+    const measured: TerrainSource = {
+        minY: source.minY,
+        height: source.height,
+        sample: (x, y, z) => {
+            samples++;
+            return source.sample(x, y, z);
+        }
+    };
+    if (source.top) measured.top = source.top.bind(source);
+    return { source: measured, samples: () => samples };
 }
 /** Stable cache key scoped to the world name and signed section coordinates. */
 export function sectionKey(level: string, x: number, z: number): string {

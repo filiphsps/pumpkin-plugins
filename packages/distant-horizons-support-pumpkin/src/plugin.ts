@@ -49,7 +49,7 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
             sessions.left(event.player.getName())
         );
         this.registerEvent(ctx, 'server-tick-end-event', (server) =>
-            sessions.tick(serverPeers(server, settings, hostLogger))
+            sessions.tick(serverPeers(server, settings, hostLogger), server.getMspt())
         );
         this.registerEvent(ctx, 'block-place-event', (_server, event: BlockPlaceEventData) => {
             if (event.cancelled) return;

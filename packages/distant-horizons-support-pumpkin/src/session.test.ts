@@ -7,14 +7,14 @@ import { Reader } from './protocol/bytes.ts';
 import { packet } from './protocol/messages.ts';
 import { type Peer, Sessions } from './session.ts';
 
-function fixture() {
+function fixture(measureNow = () => 1000) {
     const files = new MemoryFiles(),
         log = new MemoryLogger();
     const settings = readSettings(files, log);
     settings.blocks_per_tick = 16384;
     settings.packets_per_tick = 16;
     const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries),
-        sessions = new Sessions(settings, cache, log, () => 1000);
+        sessions = new Sessions(settings, cache, log, () => 1000, measureNow);
     const sent: Uint8Array[] = [];
     let reads = 0;
     const peer: Peer = {
@@ -222,6 +222,36 @@ describe('DH sessions', () => {
         expect(f.sessions.status()).toContain('0 queued packet(s)');
         expect(f.files.list('cache')).toHaveLength(2);
         expect(f.ids().filter((id) => id === 8)).toHaveLength(2);
+    });
+    it('scales capture work with server MSPT and the measured cost of block samples', () => {
+        const times = [0, 5, 5, 10];
+        const f = fixture(() => times.shift() ?? 10);
+        f.settings.blocks_per_tick = 32768;
+        let reads = 0;
+        f.peer.terrain = {
+            minY: 0,
+            height: 10,
+            chunkLoader: unavailableChunkLoader,
+            terrainGenerator: unavailableTerrainGenerator,
+            sample: () => {
+                reads++;
+                return { material: 'minecraft:plains_DH-BSW_minecraft:stone', skyLight: 15, blockLight: 0 };
+            }
+        };
+        f.sessions.receive(f.peer, f.request());
+
+        f.sessions.tick(f.peers, 45);
+        expect(reads).toBe(0);
+        expect(f.sessions.status()).toContain('Capture budget 0/32768');
+
+        f.sessions.tick(f.peers, 0);
+        expect(reads).toBe(8192);
+        expect(f.sessions.status()).toContain('Capture budget 8192/32768');
+
+        f.sessions.tick(f.peers, 0);
+        expect(reads).toBe(40960);
+        expect(f.sessions.status()).toContain('1 served');
+        expect(f.sessions.status()).toContain('Capture budget 32768/32768');
     });
     it('captures loaded terrain, sends split data and reuses the persisted capture', () => {
         const f = fixture();
