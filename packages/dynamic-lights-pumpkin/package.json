@@ -1,6 +1,6 @@
 {
     "name": "@pumpkin-plugins/dynamic-lights-pumpkin",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "private": true,
     "description": "Server-side dynamic lights for held light sources",
     "license": "MIT",
