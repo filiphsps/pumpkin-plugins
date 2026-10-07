@@ -13,7 +13,7 @@ import { schema } from '../config/schema.ts';
 import { serverPeers, withPlayer } from './peers.ts';
 
 describe('Pumpkin terrain adapter', () => {
-    it('reads negative coordinates locally and disposes chunk, border, world and client handles', () => {
+    it('reads negative coordinates through world accessors and releases world handles', () => {
         const values = defaultValues(schema),
             settings = { ...values.support, worlds: values.worlds };
         state.lookup.mockReturnValueOnce({
@@ -24,11 +24,21 @@ describe('Pumpkin terrain adapter', () => {
             ]
         });
         const chunk = {
-            getBlockStateId: vi.fn(() => 1),
-            getBiome: vi.fn(() => 'old-growth-pine-taiga'),
-            getTopBlockY: vi.fn(() => 64),
-            getSkyLight: () => 15,
-            getBlockLight: () => 0,
+            getBlockStateId: vi.fn(() => {
+                throw new Error('Chunk unloaded');
+            }),
+            getBiome: vi.fn(() => {
+                throw new Error('Chunk unloaded');
+            }),
+            getTopBlockY: vi.fn(() => {
+                throw new Error('Chunk unloaded');
+            }),
+            getSkyLight: vi.fn(() => {
+                throw new Error('Chunk unloaded');
+            }),
+            getBlockLight: vi.fn(() => {
+                throw new Error('Chunk unloaded');
+            }),
             [Symbol.dispose]: vi.fn()
         };
         const border = { getCenterX: () => 0.5, getCenterZ: () => 0, getSize: () => 10, [Symbol.dispose]: vi.fn() };
@@ -37,6 +47,11 @@ describe('Pumpkin terrain adapter', () => {
             getDimension: () => 'minecraft:overworld',
             getMinY: () => -64,
             getWorldBorder: () => border,
+            getBlockStateId: vi.fn(() => 1),
+            getBiome: vi.fn(() => 'old-growth-pine-taiga'),
+            getTopBlockY: vi.fn(() => 80),
+            getSkyLight: vi.fn(() => 15),
+            getBlockLight: vi.fn(() => 0),
             getChunk: vi.fn(() => chunk),
             [Symbol.dispose]: vi.fn()
         };
@@ -56,14 +71,23 @@ describe('Pumpkin terrain adapter', () => {
                 expect(peer.terrain.sample(-1, 64, -17).material).toBe(
                     'minecraft:old_growth_pine_taiga_DH-BSW_minecraft:oak_log_STATE_{axis:y}{waterlogged:false}'
                 );
-                expect(world.getChunk).toHaveBeenCalledWith(-1, -2);
-                expect(chunk.getBlockStateId).toHaveBeenCalledWith({ x: 15, y: 64, z: 15 });
-                expect(peer.terrain.top?.(-1, -17)).toBe(64);
-                expect(chunk.getTopBlockY).toHaveBeenLastCalledWith(15, 15);
+                expect(world.getBlockStateId).toHaveBeenCalledWith({ x: -1, y: 64, z: -17 });
+                expect(world.getBiome).toHaveBeenCalledWith({ x: -1, y: 80, z: -17 });
+                expect(world.getSkyLight).toHaveBeenCalledWith({ x: -1, y: 65, z: -17 });
+                expect(world.getBlockLight).toHaveBeenCalledWith({ x: -1, y: 65, z: -17 });
+                expect(peer.terrain.top?.(-1, -17)).toBe(80);
+                expect(world.getTopBlockY).toHaveBeenNthCalledWith(1, -1, -17);
+                expect(world.getTopBlockY).toHaveBeenNthCalledWith(2, -1, -17);
+                expect(world.getChunk).not.toHaveBeenCalled();
+                expect(chunk.getBlockStateId).not.toHaveBeenCalled();
+                expect(chunk.getBiome).not.toHaveBeenCalled();
+                expect(chunk.getSkyLight).not.toHaveBeenCalled();
+                expect(chunk.getBlockLight).not.toHaveBeenCalled();
+                expect(chunk.getTopBlockY).not.toHaveBeenCalled();
                 throw new Error('callback failure');
             })
         ).toThrow('callback failure');
-        for (const handle of [chunk, border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
+        for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
     });
     it('checks all chunks before block reads and releases acquired chunks when the last one is missing', () => {
         const values = defaultValues(schema);

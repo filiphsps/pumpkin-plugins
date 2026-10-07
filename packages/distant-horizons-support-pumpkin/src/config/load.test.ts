@@ -8,7 +8,7 @@ describe('DH settings', () => {
             log = new MemoryLogger();
         const initial = readSettings(files, log);
         expect(initial.render_distance).toBe(128);
-        expect(initial.blocks_per_tick).toBe(2048);
+        expect(initial.blocks_per_tick).toBe(8192);
         expect(initial.cached_requests_per_tick).toBe(8);
         expect(initial.cached_packets_per_tick).toBe(64);
         expect(initial.memory_cache_entries).toBe(128);
@@ -23,7 +23,7 @@ describe('DH settings', () => {
         expect(settings.render_distance).toBe(256);
         expect(settings.server_key).toBe('my-server');
         expect(settings.worlds.custom?.height).toBe(512);
-        expect(files.text('config.toml')).toContain('blocks_per_tick = 2048');
+        expect(files.text('config.toml')).toContain('blocks_per_tick = 8192');
         expect(files.text('config.toml')).toContain('cached_requests_per_tick = 8');
         expect(files.text('config.toml')).toContain('cached_packets_per_tick = 64');
     });

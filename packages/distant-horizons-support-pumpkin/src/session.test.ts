@@ -90,9 +90,41 @@ describe('DH sessions', () => {
         expect(f.sessions.status()).toContain('1 pending');
 
         f.sessions.tick(f.peers);
-        expect(attempts).toBe(2);
+        expect(attempts).toBe(3);
         expect(f.reads()).toBe(4096);
         expect(f.sessions.status()).toContain('1 served');
+    });
+    it('rechecks loaded chunks before continuing a capture on the next tick', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 64;
+        let attempts = 0;
+        f.peer.terrain.prepare = () =>
+            ++attempts === 1 ? { status: 'ready' } : { status: 'unavailable', reason: 'Chunk unloaded' };
+
+        f.sessions.receive(f.peer, f.request());
+        f.sessions.tick(f.peers);
+        expect(f.reads()).toBe(64);
+        expect(f.sessions.status()).toContain('1 pending');
+
+        f.sessions.tick(f.peers);
+        expect(attempts).toBe(2);
+        expect(f.reads()).toBe(64);
+        expect(f.sessions.status()).toContain('0 pending');
+        expect(f.sessions.status()).toContain('1 rejected');
+    });
+    it('rechecks loaded chunks before serving a completed capture', () => {
+        const f = fixture();
+        let attempts = 0;
+        f.peer.terrain.prepare = () =>
+            ++attempts === 1 ? { status: 'ready' } : { status: 'unavailable', reason: 'Chunk unloaded' };
+
+        f.sessions.receive(f.peer, f.request());
+        f.sessions.tick(f.peers);
+
+        expect(attempts).toBe(2);
+        expect(f.reads()).toBe(4096);
+        expect(f.sessions.status()).toContain('0 pending');
+        expect(f.sessions.status()).toContain('0 served, 1 rejected');
     });
     it('shows capture progress and distinguishes cancellations from completed work', () => {
         const f = fixture();

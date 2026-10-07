@@ -184,24 +184,25 @@ export class Sessions {
                             return;
                         }
                         request.fallback = cached;
-                        if (builderStepped) return;
-                        builderStepped = true;
-                        const prepared = peer.terrain.prepare?.({
-                            originX: request.section.x * SECTION_SIZE_BLOCKS,
-                            originZ: request.section.z * SECTION_SIZE_BLOCKS,
-                            width: SECTION_SIZE_BLOCKS,
-                            depth: SECTION_SIZE_BLOCKS,
-                            minY: peer.terrain.minY,
-                            height: peer.terrain.height
-                        });
-                        if (prepared?.status === 'pending') return;
-                        if (prepared && prepared.status !== 'ready') throw new Error(prepared.reason);
-                        request.builder = new LodBuilder(request.section, peer.terrain.minY, peer.terrain.height);
-                    } else {
-                        if (builderStepped) return;
-                        builderStepped = true;
                     }
+                    if (builderStepped) return;
+                    builderStepped = true;
+                    const region = {
+                        originX: request.section.x * SECTION_SIZE_BLOCKS,
+                        originZ: request.section.z * SECTION_SIZE_BLOCKS,
+                        width: SECTION_SIZE_BLOCKS,
+                        depth: SECTION_SIZE_BLOCKS,
+                        minY: peer.terrain.minY,
+                        height: peer.terrain.height
+                    };
+                    const prepared = peer.terrain.prepare?.(region);
+                    if (prepared?.status === 'pending') return;
+                    if (prepared && prepared.status !== 'ready') throw new Error(prepared.reason);
+                    request.builder ??= new LodBuilder(request.section, peer.terrain.minY, peer.terrain.height);
                     if (request.builder.step(peer.terrain, this.settings.blocks_per_tick)) {
+                        const stillLoaded = peer.terrain.prepare?.(region);
+                        if (stillLoaded?.status === 'pending') return;
+                        if (stillLoaded && stillLoaded.status !== 'ready') throw new Error(stillLoaded.reason);
                         const captured = { updated: this.now(), data: request.builder.finish(this.now()) };
                         this.cache.put(request.key, captured);
                         this.complete(request, captured);

@@ -44,7 +44,7 @@ export const schema = defineConfig(PLUGIN_NAME, {
             }),
             blocks_per_tick: int({
                 description: 'Maximum block samples per server tick across all LOD requests.',
-                default: 2048,
+                default: 8192,
                 min: 64,
                 max: 16384
             }),

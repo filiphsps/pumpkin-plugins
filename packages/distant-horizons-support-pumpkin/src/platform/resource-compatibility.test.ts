@@ -17,13 +17,12 @@ describe('QuickJS resource compatibility', () => {
             getDimension: () => 'minecraft:overworld',
             getMinY: () => -64,
             getWorldBorder: () => ({ getCenterX: () => 0, getCenterZ: () => 0, getSize: () => 60000000 }),
-            getChunk: () => ({
-                getBlockStateId: () => 1,
-                getBiome: () => 'plains',
-                getTopBlockY: () => 64,
-                getSkyLight: () => 15,
-                getBlockLight: () => 0
-            })
+            getBlockStateId: () => 1,
+            getBiome: () => 'plains',
+            getTopBlockY: () => 64,
+            getSkyLight: () => 15,
+            getBlockLight: () => 0,
+            getChunk: () => ({})
         };
         const player = {
             asJava: () => java,
@@ -33,6 +32,16 @@ describe('QuickJS resource compatibility', () => {
         } as unknown as Player;
         expect(
             withPlayer(player, { ...values.support, worlds: values.worlds }, (peer) => {
+                expect(
+                    peer.terrain.prepare?.({
+                        originX: 0,
+                        originZ: 0,
+                        width: 64,
+                        depth: 64,
+                        minY: -64,
+                        height: 384
+                    })
+                ).toEqual({ status: 'ready' });
                 expect(peer.terrain.sample(0, 64, 0).skyLight).toBe(15);
                 peer.send(new Uint8Array([1]));
             })

@@ -1,6 +1,6 @@
 import type { Player } from 'pumpkin:plugin/player@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
-import { blockStateToInfo, type Chunk } from 'pumpkin:plugin/world@0.1.0';
+import { blockStateToInfo } from 'pumpkin:plugin/world@0.1.0';
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import {
@@ -22,7 +22,6 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
     const java = player.asJava();
     if (!java) return false;
     let world: ReturnType<typeof player.getWorld> | undefined;
-    const chunks = new Map<string, Chunk>();
     const chunkLoader = unavailableChunkLoader;
     const terrainGenerator = unavailableTerrainGenerator;
     let border: ReturnType<NonNullable<typeof world>['getWorldBorder']> | undefined;
@@ -61,8 +60,6 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                 const lastChunkZ = Math.floor((region.originZ + region.depth - 1) / CHUNK_SIZE_BLOCKS);
                 for (let x = firstChunkX; x <= lastChunkX; x++) {
                     for (let z = firstChunkZ; z <= lastChunkZ; z++) {
-                        const key = `${x}:${z}`;
-                        if (chunks.has(key)) continue;
                         const result = acquireChunk(
                             { x, z },
                             () => terrainWorld.getChunk(x, z),
@@ -70,7 +67,7 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                             terrainGenerator
                         );
                         if (result.status === 'ready') {
-                            chunks.set(key, result.chunk);
+                            disposeWasiResource(result.chunk);
                             continue;
                         }
                         if (result.status === 'pending') return result;
@@ -82,32 +79,14 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                 }
                 return { status: 'ready' };
             },
-            top: (x, z) => {
-                const chunkX = Math.floor(x / CHUNK_SIZE_BLOCKS),
-                    chunkZ = Math.floor(z / CHUNK_SIZE_BLOCKS);
-                const chunk = chunks.get(`${chunkX}:${chunkZ}`);
-                if (!chunk) throw new Error('Terrain was not prepared');
-                return chunk.getTopBlockY(x - chunkX * CHUNK_SIZE_BLOCKS, z - chunkZ * CHUNK_SIZE_BLOCKS);
-            },
+            top: (x, z) => terrainWorld.getTopBlockY(x, z),
             sample: (x, y, z) => {
-                const chunkX = Math.floor(x / CHUNK_SIZE_BLOCKS),
-                    chunkZ = Math.floor(z / CHUNK_SIZE_BLOCKS),
-                    key = `${chunkX}:${chunkZ}`;
-                let chunk = chunks.get(key);
-                if (!chunk) {
-                    chunk = terrainWorld.getChunk(chunkX, chunkZ);
-                    if (!chunk) throw new Error('Chunk is not loaded');
-                    chunks.set(key, chunk);
-                }
-                const pos = {
-                        x: x - chunkX * CHUNK_SIZE_BLOCKS,
-                        y,
-                        z: z - chunkZ * CHUNK_SIZE_BLOCKS
-                    },
+                const pos = { x, y, z },
                     column = `${x}:${z}`;
-                const id = chunk.getBlockStateId(pos);
+                const id = terrainWorld.getBlockStateId(pos);
                 if (column !== lastColumn) {
-                    biome = `minecraft:${chunk.getBiome({ ...pos, y: Math.max(minY, Math.min(minY + height - 1, chunk.getTopBlockY(pos.x, pos.z))) }).replaceAll('-', '_')}`;
+                    const topY = Math.max(minY, Math.min(minY + height - 1, terrainWorld.getTopBlockY(x, z)));
+                    biome = `minecraft:${terrainWorld.getBiome({ ...pos, y: topY }).replaceAll('-', '_')}`;
                     lastId = -1;
                     lastColumn = column;
                 }
@@ -119,12 +98,12 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                     .map(([k, v]) => `{${k}:${v}}`)
                     .join('');
                 const material = `${biome}_DH-BSW_${state.name}${properties ? `_STATE_${properties}` : ''}`;
-                const lightPos = { ...pos, y: Math.min(minY + height - 1, y + 1) };
+                const lightPos = { x, y: Math.min(minY + height - 1, y + 1), z };
                 lastId = id;
                 lastSample = {
                     material,
-                    skyLight: chunk.getSkyLight(lightPos),
-                    blockLight: chunk.getBlockLight(lightPos)
+                    skyLight: terrainWorld.getSkyLight(lightPos),
+                    blockLight: terrainWorld.getBlockLight(lightPos)
                 };
                 return lastSample;
             }
@@ -141,7 +120,6 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
         });
         return true;
     } finally {
-        for (const chunk of chunks.values()) disposeWasiResource(chunk);
         disposeWasiResource(border);
         disposeWasiResource(world);
         disposeWasiResource(java);

@@ -33,7 +33,7 @@ export const info = {
         terrain: [
             `The plugin builds LOD sections covering ${SECTION_SIZE_BLOCKS} × ${SECTION_SIZE_BLOCKS} blocks`,
             `across ${SECTION_CHUNK_COUNT} server chunks.`,
-            `All ${SECTION_CHUNK_COUNT} chunks must already be loaded by Pumpkin before a capture can start.`,
+            `All ${SECTION_CHUNK_COUNT} chunks must remain loaded by Pumpkin while a capture progresses.`,
             'The plugin cannot load or generate distant chunks.',
             `Captures are limited to ${MAX_POINTS_PER_SECTION} material segments per section,`,
             `and transfer packets carry at most ${TRANSFER_PACKET_BYTES} bytes.`
