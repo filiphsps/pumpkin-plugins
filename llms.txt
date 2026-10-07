@@ -49,6 +49,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [@pumpkin-plugins/plugin-kit](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/plugin-kit/README.md): Host helpers shared by plugins
 - [@pumpkin-plugins/port-mapping](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/port-mapping/README.md): UPnP and NAT-PMP port mapping
 - [@pumpkin-plugins/signing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/README.md): Ed25519 signing for plugin builds
+- [@pumpkin-plugins/terrain](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/README.md): Shared terrain capture and access contracts
 - [@pumpkin-plugins/test-harness](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/test-harness/README.md): Runs plugins on a real Pumpkin in vitest
 - [@pumpkin-plugins/update-check](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/update-check/README.md): Check plugin versions against Pumpkin Market
 - [@pumpkin-plugins/upnpumpkin-api](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/upnpumpkin-api/README.md): Asks UPnPumpkin to open a port
@@ -78,6 +79,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [@pumpkin-plugins/plugin-kit API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/plugin-kit/): Host helpers shared by plugins
 - [@pumpkin-plugins/port-mapping API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/port-mapping/): UPnP and NAT-PMP port mapping
 - [@pumpkin-plugins/signing API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/signing/): Ed25519 signing for plugin builds
+- [@pumpkin-plugins/terrain API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/terrain/): Shared terrain capture and access contracts
 - [@pumpkin-plugins/test-harness API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/test-harness/): Runs plugins on a real Pumpkin in vitest
 - [@pumpkin-plugins/update-check API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/update-check/): Check plugin versions against Pumpkin Market
 - [@pumpkin-plugins/upnpumpkin-api API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/upnpumpkin-api/): Asks UPnPumpkin to open a port
