@@ -1,6 +1,6 @@
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { unavailableChunkLoader, unavailableTerrainGenerator } from '@pumpkin-plugins/terrain';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readSettings } from './config/load.ts';
 import { LodCache } from './lod/cache.ts';
 import { Reader } from './protocol/bytes.ts';
@@ -1020,7 +1020,10 @@ describe('DH sessions', () => {
         f.sessions.tick(f.peers);
         expect(f.reads()).toBe(64);
         expect(f.sent).toHaveLength(0);
-        f.sessions.changed('world', 0, 0);
+        f.sessions.changedMany('world', [
+            { x: 0, z: 0 },
+            { x: 63, z: 63 }
+        ]);
         f.sessions.tick(f.peers);
         expect(f.ids()).toEqual([6]);
         expect(f.files.list('cache')).toHaveLength(0);
@@ -1035,6 +1038,22 @@ describe('DH sessions', () => {
         expect(f.sessions.status()).toContain('1 pending LOD request(s)');
         for (let tick = 0; tick < 4; tick++) f.sessions.tick(f.peers);
         expect(f.sessions.status()).toContain('2 served');
+    });
+    it('deduplicates bulk mutations by LOD section and preserves neighboring cache entries', () => {
+        const f = fixture();
+        f.cache.put('world:0:0', { updated: 1, data: new Uint8Array(64).fill(1) });
+        f.cache.put('world:1:0', { updated: 1, data: new Uint8Array(64).fill(2) });
+        const changed = vi.spyOn(f.sessions, 'changed');
+
+        f.sessions.changedMany('world', [
+            { x: 0, z: 0 },
+            { x: 63, z: 63 },
+            { x: 24, z: 32 }
+        ]);
+
+        expect(changed).toHaveBeenCalledOnce();
+        expect(f.cache.has('world:0:0')).toBe(false);
+        expect(f.cache.has('world:1:0')).toBe(true);
     });
     it('resets pending requests on a world change and closes malformed sessions', () => {
         const f = fixture();

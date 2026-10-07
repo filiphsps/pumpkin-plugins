@@ -2,7 +2,9 @@ import type { CommandSender, ConsumedArgs } from 'pumpkin:plugin/command@0.1.0';
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type {
     BlockBreakEventData,
+    BlockGrowEventData,
     BlockPlaceEventData,
+    BlockSpreadEventData,
     PlayerCustomPayloadEventData,
     PlayerLeaveEventData
 } from 'pumpkin:plugin/event@0.1.0';
@@ -20,6 +22,7 @@ import { info } from './info.ts';
 import { LodCache } from './lod/cache.ts';
 import { PLUGIN_NAME } from './name.ts';
 import { serverPeers, withPlayer } from './platform/peers.ts';
+import { invalidateBlockGrow, invalidateBlockSpread } from './platform/world-mutations.ts';
 import { CHANNEL, PROTOCOL } from './protocol/messages.ts';
 import { Sessions } from './session.ts';
 
@@ -69,6 +72,12 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
                 disposeWasiResource(world);
             }
         });
+        this.registerEvent(ctx, 'block-grow-event', (_server, event: BlockGrowEventData) =>
+            invalidateBlockGrow(sessions, event)
+        );
+        this.registerEvent(ctx, 'block-spread-event', (_server, event: BlockSpreadEventData) =>
+            invalidateBlockSpread(sessions, event)
+        );
         hostLogger.info(
             `${PLUGIN_NAME}: serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain. Distant chunk generation is unavailable; see the plugin README TODO.`
         );

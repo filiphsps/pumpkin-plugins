@@ -451,6 +451,20 @@ export class Sessions {
         if (this.requests.some((request) => request.key === key) || this.refreshes.has(key))
             this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
     }
+    /** Invalidates each affected LOD section once for a bulk world mutation. */
+    changedMany(level: string, positions: readonly { x: number; z: number }[]): void {
+        const changedSections = new Set<string>();
+        for (const position of positions) {
+            const key = sectionKey(
+                level,
+                Math.floor(position.x / SECTION_SIZE_BLOCKS),
+                Math.floor(position.z / SECTION_SIZE_BLOCKS)
+            );
+            if (changedSections.has(key)) continue;
+            changedSections.add(key);
+            this.changed(level, position.x, position.z);
+        }
+    }
     private removeClient(name: string): void {
         this.clients.delete(name);
         this.cancelRequests(name);
