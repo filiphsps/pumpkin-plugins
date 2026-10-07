@@ -68,7 +68,7 @@ Settings live in `plugins/data/DistantHorizonsSupportPumpkin/config.toml`. The p
 | `support.packets_per_tick` | integer | `2` | Maximum transfer packets for newly captured LODs per server tick across all players. |
 | `support.cached_requests_per_tick` | integer | `8` | Maximum cached LOD requests checked per server tick across all players. |
 | `support.cached_packets_per_tick` | integer | `64` | Maximum transfer packets for cached LODs per server tick across all players. |
-| `support.memory_cache_entries` | integer | `128` | Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited. |
+| `support.memory_cache_entries` | integer | `512` | Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited. |
 | `support.disk_cache_entries` | integer | `4096` | Maximum LOD sections cached on disk. Set to 0 to disable; any negative value means unlimited. |
 | `support.refresh_seconds` | integer | `30` | Rebuild cached sections after this age when all their chunks are loaded. |
 | `worlds."<world>".height` | integer | none | World height in blocks above its minimum Y. |
@@ -114,7 +114,7 @@ cached_requests_per_tick = 8
 cached_packets_per_tick = 64
 
 # Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited.
-memory_cache_entries = 128
+memory_cache_entries = 512
 
 # Maximum LOD sections cached on disk. Set to 0 to disable; any negative value means unlimited.
 disk_cache_entries = 4096

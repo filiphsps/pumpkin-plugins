@@ -28,7 +28,7 @@ describe(info.name, () => {
         expect(config).toContain('blocks_per_tick = 8192');
         expect(config).toContain('cached_requests_per_tick = 8');
         expect(config).toContain('cached_packets_per_tick = 64');
-        expect(config).toContain('memory_cache_entries = 128');
+        expect(config).toContain('memory_cache_entries = 512');
         expect(config).toContain('disk_cache_entries = 4096');
         const statusFrom = server.lines.length;
         server.command('dhs status');
@@ -46,7 +46,7 @@ describe(info.name, () => {
         expect(budget).toMatch(/Capture budget \d+\/8192 block samples\/tick at \d+(?:\.\d+)? MSPT/);
         const cacheStatusFrom = server.lines.length;
         server.command('dhs cache status');
-        await server.waitForLog(/Memory cache: 0\/128 entries/, 5000, cacheStatusFrom);
+        await server.waitForLog(/Memory cache: 0\/512 entries/, 5000, cacheStatusFrom);
         await server.waitForLog(/Disk cache: 0\/4096 entries/, 5000, cacheStatusFrom);
         const cacheClearFrom = server.lines.length;
         server.command('dhs cache clear');

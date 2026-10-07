@@ -46,42 +46,42 @@ export const schema = defineConfig(PLUGIN_NAME, {
                 description: 'Maximum pending requests per player.',
                 default: 2,
                 min: 1,
-                max: 8
+                max: 16
             }),
             pending_requests: int({
                 description: 'Maximum pending requests across all players.',
                 default: 16,
                 min: 1,
-                max: 128
+                max: 1024
             }),
             blocks_per_tick: int({
                 description:
                     'Maximum block samples per server tick across all LOD requests. Actual work adapts to server MSPT.',
                 default: 8192,
                 min: 64,
-                max: 32768
+                max: 196_608
             }),
             packets_per_tick: int({
                 description: 'Maximum transfer packets for newly captured LODs per server tick across all players.',
                 default: 2,
                 min: 1,
-                max: 16
+                max: 1024
             }),
             cached_requests_per_tick: int({
                 description: 'Maximum cached LOD requests checked per server tick across all players.',
                 default: 8,
                 min: 1,
-                max: 32
+                max: 2048
             }),
             cached_packets_per_tick: int({
                 description: 'Maximum transfer packets for cached LODs per server tick across all players.',
                 default: 64,
                 min: 1,
-                max: 256
+                max: 16_384
             }),
             memory_cache_entries: cacheLimit(
                 'Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited.',
-                128
+                512
             ),
             disk_cache_entries: cacheLimit(
                 'Maximum LOD sections cached on disk. Set to 0 to disable; any negative value means unlimited.',

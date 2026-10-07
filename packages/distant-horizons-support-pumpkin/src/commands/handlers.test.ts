@@ -93,7 +93,7 @@ describe('the /dhs commands', () => {
     it('reports both cache tiers and their configured limits', () => {
         const { host, root } = setup();
         expect(host.run(root, ['dhs', 'cache', 'status'])).toEqual([
-            'Memory cache: 1/128 entries, 100 bytes.',
+            'Memory cache: 1/512 entries, 100 bytes.',
             'Disk cache: 1/4096 entries, 127 bytes.'
         ]);
     });

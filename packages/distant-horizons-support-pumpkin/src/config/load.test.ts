@@ -13,7 +13,7 @@ describe('DH settings', () => {
         expect(initial.blocks_per_tick).toBe(8192);
         expect(initial.cached_requests_per_tick).toBe(8);
         expect(initial.cached_packets_per_tick).toBe(64);
-        expect(initial.memory_cache_entries).toBe(128);
+        expect(initial.memory_cache_entries).toBe(512);
         expect(initial.disk_cache_entries).toBe(4096);
         expect(files.text('config.toml')).toContain('cached_requests_per_tick = 8');
         expect(files.text('config.toml')).toContain('cached_packets_per_tick = 64');
@@ -66,10 +66,7 @@ describe('DH settings', () => {
     it('accepts separate DH request rates', () => {
         const files = new MemoryFiles(),
             log = new MemoryLogger();
-        files.put(
-            'config.toml',
-            '[support]\ngeneration_requests_per_second = 100\nsync_requests_per_second = 100\n'
-        );
+        files.put('config.toml', '[support]\ngeneration_requests_per_second = 100\nsync_requests_per_second = 100\n');
 
         const settings = readSettings(files, log);
 
