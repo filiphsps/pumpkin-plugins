@@ -36,3 +36,8 @@ export function listLodSectionsAround(
     }
     return sections;
 }
+
+/** Stable cache key scoped to the world name and signed section coordinates. */
+export function sectionKey(level: string, x: number, z: number): string {
+    return `${level}:${x}:${z}`;
+}
