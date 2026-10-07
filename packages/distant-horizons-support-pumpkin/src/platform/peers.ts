@@ -47,13 +47,29 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
             borderZ = border.getCenterZ(),
             radius = border.getSize() / 2;
         let lastColumn = '',
+            columnTopY: number | undefined,
             lastId = -1,
             lastSample: TerrainSample | undefined,
             lastBiome = '',
-            surfaceBiome = '';
+            surfaceBiome: string | undefined;
         const sampleBiomes3d = settings.worlds[level]?.sample_biomes_3d === true;
         const biomeName = (x: number, y: number, z: number) =>
             `minecraft:${terrainWorld.getBiome({ x, y, z }).replaceAll('-', '_')}`;
+        const enterColumn = (x: number, z: number) => {
+            const column = `${x}:${z}`;
+            if (column === lastColumn) return;
+            lastColumn = column;
+            columnTopY = undefined;
+            surfaceBiome = undefined;
+            lastId = -1;
+            lastBiome = '';
+            lastSample = undefined;
+        };
+        const topBlockY = (x: number, z: number) => {
+            enterColumn(x, z);
+            if (columnTopY === undefined) columnTopY = terrainWorld.getTopBlockY(x, z);
+            return columnTopY;
+        };
         const terrain: TerrainAccess = {
             minY,
             height,
@@ -89,25 +105,21 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                 }
                 return { status: 'ready' };
             },
-            top: (x, z) => terrainWorld.getTopBlockY(x, z),
+            top: topBlockY,
             sample: (x, y, z) => {
-                const pos = { x, y, z },
-                    column = `${x}:${z}`;
+                const pos = { x, y, z };
                 const id = terrainWorld.getBlockStateId(pos);
-                if (column !== lastColumn) {
-                    if (!sampleBiomes3d) {
-                        const topY = Math.max(
-                            minY,
-                            Math.min(minY + height - 1, terrainWorld.getTopBlockY(x, z))
-                        );
+                enterColumn(x, z);
+                let biome: string;
+                if (sampleBiomes3d) {
+                    biome = biomeName(x, y, z);
+                } else {
+                    if (surfaceBiome === undefined) {
+                        const topY = Math.max(minY, Math.min(minY + height - 1, topBlockY(x, z)));
                         surfaceBiome = biomeName(x, topY, z);
                     }
-                    lastColumn = column;
-                    lastId = -1;
-                    lastBiome = '';
-                    lastSample = undefined;
+                    biome = surfaceBiome;
                 }
-                const biome = sampleBiomes3d ? biomeName(x, y, z) : surfaceBiome;
                 if (id === lastId && biome === lastBiome && lastSample) return lastSample;
                 const state = blockStateToInfo(id);
                 if (!state) throw new Error('Unknown block state');

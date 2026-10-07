@@ -1,5 +1,6 @@
 import { defaultValues } from '@pumpkin-plugins/config';
 import { MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
+import { TerrainCapture } from '@pumpkin-plugins/terrain';
 import { describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
@@ -108,8 +109,7 @@ describe('Pumpkin terrain adapter', () => {
                 expect(world.getSkyLight).toHaveBeenCalledWith({ x: -1, y: 65, z: -17 });
                 expect(world.getBlockLight).toHaveBeenCalledWith({ x: -1, y: 65, z: -17 });
                 expect(peer.terrain.top?.(-1, -17)).toBe(80);
-                expect(world.getTopBlockY).toHaveBeenNthCalledWith(1, -1, -17);
-                expect(world.getTopBlockY).toHaveBeenNthCalledWith(2, -1, -17);
+                expect(world.getTopBlockY).toHaveBeenCalledOnce();
                 expect(world.getChunk).not.toHaveBeenCalled();
                 expect(chunk.getBlockStateId).not.toHaveBeenCalled();
                 expect(chunk.getBiome).not.toHaveBeenCalled();
@@ -161,6 +161,91 @@ describe('Pumpkin terrain adapter', () => {
         expect(getBiome).toHaveBeenNthCalledWith(1, { x: 0, y: 64, z: 0 });
         expect(getBiome).toHaveBeenNthCalledWith(2, { x: 0, y: 63, z: 0 });
         expect(getSkyLight).toHaveBeenCalledTimes(2);
+        for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
+    it('reuses one heightmap value per column and refreshes it when the column changes', () => {
+        const values = defaultValues(schema),
+            settings = { ...values.support, worlds: values.worlds };
+        const getTopBlockY = vi.fn().mockReturnValueOnce(80).mockReturnValueOnce(90);
+        const border = { getCenterX: () => 0, getCenterZ: () => 0, getSize: () => 100, [Symbol.dispose]: vi.fn() };
+        const world = {
+            getName: () => 'world',
+            getDimension: () => 'minecraft:overworld',
+            getMinY: () => 0,
+            getWorldBorder: () => border,
+            getBlockStateId: () => 1,
+            getBiome: () => 'plains',
+            getTopBlockY,
+            getSkyLight: () => 15,
+            getBlockLight: () => 0,
+            [Symbol.dispose]: vi.fn()
+        };
+        const java = { [Symbol.dispose]: vi.fn() };
+        const player = {
+            asJava: () => java,
+            getWorld: () => world,
+            getName: () => 'Alice',
+            getPosition: () => [0, 64, 0]
+        };
+
+        withPlayer(player as unknown as Player, settings, (peer) => {
+            peer.terrain.sample(0, 100, 0);
+            expect(peer.terrain.top?.(0, 0)).toBe(80);
+            peer.terrain.sample(1, 100, 0);
+            expect(peer.terrain.top?.(1, 0)).toBe(90);
+        });
+
+        expect(getTopBlockY).toHaveBeenNthCalledWith(1, 0, 0);
+        expect(getTopBlockY).toHaveBeenNthCalledWith(2, 1, 0);
+        expect(getTopBlockY).toHaveBeenCalledTimes(2);
+        for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
+    it('collapses empty air above the heightmap using the shared per-column lookup', () => {
+        const values = defaultValues(schema),
+            settings = {
+                ...values.support,
+                worlds: { world: { height: 20, sample_biomes_3d: false } }
+            } as unknown as Settings;
+        state.lookup
+            .mockReturnValueOnce({ name: 'minecraft:air', properties: [] })
+            .mockReturnValueOnce({ name: 'minecraft:stone', properties: [] });
+        const getTopBlockY = vi.fn(() => -8);
+        const border = { getCenterX: () => 0, getCenterZ: () => 0, getSize: () => 100, [Symbol.dispose]: vi.fn() };
+        const world = {
+            getName: () => 'world',
+            getDimension: () => 'minecraft:overworld',
+            getMinY: () => -10,
+            getWorldBorder: () => border,
+            getBlockStateId: (_pos: { y: number }) => (_pos.y > -8 ? 0 : 1),
+            getBiome: () => 'plains',
+            getTopBlockY,
+            getSkyLight: () => 15,
+            getBlockLight: () => 0,
+            [Symbol.dispose]: vi.fn()
+        };
+        const java = { [Symbol.dispose]: vi.fn() };
+        const player = {
+            asJava: () => java,
+            getWorld: () => world,
+            getName: () => 'Alice',
+            getPosition: () => [0, 64, 0]
+        };
+        let captured: ReturnType<TerrainCapture['result']> | undefined;
+
+        withPlayer(player as unknown as Player, settings, (peer) => {
+            const capture = new TerrainCapture(
+                { originX: 0, originZ: 0, width: 1, depth: 1, minY: -10, height: 20 },
+                { isEmpty: (material) => material.endsWith('_DH-BSW_minecraft:air') }
+            );
+            expect(capture.step(peer.terrain, 20)).toBe(true);
+            captured = capture.result();
+        });
+
+        expect(getTopBlockY).toHaveBeenCalledOnce();
+        expect(captured?.columns[0]).toEqual([
+            { materialId: 0, startY: 3, height: 17, skyLight: 15, blockLight: 0 },
+            { materialId: 1, startY: 0, height: 3, skyLight: 15, blockLight: 0 }
+        ]);
         for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
     });
     it('checks all chunks before block reads and releases acquired chunks when the last one is missing', () => {
