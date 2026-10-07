@@ -36,25 +36,25 @@ export type ChunkAcquisition<T> =
 /** Returns a loaded chunk or asks the configured providers to load or generate it. */
 export function acquireChunk<T>(
     position: ChunkPosition,
-    getLoadedChunk: () => T | undefined,
+    getLoadedChunk: () => T | null | undefined,
     loader: ChunkLoader,
     generator: TerrainGenerator
-): ChunkAcquisition<T> {
+): ChunkAcquisition<NonNullable<T>> {
     const loaded = getLoadedChunk();
-    if (loaded !== undefined) return { status: 'ready', chunk: loaded };
+    if (loaded !== undefined && loaded !== null) return { status: 'ready', chunk: loaded };
 
     const loadResult = loader.load(position);
     if (loadResult.status === 'pending') return loadResult;
     if (loadResult.status === 'failed') return loadResult;
     if (loadResult.status === 'ready') {
         const chunk = getLoadedChunk();
-        return chunk === undefined ? { status: 'pending' } : { status: 'ready', chunk };
+        return chunk === undefined || chunk === null ? { status: 'pending' } : { status: 'ready', chunk };
     }
 
     const generationResult = generator.generate(position);
     if (generationResult.status === 'ready') {
         const chunk = getLoadedChunk();
-        return chunk === undefined ? { status: 'pending' } : { status: 'ready', chunk };
+        return chunk === undefined || chunk === null ? { status: 'pending' } : { status: 'ready', chunk };
     }
     if (generationResult.status === 'unavailable' && loadResult.status === 'unavailable') {
         return { status: 'unavailable', reason: `${loadResult.reason}; ${generationResult.reason}` };
