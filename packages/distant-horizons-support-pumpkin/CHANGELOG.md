@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.7](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.6...distant-horizons-support-pumpkin-v0.0.7) (2026-10-07)
+
+
+### Features
+
+* **dh:** adapt capture work to server load ([397397b](https://github.com/filiphsps/pumpkin-plugins/commit/397397b5bda510fe87cfc1bc0bb6f8367fc93284))
+* **dh:** add LOD map commands ([5bba589](https://github.com/filiphsps/pumpkin-plugins/commit/5bba5894d3da583f416a8d03e0c7659c53a32920))
+* **dh:** render cached LOD section maps ([9265715](https://github.com/filiphsps/pumpkin-plugins/commit/9265715fb5570aec2fe4a6227a50bb2fa381eb96))
+* **docs:** support typed command arguments ([ee0b90f](https://github.com/filiphsps/pumpkin-plugins/commit/ee0b90fe42eb788246dea3cd549d8c53a428842a))
+* **plugin-kit:** support typed command arguments ([54544fc](https://github.com/filiphsps/pumpkin-plugins/commit/54544fc3e40ef68dd9d453ffea3fbb61a65c4580))
+* **terrain:** add adaptive work budget ([d975d30](https://github.com/filiphsps/pumpkin-plugins/commit/d975d30ec88b75b948d1ee2a70b55af5e68ca19e))
+
 ## [0.0.6](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.5...distant-horizons-support-pumpkin-v0.0.6) (2026-10-07)
 
 
