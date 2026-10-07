@@ -16,4 +16,11 @@ describe(info.name, () => {
         await server.waitForLog(new RegExp(`Loaded ${info.name}`));
         expect(server.errors()).toEqual([]);
     });
+
+    it('registers its starter command', async () => {
+        const from = server.lines.length;
+        server.command('plugin');
+        await server.waitForLog(new RegExp(`${info.name} is running\\.`), 5000, from);
+        expect(server.errors()).toEqual([]);
+    });
 });

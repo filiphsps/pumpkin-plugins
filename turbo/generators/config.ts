@@ -15,6 +15,7 @@ const FILES = [
     'tsconfig.json',
     'vitest.config.ts',
     'src/name.ts',
+    'src/commands/spec.ts',
     'src/info.ts',
     'src/plugin.ts',
     'test/plugin.itest.ts'

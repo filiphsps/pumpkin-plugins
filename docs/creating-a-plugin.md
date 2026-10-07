@@ -27,8 +27,10 @@ pnpm gen --args my-plugin MyPlugin "Does a thing"
 ## What it does
 
 1. Creates `packages/<folder>/` with a working plugin: `package.json`, `tsconfig.json`,
-   `vitest.config.ts`, `src/info.ts`, `src/plugin.ts`, a barebones `README.md` (a title and the
-   generated blocks) and an integration test that loads the built plugin on a real Pumpkin server.
+   `vitest.config.ts`, `src/name.ts`, `src/info.ts`, `src/commands/spec.ts`, `src/plugin.ts`, a
+   barebones `README.md` (a title and the generated blocks) and an integration test that loads the
+   built plugin and checks its starter `/plugin` command on a real Pumpkin server. The name and
+   command permission are declared once in their respective source modules.
 2. Registers the plugin for releases: an entry in `release-please-config.json` (with
    `"release-as": "0.0.1"`) and one in `.release-please-manifest.json`, with the plugin starting at
    version `0.0.0`, so that its first release is `0.0.1`. The `package.json` comes with the license,
@@ -44,8 +46,9 @@ and typechecks, builds and integration-tests it, so the templates can't silently
 
 ## Next steps
 
-- Describe what the plugin needs in `src/info.ts` (permissions, commands, config), declaring commands
-  with `defineCommands`. See [Plugin info and READMEs](plugin-info-and-readmes.md).
+- Describe what the plugin needs in `src/info.ts` (permissions, commands, config), editing or
+  replacing the starter command in `src/commands/spec.ts` with `defineCommands`. Keep its permission
+  under the `COMMAND_PERMISSION` constant. See [Plugin info and READMEs](plugin-info-and-readmes.md).
 - Add plugin-specific behavior in `src/plugin.ts`'s `onPluginLoad` hook. The generated plugin extends
   `PluginBase` and calls `registerPlugin`, which provide shared metadata, lifecycle logging and the
   automatic update check. Read [Building](building.md) first: plugins run on QuickJS and a few API

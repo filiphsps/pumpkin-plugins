@@ -1,4 +1,5 @@
-import type { PluginInfo } from '@pumpkin-plugins/docs';
+import { commandInfos, type PluginInfo } from '@pumpkin-plugins/docs';
+import { commands } from './commands/spec.ts';
 import { PLUGIN_NAME } from './name.ts';
 
 /**
@@ -10,5 +11,5 @@ export const info = {
     name: PLUGIN_NAME,
     description: {{{ json description }}},
     permissions: [],
-    commands: []
+    commands: commandInfos(commands)
 } satisfies PluginInfo<typeof PLUGIN_NAME>;
