@@ -1,0 +1,6 @@
+name: Update Pumpkin Market Listing
+description: Update Pumpkin Market listing metadata from a JSON file or direct inputs
+author: Filiph Sandström
+runs:
+    using: node24
+    main: src/index.mjs

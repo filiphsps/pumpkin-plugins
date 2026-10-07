@@ -15,6 +15,7 @@ Monorepo for [Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) plugins written in
 | --- | --- |
 | [Publish to Pumpkin Market](actions/publish-to-pumpkin-market) | Upload a released Pumpkin plugin WebAssembly file to its existing Market listing |
 | [Sign Pumpkin plugin](actions/sign-pumpkin-plugin) | Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata |
+| [Update Pumpkin Market Listing](actions/update-pumpkin-market-listing) | Update Pumpkin Market listing metadata from a JSON file or direct inputs |
 
 **Plugins**
 

@@ -32,6 +32,11 @@
         "actions/sign-pumpkin-plugin": {
             "component": "sign-pumpkin-plugin",
             "release-type": "simple"
+        },
+        "actions/update-pumpkin-market-listing": {
+            "component": "update-pumpkin-market-listing",
+            "release-type": "simple",
+            "release-as": "0.0.1"
         }
     },
     "changelog-sections": [
