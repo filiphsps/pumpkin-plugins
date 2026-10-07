@@ -41,18 +41,20 @@ function titleOf(file: string, fallback: string): string {
         .readFileSync(file, 'utf8')
         .match(/^#\s+(.+)$/m)?.[1]
         ?.trim();
-    return heading?.replace(/\s+#*$/, '') || fallback;
+    const title = frontmatterOf(file).title;
+    return heading?.replace(/\s+#*$/, '') || (typeof title === 'string' ? title : fallback);
 }
 
 const rewrites: Record<string, string> = {
     'docs/index.md': 'index.md',
-    'docs/README.md': 'guides/index.md'
+    'docs/README.md': 'guides/index.md',
+    'docs/team.md': 'team.md'
 };
 const navigationAssets = new Map<string, string>();
 
 for (const file of walkMarkdown(path.join(repoRoot, 'docs'))) {
     const relative = path.relative(repoRoot, file).split(path.sep).join('/');
-    if (relative === 'docs/index.md' || relative === 'docs/README.md') continue;
+    if (relative in rewrites) continue;
     if (relative.startsWith('docs/api/')) {
         rewrites[relative] = relative.slice('docs/'.length);
         continue;
@@ -91,6 +93,7 @@ interface MenuSection {
 
 interface MegaMenu {
     text: string;
+    link?: string;
     description: string;
     overview?: MenuCard;
     sections: MenuSection[];
@@ -106,6 +109,8 @@ function frontmatterOf(file: string): Record<string, unknown> {
 }
 
 function descriptionOf(file: string): string {
+    const description = frontmatterOf(file).description;
+    if (typeof description === 'string') return description;
     const source = fs.readFileSync(file, 'utf8').replace(/^---\s*\n[\s\S]*?\n---\s*\n/, '');
     const prose = source
         .replace(/^#\s+.+$/m, '')
@@ -244,12 +249,11 @@ const componentLandingIcons = new Map(
         item.icon ? [[`${item.overview.slice(1)}.md`, item.icon] as const] : []
     )
 );
-
 const guidePages = walkMarkdown(path.join(repoRoot, 'docs'))
     .filter(
         (file) =>
             !file.startsWith(path.join(repoRoot, 'docs/api') + path.sep) &&
-            !['README.md', 'index.md'].includes(path.basename(file))
+            !['README.md', 'index.md', 'team.md'].includes(path.basename(file))
     )
     .map((file) => {
         const relative = path.relative(path.join(repoRoot, 'docs'), file).split(path.sep).join('/');
@@ -468,12 +472,15 @@ const megaMenus: MegaMenu[] = [
     }
 ];
 
+megaMenus.push({ text: 'Team', description: 'Meet the contributors.', link: '/team', sections: [] });
+
 const mobileNav: DefaultTheme.NavItem[] = [
     { text: 'Plugins', items: plugins.map((item) => ({ text: item.title, link: item.overview })) },
     { text: 'Tools', items: tools.map((item) => ({ text: item.title, link: item.overview })) },
     { text: 'Actions', items: actions.map((item) => ({ text: item.title, link: item.overview })) },
     { text: 'Guides', items: guidePages.map(({ text, link }) => ({ text, link })) },
-    { text: 'Reference', items: apiNav }
+    { text: 'Reference', items: apiNav },
+    { text: 'Team', link: '/team' }
 ];
 
 const componentSidebars: Record<string, SidebarItem[]> = {};
@@ -527,6 +534,15 @@ export default defineConfig({
     srcDir: '..',
     markdown: {
         config(md) {
+            // The standalone Team page lives in docs, but its public route is outside /guides/.
+            md.core.ruler.push('team-page-links', (state) => {
+                if (!/^(?:docs|guides)\//.test(state.env.relativePath)) return;
+                for (const token of state.tokens.flatMap((block) => block.children ?? [])) {
+                    if (token.type === 'link_open' && /^(?:\.\/)?team\.md(?:#.*)?$/.test(token.attrGet('href') ?? '')) {
+                        token.attrSet('href', (token.attrGet('href') ?? '').replace(/^(?:\.\/)?team\.md/, '/team'));
+                    }
+                }
+            });
             md.core.ruler.push('component-title-icon', (state) => {
                 const icon = componentLandingIcons.get(state.env.relativePath);
                 if (!icon) return;

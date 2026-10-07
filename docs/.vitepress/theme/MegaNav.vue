@@ -19,6 +19,7 @@ interface MenuSection {
 
 interface MegaMenu {
     text: string;
+    link?: string;
     description: string;
     overview?: MenuCard;
     sections: MenuSection[];
@@ -124,21 +125,23 @@ watch(
         @pointerleave="onNavPointerleave"
     >
         <div class="site-mega-nav__triggers">
-            <button
-                v-for="(menu, index) in menus"
-                :key="menu.text"
-                class="site-mega-nav__trigger"
-                type="button"
-                :data-menu-trigger="menu.text"
-                :aria-expanded="openMenu === menu.text"
-                :aria-controls="`mega-panel-${index}`"
-                @click="toggleMenu(menu.text)"
-                @pointerenter="onTriggerPointerenter(menu.text, $event)"
-                @keydown="onTriggerKeydown($event, index)"
-            >
-                {{ menu.text }}
-                <span class="site-mega-nav__chevron" aria-hidden="true"></span>
-            </button>
+            <template v-for="(menu, index) in menus" :key="menu.text">
+                <a v-if="menu.link" class="site-mega-nav__trigger" :href="withBase(menu.link)" @pointerenter="closeMenu()">{{ menu.text }}</a>
+                <button
+                    v-else
+                    class="site-mega-nav__trigger"
+                    type="button"
+                    :data-menu-trigger="menu.text"
+                    :aria-expanded="openMenu === menu.text"
+                    :aria-controls="`mega-panel-${index}`"
+                    @click="toggleMenu(menu.text)"
+                    @pointerenter="onTriggerPointerenter(menu.text, $event)"
+                    @keydown="onTriggerKeydown($event, index)"
+                >
+                    {{ menu.text }}
+                    <span class="site-mega-nav__chevron" aria-hidden="true"></span>
+                </button>
+            </template>
         </div>
 
         <Transition name="mega-panel">

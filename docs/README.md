@@ -2,6 +2,7 @@
 
 | Page | What it covers |
 | --- | --- |
+| [Team](team.md) | People contributing to Pumpkin Plugins |
 | [Home](index.md) | Documentation site landing page |
 | [Documentation site](documentation-site.md) | Adding component guides, generated API reference, local preview, and publishing |
 | [Creating a plugin](creating-a-plugin.md) | The `pnpm gen` generator, what it creates, and what to do next |

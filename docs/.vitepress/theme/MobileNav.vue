@@ -19,6 +19,7 @@ interface MenuSection {
 
 interface MegaMenu {
     text: string;
+    link?: string;
     description: string;
     overview?: MenuCard;
     sections: MenuSection[];
@@ -36,72 +37,75 @@ const menus = computed(() => (theme.value as ThemeConfigWithMegaMenus).megaMenus
 
 <template>
     <nav v-if="menus.length" class="site-mobile-nav" aria-label="Main navigation">
-        <details v-for="menu in menus" :key="menu.text" class="site-mobile-nav__group">
-            <summary class="site-mobile-nav__summary">{{ menu.text }}</summary>
-            <div class="site-mobile-nav__content" :class="`site-mobile-nav__content--${menu.text.toLowerCase()}`">
-                <p class="site-mobile-nav__description">{{ menu.description }}</p>
-                <a
-                    v-if="menu.overview"
-                    class="site-mobile-nav__overview"
-                    :href="withBase(menu.overview.link)"
-                >
-                    {{ menu.overview.text }}
-                </a>
-                <a
-                    v-if="menu.featured"
-                    class="site-mobile-nav__featured"
-                    :class="`site-mobile-nav__featured--${menu.featured.type ?? 'card'}`"
-                    :href="withBase(menu.featured.link)"
-                >
-                    <span class="site-mobile-nav__featured-heading">
-                        <img
-                            v-if="menu.featured.icon"
-                            class="site-mobile-nav__icon"
-                            :src="withBase(menu.featured.icon)"
-                            alt=""
-                            aria-hidden="true"
-                        >
-                        <span class="site-mobile-nav__link-title">{{ menu.featured.text }}</span>
-                    </span>
-                    <span class="site-mobile-nav__link-description">{{ menu.featured.description }}</span>
-                    <span class="site-mobile-nav__link-action">Read the plugin guide</span>
-                </a>
-                <section
-                    v-for="section in menu.sections"
-                    :key="section.text"
-                    class="site-mobile-nav__section"
-                    :class="section.gridArea ? `site-mobile-nav__section--${section.gridArea}` : ''"
-                >
-                    <h2>{{ section.text }}</h2>
+        <template v-for="menu in menus" :key="menu.text">
+            <a v-if="menu.link" class="site-mobile-nav__direct-link" :href="withBase(menu.link)">{{ menu.text }}</a>
+            <details v-else class="site-mobile-nav__group">
+                <summary class="site-mobile-nav__summary">{{ menu.text }}</summary>
+                <div class="site-mobile-nav__content" :class="`site-mobile-nav__content--${menu.text.toLowerCase()}`">
+                    <p class="site-mobile-nav__description">{{ menu.description }}</p>
                     <a
-                        v-for="item in section.items"
-                        :key="item.link"
-                        class="site-mobile-nav__link"
-                        :class="[
-                            `site-mobile-nav__link--${item.type ?? 'link'}`,
-                            { 'has-icon': item.icon }
-                        ]"
-                        :href="withBase(item.link)"
+                        v-if="menu.overview"
+                        class="site-mobile-nav__overview"
+                        :href="withBase(menu.overview.link)"
                     >
-                        <img
-                            v-if="item.icon"
-                            class="site-mobile-nav__icon"
-                            :src="withBase(item.icon)"
-                            alt=""
-                            aria-hidden="true"
-                        >
-                        <span class="site-mobile-nav__link-copy">
-                            <span class="site-mobile-nav__link-title">{{ item.text }}</span>
-                            <span v-if="item.description" class="site-mobile-nav__link-description">
-                                {{ item.description }}
-                            </span>
-                            <span v-if="item.type === 'card' || item.type === 'spotlight'" class="site-mobile-nav__link-action">
-                                Open documentation
-                            </span>
-                        </span>
+                        {{ menu.overview.text }}
                     </a>
-                </section>
-            </div>
-        </details>
+                    <a
+                        v-if="menu.featured"
+                        class="site-mobile-nav__featured"
+                        :class="`site-mobile-nav__featured--${menu.featured.type ?? 'card'}`"
+                        :href="withBase(menu.featured.link)"
+                    >
+                        <span class="site-mobile-nav__featured-heading">
+                            <img
+                                v-if="menu.featured.icon"
+                                class="site-mobile-nav__icon"
+                                :src="withBase(menu.featured.icon)"
+                                alt=""
+                                aria-hidden="true"
+                            >
+                            <span class="site-mobile-nav__link-title">{{ menu.featured.text }}</span>
+                        </span>
+                        <span class="site-mobile-nav__link-description">{{ menu.featured.description }}</span>
+                        <span class="site-mobile-nav__link-action">Read the plugin guide</span>
+                    </a>
+                    <section
+                        v-for="section in menu.sections"
+                        :key="section.text"
+                        class="site-mobile-nav__section"
+                        :class="section.gridArea ? `site-mobile-nav__section--${section.gridArea}` : ''"
+                    >
+                        <h2>{{ section.text }}</h2>
+                        <a
+                            v-for="item in section.items"
+                            :key="item.link"
+                            class="site-mobile-nav__link"
+                            :class="[
+                                `site-mobile-nav__link--${item.type ?? 'link'}`,
+                                { 'has-icon': item.icon }
+                            ]"
+                            :href="withBase(item.link)"
+                        >
+                            <img
+                                v-if="item.icon"
+                                class="site-mobile-nav__icon"
+                                :src="withBase(item.icon)"
+                                alt=""
+                                aria-hidden="true"
+                            >
+                            <span class="site-mobile-nav__link-copy">
+                                <span class="site-mobile-nav__link-title">{{ item.text }}</span>
+                                <span v-if="item.description" class="site-mobile-nav__link-description">
+                                    {{ item.description }}
+                                </span>
+                                <span v-if="item.type === 'card' || item.type === 'spotlight'" class="site-mobile-nav__link-action">
+                                    Open documentation
+                                </span>
+                            </span>
+                        </a>
+                    </section>
+                </div>
+            </details>
+        </template>
     </nav>
 </template>

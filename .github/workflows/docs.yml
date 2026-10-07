@@ -87,6 +87,8 @@ jobs:
 
             - name: 🏗️ Build the documentation site
               run: pnpm run docs
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
 
             - name: 📦 Upload Pages artifact
               uses: actions/upload-pages-artifact@v5.0.0

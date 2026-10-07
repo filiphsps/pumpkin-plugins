@@ -530,7 +530,8 @@
         margin-top: 4px;
     }
 
-    .site-mobile-nav__summary {
+    .site-mobile-nav__summary,
+    .site-mobile-nav__direct-link {
         display: flex;
         min-height: 48px;
         align-items: center;
@@ -561,6 +562,7 @@
         transform: translateY(2px) rotate(225deg);
     }
 
+    .site-mobile-nav__direct-link:focus-visible,
     .site-mobile-nav__summary:focus-visible,
     .site-mobile-nav__link:focus-visible,
     .site-mobile-nav__featured:focus-visible,
