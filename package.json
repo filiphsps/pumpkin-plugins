@@ -55,6 +55,7 @@
     "devDependencies": {
         "@biomejs/biome": "2.5.15",
         "@commitlint/config-conventional": "21.2.3",
+        "c8": "catalog:",
         "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/signing": "workspace:*",
         "@turbo/gen": "2.11.7",
@@ -68,7 +69,8 @@
         "typedoc-vitepress-theme": "1.1.4",
         "typescript": "catalog:",
         "typescript-eslint": "8.71.1",
-        "vitepress": "1.6.4"
+        "vitepress": "1.6.4",
+        "yaml": "catalog:"
     },
     "devEngines": {
         "packageManager": {
