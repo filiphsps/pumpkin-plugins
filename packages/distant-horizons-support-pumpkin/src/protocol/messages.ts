@@ -157,8 +157,16 @@ export function transfer(tracker: number, buffer: number, lod: Uint8Array): Uint
 }
 
 /** Encodes one bounded transfer fragment. */
-export function transferFragment(buffer: number, lod: Uint8Array, offset: number): Uint8Array {
-    const part = lod.subarray(offset, offset + TRANSFER_PACKET_BYTES);
+export function transferFragment(
+    buffer: number,
+    lod: Uint8Array,
+    offset: number,
+    maxDataBytes = TRANSFER_PACKET_BYTES
+): Uint8Array {
+    if (!Number.isSafeInteger(maxDataBytes) || maxDataBytes < 1 || maxDataBytes > TRANSFER_PACKET_BYTES) {
+        throw new RangeError('Invalid DH transfer fragment size');
+    }
+    const part = lod.subarray(offset, offset + maxDataBytes);
     return packet(10)
         .int(buffer)
         .blob(part)
