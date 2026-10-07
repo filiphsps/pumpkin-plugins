@@ -1,6 +1,8 @@
 import type { CommandSender } from 'pumpkin:plugin/command@0.1.0';
 import { CommandFailed, type CommandHandlers } from '@pumpkin-plugins/docs';
+import { color } from '@pumpkin-plugins/minecraft-colors';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
+import prettyBytes from 'pretty-bytes';
 import type { Settings } from '../config/schema.ts';
 import type { LodCache } from '../lod/cache.ts';
 import { FORCE_BLOCK_SAMPLES_PER_TICK, type ForcedLodStart } from '../lod/force-generation.ts';
@@ -10,6 +12,11 @@ import { withPlayer } from '../platform/peers.ts';
 import type { Sessions } from '../session.ts';
 import type { commands } from './spec.ts';
 
+type PrettyBytesOptions = NonNullable<Parameters<typeof prettyBytes>[1]>;
+const PRETTY_BYTES_OPTIONS: PrettyBytesOptions = {
+    nonBreakingSpace: true
+};
+
 /** Builds operator handlers for session status and cache management. */
 export function commandHandlers(
     sessions: Sessions,
@@ -17,34 +24,38 @@ export function commandHandlers(
     settings: Settings
 ): CommandHandlers<typeof commands, CommandSender> {
     return {
-        'dhs status': () => sessions.status().split('\n'),
+        'dhs status': () => sessions.status().split('\n').map(colorizeNumbers),
         'dhs cache status': () => {
             const stats = cache.stats();
             return [
-                `Memory cache: ${stats.memoryEntries}/${formatLimit(stats.memoryLimit)} entries, ${stats.memoryBytes} bytes.`,
-                `Disk cache: ${stats.diskEntries}/${formatLimit(stats.diskLimit)} entries, ${stats.diskBytes} bytes.`
+                `${color.named.name('Memory cache')}: ${color.named.value(String(stats.memoryEntries))}/${formatLimit(stats.memoryLimit)} entries, ${color.named.value(prettyBytes(stats.memoryBytes, PRETTY_BYTES_OPTIONS))}`,
+                `${color.named.name('Disk cache')}: ${color.named.value(String(stats.diskEntries))}/${formatLimit(stats.diskLimit)} entries, ${color.named.value(prettyBytes(stats.diskBytes, PRETTY_BYTES_OPTIONS))}.`
             ];
         },
         'dhs cache clear': () => {
             const cleared = cache.clear();
-            return [`Cleared ${cleared.memoryEntries} in-memory and ${cleared.diskEntries} disk cache entries.`];
+            return [
+                `Cleared ${color.named.value(String(cleared.memoryEntries))} in-memory and ${color.named.value(String(cleared.diskEntries))} disk cache entries.`
+            ];
         },
-        'dhs cache memory clear': () => [`Cleared ${cache.clearMemory()} in-memory cache entries.`],
-        'dhs cache disk clear': () => [`Cleared ${cache.clearDisk()} disk cache entries.`],
+        'dhs cache memory clear': () => [
+            `Cleared ${color.named.value(String(cache.clearMemory()))} in-memory cache entries.`
+        ],
+        'dhs cache disk clear': () => [`Cleared ${color.named.value(String(cache.clearDisk()))} disk cache entries.`],
         'dhs map': (sender) => showMap(cache, sender, DEFAULT_LOD_MAP_RADIUS),
         'dhs map <radius>': (sender, { radius }) => showMap(cache, sender, radius),
         'dhs map <x> <z>': (sender, { x, z }) => showMap(cache, sender, DEFAULT_LOD_MAP_RADIUS, [x, z]),
         'dhs map <x> <z> <radius>': (sender, { x, z, radius }) => showMap(cache, sender, radius, [x, z]),
-        'dhs generate': (sender) => generateLods(sessions, settings, sender, DEFAULT_LOD_GENERATION_RADIUS),
-        'dhs generate <radius>': (sender, { radius }) => generateLods(sessions, settings, sender, radius),
+        'dhs generate': (sender) => generateLODs(sessions, settings, sender, DEFAULT_LOD_GENERATION_RADIUS),
+        'dhs generate <radius>': (sender, { radius }) => generateLODs(sessions, settings, sender, radius),
         'dhs generate <x> <z>': (sender, { x, z }) =>
-            generateLods(sessions, settings, sender, DEFAULT_LOD_GENERATION_RADIUS, [x, z]),
+            generateLODs(sessions, settings, sender, DEFAULT_LOD_GENERATION_RADIUS, [x, z]),
         'dhs generate <x> <z> <radius>': (sender, { x, z, radius }) =>
-            generateLods(sessions, settings, sender, radius, [x, z])
+            generateLODs(sessions, settings, sender, radius, [x, z])
     };
 }
 
-function generateLods(
+function generateLODs(
     sessions: Sessions,
     settings: Settings,
     sender: CommandSender,
@@ -66,9 +77,9 @@ function generateLods(
         if (!found) throw new CommandFailed('Run this command as a Java player so terrain access is available.');
         if (!started) throw new CommandFailed('Could not start forced LOD capture.');
         return [
-            `Started forced LOD capture at section ${started.centerX}, ${started.centerZ} (radius ${radius}; ${started.sections} sections requested).`,
+            `Started forced LOD capture at section ${color.named.value(String(started.centerX))}, ${color.named.value(String(started.centerZ))} (radius ${color.named.value(String(radius))}; ${color.named.value(String(started.sections))} sections requested).`,
             'Already-generated LOD sections and sections outside the world border will be skipped.',
-            `Capturing at full speed with up to ${FORCE_BLOCK_SAMPLES_PER_TICK.toLocaleString()} block samples per tick. Progress will be reported in chat.`
+            `Capturing at full speed with up to ${color.named.value(FORCE_BLOCK_SAMPLES_PER_TICK.toLocaleString())} block samples per tick. Progress will be reported in chat.`
         ];
     } catch (err) {
         if (err instanceof CommandFailed) throw err;
@@ -107,7 +118,11 @@ function showMap(
 }
 
 function formatLimit(limit: number): string {
-    if (limit < 0) return 'unlimited';
-    if (limit === 0) return 'disabled';
-    return String(limit);
+    if (limit < 0) return color.named.value('unlimited');
+    if (limit === 0) return color.named.value('disabled');
+    return color.named.value(String(limit));
+}
+
+function colorizeNumbers(text: string): string {
+    return text.replace(/-?\d+(?:\.\d+)?/g, (number) => color.named.value(number));
 }

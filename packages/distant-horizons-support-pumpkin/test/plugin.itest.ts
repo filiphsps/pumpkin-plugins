@@ -115,7 +115,7 @@ describe(info.name, () => {
 
             const statusFrom = custom.lines.length;
             custom.command('dhs cache status');
-            await custom.waitForLog(/Disk cache: 1\/4096 entries, \d+ bytes\./, 5000, statusFrom);
+            await custom.waitForLog(/Disk cache: 1\/4096 entries, \d+\s+B\./, 5000, statusFrom);
 
             const clearFrom = custom.lines.length;
             custom.command('dhs cache disk clear');

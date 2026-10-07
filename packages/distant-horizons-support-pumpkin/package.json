@@ -39,9 +39,11 @@
         "readme:check": "pumpkin-plugins-docs --check"
     },
     "dependencies": {
+        "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/terrain": "workspace:*",
-        "@pumpkinmc/pumpkin-api-ts": "catalog:"
+        "@pumpkinmc/pumpkin-api-ts": "catalog:",
+        "pretty-bytes": "7.2.0"
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",
