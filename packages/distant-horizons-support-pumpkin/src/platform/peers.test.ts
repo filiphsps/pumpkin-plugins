@@ -15,6 +15,26 @@ import { schema } from '../config/schema.ts';
 import { serverPeers, withPlayer } from './peers.ts';
 
 describe('Pumpkin terrain adapter', () => {
+    it('rejects world names outside the DH level-key grammar without rewriting them', () => {
+        const values = defaultValues(schema),
+            settings = { ...values.support, worlds: values.worlds };
+        const java = { [Symbol.dispose]: vi.fn() };
+        const world = {
+            getName: () => 'world.1',
+            getDimension: () => 'minecraft:overworld',
+            [Symbol.dispose]: vi.fn()
+        };
+        const player = {
+            asJava: () => java,
+            getWorld: () => world,
+            getPosition: () => [0, 64, 0]
+        };
+
+        expect(() => withPlayer(player as unknown as Player, settings, () => {})).toThrow('valid DH level key');
+        expect(world[Symbol.dispose]).toHaveBeenCalledOnce();
+        expect(java[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
+
     it('reads negative coordinates through world accessors and releases world handles', () => {
         const values = defaultValues(schema),
             settings = { ...values.support, worlds: values.worlds };

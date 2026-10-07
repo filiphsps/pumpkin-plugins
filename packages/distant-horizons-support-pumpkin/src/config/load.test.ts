@@ -101,4 +101,16 @@ describe('DH settings', () => {
         expect(() => readSettings(files, log)).toThrow();
         expect(files.text('config.toml')).toBe('[support');
     });
+    it('preserves an invalid DH server identity without rewriting the config', () => {
+        const files = new MemoryFiles(),
+            log = new MemoryLogger(),
+            original = '[support]\nserver_key = "lod.example"\n';
+        files.put('config.toml', original);
+
+        const settings = readSettings(files, log);
+
+        expect(settings.server_key).toBe('');
+        expect(files.text('config.toml')).toBe(original);
+        expect(log.of('warn').join('\n')).toContain('Use at most 128 letters, digits, underscores or hyphens.');
+    });
 });

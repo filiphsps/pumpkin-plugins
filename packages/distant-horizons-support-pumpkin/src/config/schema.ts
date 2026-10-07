@@ -20,8 +20,8 @@ export const schema = defineConfig(PLUGIN_NAME, {
                 description: 'Optional globally unique server key. Empty uses the client connection address.',
                 default: '',
                 check: {
-                    test: (value) => value === '' || /^[a-zA-Z0-9_.-]{1,128}$/.test(value),
-                    expected: 'Use at most 128 letters, digits, underscores, dots or hyphens.'
+                    test: (value) => value === '' || /^[a-zA-Z0-9_-]{1,128}$/.test(value),
+                    expected: 'Use at most 128 letters, digits, underscores or hyphens.'
                 }
             }),
             render_distance: int({

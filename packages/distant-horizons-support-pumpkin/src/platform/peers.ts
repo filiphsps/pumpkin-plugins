@@ -32,7 +32,8 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
         const level = world.getName(),
             dimension = world.getDimension(),
             position = player.getPosition();
-        if (!/^[a-zA-Z0-9_.:-]{1,128}$/.test(level)) throw new Error('World name is not a valid DH level key');
+        if (!/^(?=.{1,150}$)([a-zA-Z0-9_-]+@)?[a-zA-Z0-9_-]+(:[a-zA-Z0-9_-]+)?$/.test(level))
+            throw new Error('World name is not a valid DH level key');
         const minY = world.getMinY();
         const height =
             settings.worlds[level]?.height ??
