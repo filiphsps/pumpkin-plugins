@@ -8,6 +8,8 @@ describe('DH settings', () => {
             log = new MemoryLogger();
         const initial = readSettings(files, log);
         expect(initial.render_distance).toBe(128);
+        expect(initial.generation_requests_per_second).toBe(20);
+        expect(initial.sync_requests_per_second).toBe(50);
         expect(initial.blocks_per_tick).toBe(8192);
         expect(initial.cached_requests_per_tick).toBe(8);
         expect(initial.cached_packets_per_tick).toBe(64);
@@ -59,6 +61,20 @@ describe('DH settings', () => {
         const settings = readSettings(files, log);
 
         expect(settings.blocks_per_tick).toBe(32768);
+        expect(log.of('warn')).toHaveLength(0);
+    });
+    it('accepts separate DH request rates', () => {
+        const files = new MemoryFiles(),
+            log = new MemoryLogger();
+        files.put(
+            'config.toml',
+            '[support]\ngeneration_requests_per_second = 100\nsync_requests_per_second = 100\n'
+        );
+
+        const settings = readSettings(files, log);
+
+        expect(settings.generation_requests_per_second).toBe(100);
+        expect(settings.sync_requests_per_second).toBe(100);
         expect(log.of('warn')).toHaveLength(0);
     });
     it('treats arbitrarily large negative TOML integers as unlimited', () => {

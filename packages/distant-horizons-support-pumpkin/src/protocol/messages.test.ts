@@ -41,17 +41,23 @@ describe('Distant Horizons protocol', () => {
         expect(() => decode(new Writer().short(15).short(3).string('world').finish())).toThrow('protocol');
     });
     it('uses the released client session configuration order', () => {
-        const bytes = sessionConfig(128, 2);
+        const bytes = sessionConfig(128, 20, 50);
         expect(bytes.length).toBe(43);
-        expect(decode(bytes)).toEqual({ type: 'config', disabled: false, distance: 128, concurrency: 2, sync: true });
+        expect(decode(bytes)).toEqual({ type: 'config', disabled: false, distance: 128, concurrency: 20, sync: true });
         const input = new Reader(bytes);
         input.short();
         input.short();
         expect(input.byte()).toBe(2);
         expect(input.int()).toBe(128);
         for (let i = 0; i < 3; i++) expect(input.int()).toBe(0);
-        expect(input.int()).toBe(2);
+        expect(input.int()).toBe(20);
         expect(input.bool()).toBe(false);
+        input.int();
+        expect(input.bool()).toBe(true);
+        expect(input.int()).toBe(128);
+        expect(input.int()).toBe(50);
+        expect(input.int()).toBe(0);
+        input.end();
     });
     it('splits data before sending its tracked response', () => {
         const bytes = new Uint8Array(60001).fill(9);

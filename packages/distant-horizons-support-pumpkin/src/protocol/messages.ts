@@ -84,20 +84,24 @@ export function packet(id: number): Writer {
 export function levelInit(dimension: string, server: string, level: string, now: number): Uint8Array {
     return packet(2).string(dimension).string(server).string(level).timestamp(now).finish();
 }
-/** Advertises loaded-chunk LOD requests, with updates supplied through login synchronization. */
-export function sessionConfig(distance: number, concurrency: number): Uint8Array {
+/** Advertises the generation and login-sync request rates allowed by this server. */
+export function sessionConfig(
+    distance: number,
+    generationRequestsPerSecond: number,
+    syncRequestsPerSecond: number
+): Uint8Array {
     return packet(4)
         .byte(2)
         .int(distance)
         .int(0)
         .int(0)
         .int(0)
-        .int(concurrency)
+        .int(generationRequestsPerSecond)
         .bool(false)
         .int(0)
         .bool(true)
         .int(distance)
-        .int(concurrency)
+        .int(syncRequestsPerSecond)
         .int(0)
         .finish();
 }

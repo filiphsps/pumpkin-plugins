@@ -392,7 +392,16 @@ export class Sessions {
             packets: []
         });
         peer.send(levelInit(peer.dimension, this.settings.server_key, peer.level, this.now()));
-        peer.send(sessionConfig(this.settings.render_distance, this.settings.requests_per_player));
+        peer.send(
+            sessionConfig(
+                this.settings.render_distance,
+                this.settings.generation_requests_per_second,
+                this.settings.sync_requests_per_second
+            )
+        );
+        this.log.debug(
+            `${logTag} Established DH session with ${ansi.named.name(peer.name)} in ${ansi.named.identifier(peer.dimension)} / ${ansi.named.identifier(peer.level)} (distance ${ansi.named.number(this.settings.render_distance)}, generation rate ${ansi.named.number(this.settings.generation_requests_per_second)}/s, sync rate ${ansi.named.number(this.settings.sync_requests_per_second)}/s).`
+        );
     }
     private complete(request: Request, value: CachedLod, cached = false): number {
         const client = this.clients.get(request.name);

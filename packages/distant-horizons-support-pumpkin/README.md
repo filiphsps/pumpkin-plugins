@@ -60,6 +60,8 @@ Settings live in `plugins/data/DistantHorizonsSupportPumpkin/config.toml`. The p
 | --- | --- | --- | --- |
 | `support.server_key` | string | `""` | Optional globally unique server key. Empty uses the client connection address. |
 | `support.render_distance` | integer | `128` | Maximum LOD request radius in chunks, limited by the world border. |
+| `support.generation_requests_per_second` | integer | `20` | Maximum terrain generation requests per second advertised to each DH client. |
+| `support.sync_requests_per_second` | integer | `50` | Maximum cached LOD synchronization requests per second advertised to each DH client. |
 | `support.requests_per_player` | integer | `2` | Maximum pending requests per player. |
 | `support.pending_requests` | integer | `16` | Maximum pending requests across all players. |
 | `support.blocks_per_tick` | integer | `8192` | Maximum block samples per server tick across all LOD requests. Actual work adapts to server MSPT. |
@@ -86,6 +88,12 @@ server_key = ""
 
 # Maximum LOD request radius in chunks, limited by the world border.
 render_distance = 128
+
+# Maximum terrain generation requests per second advertised to each DH client.
+generation_requests_per_second = 20
+
+# Maximum cached LOD synchronization requests per second advertised to each DH client.
+sync_requests_per_second = 50
 
 # Maximum pending requests per player.
 requests_per_player = 2

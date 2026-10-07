@@ -23,6 +23,8 @@ describe(info.name, () => {
         await server.waitForLog(new RegExp(`serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain`));
         const config = await readFile(path.join(server.pluginDataDir(info.name), 'config.toml'), 'utf8');
         expect(config).toContain('render_distance = 128');
+        expect(config).toContain('generation_requests_per_second = 20');
+        expect(config).toContain('sync_requests_per_second = 50');
         expect(config).toContain('blocks_per_tick = 8192');
         expect(config).toContain('cached_requests_per_tick = 8');
         expect(config).toContain('cached_packets_per_tick = 64');

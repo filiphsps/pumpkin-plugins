@@ -30,6 +30,18 @@ export const schema = defineConfig(PLUGIN_NAME, {
                 min: 4,
                 max: 1024
             }),
+            generation_requests_per_second: int({
+                description: 'Maximum terrain generation requests per second advertised to each DH client.',
+                default: 20,
+                min: 1,
+                max: 128
+            }),
+            sync_requests_per_second: int({
+                description: 'Maximum cached LOD synchronization requests per second advertised to each DH client.',
+                default: 50,
+                min: 1,
+                max: 256
+            }),
             requests_per_player: int({
                 description: 'Maximum pending requests per player.',
                 default: 2,
