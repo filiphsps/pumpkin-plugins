@@ -8,7 +8,7 @@ on the documentation site.
 
 ```yaml
 steps:
-  - uses: filiphsps/pumpkin-plugins/actions/verify-pumpkin-plugin@verify-pumpkin-plugin-v0.0.1
+  - uses: filiphsps/pumpkin-plugins/actions/verify-pumpkin-plugin@verify-pumpkin-plugin-v0.0.2
     with:
       wasm-file: dist/my-plugin.wasm
       expected-public-key: ${{ vars.PLUGIN_SIGNING_PUBLIC_KEY }}
@@ -29,7 +29,7 @@ fields accepted by the signing action:
 
 ```yaml
 steps:
-  - uses: filiphsps/pumpkin-plugins/actions/verify-pumpkin-plugin@verify-pumpkin-plugin-v0.0.1
+  - uses: filiphsps/pumpkin-plugins/actions/verify-pumpkin-plugin@verify-pumpkin-plugin-v0.0.2
     with:
       plugins-manifest: ${{ runner.temp }}/plugins.json
       expected-public-key: ${{ vars.PLUGIN_SIGNING_PUBLIC_KEY }}
