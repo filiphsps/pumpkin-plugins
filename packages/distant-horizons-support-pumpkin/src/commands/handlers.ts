@@ -42,6 +42,7 @@ export function commandHandlers(
             `Cleared ${color.named.value(String(cache.clearMemory()))} in-memory cache entries.`
         ],
         'dhs cache disk clear': () => [`Cleared ${color.named.value(String(cache.clearDisk()))} disk cache entries.`],
+        'dhs cache recover <x> <z>': (sender, { x, z }) => recoverCachedLod(sessions, settings, sender, x, z),
         'dhs map': (sender) => showMap(cache, sender, DEFAULT_LOD_MAP_RADIUS),
         'dhs map <radius>': (sender, { radius }) => showMap(cache, sender, radius),
         'dhs map <x> <z>': (sender, { x, z }) => showMap(cache, sender, DEFAULT_LOD_MAP_RADIUS, [x, z]),
@@ -80,6 +81,38 @@ function generateLODs(
             `Started forced LOD capture at section ${color.named.value(String(started.centerX))}, ${color.named.value(String(started.centerZ))} (radius ${color.named.value(String(radius))}; ${color.named.value(String(started.sections))} sections requested).`,
             'Already-generated LOD sections and sections outside the world border will be skipped.',
             `Capturing at full speed with up to ${color.named.value(FORCE_BLOCK_SAMPLES_PER_TICK.toLocaleString())} block samples per tick. Progress will be reported in chat.`
+        ];
+    } catch (err) {
+        if (err instanceof CommandFailed) throw err;
+        throw new CommandFailed(err instanceof Error ? err.message : String(err));
+    } finally {
+        disposeWasiResource(player);
+    }
+}
+
+function recoverCachedLod(
+    sessions: Sessions,
+    settings: Settings,
+    sender: CommandSender,
+    blockX: number,
+    blockZ: number
+): CommandLine[] {
+    if (!Number.isSafeInteger(blockX) || !Number.isSafeInteger(blockZ)) {
+        throw new CommandFailed('Block coordinates must be safe integers.');
+    }
+    const player = sender.asPlayer();
+    if (!player) return [errorLine('Run this command as a Java player so the current world is known.')];
+
+    try {
+        let recovery: ReturnType<Sessions['forceRecover']> | undefined;
+        const found = withPlayer(player, settings, (peer) => {
+            recovery = sessions.forceRecover(peer, blockX, blockZ);
+        });
+        if (!found) throw new CommandFailed('Run this command as a Java player so terrain access is available.');
+        if (!recovery) throw new CommandFailed('Could not start cache recovery.');
+        return [
+            `Backed up ${recovery.backup.key} to ${recovery.backup.dataPath}; recorded the key in ${recovery.backup.manifestPath}.`,
+            `Started forced LOD capture at section ${color.named.value(String(recovery.start.centerX))}, ${color.named.value(String(recovery.start.centerZ))}.`
         ];
     } catch (err) {
         if (err instanceof CommandFailed) throw err;

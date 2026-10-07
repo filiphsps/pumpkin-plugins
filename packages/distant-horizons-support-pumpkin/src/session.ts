@@ -10,6 +10,7 @@ import {
     FORCE_BLOCK_SAMPLES_PER_TICK,
     ForcedLodGeneration,
     type ForcedLodPeer,
+    type ForcedLodRecovery,
     type ForcedLodStart
 } from './lod/force-generation.ts';
 import { sectionKey } from './lod/generation.ts';
@@ -117,6 +118,10 @@ export class Sessions {
     /** Starts a cache-refreshing capture that takes priority over ordinary DH work. */
     forceGenerate(peer: Peer, blockX: number, blockZ: number, radius = 0): ForcedLodStart {
         return this.forcedGeneration.start(peer, blockX, blockZ, radius);
+    }
+    /** Backs up and rebuilds one explicitly selected cached section from loaded terrain. */
+    forceRecover(peer: Peer, blockX: number, blockZ: number): ForcedLodRecovery {
+        return this.forcedGeneration.recover(peer, blockX, blockZ);
     }
     /** Accepts and validates a DH packet from a Java player. */
     receive(peer: Peer, bytes: Uint8Array): void {

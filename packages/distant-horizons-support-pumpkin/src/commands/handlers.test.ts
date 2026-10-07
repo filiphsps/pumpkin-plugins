@@ -53,7 +53,7 @@ function setup() {
         commands,
         commandHandlers(sessions, cache, settings)
     );
-    return { cache, host, root: root?.node as FakeNode, sessions };
+    return { cache, files, host, root: root?.node as FakeNode, sessions };
 }
 
 describe('the /dhs commands', () => {
@@ -67,6 +67,7 @@ describe('the /dhs commands', () => {
             'DistantHorizonsSupportPumpkin:command.dhs.cache.clear',
             'DistantHorizonsSupportPumpkin:command.dhs.cache.memory.clear',
             'DistantHorizonsSupportPumpkin:command.dhs.cache.disk.clear',
+            'DistantHorizonsSupportPumpkin:command.dhs.cache.recover',
             'DistantHorizonsSupportPumpkin:command.dhs.map',
             'DistantHorizonsSupportPumpkin:command.dhs.map',
             'DistantHorizonsSupportPumpkin:command.dhs.map',
@@ -82,6 +83,7 @@ describe('the /dhs commands', () => {
                 '/dhs map <radius>',
                 '/dhs map <x> <z>',
                 '/dhs map <x> <z> <radius>',
+                '/dhs cache recover <x> <z>',
                 '/dhs generate',
                 '/dhs generate <radius>',
                 '/dhs generate <x> <z>',
@@ -129,6 +131,27 @@ describe('the /dhs commands', () => {
             'Cleared §61§r disk cache entries.'
         ]);
         expect(disk.cache.stats()).toMatchObject({ memoryEntries: 1, diskEntries: 0 });
+    });
+
+    it('backs up and rebuilds one explicitly selected cached section from loaded terrain', () => {
+        const f = setup();
+        const suspect = new Uint8Array(64);
+        f.cache.put('world:0:0', { updated: 1, data: suspect });
+        if (!activePeer) throw new Error('Missing command peer');
+        activePeer.terrain.prepare = () => ({ status: 'ready' });
+        const player = {
+            getPosition: () => [32, 64, 32],
+            getWorld: () => ({ getName: () => 'world', [Symbol.dispose]: () => undefined }),
+            [Symbol.dispose]: () => undefined
+        };
+        const sender = { lines: [], errors: [], asPlayer: () => player };
+
+        f.host.runAs(f.root, ['dhs', 'cache', 'recover', '<x>', '<z>'], { x: 32, z: 32 }, sender as never);
+
+        expect(sender.lines[0]).toContain('Backed up world:0:0 to cache-recovery/');
+        expect(f.cache.get('world:0:0')).toBeUndefined();
+        expect(f.files.list('cache-recovery')).toHaveLength(2);
+        expect(f.sessions.status()).toContain('Forced LOD capture for Alice');
     });
 
     it('shows cached LOD sections around the player and at block coordinates with a chosen radius', () => {
