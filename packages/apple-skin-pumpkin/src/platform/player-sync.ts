@@ -1,6 +1,7 @@
 import type { JavaPlayer, Player } from 'pumpkin:plugin/player@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
-import { colorLogValue, type Logger } from '@pumpkin-plugins/plugin-kit/logger';
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
+import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import { bool, float32be } from '@pumpkin-plugins/plugin-kit/payload';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { PLUGIN_NAME } from '../name.ts';
@@ -8,7 +9,7 @@ import { EXHAUSTION_CHANNEL, NATURAL_REGENERATION_CHANNEL, SATURATION_CHANNEL } 
 import { SyncTracker } from '../sync.ts';
 
 // Pumpkin leaves the logging target out of its default output, so every line names the plugin.
-const tag = colorLogValue(PLUGIN_NAME, 'cyan');
+const tag = ansi.named.name(PLUGIN_NAME);
 
 /**
  * Keeps AppleSkin clients in step with the server's hunger values. Vanilla tells a client about
@@ -29,13 +30,13 @@ export class PlayerSync {
         this.sent.forget(id);
         this.lastRegeneration.delete(id);
         const sent = this.withJavaClient(player, (java) => {
-            this.log.debug(`${tag} ${colorLogValue(player.getName(), 'cyan')} joined, sending their current hunger.`);
+            this.log.debug(`${tag} ${ansi.named.name(player.getName())} joined, sending their current hunger.`);
             this.sendRegeneration(player, id, java);
             this.send(player, id, java);
         });
         if (!sent) {
             this.log.debug(
-                `${tag} ${colorLogValue(player.getName(), 'cyan')} is not on Java Edition, so there is nothing to sync.`
+                `${tag} ${ansi.named.name(player.getName())} is not on Java Edition, so there is nothing to sync.`
             );
         }
     }
@@ -44,7 +45,7 @@ export class PlayerSync {
     left(player: Player): void {
         this.sent.forget(playerKey(player));
         this.lastRegeneration.delete(playerKey(player));
-        this.log.debug(`${tag} ${colorLogValue(player.getName(), 'cyan')} left, forgetting their hunger.`);
+        this.log.debug(`${tag} ${ansi.named.name(player.getName())} left, forgetting their hunger.`);
     }
 
     /**
@@ -76,15 +77,11 @@ export class PlayerSync {
         const who = player.getName();
         if (update.saturation !== undefined) {
             java.sendCustomPayload(SATURATION_CHANNEL, float32be(update.saturation));
-            this.log.debug(
-                `${tag} ${colorLogValue(who, 'cyan')}: saturation ${colorLogValue(String(update.saturation), 'yellow')}.`
-            );
+            this.log.debug(`${tag} ${ansi.named.name(who)}: saturation ${ansi.named.number(update.saturation)}.`);
         }
         if (update.exhaustion !== undefined) {
             java.sendCustomPayload(EXHAUSTION_CHANNEL, float32be(update.exhaustion));
-            this.log.debug(
-                `${tag} ${colorLogValue(who, 'cyan')}: exhaustion ${colorLogValue(String(update.exhaustion), 'yellow')}.`
-            );
+            this.log.debug(`${tag} ${ansi.named.name(who)}: exhaustion ${ansi.named.number(update.exhaustion)}.`);
         }
     }
 
@@ -96,7 +93,7 @@ export class PlayerSync {
             java.sendCustomPayload(NATURAL_REGENERATION_CHANNEL, bool(rule.val));
             this.lastRegeneration.set(id, rule.val);
             this.log.debug(
-                `${tag} ${colorLogValue(player.getName(), 'cyan')}: natural regeneration is ${rule.val ? 'on' : 'off'} in ${colorLogValue(world.getName(), 'cyan')}.`
+                `${tag} ${ansi.named.name(player.getName())}: natural regeneration is ${rule.val ? 'on' : 'off'} in ${ansi.named.name(world.getName())}.`
             );
         } finally {
             disposeWasiResource(world);

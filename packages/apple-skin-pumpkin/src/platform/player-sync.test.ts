@@ -1,4 +1,4 @@
-import { colorLogValue } from '@pumpkin-plugins/plugin-kit/logger';
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { describe, expect, it } from 'vitest';
 import { FakePlayer, FakeServer } from '../../test/fake-player.ts';
@@ -113,7 +113,7 @@ describe('PlayerSync', () => {
 
         expect(player.sent).toEqual([]);
         expect(log.of('debug')).toEqual([
-            `${colorLogValue('AppleSkinPumpkin', 'cyan')} ${colorLogValue('ada', 'cyan')} is not on Java Edition, so there is nothing to sync.`
+            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')} is not on Java Edition, so there is nothing to sync.`
         ]);
     });
 
@@ -135,10 +135,10 @@ describe('PlayerSync', () => {
         sync.joined(player.host);
 
         expect(log.of('debug')).toEqual([
-            `${colorLogValue('AppleSkinPumpkin', 'cyan')} ${colorLogValue('ada', 'cyan')} joined, sending their current hunger.`,
-            `${colorLogValue('AppleSkinPumpkin', 'cyan')} ${colorLogValue('ada', 'cyan')}: natural regeneration is on in ${colorLogValue('world', 'cyan')}.`,
-            `${colorLogValue('AppleSkinPumpkin', 'cyan')} ${colorLogValue('ada', 'cyan')}: saturation ${colorLogValue('5', 'yellow')}.`,
-            `${colorLogValue('AppleSkinPumpkin', 'cyan')} ${colorLogValue('ada', 'cyan')}: exhaustion ${colorLogValue('0.4', 'yellow')}.`
+            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')} joined, sending their current hunger.`,
+            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')}: natural regeneration is on in ${ansi.named.name('world')}.`,
+            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')}: saturation ${ansi.named.number('5')}.`,
+            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')}: exhaustion ${ansi.named.number('0.4')}.`
         ]);
     });
 
