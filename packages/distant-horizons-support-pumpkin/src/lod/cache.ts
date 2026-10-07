@@ -15,6 +15,12 @@ export interface LodCacheStats {
     diskBytes: number;
     diskLimit: number;
 }
+/** Persisted location and key for a selected cache entry exported before repair. */
+export interface CacheRecoveryBackup {
+    key: string;
+    dataPath: string;
+    manifestPath: string;
+}
 /** Persistent bounded cache; corrupt entries are discarded and rebuilt when terrain is available. */
 export class LodCache {
     private readonly memory = new Map<string, CachedLod>();
@@ -78,16 +84,7 @@ export class LodCache {
         if (value.data.length > 16 * 1024 * 1024) throw new Error('LOD exceeds cache size limit');
         if (this.diskLimit !== 0) {
             const path = this.path(key);
-            this.files.writeFile(
-                path,
-                new Writer()
-                    .int(0x44485031)
-                    .string(key)
-                    .int(checksum(value.data))
-                    .timestamp(value.updated)
-                    .blob(value.data)
-                    .finish()
-            );
+            this.files.writeFile(path, this.encode(key, value));
             const stat = this.files.stat(path);
             if (stat?.kind === 'file') this.indexDiskFile(this.name(key), stat.modified, stat.size);
         }
@@ -99,6 +96,31 @@ export class LodCache {
         }
         this.trimMemory();
         this.pruneDisk();
+    }
+    /** Exports one selected entry, records its key, then removes it from the active cache. */
+    backupAndRemove(key: string): CacheRecoveryBackup | undefined {
+        const name = this.name(key);
+        const memoryValue = this.memory.get(key);
+        const sourcePath = this.path(key);
+        const diskValue = this.diskIndex.has(name) ? this.files.readFile(sourcePath) : undefined;
+        if (!memoryValue && !diskValue) return undefined;
+
+        this.files.createDirectory('cache-recovery');
+        const files = new Set(this.files.list('cache-recovery'));
+        let suffix = 0;
+        let stem: string;
+        do {
+            stem = `${name}-${suffix++}`;
+        } while (files.has(`${stem}.dhp`) || files.has(`${stem}.dhm`));
+
+        const dataPath = `cache-recovery/${stem}.dhp`;
+        const manifestPath = `cache-recovery/${stem}.dhm`;
+        const bytes = memoryValue ? this.encode(key, memoryValue) : diskValue;
+        if (!bytes) return undefined;
+        this.files.writeFile(dataPath, bytes);
+        this.files.writeFile(manifestPath, new Writer().int(0x44485231).string(key).string(dataPath).finish());
+        this.remove(key);
+        return { key, dataPath, manifestPath };
     }
     /** Invalidates a section affected by a known world change. */
     remove(key: string): void {
@@ -136,6 +158,15 @@ export class LodCache {
     }
     private path(key: string): string {
         return `cache/${this.name(key)}`;
+    }
+    private encode(key: string, value: CachedLod): Uint8Array {
+        return new Writer()
+            .int(0x44485031)
+            .string(key)
+            .int(checksum(value.data))
+            .timestamp(value.updated)
+            .blob(value.data)
+            .finish();
     }
     private name(key: string): string {
         const bytes = new Writer().string(key).finish();

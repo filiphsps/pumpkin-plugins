@@ -1,5 +1,6 @@
 import { MemoryFiles } from '@pumpkin-plugins/plugin-kit/testing';
 import { describe, expect, it } from 'vitest';
+import { Reader } from '../protocol/bytes.ts';
 import { LodCache } from './cache.ts';
 
 const lod = (updated: number) => ({ updated, data: new Uint8Array(100).fill(updated) });
@@ -33,6 +34,59 @@ describe('LOD cache', () => {
         expect(files.listCalls).toBe(0);
         expect(files.statCalls).toBe(1);
         expect(restarted.stats().diskEntries).toBe(129);
+    });
+
+    it('backs up a selected legacy entry and its key before removal, preserving unrelated data across restart', () => {
+        const files = new MemoryFiles();
+        const cache = new LodCache(files, 8, 8);
+        const suspectKey = 'world:4:-3';
+        const unrelatedKey = 'world:5:-3';
+        const legacyEmpty = new Uint8Array(64);
+        const unrelated = new Uint8Array(64).fill(7);
+        cache.put(suspectKey, { updated: 1234, data: legacyEmpty });
+        cache.put(unrelatedKey, { updated: 2345, data: unrelated });
+        const cacheName = files.list('cache').find((name) => {
+            const reader = new Reader(files.readFile(`cache/${name}`));
+            reader.int();
+            return reader.string() === suspectKey;
+        });
+        if (!cacheName) throw new Error('Selected cache entry was not persisted');
+        const original = files.readFile(`cache/${cacheName}`);
+
+        const backup = cache.backupAndRemove(suspectKey);
+
+        expect(backup).toMatchObject({ key: suspectKey });
+        if (!backup) throw new Error('Selected cache entry was not backed up');
+        expect(files.readFile(backup.dataPath)).toEqual(original);
+        const manifest = new Reader(files.readFile(backup.manifestPath));
+        expect(manifest.int()).toBe(0x44485231);
+        expect(manifest.string()).toBe(suspectKey);
+        expect(manifest.string()).toBe(backup.dataPath);
+        manifest.end();
+
+        const restarted = new LodCache(files, 8, 8);
+        expect(restarted.get(suspectKey)).toBeUndefined();
+        expect(restarted.get(unrelatedKey)?.data).toEqual(unrelated);
+        expect(files.stat(backup.dataPath)?.kind).toBe('file');
+        expect(files.stat(backup.manifestPath)?.kind).toBe('file');
+    });
+
+    it('preserves the selected cache entry when writing its backup manifest fails', () => {
+        class FailingManifestFiles extends MemoryFiles {
+            override writeFile(path: string, content: Uint8Array): void {
+                if (path.endsWith('.dhm')) throw new Error('manifest write failed');
+                super.writeFile(path, content);
+            }
+        }
+
+        const files = new FailingManifestFiles();
+        const cache = new LodCache(files, 2, 2);
+        const key = 'world:2:-1';
+        cache.put(key, { updated: 1234, data: new Uint8Array(64).fill(8) });
+
+        expect(() => cache.backupAndRemove(key)).toThrow('manifest write failed');
+        expect(cache.get(key)?.data).toEqual(new Uint8Array(64).fill(8));
+        expect(files.list('cache-recovery')).toHaveLength(1);
     });
 
     it('persists captures across restarts, uses bounded filenames and detects corruption', () => {
