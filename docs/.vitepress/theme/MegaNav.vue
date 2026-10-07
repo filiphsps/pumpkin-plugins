@@ -34,8 +34,17 @@ const openMenu = ref<string | null>(null);
 const { theme } = useData();
 const route = useRoute();
 const menus = computed(() => (theme.value as ThemeConfigWithMegaMenus).megaMenus ?? []);
-// biome-ignore lint/correctness/noUnusedVariables: The Vue template renders the active menu.
 const activeMenu = computed(() => menus.value.find((menu) => menu.text === openMenu.value) ?? null);
+// biome-ignore lint/correctness/noUnusedVariables: The Vue template renders the regular category sections.
+const menuSections = computed(() =>
+    (activeMenu.value?.sections ?? [])
+        .map((section) => ({ ...section, items: section.items.filter((item) => item.type !== 'spotlight') }))
+        .filter((section) => section.items.length)
+);
+// biome-ignore lint/correctness/noUnusedVariables: The Vue template renders full-width spotlight rows.
+const spotlightItems = computed(() =>
+    (activeMenu.value?.sections ?? []).flatMap((section) => section.items.filter((item) => item.type === 'spotlight'))
+);
 
 function focusTrigger(menu: string | null = openMenu.value) {
     const button = [...(root.value?.querySelectorAll<HTMLButtonElement>('[data-menu-trigger]') ?? [])].find(
@@ -185,7 +194,7 @@ watch(
 
                     <div class="site-mega-nav__sections">
                         <section
-                            v-for="section in activeMenu.sections"
+                            v-for="section in menuSections"
                             :key="section.text"
                             class="site-mega-nav__section"
                             :class="[
@@ -227,6 +236,22 @@ watch(
                                 </a>
                             </div>
                         </section>
+                    </div>
+                    <div v-if="spotlightItems.length" class="site-mega-nav__spotlights">
+                        <a
+                            v-for="item in spotlightItems"
+                            :key="item.link"
+                            class="site-mega-nav__link site-mega-nav__link--spotlight"
+                            :class="{ 'has-icon': item.icon }"
+                            :href="withBase(item.link)"
+                        >
+                            <img v-if="item.icon" class="site-mega-nav__icon" :src="withBase(item.icon)" alt="" aria-hidden="true">
+                            <span class="site-mega-nav__link-copy">
+                                <span class="site-mega-nav__link-title">{{ item.text }}</span>
+                                <span v-if="item.description" class="site-mega-nav__link-description">{{ item.description }}</span>
+                            </span>
+                            <span class="site-mega-nav__link-action">Open documentation</span>
+                        </a>
                     </div>
                 </div>
             </section>

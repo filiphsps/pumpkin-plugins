@@ -1,6 +1,7 @@
 ---
 navigation:
     category: Plugin development
+    type: spotlight
 ---
 
 # Code style

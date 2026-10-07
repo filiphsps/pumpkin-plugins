@@ -95,7 +95,7 @@ const menus = computed(() => (theme.value as ThemeConfigWithMegaMenus).megaMenus
                             <span v-if="item.description" class="site-mobile-nav__link-description">
                                 {{ item.description }}
                             </span>
-                            <span v-if="item.type === 'card'" class="site-mobile-nav__link-action">
+                            <span v-if="item.type === 'card' || item.type === 'spotlight'" class="site-mobile-nav__link-action">
                                 Open documentation
                             </span>
                         </span>
