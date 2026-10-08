@@ -39,8 +39,16 @@ describe(WaypointStore.name, () => {
         const store = new WaypointStore(files, new MemoryLogger());
         expect(store.add(waypoint())).toBe(true);
         expect(store.add(waypoint('44444444-4444-4444-8444-444444444444', 'home'))).toBe(false);
-        expect(files.text('waypoints.json')).toContain('"version":2');
+        expect(files.text('waypoints.json')).toContain('"version": 2');
         expect(new WaypointStore(files, new MemoryLogger()).list()).toEqual([waypoint()]);
+    });
+
+    it('writes four-space indented JSON with a trailing newline', () => {
+        const files = new MemoryFiles();
+        const store = new WaypointStore(files, new MemoryLogger());
+        store.add(waypoint());
+
+        expect(files.text('waypoints.json')).toBe(`${JSON.stringify({ version: 2, waypoints: [waypoint()] }, null, 4)}\n`);
     });
 
     it('writes a v1 backup before migrating all legacy access modes', () => {

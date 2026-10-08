@@ -298,7 +298,7 @@ function isLegacyLocatorSettings(value: unknown): boolean {
 }
 
 function serialize(waypoints: readonly Waypoint[]): Uint8Array {
-    return strToU8(JSON.stringify({ version: STORE_VERSION, waypoints }));
+    return strToU8(`${JSON.stringify({ version: STORE_VERSION, waypoints }, null, 4)}\n`);
 }
 
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
