@@ -1,6 +1,6 @@
 {
     "name": "@pumpkin-plugins/waypoints",
-    "version": "0.0.0",
+    "version": "0.0.1",
     "private": true,
     "description": "Server waypoints with vanilla commands and Java Locator Bar",
     "license": "MIT",
