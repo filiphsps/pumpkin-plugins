@@ -176,6 +176,9 @@ catalogs:
     c8:
       specifier: 12.0.0
       version: 12.0.0
+    fflate:
+      specifier: 0.8.3
+      version: 0.8.3
     typescript:
       specifier: 6.0.3
       version: 6.0.3
@@ -469,7 +472,7 @@ importers:
         specifier: 'catalog:'
         version: https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz
       fflate:
-        specifier: 0.8.3
+        specifier: 'catalog:'
         version: 0.8.3
     devDependencies:
       '@pumpkin-plugins/build':

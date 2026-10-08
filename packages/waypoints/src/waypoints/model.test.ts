@@ -1,68 +1,102 @@
 import { describe, expect, it } from 'vitest';
-import { canManageWaypoint, canViewWaypoint, createWaypoint } from './model.ts';
+import { createWaypoint, type NewWaypoint, normalizeWaypointName, waypointNameKey } from './model.ts';
 
 const id = '11111111-1111-4111-8111-111111111111';
-const owner = '22222222-2222-4222-8222-222222222222';
-const visitor = '33333333-3333-4333-8333-333333333333';
 
 describe('waypoint model', () => {
-    it('floors block coordinates and defaults to private with locator output disabled', () => {
+    it('normalizes names and keeps exact finite coordinates with restricted defaults', () => {
+        expect(
+            createWaypoint({
+                id,
+                name: '  Cafe\u0301  ',
+                dimension: 'world',
+                position: { x: -0.125, y: 64.875, z: -16.01 }
+            })
+        ).toEqual({
+            id,
+            name: 'Café',
+            dimension: 'world',
+            position: { x: -0.125, y: 64.875, z: -16.01 },
+            color: '#FFFFFF',
+            enabled: true,
+            access: { mode: 'restricted', grants: [] }
+        });
+    });
+
+    it('uses Unicode-normalized case-insensitive name keys', () => {
+        expect(waypointNameKey(' Café ')).toBe(waypointNameKey('cafe\u0301'));
+        expect(normalizeWaypointName('  Home Base  ')).toBe('Home Base');
+    });
+
+    it.each(['', '  ', '\n', 'a'.repeat(65), 'bad\u0000name'])('rejects invalid waypoint name %j', (name) => {
+        expect(() => normalizeWaypointName(name)).toThrow();
+    });
+
+    it.each([
+        [{ x: Number.NaN, y: 0, z: 0 }],
+        [{ x: 30_000_001, y: 0, z: 0 }],
+        [{ x: 0, y: Number.POSITIVE_INFINITY, z: 0 }],
+        [{ x: 0, y: 0, z: -30_000_001 }]
+    ])('rejects invalid positions %j', (position) => {
+        expect(() => createWaypoint({ id, name: 'Home', dimension: 'world', position })).toThrow();
+    });
+
+    it('normalizes color and deduplicates typed access grants', () => {
         const waypoint = createWaypoint({
             id,
             name: 'Home',
-            dimension: 'minecraft:overworld',
-            x: -0.1,
-            y: 64.9,
-            z: -16.01,
-            ownerId: owner
+            dimension: 'world',
+            position: { x: 1, y: 2, z: 3 },
+            color: 'aabbcc',
+            icon: 'minecraft:lodestone',
+            label: 'North Gate',
+            description: 'The northern entrance',
+            visibilityRange: 128,
+            access: {
+                mode: 'public',
+                grants: [
+                    { type: 'player', playerId: '22222222-2222-4222-8222-222222222222' },
+                    { type: 'player', playerId: '22222222-2222-4222-8222-222222222222' },
+                    { type: 'permission', node: 'Waypoints:group.builders' },
+                    { type: 'group', slug: 'builders' }
+                ]
+            }
         });
 
         expect(waypoint).toMatchObject({
-            x: -1,
-            y: 64,
-            z: -17,
-            visibility: 'private',
-            allowedPlayerIds: [],
-            locatorBar: { enabled: false }
+            color: '#AABBCC',
+            icon: 'minecraft:lodestone',
+            label: 'North Gate',
+            description: 'The northern entrance',
+            visibilityRange: 128,
+            access: {
+                mode: 'public',
+                grants: [
+                    { type: 'player', playerId: '22222222-2222-4222-8222-222222222222' },
+                    { type: 'permission', node: 'Waypoints:group.builders' },
+                    { type: 'group', slug: 'builders' }
+                ]
+            }
         });
     });
 
-    it('allows owners and operators to view private points', () => {
-        const waypoint = createWaypoint({
-            id,
-            name: 'Home',
-            dimension: 'minecraft:overworld',
-            x: 0,
-            y: 0,
-            z: 0,
-            ownerId: owner
-        });
-
-        expect(canViewWaypoint(waypoint, owner)).toBe(true);
-        expect(canViewWaypoint(waypoint, visitor)).toBe(false);
-        expect(canViewWaypoint(waypoint, visitor, true)).toBe(true);
-    });
-
-    it('lets allowlisted players view but not manage a point', () => {
-        const waypoint = {
-            ...createWaypoint({ id, name: 'Home', dimension: 'minecraft:overworld', x: 0, y: 0, z: 0, ownerId: owner }),
-            visibility: 'allowlist' as const,
-            allowedPlayerIds: [visitor]
-        };
-
-        expect(canViewWaypoint(waypoint, visitor)).toBe(true);
-        expect(canManageWaypoint(waypoint, visitor)).toBe(false);
-        expect(canManageWaypoint(waypoint, visitor, true)).toBe(true);
-    });
-
-    it('makes public points visible to everyone while keeping mutations owner-scoped', () => {
-        const waypoint = {
-            ...createWaypoint({ id, name: 'Home', dimension: 'minecraft:overworld', x: 0, y: 0, z: 0, ownerId: owner }),
-            visibility: 'public' as const
-        };
-
-        expect(canViewWaypoint(waypoint, visitor)).toBe(true);
-        expect(canManageWaypoint(waypoint, visitor)).toBe(false);
-        expect(canManageWaypoint(waypoint, owner)).toBe(true);
+    it.each([
+        [{ color: '#FFF' }],
+        [{ icon: 'lodestone' }],
+        [{ label: '  ' }],
+        [{ description: 'line\nbreak' }],
+        [{ visibilityRange: 0 }],
+        [{ visibilityRange: 30_000_001 }],
+        [{ access: { mode: 'restricted', grants: [{ type: 'player', playerId: 'not-a-uuid' }] } }]
+    ])('rejects invalid metadata %j', (metadata) => {
+        expect(() =>
+            createWaypoint({
+                id,
+                name: 'Home',
+                dimension: 'world',
+                position: { x: 1, y: 2, z: 3 },
+                ...metadata
+            } as NewWaypoint)
+        ).toThrow();
     });
 });

@@ -5,10 +5,9 @@ import type {
     PlayerJoinEventData,
     PlayerLeaveEventData
 } from 'pumpkin:plugin/event@0.1.0';
+import { ItemStack } from 'pumpkin:plugin/item-stack@0.1.0';
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
-import type { Player } from 'pumpkin:plugin/player@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
-import { TextComponent } from 'pumpkin:plugin/text@0.1.0';
 import * as uuid from 'pumpkin:plugin/uuid@0.1.0';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
 import { runCommand } from '@pumpkin-plugins/plugin-kit/host';
@@ -16,26 +15,24 @@ import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
-import type { JavaLocatorRecipient } from './adapters/java-locator-bar.ts';
-import type { LocatorOutputRegistry } from './adapters/locator-output-registry.ts';
-import { createLocatorOutputRegistry } from './adapters/locator-output-registry.ts';
-import { MapDeliveryService, waypointMapAdapters } from './adapters/map-delivery.ts';
 import { commandHandlers } from './commands/handlers.ts';
-import { ADMIN_PERMISSION, commands } from './commands/spec.ts';
+import { commands } from './commands/spec.ts';
 import { info } from './info.ts';
-import { WaypointService } from './waypoints/service.ts';
+import { WaypointHudService } from './rendering/pumpkin-hud.ts';
+import { WaypointCatalog } from './waypoints/catalog.ts';
 import { WaypointStore } from './waypoints/store.ts';
 
-/** The server-owned waypoint service and its connected-client output lifecycle. */
+/** The canonical waypoint catalog and its vanilla command surface. */
 class Waypoints extends PluginBase {
     private server: Server | undefined;
-    private outputs: LocatorOutputRegistry | undefined;
+    private files: WasiDataDir | undefined;
+    private hud: WaypointHudService | undefined;
 
     constructor() {
         super(info, __PLUGIN_VERSION__);
     }
 
-    /** Loads persistent waypoint state and registers commands and recipient lifecycle events. */
+    /** Loads persistent waypoint resources and registers their commands. */
     protected onPluginLoad(ctx: Context): void {
         const files = WasiDataDir.open();
         if (files === undefined) {
@@ -45,105 +42,59 @@ class Waypoints extends PluginBase {
 
         const server = ctx.getServer();
         this.server = server;
+        this.files = files;
         const store = new WaypointStore(files, {
-            error: (message) => logging.log('error', `${info.name}: ${message}`)
+            error: (message) => logging.log('error', `${info.name}: ${message}`),
+            warn: (message) => logging.log('warn', `${info.name}: ${message}`)
         });
-        const waypoints = new WaypointService(store, () => this.reconcileConnectedPlayers());
-        const outputs = createLocatorOutputRegistry(waypoints, (id) => uuid.parse(id));
-        this.outputs = outputs;
+        const catalog = new WaypointCatalog(store);
+        const hud = new WaypointHudService(server, catalog, {
+            onError: (viewerId, error) =>
+                logging.log('warn', `${info.name}: waypoint HUD update failed for ${viewerId}: ${String(error)}`)
+        });
+        this.hud = hud;
+
+        this.registerEvent(ctx, 'server-tick-end-event', () => hud.tick());
+        this.registerEvent(ctx, 'player-join-event', (_server, event: PlayerJoinEventData) => hud.joined(event.player));
+        this.registerEvent(ctx, 'player-changed-world-event', (_server, event: PlayerChangedWorldEventData) =>
+            hud.changedWorld(event.player)
+        );
+        this.registerEvent(ctx, 'player-leave-event', (_server, event: PlayerLeaveEventData) => hud.left(event.player));
 
         registerCommands(
             ctx,
             commands,
             commandHandlers({
                 server,
-                waypoints,
-                mapDelivery: new MapDeliveryService(waypoints, waypointMapAdapters),
+                catalog,
                 createWaypointId: () => uuid.toString(uuid.generate()),
                 uuidToString: uuid.toString,
-                sendSystemMessage: (player, message) =>
-                    player.sendSystemMessage(TextComponent.fromLegacyString(message), false)
+                uuidFromString: uuid.parse,
+                validateItemIcon: (key) => {
+                    let stack: ItemStack | undefined;
+                    try {
+                        stack = new ItemStack(key, 1);
+                        return stack.getRegistryKey() === key;
+                    } catch {
+                        return false;
+                    } finally {
+                        disposeWasiResource(stack);
+                    }
+                }
             })
         );
-
-        this.registerEvent(ctx, 'server-load-event', (loadedServer) => this.reconcileAll(loadedServer, true));
-        this.registerEvent(ctx, 'player-join-event', (_server, event: PlayerJoinEventData) =>
-            this.reconcilePlayer(event.player, true)
-        );
-        this.registerEvent(ctx, 'player-changed-world-event', (_server, event: PlayerChangedWorldEventData) =>
-            this.reconcilePlayer(event.player, true)
-        );
-        this.registerEvent(ctx, 'player-leave-event', (_server, event: PlayerLeaveEventData) => {
-            outputs['java:locator-bar']?.forgetPlayer(uuid.toString(event.player.getId()));
-        });
-        this.reconcileAll(server, true);
     }
 
-    /** Removes active markers before releasing the retained server handle. */
+    /** Releases retained Pumpkin and filesystem handles on plugin unload. */
     protected override onPluginUnload(_ctx: Context): void {
-        const server = this.server;
         try {
-            if (server !== undefined) this.reconcileAll(server, false, true);
+            this.hud?.unload();
         } finally {
-            disposeWasiResource(server);
+            this.hud = undefined;
+            disposeWasiResource(this.server);
             this.server = undefined;
-            this.outputs = undefined;
-        }
-    }
-
-    private reconcileConnectedPlayers(): void {
-        const server = this.server;
-        if (server !== undefined) this.reconcileAll(server, false);
-    }
-
-    private reconcileAll(server: Server, forceReset: boolean, clear = false): void {
-        let players: Player[];
-        try {
-            players = server.getAllPlayers();
-        } catch (error) {
-            logging.log('warn', `${info.name}: could not list online players for locator update: ${String(error)}`);
-            return;
-        }
-        try {
-            for (const player of players) {
-                try {
-                    this.reconcilePlayer(player, forceReset, clear);
-                } catch (error) {
-                    logging.log('warn', `${info.name}: could not update a player's locator markers: ${String(error)}`);
-                }
-            }
-        } finally {
-            for (const player of players) disposeWasiResource(player);
-        }
-    }
-
-    private reconcilePlayer(player: Player, forceReset: boolean, clear = false): void {
-        const output = this.outputs?.['java:locator-bar'];
-        if (output === undefined) return;
-
-        const playerId = uuid.toString(player.getId());
-        const javaPlayer = player.asJava() ?? undefined;
-        if (javaPlayer === undefined) {
-            output.forgetPlayer(playerId);
-            return;
-        }
-        try {
-            const world = player.getWorld();
-            try {
-                const recipient: JavaLocatorRecipient = {
-                    playerId,
-                    dimension: world.getName(),
-                    isJava: true,
-                    isOperator: player.hasPermission(ADMIN_PERMISSION),
-                    sendPacket: (packet) => javaPlayer.sendPacket(packet)
-                };
-                if (clear) output.clear(recipient);
-                else output.reconcile(recipient, forceReset);
-            } finally {
-                disposeWasiResource(world);
-            }
-        } finally {
-            disposeWasiResource(javaPlayer);
+            disposeWasiResource(this.files);
+            this.files = undefined;
         }
     }
 }

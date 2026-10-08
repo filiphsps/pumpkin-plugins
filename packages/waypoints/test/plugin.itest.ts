@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { info } from '../src/info.ts';
 
 const waypointId = '11111111-1111-4111-8111-111111111111';
-const seededStore = JSON.stringify({
+const legacyStore = JSON.stringify({
     version: 1,
     waypoints: [
         {
@@ -30,30 +30,42 @@ describe(info.name, () => {
         server = await startPumpkin({
             name: 'waypoints',
             plugins: [builtPluginPath(process.cwd())],
-            files: { 'plugins/data/Waypoints/waypoints.json': seededStore }
+            files: { 'plugins/data/Waypoints/waypoints.json': legacyStore }
         });
     });
     afterAll(async () => {
         await server?.stop();
     });
 
-    it('loads on a real server', async () => {
+    it('loads on the pinned real server and migrates v1 with a byte-identical backup', async () => {
         await server.waitForLog(new RegExp(`Loaded ${info.name}`));
+        const directory = server.pluginDataDir(info.name);
+        expect(readFileSync(join(directory, 'waypoints.v1.json'), 'utf8')).toBe(legacyStore);
+        expect(JSON.parse(readFileSync(join(directory, 'waypoints.json'), 'utf8'))).toEqual({
+            version: 2,
+            waypoints: [
+                {
+                    id: waypointId,
+                    name: 'Spawn',
+                    dimension: 'world',
+                    position: { x: 0, y: 64, z: 0 },
+                    color: '#FFFFFF',
+                    enabled: true,
+                    access: { mode: 'public', grants: [] }
+                }
+            ]
+        });
         expect(server.errors()).toEqual([]);
     });
 
-    it('registers administrative commands and reads the persisted waypoint store', async () => {
+    it('registers double coordinate commands and rejects console administration cleanly', async () => {
         const from = server.lines.length;
-        server.command('wp admin list');
-        await server.waitForLog(/Spawn \[11111111-1111-4111-8111-111111111111\]/, 5000, from);
-        const removeFrom = server.lines.length;
-        server.command(`wp admin remove ${waypointId}`);
-        await server.waitForLog(/Removed waypoint\./, 5000, removeFrom);
+        server.command('wp create "Console Test" 12.375 64.5 -8.25');
+        await server.waitForLog(/This command can only be used by a player\./, 5000, from);
 
-        const saved = JSON.parse(readFileSync(join(server.pluginDataDir(info.name), 'waypoints.json'), 'utf8')) as {
-            waypoints: unknown[];
-        };
-        expect(saved.waypoints).toEqual([]);
+        const usageFrom = server.lines.length;
+        server.command('wp create');
+        await server.waitForLog(/Usage: \/wp create <name> \[<x> <y> <z>\]\./, 5000, usageFrom);
         expect(server.errors()).toEqual([]);
     });
 });

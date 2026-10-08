@@ -1,100 +1,122 @@
-import { defineCommands } from '@pumpkin-plugins/docs';
+import { type CommandArgumentSpec, defineCommands } from '@pumpkin-plugins/docs';
 import { PLUGIN_NAME } from '../name.ts';
 
-/** Permission node for player-facing waypoint commands. */
+/** Permission node for player-readable waypoint commands. */
 export const COMMAND_PERMISSION = `${PLUGIN_NAME}:command.use` as const;
 
-/** Single operator override shared by administrative commands and waypoint policy checks. */
+/** Command-tree default for mutations; handlers still verify actual Pumpkin operator status. */
 export const ADMIN_PERMISSION = `${PLUGIN_NAME}:command.admin` as const;
 
-const nameArgument = { name: 'name', type: 'string', mode: 'quotable' } as const;
-const idArgument = { name: 'id', type: 'string', mode: 'single-word' } as const;
-const playerArgument = { name: 'player', type: 'string', mode: 'single-word' } as const;
-const s32 = { min: -2_147_483_648, max: 2_147_483_647 } as const;
+const ADMIN_DEFAULT = { tag: 'op', val: 'three' } as const;
+const name = { name: 'name', type: 'string', mode: 'quotable' } as const;
+const newName = { name: 'newName', type: 'string', mode: 'quotable' } as const;
+const player = { name: 'player', type: 'string', mode: 'single-word' } as const;
+const permission = { name: 'permission', type: 'string', mode: 'single-word' } as const;
+const group = { name: 'group', type: 'string', mode: 'single-word' } as const;
+const hex = { name: 'hex', type: 'string', mode: 'single-word' } as const;
+const item = { name: 'item', type: 'string', mode: 'single-word' } as const;
+const label = { name: 'label', type: 'string', mode: 'greedy' } as const;
+const description = { name: 'description', type: 'string', mode: 'greedy' } as const;
+const coordinate = { min: -30_000_000, max: 30_000_000 } as const;
 
-/** The single command declaration used for Pumpkin registration, handler types, and README usage. */
+function admin<const Arguments extends readonly [CommandArgumentSpec, ...CommandArgumentSpec[]]>(
+    description_: string,
+    arguments_: Arguments
+) {
+    return {
+        description: description_,
+        permission: ADMIN_PERMISSION,
+        defaultPermission: ADMIN_DEFAULT,
+        arguments: arguments_
+    } as const;
+}
+
+const namedCoordinateVariants = [
+    [name],
+    [
+        name,
+        { name: 'x', type: 'double', ...coordinate },
+        { name: 'y', type: 'double' },
+        { name: 'z', type: 'double', ...coordinate }
+    ]
+] as const;
+const teleportVariants = [[name], [name, { name: 'targets', type: 'players' }]] as const;
+
+/** The single declaration used for Pumpkin registration, typed handlers, and generated README usage. */
 export const commands = defineCommands(PLUGIN_NAME, {
     wp: {
         description: 'Create and manage server waypoints',
         permission: COMMAND_PERMISSION,
         defaultPermission: { tag: 'allow' },
         subcommands: {
-            mark: {
-                description: 'Save your current block position as a private waypoint',
-                arguments: [nameArgument]
+            create: {
+                description: 'Create a waypoint at your position or explicit coordinates',
+                permission: ADMIN_PERMISSION,
+                defaultPermission: ADMIN_DEFAULT,
+                argumentVariants: namedCoordinateVariants
             },
-            add: {
-                description: 'Save block coordinates as a private waypoint',
-                arguments: [
-                    nameArgument,
-                    { name: 'x', type: 'integer', ...s32 },
-                    { name: 'y', type: 'integer', ...s32 },
-                    { name: 'z', type: 'integer', ...s32 }
-                ]
+            delete: admin('Delete a waypoint by name', [name]),
+            rename: admin('Rename a waypoint', [name, newName]),
+            relocate: {
+                description: 'Move a waypoint to your position or explicit coordinates',
+                permission: ADMIN_PERMISSION,
+                defaultPermission: ADMIN_DEFAULT,
+                argumentVariants: namedCoordinateVariants
             },
-            list: {
-                description: 'List waypoints you can access; use all to include other dimensions',
-                argumentVariants: [[{ name: 'scope', type: 'string', mode: 'single-word' }]]
+            list: { description: 'List enabled waypoints you can access' },
+            info: { description: 'Show details for an enabled waypoint you can access', arguments: [name] },
+            teleport: {
+                description: 'Teleport to a waypoint or, as an operator, teleport selected players',
+                argumentVariants: teleportVariants
             },
-            show: {
-                description: 'Show an accessible waypoint by UUID',
-                arguments: [idArgument]
+            tp: {
+                description: 'Alias for teleport',
+                argumentVariants: teleportVariants
             },
+            enable: admin('Enable a waypoint', [name]),
+            disable: admin('Disable a waypoint', [name]),
+            get: admin('Inspect a waypoint, including disabled records', [name]),
             access: {
-                description: 'Change visibility and allowlist access',
+                description: 'Manage waypoint access',
                 subcommands: {
-                    public: { description: 'Make a waypoint visible to everyone', arguments: [idArgument] },
-                    private: { description: 'Make a waypoint visible only to its owner', arguments: [idArgument] },
-                    allowlist: {
-                        description: 'Limit a waypoint to its owner and invited players',
-                        arguments: [idArgument]
-                    },
-                    invite: {
-                        description: 'Invite an online player to an allowlisted waypoint',
-                        arguments: [idArgument, playerArgument]
+                    public: admin('Allow every player to access a waypoint', [name]),
+                    restricted: admin('Restrict a waypoint to its grants', [name]),
+                    list: admin('List a waypoint access mode and its grants', [name]),
+                    grant: {
+                        description: 'Add an access grant',
+                        subcommands: {
+                            player: admin('Grant access to an online player', [name, player]),
+                            permission: admin('Grant access to a permission node', [name, permission]),
+                            group: admin('Grant access to a permission marker group', [name, group])
+                        }
                     },
                     revoke: {
-                        description: 'Remove an online player from a waypoint allowlist',
-                        arguments: [idArgument, playerArgument]
+                        description: 'Remove an access grant',
+                        subcommands: {
+                            player: admin('Revoke an online player grant', [name, player]),
+                            permission: admin('Revoke a permission node grant', [name, permission]),
+                            group: admin('Revoke a permission marker group grant', [name, group])
+                        }
                     }
                 }
             },
-            locator: {
-                description: 'Configure a waypoint on the Java Locator Bar',
+            set: {
+                description: 'Set waypoint metadata',
                 subcommands: {
-                    on: { description: 'Enable locator output for a waypoint', arguments: [idArgument] },
-                    off: { description: 'Disable locator output for a waypoint', arguments: [idArgument] },
-                    color: {
-                        description: 'Set or reset a waypoint RGB color',
-                        arguments: [idArgument, { name: 'hex', type: 'string', mode: 'single-word' }]
-                    },
-                    'java-style': {
-                        description: 'Set or reset a Java waypoint style resource ID',
-                        arguments: [idArgument, { name: 'style', type: 'string', mode: 'single-word' }]
-                    }
+                    color: admin('Set the waypoint color', [name, hex]),
+                    icon: admin('Set the waypoint item icon', [name, item]),
+                    label: admin('Set the waypoint display label', [name, label]),
+                    description: admin('Set the waypoint description', [name, description]),
+                    'visibility-range': admin('Set the waypoint rendering range in blocks', [
+                        name,
+                        { name: 'range', type: 'double', min: Number.MIN_VALUE, max: 30_000_000 }
+                    ])
                 }
             },
-            remove: {
-                description: 'Remove a waypoint you own',
-                arguments: [idArgument]
-            },
-            send: {
-                description: 'Show a waypoint to yourself through a map adapter',
-                arguments: [idArgument, { name: 'adapter', type: 'string', mode: 'single-word' }]
-            },
-            'send-to': {
-                description: 'Send an accessible waypoint to an online player',
-                arguments: [idArgument, playerArgument, { name: 'adapter', type: 'string', mode: 'single-word' }]
-            },
-            admin: {
-                description: 'Administer every waypoint',
-                permission: ADMIN_PERMISSION,
-                defaultPermission: { tag: 'op', val: 'three' },
-                subcommands: {
-                    list: { description: 'List every saved waypoint' },
-                    remove: { description: 'Remove any waypoint by UUID', arguments: [idArgument] }
-                }
-            }
+            reset: admin('Reset one mutable waypoint property to its default', [
+                name,
+                { name: 'property', type: 'string', mode: 'single-word' }
+            ])
         }
     }
 });

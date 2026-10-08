@@ -2,7 +2,7 @@
     "name": "@pumpkin-plugins/waypoints",
     "version": "0.0.0",
     "private": true,
-    "description": "Server waypoints with vanilla commands and Java Locator Bar",
+    "description": "Server-managed waypoints with access rules and vanilla commands",
     "license": "MIT",
     "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
     "contributors": [
@@ -39,9 +39,9 @@
         "readme:check": "pumpkin-plugins-docs --check"
     },
     "dependencies": {
+        "fflate": "catalog:",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
-        "@pumpkinmc/pumpkin-api-ts": "catalog:",
-        "fflate": "0.8.3"
+        "@pumpkinmc/pumpkin-api-ts": "catalog:"
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",

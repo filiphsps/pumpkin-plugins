@@ -3,44 +3,64 @@ import { describe, expect, it } from 'vitest';
 import { ADMIN_PERMISSION, COMMAND_PERMISSION, commands } from './spec.ts';
 
 describe('waypoint commands', () => {
-    it('documents the supported vanilla command paths from the command declaration', () => {
-        expect(commandInfos(commands).map(({ usage }) => usage)).toEqual([
-            '/wp mark <name>',
-            '/wp add <name> <x> <y> <z>',
+    it('declares the redesigned public and operator command surface', () => {
+        const usages = commandInfos(commands).map(({ usage }) => usage);
+        expect(usages).toEqual([
+            '/wp create',
+            '/wp create <name>',
+            '/wp create <name> <x> <y> <z>',
+            '/wp delete <name>',
+            '/wp rename <name> <newName>',
+            '/wp relocate',
+            '/wp relocate <name>',
+            '/wp relocate <name> <x> <y> <z>',
             '/wp list',
-            '/wp list <scope>',
-            '/wp show <id>',
-            '/wp access public <id>',
-            '/wp access private <id>',
-            '/wp access allowlist <id>',
-            '/wp access invite <id> <player>',
-            '/wp access revoke <id> <player>',
-            '/wp locator on <id>',
-            '/wp locator off <id>',
-            '/wp locator color <id> <hex>',
-            '/wp locator java-style <id> <style>',
-            '/wp remove <id>',
-            '/wp send <id> <adapter>',
-            '/wp send-to <id> <player> <adapter>',
-            '/wp admin list',
-            '/wp admin remove <id>'
+            '/wp info <name>',
+            '/wp teleport',
+            '/wp teleport <name>',
+            '/wp teleport <name> <targets>',
+            '/wp tp',
+            '/wp tp <name>',
+            '/wp tp <name> <targets>',
+            '/wp enable <name>',
+            '/wp disable <name>',
+            '/wp get <name>',
+            '/wp access public <name>',
+            '/wp access restricted <name>',
+            '/wp access list <name>',
+            '/wp access grant player <name> <player>',
+            '/wp access grant permission <name> <permission>',
+            '/wp access grant group <name> <group>',
+            '/wp access revoke player <name> <player>',
+            '/wp access revoke permission <name> <permission>',
+            '/wp access revoke group <name> <group>',
+            '/wp set color <name> <hex>',
+            '/wp set icon <name> <item>',
+            '/wp set label <name> <label>',
+            '/wp set description <name> <description>',
+            '/wp set visibility-range <name> <range>',
+            '/wp reset <name> <property>'
         ]);
+        expect(usages.some((usage) => /mark|locator|send|show|admin/.test(usage))).toBe(false);
     });
 
-    it('keeps public commands open and applies the operator default only to admin commands', () => {
+    it('separates player-readable commands from operator-guarded mutations', () => {
         const infos = commandInfos(commands);
-        expect(infos.find(({ usage }) => usage === '/wp mark <name>')).toMatchObject({
+        expect(infos.find(({ usage }) => usage === '/wp list')).toMatchObject({
             permission: COMMAND_PERMISSION,
             defaultPermission: { tag: 'allow' }
         });
-        expect(infos.filter(({ usage }) => usage.startsWith('/wp admin '))).toHaveLength(2);
-        expect(
-            infos
-                .filter(({ usage }) => usage.startsWith('/wp admin '))
-                .every(
-                    ({ permission, defaultPermission }) =>
-                        permission === ADMIN_PERMISSION && defaultPermission?.tag === 'op'
-                )
-        ).toBe(true);
+        expect(infos.find(({ usage }) => usage === '/wp info <name>')).toMatchObject({
+            permission: COMMAND_PERMISSION,
+            defaultPermission: { tag: 'allow' }
+        });
+        expect(infos.find(({ usage }) => usage === '/wp create <name> <x> <y> <z>')).toMatchObject({
+            permission: ADMIN_PERMISSION,
+            defaultPermission: { tag: 'op' }
+        });
+        expect(infos.find(({ usage }) => usage === '/wp access grant permission <name> <permission>')).toMatchObject({
+            permission: ADMIN_PERMISSION,
+            defaultPermission: { tag: 'op' }
+        });
     });
 });
