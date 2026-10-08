@@ -6,7 +6,16 @@ describe('DH world mutation events', () => {
     it('invalidates the grown block position when the event is not cancelled', () => {
         const changedMany = vi.fn();
         const sessions = { changedMany } as unknown as Sessions;
-        const world = { getName: vi.fn(() => 'world'), [Symbol.dispose]: vi.fn() };
+        let disposed = false;
+        const world = {
+            getName: vi.fn(() => {
+                if (disposed) throw new Error('World has been disposed');
+                return 'world';
+            }),
+            [Symbol.dispose]: vi.fn(() => {
+                disposed = true;
+            })
+        };
 
         invalidateBlockGrow(sessions, {
             targetWorld: world as never,
@@ -20,13 +29,22 @@ describe('DH world mutation events', () => {
 
         expect(changedMany).toHaveBeenCalledWith('world', [{ x: 64, z: -1 }]);
         expect(world.getName).toHaveBeenCalledOnce();
-        expect(world[Symbol.dispose]).toHaveBeenCalledOnce();
+        expect(world.getName()).toBe('world');
     });
 
     it('invalidates the spread target instead of its source when uncancelled', () => {
         const changedMany = vi.fn();
         const sessions = { changedMany } as unknown as Sessions;
-        const world = { getName: vi.fn(() => 'world'), [Symbol.dispose]: vi.fn() };
+        let disposed = false;
+        const world = {
+            getName: vi.fn(() => {
+                if (disposed) throw new Error('World has been disposed');
+                return 'world';
+            }),
+            [Symbol.dispose]: vi.fn(() => {
+                disposed = true;
+            })
+        };
 
         invalidateBlockSpread(sessions, {
             sourcePos: { x: 1, y: 70, z: 2 },
@@ -38,13 +56,22 @@ describe('DH world mutation events', () => {
 
         expect(changedMany).toHaveBeenCalledWith('world', [{ x: 65, z: -1 }]);
         expect(world.getName).toHaveBeenCalledOnce();
-        expect(world[Symbol.dispose]).toHaveBeenCalledOnce();
+        expect(world.getName()).toBe('world');
     });
 
-    it.each(['growth', 'spread'])('does not invalidate a cancelled %s event and releases its world', (kind) => {
+    it.each(['growth', 'spread'])('preserves the world of a cancelled %s event without invalidating it', (kind) => {
         const changedMany = vi.fn();
         const sessions = { changedMany } as unknown as Sessions;
-        const world = { getName: vi.fn(() => 'world'), [Symbol.dispose]: vi.fn() };
+        let disposed = false;
+        const world = {
+            getName: vi.fn(() => {
+                if (disposed) throw new Error('World has been disposed');
+                return 'world';
+            }),
+            [Symbol.dispose]: vi.fn(() => {
+                disposed = true;
+            })
+        };
         const position = { x: 1, y: 70, z: 2 };
 
         if (kind === 'growth') {
@@ -69,6 +96,6 @@ describe('DH world mutation events', () => {
 
         expect(changedMany).not.toHaveBeenCalled();
         expect(world.getName).not.toHaveBeenCalled();
-        expect(world[Symbol.dispose]).toHaveBeenCalledOnce();
+        expect(world.getName()).toBe('world');
     });
 });
