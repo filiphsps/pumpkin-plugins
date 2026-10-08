@@ -36,9 +36,9 @@ export const info = {
         terrain: [
             `The plugin builds LOD sections covering ${SECTION_SIZE_BLOCKS} × ${SECTION_SIZE_BLOCKS} blocks`,
             `across ${SECTION_CHUNK_COUNT} server chunks.`,
-            `All ${SECTION_CHUNK_COUNT} chunks must remain loaded by Pumpkin while a capture progresses.`,
+            `All ${SECTION_CHUNK_COUNT} chunks must be loaded before sampling and remain available for each capture attempt.`,
             'The plugin cannot load or generate distant chunks.',
-            'Chunks absent from Pumpkin are rejected before sampling; genuinely empty loaded terrain remains valid.',
+            'Requests for unavailable chunks remain pending and retry with exponential backoff until the section is loaded or the client cancels; genuinely empty loaded terrain remains valid.',
             'By default, each vertical column uses its surface biome. Set `sample_biomes_3d = true` under that world in `[worlds."<world>"]` to sample cave and other vertical biomes; this adds a biome lookup for each sampled block.',
             'Player edits, crop growth and fire spread invalidate affected cached sections. Mutations without exact world and changed-position data from the pinned Pumpkin API may remain cached until refresh.',
             `Captures are limited to ${MAX_POINTS_PER_SECTION} material segments per section,`,

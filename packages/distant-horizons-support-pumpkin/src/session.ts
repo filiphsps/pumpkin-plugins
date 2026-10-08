@@ -31,6 +31,9 @@ import {
 } from './protocol/messages.ts';
 
 const logTag = ansi.named.name(PLUGIN_NAME);
+const INITIAL_TERRAIN_RETRY_MS = 1000;
+const MAX_TERRAIN_RETRY_MS = 30_000;
+const TERRAIN_RETRY_RETENTION_MS = 60_000;
 
 /** A Java player snapshot and terrain access, valid only during an adapter callback. */
 export interface Peer extends ForcedLodPeer {
@@ -78,6 +81,11 @@ interface Request {
     cached?: CachedLod | null;
     revision: number;
 }
+interface TerrainRetry {
+    attempts: number;
+    retryAt: number;
+    updatedAt: number;
+}
 interface Refresh {
     name: string;
     key: string;
@@ -90,6 +98,7 @@ interface Refresh {
 export class Sessions {
     private readonly clients = new Map<string, Client>();
     private readonly requests: Request[] = [];
+    private readonly terrainRetries = new Map<string, TerrainRetry>();
     private readonly refreshes = new Map<string, Refresh>();
     private readonly revisions = new Map<string, number>();
     private readonly workBudget = new AdaptiveWorkBudget({ initialUnits: 8192 });
@@ -231,6 +240,7 @@ export class Sessions {
     tick(peers: Peers, serverMspt = 0): void {
         const handlerStarted = this.measureNow();
         this.ticks++;
+        this.pruneTerrainRetries();
         const refreshesAtStart = [...this.refreshes.values()];
         for (const [name, client] of this.clients) {
             if (
@@ -302,11 +312,25 @@ export class Sessions {
                         minY: peer.terrain.minY,
                         height: peer.terrain.height
                     };
+                    const retry = this.terrainRetries.get(request.key);
+                    if (retry && this.now() < retry.retryAt) return;
                     if (availabilityChecks >= this.settings.cached_requests_per_tick) return;
                     availabilityChecks++;
-                    const prepared = peer.terrain.prepare?.(region);
-                    if (prepared?.status === 'pending') return;
-                    if (prepared && prepared.status !== 'ready') throw new Error(prepared.reason);
+                    let prepared: ReturnType<NonNullable<typeof peer.terrain.prepare>> | undefined;
+                    try {
+                        prepared = peer.terrain.prepare?.(region);
+                    } catch (err) {
+                        this.deferTerrain(request, String(err));
+                        return;
+                    }
+                    if (prepared && prepared.status !== 'ready') {
+                        this.deferTerrain(
+                            request,
+                            prepared.status === 'unavailable' ? prepared.reason : 'Terrain preparation is pending'
+                        );
+                        return;
+                    }
+                    this.terrainRetries.delete(request.key);
                     if (
                         !request.builder &&
                         this.captureRequestCount(request.name, request) >= this.settings.requests_per_player
@@ -324,12 +348,24 @@ export class Sessions {
                     const started = this.measureNow();
                     const complete = request.builder.step(measured.source, blocksBudget);
                     if (complete) {
-                        const stillLoaded = peer.terrain.prepare?.(region);
-                        if (stillLoaded?.status === 'pending') {
+                        let stillLoaded: ReturnType<NonNullable<typeof peer.terrain.prepare>> | undefined;
+                        try {
+                            stillLoaded = peer.terrain.prepare?.(region);
+                        } catch (err) {
+                            this.deferTerrain(request, String(err));
                             this.workBudget.observe(measured.samples(), this.measureNow() - started);
                             return;
                         }
-                        if (stillLoaded && stillLoaded.status !== 'ready') throw new Error(stillLoaded.reason);
+                        if (stillLoaded && stillLoaded.status !== 'ready') {
+                            this.deferTerrain(
+                                request,
+                                stillLoaded.status === 'unavailable'
+                                    ? stillLoaded.reason
+                                    : 'Terrain preparation is pending'
+                            );
+                            this.workBudget.observe(measured.samples(), this.measureNow() - started);
+                            return;
+                        }
                         const captured = { updated: this.now(), data: request.builder.finish(this.now()) };
                         this.cache.put(request.key, captured);
                         this.log.debug(
@@ -602,6 +638,7 @@ export class Sessions {
         );
     }
     private complete(request: Request, value: CachedLod, cached = false): void {
+        this.terrainRetries.delete(request.key);
         const client = this.clients.get(request.name);
         if (client) {
             const isUnchanged = request.timestamp !== undefined && value.updated <= request.timestamp;
@@ -626,6 +663,32 @@ export class Sessions {
         const index = this.requests.indexOf(request);
         if (index >= 0) this.requests.splice(index, 1);
         this.clearRevisionIfUnused(request.key);
+    }
+    private deferTerrain(request: Request, reason: string): void {
+        const now = this.now();
+        const previous = this.terrainRetries.get(request.key);
+        const attempts = Math.min((previous?.attempts ?? 0) + 1, 32);
+        const delay = Math.min(INITIAL_TERRAIN_RETRY_MS * 2 ** Math.min(attempts - 1, 10), MAX_TERRAIN_RETRY_MS);
+        request.builder = undefined;
+        this.terrainRetries.delete(request.key);
+        this.terrainRetries.set(request.key, { attempts, retryAt: now + delay, updatedAt: now });
+        const maximumEntries = Math.max(64, this.settings.pending_requests * 4);
+        while (this.terrainRetries.size > maximumEntries) {
+            const oldestKey = this.terrainRetries.keys().next().value;
+            if (oldestKey === undefined) break;
+            this.terrainRetries.delete(oldestKey);
+        }
+        this.log.debug(
+            `${logTag} Deferred DH request ${ansi.named.number(request.tracker)} from ${ansi.named.name(request.name)} for ${lodLocation(request.level, request.section.x, request.section.z)}: ${reason}; retrying in ${ansi.named.number(delay)} ms.`
+        );
+    }
+    private pruneTerrainRetries(): void {
+        const now = this.now();
+        const activeKeys = new Set(this.requests.map((request) => request.key));
+        for (const [key, retry] of this.terrainRetries) {
+            if (!activeKeys.has(key) && now - retry.updatedAt >= TERRAIN_RETRY_RETENTION_MS)
+                this.terrainRetries.delete(key);
+        }
     }
     private cancelRequests(name: string): void {
         for (let i = this.requests.length - 1; i >= 0; i--) {
