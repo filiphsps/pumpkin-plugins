@@ -17,7 +17,7 @@ import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
-import { commandHandlers } from './commands/handlers.ts';
+import { commandHandlers, waypointNameSuggestions } from './commands/handlers.ts';
 import { itemIconInputFromCommand } from './commands/item-input.ts';
 import { commands } from './commands/spec.ts';
 import { info } from './info.ts';
@@ -81,40 +81,40 @@ class Waypoints extends PluginBase {
             hud.left(event.player);
         });
 
-        registerCommands(
-            ctx,
-            commands,
-            commandHandlers({
-                server,
-                catalog,
-                createWaypointId: () => uuid.toString(uuid.generate()),
-                uuidToString: uuid.toString,
-                uuidFromString: uuid.parse,
-                consumePendingItemIconInput: (sender) => {
-                    if (sender.isPlayer()) {
-                        const playerKey = sender.getName().toLowerCase();
-                        const input = this.pendingItemIconInputs.get(playerKey);
-                        this.pendingItemIconInputs.delete(playerKey);
-                        return input;
-                    }
-                    const input = this.pendingServerItemIconInput;
-                    this.pendingServerItemIconInput = undefined;
+        const commandRuntime = {
+            server,
+            catalog,
+            createWaypointId: () => uuid.toString(uuid.generate()),
+            uuidToString: uuid.toString,
+            uuidFromString: uuid.parse,
+            consumePendingItemIconInput: (sender: CommandSender) => {
+                if (sender.isPlayer()) {
+                    const playerKey = sender.getName().toLowerCase();
+                    const input = this.pendingItemIconInputs.get(playerKey);
+                    this.pendingItemIconInputs.delete(playerKey);
                     return input;
-                },
-                validateItemIcon: (key) => {
-                    let stack: ItemStack | undefined;
-                    try {
-                        const requestedKey = normalizeItemIdentifier(key);
-                        stack = new ItemStack(requestedKey, 1);
-                        return normalizeItemIdentifier(stack.getRegistryKey()) === requestedKey;
-                    } catch {
-                        return false;
-                    } finally {
-                        disposeWasiResource(stack);
-                    }
                 }
-            })
-        );
+                const input = this.pendingServerItemIconInput;
+                this.pendingServerItemIconInput = undefined;
+                return input;
+            },
+            validateItemIcon: (key: string) => {
+                let stack: ItemStack | undefined;
+                try {
+                    const requestedKey = normalizeItemIdentifier(key);
+                    stack = new ItemStack(requestedKey, 1);
+                    return normalizeItemIdentifier(stack.getRegistryKey()) === requestedKey;
+                } catch {
+                    return false;
+                } finally {
+                    disposeWasiResource(stack);
+                }
+            }
+        };
+        registerCommands(ctx, commands, commandHandlers(commandRuntime), {
+            arguments: { name: waypointNameSuggestions(commandRuntime) },
+            register: (handler) => this.registerCommandSuggestionHandler(handler)
+        });
     }
 
     /** Releases retained Pumpkin and filesystem handles on plugin unload. */

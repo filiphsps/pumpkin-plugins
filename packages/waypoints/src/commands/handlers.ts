@@ -2,6 +2,7 @@ import type { CommandSender } from 'pumpkin:plugin/command@0.1.0';
 import type { Player, Uuid } from 'pumpkin:plugin/player@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { type CommandHandlers, type CommandLine, errorLine } from '@pumpkin-plugins/docs';
+import type { CommandSuggestionHandler } from '@pumpkin-plugins/plugin-kit/commands';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { PLUGIN_NAME } from '../name';
 import { canAccessWaypoint } from '../waypoints/access';
@@ -228,13 +229,42 @@ export function commandHandlers(runtime: WaypointCommandRuntime): CommandHandler
     };
 }
 
+/** Suggests waypoint names visible to this sender, using the same access policy as commands. */
+export function waypointNameSuggestions(runtime: WaypointCommandRuntime): CommandSuggestionHandler<CommandSender> {
+    return (sender, request) =>
+        withActorContext(
+            runtime,
+            sender,
+            (actor) => {
+                if (!runtime.catalog.isAvailable) return [];
+                const prefix = suggestionPrefix(request.remaining);
+                return runtime.catalog
+                    .list()
+                    .filter((waypoint) => (waypoint.enabled || actor.isOperator) && canAccessWaypoint(waypoint, actor))
+                    .filter((waypoint) => waypointNameKey(waypoint.name).startsWith(prefix))
+                    .sort((left, right) => waypointNameKey(left.name).localeCompare(waypointNameKey(right.name)))
+                    .map((waypoint) => quoteWaypointName(waypoint.name));
+            },
+            () => []
+        );
+}
+
 function withActor(
     runtime: WaypointCommandRuntime,
     sender: CommandSender,
     run: (actor: Actor) => readonly CommandLine[]
 ): CommandLine[] {
+    return [...withActorContext(runtime, sender, run, () => [errorLine(PLAYER_ONLY)])];
+}
+
+function withActorContext<Result>(
+    runtime: WaypointCommandRuntime,
+    sender: CommandSender,
+    run: (actor: Actor) => Result,
+    noPlayer: () => Result
+): Result {
     const player = sender.asPlayer() ?? undefined;
-    if (player === undefined) return [errorLine(PLAYER_ONLY)];
+    if (player === undefined) return noPlayer();
     try {
         const id = player.getId();
         const opManager = runtime.server.getOpManager();
@@ -250,10 +280,23 @@ function withActor(
             isOperator,
             hasPermission: (node) => player.hasPermission(node)
         };
-        return [...run(actor)];
+        return run(actor);
     } finally {
         disposeWasiResource(player);
     }
+}
+
+function suggestionPrefix(remaining: string): string {
+    const unquoted = remaining.startsWith('"') ? remaining.slice(1) : remaining;
+    return unquoted
+        .replace(/\\(["\\])/g, '$1')
+        .toLowerCase()
+        .normalize('NFC');
+}
+
+function quoteWaypointName(name: string): string {
+    if (/^[A-Za-z0-9_.+-]+$/.test(name)) return name;
+    return `"${name.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 }
 
 function withOperator(

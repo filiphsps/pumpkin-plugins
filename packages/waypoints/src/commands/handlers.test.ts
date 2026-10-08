@@ -5,7 +5,7 @@ import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { WaypointCatalog } from '../waypoints/catalog.ts';
 import { WaypointStore } from '../waypoints/store.ts';
-import { commandHandlers } from './handlers.ts';
+import { commandHandlers, waypointNameSuggestions } from './handlers.ts';
 
 vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({
     hostLogger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
@@ -36,7 +36,7 @@ function setup(isOperator = false, pendingItemIconInput?: string) {
         getPlayerByName: vi.fn()
     } as unknown as Server;
     const sender = { asPlayer: () => player, hasPermission: vi.fn(() => true) } as unknown as CommandSender;
-    const handlers = commandHandlers({
+    const runtime = {
         server,
         catalog,
         createWaypointId: () => waypointId,
@@ -44,11 +44,57 @@ function setup(isOperator = false, pendingItemIconInput?: string) {
         uuidFromString: () => ({ high: 1n, low: 2n }) as never,
         consumePendingItemIconInput: () => pendingItemIconInput,
         validateItemIcon: () => true
-    });
-    return { catalog, files, handlers, opManager, player, sender, server, world };
+    };
+    const handlers = commandHandlers(runtime);
+    return { catalog, files, handlers, opManager, player, runtime, sender, server, world };
 }
 
 describe('/wp handlers', () => {
+    it('suggests only enabled waypoints accessible to the requesting player', () => {
+        const { catalog, runtime, sender } = setup(false);
+        catalog.create({
+            id: waypointId,
+            name: 'Market Place',
+            dimension: 'world',
+            position: { x: 0, y: 64, z: 0 },
+            access: { mode: 'public', grants: [] }
+        });
+        catalog.create({
+            id: '33333333-3333-4333-8333-333333333333',
+            name: 'Meadow',
+            dimension: 'world',
+            position: { x: 0, y: 64, z: 0 },
+            access: { mode: 'restricted', grants: [{ type: 'player', playerId }] }
+        });
+        catalog.create({
+            id: '44444444-4444-4444-8444-444444444444',
+            name: 'Mine',
+            dimension: 'world',
+            position: { x: 0, y: 64, z: 0 },
+            access: {
+                mode: 'restricted',
+                grants: [{ type: 'player', playerId: '55555555-5555-4555-8555-555555555555' }]
+            }
+        });
+        catalog.create({
+            id: '66666666-6666-4666-8666-666666666666',
+            name: 'Mountain',
+            dimension: 'world',
+            position: { x: 0, y: 64, z: 0 },
+            enabled: false,
+            access: { mode: 'public', grants: [] }
+        });
+
+        expect(
+            waypointNameSuggestions(runtime)(sender, {
+                input: '/wp tp m',
+                cursor: 8,
+                start: 7,
+                remaining: 'm'
+            })
+        ).toEqual(['"Market Place"', 'Meadow']);
+    });
+
     it('uses Pumpkin operator status instead of a grantable command permission', () => {
         const { catalog, handlers, opManager, player, sender } = setup(false);
         const run = (
