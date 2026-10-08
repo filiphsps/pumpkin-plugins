@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.0.10](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.9...distant-horizons-support-pumpkin-v0.0.10) (2026-10-08)
+
+
+### Features
+
+* **dh:** add per-world 3d biome sampling ([722a3ec](https://github.com/filiphsps/pumpkin-plugins/commit/722a3ec9041292164df2ee1f98b681779c27eeee))
+
+
+### Bug Fixes
+
+* **dh:** invalidate cached sections on growth and spread ([204218e](https://github.com/filiphsps/pumpkin-plugins/commit/204218e53921704eb672019eba5474c0c44e42d6))
+* **dh:** omit client dimension text from debug logs ([068f010](https://github.com/filiphsps/pumpkin-plugins/commit/068f01012ff8740d5fb442e20eed19652f838ef7))
+
+
+### Performance Improvements
+
+* **dh:** reuse heightmap values within columns ([9563af7](https://github.com/filiphsps/pumpkin-plugins/commit/9563af708fd0cf0374fdecd62511356f010bf722))
+
 ## [0.0.9](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.8...distant-horizons-support-pumpkin-v0.0.9) (2026-10-07)
 
 
