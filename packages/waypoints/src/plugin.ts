@@ -12,7 +12,7 @@ import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import * as uuid from 'pumpkin:plugin/uuid@0.1.0';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
-import { runCommand } from '@pumpkin-plugins/plugin-kit/host';
+import { cancelTask, runCommand, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
@@ -31,6 +31,7 @@ class Waypoints extends PluginBase {
     private server: Server | undefined;
     private files: WasiDataDir | undefined;
     private hud: WaypointHudService | undefined;
+    private hudTaskId: number | undefined;
     private readonly pendingItemIconInputs = new Map<string, string>();
     private pendingServerItemIconInput: string | undefined;
 
@@ -59,8 +60,9 @@ class Waypoints extends PluginBase {
                 logging.log('warn', `${info.name}: waypoint HUD update failed for ${viewerId}: ${String(error)}`)
         });
         this.hud = hud;
+        // Pumpkin disables scheduled plugin tasks before shutting down the WASM store.
+        this.hudTaskId = scheduleRepeating(1, () => hud.tick());
 
-        this.registerEvent(ctx, 'server-tick-end-event', () => hud.tick());
         this.registerEvent(ctx, 'player-join-event', (_server, event: PlayerJoinEventData) => hud.joined(event.player));
         this.registerEvent(ctx, 'player-changed-world-event', (_server, event: PlayerChangedWorldEventData) =>
             hud.changedWorld(event.player)
@@ -119,6 +121,15 @@ class Waypoints extends PluginBase {
     protected override onPluginUnload(_ctx: Context): void {
         this.pendingItemIconInputs.clear();
         this.pendingServerItemIconInput = undefined;
+        const hudTaskId = this.hudTaskId;
+        this.hudTaskId = undefined;
+        if (hudTaskId !== undefined) {
+            try {
+                cancelTask(hudTaskId);
+            } catch (error) {
+                logging.log('warn', `${info.name}: failed to cancel HUD update task: ${String(error)}`);
+            }
+        }
         try {
             this.hud?.unload();
         } finally {

@@ -12,7 +12,9 @@ const state = vi.hoisted(() => ({
     plugin: undefined as LoadedPlugin | undefined,
     files: undefined as MemoryFiles | undefined,
     commandRuntime: undefined as unknown,
-    events: new Map<string, (server: Server, event: unknown) => void>()
+    events: new Map<string, (server: Server, event: unknown) => void>(),
+    tasks: new Map<number, (server: Server) => void>(),
+    nextTask: 0
 }));
 
 vi.mock('pumpkin:plugin/logging@0.1.0', () => ({ log: vi.fn() }));
@@ -46,7 +48,15 @@ vi.mock('@pumpkin-plugins/plugin-kit/plugin', () => ({
     handleTask: vi.fn()
 }));
 vi.mock('@pumpkin-plugins/plugin-kit/data-dir', () => ({ WasiDataDir: { open: () => state.files } }));
-vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({ runCommand: vi.fn() }));
+vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({
+    runCommand: vi.fn(),
+    scheduleRepeating: (_period: number, run: (server: Server) => void) => {
+        const id = ++state.nextTask;
+        state.tasks.set(id, run);
+        return id;
+    },
+    cancelTask: (id: number) => state.tasks.delete(id)
+}));
 vi.mock('@pumpkin-plugins/plugin-kit/register-commands', () => ({ registerCommands: vi.fn() }));
 vi.mock('./commands/handlers.ts', () => ({
     commandHandlers: (runtime: unknown) => {
@@ -59,12 +69,14 @@ describe('Waypoints plugin HUD lifecycle', () => {
     beforeEach(async () => {
         vi.resetModules();
         state.events.clear();
+        state.tasks.clear();
+        state.nextTask = 0;
         state.commandRuntime = undefined;
         state.files = new MemoryFiles();
         await import('./plugin.ts');
     });
 
-    it('registers HUD lifecycle and command-input events and unloads cleanly', () => {
+    it('schedules HUD updates and cancels the task on unload', () => {
         const plugin = state.plugin;
         if (plugin === undefined) throw new Error('Plugin was not registered');
         const opManager = { isOp: () => false, [Symbol.dispose]: vi.fn() };
@@ -77,15 +89,16 @@ describe('Waypoints plugin HUD lifecycle', () => {
         plugin.onPluginLoad(context);
 
         expect([...state.events.keys()]).toEqual([
-            'server-tick-end-event',
             'player-join-event',
             'player-changed-world-event',
             'player-command-send-event',
             'server-command-event',
             'player-leave-event'
         ]);
-        state.events.get('server-tick-end-event')?.(server, {});
+        expect(state.tasks.size).toBe(1);
+        state.tasks.get(1)?.(server);
         expect(() => plugin.onPluginUnload(context)).not.toThrow();
+        expect(state.tasks.size).toBe(0);
     });
 
     it('provides the selected icon token from the pre-dispatch command events', () => {
