@@ -5,22 +5,42 @@ import type { Uuid } from 'pumpkin:plugin/uuid@0.1.0';
 export const TEXT_DISPLAY_ENTITY_TYPE_ID = 135;
 
 const BILLBOARD_CENTER = 3;
+const POSITION_INTERPOLATION_TICKS = 1;
 const TEXT_COMPONENT_META_TYPE = 5;
 const VAR_INT_META_TYPE = 1;
 const BYTE_META_TYPE = 0;
+// Minecraft 26.3 registers Long at serializer 2, so Float uses serializer 3.
+const FLOAT_META_TYPE = 3;
+const VECTOR3_META_TYPE = 39;
 const TEXT_LINE_WIDTH = 300;
 const TEXT_BACKGROUND = 0x40000000;
 const TEXT_DISPLAY_SEE_THROUGH = 0x02;
+const TEXT_DISPLAY_VIEW_RANGE = 10;
 const ENTITY_DELTA_SCALE = 4096;
 const MIN_ENTITY_DELTA = -32_768;
 const MAX_ENTITY_DELTA = 32_767;
 
 /** Encodes TextDisplay metadata; 26.3 components are already network-NBT encoded by Pumpkin. */
-export function encodeTextDisplayMetadata(componentNbt: Uint8Array): Uint8Array {
+export function encodeTextDisplayMetadata(componentNbt: Uint8Array, scale = 1): Uint8Array {
     return Uint8Array.from([
+        8,
+        VAR_INT_META_TYPE,
+        0,
+        9,
+        VAR_INT_META_TYPE,
+        POSITION_INTERPOLATION_TICKS,
+        10,
+        VAR_INT_META_TYPE,
+        POSITION_INTERPOLATION_TICKS,
+        12,
+        VECTOR3_META_TYPE,
+        ...encodeScale(scale),
         15,
         BYTE_META_TYPE,
         BILLBOARD_CENTER,
+        17,
+        FLOAT_META_TYPE,
+        ...encodeFloat(TEXT_DISPLAY_VIEW_RANGE),
         23,
         TEXT_COMPONENT_META_TYPE,
         ...componentNbt,
@@ -67,10 +87,25 @@ export function createEntityRemovePacket(entityIds: readonly number[]): Clientbo
 }
 
 /** Builds the Java packet that applies metadata to one fake entity. */
-export function createTextDisplayMetadataPacket(entityId: number, componentNbt: Uint8Array): ClientboundPacket {
+export function createTextDisplayMetadataPacket(
+    entityId: number,
+    componentNbt: Uint8Array,
+    scale = 1
+): ClientboundPacket {
     return {
         tag: 'c-set-entity-metadata',
-        val: { entityId, metadata: encodeTextDisplayMetadata(componentNbt) }
+        val: { entityId, metadata: encodeTextDisplayMetadata(componentNbt, scale) }
+    };
+}
+
+/** Updates only a display's scale and restarts its one-tick transformation interpolation. */
+export function createTextDisplayScalePacket(entityId: number, scale: number): ClientboundPacket {
+    return {
+        tag: 'c-set-entity-metadata',
+        val: {
+            entityId,
+            metadata: Uint8Array.from([8, VAR_INT_META_TYPE, 0, 12, VECTOR3_META_TYPE, ...encodeScale(scale), 255])
+        }
     };
 }
 
@@ -136,4 +171,17 @@ function encodeVarInt(value: number): number[] {
         bytes.push(byte);
     } while (remaining !== 0);
     return bytes;
+}
+
+/** Encodes the view range as an IEEE-754 float in network byte order. */
+function encodeFloat(value: number): number[] {
+    const bytes = new Uint8Array(4);
+    new DataView(bytes.buffer).setFloat32(0, value, false);
+    return [...bytes];
+}
+
+/** Encodes a uniform display scale as three big-endian floats. */
+function encodeScale(scale: number): number[] {
+    const component = encodeFloat(scale);
+    return [...component, ...component, ...component];
 }

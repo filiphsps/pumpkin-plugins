@@ -14,7 +14,8 @@ describe('Java 26.3 text display packets', () => {
     it('encodes centered text metadata with the pinned 26.3 indices and raw NBT component bytes', async () => {
         const protocol = await loadProtocol();
         expect([...protocol.encodeTextDisplayMetadata(Uint8Array.of(10, 0, 0))]).toEqual([
-            15, 0, 3, 23, 5, 10, 0, 0, 24, 1, 172, 2, 25, 1, 128, 128, 128, 128, 4, 26, 0, 255, 27, 0, 2, 255
+            8, 1, 0, 9, 1, 1, 10, 1, 1, 12, 39, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 15, 0, 3, 17, 3, 65, 32, 0,
+            0, 23, 5, 10, 0, 0, 24, 1, 172, 2, 25, 1, 128, 128, 128, 128, 4, 26, 0, 255, 27, 0, 2, 255
         ]);
     });
 
@@ -23,7 +24,18 @@ describe('Java 26.3 text display packets', () => {
         expect([...protocol.encodeTextDisplayMetadata(Uint8Array.of(10, 0, 0)).slice(-4)]).toEqual([27, 0, 2, 255]);
     });
 
-    it('spawns the pinned text display entity with the supplied UUID and camera-plane position', async () => {
+    it('updates scale without resending text or creating another entity', async () => {
+        const protocol = await loadProtocol();
+        expect(protocol.createTextDisplayScalePacket(-1_500_000_000, 0.5)).toEqual({
+            tag: 'c-set-entity-metadata',
+            val: {
+                entityId: -1_500_000_000,
+                metadata: Uint8Array.from([8, 1, 0, 12, 39, 63, 0, 0, 0, 63, 0, 0, 0, 63, 0, 0, 0, 255])
+            }
+        });
+    });
+
+    it('spawns the pinned text display entity with the supplied UUID and world position', async () => {
         const protocol = await loadProtocol();
         expect(
             protocol.createTextDisplaySpawnPacket(-1_000_000_000, { high: 1n, low: 2n }, { x: 1, y: 2, z: 3 })
@@ -99,7 +111,9 @@ describe('Java 26.3 text display packets', () => {
             val: {
                 entityId: -1_500_000_000,
                 metadata: Uint8Array.from([
-                    15, 0, 3, 23, 5, 10, 0, 0, 24, 1, 172, 2, 25, 1, 128, 128, 128, 128, 4, 26, 0, 255, 27, 0, 2, 255
+                    8, 1, 0, 9, 1, 1, 10, 1, 1, 12, 39, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 15, 0, 3, 17, 3,
+                    65, 32, 0, 0, 23, 5, 10, 0, 0, 24, 1, 172, 2, 25, 1, 128, 128, 128, 128, 4, 26, 0, 255, 27, 0, 2,
+                    255
                 ])
             }
         });
