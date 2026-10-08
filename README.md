@@ -27,7 +27,7 @@ component overviews, and generated API references.
 | --- | --- | --- |
 | [AppleSkinPumpkin](packages/apple-skin-pumpkin) | AppleSkin server-side support | MIT |
 | [BedrockAddonManager](packages/bedrock-addon-manager) | Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and reads their manifests. Pumpkin does not yet expose an API for sending packs to players. | MIT |
-| [DistantHorizonsSupportPumpkin](packages/distant-horizons-support-pumpkin) | Unofficial Distant Horizons server support for Pumpkin | [GPL-3.0-or-later](packages/distant-horizons-support-pumpkin/LICENSE) |
+| [DistantHorizonsSupportPumpkin](packages/distant-horizons-support-pumpkin) | Unofficial Distant Horizons server-side support for Pumpkin | [GPL-3.0-or-later](packages/distant-horizons-support-pumpkin/LICENSE) |
 | [DynamicLightsPumpkin](packages/dynamic-lights-pumpkin) | Server-driven dynamic lights for held items and nearby entities | MIT |
 | [UPnPumpkin](packages/upnpumpkin) | Opens server ports on the router with UPnP or NAT-PMP so players can connect from the internet. Other plugins can request port mappings through UPnPumpkin. | MIT |
 | [Waypoints](packages/waypoints) | Server waypoints with vanilla commands and Java Locator Bar | MIT |
