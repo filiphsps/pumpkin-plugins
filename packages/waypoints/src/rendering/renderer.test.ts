@@ -26,6 +26,32 @@ function createRenderer(options?: {
 }
 
 describe('WaypointHudRenderer', () => {
+    it('sends each configured icon below its label and refreshes icon-only edits', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const first = waypoint({ icon: 'minecraft:pumpkin_pie' });
+        const second = waypoint({
+            id: '55555555-5555-4555-8555-555555555555',
+            name: 'Flowers',
+            icon: 'minecraft:poppy'
+        });
+        renderer.renderViewer(client.viewer, [first, second]);
+        const metadata = client.packets.filter((packet) => packet.tag === 'c-set-entity-metadata');
+        const contents = metadata.map((packet) => new TextDecoder().decode(packet.val.metadata));
+        expect(contents[0]).toContain('minecraft:item/pumpkin_pie');
+        expect(contents[1]).toContain('minecraft:block/poppy');
+        expect(contents.every((text) => text.includes('\n'))).toBe(true);
+        client.packets.length = 0;
+        renderer.renderViewer(client.viewer, [waypoint({ ...first, icon: 'minecraft:apple' }), second]);
+        expect(client.packets.map(({ tag }) => tag)).toEqual(['c-set-entity-metadata']);
+        const update = client.packets[0];
+        if (update?.tag !== 'c-set-entity-metadata') throw new Error('Expected an icon update.');
+        expect(new TextDecoder().decode(update.val.metadata)).toContain('minecraft:item/apple');
+        client.packets.length = 0;
+        renderer.renderViewer(client.viewer, [waypoint({ ...first, icon: undefined }), second]);
+        expect(client.packets.map(({ tag }) => tag)).toEqual(['c-set-entity-metadata']);
+    });
+
     it('sends restricted display packets only to viewers allowed by the waypoint ACL', () => {
         expect(WaypointHudRendererConstructor).toBeTypeOf('function');
         const renderer = createRenderer();
@@ -405,7 +431,7 @@ function makeViewer(
         isOperator: false,
         hasPermission: () => false,
         createEntityUuid: () => ({ high: 0n, low: ++nextUuid }),
-        encodeTextComponent: () => Uint8Array.of(10, 0, 0),
+        encodeTextComponent: () => Uint8Array.of(10, 0),
         sendPacket: (packet) => {
             if (fail) throw new Error('packet sink failed');
             packets.push(packet);

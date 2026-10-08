@@ -101,7 +101,8 @@ successful v1 migration keeps the original bytes in `waypoints.v1.json`.
 
 Minecraft Java 26.3 players see each enabled waypoint they can access in the same dimension and
 within its optional visibility range. The display shows the waypoint label (or name) in its color
-and the rounded distance in meters. Each player's display packets are private to that player, so
+and the rounded distance in meters, with its configured item sprite centered on a line below.
+Each player's display packets are private to that player, so
 restricted names and personalized distances are not sent to other clients.
 
 The HUD uses client-only TextDisplay packets on a camera-relative plane about three blocks ahead,
@@ -110,4 +111,5 @@ above its waypoint and stays anchored there within three blocks. Screen directio
 movement jitter; ordinary waypoints use stronger vertical stabilization, while destinations several
 blocks above or below the player follow height changes faster. Small stationary camera-position and
 yaw changes are also ignored. Other Java protocol versions and Bedrock clients do not receive the
-HUD. The stored item icon is not displayed yet.
+HUD. Icons use vanilla 26.3 atlas textures; block items use a representative model texture, and
+custom item IDs require the corresponding `item/<path>` sprite in the client's resource pack.

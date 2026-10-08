@@ -8,6 +8,7 @@ import {
     createTextDisplayMovement,
     createTextDisplaySpawnPacket
 } from './display-protocol.ts';
+import { appendWaypointIcon } from './icon-component.ts';
 import {
     cameraPlaneCoordinates,
     type HudCamera,
@@ -60,6 +61,7 @@ interface DisplayState {
     readonly entityUuid: Uuid;
     position: WaypointPosition;
     textJson: string | undefined;
+    icon: string | undefined;
     spawned: boolean;
     smoothedHorizontalRatio: number | undefined;
     smoothedVerticalRatio: number | undefined;
@@ -129,6 +131,7 @@ export class WaypointHudRenderer {
                 worldBlend,
                 isElevated: Math.abs(waypoint.position.y - viewer.position.y) > 3,
                 camera,
+                icon: waypoint.icon,
                 textJson: createWaypointHudTextJson(waypoint, waypointDistance),
                 width: Math.max(0.7, (Array.from(label).length + DISTANCE_TEXT_WIDTH_CHARS) * LABEL_CHARACTER_WIDTH)
             });
@@ -150,6 +153,7 @@ export class WaypointHudRenderer {
                 worldBlend: candidate.worldBlend,
                 isElevated: candidate.isElevated,
                 camera,
+                icon: candidate.icon,
                 textJson: candidate.textJson
             });
         }
@@ -276,6 +280,7 @@ export class WaypointHudRenderer {
                 entityUuid: viewer.createEntityUuid(),
                 position: desired.position,
                 textJson: undefined,
+                icon: undefined,
                 spawned: false,
                 smoothedHorizontalRatio: undefined,
                 smoothedVerticalRatio: undefined
@@ -302,10 +307,11 @@ export class WaypointHudRenderer {
             viewer.sendPacket(createTextDisplaySpawnPacket(display.entityId, display.entityUuid, display.position));
             display.spawned = true;
         }
-        if (display.textJson !== desired.textJson) {
-            const componentNbt = viewer.encodeTextComponent(desired.textJson);
+        if (display.textJson !== desired.textJson || display.icon !== desired.icon) {
+            const componentNbt = appendWaypointIcon(viewer.encodeTextComponent(desired.textJson), desired.icon);
             viewer.sendPacket(createTextDisplayMetadataPacket(display.entityId, componentNbt));
             display.textJson = desired.textJson;
+            display.icon = desired.icon;
         }
     }
 
@@ -342,6 +348,7 @@ export function createWaypointHudTextJson(waypoint: Waypoint, distanceBlocks: nu
 }
 
 interface DesiredDisplay {
+    readonly icon: string | undefined;
     readonly position: WaypointPosition;
     readonly worldBlend: number;
     readonly isElevated: boolean;
