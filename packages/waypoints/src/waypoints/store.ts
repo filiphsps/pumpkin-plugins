@@ -47,6 +47,16 @@ export class WaypointStore {
         return [...this.waypoints.values()].map(cloneWaypoint);
     }
 
+    /** Reloads validated disk data, preserving the active catalog if the file cannot be loaded. */
+    reload(): boolean {
+        const replacement = new WaypointStore(this.files, this.logger);
+        if (!replacement.available) return false;
+        this.waypoints = replacement.waypoints;
+        this.available = true;
+        this.invalidReason = undefined;
+        return true;
+    }
+
     /** Looks up a waypoint by immutable UUID. */
     get(id: string): Waypoint | undefined {
         const waypoint = this.waypoints.get(id);

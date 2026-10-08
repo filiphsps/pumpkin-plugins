@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { builtPluginPath, type PumpkinInstance, startPumpkin } from '@pumpkin-plugins/test-harness';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -66,6 +66,33 @@ describe(info.name, () => {
         const usageFrom = server.lines.length;
         server.command('wp create');
         await server.waitForLog(/Usage: \/wp create <name> \[<x> <y> <z>\]\./, 5000, usageFrom);
+        expect(server.errors()).toEqual([]);
+    });
+
+    it('reloads an externally edited waypoint file through /wp reload', async () => {
+        await server.waitForLog(new RegExp(`Loaded ${info.name}`));
+        const directory = server.pluginDataDir(info.name);
+        writeFileSync(
+            join(directory, 'waypoints.json'),
+            JSON.stringify({
+                version: 2,
+                waypoints: [
+                    {
+                        id: '33333333-3333-4333-8333-333333333333',
+                        name: 'Reloaded',
+                        dimension: 'world',
+                        position: { x: 1, y: 64, z: 2 },
+                        color: '#FFFFFF',
+                        enabled: true,
+                        access: { mode: 'public', grants: [] }
+                    }
+                ]
+            })
+        );
+
+        const reloadFrom = server.lines.length;
+        server.command('wp reload');
+        await server.waitForLog(/Reloaded waypoints from disk\./, 5000, reloadFrom);
         expect(server.errors()).toEqual([]);
     });
 });

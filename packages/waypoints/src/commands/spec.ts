@@ -55,6 +55,11 @@ export const commands = defineCommands(PLUGIN_NAME, {
                 defaultPermission: ADMIN_DEFAULT,
                 argumentVariants: namedCoordinateVariants
             },
+            reload: {
+                description: 'Reload waypoint data from disk',
+                permission: ADMIN_PERMISSION,
+                defaultPermission: ADMIN_DEFAULT
+            },
             delete: admin('Delete a waypoint by name', [name]),
             rename: admin('Rename a waypoint', [name, newName]),
             relocate: {

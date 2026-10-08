@@ -33,6 +33,11 @@ export class WaypointCatalog {
         return this.store.list();
     }
 
+    /** Reloads the canonical waypoint data from disk. */
+    reload(): boolean {
+        return this.store.reload();
+    }
+
     /** Looks up an immutable waypoint UUID. */
     getById(id: string): Waypoint | undefined {
         return this.store.get(id);

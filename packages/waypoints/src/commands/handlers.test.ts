@@ -109,6 +109,22 @@ describe('/wp handlers', () => {
         expect(catalog.list()).toEqual([]);
     });
 
+    it('reloads waypoint records from disk for server operators', () => {
+        const { catalog, files, handlers, sender } = setup(true);
+        catalog.create({ id: waypointId, name: 'Old Home', dimension: 'world', position: { x: 1, y: 2, z: 3 } });
+        const diskData = JSON.parse(files.text('waypoints.json') ?? 'null') as {
+            waypoints: Array<{ name: string }>;
+        };
+        const diskWaypoint = diskData.waypoints[0];
+        if (diskWaypoint === undefined) throw new Error('Expected a waypoint in the saved file');
+        diskWaypoint.name = 'Disk Home';
+        files.writeFile('waypoints.json', new TextEncoder().encode(JSON.stringify(diskData)));
+        const run = (handlers as unknown as Record<string, (sender: CommandSender) => readonly unknown[]>)['wp reload'];
+
+        expect(run(sender)).toEqual(['Reloaded waypoints from disk.']);
+        expect(catalog.list().map(({ name }) => name)).toEqual(['Disk Home']);
+    });
+
     it('creates a shared waypoint at the player exact position and current world', () => {
         const { catalog, handlers, player, sender, world } = setup(true);
         const run = (

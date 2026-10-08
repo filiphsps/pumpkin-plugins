@@ -43,6 +43,26 @@ describe(WaypointStore.name, () => {
         expect(new WaypointStore(files, new MemoryLogger()).list()).toEqual([waypoint()]);
     });
 
+    it('reloads valid disk data and keeps the active snapshot when disk data is invalid', () => {
+        const files = new MemoryFiles();
+        const store = new WaypointStore(files, new MemoryLogger());
+        store.add(waypoint());
+        files.writeFile(
+            'waypoints.json',
+            strToU8(
+                JSON.stringify({ version: 2, waypoints: [waypoint('44444444-4444-4444-8444-444444444444', 'Disk')] })
+            )
+        );
+
+        expect(store.reload()).toBe(true);
+        expect(store.list().map(({ name }) => name)).toEqual(['Disk']);
+
+        files.writeFile('waypoints.json', strToU8('{ invalid json'));
+        expect(store.reload()).toBe(false);
+        expect(store.list().map(({ name }) => name)).toEqual(['Disk']);
+        expect(store.isAvailable).toBe(true);
+    });
+
     it('writes four-space indented JSON with a trailing newline', () => {
         const files = new MemoryFiles();
         const store = new WaypointStore(files, new MemoryLogger());

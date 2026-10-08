@@ -9,6 +9,7 @@ describe('waypoint commands', () => {
             '/wp create',
             '/wp create <name>',
             '/wp create <name> <x> <y> <z>',
+            '/wp reload',
             '/wp delete <name>',
             '/wp rename <name> <newName>',
             '/wp relocate',
@@ -55,6 +56,10 @@ describe('waypoint commands', () => {
             defaultPermission: { tag: 'allow' }
         });
         expect(infos.find(({ usage }) => usage === '/wp create <name> <x> <y> <z>')).toMatchObject({
+            permission: ADMIN_PERMISSION,
+            defaultPermission: { tag: 'op' }
+        });
+        expect(infos.find(({ usage }) => usage === '/wp reload')).toMatchObject({
             permission: ADMIN_PERMISSION,
             defaultPermission: { tag: 'op' }
         });

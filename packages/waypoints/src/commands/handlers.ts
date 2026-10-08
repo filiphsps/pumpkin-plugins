@@ -38,6 +38,13 @@ interface Actor {
 /** Builds handlers whose names and values are inferred from the shared command declaration. */
 export function commandHandlers(runtime: WaypointCommandRuntime): CommandHandlers<typeof commands, CommandSender> {
     return {
+        'wp reload': (sender) =>
+            withActorContext(
+                runtime,
+                sender,
+                (actor) => (actor.isOperator ? reloadLines(runtime) : [errorLine(OPERATOR_ONLY)]),
+                () => reloadLines(runtime)
+            ),
         'wp create': () => [errorLine('Usage: /wp create <name> [<x> <y> <z>].')],
         'wp create <name>': (sender, { name }) =>
             withOperator(runtime, sender, (actor) =>
@@ -305,6 +312,12 @@ function withOperator(
     run: (actor: Actor) => readonly CommandLine[]
 ): CommandLine[] {
     return withActor(runtime, sender, (actor) => (actor.isOperator ? run(actor) : [errorLine(OPERATOR_ONLY)]));
+}
+
+function reloadLines(runtime: WaypointCommandRuntime): CommandLine[] {
+    return runtime.catalog.reload()
+        ? ['Reloaded waypoints from disk.']
+        : [errorLine('Could not reload waypoint data; current data remains active. Check the server log.')];
 }
 
 function withCurrentLocation(

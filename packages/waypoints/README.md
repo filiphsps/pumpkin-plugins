@@ -40,6 +40,7 @@ Pumpkin asks for these on the server console the first time the plugin loads.
 | `/wp create` | Create a waypoint at your position or explicit coordinates | `Waypoints:command.admin` | operators (level 3) |
 | `/wp create <name>` | Create a waypoint at your position or explicit coordinates | `Waypoints:command.admin` | operators (level 3) |
 | `/wp create <name> <x> <y> <z>` | Create a waypoint at your position or explicit coordinates | `Waypoints:command.admin` | operators (level 3) |
+| `/wp reload` | Reload waypoint data from disk | `Waypoints:command.admin` | operators (level 3) |
 | `/wp delete <name>` | Delete a waypoint by name | `Waypoints:command.admin` | operators (level 3) |
 | `/wp rename <name> <newName>` | Rename a waypoint | `Waypoints:command.admin` | operators (level 3) |
 | `/wp relocate` | Move a waypoint to your position or explicit coordinates | `Waypoints:command.admin` | operators (level 3) |
