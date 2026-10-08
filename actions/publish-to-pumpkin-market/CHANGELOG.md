@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.4](https://github.com/filiphsps/pumpkin-plugins/compare/publish-to-pumpkin-market-v0.0.3...publish-to-pumpkin-market-v0.0.4) (2026-10-08)
+
+
+### Bug Fixes
+
+* **market-action:** set WebAssembly upload content type ([0b9b2ad](https://github.com/filiphsps/pumpkin-plugins/commit/0b9b2adb4bb1fb8a4d76a3ff3c94d2c1d89dae11))
+
 ## [0.0.3](https://github.com/filiphsps/pumpkin-plugins/compare/publish-to-pumpkin-market-v0.0.2...publish-to-pumpkin-market-v0.0.3) (2026-10-07)
 
 

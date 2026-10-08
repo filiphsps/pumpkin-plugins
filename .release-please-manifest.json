@@ -1,5 +1,5 @@
 {
-    "actions/publish-to-pumpkin-market": "0.0.3",
+    "actions/publish-to-pumpkin-market": "0.0.4",
     "actions/sign-pumpkin-plugin": "0.0.3",
     "actions/update-pumpkin-market-listing": "0.0.2",
     "actions/verify-pumpkin-plugin": "0.0.2",
