@@ -30,7 +30,10 @@ export function offsetOnCameraPlane(
 }
 
 /** Resolves the position's horizontal and vertical coordinates on the camera plane. */
-export function cameraPlaneCoordinates(camera: HudCamera, position: WaypointPosition): {
+export function cameraPlaneCoordinates(
+    camera: HudCamera,
+    position: WaypointPosition
+): {
     readonly horizontal: number;
     readonly vertical: number;
 } {

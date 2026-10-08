@@ -198,9 +198,7 @@ describe('WaypointHudRenderer', () => {
         createRenderer().renderViewer(right.viewer, [second, first]);
 
         const spawnPositions = (client: ReturnType<typeof makeViewer>) =>
-            client.packets
-                .filter(({ tag }) => tag === 'c-spawn-entity')
-                .map((packet) => packetValue(packet).position);
+            client.packets.filter(({ tag }) => tag === 'c-spawn-entity').map((packet) => packetValue(packet).position);
         const leftPositions = spawnPositions(left);
         const rightPositions = spawnPositions(right);
 

@@ -8,12 +8,7 @@ import {
     createTextDisplayMovement,
     createTextDisplaySpawnPacket
 } from './display-protocol.ts';
-import {
-    cameraPlaneCoordinates,
-    offsetOnCameraPlane,
-    type HudCamera,
-    projectWaypointOnCameraPlane
-} from './layout.ts';
+import { cameraPlaneCoordinates, type HudCamera, offsetOnCameraPlane, projectWaypointOnCameraPlane } from './layout.ts';
 
 const DEFAULT_DISPLAY_DEPTH = 3;
 const FIRST_CLIENT_ENTITY_ID = -1_500_000_000;
@@ -309,7 +304,7 @@ function positionChanged(left: WaypointPosition, right: WaypointPosition): boole
 }
 
 function smoothYaw(current: number, target: number, followRate: number): number {
-    const difference = (((target - current + 180) % 360) + 360) % 360 - 180;
+    const difference = ((((target - current + 180) % 360) + 360) % 360) - 180;
     return current + difference * followRate;
 }
 

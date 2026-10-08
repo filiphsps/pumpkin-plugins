@@ -48,7 +48,9 @@ describe(WaypointStore.name, () => {
         const store = new WaypointStore(files, new MemoryLogger());
         store.add(waypoint());
 
-        expect(files.text('waypoints.json')).toBe(`${JSON.stringify({ version: 2, waypoints: [waypoint()] }, null, 4)}\n`);
+        expect(files.text('waypoints.json')).toBe(
+            `${JSON.stringify({ version: 2, waypoints: [waypoint()] }, null, 4)}\n`
+        );
     });
 
     it('writes a v1 backup before migrating all legacy access modes', () => {

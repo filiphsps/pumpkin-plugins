@@ -84,10 +84,7 @@ describe('/wp handlers', () => {
     it('keeps targeting by waypoint name after changing its display label', () => {
         const { catalog, handlers, sender } = setup(true);
         catalog.create({ id: waypointId, name: 'Bert', dimension: 'world', position: { x: 0, y: 64, z: 0 } });
-        const run = handlers as unknown as Record<
-            string,
-            (sender: CommandSender, args?: object) => readonly unknown[]
-        >;
+        const run = handlers as unknown as Record<string, (sender: CommandSender, args?: object) => readonly unknown[]>;
 
         expect(run['wp set label <name> <label>']?.(sender, { name: 'Bert', label: 'Taylor' })).toEqual([
             'Updated label for Bert.'
@@ -105,14 +102,9 @@ describe('/wp handlers', () => {
     ])('stores item identifier %s as %s', (item, expectedIcon) => {
         const { catalog, handlers, sender } = setup(true);
         catalog.create({ id: waypointId, name: 'Bert', dimension: 'world', position: { x: 0, y: 64, z: 0 } });
-        const run = handlers as unknown as Record<
-            string,
-            (sender: CommandSender, args?: object) => readonly unknown[]
-        >;
+        const run = handlers as unknown as Record<string, (sender: CommandSender, args?: object) => readonly unknown[]>;
 
-        expect(run['wp set icon <name> <item>']?.(sender, { name: 'Bert', item })).toEqual([
-            'Updated icon for Bert.'
-        ]);
+        expect(run['wp set icon <name> <item>']?.(sender, { name: 'Bert', item })).toEqual(['Updated icon for Bert.']);
         expect(catalog.getByName('Bert')?.icon).toBe(expectedIcon);
     });
 
