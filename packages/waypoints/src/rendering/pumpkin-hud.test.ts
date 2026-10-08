@@ -135,7 +135,7 @@ describe('WaypointHudService', () => {
         ]);
     });
 
-    it('samples fresh player position each tick and sends a supported relative movement packet', () => {
+    it('moves the nearby HUD with the current eye position and refreshes its distance text', () => {
         const client = makePlayer(viewerId, 'v-26-3');
         const server = {
             getAllPlayers: () => [client.player],
@@ -152,8 +152,10 @@ describe('WaypointHudService', () => {
         const service = createService(server, catalog);
 
         service.tick();
-        client.pose.eye = [0, 65.62, 1];
         client.pose.position = [0, 64, 1];
+        client.pose.eye = [0, 65.62, 1];
+        client.getYaw.mockReturnValue(180);
+        client.getPitch.mockReturnValue(45);
         service.tick();
 
         expect(client.packets.map(({ tag }) => tag)).toEqual([
@@ -162,7 +164,38 @@ describe('WaypointHudService', () => {
             'c-update-entity-pos',
             'c-set-entity-metadata'
         ]);
-        expect(client.packets[2]?.val.delta).toEqual([0, 0, 4096]);
+        const initial = client.packets[0]?.val.position as number[];
+        expect(Math.hypot(initial[0] ?? 0, (initial[1] ?? 0) - 65.62, initial[2] ?? 0)).toBeCloseTo(8, 3);
+        const movement = client.packets[2]?.val.delta as number[];
+        expect(movement[2]).toBeGreaterThan(4080);
+        expect(movement[2]).toBeLessThan(4100);
+        expect(uuidMocks.encodedTextJson.at(-1)).toContain('19m');
+        expect(client.entity[Symbol.dispose]).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not move or replace a HUD marker when the viewer only rotates the camera', () => {
+        const client = makePlayer(viewerId, 'v-26-3');
+        const server = {
+            getAllPlayers: () => [client.player],
+            getOpManager: () => ({ isOp: () => false, [Symbol.dispose]: vi.fn() })
+        } as unknown as Server;
+        const catalog = new WaypointCatalog(new WaypointStore(new MemoryFiles(), new MemoryLogger()));
+        catalog.create({
+            id: '77777777-7777-4777-8777-777777777777',
+            name: 'North',
+            dimension: 'overworld',
+            position: { x: 10, y: 64, z: 20 },
+            access: { mode: 'public', grants: [] }
+        });
+        const service = createService(server, catalog);
+        service.tick();
+        client.getYaw.mockReturnValue(180);
+        client.getPitch.mockReturnValue(45);
+        service.tick();
+        client.getYaw.mockReturnValue(-90);
+        client.getPitch.mockReturnValue(-80);
+        service.tick();
+        expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
     });
 });
 
@@ -170,10 +203,8 @@ function makePlayer(id: string, version: string, fail = false) {
     const packets: Array<{ tag: string; val: Record<string, unknown> }> = [];
     const playerUuid = id === viewerId ? exactPlayerUuid : { high: 5n, low: 6n };
     const pose = {
-        eye: [0, 65.62, 0] as readonly number[],
         position: [0, 64, 0] as readonly number[],
-        yaw: 0,
-        pitch: 0
+        eye: [0, 65.62, 0] as readonly number[]
     };
     const java = {
         getVersion: () => version,
@@ -185,17 +216,20 @@ function makePlayer(id: string, version: string, fail = false) {
     };
     const world = { getName: () => 'overworld', [Symbol.dispose]: vi.fn() };
     const entity = { getEyePosition: () => pose.eye, [Symbol.dispose]: vi.fn() };
+    const asEntity = vi.fn(() => entity);
+    const getYaw = vi.fn(() => 0);
+    const getPitch = vi.fn(() => 0);
     const player = {
         getId: () => playerUuid,
         getName: () => 'Alex',
         asJava: () => java,
-        asEntity: () => entity,
+        asEntity,
         getPosition: () => pose.position,
-        getYaw: () => pose.yaw,
-        getPitch: () => pose.pitch,
+        getYaw,
+        getPitch,
         getWorld: () => world,
         hasPermission: () => false,
         [Symbol.dispose]: vi.fn()
     } as unknown as Player;
-    return { player, packets, java, world, entity, pose };
+    return { player, packets, java, world, entity, asEntity, getYaw, getPitch, pose };
 }

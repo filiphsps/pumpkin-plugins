@@ -62,7 +62,7 @@ export class WaypointHudService {
         this.renderOne(player);
     }
 
-    /** Reprojects the HUD immediately after a player's world changes. */
+    /** Refreshes the viewer's displays immediately after a player's world changes. */
     changedWorld(player: Player): void {
         this.renderOne(player);
     }
@@ -163,11 +163,7 @@ export class WaypointHudService {
                     id,
                     dimension,
                     position: { x, y, z },
-                    camera: {
-                        position: { x: eyeX, y: eyeY, z: eyeZ },
-                        yaw: player.getYaw(),
-                        pitch: player.getPitch()
-                    },
+                    eyePosition: { x: eyeX, y: eyeY, z: eyeZ },
                     isOperator,
                     hasPermission: (node) => player.hasPermission(node),
                     createEntityUuid: uuid.generate,

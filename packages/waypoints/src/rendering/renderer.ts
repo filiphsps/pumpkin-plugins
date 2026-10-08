@@ -6,42 +6,23 @@ import {
     createEntityRemovePacket,
     createTextDisplayMetadataPacket,
     createTextDisplayMovement,
+    createTextDisplayScalePacket,
     createTextDisplaySpawnPacket
 } from './display-protocol.ts';
 import { appendWaypointIcon } from './icon-component.ts';
-import {
-    cameraPlaneCoordinates,
-    type HudCamera,
-    offsetOnCameraPlane,
-    offsetOnCameraPlaneAxes,
-    projectWaypointOnCameraPlane
-} from './layout.ts';
+import { placeWaypointHud } from './layout.ts';
 
-const DEFAULT_DISPLAY_DEPTH = 3;
 const LABEL_ANCHOR_HEIGHT = 2;
-const WORLD_TRANSITION_START_DISTANCE = 10;
-const WORLD_TRANSITION_END_DISTANCE = 3;
+const WORLD_STACK_HEIGHT = 0.7;
 const FIRST_CLIENT_ENTITY_ID = -1_500_000_000;
 const LAST_CLIENT_ENTITY_ID = -2_000_000_000;
-const PLAYER_MOVEMENT_THRESHOLD = 0.05;
-const CAMERA_POSITION_THRESHOLD = 0.1;
-const STATIONARY_YAW_FOLLOW_RATE = 0.05;
-const STATIONARY_YAW_DEADZONE_DEGREES = 0.5;
-const LABEL_CHARACTER_WIDTH = 0.075;
-const DISTANCE_TEXT_WIDTH_CHARS = 10;
-const LABEL_COLLISION_HEIGHT = 0.24;
-const LABEL_VERTICAL_STEP = 0.32;
-const HORIZONTAL_DIRECTION_FOLLOW_RATE = 0.25;
-const VERTICAL_DIRECTION_FOLLOW_RATE = 0.15;
-const ELEVATED_WAYPOINT_VERTICAL_FOLLOW_RATE = 0.55;
-const SCREEN_DIRECTION_DEADZONE = 0.01;
 
-/** Per-viewer inputs required to render one private waypoint HUD. */
+/** Per-viewer inputs required to render one private waypoint display set. */
 export interface WaypointHudViewer {
     readonly id: string;
     dimension: string;
     position: WaypointPosition;
-    camera: HudCamera;
+    eyePosition: WaypointPosition;
     readonly isOperator: boolean;
     readonly hasPermission: (node: string) => boolean;
     readonly createEntityUuid: () => Uuid;
@@ -51,7 +32,6 @@ export interface WaypointHudViewer {
 
 /** Options for the client-only Java waypoint renderer. */
 export interface WaypointHudRendererOptions {
-    readonly depth?: number;
     readonly onError?: (viewerId: string, error: unknown) => void;
 }
 
@@ -60,42 +40,36 @@ interface DisplayState {
     readonly entityId: number;
     readonly entityUuid: Uuid;
     position: WaypointPosition;
+    elevation: number;
     textJson: string | undefined;
+    scale: number | undefined;
     icon: string | undefined;
     spawned: boolean;
-    smoothedHorizontalRatio: number | undefined;
-    smoothedVerticalRatio: number | undefined;
 }
 
 interface ViewerState {
     dimension: string;
     nextEntityId: number;
-    lastPlayerPosition: WaypointPosition;
-    projectionPosition: WaypointPosition;
-    projectionYaw: number;
-    projectionPitch: number;
     readonly displays: Map<string, DisplayState>;
 }
 
 /**
- * Renders access-filtered waypoints as client-only Java TextDisplays. Each viewer gets an
- * independent entity ledger, so restricted waypoint labels and personalized distances never
+ * Renders access-filtered waypoints as client-only Java TextDisplays with directional HUD placement. Each
+ * viewer gets an independent entity ledger, so restricted waypoint labels and personalized distances never
  * enter another player's packet stream.
  */
 export class WaypointHudRenderer {
     private readonly viewers = new Map<string, ViewerState>();
-    private readonly depth: number;
     private readonly onError: (viewerId: string, error: unknown) => void;
 
     constructor(options: WaypointHudRendererOptions = {}) {
-        this.depth = options.depth ?? DEFAULT_DISPLAY_DEPTH;
         this.onError = options.onError ?? (() => undefined);
     }
 
-    /** Renders one viewer's current authorized projection and diffs its display packets. */
+    /** Renders one viewer's current authorized waypoints and diffs its display packets. */
     renderViewer(viewer: WaypointHudViewer, waypoints: readonly Waypoint[]): void {
+        if (![viewer.eyePosition.x, viewer.eyePosition.y, viewer.eyePosition.z].every(Number.isFinite)) return;
         const state = this.viewerState(viewer);
-        const camera = this.projectionCamera(viewer, state);
         const visible = projectWaypointsForViewer(waypoints, {
             playerId: viewer.id,
             isOperator: viewer.isOperator,
@@ -103,58 +77,31 @@ export class WaypointHudRenderer {
             dimension: viewer.dimension,
             position: viewer.position
         });
-        const candidates: DisplayCandidate[] = [];
-        for (const waypoint of visible) {
-            const waypointDistance = distance(viewer.position, waypoint.position);
-            const worldBlend = smoothstep(
-                clamp(
-                    (WORLD_TRANSITION_START_DISTANCE - waypointDistance) /
-                        (WORLD_TRANSITION_START_DISTANCE - WORLD_TRANSITION_END_DISTANCE),
-                    0,
-                    1
-                )
-            );
-            const worldAnchor = {
-                x: waypoint.position.x,
-                y: waypoint.position.y + LABEL_ANCHOR_HEIGHT,
-                z: waypoint.position.z
-            };
-            const projected =
-                worldBlend === 1 ? undefined : projectWaypointOnCameraPlane(camera, worldAnchor, this.depth);
-            if (projected === undefined && worldBlend === 0) continue;
-            const label = waypoint.label ?? waypoint.name;
-            const position =
-                projected === undefined ? worldAnchor : interpolatePosition(projected, worldAnchor, worldBlend);
-            candidates.push({
-                waypointId: waypoint.id,
-                position,
-                worldBlend,
-                isElevated: Math.abs(waypoint.position.y - viewer.position.y) > 3,
-                camera,
-                icon: waypoint.icon,
-                textJson: createWaypointHudTextJson(waypoint, waypointDistance),
-                width: Math.max(0.7, (Array.from(label).length + DISTANCE_TEXT_WIDTH_CHARS) * LABEL_CHARACTER_WIDTH)
-            });
-        }
-        candidates.sort((left, right) => left.waypointId.localeCompare(right.waypointId));
-
         const desired = new Map<string, DesiredDisplay>();
-        const placed: PlacedLabel[] = [];
-        for (const candidate of candidates) {
-            let position = candidate.position;
-            let verticalOffset = 0;
-            while (overlaps(camera, position, candidate.width, placed)) {
-                verticalOffset += LABEL_VERTICAL_STEP;
-                position = offsetOnCameraPlane(camera, candidate.position, verticalOffset);
-            }
-            placed.push({ position, width: candidate.width });
-            desired.set(candidate.waypointId, {
-                position,
-                worldBlend: candidate.worldBlend,
-                isElevated: candidate.isElevated,
-                camera,
-                icon: candidate.icon,
-                textJson: candidate.textJson
+        const stackCounts = new Map<string, number>();
+        for (const waypoint of [...visible].sort((left, right) => left.id.localeCompare(right.id))) {
+            // Group nearby stored positions, independent of camera yaw and projection/FOV boundaries.
+            const stackKey = [waypoint.position.x, waypoint.position.y, waypoint.position.z]
+                .map((coordinate) => Math.round(coordinate * 2))
+                .join(',');
+            const stackIndex = stackCounts.get(stackKey) ?? 0;
+            stackCounts.set(stackKey, stackIndex + 1);
+            const waypointDistance = distance(viewer.position, waypoint.position);
+            const placement = placeWaypointHud(
+                viewer.eyePosition,
+                {
+                    x: waypoint.position.x,
+                    y: waypoint.position.y + LABEL_ANCHOR_HEIGHT + stackIndex * WORLD_STACK_HEIGHT,
+                    z: waypoint.position.z
+                },
+                waypointDistance,
+                state.displays.get(waypoint.id)?.elevation,
+                stackIndex
+            );
+            desired.set(waypoint.id, {
+                ...placement,
+                icon: waypoint.icon,
+                textJson: createWaypointHudTextJson(waypoint, waypointDistance)
             });
         }
 
@@ -205,10 +152,6 @@ export class WaypointHudRenderer {
             state = {
                 dimension: viewer.dimension,
                 nextEntityId: FIRST_CLIENT_ENTITY_ID,
-                lastPlayerPosition: { ...viewer.position },
-                projectionPosition: { ...viewer.camera.position },
-                projectionYaw: viewer.camera.yaw,
-                projectionPitch: viewer.camera.pitch,
                 displays: new Map()
             };
             this.viewers.set(viewer.id, state);
@@ -216,38 +159,8 @@ export class WaypointHudRenderer {
             // The client discards the old world's entity table during dimension changes.
             state.displays.clear();
             state.dimension = viewer.dimension;
-            state.lastPlayerPosition = { ...viewer.position };
-            state.projectionPosition = { ...viewer.camera.position };
-            state.projectionYaw = viewer.camera.yaw;
-            state.projectionPitch = viewer.camera.pitch;
         }
         return state;
-    }
-
-    private projectionCamera(viewer: WaypointHudViewer, state: ViewerState): HudCamera {
-        const moved = distance(viewer.position, state.lastPlayerPosition) > PLAYER_MOVEMENT_THRESHOLD;
-        const cameraMoved = distance(viewer.camera.position, state.projectionPosition) > CAMERA_POSITION_THRESHOLD;
-        if (moved || !Number.isFinite(state.projectionYaw) || !Number.isFinite(viewer.camera.yaw)) {
-            state.lastPlayerPosition = { ...viewer.position };
-            state.projectionPosition = { ...viewer.camera.position };
-            state.projectionYaw = viewer.camera.yaw;
-            state.projectionPitch = viewer.camera.pitch;
-        } else {
-            if (cameraMoved) state.projectionPosition = { ...viewer.camera.position };
-            const yawDifference = angleDifference(state.projectionYaw, viewer.camera.yaw);
-            if (Math.abs(yawDifference) > STATIONARY_YAW_DEADZONE_DEGREES) {
-                state.projectionYaw = smoothYaw(state.projectionYaw, viewer.camera.yaw, STATIONARY_YAW_FOLLOW_RATE);
-            }
-        }
-        if (!Number.isFinite(state.projectionPitch) || !Number.isFinite(viewer.camera.pitch)) {
-            state.projectionPitch = viewer.camera.pitch;
-        }
-        return {
-            ...viewer.camera,
-            position: state.projectionPosition,
-            yaw: state.projectionYaw,
-            pitch: state.projectionPitch
-        };
     }
 
     private removeUndesired(
@@ -279,16 +192,17 @@ export class WaypointHudRenderer {
                 entityId: this.allocateEntityId(state),
                 entityUuid: viewer.createEntityUuid(),
                 position: desired.position,
+                elevation: desired.elevation,
                 textJson: undefined,
+                scale: undefined,
                 icon: undefined,
-                spawned: false,
-                smoothedHorizontalRatio: undefined,
-                smoothedVerticalRatio: undefined
+                spawned: false
             };
             state.displays.set(waypointId, display);
         }
 
-        const position = stabilizeScreenDirection(desired.camera, desired, display);
+        display.elevation = desired.elevation;
+        const position = desired.position;
         if (display.spawned && positionChanged(display.position, position)) {
             const movement = createTextDisplayMovement(display.entityId, display.position, position);
             if (movement === undefined) {
@@ -296,8 +210,8 @@ export class WaypointHudRenderer {
                 viewer.sendPacket(createEntityRemovePacket([display.entityId]));
                 display.spawned = false;
                 display.textJson = undefined;
-            } else {
-                if (movement.packet !== undefined) viewer.sendPacket(movement.packet);
+            } else if (movement.packet !== undefined) {
+                viewer.sendPacket(movement.packet);
             }
             display.position = movement?.position ?? position;
         }
@@ -309,9 +223,13 @@ export class WaypointHudRenderer {
         }
         if (display.textJson !== desired.textJson || display.icon !== desired.icon) {
             const componentNbt = appendWaypointIcon(viewer.encodeTextComponent(desired.textJson), desired.icon);
-            viewer.sendPacket(createTextDisplayMetadataPacket(display.entityId, componentNbt));
+            viewer.sendPacket(createTextDisplayMetadataPacket(display.entityId, componentNbt, desired.scale));
             display.textJson = desired.textJson;
+            display.scale = desired.scale;
             display.icon = desired.icon;
+        } else if (display.scale !== desired.scale) {
+            viewer.sendPacket(createTextDisplayScalePacket(display.entityId, desired.scale));
+            display.scale = desired.scale;
         }
     }
 
@@ -350,115 +268,15 @@ export function createWaypointHudTextJson(waypoint: Waypoint, distanceBlocks: nu
 interface DesiredDisplay {
     readonly icon: string | undefined;
     readonly position: WaypointPosition;
-    readonly worldBlend: number;
-    readonly isElevated: boolean;
-    readonly camera: HudCamera;
+    readonly elevation: number;
+    readonly scale: number;
     readonly textJson: string;
-}
-
-interface DisplayCandidate extends DesiredDisplay {
-    readonly waypointId: string;
-    readonly width: number;
-}
-
-interface PlacedLabel {
-    readonly position: WaypointPosition;
-    readonly width: number;
 }
 
 function distance(left: WaypointPosition, right: WaypointPosition): number {
     return Math.hypot(left.x - right.x, left.y - right.y, left.z - right.z);
 }
 
-function stabilizeScreenDirection(camera: HudCamera, desired: DesiredDisplay, display: DisplayState): WaypointPosition {
-    const coordinates = cameraPlaneCoordinates(camera, desired.position);
-    if (!Number.isFinite(coordinates.forward) || coordinates.forward <= 0) return desired.position;
-
-    const horizontalRatio = coordinates.horizontal / coordinates.forward;
-    const verticalRatio = coordinates.vertical / coordinates.forward;
-    if (desired.worldBlend >= 1) {
-        display.smoothedHorizontalRatio = horizontalRatio;
-        display.smoothedVerticalRatio = verticalRatio;
-        return desired.position;
-    }
-    if (display.smoothedHorizontalRatio === undefined || display.smoothedVerticalRatio === undefined) {
-        display.smoothedHorizontalRatio = horizontalRatio;
-        display.smoothedVerticalRatio = verticalRatio;
-        return desired.position;
-    }
-
-    const horizontalRate = followRate(HORIZONTAL_DIRECTION_FOLLOW_RATE, desired.worldBlend);
-    const verticalRate = followRate(
-        desired.isElevated ? ELEVATED_WAYPOINT_VERTICAL_FOLLOW_RATE : VERTICAL_DIRECTION_FOLLOW_RATE,
-        desired.worldBlend
-    );
-    const deadzone = SCREEN_DIRECTION_DEADZONE * (1 - desired.worldBlend);
-    display.smoothedHorizontalRatio = easeRatio(
-        display.smoothedHorizontalRatio,
-        horizontalRatio,
-        horizontalRate,
-        deadzone
-    );
-    display.smoothedVerticalRatio = easeRatio(display.smoothedVerticalRatio, verticalRatio, verticalRate, deadzone);
-
-    return offsetOnCameraPlaneAxes(
-        camera,
-        desired.position,
-        (display.smoothedHorizontalRatio - horizontalRatio) * coordinates.forward,
-        (display.smoothedVerticalRatio - verticalRatio) * coordinates.forward
-    );
-}
-
-function followRate(baseRate: number, worldBlend: number): number {
-    return baseRate + (1 - baseRate) * worldBlend;
-}
-
-function easeRatio(current: number, target: number, followRate: number, deadzone: number): number {
-    const difference = target - current;
-    if (Math.abs(difference) <= deadzone) return current;
-    return current + difference * followRate;
-}
-
-function interpolatePosition(from: WaypointPosition, to: WaypointPosition, amount: number): WaypointPosition {
-    return {
-        x: from.x + (to.x - from.x) * amount,
-        y: from.y + (to.y - from.y) * amount,
-        z: from.z + (to.z - from.z) * amount
-    };
-}
-
-function smoothstep(amount: number): number {
-    return amount * amount * (3 - 2 * amount);
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-    return Math.min(maximum, Math.max(minimum, value));
-}
-
 function positionChanged(left: WaypointPosition, right: WaypointPosition): boolean {
     return left.x !== right.x || left.y !== right.y || left.z !== right.z;
-}
-
-function smoothYaw(current: number, target: number, followRate: number): number {
-    return current + angleDifference(current, target) * followRate;
-}
-
-function angleDifference(current: number, target: number): number {
-    return ((((target - current + 180) % 360) + 360) % 360) - 180;
-}
-
-function overlaps(
-    camera: HudCamera,
-    position: WaypointPosition,
-    width: number,
-    placed: readonly PlacedLabel[]
-): boolean {
-    const candidate = cameraPlaneCoordinates(camera, position);
-    return placed.some(({ position: otherPosition, width: otherWidth }) => {
-        const other = cameraPlaneCoordinates(camera, otherPosition);
-        return (
-            Math.abs(candidate.horizontal - other.horizontal) < (width + otherWidth) / 2 &&
-            Math.abs(candidate.vertical - other.vertical) < LABEL_COLLISION_HEIGHT
-        );
-    });
 }

@@ -1,52 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { placeWaypointHud } from './layout.ts';
 
-async function loadProjection(): Promise<
-    (
-        camera: { position: { x: number; y: number; z: number }; yaw: number; pitch: number },
-        target: { x: number; y: number; z: number },
-        depth: number
-    ) => { x: number; y: number; z: number } | undefined
-> {
-    const layout = await import('./layout.ts').catch(() => undefined);
-    if (layout === undefined) throw new Error('Could not load waypoint HUD layout.');
-    expect(layout.projectWaypointOnCameraPlane).toBeTypeOf('function');
-    return layout.projectWaypointOnCameraPlane;
-}
-
-describe('waypoint HUD layout', () => {
-    it('places a camera-facing marker on a fixed-depth plane along the waypoint direction', async () => {
-        const project = await loadProjection();
-        expect(project({ position: { x: 0, y: 2, z: 0 }, yaw: 0, pitch: 0 }, { x: 10, y: 2, z: 10 }, 6)).toEqual({
-            x: 6,
-            y: 2,
-            z: 6
-        });
+describe('directional HUD placement', () => {
+    it('limits apparent bearing error when the camera has moved beyond the last server sample', () => {
+        const marker = placeWaypointHud({ x: 0, y: 65.62, z: 0 }, { x: 0, y: 66, z: 100 }, 100, undefined);
+        // A camera 0.6 blocks ahead of the server sample: about two sprinting ticks.
+        const shownBearing = Math.atan2(marker.position.x - 0.6, marker.position.z);
+        const destinationBearing = Math.atan2(-0.6, 100);
+        expect(Math.abs(shownBearing - destinationBearing)).toBeLessThan((5 * Math.PI) / 180);
     });
 
-    it('uses sampled yaw and pitch to keep the marker in front of the player', async () => {
-        const project = await loadProjection();
-        expect(project({ position: { x: 0, y: 2, z: 0 }, yaw: 90, pitch: 0 }, { x: -10, y: 2, z: 10 }, 6)).toEqual({
-            x: -6,
-            y: 2,
-            z: 6
-        });
-    });
-
-    it('omits a waypoint that is behind the viewer', async () => {
-        const project = await loadProjection();
-        expect(
-            project({ position: { x: 0, y: 2, z: 0 }, yaw: 0, pitch: 0 }, { x: 0, y: 2, z: -10 }, 6)
-        ).toBeUndefined();
-    });
-
-    it('keeps a nearby waypoint at eye height while looking down', async () => {
-        const project = await loadProjection();
-        const camera = { position: { x: 0, y: 65.62, z: 0 }, yaw: 40, pitch: 70 };
-
-        expect(project(camera, { x: 0, y: 64, z: 0 }, 3)).toEqual({
-            x: -Math.sin((40 * Math.PI) / 180) * 3,
-            y: 65.62,
-            z: Math.cos((40 * Math.PI) / 180) * 3
-        });
+    it('keeps text angular size consistent through the HUD and world-anchor transition', () => {
+        let previousElevation: number | undefined;
+        for (let z = 0; z <= 20; z += 0.25) {
+            const eye = { x: 0, y: 65.62, z };
+            const marker = placeWaypointHud(eye, { x: 0, y: 66, z: 20 }, 20 - z, previousElevation);
+            previousElevation = marker.elevation;
+            const renderedDistance = Math.hypot(marker.position.x, marker.position.y - eye.y, marker.position.z - z);
+            expect(marker.scale / renderedDistance).toBeCloseTo(0.18, 2);
+        }
     });
 });

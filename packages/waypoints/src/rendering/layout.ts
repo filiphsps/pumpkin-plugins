@@ -1,150 +1,91 @@
 import type { WaypointPosition } from '../waypoints/model.ts';
 
-const NEAR_TARGET_DISTANCE = 2;
+const HUD_DISTANCE = 8;
+const TEXT_SCALE_PER_BLOCK = 0.18;
+const STACK_ELEVATION_STEP = 0.1;
+const WORLD_BLEND_START_DISTANCE = 10;
+const WORLD_BLEND_END_DISTANCE = 3;
+const ORDINARY_ELEVATION_FOLLOW_RATE = 0.08;
+const STEEP_ELEVATION_FOLLOW_RATE = 0.4;
+const STEEP_ELEVATION_START = Math.PI / 12;
+const STEEP_ELEVATION_END = Math.PI / 4;
+const ELEVATION_SNAP_DISTANCE = 0.00001;
 
-/** Camera pose sampled from one Java viewer. Angles use Minecraft degrees. */
-export interface HudCamera {
+/** One marker's world position and the elevation carried into its next render tick. */
+export interface WaypointHudPlacement {
     readonly position: WaypointPosition;
-    readonly yaw: number;
-    readonly pitch: number;
+    readonly elevation: number;
+    readonly scale: number;
 }
 
-/** Returns a point shifted in screen space along the camera plane's vertical axis. */
-export function offsetOnCameraPlane(
-    camera: HudCamera,
-    position: WaypointPosition,
-    verticalOffset: number
-): WaypointPosition {
-    const pitch = (camera.pitch * Math.PI) / 180;
-    const yaw = (camera.yaw * Math.PI) / 180;
-    const up = {
-        x: -Math.sin(pitch) * Math.sin(yaw),
-        y: Math.cos(pitch),
-        z: Math.sin(pitch) * Math.cos(yaw)
+/**
+ * Places a distant marker on a viewer-centered sphere along the waypoint's world bearing. Only
+ * elevation is filtered; the eye origin and horizontal bearing follow the current position directly.
+ * Nearby markers blend continuously into their real world anchor, independently of camera rotation.
+ */
+export function placeWaypointHud(
+    eyePosition: WaypointPosition,
+    worldAnchor: WaypointPosition,
+    waypointDistance: number,
+    previousElevation: number | undefined,
+    stackIndex = 0
+): WaypointHudPlacement {
+    const x = worldAnchor.x - eyePosition.x;
+    const y = worldAnchor.y - eyePosition.y;
+    const z = worldAnchor.z - eyePosition.z;
+    const horizontalDistance = Math.hypot(x, z);
+    const worldBlend = smoothstep(
+        (WORLD_BLEND_START_DISTANCE - waypointDistance) / (WORLD_BLEND_START_DISTANCE - WORLD_BLEND_END_DISTANCE)
+    );
+    const rawElevation = Math.min(
+        Math.PI / 2,
+        Math.atan2(y, horizontalDistance) + stackIndex * STACK_ELEVATION_STEP * (1 - worldBlend)
+    );
+    const steepness = smoothstep(
+        (Math.abs(rawElevation) - STEEP_ELEVATION_START) / (STEEP_ELEVATION_END - STEEP_ELEVATION_START)
+    );
+    const hudFollowRate =
+        ORDINARY_ELEVATION_FOLLOW_RATE + (STEEP_ELEVATION_FOLLOW_RATE - ORDINARY_ELEVATION_FOLLOW_RATE) * steepness;
+    const followRate = hudFollowRate + (1 - hudFollowRate) * worldBlend;
+    const elevation =
+        previousElevation === undefined ||
+        horizontalDistance === 0 ||
+        worldBlend === 1 ||
+        Math.abs(rawElevation - previousElevation) <= ELEVATION_SNAP_DISTANCE
+            ? rawElevation
+            : previousElevation + (rawElevation - previousElevation) * followRate;
+
+    // World direction has no division by camera-forward depth, so side/behind markers cannot fly away.
+    const hudRadius = Math.min(HUD_DISTANCE, Math.hypot(x, y, z));
+    const horizontalRadius = Math.min(horizontalDistance, Math.cos(elevation) * hudRadius);
+    const hudPosition = {
+        x: eyePosition.x + (horizontalDistance === 0 ? 0 : (x / horizontalDistance) * horizontalRadius),
+        y: eyePosition.y + Math.sin(elevation) * hudRadius,
+        z: eyePosition.z + (horizontalDistance === 0 ? 0 : (z / horizontalDistance) * horizontalRadius)
     };
+    const position =
+        worldBlend === 1
+            ? worldAnchor
+            : {
+                  x: hudPosition.x + (worldAnchor.x - hudPosition.x) * worldBlend,
+                  y: hudPosition.y + (worldAnchor.y - hudPosition.y) * worldBlend,
+                  z: hudPosition.z + (worldAnchor.z - hudPosition.z) * worldBlend
+              };
+    const renderedDistance = Math.hypot(
+        position.x - eyePosition.x,
+        position.y - eyePosition.y,
+        position.z - eyePosition.z
+    );
     return {
-        x: position.x + up.x * verticalOffset,
-        y: position.y + up.y * verticalOffset,
-        z: position.z + up.z * verticalOffset
+        position,
+        elevation,
+        // Quantize scale to avoid metadata churn from floating point noise at a fixed HUD distance.
+        scale: Math.round(Math.max(0.25, renderedDistance) * TEXT_SCALE_PER_BLOCK * 4096) / 4096
     };
 }
 
-/** Shifts a point along the camera plane's horizontal and vertical screen axes. */
-export function offsetOnCameraPlaneAxes(
-    camera: HudCamera,
-    position: WaypointPosition,
-    horizontalOffset: number,
-    verticalOffset: number
-): WaypointPosition {
-    const yaw = (camera.yaw * Math.PI) / 180;
-    const pitch = (camera.pitch * Math.PI) / 180;
-    const right = { x: Math.cos(yaw), y: 0, z: Math.sin(yaw) };
-    const up = {
-        x: -Math.sin(pitch) * Math.sin(yaw),
-        y: Math.cos(pitch),
-        z: Math.sin(pitch) * Math.cos(yaw)
-    };
-    return {
-        x: position.x + right.x * horizontalOffset + up.x * verticalOffset,
-        y: position.y + right.y * horizontalOffset + up.y * verticalOffset,
-        z: position.z + right.z * horizontalOffset + up.z * verticalOffset
-    };
-}
-
-/** Resolves the position's horizontal and vertical coordinates on the camera plane. */
-export function cameraPlaneCoordinates(
-    camera: HudCamera,
-    position: WaypointPosition
-): {
-    readonly horizontal: number;
-    readonly vertical: number;
-    readonly forward: number;
-} {
-    const yaw = (camera.yaw * Math.PI) / 180;
-    const pitch = (camera.pitch * Math.PI) / 180;
-    const direction = {
-        x: position.x - camera.position.x,
-        y: position.y - camera.position.y,
-        z: position.z - camera.position.z
-    };
-    const right = { x: Math.cos(yaw), y: 0, z: Math.sin(yaw) };
-    const up = {
-        x: -Math.sin(pitch) * Math.sin(yaw),
-        y: Math.cos(pitch),
-        z: Math.sin(pitch) * Math.cos(yaw)
-    };
-    const forward = {
-        x: -Math.sin(yaw) * Math.cos(pitch),
-        y: -Math.sin(pitch),
-        z: Math.cos(yaw) * Math.cos(pitch)
-    };
-    return {
-        horizontal: dot(direction, right),
-        vertical: dot(direction, up),
-        forward: dot(direction, forward)
-    };
-}
-
-/** Projects a target onto a fixed-depth plane in front of the viewer, preserving its screen direction. */
-export function projectWaypointOnCameraPlane(
-    camera: HudCamera,
-    target: WaypointPosition,
-    depth: number
-): WaypointPosition | undefined {
-    if (
-        !Number.isFinite(depth) ||
-        depth <= 0 ||
-        ![
-            camera.position.x,
-            camera.position.y,
-            camera.position.z,
-            camera.yaw,
-            camera.pitch,
-            target.x,
-            target.y,
-            target.z
-        ].every(Number.isFinite)
-    ) {
-        return undefined;
-    }
-
-    const yaw = (camera.yaw * Math.PI) / 180;
-    const pitch = (camera.pitch * Math.PI) / 180;
-    const forward = {
-        x: -Math.sin(yaw) * Math.cos(pitch),
-        y: -Math.sin(pitch),
-        z: Math.cos(yaw) * Math.cos(pitch)
-    };
-    const right = { x: Math.cos(yaw), y: 0, z: Math.sin(yaw) };
-    const up = {
-        x: -Math.sin(pitch) * Math.sin(yaw),
-        y: Math.cos(pitch),
-        z: Math.sin(pitch) * Math.cos(yaw)
-    };
-    const direction = {
-        x: target.x - camera.position.x,
-        y: target.y - camera.position.y,
-        z: target.z - camera.position.z
-    };
-    if (Math.hypot(direction.x, direction.y, direction.z) <= NEAR_TARGET_DISTANCE) {
-        return {
-            x: camera.position.x - Math.sin(yaw) * depth,
-            y: camera.position.y,
-            z: camera.position.z + Math.cos(yaw) * depth
-        };
-    }
-    const forwardDepth = dot(direction, forward);
-    if (forwardDepth <= 0) return undefined;
-
-    const horizontal = (dot(direction, right) / forwardDepth) * depth;
-    const vertical = (dot(direction, up) / forwardDepth) * depth;
-    return {
-        x: camera.position.x + forward.x * depth + right.x * horizontal + up.x * vertical,
-        y: camera.position.y + forward.y * depth + right.y * horizontal + up.y * vertical,
-        z: camera.position.z + forward.z * depth + right.z * horizontal + up.z * vertical
-    };
-}
-
-function dot(left: WaypointPosition, right: WaypointPosition): number {
-    return left.x * right.x + left.y * right.y + left.z * right.z;
+/** Blends smoothly between zero and one with zero slope at both endpoints. */
+function smoothstep(value: number): number {
+    const amount = Math.max(0, Math.min(1, value));
+    return amount * amount * (3 - 2 * amount);
 }

@@ -12,15 +12,11 @@ const waypointId = '44444444-4444-4444-8444-444444444444';
 const rendererModule = await import('./renderer.ts').catch(() => ({}) as typeof import('./renderer.ts'));
 const WaypointHudRendererConstructor = rendererModule.WaypointHudRenderer as
     | (new (options?: {
-          depth?: number;
           onError?: (viewerId: string, error: unknown) => void;
       }) => WaypointHudRenderer)
     | undefined;
 
-function createRenderer(options?: {
-    depth?: number;
-    onError?: (viewerId: string, error: unknown) => void;
-}): WaypointHudRenderer {
+function createRenderer(options?: { onError?: (viewerId: string, error: unknown) => void }): WaypointHudRenderer {
     if (WaypointHudRendererConstructor === undefined) throw new Error('Waypoint HUD renderer is unavailable.');
     return new WaypointHudRendererConstructor(options);
 }
@@ -81,222 +77,176 @@ describe('WaypointHudRenderer', () => {
         expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
     });
 
-    it('keeps the default display close to the player camera', () => {
+    it('places a distant waypoint along its world direction at a bounded HUD distance', () => {
         const renderer = createRenderer();
         const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 0, y: 64, z: 50 } });
 
-        renderer.renderViewer(client.viewer, [waypoint()]);
-
-        const spawn = client.packets.find(({ tag }) => tag === 'c-spawn-entity');
-        if (spawn === undefined) throw new Error('Expected a text display spawn packet.');
-        const position = packetValue(spawn).position as readonly number[];
-        expect(
-            Math.hypot(position[0] ?? Infinity, (position[1] ?? Infinity) - 65.62, position[2] ?? Infinity)
-        ).toBeLessThan(4);
+        renderer.renderViewer(client.viewer, [destination]);
+        const position = readDisplayPosition(client);
+        expect(Math.hypot(position.x, position.y - 65.62, position.z)).toBeCloseTo(8, 3);
+        expect(position.x).toBe(0);
+        expect(position.z).toBeGreaterThan(7.99);
+        expect((position.y - 65.62) / position.z).toBeCloseTo(0.38 / 50, 5);
     });
 
-    it('moves a camera-projected display with the player and updates its text when distance changes', () => {
+    it('keeps a waypoint behind the viewer nearby instead of removing or reprojecting it', () => {
         const renderer = createRenderer();
         const client = makeViewer(ownerId);
-        const destination = waypoint({ position: { x: 0, y: 65.62, z: 20 } });
+        const destination = waypoint({ position: { x: 0, y: 64, z: -50 } });
 
         renderer.renderViewer(client.viewer, [destination]);
-        renderer.renderViewer(client.viewer, [destination]);
+        for (let tick = 0; tick < 10; tick += 1) renderer.renderViewer(client.viewer, [destination]);
+        const position = readDisplayPosition(client);
+        expect(position.z).toBeLessThan(-7.99);
+        expect(Math.hypot(position.x, position.y - 65.62, position.z)).toBeCloseTo(8, 3);
         expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
-
-        client.viewer.camera = { position: { x: 0, y: 65.62, z: 1 }, yaw: 0, pitch: 0 };
-        renderer.renderViewer(client.viewer, [destination]);
-        expect(client.packets.map(({ tag }) => tag)).toEqual([
-            'c-spawn-entity',
-            'c-set-entity-metadata',
-            'c-update-entity-pos'
-        ]);
-        const movement = client.packets.at(-1);
-        if (movement === undefined) throw new Error('Expected an entity movement packet.');
-        const firstDelta = packetValue(movement).delta as number[];
-        expect(firstDelta[2]).toBe(4096);
-        expect(Math.abs(firstDelta[1] ?? Infinity)).toBeLessThan(100);
-
-        client.viewer.camera = { position: { x: 0, y: 65.62, z: 2 }, yaw: 0, pitch: 0 };
-        renderer.renderViewer(client.viewer, [destination]);
-        const secondMovement = client.packets.at(-1);
-        if (secondMovement === undefined) throw new Error('Expected a second entity movement packet.');
-        const secondDelta = packetValue(secondMovement).delta as number[];
-        expect(secondDelta[2]).toBe(4096);
-        expect(Math.abs(secondDelta[1] ?? Infinity)).toBeLessThan(100);
-
-        client.viewer.position = { x: 0, y: 64, z: 19 };
-        renderer.renderViewer(client.viewer, [destination]);
-        expect(client.packets.at(-1)?.tag).toBe('c-set-entity-metadata');
     });
 
-    it('blends the HUD marker into a stable world anchor as the player reaches the waypoint', () => {
+    it('keeps a sideways waypoint at a finite HUD distance', () => {
+        const client = makeViewer(ownerId);
+        createRenderer().renderViewer(client.viewer, [waypoint({ position: { x: 50, y: 64, z: 0 } })]);
+        const position = readDisplayPosition(client);
+        expect(position.x).toBeGreaterThan(7.99);
+        expect(position.z).toBe(0);
+        expect(Math.hypot(position.x, position.y - 65.62)).toBeCloseTo(8, 3);
+    });
+
+    it('does not emit display packets from an invalid eye sample', () => {
+        const client = makeViewer(ownerId);
+        client.viewer.eyePosition = { x: 0, y: Number.NaN, z: 0 };
+        createRenderer().renderViewer(client.viewer, [waypoint()]);
+        expect(client.packets).toEqual([]);
+    });
+
+    it('strongly damps a vertical bump while moving the HUD origin with the current eye position', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 0, y: 64, z: 50 } });
+
+        renderer.renderViewer(client.viewer, [destination]);
+        const initialHeight = readDisplayPosition(client).y - 65.62;
+        client.viewer.position = { x: 0, y: 64.8, z: 0 };
+        client.viewer.eyePosition = { x: 0, y: 66.42, z: 0 };
+        renderer.renderViewer(client.viewer, [destination]);
+        const position = readDisplayPosition(client);
+        expect(Math.abs(position.y - 66.42 - initialHeight) / 8).toBeLessThan(0.002);
+        expect(position.y).toBeGreaterThan(66.4);
+        expect(Math.hypot(position.x, position.y - 66.42, position.z)).toBeCloseTo(8, 3);
+    });
+
+    it('follows a steep vertical destination faster while eventually settling at its true direction', () => {
+        const ordinary = makeViewer(ownerId);
+        const elevated = makeViewer(allowedId);
+        const renderer = createRenderer();
+        const ordinaryWaypoint = waypoint({ position: { x: 0, y: 64, z: 30 } });
+        const elevatedWaypoint = waypoint({ position: { x: 0, y: 94, z: 30 } });
+        const elevation = (client: ReturnType<typeof makeViewer>) => {
+            const position = readDisplayPosition(client);
+            return Math.atan2(position.y - client.viewer.eyePosition.y, position.z);
+        };
+        renderer.renderViewer(ordinary.viewer, [ordinaryWaypoint]);
+        renderer.renderViewer(elevated.viewer, [elevatedWaypoint]);
+        const ordinaryStart = elevation(ordinary);
+        const elevatedStart = elevation(elevated);
+        for (const client of [ordinary, elevated]) {
+            client.viewer.position = { x: 0, y: 65, z: 0 };
+            client.viewer.eyePosition = { x: 0, y: 66.62, z: 0 };
+        }
+        renderer.renderViewer(ordinary.viewer, [ordinaryWaypoint]);
+        renderer.renderViewer(elevated.viewer, [elevatedWaypoint]);
+        expect(Math.abs(elevation(elevated) - elevatedStart)).toBeGreaterThan(
+            Math.abs(elevation(ordinary) - ordinaryStart) * 2
+        );
+        for (let tick = 0; tick < 200; tick += 1) renderer.renderViewer(elevated.viewer, [elevatedWaypoint]);
+        expect(elevation(elevated)).toBeCloseTo(Math.atan2(29.38, 30), 3);
+        const packetsAtRest = elevated.packets.length;
+        for (let tick = 0; tick < 5; tick += 1) renderer.renderViewer(elevated.viewer, [elevatedWaypoint]);
+        expect(elevated.packets).toHaveLength(packetsAtRest);
+    });
+
+    it('tracks straight movement without reversing direction or oscillating its bearing', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 0, y: 64, z: 100 } });
+        renderer.renderViewer(client.viewer, [destination]);
+        let previousElevation = readDisplayPosition(client).y - client.viewer.eyePosition.y;
+        for (let tick = 1; tick <= 80; tick += 1) {
+            client.viewer.position = { x: 0, y: 64, z: tick * 0.25 };
+            client.viewer.eyePosition = { x: 0, y: 65.62, z: tick * 0.25 };
+            renderer.renderViewer(client.viewer, [destination]);
+            const position = readDisplayPosition(client);
+            expect(position.x).toBe(0);
+            expect(Math.hypot(position.y - 65.62, position.z - tick * 0.25)).toBeCloseTo(8, 3);
+            expect(position.y - 65.62).toBeGreaterThanOrEqual(previousElevation - 1 / 4096);
+            previousElevation = position.y - 65.62;
+        }
+        for (const packet of client.packets) {
+            if (packet.tag === 'c-update-entity-pos') expect(packet.val.delta[2]).toBeGreaterThan(0);
+        }
+    });
+
+    it('blends into and out of the world anchor without jumps or entity replacements', () => {
         const renderer = createRenderer();
         const client = makeViewer(ownerId);
         const destination = waypoint({ position: { x: 0, y: 64, z: 20 } });
-
         renderer.renderViewer(client.viewer, [destination]);
-        const positions: number[] = [];
-        for (let z = 1; z <= 20; z += 1) {
-            client.viewer.position = { x: 0, y: 64, z };
-            client.viewer.camera = { position: { x: 0, y: 65.62, z }, yaw: 0, pitch: 0 };
+        let previous = readDisplayPosition(client);
+        for (let step = 1; step <= 80; step += 1) {
+            client.viewer.position = { x: 0, y: 64, z: step * 0.25 };
+            client.viewer.eyePosition = { x: 0, y: 65.62, z: step * 0.25 };
             renderer.renderViewer(client.viewer, [destination]);
-            positions.push(readDisplayPosition(client).z);
+            const position = readDisplayPosition(client);
+            expect(Math.hypot(position.y - previous.y, position.z - previous.z)).toBeLessThan(0.6);
+            expect(position.z).toBeGreaterThanOrEqual(previous.z - 1 / 4096);
+            previous = position;
         }
-
-        const entityChanges = client.packets
-            .filter(({ tag }) => tag === 'c-spawn-entity' || tag === 'c-remove-entities')
-            .map(({ tag }) => tag);
-        expect(entityChanges).toEqual(['c-spawn-entity']);
-        expect(positions.at(-1)).toBeCloseTo(20, 3);
+        expect(readDisplayPosition(client).z).toBeCloseTo(20, 3);
         expect(readDisplayPosition(client).y).toBeCloseTo(66, 3);
-        for (let index = 1; index < positions.length; index += 1) {
-            expect(Math.abs((positions[index] ?? 0) - (positions[index - 1] ?? 0))).toBeLessThan(3);
+        expect(client.packets.filter(({ tag }) => tag === 'c-spawn-entity')).toHaveLength(1);
+        expect(client.packets.some(({ tag }) => tag === 'c-remove-entities')).toBe(false);
+        client.packets.length = 0;
+        client.viewer.position = { x: 0, y: 64, z: 19 };
+        client.viewer.eyePosition = { x: 0, y: 65.62, z: 19 };
+        renderer.renderViewer(client.viewer, [destination]);
+        expect(client.packets.some(({ tag }) => tag === 'c-update-entity-pos')).toBe(false);
+
+        // Keep the original spawn ledger to reconstruct movement during the retreat.
+        const retreat = makeViewer(allowedId);
+        retreat.viewer.position = { x: 0, y: 64, z: 19 };
+        retreat.viewer.eyePosition = { x: 0, y: 65.62, z: 19 };
+        renderer.renderViewer(retreat.viewer, [destination]);
+        previous = readDisplayPosition(retreat);
+        for (let step = 75; step >= 0; step -= 1) {
+            retreat.viewer.position = { x: 0, y: 64, z: step * 0.25 };
+            retreat.viewer.eyePosition = { x: 0, y: 65.62, z: step * 0.25 };
+            renderer.renderViewer(retreat.viewer, [destination]);
+            const position = readDisplayPosition(retreat);
+            expect(Math.hypot(position.y - previous.y, position.z - previous.z)).toBeLessThan(0.6);
+            previous = position;
         }
+        const end = readDisplayPosition(retreat);
+        expect(Math.hypot(end.x, end.y - 65.62, end.z)).toBeCloseTo(8, 3);
+        expect(retreat.packets.filter(({ tag }) => tag === 'c-spawn-entity')).toHaveLength(1);
+        expect(retreat.packets.some(({ tag }) => tag === 'c-remove-entities')).toBe(false);
     });
 
-    it('eases ordinary screen-height movement while following an elevated waypoint faster', async () => {
-        const ordinary = makeViewer(ownerId);
-        const elevated = makeViewer(allowedId);
-        const ordinaryWaypoint = waypoint({ position: { x: 0, y: 64, z: 30 } });
-        const elevatedWaypoint = waypoint({
-            id: '55555555-5555-4555-8555-555555555555',
-            position: { x: 0, y: 74, z: 30 }
-        });
-        const ordinaryRenderer = createRenderer();
-        const elevatedRenderer = createRenderer();
-
-        ordinaryRenderer.renderViewer(ordinary.viewer, [ordinaryWaypoint]);
-        elevatedRenderer.renderViewer(elevated.viewer, [elevatedWaypoint]);
-        const { cameraPlaneCoordinates } = await import('./layout.ts');
-        const screenHeight = (client: ReturnType<typeof makeViewer>) =>
-            cameraPlaneCoordinates(client.viewer.camera, readDisplayPosition(client)).vertical;
-        const ordinaryStart = screenHeight(ordinary);
-        const elevatedStart = screenHeight(elevated);
-
-        for (const client of [ordinary, elevated]) {
-            client.viewer.position = { x: 0.1, y: 64, z: 0 };
-            client.viewer.camera = { position: { x: 0.1, y: 65.62, z: 0 }, yaw: 0, pitch: 30 };
-        }
-        ordinaryRenderer.renderViewer(ordinary.viewer, [ordinaryWaypoint]);
-        elevatedRenderer.renderViewer(elevated.viewer, [elevatedWaypoint]);
-
-        const ordinaryMovement = Math.abs(screenHeight(ordinary) - ordinaryStart);
-        const elevatedMovement = Math.abs(screenHeight(elevated) - elevatedStart);
-        expect(ordinaryMovement).toBeLessThan(0.3);
-        expect(elevatedMovement).toBeGreaterThan(ordinaryMovement * 2);
-    });
-
-    it('eases horizontal screen movement when the player shifts from side to side', async () => {
+    it('recreates the nearby HUD after a same-world teleport beyond the relative packet range', () => {
         const renderer = createRenderer();
         const client = makeViewer(ownerId);
-        const destination = waypoint({ position: { x: 0, y: 64, z: 30 } });
-        const { cameraPlaneCoordinates, projectWaypointOnCameraPlane } = await import('./layout.ts');
-        const screenSide = () => cameraPlaneCoordinates(client.viewer.camera, readDisplayPosition(client)).horizontal;
-
-        renderer.renderViewer(client.viewer, [destination]);
-        const initial = screenSide();
-        client.viewer.position = { x: 0.5, y: 64, z: 0 };
-        client.viewer.camera = { position: { x: 0.5, y: 65.62, z: 0 }, yaw: 0, pitch: 0 };
-        renderer.renderViewer(client.viewer, [destination]);
-        const shifted = screenSide();
-        const rawProjected = projectWaypointOnCameraPlane(client.viewer.camera, { x: 0, y: 66, z: 30 }, 3);
-        if (rawProjected === undefined) throw new Error('Expected a forward waypoint projection.');
-        const rawShift = Math.abs(cameraPlaneCoordinates(client.viewer.camera, rawProjected).horizontal - initial);
-
-        client.viewer.position = { x: 0, y: 64, z: 0 };
-        client.viewer.camera = { position: { x: 0, y: 65.62, z: 0 }, yaw: 0, pitch: 0 };
-        renderer.renderViewer(client.viewer, [destination]);
-        const returned = screenSide();
-
-        expect(Math.abs(shifted - initial)).toBeLessThan(rawShift * 0.5);
-        expect(Math.abs(returned - shifted)).toBeLessThan(Math.abs(shifted - initial));
-    });
-
-    it('ignores tiny stationary camera jitter below the packet resolution', () => {
-        const renderer = createRenderer();
-        const client = makeViewer(ownerId);
-        const destination = waypoint({ position: { x: 10, y: 65.62, z: 10 } });
-
-        renderer.renderViewer(client.viewer, [destination]);
-        client.viewer.camera = { position: client.viewer.camera.position, yaw: 0.02, pitch: 0 };
-        renderer.renderViewer(client.viewer, [destination]);
-
-        expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
-    });
-
-    it('ignores small eye-position noise while the player is stationary', () => {
-        const renderer = createRenderer();
-        const client = makeViewer(ownerId);
-        const destination = waypoint({ position: { x: 10, y: 65.62, z: 10 } });
-
-        renderer.renderViewer(client.viewer, [destination]);
-        client.viewer.camera = { position: { x: 0.001, y: 65.62, z: 0 }, yaw: 0, pitch: 0 };
-        renderer.renderViewer(client.viewer, [destination]);
-
-        expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
-    });
-
-    it('ignores small stationary yaw noise while the player is stationary', () => {
-        const renderer = createRenderer();
-        const client = makeViewer(ownerId);
-        const destination = waypoint({ position: { x: 10, y: 65.62, z: 10 } });
-
-        renderer.renderViewer(client.viewer, [destination]);
-        client.viewer.camera = { position: client.viewer.camera.position, yaw: 0.1, pitch: 0 };
-        renderer.renderViewer(client.viewer, [destination]);
-
-        expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
-    });
-
-    it('stabilizes head rotation while standing still and follows it while walking', () => {
-        const renderer = createRenderer();
-        const client = makeViewer(ownerId);
-        const destination = waypoint({ position: { x: 10, y: 65.62, z: 10 } });
-
-        renderer.renderViewer(client.viewer, [destination]);
-        client.viewer.camera = { position: client.viewer.camera.position, yaw: 20, pitch: 60 };
-        renderer.renderViewer(client.viewer, [destination]);
-
-        const stationaryMovement = client.packets.at(-1);
-        if (stationaryMovement?.tag !== 'c-update-entity-pos') {
-            throw new Error('Expected the smoothed stationary camera update.');
-        }
-        expect(stationaryMovement.val.delta[1]).toBe(0);
-        expect(Math.hypot(stationaryMovement.val.delta[0], stationaryMovement.val.delta[2])).toBeLessThan(500);
-
-        client.viewer.position = { x: 0.1, y: 64, z: 0 };
-        client.viewer.camera = { position: { x: 0.1, y: 65.62, z: 0 }, yaw: 20, pitch: 60 };
-        renderer.renderViewer(client.viewer, [destination]);
-
-        const walkingMovement = client.packets.at(-1);
-        if (walkingMovement?.tag !== 'c-update-entity-pos') {
-            throw new Error('Expected the camera to follow while the player moves.');
-        }
-        expect(Math.hypot(walkingMovement.val.delta[0], walkingMovement.val.delta[2])).toBeGreaterThan(500);
-    });
-
-    it('re-spawns a display when a same-dimension move exceeds the relative packet range', () => {
-        const renderer = createRenderer();
-        const client = makeViewer(ownerId);
-        const destination = waypoint({ position: { x: 0, y: 65.62, z: 20 } });
-
+        const destination = waypoint({ position: { x: 0, y: 64, z: 100 } });
         renderer.renderViewer(client.viewer, [destination]);
         client.packets.length = 0;
-        client.viewer.camera = { position: { x: 0, y: 65.62, z: 10 }, yaw: 0, pitch: 0 };
+        client.viewer.position = { x: 0, y: 64, z: 20 };
+        client.viewer.eyePosition = { x: 0, y: 65.62, z: 20 };
         renderer.renderViewer(client.viewer, [destination]);
-
         expect(client.packets.map(({ tag }) => tag)).toEqual([
             'c-remove-entities',
             'c-spawn-entity',
             'c-set-entity-metadata'
         ]);
-        const spawn = client.packets[1];
-        if (spawn === undefined) throw new Error('Expected the display to be respawned.');
-        const spawnPosition = packetValue(spawn).position as readonly number[];
-        expect(spawnPosition[0]).toBe(0);
-        expect(Math.abs((spawnPosition[1] ?? Infinity) - 65.62)).toBeLessThan(0.5);
-        expect(spawnPosition[2]).toBe(13);
+        expect(readDisplayPosition(client).z).toBeGreaterThan(27.99);
+        expect(readDisplayPosition(client).z).toBeLessThan(28.01);
     });
 
     it('shows the colored label and rounded distance in the HUD component', () => {
@@ -308,6 +258,21 @@ describe('WaypointHudRenderer', () => {
                 { text: ' (13m)', color: '#FFFFFF' }
             ]
         });
+    });
+
+    it('sends scale changes while preserving apparent text size near the world anchor', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 0, y: 64, z: 20 } });
+        for (let z = 0; z <= 20; z += 0.25) {
+            client.viewer.position = { x: 0, y: 64, z };
+            client.viewer.eyePosition = { x: 0, y: 65.62, z };
+            renderer.renderViewer(client.viewer, [destination]);
+            const position = readDisplayPosition(client);
+            const distance = Math.hypot(position.x, position.y - 65.62, position.z - z);
+            expect(readDisplayScale(client) / distance).toBeCloseTo(0.18, 2);
+        }
+        expect(client.packets.filter(({ tag }) => tag === 'c-spawn-entity')).toHaveLength(1);
     });
 
     it('allocates unique negative IDs to multiple displays in one client entity table', () => {
@@ -324,7 +289,7 @@ describe('WaypointHudRenderer', () => {
         expect(ids).toEqual([-1_500_000_000, -1_500_000_001]);
     });
 
-    it('separates overlapping labels and keeps their layout independent of input order', () => {
+    it('spaces collocated labels with a stable order independent of input ordering', () => {
         const first = waypoint({ name: 'Market', position: { x: 0, y: 64, z: 0 } });
         const second = waypoint({
             id: '55555555-5555-4555-8555-555555555555',
@@ -344,9 +309,8 @@ describe('WaypointHudRenderer', () => {
 
         expect(leftPositions).toEqual(rightPositions);
         expect(leftPositions).toHaveLength(2);
-        const firstPosition = leftPositions[0] as number[];
-        const secondPosition = leftPositions[1] as number[];
-        expect(Math.abs((firstPosition[1] ?? 0) - (secondPosition[1] ?? 0))).toBeGreaterThan(0.25);
+        const [firstPosition, secondPosition] = leftPositions as number[][];
+        expect(Math.abs((firstPosition?.[1] ?? 0) - (secondPosition?.[1] ?? 0))).toBeGreaterThan(0.3);
     });
 
     it('removes a display immediately after access is revoked', () => {
@@ -427,7 +391,7 @@ function makeViewer(
         id,
         dimension: 'overworld',
         position: { x: 0, y: 64, z: 0 },
-        camera: { position: { x: 0, y: 65.62, z: 0 }, yaw: 0, pitch: 0 },
+        eyePosition: { x: 0, y: 65.62, z: 0 },
         isOperator: false,
         hasPermission: () => false,
         createEntityUuid: () => ({ high: 0n, low: ++nextUuid }),
@@ -443,6 +407,17 @@ function makeViewer(
 function packetValue(packet: ClientboundPacket): Record<string, unknown> {
     if ('val' in packet) return packet.val as Record<string, unknown>;
     throw new TypeError('Expected a tagged packet value.');
+}
+
+function readDisplayScale(client: ReturnType<typeof makeViewer>): number {
+    let scale = 1;
+    for (const packet of client.packets) {
+        if (packet.tag !== 'c-set-entity-metadata') continue;
+        const bytes = packet.val.metadata;
+        const index = bytes.findIndex((byte, offset) => byte === 12 && bytes[offset + 1] === 39);
+        if (index >= 0) scale = new DataView(bytes.buffer, bytes.byteOffset + index + 2, 12).getFloat32(0, false);
+    }
+    return scale;
 }
 
 function readDisplayPosition(client: ReturnType<typeof makeViewer>): { x: number; y: number; z: number } {

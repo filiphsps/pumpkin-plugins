@@ -29,14 +29,24 @@ and the rounded distance in meters, with its configured item sprite centered on 
 Each player's display packets are private to that player, so
 restricted names and personalized distances are not sent to other clients.
 
-The HUD uses client-only TextDisplay packets on a camera-relative plane about three blocks ahead,
-updated once per server tick. Within ten blocks, each label eases into a world position two blocks
-above its waypoint and stays anchored there within three blocks. Labels render through world
-geometry so terrain does not hide them. Screen direction is eased to reduce movement jitter;
-ordinary waypoints use stronger vertical stabilization, while destinations several blocks above or
-below the player follow height changes faster. Small stationary camera-position and yaw changes are
-also ignored. Other Java protocol versions and Bedrock clients do not receive the HUD. Icons use vanilla 26.3 atlas textures; block items use a representative model texture, and
-custom item IDs require the corresponding `item/<path>` sprite in the client's resource pack.
+The HUD uses client-only TextDisplay entities up to eight blocks from the player's eyes along each
+waypoint's world direction. The farther projection reduces the apparent movement caused by delayed
+position samples. Labels face the viewer and render through terrain. Camera rotation does not move
+or replace them. Between ten and three blocks from a waypoint, the projection blends into a world
+anchor two blocks above its stored Y coordinate. It never passes the destination during the blend;
+within three blocks it stays at the anchor. The transition works in both directions.
+
+Text and icons keep a consistent apparent size throughout the transition, including close approach.
+Waypoints stored in the same half-block grid cell get a stable vertical stack, ordered by identifier,
+without camera-dependent rearrangement. Distinct waypoints along the same bearing may still overlap.
+
+Steps and jumps receive strong elevation damping while steep vertical destinations respond faster.
+Damping eases off near the world anchor. Position and scale updates interpolate over one client tick;
+unchanged text is not resent for scale-only updates. This approximates a first-person HUD: network
+latency, client view bobbing, and third-person camera offsets can still affect alignment. Other Java
+protocol versions and Bedrock clients do not receive the HUD. Icons use vanilla 26.3 atlas textures;
+block items use a representative model texture, and custom item IDs require the corresponding
+`item/<path>` sprite in the client's resource pack.
 
 Malformed or unsupported storage is preserved and disables writes. Fix the file before expecting
 changes to persist.
