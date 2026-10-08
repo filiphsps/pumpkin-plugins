@@ -353,6 +353,48 @@ describe('Pumpkin terrain adapter', () => {
         for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
     });
 
+    it('treats chunk lookup errors as unavailable terrain during shutdown', () => {
+        const values = defaultValues(schema),
+            settings = { ...values.support, worlds: values.worlds };
+        const border = { getCenterX: () => 0, getCenterZ: () => 0, getSize: () => 100, [Symbol.dispose]: vi.fn() };
+        const world = {
+            getName: () => 'world',
+            getDimension: () => 'minecraft:overworld',
+            getMinY: () => 0,
+            getWorldBorder: () => border,
+            getChunk: vi.fn(() => {
+                throw new Error('server stopped');
+            }),
+            [Symbol.dispose]: vi.fn()
+        };
+        const java = { [Symbol.dispose]: vi.fn() };
+        const player = {
+            asJava: () => java,
+            getWorld: () => world,
+            getName: () => 'Alice',
+            getPosition: () => [0, 64, 0]
+        };
+
+        withPlayer(player as unknown as Player, settings, (peer) => {
+            expect(
+                peer.terrain.prepare?.({
+                    originX: 0,
+                    originZ: 0,
+                    width: 1,
+                    depth: 1,
+                    minY: 0,
+                    height: 384
+                })
+            ).toMatchObject({
+                status: 'unavailable',
+                reason: expect.stringContaining('Chunk 0, 0 could not be checked: Error: server stopped')
+            });
+        });
+
+        expect(world.getChunk).toHaveBeenCalledOnce();
+        for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
+
     it('releases the Java handle when acquiring the world fails', () => {
         const values = defaultValues(schema);
         const java = { [Symbol.dispose]: vi.fn() };

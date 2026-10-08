@@ -82,16 +82,26 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                 const lastChunkZ = Math.floor((region.originZ + region.depth - 1) / CHUNK_SIZE_BLOCKS);
                 for (let x = firstChunkX; x <= lastChunkX; x++) {
                     for (let z = firstChunkZ; z <= lastChunkZ; z++) {
-                        const result = acquireChunk(
-                            { x, z },
-                            () => {
-                                // Generated types say undefined for WIT option-none; QuickJS lifts it as null.
-                                const chunk = terrainWorld.getChunk(x, z);
-                                return chunk ?? undefined;
-                            },
-                            chunkLoader,
-                            terrainGenerator
-                        );
+                        const result = (() => {
+                            try {
+                                return acquireChunk(
+                                    { x, z },
+                                    () => {
+                                        // Generated types say undefined for WIT option-none; QuickJS lifts it as null.
+                                        const chunk = terrainWorld.getChunk(x, z);
+                                        return chunk ?? undefined;
+                                    },
+                                    chunkLoader,
+                                    terrainGenerator
+                                );
+                            } catch (err) {
+                                // Host world resources can become unavailable while Pumpkin is stopping.
+                                return {
+                                    status: 'unavailable' as const,
+                                    reason: `Chunk ${x}, ${z} could not be checked: ${String(err)}`
+                                };
+                            }
+                        })();
                         if (result.status === 'ready') {
                             disposeWasiResource(result.chunk);
                             continue;
