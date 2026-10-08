@@ -50,6 +50,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [UPnPumpkin: Troubleshoot port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/troubleshooting.md): Confirm UPnP or NAT-PMP is enabled in the router settings and that the server host shares the router's local network.
 - [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/index.md): Server-managed waypoints with access rules and vanilla commands
 - [Waypoints README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/README.md): Additional component overview and usage details.
+- [Waypoints: Waypoint HUD preview](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/hud-preview.md): This build is ready for local preview testing.
 
 ## Shared tools
 
