@@ -32,36 +32,61 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 
 ## Plugins
 
-- [AppleSkinPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/apple-skin-pumpkin/README.md): AppleSkin server-side support
-- [BedrockAddonManager](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/README.md): Serves Bedrock packs over HTTP; Pumpkin can't send them to players yet
+- [AppleSkinPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/apple-skin-pumpkin/docs/index.md): AppleSkin server-side support
+- [AppleSkinPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/apple-skin-pumpkin/README.md): Additional component overview and usage details.
+- [BedrockAddonManager](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/index.md): Serves Bedrock packs over HTTP; Pumpkin can't send them to players yet
+- [BedrockAddonManager README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/README.md): Additional component overview and usage details.
+- [BedrockAddonManager: Set up Bedrock packs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/setup.md): The folder is scanned at startup and on /baddon reload; new files are not detected automatically.
+- [BedrockAddonManager: Troubleshoot Bedrock pack hosting](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/troubleshooting.md): Check that web.enabled is true, the pack appears in /baddon list, and the configured bind address and port are reachable through the server firewall.
 - [Distant Horizons Support Pumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/index.md): Unofficial Distant Horizons server support for Pumpkin
 - [Distant Horizons Support Pumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/README.md): Additional component overview and usage details.
-- [Distant Horizons Support Pumpkin: Install and connect](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/setup.md): Before installing, check the generated Compatibility and terrain reference for the supported Distant Horizons release and protocol.
-- [Distant Horizons Support Pumpkin: Troubleshooting](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/troubleshooting.md): Confirm the client uses the supported Distant Horizons release in the generated compatibility reference.
-- [DynamicLightsPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/README.md): Server-side dynamic lights for held light sources
-- [UPnPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/README.md): Opens router ports for Pumpkin with UPnP and NAT-PMP
-- [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/README.md): Server waypoints with vanilla commands and Java Locator Bar
+- [Distant Horizons Support Pumpkin: Install and connect](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/setup.md): Before installing, check the plugin README for the supported Distant Horizons release and protocol.
+- [Distant Horizons Support Pumpkin: Troubleshooting](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/troubleshooting.md): Confirm the client uses the supported Distant Horizons release listed in the plugin README.
+- [DynamicLightsPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/docs/index.md): Server-side dynamic lights for held light sources
+- [DynamicLightsPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/README.md): Additional component overview and usage details.
+- [DynamicLightsPumpkin: Configure light sources](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/docs/configuration.md): Settings live in plugins/data/DynamicLightsPumpkin/config.toml.
+- [UPnPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/index.md): Opens router ports for Pumpkin with UPnP and NAT-PMP
+- [UPnPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/README.md): Additional component overview and usage details.
+- [UPnPumpkin: Troubleshoot port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/troubleshooting.md): Confirm UPnP or NAT-PMP is enabled in the router settings and that the server host shares the router's local network.
+- [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/index.md): Server waypoints with vanilla commands and Java Locator Bar
+- [Waypoints README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/README.md): Additional component overview and usage details.
+- [Waypoints: Java Locator Bar markers](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/locator-bar.md): New waypoints do not appear in the Locator Bar until their owner enables output.
 
 ## Shared tools
 
-- [@pumpkin-plugins/build](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/build/README.md): Shared build tool for the plugins
-- [@pumpkin-plugins/config](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/config/README.md): Schema-driven TOML config for plugins
-- [@pumpkin-plugins/docs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/docs/README.md): README generator for plugins and actions
-- [@pumpkin-plugins/minecraft-colors](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/minecraft-colors/README.md): Chalk-like Minecraft text formatting for plugins
-- [@pumpkin-plugins/plugin-kit](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/plugin-kit/README.md): Host helpers shared by plugins
-- [@pumpkin-plugins/port-mapping](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/port-mapping/README.md): UPnP and NAT-PMP port mapping
-- [@pumpkin-plugins/signing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/README.md): Ed25519 signing for plugin builds
-- [@pumpkin-plugins/terrain](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/README.md): Shared terrain capture and access contracts
-- [@pumpkin-plugins/test-harness](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/test-harness/README.md): Runs plugins on a real Pumpkin in vitest
-- [@pumpkin-plugins/update-check](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/update-check/README.md): Check plugin versions against Pumpkin Market
-- [@pumpkin-plugins/upnpumpkin-api](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/upnpumpkin-api/README.md): Asks UPnPumpkin to open a port
+- [Plugin build tool](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/build/docs/index.md): Shared build tool for the plugins
+- [Plugin build tool README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/build/README.md): Additional component overview and usage details.
+- [Plugin configuration library](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/config/docs/index.md): Schema-driven TOML config for plugins
+- [Plugin configuration library README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/config/README.md): Additional component overview and usage details.
+- [Documentation generator](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/docs/docs/index.md): Generates component READMEs, doc links, and repository catalogs
+- [Documentation generator README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/docs/README.md): Additional component overview and usage details.
+- [Minecraft colors](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/minecraft-colors/docs/index.md): Chalk-like Minecraft text formatting for plugins
+- [Minecraft colors README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/minecraft-colors/README.md): Additional component overview and usage details.
+- [Plugin kit](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/plugin-kit/docs/index.md): Host helpers shared by plugins
+- [Plugin kit README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/plugin-kit/README.md): Additional component overview and usage details.
+- [Port mapping library](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/port-mapping/docs/index.md): UPnP and NAT-PMP port mapping
+- [Port mapping library README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/port-mapping/README.md): Additional component overview and usage details.
+- [Pumpkin plugin signing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/docs/index.md): Ed25519 signing for plugin builds
+- [Pumpkin plugin signing README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/README.md): Additional component overview and usage details.
+- [Terrain capture](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/docs/index.md): Shared terrain capture and access contracts
+- [Terrain capture README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/README.md): Additional component overview and usage details.
+- [Pumpkin test harness](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/test-harness/docs/index.md): Runs plugins on a real Pumpkin in vitest
+- [Pumpkin test harness README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/test-harness/README.md): Additional component overview and usage details.
+- [Pumpkin Market update checks](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/update-check/docs/index.md): Check plugin versions against Pumpkin Market
+- [Pumpkin Market update checks README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/update-check/README.md): Additional component overview and usage details.
+- [UPnPumpkin plugin API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/upnpumpkin-api/docs/index.md): Asks UPnPumpkin to open a port
+- [UPnPumpkin plugin API README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/upnpumpkin-api/README.md): Additional component overview and usage details.
 
 ## GitHub Actions
 
-- [Publish to Pumpkin Market](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/publish-to-pumpkin-market/README.md): Upload a released Pumpkin plugin WebAssembly file to its existing Market listing
-- [Sign Pumpkin plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/sign-pumpkin-plugin/README.md): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
-- [Update Pumpkin Market Listing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/update-pumpkin-market-listing/README.md): Update Pumpkin Market listing metadata from a JSON file or direct inputs
-- [Verify Pumpkin plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/verify-pumpkin-plugin/README.md): Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks
+- [Publish a plugin to Pumpkin Market](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/publish-to-pumpkin-market/docs/index.md): Upload a released Pumpkin plugin WebAssembly file to its existing Market listing
+- [Publish a plugin to Pumpkin Market README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/publish-to-pumpkin-market/README.md): Additional component overview and usage details.
+- [Sign Pumpkin plugins](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/sign-pumpkin-plugin/docs/index.md): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
+- [Sign Pumpkin plugins README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/sign-pumpkin-plugin/README.md): Additional component overview and usage details.
+- [Update a Pumpkin Market listing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/update-pumpkin-market-listing/docs/index.md): Update Pumpkin Market listing metadata from a JSON file or direct inputs
+- [Update a Pumpkin Market listing README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/update-pumpkin-market-listing/README.md): Additional component overview and usage details.
+- [Verify Pumpkin plugin signatures](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/verify-pumpkin-plugin/docs/index.md): Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks
+- [Verify Pumpkin plugin signatures README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/verify-pumpkin-plugin/README.md): Additional component overview and usage details.
 
 ## API reference
 
@@ -76,18 +101,18 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [DynamicLightsPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/dynamic-lights-pumpkin/): Server-side dynamic lights for held light sources
 - [UPnPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/upnpumpkin/): Opens router ports for Pumpkin with UPnP and NAT-PMP
 - [Waypoints API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/waypoints/): Server waypoints with vanilla commands and Java Locator Bar
-- [@pumpkin-plugins/build API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/build/): Shared build tool for the plugins
-- [@pumpkin-plugins/config API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/config/): Schema-driven TOML config for plugins
-- [@pumpkin-plugins/docs API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/docs/): README generator for plugins and actions
-- [@pumpkin-plugins/minecraft-colors API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/minecraft-colors/): Chalk-like Minecraft text formatting for plugins
-- [@pumpkin-plugins/plugin-kit API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/plugin-kit/): Host helpers shared by plugins
-- [@pumpkin-plugins/port-mapping API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/port-mapping/): UPnP and NAT-PMP port mapping
-- [@pumpkin-plugins/signing API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/signing/): Ed25519 signing for plugin builds
-- [@pumpkin-plugins/terrain API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/terrain/): Shared terrain capture and access contracts
-- [@pumpkin-plugins/test-harness API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/test-harness/): Runs plugins on a real Pumpkin in vitest
-- [@pumpkin-plugins/update-check API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/update-check/): Check plugin versions against Pumpkin Market
-- [@pumpkin-plugins/upnpumpkin-api API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/upnpumpkin-api/): Asks UPnPumpkin to open a port
-- [Publish to Pumpkin Market API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/publish-to-pumpkin-market/): Upload a released Pumpkin plugin WebAssembly file to its existing Market listing
-- [Sign Pumpkin plugin API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/sign-pumpkin-plugin/): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
-- [Update Pumpkin Market Listing API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/update-pumpkin-market-listing/): Update Pumpkin Market listing metadata from a JSON file or direct inputs
-- [Verify Pumpkin plugin API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/verify-pumpkin-plugin/): Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks
+- [Plugin build tool API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/build/): Shared build tool for the plugins
+- [Plugin configuration library API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/config/): Schema-driven TOML config for plugins
+- [Documentation generator API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/docs/): Generates component READMEs, doc links, and repository catalogs
+- [Minecraft colors API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/minecraft-colors/): Chalk-like Minecraft text formatting for plugins
+- [Plugin kit API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/plugin-kit/): Host helpers shared by plugins
+- [Port mapping library API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/port-mapping/): UPnP and NAT-PMP port mapping
+- [Pumpkin plugin signing API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/signing/): Ed25519 signing for plugin builds
+- [Terrain capture API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/terrain/): Shared terrain capture and access contracts
+- [Pumpkin test harness API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/test-harness/): Runs plugins on a real Pumpkin in vitest
+- [Pumpkin Market update checks API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/update-check/): Check plugin versions against Pumpkin Market
+- [UPnPumpkin plugin API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/upnpumpkin-api/): Asks UPnPumpkin to open a port
+- [Publish a plugin to Pumpkin Market API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/publish-to-pumpkin-market/): Upload a released Pumpkin plugin WebAssembly file to its existing Market listing
+- [Sign Pumpkin plugins API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/sign-pumpkin-plugin/): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
+- [Update a Pumpkin Market listing API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/update-pumpkin-market-listing/): Update Pumpkin Market listing metadata from a JSON file or direct inputs
+- [Verify Pumpkin plugin signatures API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/verify-pumpkin-plugin/): Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks
