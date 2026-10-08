@@ -65,11 +65,16 @@ function uploadedFile(body, contentType, filename) {
     assert.ok(boundaryMatch, 'multipart content type should include a boundary');
     const header = body.indexOf(Buffer.from(`filename="${filename}"`));
     assert.notEqual(header, -1, `multipart body should include ${filename}`);
+    const headerStart = body.lastIndexOf(Buffer.from('Content-Disposition:'), header);
     const start = body.indexOf(Buffer.from('\r\n\r\n'), header) + 4;
     const end = body.indexOf(Buffer.from(`\r\n--${boundaryMatch[1] ?? boundaryMatch[2]}`), start);
+    assert.notEqual(headerStart, -1, 'file part should include a content disposition header');
     assert.ok(start >= 4, 'file part should include a header/body separator');
     assert.notEqual(end, -1, 'file part should end at the multipart boundary');
-    return body.subarray(start, end);
+    return {
+        headers: body.subarray(headerStart, start - 4).toString('utf8'),
+        bytes: body.subarray(start, end)
+    };
 }
 
 describe('publish-to-market action', () => {
@@ -241,10 +246,9 @@ describe('publish-to-market action', () => {
             assert.equal(requests[2].method, 'PUT');
             assert.equal(requests[2].url, '/api/plugins/42');
             assert.equal(requests[2].headers.authorization, 'Bearer test-token');
-            assert.deepEqual(
-                uploadedFile(requests[2].rawBody, requests[2].headers['content-type'], 'plugin.wasm'),
-                fs.readFileSync(path.join(dir, 'plugin.wasm'))
-            );
+            const wasmPart = uploadedFile(requests[2].rawBody, requests[2].headers['content-type'], 'plugin.wasm');
+            assert.match(wasmPart.headers, /Content-Type: application\/wasm/i);
+            assert.deepEqual(wasmPart.bytes, fs.readFileSync(path.join(dir, 'plugin.wasm')));
             assert.match(
                 requests[2].body,
                 /name="metadata"\r\n\r\n{"version":"1.2.3","track":"beta","releaseNotes":"## Fixed\\n\\n- Kept the ports open\."}/

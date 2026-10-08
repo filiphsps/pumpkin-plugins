@@ -48,7 +48,7 @@ async function publish() {
 
     const metadata = { version, track, releaseNotes };
     const form = new FormData();
-    form.append('wasm', new Blob([fs.readFileSync(file)]), path.basename(file));
+    form.append('wasm', new Blob([fs.readFileSync(file)], { type: 'application/wasm' }), path.basename(file));
     form.append('metadata', JSON.stringify(metadata));
 
     const response = await marketFetch(`${marketUrl}/api/plugins/${listing.id}`, {
