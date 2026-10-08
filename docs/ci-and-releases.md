@@ -180,8 +180,10 @@ manifest, pinning verification to the public key derived from that run's signing
 repository secret when available, while pull requests and pushes without the secret use an ephemeral
 key. CI uses the verified signed files for integration tests. The ephemeral key is only for checks;
 release jobs never receive it. Release jobs use the signing action to sign the exact build artifact
-after checking that the release tag points to the commit that produced the build. It uploads the
-signed `.wasm` and refreshed `.sha256` to the GitHub release and Pumpkin Market.
+after checking that the release tag points to the commit that produced the build. The signed `.wasm`
+and refreshed `.sha256` go to the GitHub release. Before Market upload, CI verifies that signed
+artifact against the expected plugin name and version, then removes its publisher signing sections;
+Market signs each public download itself.
 
 | Situation | Result |
 | --- | --- |

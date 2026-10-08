@@ -639,6 +639,15 @@ jobs:
                   echo "version=${RELEASE_TAG##*-v}" >> "$GITHUB_OUTPUT"
                   echo "wasm_file=dist/$(basename "$PLUGIN_DIRECTORY").wasm" >> "$GITHUB_OUTPUT"
 
+            # The GitHub release keeps its publisher signature. Market signs each public download,
+            # so send it the verified component without the publisher's signing sections.
+            - name: 🔏 Prepare component for Market signing
+              env:
+                  WASM_FILE: ${{ steps.market.outputs.wasm_file }}
+                  PLUGIN_NAME: ${{ steps.market.outputs.plugin_name }}
+                  PLUGIN_VERSION: ${{ steps.market.outputs.version }}
+              run: node scripts/prepare-market-plugin.mjs "$WASM_FILE" "$PLUGIN_NAME" "$PLUGIN_VERSION"
+
             # Missing credentials or a not-yet-published listing produce a warning and leave the
             # GitHub release intact. API failures still fail this job so it can be retried.
             - name: 🛒 Publish to Pumpkin Market
