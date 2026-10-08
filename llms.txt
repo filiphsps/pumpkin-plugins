@@ -48,9 +48,8 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [UPnPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/index.md): Opens router ports for Pumpkin with UPnP and NAT-PMP
 - [UPnPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/README.md): Additional component overview and usage details.
 - [UPnPumpkin: Troubleshoot port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/troubleshooting.md): Confirm UPnP or NAT-PMP is enabled in the router settings and that the server host shares the router's local network.
-- [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/index.md): Server waypoints with vanilla commands and Java Locator Bar
+- [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/index.md): Server-managed waypoints with access rules and vanilla commands
 - [Waypoints README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/README.md): Additional component overview and usage details.
-- [Waypoints: Java Locator Bar markers](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/locator-bar.md): New waypoints do not appear in the Locator Bar until their owner enables output.
 
 ## Shared tools
 
@@ -100,7 +99,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Distant Horizons Support Pumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/distant-horizons-support-pumpkin/): Unofficial Distant Horizons server support for Pumpkin
 - [DynamicLightsPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/dynamic-lights-pumpkin/): Server-side dynamic lights for held light sources
 - [UPnPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/upnpumpkin/): Opens router ports for Pumpkin with UPnP and NAT-PMP
-- [Waypoints API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/waypoints/): Server waypoints with vanilla commands and Java Locator Bar
+- [Waypoints API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/waypoints/): Server-managed waypoints with access rules and vanilla commands
 - [Plugin build tool API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/build/): Shared build tool for the plugins
 - [Plugin configuration library API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/config/): Schema-driven TOML config for plugins
 - [Documentation generator API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/docs/): Generates component READMEs, doc links, and repository catalogs
