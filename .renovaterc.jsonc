@@ -14,6 +14,8 @@
         // The lockfile pins a lot of transitives exactly, so give it a weekly refresh.
         ":maintainLockFilesWeekly"
     ],
+    "labels": ["dependencies"],
+    "dependencyDashboardLabels": ["dependencies"],
     "packageRules": [
         {
             // Node declarations are needed by Node-hosted tools, tests, and Vitest configs. Keep the
