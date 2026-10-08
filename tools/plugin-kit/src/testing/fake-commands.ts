@@ -1,10 +1,11 @@
 import type { CommandArgumentSpec, CommandArgumentValue } from '@pumpkin-plugins/docs';
-import type { CommandHost, CommandNodeLike } from '../commands.ts';
+import type { CommandHost, CommandNodeLike, CommandSuggestionHandler, CommandSuggestionRequest } from '../commands.ts';
 
 /** A node of a fake command tree, with what was attached to it. */
 export class FakeNode implements CommandNodeLike {
     readonly children: FakeNode[] = [];
     handlerId: number | undefined;
+    suggestionHandlerId: number | undefined;
     private consumed = false;
 
     /** Creates a node for the word `name`. */
@@ -24,6 +25,11 @@ export class FakeNode implements CommandNodeLike {
     executeWithHandlerId(id: number): void {
         this.assertAvailable();
         this.handlerId = id;
+    }
+
+    suggestWithHandlerId(id: number): void {
+        this.assertAvailable();
+        this.suggestionHandlerId = id;
     }
 
     private consume(): void {
@@ -52,6 +58,11 @@ export class FakeCommandHost implements CommandHost<FakeSender> {
         number,
         (sender: FakeSender, args: Readonly<Record<string, CommandArgumentValue>>) => void
     >();
+    private readonly suggestionHandlers = new Map<number, CommandSuggestionHandler<FakeSender>>();
+
+    get suggestionHandlerCount(): number {
+        return this.suggestionHandlers.size;
+    }
 
     root(name: string): FakeNode {
         return new FakeNode(name);
@@ -63,6 +74,12 @@ export class FakeCommandHost implements CommandHost<FakeSender> {
 
     argument(spec: CommandArgumentSpec): FakeNode {
         return new FakeNode(`<${spec.name}>`, spec);
+    }
+
+    onSuggest(handler: CommandSuggestionHandler<FakeSender>): number {
+        const id = 100_000 + this.suggestionHandlers.size;
+        this.suggestionHandlers.set(id, handler);
+        return id;
     }
 
     onRun(
@@ -85,6 +102,16 @@ export class FakeCommandHost implements CommandHost<FakeSender> {
 
     hasPermission(_sender: FakeSender, _permission: string): boolean {
         return true;
+    }
+
+    /** Resolves suggestions for an argument node through its registered callback. */
+    suggest(root: FakeNode, path: string[], request: CommandSuggestionRequest): string[] {
+        let node: FakeNode | undefined = path[0] === root.name ? root : undefined;
+        for (const word of path.slice(1)) node = node?.children.find((child) => child.name === word);
+        const id = node?.suggestionHandlerId;
+        const handler = id === undefined ? undefined : this.suggestionHandlers.get(id);
+        if (handler === undefined) throw new Error(`/${path.join(' ')} has no suggestion handler`);
+        return [...handler({ lines: [], errors: [], asPlayer: () => undefined }, request)];
     }
 
     /** Runs the command at the end of `path` (the words after `/`) and returns what it sent back. */

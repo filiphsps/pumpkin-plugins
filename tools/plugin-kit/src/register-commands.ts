@@ -1,6 +1,15 @@
-import { type Arg, Command, CommandNode, type CommandSender, type ConsumedArgs } from 'pumpkin:plugin/command@0.1.0';
+import {
+    type Arg,
+    Command,
+    CommandNode,
+    type CommandSender,
+    type CommandSuggestions,
+    type ConsumedArgs,
+    type SuggestionRequest
+} from 'pumpkin:plugin/command@0.1.0';
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { PermissionDefault } from 'pumpkin:plugin/permission@0.1.0';
+import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { TextComponent } from 'pumpkin:plugin/text@0.1.0';
 import * as uuid from 'pumpkin:plugin/uuid@0.1.0';
 import {
@@ -11,7 +20,7 @@ import {
     type CommandTree,
     commandPermissionInfos
 } from '@pumpkin-plugins/docs';
-import { buildCommands, type CommandHost } from './commands.ts';
+import { buildCommands, type CommandHost, type CommandSuggestionHandler } from './commands.ts';
 import { onCommand } from './host.ts';
 import { disposeWasiResource } from './wasi-resource.ts';
 
@@ -32,13 +41,27 @@ function text(line: string, tone?: 'error'): TextComponent {
 export function registerCommands<T extends CommandTree>(
     ctx: Context,
     tree: T,
-    handlers: CommandHandlers<T, CommandSender>
+    handlers: CommandHandlers<T, CommandSender>,
+    suggestions?: {
+        readonly arguments: Readonly<Partial<Record<string, CommandSuggestionHandler<CommandSender>>>>;
+        readonly register: (
+            handler: (sender: CommandSender, server: Server, request: SuggestionRequest) => CommandSuggestions
+        ) => number;
+    }
 ): void {
     const server = ctx.getServer();
     const host: CommandHost<CommandSender> = {
         root: (name, description) => new Command([name], description),
         literal: (name) => CommandNode.literal(name),
         argument: (spec) => CommandNode.argument(spec.name, argumentType(spec)),
+        onSuggest: (handler) => {
+            if (suggestions === undefined) throw new Error('Command suggestions require a registration callback.');
+            return suggestions.register((sender, _server, request) => ({
+                start: request.start,
+                length: request.cursor - request.start,
+                values: handler(sender, request).map((value) => ({ value, tooltip: undefined }))
+            }));
+        },
         onRun: (run, arguments_) =>
             onCommand((sender, consumed) => {
                 try {
@@ -82,7 +105,12 @@ export function registerCommands<T extends CommandTree>(
         });
     };
 
-    for (const { name, permission, node } of buildCommands<CommandSender, T>(host, tree, handlers)) {
+    for (const { name, permission, node } of buildCommands<CommandSender, T>(
+        host,
+        tree,
+        handlers,
+        suggestions?.arguments
+    )) {
         const spec = tree[name];
         const hasSubcommands = spec.subcommands && Object.keys(spec.subcommands).length > 0;
         const rootPermission = hasSubcommands

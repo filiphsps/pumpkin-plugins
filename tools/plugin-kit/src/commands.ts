@@ -18,6 +18,23 @@ export interface CommandNodeLike {
     executeWithHandlerId(id: number): unknown;
 }
 
+/** An argument node that can request dynamic completions. */
+export interface CommandArgumentNodeLike extends CommandNodeLike {
+    /** Uses a registered callback to suggest values for this argument node. */
+    suggestWithHandlerId(id: number): unknown;
+}
+
+/** The input context Pumpkin provides when a client requests argument suggestions. */
+export interface CommandSuggestionRequest {
+    readonly input: string;
+    readonly cursor: number;
+    readonly start: number;
+    readonly remaining: string;
+}
+
+/** Returns candidate strings for one argument node. */
+export type CommandSuggestionHandler<Sender> = (sender: Sender, request: CommandSuggestionRequest) => readonly string[];
+
 /** What building commands needs from the host. `registerCommands` implements it with Pumpkin's command classes. */
 export interface CommandHost<Sender> {
     /** Creates the root of a command: the word typed after `/`. */
@@ -25,7 +42,9 @@ export interface CommandHost<Sender> {
     /** Creates a fixed word below a node. */
     literal(name: string): CommandNodeLike;
     /** Creates a typed argument below a node. */
-    argument(spec: CommandArgumentSpec): CommandNodeLike;
+    argument(spec: CommandArgumentSpec): CommandArgumentNodeLike;
+    /** Registers a dynamic suggestion callback and returns its host handler ID. */
+    onSuggest(handler: CommandSuggestionHandler<Sender>): number;
     /** Registers what runs when a command is used, and returns its id. */
     onRun(
         run: (sender: Sender, args: Readonly<Record<string, CommandArgumentValue>>) => void,
@@ -61,7 +80,8 @@ export interface BuiltCommand {
 export function buildCommands<Sender, T extends CommandTree>(
     host: CommandHost<Sender>,
     tree: T,
-    handlers: CommandHandlers<T, Sender>
+    handlers: CommandHandlers<T, Sender>,
+    suggestions: Readonly<Partial<Record<string, CommandSuggestionHandler<Sender>>>> = {}
 ): BuiltCommand[] {
     const lookup = handlers as unknown as Record<
         string,
@@ -76,6 +96,20 @@ export function buildCommands<Sender, T extends CommandTree>(
             throw new Error(`no handler for /${key}`);
         }
         return handler;
+    };
+    const suggestionIds = new Map<string, number>();
+    const argument = (spec: CommandArgumentSpec): CommandNodeLike => {
+        const node = host.argument(spec);
+        const suggestion = suggestions[spec.name];
+        if (suggestion !== undefined) {
+            let id = suggestionIds.get(spec.name);
+            if (id === undefined) {
+                id = host.onSuggest(suggestion);
+                suggestionIds.set(spec.name, id);
+            }
+            node.suggestWithHandlerId(id);
+        }
+        return node;
     };
     // Validate before allocating host nodes or callbacks, so a missing late handler leaves no partial tree.
     const flatCommands = flattenCommands(tree);
@@ -140,7 +174,7 @@ export function buildCommands<Sender, T extends CommandTree>(
         prefix: readonly CommandArgumentSpec[] = []
     ): void => {
         for (const branch of branches) {
-            const child = host.argument(branch.spec);
+            const child = argument(branch.spec);
             const arguments_ = [...prefix, branch.spec];
             if (branch.terminal) register(child, path, permission, checkPermission, arguments_);
             attachArgumentBranches(child, path, permission, checkPermission, [...branch.children.values()], arguments_);
@@ -160,7 +194,7 @@ export function buildCommands<Sender, T extends CommandTree>(
             return;
         }
 
-        const argumentNodes = arguments_.map((argument) => host.argument(argument));
+        const argumentNodes = arguments_.map(argument);
         const lastNode = argumentNodes.at(-1);
         if (!lastNode) throw new Error(`command /${handlerPath(path, arguments_)} has no argument node`);
         register(lastNode, path, permission, checkPermission, arguments_);

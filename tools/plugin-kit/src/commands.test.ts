@@ -1,6 +1,6 @@
 import { CommandFailed, commandInfos, defineCommands, errorLine } from '@pumpkin-plugins/docs';
 import { describe, expect, it, vi } from 'vitest';
-import { buildCommands } from './commands.ts';
+import { buildCommands, type CommandSuggestionRequest } from './commands.ts';
 import { FakeCommandFailure, FakeCommandHost, FakeNode } from './testing/fake-commands.ts';
 
 const tree = defineCommands('Demo', {
@@ -206,6 +206,42 @@ describe('buildCommands', () => {
             min: -30_000_000,
             max: 30_000_000
         });
+    });
+
+    it('attaches one dynamic suggestion handler to every argument with the matching name', () => {
+        const argumentTree = defineCommands('Demo', {
+            locate: {
+                description: 'Look up a location',
+                permission: 'Demo:command.locate',
+                subcommands: {
+                    info: {
+                        description: 'Show information',
+                        arguments: [{ name: 'name', type: 'string', mode: 'quotable' }]
+                    },
+                    delete: {
+                        description: 'Delete a location',
+                        arguments: [{ name: 'name', type: 'string', mode: 'quotable' }]
+                    }
+                }
+            }
+        });
+        const host = new FakeCommandHost();
+        const request: CommandSuggestionRequest = {
+            input: '/locate info M',
+            cursor: 15,
+            start: 13,
+            remaining: 'M'
+        };
+        const [root] = buildCommands(
+            host,
+            argumentTree,
+            { 'locate info <name>': () => [], 'locate delete <name>': () => [] },
+            { name: (_sender, current) => (current.remaining === 'M' ? ['Market'] : ['Market', 'Mine']) }
+        );
+
+        expect(host.suggest(root?.node as FakeNode, ['locate', 'info', '<name>'], request)).toEqual(['Market']);
+        expect(host.suggest(root?.node as FakeNode, ['locate', 'delete', '<name>'], request)).toEqual(['Market']);
+        expect(host.suggestionHandlerCount).toBe(1);
     });
 
     it('runs the command itself and several argument variants with shared prefixes', () => {

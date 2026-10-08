@@ -1,9 +1,14 @@
-import type { CommandSender } from 'pumpkin:plugin/command@0.1.0';
+import type { CommandSender, CommandSuggestions, SuggestionRequest } from 'pumpkin:plugin/command@0.1.0';
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
+import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { CommandFailed, defineCommands, errorLine } from '@pumpkin-plugins/docs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const host = vi.hoisted(() => ({ onCommand: vi.fn(), color: vi.fn(), uuidToString: vi.fn(() => 'player-uuid') }));
+const host = vi.hoisted(() => ({
+    onCommand: vi.fn(),
+    color: vi.fn(),
+    uuidToString: vi.fn(() => 'player-uuid')
+}));
 vi.mock('./host.ts', () => ({ onCommand: host.onCommand }));
 vi.mock('pumpkin:plugin/text@0.1.0', () => ({
     TextComponent: {
@@ -28,6 +33,7 @@ vi.mock('pumpkin:plugin/command@0.1.0', () => {
             this.children.push(node);
         });
         executeWithHandlerId = vi.fn((_id: number) => this.assertAvailable());
+        suggestWithHandlerId = vi.fn((_id: number) => this.assertAvailable());
 
         private consume() {
             this.assertAvailable();
@@ -70,6 +76,49 @@ beforeEach(() => {
 });
 
 describe('registerCommands', () => {
+    it('registers and converts dynamic argument suggestions for Pumpkin', () => {
+        const suggestions = vi.fn((_sender: CommandSender, request: SuggestionRequest) =>
+            request.remaining === 'M' ? ['Market'] : ['Market', 'Mine']
+        );
+        let registeredSuggestion:
+            | ((sender: CommandSender, server: Server, request: SuggestionRequest) => CommandSuggestions)
+            | undefined;
+        const register = vi.fn((handler: typeof registeredSuggestion extends infer T ? NonNullable<T> : never) => {
+            registeredSuggestion = handler;
+            return 910_001;
+        });
+        const argumentTree = defineCommands('Demo', {
+            locate: {
+                description: 'Find a location',
+                permission: 'Demo:command.locate',
+                arguments: [{ name: 'name', type: 'string', mode: 'quotable' }]
+            }
+        });
+        const { ctx, registerCommand, server } = context();
+
+        registerCommands(
+            ctx,
+            argumentTree,
+            { 'locate <name>': () => [] },
+            {
+                arguments: { name: suggestions },
+                register
+            }
+        );
+
+        const node = registerCommand.mock.calls[0][0].children[0];
+        expect(node.suggestWithHandlerId).toHaveBeenCalledWith(910_001);
+        expect(register).toHaveBeenCalledOnce();
+        const sender = {} as CommandSender;
+        const request = { input: '/locate M', cursor: 9, start: 8, remaining: 'M' };
+        expect(registeredSuggestion?.(sender, server as never, request)).toEqual({
+            start: 8,
+            length: 1,
+            values: [{ value: 'Market', tooltip: undefined }]
+        });
+        expect(suggestions).toHaveBeenCalledWith(sender, request);
+    });
+
     it('registers shared permission nodes once with the default operator level', () => {
         const { ctx, registerCommand, registerPermission } = context();
         registerCommands(ctx, tree, { first: () => [], second: () => [] });
