@@ -42,6 +42,6 @@ writeFileSync(
     output,
     '// Generated from Minecraft 26.3 by scripts/generate-icon-sprites.mjs.\n' +
         '/** Vanilla items whose representative sprite differs from item/{registry path}. */\n' +
-        `export const BLOCK_ICON_SPRITES: Readonly<Record<string, string>> = ${JSON.stringify(sprites, null, 4)};\n`
+        `export const BLOCK_ICON_SPRITES: { readonly [key: string]: string } = ${JSON.stringify(sprites, null, 4)};\n`
 );
 execFileSync('pnpm', ['exec', 'biome', 'format', '--write', output]);

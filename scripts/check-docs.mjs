@@ -30,6 +30,14 @@ function markdownFiles(dir) {
 }
 
 const packages = [...packageDirs('packages'), ...packageDirs('tools')];
+const generatedPackageOutputs = new Set(
+    packages.flatMap((dir) => {
+        const output = JSON.parse(read(dir, 'package.json')).pumpkinPlugin?.output;
+        if (typeof output !== 'string' || path.posix.isAbsolute(output)) return [];
+        const target = path.posix.normalize(path.posix.join(dir, output));
+        return target.startsWith(`${dir}/`) ? [target] : [];
+    })
+);
 const actions = exists('actions')
     ? fs
           .readdirSync(path.join(root, 'actions'), { withFileTypes: true })
@@ -117,7 +125,9 @@ for (const file of docs) {
         ) {
             continue;
         }
-        if (!exists(target)) problems.push(`${file} mentions ${target}, which does not exist`);
+        if (!exists(target) && !generatedPackageOutputs.has(target)) {
+            problems.push(`${file} mentions ${target}, which does not exist`);
+        }
     }
 }
 

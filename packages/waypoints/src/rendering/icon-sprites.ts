@@ -1,6 +1,6 @@
 // Generated from Minecraft 26.3 by scripts/generate-icon-sprites.mjs.
 /** Vanilla items whose representative sprite differs from item/{registry path}. */
-export const BLOCK_ICON_SPRITES: Readonly<Record<string, string>> = {
+export const BLOCK_ICON_SPRITES: { readonly [key: string]: string } = {
     acacia_sapling: 'block/acacia_sapling',
     activator_rail: 'block/activator_rail',
     allium: 'block/allium',

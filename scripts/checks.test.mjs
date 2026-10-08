@@ -113,6 +113,21 @@ describe('check-docs', () => {
         assert.match(result.out, /mentions tools\/kit\/src\/gone\.ts, which does not exist/);
     });
 
+    it('accepts a documented plugin build output declared by its package', () => {
+        const result = run(
+            'check-docs.mjs',
+            repo({
+                ...good,
+                'packages/waypoints/package.json': {
+                    name: '@x/waypoints',
+                    pumpkinPlugin: { output: 'build/waypoints.wasm' }
+                },
+                'packages/waypoints/README.md': '# @x/waypoints\n\nCopy `packages/waypoints/build/waypoints.wasm`.\n'
+            })
+        );
+        assert.ok(result.ok, result.out);
+    });
+
     it('fails for a pnpm command that is not a script, but allows pnpm built-ins', () => {
         const bad = run('check-docs.mjs', repo({ ...good, 'docs/guide.md': '# Guide\n\n```sh\npnpm nonsense\n```\n' }));
         assert.match(bad.out, /runs `pnpm nonsense`/);
