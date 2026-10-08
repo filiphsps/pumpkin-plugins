@@ -1,5 +1,7 @@
 import type { WaypointPosition } from '../waypoints/model.ts';
 
+const NEAR_TARGET_DISTANCE = 2;
+
 /** Camera pose sampled from one Java viewer. Angles use Minecraft degrees. */
 export interface HudCamera {
     readonly position: WaypointPosition;
@@ -48,6 +50,13 @@ export function projectWaypointOnCameraPlane(
         y: target.y - camera.position.y,
         z: target.z - camera.position.z
     };
+    if (Math.hypot(direction.x, direction.y, direction.z) <= NEAR_TARGET_DISTANCE) {
+        return {
+            x: camera.position.x - Math.sin(yaw) * depth,
+            y: camera.position.y,
+            z: camera.position.z + Math.cos(yaw) * depth
+        };
+    }
     const forwardDepth = dot(direction, forward);
     if (forwardDepth <= 0) return undefined;
 

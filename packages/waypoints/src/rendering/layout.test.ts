@@ -38,4 +38,15 @@ describe('waypoint HUD layout', () => {
             project({ position: { x: 0, y: 2, z: 0 }, yaw: 0, pitch: 0 }, { x: 0, y: 2, z: -10 }, 6)
         ).toBeUndefined();
     });
+
+    it('keeps a nearby waypoint at eye height while looking down', async () => {
+        const project = await loadProjection();
+        const camera = { position: { x: 0, y: 65.62, z: 0 }, yaw: 40, pitch: 70 };
+
+        expect(project(camera, { x: 0, y: 64, z: 0 }, 3)).toEqual({
+            x: -Math.sin((40 * Math.PI) / 180) * 3,
+            y: 65.62,
+            z: Math.cos((40 * Math.PI) / 180) * 3
+        });
+    });
 });
