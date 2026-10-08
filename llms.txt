@@ -40,6 +40,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Distant Horizons support: Troubleshooting](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/troubleshooting.md): Confirm the client uses the supported Distant Horizons release in the generated compatibility reference.
 - [DynamicLightsPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/README.md): Server-side dynamic lights for held light sources
 - [UPnPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/README.md): Opens router ports for Pumpkin with UPnP and NAT-PMP
+- [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/README.md): Server waypoints with vanilla commands and Java Locator Bar
 
 ## Shared tools
 
@@ -74,6 +75,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Distant Horizons support API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/distant-horizons-support-pumpkin/): Unofficial Distant Horizons server support for Pumpkin
 - [DynamicLightsPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/dynamic-lights-pumpkin/): Server-side dynamic lights for held light sources
 - [UPnPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/upnpumpkin/): Opens router ports for Pumpkin with UPnP and NAT-PMP
+- [Waypoints API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/waypoints/): Server waypoints with vanilla commands and Java Locator Bar
 - [@pumpkin-plugins/build API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/build/): Shared build tool for the plugins
 - [@pumpkin-plugins/config API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/config/): Schema-driven TOML config for plugins
 - [@pumpkin-plugins/docs API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/docs/): README generator for plugins and actions
