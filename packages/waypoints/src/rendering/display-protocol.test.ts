@@ -14,8 +14,13 @@ describe('Java 26.3 text display packets', () => {
     it('encodes centered text metadata with the pinned 26.3 indices and raw NBT component bytes', async () => {
         const protocol = await loadProtocol();
         expect([...protocol.encodeTextDisplayMetadata(Uint8Array.of(10, 0, 0))]).toEqual([
-            15, 0, 3, 23, 5, 10, 0, 0, 24, 1, 172, 2, 25, 1, 128, 128, 128, 128, 4, 26, 0, 255, 27, 0, 0, 255
+            15, 0, 3, 23, 5, 10, 0, 0, 24, 1, 172, 2, 25, 1, 128, 128, 128, 128, 4, 26, 0, 255, 27, 0, 2, 255
         ]);
+    });
+
+    it('renders HUD text through world geometry', async () => {
+        const protocol = await loadProtocol();
+        expect([...protocol.encodeTextDisplayMetadata(Uint8Array.of(10, 0, 0)).slice(-4)]).toEqual([27, 0, 2, 255]);
     });
 
     it('spawns the pinned text display entity with the supplied UUID and camera-plane position', async () => {
@@ -94,7 +99,7 @@ describe('Java 26.3 text display packets', () => {
             val: {
                 entityId: -1_500_000_000,
                 metadata: Uint8Array.from([
-                    15, 0, 3, 23, 5, 10, 0, 0, 24, 1, 172, 2, 25, 1, 128, 128, 128, 128, 4, 26, 0, 255, 27, 0, 0, 255
+                    15, 0, 3, 23, 5, 10, 0, 0, 24, 1, 172, 2, 25, 1, 128, 128, 128, 128, 4, 26, 0, 255, 27, 0, 2, 255
                 ])
             }
         });

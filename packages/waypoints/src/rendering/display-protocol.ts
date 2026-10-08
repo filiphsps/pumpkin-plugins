@@ -10,6 +10,7 @@ const VAR_INT_META_TYPE = 1;
 const BYTE_META_TYPE = 0;
 const TEXT_LINE_WIDTH = 300;
 const TEXT_BACKGROUND = 0x40000000;
+const TEXT_DISPLAY_SEE_THROUGH = 0x02;
 const ENTITY_DELTA_SCALE = 4096;
 const MIN_ENTITY_DELTA = -32_768;
 const MAX_ENTITY_DELTA = 32_767;
@@ -34,7 +35,7 @@ export function encodeTextDisplayMetadata(componentNbt: Uint8Array): Uint8Array 
         255,
         27,
         BYTE_META_TYPE,
-        0,
+        TEXT_DISPLAY_SEE_THROUGH,
         255
     ]);
 }

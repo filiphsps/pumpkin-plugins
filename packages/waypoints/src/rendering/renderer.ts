@@ -13,8 +13,10 @@ import { cameraPlaneCoordinates, type HudCamera, offsetOnCameraPlane, projectWay
 const DEFAULT_DISPLAY_DEPTH = 3;
 const FIRST_CLIENT_ENTITY_ID = -1_500_000_000;
 const LAST_CLIENT_ENTITY_ID = -2_000_000_000;
-const PLAYER_MOVEMENT_THRESHOLD = 0.01;
+const PLAYER_MOVEMENT_THRESHOLD = 0.05;
+const CAMERA_POSITION_THRESHOLD = 0.1;
 const STATIONARY_YAW_FOLLOW_RATE = 0.05;
+const STATIONARY_YAW_DEADZONE_DEGREES = 0.5;
 const LABEL_CHARACTER_WIDTH = 0.075;
 const DISTANCE_TEXT_WIDTH_CHARS = 10;
 const LABEL_COLLISION_HEIGHT = 0.24;
@@ -52,6 +54,7 @@ interface ViewerState {
     dimension: string;
     nextEntityId: number;
     lastPlayerPosition: WaypointPosition;
+    projectionPosition: WaypointPosition;
     projectionYaw: number;
     projectionPitch: number;
     readonly displays: Map<string, DisplayState>;
@@ -159,6 +162,7 @@ export class WaypointHudRenderer {
                 dimension: viewer.dimension,
                 nextEntityId: FIRST_CLIENT_ENTITY_ID,
                 lastPlayerPosition: { ...viewer.position },
+                projectionPosition: { ...viewer.camera.position },
                 projectionYaw: viewer.camera.yaw,
                 projectionPitch: viewer.camera.pitch,
                 displays: new Map()
@@ -169,6 +173,7 @@ export class WaypointHudRenderer {
             state.displays.clear();
             state.dimension = viewer.dimension;
             state.lastPlayerPosition = { ...viewer.position };
+            state.projectionPosition = { ...viewer.camera.position };
             state.projectionYaw = viewer.camera.yaw;
             state.projectionPitch = viewer.camera.pitch;
         }
@@ -177,16 +182,28 @@ export class WaypointHudRenderer {
 
     private projectionCamera(viewer: WaypointHudViewer, state: ViewerState): HudCamera {
         const moved = distance(viewer.position, state.lastPlayerPosition) > PLAYER_MOVEMENT_THRESHOLD;
+        const cameraMoved = distance(viewer.camera.position, state.projectionPosition) > CAMERA_POSITION_THRESHOLD;
         if (moved || !Number.isFinite(state.projectionYaw) || !Number.isFinite(viewer.camera.yaw)) {
+            state.lastPlayerPosition = { ...viewer.position };
+            state.projectionPosition = { ...viewer.camera.position };
             state.projectionYaw = viewer.camera.yaw;
+            state.projectionPitch = viewer.camera.pitch;
         } else {
-            state.projectionYaw = smoothYaw(state.projectionYaw, viewer.camera.yaw, STATIONARY_YAW_FOLLOW_RATE);
+            if (cameraMoved) state.projectionPosition = { ...viewer.camera.position };
+            const yawDifference = angleDifference(state.projectionYaw, viewer.camera.yaw);
+            if (Math.abs(yawDifference) > STATIONARY_YAW_DEADZONE_DEGREES) {
+                state.projectionYaw = smoothYaw(state.projectionYaw, viewer.camera.yaw, STATIONARY_YAW_FOLLOW_RATE);
+            }
         }
-        if (moved || !Number.isFinite(state.projectionPitch) || !Number.isFinite(viewer.camera.pitch)) {
+        if (!Number.isFinite(state.projectionPitch) || !Number.isFinite(viewer.camera.pitch)) {
             state.projectionPitch = viewer.camera.pitch;
         }
-        state.lastPlayerPosition = { ...viewer.position };
-        return { ...viewer.camera, yaw: state.projectionYaw, pitch: state.projectionPitch };
+        return {
+            ...viewer.camera,
+            position: state.projectionPosition,
+            yaw: state.projectionYaw,
+            pitch: state.projectionPitch
+        };
     }
 
     private removeUndesired(
@@ -304,8 +321,11 @@ function positionChanged(left: WaypointPosition, right: WaypointPosition): boole
 }
 
 function smoothYaw(current: number, target: number, followRate: number): number {
-    const difference = ((((target - current + 180) % 360) + 360) % 360) - 180;
-    return current + difference * followRate;
+    return current + angleDifference(current, target) * followRate;
+}
+
+function angleDifference(current: number, target: number): number {
+    return ((((target - current + 180) % 360) + 360) % 360) - 180;
 }
 
 function overlaps(

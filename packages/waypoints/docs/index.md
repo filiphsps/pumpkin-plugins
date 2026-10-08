@@ -29,9 +29,9 @@ and the rounded distance in meters. Each player's display packets are private to
 restricted names and personalized distances are not sent to other clients.
 
 The HUD uses client-only TextDisplay packets on a camera-relative plane about three blocks ahead,
-updated once per server tick. It can lag slightly while moving or turning, and world geometry can
-occlude it. Other Java protocol versions and Bedrock clients do not receive the HUD. The stored item
-icon is not displayed yet.
+updated once per server tick. Labels render through world geometry so terrain does not hide them.
+Small stationary camera-position and yaw changes are ignored to reduce jitter. Other Java protocol
+versions and Bedrock clients do not receive the HUD. The stored item icon is not displayed yet.
 
 Malformed or unsupported storage is preserved and disables writes. Fix the file before expecting
 changes to persist.

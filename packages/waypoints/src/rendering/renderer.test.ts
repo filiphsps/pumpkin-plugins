@@ -112,6 +112,30 @@ describe('WaypointHudRenderer', () => {
         expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
     });
 
+    it('ignores small eye-position noise while the player is stationary', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 10, y: 65.62, z: 10 } });
+
+        renderer.renderViewer(client.viewer, [destination]);
+        client.viewer.camera = { position: { x: 0.001, y: 65.62, z: 0 }, yaw: 0, pitch: 0 };
+        renderer.renderViewer(client.viewer, [destination]);
+
+        expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
+    });
+
+    it('ignores small stationary yaw noise while the player is stationary', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 10, y: 65.62, z: 10 } });
+
+        renderer.renderViewer(client.viewer, [destination]);
+        client.viewer.camera = { position: client.viewer.camera.position, yaw: 0.1, pitch: 0 };
+        renderer.renderViewer(client.viewer, [destination]);
+
+        expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
+    });
+
     it('stabilizes head rotation while standing still and follows it while walking', () => {
         const renderer = createRenderer();
         const client = makeViewer(ownerId);
