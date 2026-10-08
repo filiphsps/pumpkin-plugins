@@ -10,10 +10,11 @@ navigation:
 
 ## Biome
 
-[Biome](https://biomejs.dev) formats and lints everything (`biome.json`). `pnpm lint:fix` applies
-what it can fix. The [agent check runner](agent-tooling.md) checks changed files without applying
-fixes, so it can safely inspect a working tree that contains other people's edits. Notable rules from
-the config: single quotes, four-space indent, shorthand array types (`T[]`), `import type` for types, and a warning on `any`.
+[Biome](https://biomejs.dev) formats and lints the supported files (`biome.json`). `pnpm lint:fix`
+also enables Biome's HTML formatter, which formats SVG files. The [agent check runner](agent-tooling.md)
+checks changed files without applying fixes, so it can safely inspect a working tree that contains
+other people's edits. Notable rules from the config: single quotes, four-space indent, shorthand
+array types (`T[]`), `import type` for types, and a warning on `any`.
 
 ## JSDoc
 

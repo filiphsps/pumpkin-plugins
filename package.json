@@ -29,7 +29,7 @@
         "gen": "turbo gen plugin",
         "gen:action": "turbo gen action",
         "lint": "biome check . && eslint .",
-        "lint:fix": "biome check --write . && eslint --fix .",
+        "lint:fix": "biome check --write --html-formatter-enabled=true . && eslint --fix .",
         "lint:commits": "commitlint --from HEAD~1",
         "build": "turbo run build",
         "typecheck": "turbo run typecheck",
