@@ -31,7 +31,7 @@ export function appendWaypointIcon(labelNbt: Uint8Array, icon: string | undefine
         0,
         8,
         ...encodeString('type'),
-        ...encodeString('minecraft:object'),
+        ...encodeString('object'),
         8,
         ...encodeString('object'),
         ...encodeString('atlas'),
