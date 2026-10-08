@@ -9,7 +9,7 @@ import { PLUGIN_NAME } from './name.ts';
  */
 export const info = {
     name: PLUGIN_NAME,
-    description: 'Server waypoints for map mods and vanilla commands',
+    description: 'Server waypoints with vanilla commands and Java Locator Bar',
     permissions: [
         { name: 'fs.read.data', reason: 'Read the waypoint store from the plugin data folder.' },
         { name: 'fs.write.data', reason: 'Persist waypoint changes in the plugin data folder.' }
