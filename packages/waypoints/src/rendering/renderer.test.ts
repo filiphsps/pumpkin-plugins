@@ -184,6 +184,33 @@ describe('WaypointHudRenderer', () => {
         expect(ids).toEqual([-1_500_000_000, -1_500_000_001]);
     });
 
+    it('separates overlapping labels and keeps their layout independent of input order', () => {
+        const first = waypoint({ name: 'Market', position: { x: 0, y: 64, z: 0 } });
+        const second = waypoint({
+            id: '55555555-5555-4555-8555-555555555555',
+            name: 'Harbor',
+            position: { x: 0, y: 64, z: 0 }
+        });
+        const left = makeViewer(ownerId);
+        const right = makeViewer(ownerId);
+
+        createRenderer().renderViewer(left.viewer, [first, second]);
+        createRenderer().renderViewer(right.viewer, [second, first]);
+
+        const spawnPositions = (client: ReturnType<typeof makeViewer>) =>
+            client.packets
+                .filter(({ tag }) => tag === 'c-spawn-entity')
+                .map((packet) => packetValue(packet).position);
+        const leftPositions = spawnPositions(left);
+        const rightPositions = spawnPositions(right);
+
+        expect(leftPositions).toEqual(rightPositions);
+        expect(leftPositions).toHaveLength(2);
+        const firstPosition = leftPositions[0] as number[];
+        const secondPosition = leftPositions[1] as number[];
+        expect(Math.abs((firstPosition[1] ?? 0) - (secondPosition[1] ?? 0))).toBeGreaterThan(0.25);
+    });
+
     it('removes a display immediately after access is revoked', () => {
         const renderer = createRenderer();
         const client = makeViewer(allowedId);

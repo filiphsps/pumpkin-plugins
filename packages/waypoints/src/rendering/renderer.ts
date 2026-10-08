@@ -8,13 +8,22 @@ import {
     createTextDisplayMovement,
     createTextDisplaySpawnPacket
 } from './display-protocol.ts';
-import { type HudCamera, projectWaypointOnCameraPlane } from './layout.ts';
+import {
+    cameraPlaneCoordinates,
+    offsetOnCameraPlane,
+    type HudCamera,
+    projectWaypointOnCameraPlane
+} from './layout.ts';
 
 const DEFAULT_DISPLAY_DEPTH = 3;
 const FIRST_CLIENT_ENTITY_ID = -1_500_000_000;
 const LAST_CLIENT_ENTITY_ID = -2_000_000_000;
 const PLAYER_MOVEMENT_THRESHOLD = 0.01;
 const STATIONARY_YAW_FOLLOW_RATE = 0.05;
+const LABEL_CHARACTER_WIDTH = 0.075;
+const DISTANCE_TEXT_WIDTH_CHARS = 10;
+const LABEL_COLLISION_HEIGHT = 0.24;
+const LABEL_VERTICAL_STEP = 0.32;
 
 /** Per-viewer inputs required to render one private waypoint HUD. */
 export interface WaypointHudViewer {
@@ -79,15 +88,32 @@ export class WaypointHudRenderer {
             dimension: viewer.dimension,
             position: viewer.position
         });
-        const desired = new Map<string, DesiredDisplay>();
-
+        const candidates: DisplayCandidate[] = [];
         for (const waypoint of visible) {
             const projected = projectWaypointOnCameraPlane(camera, waypoint.position, this.depth);
             if (projected === undefined) continue;
-            desired.set(waypoint.id, {
+            const label = waypoint.label ?? waypoint.name;
+            const distanceBlocks = distance(viewer.position, waypoint.position);
+            candidates.push({
+                waypointId: waypoint.id,
                 position: projected,
-                textJson: createWaypointHudTextJson(waypoint, distance(viewer.position, waypoint.position))
+                textJson: createWaypointHudTextJson(waypoint, distanceBlocks),
+                width: Math.max(0.7, (Array.from(label).length + DISTANCE_TEXT_WIDTH_CHARS) * LABEL_CHARACTER_WIDTH)
             });
+        }
+        candidates.sort((left, right) => left.waypointId.localeCompare(right.waypointId));
+
+        const desired = new Map<string, DesiredDisplay>();
+        const placed: PlacedLabel[] = [];
+        for (const candidate of candidates) {
+            let position = candidate.position;
+            let verticalOffset = 0;
+            while (overlaps(camera, position, candidate.width, placed)) {
+                verticalOffset += LABEL_VERTICAL_STEP;
+                position = offsetOnCameraPlane(camera, candidate.position, verticalOffset);
+            }
+            placed.push({ position, width: candidate.width });
+            desired.set(candidate.waypointId, { position, textJson: candidate.textJson });
         }
 
         this.removeUndesired(viewer, state, desired);
@@ -264,6 +290,16 @@ interface DesiredDisplay {
     readonly textJson: string;
 }
 
+interface DisplayCandidate extends DesiredDisplay {
+    readonly waypointId: string;
+    readonly width: number;
+}
+
+interface PlacedLabel {
+    readonly position: WaypointPosition;
+    readonly width: number;
+}
+
 function distance(left: WaypointPosition, right: WaypointPosition): number {
     return Math.hypot(left.x - right.x, left.y - right.y, left.z - right.z);
 }
@@ -275,4 +311,20 @@ function positionChanged(left: WaypointPosition, right: WaypointPosition): boole
 function smoothYaw(current: number, target: number, followRate: number): number {
     const difference = (((target - current + 180) % 360) + 360) % 360 - 180;
     return current + difference * followRate;
+}
+
+function overlaps(
+    camera: HudCamera,
+    position: WaypointPosition,
+    width: number,
+    placed: readonly PlacedLabel[]
+): boolean {
+    const candidate = cameraPlaneCoordinates(camera, position);
+    return placed.some(({ position: otherPosition, width: otherWidth }) => {
+        const other = cameraPlaneCoordinates(camera, otherPosition);
+        return (
+            Math.abs(candidate.horizontal - other.horizontal) < (width + otherWidth) / 2 &&
+            Math.abs(candidate.vertical - other.vertical) < LABEL_COLLISION_HEIGHT
+        );
+    });
 }

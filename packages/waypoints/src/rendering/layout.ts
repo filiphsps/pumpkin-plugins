@@ -9,6 +9,47 @@ export interface HudCamera {
     readonly pitch: number;
 }
 
+/** Returns a point shifted in screen space along the camera plane's vertical axis. */
+export function offsetOnCameraPlane(
+    camera: HudCamera,
+    position: WaypointPosition,
+    verticalOffset: number
+): WaypointPosition {
+    const pitch = (camera.pitch * Math.PI) / 180;
+    const yaw = (camera.yaw * Math.PI) / 180;
+    const up = {
+        x: -Math.sin(pitch) * Math.sin(yaw),
+        y: Math.cos(pitch),
+        z: Math.sin(pitch) * Math.cos(yaw)
+    };
+    return {
+        x: position.x + up.x * verticalOffset,
+        y: position.y + up.y * verticalOffset,
+        z: position.z + up.z * verticalOffset
+    };
+}
+
+/** Resolves the position's horizontal and vertical coordinates on the camera plane. */
+export function cameraPlaneCoordinates(camera: HudCamera, position: WaypointPosition): {
+    readonly horizontal: number;
+    readonly vertical: number;
+} {
+    const yaw = (camera.yaw * Math.PI) / 180;
+    const pitch = (camera.pitch * Math.PI) / 180;
+    const direction = {
+        x: position.x - camera.position.x,
+        y: position.y - camera.position.y,
+        z: position.z - camera.position.z
+    };
+    const right = { x: Math.cos(yaw), y: 0, z: Math.sin(yaw) };
+    const up = {
+        x: -Math.sin(pitch) * Math.sin(yaw),
+        y: Math.cos(pitch),
+        z: Math.sin(pitch) * Math.cos(yaw)
+    };
+    return { horizontal: dot(direction, right), vertical: dot(direction, up) };
+}
+
 /** Projects a target onto a fixed-depth plane in front of the viewer, preserving its screen direction. */
 export function projectWaypointOnCameraPlane(
     camera: HudCamera,
