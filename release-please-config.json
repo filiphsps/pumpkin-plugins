@@ -36,10 +36,6 @@
         },
         "packages/upnpumpkin": {
             "component": "upnpumpkin"
-        },
-        "packages/waypoints": {
-            "component": "waypoints",
-            "release-as": "0.0.1"
         }
     },
     "changelog-sections": [
