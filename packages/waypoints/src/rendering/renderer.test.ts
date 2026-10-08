@@ -100,6 +100,21 @@ describe('WaypointHudRenderer', () => {
         expect(client.packets.at(-1)?.tag).toBe('c-set-entity-metadata');
     });
 
+    it('updates sub-centimeter camera movement instead of letting the HUD step behind the view', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 10, y: 65.62, z: 10 } });
+
+        renderer.renderViewer(client.viewer, [destination]);
+        client.viewer.camera = { position: client.viewer.camera.position, yaw: 0.02, pitch: 0 };
+        renderer.renderViewer(client.viewer, [destination]);
+
+        const movement = client.packets.find(({ tag }) => tag === 'c-update-entity-pos');
+        expect(movement).toBeDefined();
+        if (movement?.tag !== 'c-update-entity-pos') throw new Error('Expected a display movement packet.');
+        expect(movement.val.delta).toEqual([4, 0, 4]);
+    });
+
     it('re-spawns a display when a same-dimension move exceeds the relative packet range', () => {
         const renderer = createRenderer();
         const client = makeViewer(ownerId);

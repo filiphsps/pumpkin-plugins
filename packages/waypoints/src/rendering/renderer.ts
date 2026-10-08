@@ -5,7 +5,7 @@ import { projectWaypointsForViewer } from '../waypoints/visibility.ts';
 import {
     createEntityRemovePacket,
     createTextDisplayMetadataPacket,
-    createTextDisplayMovePacket,
+    createTextDisplayMovement,
     createTextDisplaySpawnPacket
 } from './display-protocol.ts';
 import { type HudCamera, projectWaypointOnCameraPlane } from './layout.ts';
@@ -13,7 +13,6 @@ import { type HudCamera, projectWaypointOnCameraPlane } from './layout.ts';
 const DEFAULT_DISPLAY_DEPTH = 3;
 const FIRST_CLIENT_ENTITY_ID = -1_500_000_000;
 const LAST_CLIENT_ENTITY_ID = -2_000_000_000;
-const MIN_POSITION_CHANGE = 0.025;
 
 /** Per-viewer inputs required to render one private waypoint HUD. */
 export interface WaypointHudViewer {
@@ -77,10 +76,10 @@ export class WaypointHudRenderer {
         const desired = new Map<string, DesiredDisplay>();
 
         for (const waypoint of visible) {
-            const position = projectWaypointOnCameraPlane(viewer.camera, waypoint.position, this.depth);
-            if (position === undefined) continue;
+            const projected = projectWaypointOnCameraPlane(viewer.camera, waypoint.position, this.depth);
+            if (projected === undefined) continue;
             desired.set(waypoint.id, {
-                position,
+                position: projected,
                 textJson: createWaypointHudTextJson(waypoint, distance(viewer.position, waypoint.position))
             });
         }
@@ -175,16 +174,16 @@ export class WaypointHudRenderer {
         }
 
         if (display.spawned && positionChanged(display.position, desired.position)) {
-            const movement = createTextDisplayMovePacket(display.entityId, display.position, desired.position);
+            const movement = createTextDisplayMovement(display.entityId, display.position, desired.position);
             if (movement === undefined) {
                 // The supported relative packet carries signed 16-bit deltas; respawn on large same-world jumps.
                 viewer.sendPacket(createEntityRemovePacket([display.entityId]));
                 display.spawned = false;
                 display.textJson = undefined;
             } else {
-                viewer.sendPacket(movement);
+                if (movement.packet !== undefined) viewer.sendPacket(movement.packet);
             }
-            display.position = desired.position;
+            display.position = movement?.position ?? desired.position;
         }
 
         if (!display.spawned) {
@@ -240,9 +239,5 @@ function distance(left: WaypointPosition, right: WaypointPosition): number {
 }
 
 function positionChanged(left: WaypointPosition, right: WaypointPosition): boolean {
-    return (
-        Math.abs(left.x - right.x) >= MIN_POSITION_CHANGE ||
-        Math.abs(left.y - right.y) >= MIN_POSITION_CHANGE ||
-        Math.abs(left.z - right.z) >= MIN_POSITION_CHANGE
-    );
+    return left.x !== right.x || left.y !== right.y || left.z !== right.z;
 }

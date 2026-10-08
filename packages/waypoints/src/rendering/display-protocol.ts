@@ -73,12 +73,18 @@ export function createTextDisplayMetadataPacket(entityId: number, componentNbt: 
     };
 }
 
-/** Moves a client-only display with the relative packet supported by Pumpkin's pinned serializer. */
-export function createTextDisplayMovePacket(
+/** One encoded movement and the position the client reaches after applying it. */
+export interface TextDisplayMovement {
+    readonly packet?: ClientboundPacket;
+    readonly position: Vec3;
+}
+
+/** Encodes a display movement at Minecraft's 1/4096-block precision. */
+export function createTextDisplayMovement(
     entityId: number,
     previous: Vec3,
     position: Vec3
-): ClientboundPacket | undefined {
+): TextDisplayMovement | undefined {
     const delta: [number, number, number] = [
         Math.round((position.x - previous.x) * ENTITY_DELTA_SCALE),
         Math.round((position.y - previous.y) * ENTITY_DELTA_SCALE),
@@ -91,14 +97,23 @@ export function createTextDisplayMovePacket(
     ) {
         return undefined;
     }
+    const nextPosition = {
+        x: previous.x + delta[0] / ENTITY_DELTA_SCALE,
+        y: previous.y + delta[1] / ENTITY_DELTA_SCALE,
+        z: previous.z + delta[2] / ENTITY_DELTA_SCALE
+    };
+    if (delta.every((component) => component === 0)) return { position: nextPosition };
     return {
-        tag: 'c-update-entity-pos',
-        val: {
-            entityId,
-            // The pinned host casts these f64 fields directly to the protocol's i16 delta units.
-            delta,
-            onGround: true
-        }
+        packet: {
+            tag: 'c-update-entity-pos',
+            val: {
+                entityId,
+                // The pinned host casts these f64 fields directly to the protocol's i16 delta units.
+                delta,
+                onGround: true
+            }
+        },
+        position: nextPosition
     };
 }
 

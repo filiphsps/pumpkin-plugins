@@ -6,7 +6,7 @@ async function loadProtocol(): Promise<typeof import('./display-protocol.ts')> {
     expect(protocol.encodeTextDisplayMetadata).toBeTypeOf('function');
     expect(protocol.createTextDisplaySpawnPacket).toBeTypeOf('function');
     expect(protocol.createEntityRemovePacket).toBeTypeOf('function');
-    expect(protocol.createTextDisplayMovePacket).toBeTypeOf('function');
+    expect(protocol.createTextDisplayMovement).toBeTypeOf('function');
     return protocol;
 }
 
@@ -49,14 +49,41 @@ describe('Java 26.3 text display packets', () => {
     it('encodes supported relative movement in Minecraft fixed-point units', async () => {
         const protocol = await loadProtocol();
         expect(
-            protocol.createTextDisplayMovePacket(-1_000_000_000, { x: 1, y: 2, z: 3 }, { x: 2, y: 2.5, z: 4 })
+            protocol.createTextDisplayMovement(-1_000_000_000, { x: 1, y: 2, z: 3 }, { x: 2, y: 2.5, z: 4 })
         ).toEqual({
-            tag: 'c-update-entity-pos',
-            val: {
-                entityId: -1_000_000_000,
-                delta: [4096, 2048, 4096],
-                onGround: true
-            }
+            packet: {
+                tag: 'c-update-entity-pos',
+                val: {
+                    entityId: -1_000_000_000,
+                    delta: [4096, 2048, 4096],
+                    onGround: true
+                }
+            },
+            position: { x: 2, y: 2.5, z: 4 }
+        });
+    });
+
+    it('retains sub-resolution movement until it can be encoded without position drift', async () => {
+        const protocol = await loadProtocol();
+        const previous = { x: 1, y: 2, z: 3 };
+        const first = protocol.createTextDisplayMovement(-1_000_000_000, previous, { x: 1.0001, y: 2, z: 3 });
+        expect(first).toEqual({ position: previous });
+
+        const second = protocol.createTextDisplayMovement(-1_000_000_000, first?.position ?? previous, {
+            x: 1.0002,
+            y: 2,
+            z: 3
+        });
+        expect(second).toEqual({
+            packet: {
+                tag: 'c-update-entity-pos',
+                val: {
+                    entityId: -1_000_000_000,
+                    delta: [1, 0, 0],
+                    onGround: true
+                }
+            },
+            position: { x: 1 + 1 / 4096, y: 2, z: 3 }
         });
     });
 
