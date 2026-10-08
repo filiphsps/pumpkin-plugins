@@ -19,7 +19,7 @@ import {
  */
 export const info = {
     name: PLUGIN_NAME,
-    description: 'Unofficial Distant Horizons server support for Pumpkin',
+    description: 'Unofficial Distant Horizons server-side support for Pumpkin',
     permissions: [
         { name: 'fs.read.data', reason: 'Read settings and cached LOD terrain.' },
         { name: 'fs.write.data', reason: 'Write settings and persist captured LOD terrain.' }
