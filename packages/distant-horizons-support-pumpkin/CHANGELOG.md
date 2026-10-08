@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.0.12](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.11...distant-horizons-support-pumpkin-v0.0.12) (2026-10-08)
+
+
+### Features
+
+* **plugin-kit:** support double and player selector arguments ([bfbf5e9](https://github.com/filiphsps/pumpkin-plugins/commit/bfbf5e92957fa2d884778fed05436c1f576c76e0))
+* **waypoints:** add shared waypoint HUD and access rules ([54f39f1](https://github.com/filiphsps/pumpkin-plugins/commit/54f39f1d01ce916cffd64b7f6af79c651d77d829))
+
+
+### Bug Fixes
+
+* **dh:** back off unavailable terrain requests ([7b007b3](https://github.com/filiphsps/pumpkin-plugins/commit/7b007b3aa90a5c88f7aa5486fbe6efc9e8f1efe8))
+* **dh:** handle unavailable chunks during shutdown ([426422e](https://github.com/filiphsps/pumpkin-plugins/commit/426422ef36c0a5795fc5d4aeef22309fad27573b))
+* **runtime:** preserve WIT 64-bit values as bigint ([6979f1d](https://github.com/filiphsps/pumpkin-plugins/commit/6979f1ddab17f67919a2b0a89e47bc3ee19b5dd7))
+* **runtime:** release imported Wasm resources ([36a638c](https://github.com/filiphsps/pumpkin-plugins/commit/36a638c0b56658470a71c788df166edc491e2c89))
+* **waypoints:** recover native item argument values ([15a31b2](https://github.com/filiphsps/pumpkin-plugins/commit/15a31b2ae86b2f0caac60f5db03fffea42baf141))
+
 ## [0.0.11](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.10...distant-horizons-support-pumpkin-v0.0.11) (2026-10-08)
 
 
