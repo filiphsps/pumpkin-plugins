@@ -108,9 +108,11 @@ describe('plugin README', () => {
 });
 
 describe('root README', () => {
-    const readme = '# Repo\n\n<!-- docs:begin packages -->\n<!-- docs:end packages -->\n\nAfter.\n';
+    const readme =
+        '# Repo\n\n<!-- docs:begin docs-site -->\n<!-- docs:end docs-site -->\n\n<!-- docs:begin packages -->\n<!-- docs:end packages -->\n\nAfter.\n';
     beforeEach(() => {
         put('pnpm-workspace.yaml', 'packages: []\n');
+        put('package.json', '{"repository":"https://github.com/example/repo"}');
         put('README.md', readme);
         put('LICENSE', 'Root MIT license');
         put('packages/alpha/package.json', '{"name":"@x/alpha","description":"ignored, info wins","license":"MIT"}');
@@ -120,7 +122,7 @@ describe('root README', () => {
     });
 
     it('has one linked row per package folder and follows additions', () => {
-        expect(run(dir, 'root').stdout).toContain('README.md: updated');
+        expect(run(dir, 'root').stdout).toContain('README.md and component references: updated');
         const first = read('README.md');
         expect(first).toContain('| [Alpha](packages/alpha) | Alpha plugin. | MIT |');
         expect(first).toContain('| [@x/beta](packages/beta) | Beta from package.json | MIT |');
@@ -148,7 +150,7 @@ describe('root README', () => {
         put('actions/sign/README.md', '# Sign plugin\n');
         put('actions/not-an-action/README.md', '# Not an action\n');
 
-        expect(run(dir, 'root').stdout).toContain('README.md: updated');
+        expect(run(dir, 'root').stdout).toContain('README.md and component references: updated');
         const generated = read('README.md');
         expect(generated).toContain('**Actions**');
         expect(generated).toContain('| [Sign plugin](actions/sign) | Add the plugin release signature |');

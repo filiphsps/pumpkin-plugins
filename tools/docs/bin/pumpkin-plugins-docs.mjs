@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // pumpkin-plugins-docs [--check]        refresh the generated blocks of ./README.md (run in a plugin)
-// pumpkin-plugins-docs root [--check]   refresh the packages tables of the repo's README.md
+// pumpkin-plugins-docs root [--check]   refresh the repo README and component documentation links
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { generatePluginReadme, generateRootReadme } from '../src/node.ts';
@@ -15,9 +15,11 @@ try {
         throw new Error('run `root` from the repository root');
     }
     const status = root ? await generateRootReadme(cwd, check) : await generatePluginReadme(cwd, check);
-    const where = path.join(path.relative(process.cwd(), cwd) || '.', 'README.md');
+    const where = root
+        ? 'README.md and component references'
+        : path.join(path.relative(process.cwd(), cwd) || '.', 'README.md');
     if (status === 'stale') {
-        console.error(`${where} is out of date. Run \`pnpm readme\` and commit the result.`);
+        console.error(`${where} ${root ? 'are' : 'is'} out of date. Run \`pnpm readme\` and commit the result.`);
         process.exit(1);
     }
     console.log(`${where}: ${status}`);

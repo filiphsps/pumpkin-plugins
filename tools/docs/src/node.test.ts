@@ -8,7 +8,11 @@ let root: string;
 
 beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'docs-node-test-'));
-    put('README.md', '# Repo\n\n<!-- docs:begin packages -->\n<!-- docs:end packages -->\n');
+    put('package.json', '{"repository":{"type":"git","url":"git+https://github.com/example/repo.git"}}');
+    put(
+        'README.md',
+        '# Repo\n\n<!-- docs:begin docs-site -->\n<!-- docs:end docs-site -->\n\n<!-- docs:begin packages -->\n<!-- docs:end packages -->\n'
+    );
 });
 
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -24,6 +28,71 @@ function read(relativePath: string): string {
 }
 
 describe('generateRootReadme', () => {
+    it('generates component reference links from package paths and action metadata', async () => {
+        put('packages/sample-plugin/package.json', '{"name":"@example/sample-plugin","pumpkinPlugin":{}}');
+        put(
+            'packages/sample-plugin/src/info.ts',
+            'export const info = { name: "SamplePlugin", description: "Sample." };\n'
+        );
+        put(
+            'packages/sample-plugin/README.md',
+            '# SamplePlugin\n\n<!-- docs:begin reference -->\n<!-- docs:end reference -->\n'
+        );
+        put('packages/sample-plugin/docs/index.md', '# Sample plugin guide\n');
+
+        put('tools/sample-tool/package.json', '{"name":"@example/sample-tool"}');
+        put('tools/sample-tool/src/index.ts', 'export {};\n');
+        put(
+            'tools/sample-tool/README.md',
+            '# Sample tool\n\n<!-- docs:begin reference -->\n<!-- docs:end reference -->\n'
+        );
+
+        put('actions/sample-action/action.yml', 'name: Sample action\ndescription: Do a sample thing\n');
+        put('actions/sample-action/src/index.mjs', '');
+        put(
+            'actions/sample-action/README.md',
+            '# Sample action\n\n<!-- docs:begin reference -->\n<!-- docs:end reference -->\n'
+        );
+
+        expect(await generateRootReadme(root)).toBe('updated');
+        expect(read('README.md')).toContain('https://example.github.io/repo/');
+        expect(read('packages/sample-plugin/README.md')).toContain(
+            '[plugin guide](https://example.github.io/repo/packages/sample-plugin/docs/)'
+        );
+        expect(read('packages/sample-plugin/README.md')).toContain(
+            '[API reference](https://example.github.io/repo/api/plugins/sample-plugin/)'
+        );
+        expect(read('tools/sample-tool/README.md')).toContain(
+            '[API reference](https://example.github.io/repo/api/tools/@example/sample-tool/)'
+        );
+        expect(read('actions/sample-action/README.md')).toContain(
+            '[API reference](https://example.github.io/repo/api/actions/sample-action/)'
+        );
+        expect(await generateRootReadme(root, true)).toBe('unchanged');
+
+        const beforeSiteChange = read('packages/sample-plugin/README.md');
+        put('package.json', '{"repository":"https://github.com/example/new-repo"}');
+        expect(await generateRootReadme(root, true)).toBe('stale');
+        expect(read('packages/sample-plugin/README.md')).toBe(beforeSiteChange);
+        expect(await generateRootReadme(root)).toBe('updated');
+        expect(read('packages/sample-plugin/README.md')).toContain(
+            'https://example.github.io/new-repo/packages/sample-plugin/docs/'
+        );
+    });
+
+    it('rejects component READMEs without a reference block before writing other READMEs', async () => {
+        put('packages/sample-plugin/package.json', '{"name":"@example/sample-plugin","pumpkinPlugin":{}}');
+        put(
+            'packages/sample-plugin/src/info.ts',
+            'export const info = { name: "SamplePlugin", description: "Sample." };\n'
+        );
+        put('packages/sample-plugin/README.md', '# SamplePlugin\n');
+
+        const rootReadme = read('README.md');
+        await expect(generateRootReadme(root)).rejects.toThrow('docs:begin reference');
+        expect(read('README.md')).toBe(rootReadme);
+    });
+
     it('reads action metadata from both YAML filenames and scalar styles', async () => {
         put('actions/plain/action.yml', 'name: Plain # comment\ndescription: Simple action # comment\n');
         put('actions/quoted/action.yaml', `name: "A: B"\ndescription: 'Action with a ''quote'''\n`);
@@ -93,5 +162,10 @@ describe('generateRootReadme', () => {
 
         put('README.md', '# Repo\n');
         await expect(generateRootReadme(root)).rejects.toThrow('docs:begin packages');
+    });
+
+    it('requires a GitHub repository URL for generated documentation links', async () => {
+        put('package.json', '{"repository":"https://example.com/repo"}');
+        await expect(generateRootReadme(root)).rejects.toThrow('needs a GitHub repository URL');
     });
 });

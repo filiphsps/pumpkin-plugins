@@ -28,17 +28,18 @@ pnpm gen --args my-plugin MyPlugin "Does a thing"
 
 1. Creates `packages/<folder>/` with a working plugin: `package.json`, `tsconfig.json`,
    `vitest.config.ts`, `src/name.ts`, `src/info.ts`, `src/commands/spec.ts`, `src/plugin.ts`, a
-   barebones `README.md` (a title and the generated blocks) and an integration test that loads the
-   built plugin and checks its starter `/plugin` command on a real Pumpkin server. The name and
-   command permission are declared once in their respective source modules.
+   barebones `README.md` (a title and generated blocks, including the component reference marker)
+   and an integration test that loads the built plugin and checks its starter `/plugin` command on a
+   real Pumpkin server. The name and command permission are declared once in their respective
+   source modules.
 2. Registers the plugin for releases: an entry in `release-please-config.json` (with
    `"release-as": "0.0.1"`) and one in `.release-please-manifest.json`, with the plugin starting at
    version `0.0.0`, so that its first release is `0.0.1`. The `package.json` comes with the license,
    author, repository and funding metadata every package has. CI fails if a plugin isn't registered
    or its metadata is incomplete (`pnpm check`). See
    [Registering a plugin for releases](ci-and-releases.md#registering-a-plugin-for-releases).
-3. Runs `pnpm install`, fills in the plugin's README from its `info.ts`, and adds the plugin to the
-   package table in the root README.
+3. Runs `pnpm install`, fills in the plugin's README from its `info.ts`, generates its docs-site
+   reference links from repository metadata, and adds the plugin to the root README.
 4. Formats the new files with Biome.
 
 It doesn't commit anything. A CI job (`🧬 Generator`) generates a throwaway plugin on every run
@@ -88,4 +89,5 @@ things are easy to forget:
   in [Registering a plugin for releases](ci-and-releases.md#registering-a-plugin-for-releases), and
   `node scripts/check-release-config.mjs` tells you what is missing.
 - `pnpm install` has to run so the workspace links are created.
-- `pnpm readme` has to run so the package table in the root README lists it.
+- `pnpm readme` has to run so the package table lists it and its docs-site reference links are
+  generated.

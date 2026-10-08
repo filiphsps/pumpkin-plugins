@@ -3,13 +3,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { type DefaultTheme, defineConfig } from 'vitepress';
 import { parse as parseYaml } from 'yaml';
+import { githubPagesUrl } from '../../tools/docs/src/site.ts';
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
-const siteBase = '/pumpkin-plugins/';
 const repository = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).repository;
 const repoUrl = (typeof repository === 'string' ? repository : repository.url)
     .replace(/^git\+/, '')
     .replace(/\.git$/, '');
+const siteUrl = githubPagesUrl(repository);
+const siteBase = siteUrl?.pathname ?? '/';
 const markdown = (file: string) => file.endsWith('.md');
 
 function walkMarkdown(directory: string): string[] {
@@ -311,9 +313,8 @@ interface LlmsEntry {
 }
 
 const githubRepository = /^https:\/\/github\.com\/([^/]+\/[^/]+)$/.exec(repoUrl)?.[1];
-const githubOwner = githubRepository?.split('/')[0];
 const rawRepositoryUrl = githubRepository ? `https://raw.githubusercontent.com/${githubRepository}/master` : undefined;
-const publishedSiteUrl = githubOwner ? new URL(siteBase, `https://${githubOwner}.github.io/`).href : undefined;
+const publishedSiteUrl = siteUrl?.href;
 
 function markdownSourceUrl(file: string): string {
     const relative = path.relative(repoRoot, file).split(path.sep).map(encodeURIComponent).join('/');

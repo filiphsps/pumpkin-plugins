@@ -27,11 +27,13 @@ for all three values; the display name defaults to a title-cased folder name.
    Shared `getInput()` and `setOutput()` helpers, with regression tests for GitHub's input names and
    output-file format, live once in `actions/common/src/`.
 3. A `README.md`, `CHANGELOG.md` and `version.txt`, initialized to `0.0.0`. The README's Inputs and
-   Outputs tables are generated from `action.yml`; actions with no declared values get an explicit
-   “no inputs/outputs” note.
+   Outputs tables are generated from `action.yml`; its docs-site reference link is generated from
+   the action folder and metadata. Actions with no declared values get an explicit “no
+   inputs/outputs” note.
 4. Entries in `release-please-config.json` and `.release-please-manifest.json`. The action's first
    release is pinned to `0.0.1`, and later releases get independent `<folder>-v<version>` tags.
-5. A row in the Actions table in the root `README.md`.
+5. A row in the Actions table in the root `README.md`, plus generated API reference links in the
+   action README.
 
 The generator formats the files after creating them. It does not commit anything.
 
@@ -45,7 +47,7 @@ The generator formats the files after creating them. It does not commit anything
 - Implement the action in `src/index.mjs` and cover its behavior in `src/*.test.mjs`. Action tests
   live beside their implementation and CI runs tests only for the changed action.
 - Update the README's hand-written overview and usage examples, then run `pnpm readme` to generate
-  its input/output tables and refresh the root action table.
+  its input/output tables and docs-site reference link and refresh the root action table.
 
 Each action has an independent GitHub release and can be referenced by its subdirectory path. GitHub
 does not automatically list action metadata files nested in a monorepo in the Marketplace; see

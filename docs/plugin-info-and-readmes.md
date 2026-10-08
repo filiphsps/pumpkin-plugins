@@ -190,6 +190,13 @@ The README has to exist. `pnpm gen` creates it from `turbo/generators/templates/
 a barebones file with a title and the four blocks, and the first `pnpm readme` fills them in. A
 missing README is an error rather than something the tool invents.
 
+Every plugin, tool and action README also has a `reference` block. The repository-level
+`pumpkin-plugins-docs root` command discovers API routes from package manifests and action metadata,
+and adds a component guide link when that component has `docs/index.md`. The public site base comes
+from the root package's GitHub repository URL. Keep the markers in place; `pnpm readme` updates the
+links from these sources, so component names, slugs and site URLs do not need to be copied into the
+README by hand.
+
 Versions are deliberately not part of generated content, because release-please changes them in
 the release PR and the README would be stale the moment it merged.
 
@@ -204,12 +211,17 @@ The package tables show the `license` from each package's `package.json`. A pack
 `LICENSE`, `LICENSE.md` or `LICENSE.txt` file (case-insensitive) gets a relative link to that file.
 Packages using the repository's root license show the license as plain text.
 
-Tools aren't generated: each one has a small hand-written README (a title that is its package name,
-what it is for, and a link to the doc that covers it), and `pnpm check` fails when one is missing.
+Tool README prose is hand-written: each one has a title that is its package name, what it is for,
+and links to relevant guides. The repository-level generator fills its API reference block, and
+`pnpm check` fails when a tool README is missing.
+
+The root README's public documentation link is generated from the same repository URL. The package
+and action tables, site link and component README references are refreshed by `pnpm readme`.
 
 ## When it runs
 
-- `pnpm readme` regenerates everything locally. `pnpm readme:check` fails if anything is stale.
+- `pnpm readme` regenerates plugin README content, action input/output tables, root README tables,
+  and site/API references. `pnpm readme:check` fails if any generated content is stale.
 - CI checks that generated content is current. Contributors should run `pnpm readme` and commit the
   generated README changes with the source change.
 - Each time release-please creates or updates the release PR, the release job regenerates the

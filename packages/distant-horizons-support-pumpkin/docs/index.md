@@ -11,15 +11,12 @@ later requests.
 
 ## Start here
 
-- [Install and connect](setup.md) covers the server plugin, client compatibility, permissions and
-  first-start settings.
-- [Troubleshooting](troubleshooting.md) explains unavailable terrain, stale cache entries and
-  server status output.
+- Read the setup guide before installing to check client compatibility, permissions, and first-start
+  settings.
+- Use the troubleshooting guide for unavailable terrain, stale cache entries, and server status.
 
 ## Reference
 
-The generated [Compatibility and terrain](../README.md#compatibility-and-terrain) section lists the
-supported client release and protocol along with the terrain limits. The generated
-[Configuration](../README.md#configuration), [Commands](../README.md#commands) and
-[Permissions](../README.md#permissions) sections are built from the plugin's schema and command
-declarations.
+The plugin README is generated from the compatibility metadata, configuration schema, command
+declarations, and permission metadata. It stays in sync with the supported client protocol,
+terrain limits, settings, commands, and permissions.

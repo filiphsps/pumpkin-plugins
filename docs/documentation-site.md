@@ -6,8 +6,9 @@ navigation:
 # Documentation site
 
 The VitePress site combines the hand-written guides in `docs/`, component READMEs, component-level
-guides, and generated API references. Navigation groups pages by category metadata stored with their
-docs. Names and descriptions come from package manifests, action metadata, and guide introductions.
+guides, and generated API references. It discovers plugins, tools and actions from package manifests
+and action metadata, then builds their navigation and reference links from those sources. Names and
+descriptions come from package manifests, plugin metadata, action metadata and guide introductions.
 On phones, the same sections open as compact accordions in the navigation screen.
 
 ## Add a component guide
@@ -48,6 +49,12 @@ and description still come from the page heading and package manifest.
 The component README is the overview when no custom `docs/index.md` exists. If a custom
 index exists, it becomes the component landing page and the README remains available as a separate
 **README** entry.
+
+Each component README's `reference` block is refreshed by `pnpm readme`. Its API URL is derived from
+the discovered component path, and a link to a component guide appears when `docs/index.md` exists.
+The public documentation base comes from the repository URL in the root `package.json`. Keep the
+markers in place and edit the source metadata or docs files instead of maintaining those links by
+hand.
 
 ## Reference
 
