@@ -164,6 +164,8 @@ export class WaypointHudService {
                     dimension,
                     position: { x, y, z },
                     eyePosition: { x: eyeX, y: eyeY, z: eyeZ },
+                    yaw: player.getYaw(),
+                    pitch: player.getPitch(),
                     isOperator,
                     hasPermission: (node) => player.hasPermission(node),
                     createEntityUuid: uuid.generate,

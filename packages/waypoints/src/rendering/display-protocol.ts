@@ -120,17 +120,6 @@ export function createTextDisplayAppearancePacket(
     };
 }
 
-/** Updates only a display's scale and restarts its one-tick transformation interpolation. */
-export function createTextDisplayScalePacket(entityId: number, scale: number): ClientboundPacket {
-    return {
-        tag: 'c-set-entity-metadata',
-        val: {
-            entityId,
-            metadata: Uint8Array.from([8, VAR_INT_META_TYPE, 0, 12, VECTOR3_META_TYPE, ...encodeScale(scale), 255])
-        }
-    };
-}
-
 /** One encoded movement and the position the client reaches after applying it. */
 export interface TextDisplayMovement {
     readonly packet?: ClientboundPacket;

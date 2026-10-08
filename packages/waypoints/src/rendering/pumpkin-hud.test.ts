@@ -129,9 +129,8 @@ describe('WaypointHudService', () => {
         expect(uuidMocks.encodedTextJson).toHaveLength(1);
         const encodedText = uuidMocks.encodedTextJson[0];
         if (encodedText === undefined) throw new Error('Expected an encoded HUD component.');
-        expect(JSON.parse(encodedText)).toMatchObject({
-            extra: [{ text: 'Restricted', color: '#FFFFFF' }, { text: ' (10m)' }]
-        });
+        expect(JSON.parse(encodedText).extra[0]).toMatchObject({ text: 'Restricted', color: '#FFFFFF' });
+        expect(JSON.parse(encodedText).extra[1]).toMatchObject({ text: ' (10m)' });
         expect(uuidMocks.disposedTextComponents).toBe(1);
         expect(generatedEntityUuid).toEqual({ high: 3n, low: 4n });
     });
@@ -226,7 +225,10 @@ describe('WaypointHudService', () => {
         client.getYaw.mockReturnValue(-90);
         client.getPitch.mockReturnValue(-80);
         service.tick();
-        expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
+        expect(client.packets.filter(({ tag }) => tag === 'c-spawn-entity')).toHaveLength(1);
+        expect(client.packets.some(({ tag }) => tag === 'c-update-entity-pos' || tag === 'c-remove-entities')).toBe(
+            false
+        );
     });
 });
 

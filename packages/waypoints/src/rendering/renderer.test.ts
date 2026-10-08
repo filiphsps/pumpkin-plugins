@@ -22,6 +22,113 @@ function createRenderer(options?: { onError?: (viewerId: string, error: unknown)
 }
 
 describe('WaypointHudRenderer', () => {
+    it('keeps distant peripheral labels compact and reveals names after a settled look', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 0, y: 64, z: 100 }, icon: 'minecraft:compass' });
+        client.viewer.yaw = 45;
+        renderer.renderViewer(client.viewer, [destination]);
+        expect(client.textJsons.at(-1)).not.toContain('Market');
+        expect(client.textJsons.at(-1)).toContain('100m');
+        client.viewer.yaw = 0;
+        for (let tick = 0; tick < 2; tick++) renderer.renderViewer(client.viewer, [destination]);
+        expect(client.textJsons.at(-1)).not.toContain('Market');
+        for (let tick = 0; tick < 6; tick++) renderer.renderViewer(client.viewer, [destination]);
+        expect(client.textJsons.at(-1)).toContain('Market');
+        expect(client.packets.filter(({ tag }) => tag === 'c-spawn-entity')).toHaveLength(1);
+        expect(client.packets.some(({ tag }) => tag === 'c-update-entity-pos')).toBe(false);
+    });
+
+    it('does not flicker names when the look angle wobbles at the focus boundary', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 0, y: 64, z: 100 }, icon: 'minecraft:compass' });
+        renderer.renderViewer(client.viewer, [destination]);
+        const encodings = client.textJsons.length;
+        for (const yaw of [13, 16, 18, 16, 19, 15, 13]) {
+            client.viewer.yaw = yaw;
+            renderer.renderViewer(client.viewer, [destination]);
+        }
+        expect(client.textJsons).toHaveLength(encodings);
+        expect(client.textJsons.at(-1)).toContain('Market');
+        client.viewer.yaw = 45;
+        for (let tick = 0; tick < 8; tick++) renderer.renderViewer(client.viewer, [destination]);
+        expect(client.textJsons.at(-1)).not.toContain('Market');
+    });
+
+    it('uses view depth for size without moving the marker when the camera turns', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 0, y: 65.62, z: 100 } });
+        renderer.renderViewer(client.viewer, [destination]);
+        const centeredScale = readDisplayScale(client);
+        client.viewer.yaw = 45;
+        renderer.renderViewer(client.viewer, [destination]);
+        expect(readDisplayScale(client) / centeredScale).toBeCloseTo(Math.SQRT1_2, 2);
+        client.viewer.yaw = 180;
+        renderer.renderViewer(client.viewer, [destination]);
+        expect(readDisplayScale(client)).toBeGreaterThan(0);
+        expect(client.packets.some(({ tag }) => tag === 'c-update-entity-pos')).toBe(false);
+        expect(client.packets.filter(({ tag }) => tag === 'c-spawn-entity')).toHaveLength(1);
+    });
+
+    it('avoids distance text churn around a rounding boundary', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 0, y: 64, z: 100 } });
+        for (const z of [0, 0.49, 0.51, 0.48, 0.52, 0.49]) {
+            client.viewer.position = { x: 0, y: 64, z };
+            client.viewer.eyePosition = { x: 0, y: 65.62, z };
+            renderer.renderViewer(client.viewer, [destination]);
+        }
+        expect(client.textJsons).toHaveLength(1);
+        client.viewer.position = { x: 0, y: 64, z: 0.8 };
+        client.viewer.eyePosition = { x: 0, y: 65.62, z: 0.8 };
+        renderer.renderViewer(client.viewer, [destination]);
+        expect(client.textJsons.at(-1)).toContain('99m');
+    });
+
+    it('fades on arrival and returns without replacing the world-anchored entity', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 0, y: 64, z: 0 } });
+        renderer.renderViewer(client.viewer, [destination]);
+        expect(readDisplayOpacity(client)).toBe(0);
+        client.viewer.position = { x: 0, y: 64, z: 1.4 };
+        client.viewer.eyePosition = { x: 0, y: 65.62, z: 1.4 };
+        renderer.renderViewer(client.viewer, [destination]);
+        expect(readDisplayOpacity(client)).toBeGreaterThan(0);
+        expect(readDisplayOpacity(client)).toBeLessThan(255);
+        client.viewer.position = { x: 0, y: 64, z: 2.5 };
+        client.viewer.eyePosition = { x: 0, y: 65.62, z: 2.5 };
+        renderer.renderViewer(client.viewer, [destination]);
+        expect(readDisplayOpacity(client)).toBe(255);
+        expect(client.packets.filter(({ tag }) => tag === 'c-spawn-entity')).toHaveLength(1);
+        expect(client.packets.some(({ tag }) => tag === 'c-remove-entities')).toBe(false);
+    });
+
+    it('shows a nearby name even when it is outside the focus cone', () => {
+        const client = makeViewer(ownerId);
+        client.viewer.yaw = 90;
+        createRenderer().renderViewer(client.viewer, [waypoint()]);
+        expect(client.textJsons.at(-1)).toContain('Market');
+    });
+
+    it('abbreviates long distances and bounds HUD labels without changing stored text', () => {
+        const destination = waypoint({ label: 'A'.repeat(80) + '🌍' });
+        const json = JSON.parse(createWaypointHudTextJson(destination, 12_345));
+        expect(json.extra[0].text).toBe('A'.repeat(31) + '…');
+        expect(json.extra[1].text).toBe(' (12.3km)');
+        expect(destination.label).toHaveLength(82);
+    });
+
+    it('gives iconless waypoints a colored marker without changing their metadata', () => {
+        const destination = waypoint({ color: '#FF8040' });
+        const json = JSON.parse(createWaypointHudTextJson(destination, 50));
+        expect(json.extra.at(-1)).toMatchObject({ text: '\n◆', color: '#FF8040' });
+        expect(destination.icon).toBeUndefined();
+    });
+
     it('sends each configured icon below its label and refreshes icon-only edits', () => {
         const renderer = createRenderer();
         const client = makeViewer(ownerId);
@@ -255,7 +362,8 @@ describe('WaypointHudRenderer', () => {
             text: '',
             extra: [
                 { text: 'North Gate', color: '#12ABEF', bold: true },
-                { text: ' (13m)', color: '#FFFFFF' }
+                { text: ' (13m)', color: '#FFFFFF' },
+                { text: '\n◆', color: '#12ABEF' }
             ]
         });
     });
@@ -267,6 +375,7 @@ describe('WaypointHudRenderer', () => {
         for (let z = 0; z <= 20; z += 0.25) {
             client.viewer.position = { x: 0, y: 64, z };
             client.viewer.eyePosition = { x: 0, y: 65.62, z };
+            client.viewer.pitch = (-Math.atan2(0.38, 20 - z) * 180) / Math.PI;
             renderer.renderViewer(client.viewer, [destination]);
             const position = readDisplayPosition(client);
             const distance = Math.hypot(position.x, position.y - 65.62, position.z - z);
@@ -384,24 +493,43 @@ function makeViewer(
 ): {
     readonly viewer: WaypointHudViewer;
     readonly packets: ClientboundPacket[];
+    readonly textJsons: string[];
 } {
     const packets: ClientboundPacket[] = [];
+    const textJsons: string[] = [];
     let nextUuid = 0n;
     const viewer: WaypointHudViewer = {
         id,
         dimension: 'overworld',
         position: { x: 0, y: 64, z: 0 },
         eyePosition: { x: 0, y: 65.62, z: 0 },
+        yaw: 0,
+        pitch: 0,
         isOperator: false,
         hasPermission: () => false,
         createEntityUuid: () => ({ high: 0n, low: ++nextUuid }),
-        encodeTextComponent: () => Uint8Array.of(10, 0),
+        encodeTextComponent: (json) => {
+            textJsons.push(json);
+            return Uint8Array.of(10, 0);
+        },
         sendPacket: (packet) => {
             if (fail) throw new Error('packet sink failed');
             packets.push(packet);
         }
     };
-    return { viewer, packets };
+    return { viewer, packets, textJsons };
+}
+
+function readDisplayOpacity(client: ReturnType<typeof makeViewer>): number {
+    let opacity = 255;
+    for (const packet of client.packets) {
+        if (packet.tag !== 'c-set-entity-metadata') continue;
+        const bytes = packet.val.metadata;
+        // Opacity is the final field of appearance-only packets and immediately precedes style flags at spawn.
+        if (bytes.at(-4) === 26 && bytes.at(-3) === 0) opacity = bytes.at(-2) ?? 255;
+        else if (bytes.at(-7) === 26 && bytes.at(-6) === 0) opacity = bytes.at(-5) ?? 255;
+    }
+    return opacity;
 }
 
 function packetValue(packet: ClientboundPacket): Record<string, unknown> {
