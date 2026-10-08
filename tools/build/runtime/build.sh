@@ -15,7 +15,7 @@ CARGO_TARGET_DIR=$(CDPATH= cd -- "$target_dir" && pwd)
 export QJS_SOURCE_DIR WASI_SDK_PATH
 export CARGO_TARGET_DIR
 
-expected_commit=50e5a140a1fbca35a01d0504b9807120100fc224
+expected_commit=e563c6d6ae50b087980414015663ca9c948c09bb
 actual_commit=$(git -C "$QJS_SOURCE_DIR" rev-parse HEAD)
 if [ "$actual_commit" != "$expected_commit" ]; then
     printf 'Expected componentize-qjs at %s, got %s\n' "$expected_commit" "$actual_commit" >&2

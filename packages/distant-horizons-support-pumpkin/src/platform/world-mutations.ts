@@ -1,5 +1,4 @@
 import type { BlockGrowEventData, BlockSpreadEventData } from 'pumpkin:plugin/event@0.1.0';
-import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import type { Sessions } from '../session.ts';
 
 type MutationWorld = BlockGrowEventData['targetWorld'];
@@ -22,9 +21,6 @@ function invalidateMutation(
     positions: readonly MutationPosition[],
     cancelled: boolean
 ): void {
-    try {
-        if (!cancelled) sessions.changedMany(world.getName(), positions);
-    } finally {
-        disposeWasiResource(world);
-    }
+    // The event is returned to Pumpkin with this world handle; ownership transfers back to the host.
+    if (!cancelled) sessions.changedMany(world.getName(), positions);
 }

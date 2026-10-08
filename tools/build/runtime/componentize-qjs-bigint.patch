@@ -1,21 +1,19 @@
 diff --git a/crates/runtime/src/call.rs b/crates/runtime/src/call.rs
-index c0a9a49..6a25eff 100644
+index efa8551..ff9f6aa 100644
 --- a/crates/runtime/src/call.rs
 +++ b/crates/runtime/src/call.rs
-@@ -10,7 +10,7 @@ use crate::{BorrowedResource, QjsCallContext, with_ctx};
--
-+
+@@ -13,7 +13,7 @@ use crate::{QjsCallContext, with_ctx};
+
  use rquickjs::class::Class;
  use rquickjs::function::This;
--use rquickjs::{Coerced, Constructor, Function, IntoJs, Persistent, Symbol, Value};
-+use rquickjs::{BigInt, Coerced, Constructor, Function, IntoJs, Persistent, Symbol, Value};
+-use rquickjs::{CatchResultExt, Coerced, Constructor, Function, IntoJs, Persistent, Symbol, Value};
++use rquickjs::{BigInt, CatchResultExt, Coerced, Constructor, Function, IntoJs, Persistent, Symbol, Value};
  use smallvec::SmallVec;
  use wit_dylib_ffi::{
      Call, Enum, Flags, Future, List, Map, Record, Resource, Stream, Tuple, Type, Variant,
-@@ -125,11 +125,27 @@ impl Call for QjsCallContext {
+@@ -85,11 +85,27 @@ impl Call for QjsCallContext {
      }
--
-+
+
      fn pop_u64(&mut self) -> u64 {
 -        pop_with(self, |v| v.get().expect("expected number"))
 +        pop_with(self, |v| {
@@ -28,8 +26,7 @@ index c0a9a49..6a25eff 100644
 +            result
 +        })
      }
--
-+
+
      fn pop_s64(&mut self) -> i64 {
 -        pop_with(self, |v| v.get().expect("expected number"))
 +        pop_with(self, |v| {
@@ -42,23 +39,19 @@ index c0a9a49..6a25eff 100644
 +            result
 +        })
      }
--
-+
+
      fn pop_f32(&mut self) -> f32 {
-@@ -488,11 +504,11 @@ impl Call for QjsCallContext {
+@@ -474,11 +490,11 @@ impl Call for QjsCallContext {
      }
--
-+
+
      fn push_u64(&mut self, val: u64) {
 -        push_with(self, |ctx| val.into_js(ctx).unwrap());
 +        push_with(self, |ctx| BigInt::from_u64(ctx.clone(), val).unwrap().into_value());
      }
--
-+
+
      fn push_s64(&mut self, val: i64) {
 -        push_with(self, |ctx| val.into_js(ctx).unwrap());
 +        push_with(self, |ctx| BigInt::from_i64(ctx.clone(), val).unwrap().into_value());
      }
--
-+
+
      fn push_f32(&mut self, val: f32) {
