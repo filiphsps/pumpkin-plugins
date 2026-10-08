@@ -12,8 +12,8 @@ byte-identical `waypoints.v1.json` backup when migrating the previous schema.
 
 Operators can create a waypoint at their exact position with `/wp create "Home Base"`, or provide
 absolute coordinates with `/wp create "Home Base" 120.5 64 -30`. Names are unique across dimensions.
-Use `/wp list` to see enabled waypoints you can access, `/wp info <name>` for details, and `/wp tp
-<name>` to teleport yourself. Operators can use `/wp tp <name> @a` to teleport a player selector.
+Use `/wp list` to see enabled waypoints you can access, `/wp info <name>` for details, and
+`/wp tp <name>` to teleport yourself. Operators can use `/wp tp <name> @a` to teleport a player selector.
 
 Only server operators can create, edit, enable, disable, grant, or delete waypoints. Every
 administrative handler checks Pumpkin's operator list even if a command permission was manually
