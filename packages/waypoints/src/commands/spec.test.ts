@@ -63,4 +63,12 @@ describe('waypoint commands', () => {
             defaultPermission: { tag: 'op' }
         });
     });
+
+    it('accepts namespaced item IDs as an unquoted icon argument', () => {
+        expect(commands.wp.subcommands.set.subcommands.icon.arguments[1]).toEqual({
+            name: 'item',
+            type: 'string',
+            mode: 'greedy'
+        });
+    });
 });

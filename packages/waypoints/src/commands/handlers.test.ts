@@ -99,6 +99,23 @@ describe('/wp handlers', () => {
         expect(catalog.getByName('Taylor')).toBeUndefined();
     });
 
+    it.each([
+        ['minecraft:golden_apple', 'minecraft:golden_apple'],
+        ['golden_apple', 'minecraft:golden_apple']
+    ])('stores item identifier %s as %s', (item, expectedIcon) => {
+        const { catalog, handlers, sender } = setup(true);
+        catalog.create({ id: waypointId, name: 'Bert', dimension: 'world', position: { x: 0, y: 64, z: 0 } });
+        const run = handlers as unknown as Record<
+            string,
+            (sender: CommandSender, args?: object) => readonly unknown[]
+        >;
+
+        expect(run['wp set icon <name> <item>']?.(sender, { name: 'Bert', item })).toEqual([
+            'Updated icon for Bert.'
+        ]);
+        expect(catalog.getByName('Bert')?.icon).toBe(expectedIcon);
+    });
+
     it('shows only enabled waypoints the player can access and hides missing-record differences', () => {
         const { catalog, handlers, sender } = setup(false);
         catalog.create({ id: waypointId, name: 'Private', dimension: 'world', position: { x: 1, y: 64, z: 2 } });

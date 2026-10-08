@@ -20,6 +20,7 @@ import { commands } from './commands/spec.ts';
 import { info } from './info.ts';
 import { WaypointHudService } from './rendering/pumpkin-hud.ts';
 import { WaypointCatalog } from './waypoints/catalog.ts';
+import { normalizeItemIdentifier } from './waypoints/model.ts';
 import { WaypointStore } from './waypoints/store.ts';
 
 /** The canonical waypoint catalog and its vanilla command surface. */
@@ -73,8 +74,9 @@ class Waypoints extends PluginBase {
                 validateItemIcon: (key) => {
                     let stack: ItemStack | undefined;
                     try {
-                        stack = new ItemStack(key, 1);
-                        return stack.getRegistryKey() === key;
+                        const requestedKey = normalizeItemIdentifier(key);
+                        stack = new ItemStack(requestedKey, 1);
+                        return normalizeItemIdentifier(stack.getRegistryKey()) === requestedKey;
                     } catch {
                         return false;
                     } finally {

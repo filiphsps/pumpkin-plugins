@@ -80,9 +80,33 @@ describe('waypoint model', () => {
         });
     });
 
+    it('stores unqualified vanilla item keys with the minecraft namespace', () => {
+        const waypoint = createWaypoint({
+            id,
+            name: 'Pumpkin',
+            dimension: 'world',
+            position: { x: 1, y: 2, z: 3 },
+            icon: 'pumpkin_pie'
+        });
+
+        expect(waypoint.icon).toBe('minecraft:pumpkin_pie');
+    });
+
+    it('preserves a supplied item namespace', () => {
+        const waypoint = createWaypoint({
+            id,
+            name: 'Mod Item',
+            dimension: 'world',
+            position: { x: 1, y: 2, z: 3 },
+            icon: 'example:custom_item'
+        });
+
+        expect(waypoint.icon).toBe('example:custom_item');
+    });
+
     it.each([
         [{ color: '#FFF' }],
-        [{ icon: 'lodestone' }],
+        [{ icon: 'minecraft:' }],
         [{ label: '  ' }],
         [{ description: 'line\nbreak' }],
         [{ visibilityRange: 0 }],

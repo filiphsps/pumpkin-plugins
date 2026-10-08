@@ -72,6 +72,14 @@ export function waypointNameKey(name: string): string {
     return normalizeWaypointName(name).toLowerCase().normalize('NFC');
 }
 
+/** Canonicalizes an item key, treating unqualified keys as vanilla Minecraft IDs. */
+export function normalizeItemIdentifier(value: string): string {
+    if (typeof value !== 'string') throw new TypeError('Waypoint icon must be an item identifier.');
+    const identifier = value.includes(':') ? value : `minecraft:${value}`;
+    if (!ITEM_ID.test(identifier)) throw new TypeError('Waypoint icon must be a valid item identifier.');
+    return identifier;
+}
+
 /** Creates a validated waypoint with canonical metadata and restricted access by default. */
 export function createWaypoint(input: NewWaypoint): Waypoint {
     if (!UUID.test(input.id)) throw new TypeError('Waypoint id must be a UUID.');
@@ -173,8 +181,7 @@ function normalizePosition(value: WaypointPosition): WaypointPosition {
 
 function normalizeIcon(value: string | undefined): string | undefined {
     if (value === undefined) return undefined;
-    if (!ITEM_ID.test(value)) throw new TypeError('Waypoint icon must be a namespaced item identifier.');
-    return value;
+    return normalizeItemIdentifier(value);
 }
 
 function normalizeText(value: string | undefined, field: string): string | undefined {
