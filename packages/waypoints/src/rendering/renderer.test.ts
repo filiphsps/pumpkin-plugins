@@ -343,6 +343,24 @@ describe('WaypointHudRenderer', () => {
         expect(retreat.packets.some(({ tag }) => tag === 'c-remove-entities')).toBe(false);
     });
 
+    it('resets elevation and focus after a large same-world position jump', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 0, y: 64, z: 100 } });
+        renderer.renderViewer(client.viewer, [destination]);
+        client.viewer.position = { x: 20, y: 84, z: 0 };
+        client.viewer.eyePosition = { x: 20, y: 85.62, z: 0 };
+        client.viewer.yaw = 90;
+        renderer.renderViewer(client.viewer, [destination]);
+        const marker = readDisplayPosition(client);
+        const shown = Math.atan2(marker.y - 85.62, Math.hypot(marker.x - 20, marker.z));
+        expect(shown).toBeCloseTo(Math.atan2(-19.62, Math.hypot(20, 100)), 4);
+        expect(client.textJsons.at(-1)).not.toContain('Market');
+        const packets = client.packets.length;
+        for (let tick = 0; tick < 20; tick++) renderer.renderViewer(client.viewer, [destination]);
+        expect(client.packets).toHaveLength(packets);
+    });
+
     it('recreates the nearby HUD after a same-world teleport beyond the relative packet range', () => {
         const renderer = createRenderer();
         const client = makeViewer(ownerId);

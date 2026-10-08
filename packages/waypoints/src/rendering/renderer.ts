@@ -19,6 +19,7 @@ const LABEL_ANCHOR_HEIGHT = 2;
 const WORLD_STACK_HEIGHT = 0.7;
 const FIRST_CLIENT_ENTITY_ID = -1_500_000_000;
 const LAST_CLIENT_ENTITY_ID = -2_000_000_000;
+const VISUAL_HISTORY_RESET_DISTANCE = 8;
 
 /** Per-viewer inputs required to render one private waypoint display set. */
 export interface WaypointHudViewer {
@@ -56,6 +57,7 @@ interface DisplayState {
 
 interface ViewerState {
     dimension: string;
+    eyePosition: WaypointPosition;
     nextEntityId: number;
     readonly displays: Map<string, DisplayState>;
 }
@@ -82,6 +84,8 @@ export class WaypointHudRenderer {
         )
             return;
         const state = this.viewerState(viewer);
+        const resetHistory = distance(state.eyePosition, viewer.eyePosition) > VISUAL_HISTORY_RESET_DISTANCE;
+        state.eyePosition = { ...viewer.eyePosition };
         const visible = projectWaypointsForViewer(waypoints, {
             playerId: viewer.id,
             isOperator: viewer.isOperator,
@@ -99,6 +103,8 @@ export class WaypointHudRenderer {
             const stackIndex = stackCounts.get(stackKey) ?? 0;
             stackCounts.set(stackKey, stackIndex + 1);
             const waypointDistance = distance(viewer.position, waypoint.position);
+            // Large sample discontinuities should start at the new bearing, not animate stale elevation/focus.
+            const previous = resetHistory ? undefined : state.displays.get(waypoint.id);
             const placement = placeWaypointHud(
                 viewer.eyePosition,
                 {
@@ -107,15 +113,10 @@ export class WaypointHudRenderer {
                     z: waypoint.position.z
                 },
                 waypointDistance,
-                state.displays.get(waypoint.id)?.elevation,
+                previous?.elevation,
                 stackIndex
             );
-            const presentation = presentWaypointHud(
-                viewer,
-                placement,
-                waypointDistance,
-                state.displays.get(waypoint.id)?.presentation
-            );
+            const presentation = presentWaypointHud(viewer, placement, waypointDistance, previous?.presentation);
             desired.set(waypoint.id, {
                 ...placement,
                 scale: presentation.scale,
@@ -171,6 +172,7 @@ export class WaypointHudRenderer {
         if (state === undefined) {
             state = {
                 dimension: viewer.dimension,
+                eyePosition: { ...viewer.eyePosition },
                 nextEntityId: FIRST_CLIENT_ENTITY_ID,
                 displays: new Map()
             };
