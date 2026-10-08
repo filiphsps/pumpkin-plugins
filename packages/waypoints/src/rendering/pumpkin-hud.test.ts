@@ -99,7 +99,7 @@ describe('WaypointHudService', () => {
         const encodedText = uuidMocks.encodedTextJson[0];
         if (encodedText === undefined) throw new Error('Expected an encoded HUD component.');
         expect(JSON.parse(encodedText)).toMatchObject({
-            extra: [{ text: 'Restricted', color: '#FFFFFF' }, { text: '\n10m' }]
+            extra: [{ text: 'Restricted', color: '#FFFFFF' }, { text: ' (10m)' }]
         });
         expect(uuidMocks.disposedTextComponents).toBe(1);
         expect(generatedEntityUuid).toEqual({ high: 3n, low: 4n });

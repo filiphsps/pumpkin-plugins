@@ -141,7 +141,7 @@ describe('WaypointHudRenderer', () => {
             text: '',
             extra: [
                 { text: 'North Gate', color: '#12ABEF', bold: true },
-                { text: '\n13m', color: '#FFFFFF' }
+                { text: ' (13m)', color: '#FFFFFF' }
             ]
         });
     });

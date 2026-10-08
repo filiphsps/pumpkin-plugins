@@ -216,7 +216,7 @@ export class WaypointHudRenderer {
     }
 }
 
-/** Creates a literal two-line name and rounded-distance component using the waypoint color. */
+/** Creates a literal name and rounded-distance component using the waypoint color. */
 export function createWaypointHudTextJson(waypoint: Waypoint, distanceBlocks: number): string {
     const label = waypoint.label ?? waypoint.name;
     const distanceText = `${Math.round(distanceBlocks)}m`;
@@ -224,7 +224,7 @@ export function createWaypointHudTextJson(waypoint: Waypoint, distanceBlocks: nu
         text: '',
         extra: [
             { text: label, color: waypoint.color, bold: true },
-            { text: `\n${distanceText}`, color: '#FFFFFF' }
+            { text: ` (${distanceText})`, color: '#FFFFFF' }
         ]
     });
 }
