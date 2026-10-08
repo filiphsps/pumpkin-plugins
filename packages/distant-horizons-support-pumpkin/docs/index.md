@@ -3,7 +3,7 @@ navigation:
     featured: true
 ---
 
-# Distant Horizons support
+# Distant Horizons Support Pumpkin
 
 This plugin lets Java Edition players use Distant Horizons with a Pumpkin server. It answers LOD
 requests from terrain the server has loaded or captured before, and keeps completed captures for
