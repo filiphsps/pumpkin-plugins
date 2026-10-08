@@ -195,9 +195,9 @@ describe('WaypointHudService', () => {
             'c-set-entity-metadata'
         ]);
         const initial = client.packets[0]?.val.position as number[];
-        expect(Math.hypot(initial[0] ?? 0, (initial[1] ?? 0) - 65.62, initial[2] ?? 0)).toBeCloseTo(8, 3);
+        expect(Math.hypot(initial[0] ?? 0, (initial[1] ?? 0) - 65.62, initial[2] ?? 0)).toBeCloseTo(10.9387, 3);
         const movement = client.packets[2]?.val.delta as number[];
-        expect(movement[2]).toBeGreaterThan(4080);
+        expect(movement[2]).toBeGreaterThan(2800);
         expect(movement[2]).toBeLessThan(4100);
         expect(uuidMocks.encodedTextJson.at(-1)).toContain('19m');
         expect(client.entity[Symbol.dispose]).toHaveBeenCalledTimes(2);

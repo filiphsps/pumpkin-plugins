@@ -1,9 +1,9 @@
 import type { WaypointPosition } from '../waypoints/model.ts';
 
-const HUD_DISTANCE = 8;
+const MAX_HUD_DISTANCE = 24;
 const TEXT_SCALE_PER_BLOCK = 0.18;
 const STACK_ELEVATION_STEP = 0.1;
-const WORLD_BLEND_START_DISTANCE = 10;
+const WORLD_BLEND_START_DISTANCE = 16;
 const WORLD_BLEND_END_DISTANCE = 3;
 const ORDINARY_ELEVATION_FOLLOW_RATE = 0.08;
 const STEEP_ELEVATION_FOLLOW_RATE = 0.4;
@@ -56,7 +56,10 @@ export function placeWaypointHud(
             : previousElevation + (rawElevation - previousElevation) * followRate;
 
     // World direction has no division by camera-forward depth, so side/behind markers cannot fly away.
-    const hudRadius = Math.min(HUD_DISTANCE, Math.hypot(x, y, z));
+    const targetDistance = Math.hypot(x, y, z);
+    // A soft minimum avoids the velocity kink of a fixed-radius clamp. Farther proxies reduce
+    // bearing error from delayed server samples; the radius always stays short of the destination.
+    const hudRadius = targetDistance / (1 + targetDistance / MAX_HUD_DISTANCE);
     const horizontalRadius = Math.min(horizontalDistance, Math.cos(elevation) * hudRadius);
     const hudPosition = {
         x: eyePosition.x + (horizontalDistance === 0 ? 0 : (x / horizontalDistance) * horizontalRadius),

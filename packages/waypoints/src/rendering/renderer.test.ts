@@ -191,9 +191,9 @@ describe('WaypointHudRenderer', () => {
 
         renderer.renderViewer(client.viewer, [destination]);
         const position = readDisplayPosition(client);
-        expect(Math.hypot(position.x, position.y - 65.62, position.z)).toBeCloseTo(8, 3);
+        expect(Math.hypot(position.x, position.y - 65.62, position.z)).toBeCloseTo(16.2164, 3);
         expect(position.x).toBe(0);
-        expect(position.z).toBeGreaterThan(7.99);
+        expect(position.z).toBeGreaterThan(16.2);
         expect((position.y - 65.62) / position.z).toBeCloseTo(0.38 / 50, 5);
     });
 
@@ -205,8 +205,8 @@ describe('WaypointHudRenderer', () => {
         renderer.renderViewer(client.viewer, [destination]);
         for (let tick = 0; tick < 10; tick += 1) renderer.renderViewer(client.viewer, [destination]);
         const position = readDisplayPosition(client);
-        expect(position.z).toBeLessThan(-7.99);
-        expect(Math.hypot(position.x, position.y - 65.62, position.z)).toBeCloseTo(8, 3);
+        expect(position.z).toBeLessThan(-16.2);
+        expect(Math.hypot(position.x, position.y - 65.62, position.z)).toBeCloseTo(16.2164, 3);
         expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
     });
 
@@ -214,9 +214,9 @@ describe('WaypointHudRenderer', () => {
         const client = makeViewer(ownerId);
         createRenderer().renderViewer(client.viewer, [waypoint({ position: { x: 50, y: 64, z: 0 } })]);
         const position = readDisplayPosition(client);
-        expect(position.x).toBeGreaterThan(7.99);
+        expect(position.x).toBeGreaterThan(16.2);
         expect(position.z).toBe(0);
-        expect(Math.hypot(position.x, position.y - 65.62)).toBeCloseTo(8, 3);
+        expect(Math.hypot(position.x, position.y - 65.62)).toBeCloseTo(16.2164, 3);
     });
 
     it('does not emit display packets from an invalid eye sample', () => {
@@ -237,9 +237,12 @@ describe('WaypointHudRenderer', () => {
         client.viewer.eyePosition = { x: 0, y: 66.42, z: 0 };
         renderer.renderViewer(client.viewer, [destination]);
         const position = readDisplayPosition(client);
-        expect(Math.abs(position.y - 66.42 - initialHeight) / 8).toBeLessThan(0.002);
+        expect(Math.abs(position.y - 66.42 - initialHeight) / Math.hypot(position.y - 66.42, position.z)).toBeLessThan(
+            0.002
+        );
         expect(position.y).toBeGreaterThan(66.4);
-        expect(Math.hypot(position.x, position.y - 66.42, position.z)).toBeCloseTo(8, 3);
+        expect(Math.hypot(position.x, position.y - 66.42, position.z)).toBeGreaterThan(16);
+        expect(Math.hypot(position.x, position.y - 66.42, position.z)).toBeLessThan(16.3);
     });
 
     it('follows a steep vertical destination faster while eventually settling at its true direction', () => {
@@ -284,7 +287,9 @@ describe('WaypointHudRenderer', () => {
             renderer.renderViewer(client.viewer, [destination]);
             const position = readDisplayPosition(client);
             expect(position.x).toBe(0);
-            expect(Math.hypot(position.y - 65.62, position.z - tick * 0.25)).toBeCloseTo(8, 3);
+            const radius = Math.hypot(position.y - 65.62, position.z - tick * 0.25);
+            expect(radius).toBeGreaterThan(18);
+            expect(radius).toBeLessThan(20);
             expect(position.y - 65.62).toBeGreaterThanOrEqual(previousElevation - 1 / 4096);
             previousElevation = position.y - 65.62;
         }
@@ -333,7 +338,7 @@ describe('WaypointHudRenderer', () => {
             previous = position;
         }
         const end = readDisplayPosition(retreat);
-        expect(Math.hypot(end.x, end.y - 65.62, end.z)).toBeCloseTo(8, 3);
+        expect(Math.hypot(end.x, end.y - 65.62, end.z)).toBeCloseTo(10.91, 2);
         expect(retreat.packets.filter(({ tag }) => tag === 'c-spawn-entity')).toHaveLength(1);
         expect(retreat.packets.some(({ tag }) => tag === 'c-remove-entities')).toBe(false);
     });
@@ -352,8 +357,8 @@ describe('WaypointHudRenderer', () => {
             'c-spawn-entity',
             'c-set-entity-metadata'
         ]);
-        expect(readDisplayPosition(client).z).toBeGreaterThan(27.99);
-        expect(readDisplayPosition(client).z).toBeLessThan(28.01);
+        expect(readDisplayPosition(client).z).toBeGreaterThan(38.45);
+        expect(readDisplayPosition(client).z).toBeLessThan(38.47);
     });
 
     it('shows the colored label and rounded distance in the HUD component', () => {
