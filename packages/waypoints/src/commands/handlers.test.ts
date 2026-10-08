@@ -81,6 +81,24 @@ describe('/wp handlers', () => {
         expect(player[Symbol.dispose]).toHaveBeenCalledOnce();
     });
 
+    it('keeps targeting by waypoint name after changing its display label', () => {
+        const { catalog, handlers, sender } = setup(true);
+        catalog.create({ id: waypointId, name: 'Bert', dimension: 'world', position: { x: 0, y: 64, z: 0 } });
+        const run = handlers as unknown as Record<
+            string,
+            (sender: CommandSender, args?: object) => readonly unknown[]
+        >;
+
+        expect(run['wp set label <name> <label>']?.(sender, { name: 'Bert', label: 'Taylor' })).toEqual([
+            'Updated label for Bert.'
+        ]);
+        expect(run['wp set color <name> <hex>']?.(sender, { name: 'Bert', hex: '00ff00' })).toEqual([
+            'Updated color for Bert.'
+        ]);
+        expect(catalog.getByName('Bert')).toMatchObject({ name: 'Bert', label: 'Taylor', color: '#00FF00' });
+        expect(catalog.getByName('Taylor')).toBeUndefined();
+    });
+
     it('shows only enabled waypoints the player can access and hides missing-record differences', () => {
         const { catalog, handlers, sender } = setup(false);
         catalog.create({ id: waypointId, name: 'Private', dimension: 'world', position: { x: 1, y: 64, z: 2 } });
