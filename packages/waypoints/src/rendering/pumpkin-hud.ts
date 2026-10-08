@@ -74,7 +74,7 @@ export class WaypointHudService {
         try {
             id = playerKey(player);
             java = player.asJava();
-            if (java === undefined) {
+            if (java == null) {
                 this.renderer.forgetViewer(id);
                 return;
             }
@@ -94,7 +94,7 @@ export class WaypointHudService {
                 try {
                     const id = playerKey(player);
                     java = player.asJava();
-                    if (java === undefined) this.renderer.forgetViewer(id);
+                    if (java == null) this.renderer.forgetViewer(id);
                     else this.renderer.removeViewer(id, (packet) => java?.sendPacket(packet));
                 } catch (error) {
                     this.report('*', error);
@@ -137,7 +137,7 @@ export class WaypointHudService {
         let entity: ReturnType<Player['asEntity']> | undefined;
         try {
             java = player.asJava();
-            if (java === undefined) {
+            if (java == null) {
                 this.renderer.forgetViewer(id);
                 return;
             }

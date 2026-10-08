@@ -1,7 +1,7 @@
 import type { Player } from 'pumpkin:plugin/player@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WaypointCatalog } from '../waypoints/catalog.ts';
 import { WaypointStore } from '../waypoints/store.ts';
 import type { WaypointHudService } from './pumpkin-hud.ts';
@@ -61,6 +61,37 @@ function createService(
 }
 
 describe('WaypointHudService', () => {
+    beforeEach(() => {
+        uuidMocks.encodedTextJson.length = 0;
+        uuidMocks.disposedTextComponents = 0;
+    });
+
+    it('skips a null Java handle without logging errors or blocking another player', () => {
+        const unsupported = makePlayer(restrictedId, 'v-26-3');
+        unsupported.player.asJava = () => null as unknown as ReturnType<Player['asJava']>;
+        const supported = makePlayer(viewerId, 'v-26-3');
+        const server = {
+            getAllPlayers: () => [unsupported.player, supported.player],
+            getOpManager: () => ({ isOp: () => false, [Symbol.dispose]: vi.fn() })
+        } as unknown as Server;
+        const catalog = new WaypointCatalog(new WaypointStore(new MemoryFiles(), new MemoryLogger()));
+        catalog.create({
+            id: '44444444-4444-4444-8444-444444444444',
+            name: 'Open',
+            dimension: 'overworld',
+            position: { x: 0, y: 64, z: 10 },
+            access: { mode: 'public', grants: [] }
+        });
+        const errors: unknown[] = [];
+        const service = createService(server, catalog, { onError: (_id, error) => errors.push(error) });
+        service.tick();
+        service.left(unsupported.player);
+        service.unload();
+        expect(errors).toEqual([]);
+        expect(supported.packets.some(({ tag }) => tag === 'c-spawn-entity')).toBe(true);
+        expect(unsupported.packets).toEqual([]);
+    });
+
     it('renders only authorized Minecraft 26.3 viewers and removes their displays on leave', () => {
         expect(WaypointHudServiceConstructor).toBeTypeOf('function');
         const authorized = makePlayer(viewerId, 'v-26-3');
