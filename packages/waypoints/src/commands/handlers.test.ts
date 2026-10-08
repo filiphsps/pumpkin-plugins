@@ -14,7 +14,7 @@ vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({
 const playerId = '22222222-2222-4222-8222-222222222222';
 const waypointId = '11111111-1111-4111-8111-111111111111';
 
-function setup(isOperator = false) {
+function setup(isOperator = false, pendingItemIconInput?: string) {
     const files = new MemoryFiles();
     const catalog = new WaypointCatalog(new WaypointStore(files, new MemoryLogger()));
     const world = { getName: () => 'world', getMinY: () => -64, [Symbol.dispose]: vi.fn() };
@@ -42,6 +42,7 @@ function setup(isOperator = false) {
         createWaypointId: () => waypointId,
         uuidToString: () => playerId,
         uuidFromString: () => ({ high: 1n, low: 2n }) as never,
+        consumePendingItemIconInput: () => pendingItemIconInput,
         validateItemIcon: () => true
     });
     return { catalog, files, handlers, opManager, player, sender, server, world };
@@ -106,6 +107,17 @@ describe('/wp handlers', () => {
 
         expect(run['wp set icon <name> <item>']?.(sender, { name: 'Bert', item })).toEqual(['Updated icon for Bert.']);
         expect(catalog.getByName('Bert')?.icon).toBe(expectedIcon);
+    });
+
+    it('uses the raw command event input when Pumpkin drops the parsed item argument', () => {
+        const { catalog, handlers, sender } = setup(true, 'minecraft:pumpkin_pie');
+        catalog.create({ id: waypointId, name: 'Pumpkin', dimension: 'world', position: { x: 0, y: 64, z: 0 } });
+        const run = handlers as unknown as Record<string, (sender: CommandSender, args?: object) => readonly unknown[]>;
+
+        expect(run['wp set icon <name> <item>']?.(sender, { name: 'Pumpkin', item: '' })).toEqual([
+            'Updated icon for Pumpkin.'
+        ]);
+        expect(catalog.getByName('Pumpkin')?.icon).toBe('minecraft:pumpkin_pie');
     });
 
     it('shows only enabled waypoints the player can access and hides missing-record differences', () => {

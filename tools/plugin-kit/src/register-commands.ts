@@ -107,6 +107,7 @@ function argumentType(spec: CommandArgumentSpec) {
         };
     }
     if (spec.type === 'players') return { tag: 'players' as const };
+    if (spec.type === 'item') return { tag: 'item' as const };
     return { tag: 'string' as const, val: spec.mode };
 }
 
@@ -165,6 +166,12 @@ function decodeArguments(
             } finally {
                 for (const player of argument.val) disposeWasiResource(player);
             }
+            continue;
+        }
+
+        if (spec.type === 'item') {
+            // Some Pumpkin hosts expose an item argument through a different Arg variant; callers can recover its raw token.
+            values[spec.name] = argument.tag === 'item' || argument.tag === 'simple' ? argument.val : '';
             continue;
         }
 

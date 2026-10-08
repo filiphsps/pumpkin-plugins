@@ -11,6 +11,7 @@ interface LoadedPlugin {
 const state = vi.hoisted(() => ({
     plugin: undefined as LoadedPlugin | undefined,
     files: undefined as MemoryFiles | undefined,
+    commandRuntime: undefined as unknown,
     events: new Map<string, (server: Server, event: unknown) => void>()
 }));
 
@@ -47,16 +48,23 @@ vi.mock('@pumpkin-plugins/plugin-kit/plugin', () => ({
 vi.mock('@pumpkin-plugins/plugin-kit/data-dir', () => ({ WasiDataDir: { open: () => state.files } }));
 vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({ runCommand: vi.fn() }));
 vi.mock('@pumpkin-plugins/plugin-kit/register-commands', () => ({ registerCommands: vi.fn() }));
+vi.mock('./commands/handlers.ts', () => ({
+    commandHandlers: (runtime: unknown) => {
+        state.commandRuntime = runtime;
+        return {};
+    }
+}));
 
 describe('Waypoints plugin HUD lifecycle', () => {
     beforeEach(async () => {
         vi.resetModules();
         state.events.clear();
+        state.commandRuntime = undefined;
         state.files = new MemoryFiles();
         await import('./plugin.ts');
     });
 
-    it('registers tick, join, world-change, and leave handlers and unloads cleanly', () => {
+    it('registers HUD lifecycle and command-input events and unloads cleanly', () => {
         const plugin = state.plugin;
         if (plugin === undefined) throw new Error('Plugin was not registered');
         const opManager = { isOp: () => false, [Symbol.dispose]: vi.fn() };
@@ -72,9 +80,35 @@ describe('Waypoints plugin HUD lifecycle', () => {
             'server-tick-end-event',
             'player-join-event',
             'player-changed-world-event',
+            'player-command-send-event',
+            'server-command-event',
             'player-leave-event'
         ]);
         state.events.get('server-tick-end-event')?.(server, {});
         expect(() => plugin.onPluginUnload(context)).not.toThrow();
+    });
+
+    it('provides the selected icon token from the pre-dispatch command events', () => {
+        const plugin = state.plugin;
+        if (plugin === undefined) throw new Error('Plugin was not registered');
+        const server = { getAllPlayers: () => [] } as unknown as Server;
+        const context = { getServer: () => server } as Context;
+        plugin.onPluginLoad(context);
+
+        const runtime = state.commandRuntime as {
+            consumePendingItemIconInput(sender: never): string | undefined;
+        };
+        const playerSender = { isPlayer: () => true, getName: () => 'Alex' } as never;
+        state.events.get('player-command-send-event')?.(server, {
+            player: { getName: () => 'Alex' },
+            command: 'wp set icon Pumpkin minecraft:pumpkin_pie'
+        });
+        expect(runtime.consumePendingItemIconInput(playerSender)).toBe('minecraft:pumpkin_pie');
+        expect(runtime.consumePendingItemIconInput(playerSender)).toBeUndefined();
+
+        const consoleSender = { isPlayer: () => false, getName: () => 'Server' } as never;
+        state.events.get('server-command-event')?.(server, { command: 'wp set icon Pumpkin pumpkin_pie' });
+        expect(runtime.consumePendingItemIconInput(consoleSender)).toBe('pumpkin_pie');
+        expect(runtime.consumePendingItemIconInput(consoleSender)).toBeUndefined();
     });
 });

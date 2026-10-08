@@ -64,11 +64,10 @@ describe('waypoint commands', () => {
         });
     });
 
-    it('accepts namespaced item IDs as an unquoted icon argument', () => {
+    it('uses Pumpkin item arguments for icon IDs and autocomplete', () => {
         expect(commands.wp.subcommands.set.subcommands.icon.arguments[1]).toEqual({
             name: 'item',
-            type: 'string',
-            mode: 'greedy'
+            type: 'item'
         });
     });
 });

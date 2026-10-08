@@ -14,8 +14,7 @@ const player = { name: 'player', type: 'string', mode: 'single-word' } as const;
 const permission = { name: 'permission', type: 'string', mode: 'single-word' } as const;
 const group = { name: 'group', type: 'string', mode: 'single-word' } as const;
 const hex = { name: 'hex', type: 'string', mode: 'single-word' } as const;
-// The pinned Pumpkin host drops parsed ItemStacks from ConsumedArgs; keep the raw key for validation.
-const item = { name: 'item', type: 'string', mode: 'greedy' } as const;
+const item = { name: 'item', type: 'item' } as const;
 const label = { name: 'label', type: 'string', mode: 'greedy' } as const;
 const description = { name: 'description', type: 'string', mode: 'greedy' } as const;
 const coordinate = { min: -30_000_000, max: 30_000_000 } as const;

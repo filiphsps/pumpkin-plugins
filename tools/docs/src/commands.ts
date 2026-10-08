@@ -54,6 +54,7 @@ export interface CommandPlayerReference {
 export type CommandArgumentSpec =
     | { readonly name: string; readonly type: 'integer'; readonly min?: number; readonly max?: number }
     | { readonly name: string; readonly type: 'double'; readonly min?: number; readonly max?: number }
+    | { readonly name: string; readonly type: 'item' }
     | { readonly name: string; readonly type: 'players' }
     | { readonly name: string; readonly type: 'string'; readonly mode: 'single-word' | 'quotable' | 'greedy' };
 

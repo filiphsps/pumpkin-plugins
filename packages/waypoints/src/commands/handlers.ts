@@ -22,6 +22,7 @@ export interface WaypointCommandRuntime {
     createWaypointId(): string;
     uuidToString(id: Uuid): string;
     uuidFromString(id: string): Uuid | undefined;
+    consumePendingItemIconInput?(sender: CommandSender): string | undefined;
     /** Checks an item key against Pumpkin's item registry without persisting an item stack. */
     validateItemIcon(key: string): boolean;
 }
@@ -192,14 +193,19 @@ export function commandHandlers(runtime: WaypointCommandRuntime): CommandHandler
             }),
         'wp set icon <name> <item>': (sender, { name, item }) =>
             withOperator(runtime, sender, () => {
+                const pendingInput = runtime.consumePendingItemIconInput?.(sender);
+                const itemIdentifier = item || pendingInput || '';
+                if (itemIdentifier === '') {
+                    return [errorLine('Pumpkin did not pass the selected item identifier to the plugin.')];
+                }
                 let valid = false;
                 try {
-                    valid = runtime.validateItemIcon(item);
+                    valid = runtime.validateItemIcon(itemIdentifier);
                 } catch {
                     valid = false;
                 }
                 return valid
-                    ? mutationLines(runtime.catalog.update(name, { icon: item }), `Updated icon for ${name}.`)
+                    ? mutationLines(runtime.catalog.update(name, { icon: itemIdentifier }), `Updated icon for ${name}.`)
                     : [errorLine('That item identifier is not present in the server item registry.')];
             }),
         'wp set label <name> <label>': (sender, { name, label }) =>

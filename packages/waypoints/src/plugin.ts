@@ -2,8 +2,10 @@ import type { CommandSender, ConsumedArgs } from 'pumpkin:plugin/command@0.1.0';
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type {
     PlayerChangedWorldEventData,
+    PlayerCommandSendEventData,
     PlayerJoinEventData,
-    PlayerLeaveEventData
+    PlayerLeaveEventData,
+    ServerCommandEventData
 } from 'pumpkin:plugin/event@0.1.0';
 import { ItemStack } from 'pumpkin:plugin/item-stack@0.1.0';
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
@@ -16,6 +18,7 @@ import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands'
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
 import { commandHandlers } from './commands/handlers.ts';
+import { itemIconInputFromCommand } from './commands/item-input.ts';
 import { commands } from './commands/spec.ts';
 import { info } from './info.ts';
 import { WaypointHudService } from './rendering/pumpkin-hud.ts';
@@ -28,6 +31,8 @@ class Waypoints extends PluginBase {
     private server: Server | undefined;
     private files: WasiDataDir | undefined;
     private hud: WaypointHudService | undefined;
+    private readonly pendingItemIconInputs = new Map<string, string>();
+    private pendingServerItemIconInput: string | undefined;
 
     constructor() {
         super(info, __PLUGIN_VERSION__);
@@ -60,7 +65,19 @@ class Waypoints extends PluginBase {
         this.registerEvent(ctx, 'player-changed-world-event', (_server, event: PlayerChangedWorldEventData) =>
             hud.changedWorld(event.player)
         );
-        this.registerEvent(ctx, 'player-leave-event', (_server, event: PlayerLeaveEventData) => hud.left(event.player));
+        this.registerEvent(ctx, 'player-command-send-event', (_server, event: PlayerCommandSendEventData) => {
+            const playerKey = event.player.getName().toLowerCase();
+            const itemInput = itemIconInputFromCommand(event.command);
+            if (itemInput === undefined) this.pendingItemIconInputs.delete(playerKey);
+            else this.pendingItemIconInputs.set(playerKey, itemInput);
+        });
+        this.registerEvent(ctx, 'server-command-event', (_server, event: ServerCommandEventData) => {
+            this.pendingServerItemIconInput = itemIconInputFromCommand(event.command);
+        });
+        this.registerEvent(ctx, 'player-leave-event', (_server, event: PlayerLeaveEventData) => {
+            this.pendingItemIconInputs.delete(event.player.getName().toLowerCase());
+            hud.left(event.player);
+        });
 
         registerCommands(
             ctx,
@@ -71,6 +88,17 @@ class Waypoints extends PluginBase {
                 createWaypointId: () => uuid.toString(uuid.generate()),
                 uuidToString: uuid.toString,
                 uuidFromString: uuid.parse,
+                consumePendingItemIconInput: (sender) => {
+                    if (sender.isPlayer()) {
+                        const playerKey = sender.getName().toLowerCase();
+                        const input = this.pendingItemIconInputs.get(playerKey);
+                        this.pendingItemIconInputs.delete(playerKey);
+                        return input;
+                    }
+                    const input = this.pendingServerItemIconInput;
+                    this.pendingServerItemIconInput = undefined;
+                    return input;
+                },
                 validateItemIcon: (key) => {
                     let stack: ItemStack | undefined;
                     try {
@@ -89,6 +117,8 @@ class Waypoints extends PluginBase {
 
     /** Releases retained Pumpkin and filesystem handles on plugin unload. */
     protected override onPluginUnload(_ctx: Context): void {
+        this.pendingItemIconInputs.clear();
+        this.pendingServerItemIconInput = undefined;
         try {
             this.hud?.unload();
         } finally {

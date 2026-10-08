@@ -252,6 +252,41 @@ describe('registerCommands', () => {
         expect(args[Symbol.dispose]).toHaveBeenCalledOnce();
     });
 
+    it.each([
+        [{ tag: 'item', val: 'minecraft:golden_apple' }, 'minecraft:golden_apple'],
+        [{ tag: 'simple', val: '' }, ''],
+        [{ tag: 'item-predicate', val: 'minecraft:golden_apple' }, '']
+    ])('registers native item arguments and forwards the host value %j', (value, expected) => {
+        const argumentTree = defineCommands('Demo', {
+            icon: {
+                description: 'Set an item icon',
+                permission: 'Demo:command.icon',
+                arguments: [{ name: 'item', type: 'item' }]
+            }
+        });
+        const { ctx, registerCommand } = context();
+        const args = {
+            getValue: vi.fn(() => value),
+            [Symbol.dispose]: vi.fn()
+        };
+        registerCommands(ctx, argumentTree, { 'icon <item>': (_sender, received) => [received.item] });
+
+        const commandNode = registerCommand.mock.calls[0]?.[0] as {
+            children: { argumentType?: unknown }[];
+        };
+        expect(commandNode.children[0]?.argumentType).toEqual({ tag: 'item' });
+
+        const sendMessage = vi.fn();
+        const callback = host.onCommand.mock.calls[0]?.[0] as (
+            sender: CommandSender,
+            consumedArgs: typeof args
+        ) => number;
+        expect(callback({ sendMessage } as unknown as CommandSender, args as never)).toBe(1);
+        expect(sendMessage.mock.calls.map(([component]) => component.line)).toEqual([expected]);
+        expect(args.getValue).toHaveBeenCalledExactlyOnceWith('item');
+        expect(args[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
+
     it('decodes doubles and snapshots player selectors before disposing their WASI resources', () => {
         const argumentTree = defineCommands('Demo', {
             teleport: {

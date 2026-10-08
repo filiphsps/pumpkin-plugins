@@ -290,6 +290,27 @@ describe('types', () => {
         expect(Object.keys(typed)).toEqual(['map at <x> <z> <world> <label> <tail>']);
     });
 
+    it('infers native item arguments as registry-key strings', () => {
+        const itemCommand = defineCommands('Demo', {
+            icon: {
+                description: 'Set an item icon',
+                permission: 'Demo:command.icon',
+                arguments: [{ name: 'item', type: 'item' }]
+            }
+        });
+        const typed: CommandHandlers<typeof itemCommand> = {
+            'icon <item>': (_sender, args) => {
+                const itemId: string = args.item;
+                // @ts-expect-error item argument values are strings, not numbers
+                const invalid: number = args.item;
+                return [itemId, String(invalid)];
+            }
+        };
+
+        expect(flattenCommands(itemCommand).map(({ usage }) => usage)).toEqual(['/icon <item>']);
+        expect(Object.keys(typed)).toEqual(['icon <item>']);
+    });
+
     it('supports double coordinates and snapshots player selectors into plain references', () => {
         const typedCommands = defineCommands('Demo', {
             teleport: {
