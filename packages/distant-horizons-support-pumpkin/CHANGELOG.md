@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.11](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.10...distant-horizons-support-pumpkin-v0.0.11) (2026-10-08)
+
+
+### Bug Fixes
+
+* **dh:** trigger release pr ([11b8c8a](https://github.com/filiphsps/pumpkin-plugins/commit/11b8c8a0a420c87633dedc9aff5dbb89c08629a0))
+
 ## [0.0.10](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.9...distant-horizons-support-pumpkin-v0.0.10) (2026-10-08)
 
 
