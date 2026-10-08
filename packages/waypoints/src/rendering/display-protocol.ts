@@ -15,13 +15,15 @@ const VECTOR3_META_TYPE = 39;
 const TEXT_LINE_WIDTH = 300;
 const TEXT_BACKGROUND = 0x40000000;
 const TEXT_DISPLAY_SEE_THROUGH = 0x02;
+const TEXT_DISPLAY_SHADOW = 0x01;
+const FULL_BRIGHTNESS = (15 << 4) | (15 << 20);
 const TEXT_DISPLAY_VIEW_RANGE = 10;
 const ENTITY_DELTA_SCALE = 4096;
 const MIN_ENTITY_DELTA = -32_768;
 const MAX_ENTITY_DELTA = 32_767;
 
 /** Encodes TextDisplay metadata; 26.3 components are already network-NBT encoded by Pumpkin. */
-export function encodeTextDisplayMetadata(componentNbt: Uint8Array, scale = 1): Uint8Array {
+export function encodeTextDisplayMetadata(componentNbt: Uint8Array, scale = 1, opacity = 255): Uint8Array {
     return Uint8Array.from([
         8,
         VAR_INT_META_TYPE,
@@ -38,6 +40,9 @@ export function encodeTextDisplayMetadata(componentNbt: Uint8Array, scale = 1): 
         15,
         BYTE_META_TYPE,
         BILLBOARD_CENTER,
+        16,
+        VAR_INT_META_TYPE,
+        ...encodeVarInt(FULL_BRIGHTNESS),
         17,
         FLOAT_META_TYPE,
         ...encodeFloat(TEXT_DISPLAY_VIEW_RANGE),
@@ -47,15 +52,10 @@ export function encodeTextDisplayMetadata(componentNbt: Uint8Array, scale = 1): 
         24,
         VAR_INT_META_TYPE,
         ...encodeVarInt(TEXT_LINE_WIDTH),
-        25,
-        VAR_INT_META_TYPE,
-        ...encodeVarInt(TEXT_BACKGROUND),
-        26,
-        BYTE_META_TYPE,
-        255,
+        ...encodeOpacity(opacity),
         27,
         BYTE_META_TYPE,
-        TEXT_DISPLAY_SEE_THROUGH,
+        TEXT_DISPLAY_SEE_THROUGH | TEXT_DISPLAY_SHADOW,
         255
     ]);
 }
@@ -90,11 +90,33 @@ export function createEntityRemovePacket(entityIds: readonly number[]): Clientbo
 export function createTextDisplayMetadataPacket(
     entityId: number,
     componentNbt: Uint8Array,
-    scale = 1
+    scale = 1,
+    opacity = 255
 ): ClientboundPacket {
     return {
         tag: 'c-set-entity-metadata',
-        val: { entityId, metadata: encodeTextDisplayMetadata(componentNbt, scale) }
+        val: { entityId, metadata: encodeTextDisplayMetadata(componentNbt, scale, opacity) }
+    };
+}
+
+/** Updates changed scale or opacity fields without resending text, using one-tick interpolation. */
+export function createTextDisplayAppearancePacket(
+    entityId: number,
+    appearance: { readonly scale?: number; readonly opacity?: number }
+): ClientboundPacket {
+    return {
+        tag: 'c-set-entity-metadata',
+        val: {
+            entityId,
+            metadata: Uint8Array.from([
+                8,
+                VAR_INT_META_TYPE,
+                0,
+                ...(appearance.scale === undefined ? [] : [12, VECTOR3_META_TYPE, ...encodeScale(appearance.scale)]),
+                ...(appearance.opacity === undefined ? [] : encodeOpacity(appearance.opacity)),
+                255
+            ])
+        }
     };
 }
 
@@ -184,4 +206,10 @@ function encodeFloat(value: number): number[] {
 function encodeScale(scale: number): number[] {
     const component = encodeFloat(scale);
     return [...component, ...component, ...component];
+}
+
+/** Fades the backdrop with the text so arriving never leaves an empty black rectangle. */
+function encodeOpacity(opacity: number): number[] {
+    const background = Math.round((opacity / 255) * (TEXT_BACKGROUND >>> 24)) << 24;
+    return [25, VAR_INT_META_TYPE, ...encodeVarInt(background), 26, BYTE_META_TYPE, opacity];
 }

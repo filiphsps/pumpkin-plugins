@@ -11,22 +11,47 @@ async function loadProtocol(): Promise<typeof import('./display-protocol.ts')> {
 }
 
 describe('Java 26.3 text display packets', () => {
+    it('fades both text and backdrop without resending its component', async () => {
+        const protocol = await loadProtocol();
+        expect(protocol.createTextDisplayAppearancePacket(-1_500_000_000, { opacity: 0 })).toEqual({
+            tag: 'c-set-entity-metadata',
+            val: { entityId: -1_500_000_000, metadata: Uint8Array.from([8, 1, 0, 25, 1, 0, 26, 0, 0, 255]) }
+        });
+        expect(protocol.createTextDisplayAppearancePacket(-1_500_000_000, { opacity: 255 })).toEqual({
+            tag: 'c-set-entity-metadata',
+            val: {
+                entityId: -1_500_000_000,
+                metadata: Uint8Array.from([8, 1, 0, 25, 1, 128, 128, 128, 128, 4, 26, 0, 255, 255])
+            }
+        });
+    });
+
+    it('sets full brightness and a text shadow so labels and icons remain legible at night', async () => {
+        const protocol = await loadProtocol();
+        const bytes = [...protocol.encodeTextDisplayMetadata(Uint8Array.of(10, 0, 0))];
+        expect(bytes).toContain(16);
+        const brightness = bytes.indexOf(16);
+        expect(bytes.slice(brightness, brightness + 6)).toEqual([16, 1, 240, 129, 192, 7]);
+        expect(bytes.slice(-4)).toEqual([27, 0, 3, 255]);
+    });
+
     it('encodes centered text metadata with the pinned 26.3 indices and raw NBT component bytes', async () => {
         const protocol = await loadProtocol();
         expect([...protocol.encodeTextDisplayMetadata(Uint8Array.of(10, 0, 0))]).toEqual([
-            8, 1, 0, 9, 1, 1, 10, 1, 1, 12, 39, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 15, 0, 3, 17, 3, 65, 32, 0,
-            0, 23, 5, 10, 0, 0, 24, 1, 172, 2, 25, 1, 128, 128, 128, 128, 4, 26, 0, 255, 27, 0, 2, 255
+            8, 1, 0, 9, 1, 1, 10, 1, 1, 12, 39, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 15, 0, 3, 16, 1, 240, 129,
+            192, 7, 17, 3, 65, 32, 0, 0, 23, 5, 10, 0, 0, 24, 1, 172, 2, 25, 1, 128, 128, 128, 128, 4, 26, 0, 255, 27,
+            0, 3, 255
         ]);
     });
 
     it('renders HUD text through world geometry', async () => {
         const protocol = await loadProtocol();
-        expect([...protocol.encodeTextDisplayMetadata(Uint8Array.of(10, 0, 0)).slice(-4)]).toEqual([27, 0, 2, 255]);
+        expect([...protocol.encodeTextDisplayMetadata(Uint8Array.of(10, 0, 0)).slice(-4)]).toEqual([27, 0, 3, 255]);
     });
 
     it('updates scale without resending text or creating another entity', async () => {
         const protocol = await loadProtocol();
-        expect(protocol.createTextDisplayScalePacket(-1_500_000_000, 0.5)).toEqual({
+        expect(protocol.createTextDisplayAppearancePacket(-1_500_000_000, { scale: 0.5 })).toEqual({
             tag: 'c-set-entity-metadata',
             val: {
                 entityId: -1_500_000_000,
@@ -111,9 +136,9 @@ describe('Java 26.3 text display packets', () => {
             val: {
                 entityId: -1_500_000_000,
                 metadata: Uint8Array.from([
-                    8, 1, 0, 9, 1, 1, 10, 1, 1, 12, 39, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 15, 0, 3, 17, 3,
-                    65, 32, 0, 0, 23, 5, 10, 0, 0, 24, 1, 172, 2, 25, 1, 128, 128, 128, 128, 4, 26, 0, 255, 27, 0, 2,
-                    255
+                    8, 1, 0, 9, 1, 1, 10, 1, 1, 12, 39, 63, 128, 0, 0, 63, 128, 0, 0, 63, 128, 0, 0, 15, 0, 3, 16, 1,
+                    240, 129, 192, 7, 17, 3, 65, 32, 0, 0, 23, 5, 10, 0, 0, 24, 1, 172, 2, 25, 1, 128, 128, 128, 128, 4,
+                    26, 0, 255, 27, 0, 3, 255
                 ])
             }
         });
