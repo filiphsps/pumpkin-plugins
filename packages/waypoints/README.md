@@ -105,6 +105,9 @@ and the rounded distance in meters. Each player's display packets are private to
 restricted names and personalized distances are not sent to other clients.
 
 The HUD uses client-only TextDisplay packets on a camera-relative plane about three blocks ahead,
-updated once per server tick. It can lag slightly while moving or turning, and world geometry can
-occlude it. Other Java protocol versions and Bedrock clients do not receive the HUD. The stored item
-icon is not displayed yet.
+updated once per server tick. Within ten blocks, each label eases into a world position two blocks
+above its waypoint and stays anchored there within three blocks. Screen direction is eased to reduce
+movement jitter; ordinary waypoints use stronger vertical stabilization, while destinations several
+blocks above or below the player follow height changes faster. Small stationary camera-position and
+yaw changes are also ignored. Other Java protocol versions and Bedrock clients do not receive the
+HUD. The stored item icon is not displayed yet.

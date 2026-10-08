@@ -8,9 +8,18 @@ import {
     createTextDisplayMovement,
     createTextDisplaySpawnPacket
 } from './display-protocol.ts';
-import { cameraPlaneCoordinates, type HudCamera, offsetOnCameraPlane, projectWaypointOnCameraPlane } from './layout.ts';
+import {
+    cameraPlaneCoordinates,
+    type HudCamera,
+    offsetOnCameraPlane,
+    offsetOnCameraPlaneAxes,
+    projectWaypointOnCameraPlane
+} from './layout.ts';
 
 const DEFAULT_DISPLAY_DEPTH = 3;
+const LABEL_ANCHOR_HEIGHT = 2;
+const WORLD_TRANSITION_START_DISTANCE = 10;
+const WORLD_TRANSITION_END_DISTANCE = 3;
 const FIRST_CLIENT_ENTITY_ID = -1_500_000_000;
 const LAST_CLIENT_ENTITY_ID = -2_000_000_000;
 const PLAYER_MOVEMENT_THRESHOLD = 0.05;
@@ -21,6 +30,10 @@ const LABEL_CHARACTER_WIDTH = 0.075;
 const DISTANCE_TEXT_WIDTH_CHARS = 10;
 const LABEL_COLLISION_HEIGHT = 0.24;
 const LABEL_VERTICAL_STEP = 0.32;
+const HORIZONTAL_DIRECTION_FOLLOW_RATE = 0.25;
+const VERTICAL_DIRECTION_FOLLOW_RATE = 0.15;
+const ELEVATED_WAYPOINT_VERTICAL_FOLLOW_RATE = 0.55;
+const SCREEN_DIRECTION_DEADZONE = 0.01;
 
 /** Per-viewer inputs required to render one private waypoint HUD. */
 export interface WaypointHudViewer {
@@ -48,6 +61,8 @@ interface DisplayState {
     position: WaypointPosition;
     textJson: string | undefined;
     spawned: boolean;
+    smoothedHorizontalRatio: number | undefined;
+    smoothedVerticalRatio: number | undefined;
 }
 
 interface ViewerState {
@@ -88,14 +103,33 @@ export class WaypointHudRenderer {
         });
         const candidates: DisplayCandidate[] = [];
         for (const waypoint of visible) {
-            const projected = projectWaypointOnCameraPlane(camera, waypoint.position, this.depth);
-            if (projected === undefined) continue;
+            const waypointDistance = distance(viewer.position, waypoint.position);
+            const worldBlend = smoothstep(
+                clamp(
+                    (WORLD_TRANSITION_START_DISTANCE - waypointDistance) /
+                        (WORLD_TRANSITION_START_DISTANCE - WORLD_TRANSITION_END_DISTANCE),
+                    0,
+                    1
+                )
+            );
+            const worldAnchor = {
+                x: waypoint.position.x,
+                y: waypoint.position.y + LABEL_ANCHOR_HEIGHT,
+                z: waypoint.position.z
+            };
+            const projected =
+                worldBlend === 1 ? undefined : projectWaypointOnCameraPlane(camera, worldAnchor, this.depth);
+            if (projected === undefined && worldBlend === 0) continue;
             const label = waypoint.label ?? waypoint.name;
-            const distanceBlocks = distance(viewer.position, waypoint.position);
+            const position =
+                projected === undefined ? worldAnchor : interpolatePosition(projected, worldAnchor, worldBlend);
             candidates.push({
                 waypointId: waypoint.id,
-                position: projected,
-                textJson: createWaypointHudTextJson(waypoint, distanceBlocks),
+                position,
+                worldBlend,
+                isElevated: Math.abs(waypoint.position.y - viewer.position.y) > 3,
+                camera,
+                textJson: createWaypointHudTextJson(waypoint, waypointDistance),
                 width: Math.max(0.7, (Array.from(label).length + DISTANCE_TEXT_WIDTH_CHARS) * LABEL_CHARACTER_WIDTH)
             });
         }
@@ -111,7 +145,13 @@ export class WaypointHudRenderer {
                 position = offsetOnCameraPlane(camera, candidate.position, verticalOffset);
             }
             placed.push({ position, width: candidate.width });
-            desired.set(candidate.waypointId, { position, textJson: candidate.textJson });
+            desired.set(candidate.waypointId, {
+                position,
+                worldBlend: candidate.worldBlend,
+                isElevated: candidate.isElevated,
+                camera,
+                textJson: candidate.textJson
+            });
         }
 
         this.removeUndesired(viewer, state, desired);
@@ -236,13 +276,16 @@ export class WaypointHudRenderer {
                 entityUuid: viewer.createEntityUuid(),
                 position: desired.position,
                 textJson: undefined,
-                spawned: false
+                spawned: false,
+                smoothedHorizontalRatio: undefined,
+                smoothedVerticalRatio: undefined
             };
             state.displays.set(waypointId, display);
         }
 
-        if (display.spawned && positionChanged(display.position, desired.position)) {
-            const movement = createTextDisplayMovement(display.entityId, display.position, desired.position);
+        const position = stabilizeScreenDirection(desired.camera, desired, display);
+        if (display.spawned && positionChanged(display.position, position)) {
+            const movement = createTextDisplayMovement(display.entityId, display.position, position);
             if (movement === undefined) {
                 // The supported relative packet carries signed 16-bit deltas; respawn on large same-world jumps.
                 viewer.sendPacket(createEntityRemovePacket([display.entityId]));
@@ -251,8 +294,9 @@ export class WaypointHudRenderer {
             } else {
                 if (movement.packet !== undefined) viewer.sendPacket(movement.packet);
             }
-            display.position = movement?.position ?? desired.position;
+            display.position = movement?.position ?? position;
         }
+        if (!display.spawned) display.position = position;
 
         if (!display.spawned) {
             viewer.sendPacket(createTextDisplaySpawnPacket(display.entityId, display.entityUuid, display.position));
@@ -299,6 +343,9 @@ export function createWaypointHudTextJson(waypoint: Waypoint, distanceBlocks: nu
 
 interface DesiredDisplay {
     readonly position: WaypointPosition;
+    readonly worldBlend: number;
+    readonly isElevated: boolean;
+    readonly camera: HudCamera;
     readonly textJson: string;
 }
 
@@ -314,6 +361,71 @@ interface PlacedLabel {
 
 function distance(left: WaypointPosition, right: WaypointPosition): number {
     return Math.hypot(left.x - right.x, left.y - right.y, left.z - right.z);
+}
+
+function stabilizeScreenDirection(camera: HudCamera, desired: DesiredDisplay, display: DisplayState): WaypointPosition {
+    const coordinates = cameraPlaneCoordinates(camera, desired.position);
+    if (!Number.isFinite(coordinates.forward) || coordinates.forward <= 0) return desired.position;
+
+    const horizontalRatio = coordinates.horizontal / coordinates.forward;
+    const verticalRatio = coordinates.vertical / coordinates.forward;
+    if (desired.worldBlend >= 1) {
+        display.smoothedHorizontalRatio = horizontalRatio;
+        display.smoothedVerticalRatio = verticalRatio;
+        return desired.position;
+    }
+    if (display.smoothedHorizontalRatio === undefined || display.smoothedVerticalRatio === undefined) {
+        display.smoothedHorizontalRatio = horizontalRatio;
+        display.smoothedVerticalRatio = verticalRatio;
+        return desired.position;
+    }
+
+    const horizontalRate = followRate(HORIZONTAL_DIRECTION_FOLLOW_RATE, desired.worldBlend);
+    const verticalRate = followRate(
+        desired.isElevated ? ELEVATED_WAYPOINT_VERTICAL_FOLLOW_RATE : VERTICAL_DIRECTION_FOLLOW_RATE,
+        desired.worldBlend
+    );
+    const deadzone = SCREEN_DIRECTION_DEADZONE * (1 - desired.worldBlend);
+    display.smoothedHorizontalRatio = easeRatio(
+        display.smoothedHorizontalRatio,
+        horizontalRatio,
+        horizontalRate,
+        deadzone
+    );
+    display.smoothedVerticalRatio = easeRatio(display.smoothedVerticalRatio, verticalRatio, verticalRate, deadzone);
+
+    return offsetOnCameraPlaneAxes(
+        camera,
+        desired.position,
+        (display.smoothedHorizontalRatio - horizontalRatio) * coordinates.forward,
+        (display.smoothedVerticalRatio - verticalRatio) * coordinates.forward
+    );
+}
+
+function followRate(baseRate: number, worldBlend: number): number {
+    return baseRate + (1 - baseRate) * worldBlend;
+}
+
+function easeRatio(current: number, target: number, followRate: number, deadzone: number): number {
+    const difference = target - current;
+    if (Math.abs(difference) <= deadzone) return current;
+    return current + difference * followRate;
+}
+
+function interpolatePosition(from: WaypointPosition, to: WaypointPosition, amount: number): WaypointPosition {
+    return {
+        x: from.x + (to.x - from.x) * amount,
+        y: from.y + (to.y - from.y) * amount,
+        z: from.z + (to.z - from.z) * amount
+    };
+}
+
+function smoothstep(amount: number): number {
+    return amount * amount * (3 - 2 * amount);
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+    return Math.min(maximum, Math.max(minimum, value));
 }
 
 function positionChanged(left: WaypointPosition, right: WaypointPosition): boolean {

@@ -29,6 +29,28 @@ export function offsetOnCameraPlane(
     };
 }
 
+/** Shifts a point along the camera plane's horizontal and vertical screen axes. */
+export function offsetOnCameraPlaneAxes(
+    camera: HudCamera,
+    position: WaypointPosition,
+    horizontalOffset: number,
+    verticalOffset: number
+): WaypointPosition {
+    const yaw = (camera.yaw * Math.PI) / 180;
+    const pitch = (camera.pitch * Math.PI) / 180;
+    const right = { x: Math.cos(yaw), y: 0, z: Math.sin(yaw) };
+    const up = {
+        x: -Math.sin(pitch) * Math.sin(yaw),
+        y: Math.cos(pitch),
+        z: Math.sin(pitch) * Math.cos(yaw)
+    };
+    return {
+        x: position.x + right.x * horizontalOffset + up.x * verticalOffset,
+        y: position.y + right.y * horizontalOffset + up.y * verticalOffset,
+        z: position.z + right.z * horizontalOffset + up.z * verticalOffset
+    };
+}
+
 /** Resolves the position's horizontal and vertical coordinates on the camera plane. */
 export function cameraPlaneCoordinates(
     camera: HudCamera,
@@ -36,6 +58,7 @@ export function cameraPlaneCoordinates(
 ): {
     readonly horizontal: number;
     readonly vertical: number;
+    readonly forward: number;
 } {
     const yaw = (camera.yaw * Math.PI) / 180;
     const pitch = (camera.pitch * Math.PI) / 180;
@@ -50,7 +73,16 @@ export function cameraPlaneCoordinates(
         y: Math.cos(pitch),
         z: Math.sin(pitch) * Math.cos(yaw)
     };
-    return { horizontal: dot(direction, right), vertical: dot(direction, up) };
+    const forward = {
+        x: -Math.sin(yaw) * Math.cos(pitch),
+        y: -Math.sin(pitch),
+        z: Math.cos(yaw) * Math.cos(pitch)
+    };
+    return {
+        horizontal: dot(direction, right),
+        vertical: dot(direction, up),
+        forward: dot(direction, forward)
+    };
 }
 
 /** Projects a target onto a fixed-depth plane in front of the viewer, preserving its screen direction. */

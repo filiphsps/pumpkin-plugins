@@ -87,17 +87,104 @@ describe('WaypointHudRenderer', () => {
         ]);
         const movement = client.packets.at(-1);
         if (movement === undefined) throw new Error('Expected an entity movement packet.');
-        expect(packetValue(movement).delta).toEqual([0, 0, 4096]);
+        const firstDelta = packetValue(movement).delta as number[];
+        expect(firstDelta[2]).toBe(4096);
+        expect(Math.abs(firstDelta[1] ?? Infinity)).toBeLessThan(100);
 
         client.viewer.camera = { position: { x: 0, y: 65.62, z: 2 }, yaw: 0, pitch: 0 };
         renderer.renderViewer(client.viewer, [destination]);
         const secondMovement = client.packets.at(-1);
         if (secondMovement === undefined) throw new Error('Expected a second entity movement packet.');
-        expect(packetValue(secondMovement).delta).toEqual([0, 0, 4096]);
+        const secondDelta = packetValue(secondMovement).delta as number[];
+        expect(secondDelta[2]).toBe(4096);
+        expect(Math.abs(secondDelta[1] ?? Infinity)).toBeLessThan(100);
 
         client.viewer.position = { x: 0, y: 64, z: 19 };
         renderer.renderViewer(client.viewer, [destination]);
         expect(client.packets.at(-1)?.tag).toBe('c-set-entity-metadata');
+    });
+
+    it('blends the HUD marker into a stable world anchor as the player reaches the waypoint', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 0, y: 64, z: 20 } });
+
+        renderer.renderViewer(client.viewer, [destination]);
+        const positions: number[] = [];
+        for (let z = 1; z <= 20; z += 1) {
+            client.viewer.position = { x: 0, y: 64, z };
+            client.viewer.camera = { position: { x: 0, y: 65.62, z }, yaw: 0, pitch: 0 };
+            renderer.renderViewer(client.viewer, [destination]);
+            positions.push(readDisplayPosition(client).z);
+        }
+
+        const entityChanges = client.packets
+            .filter(({ tag }) => tag === 'c-spawn-entity' || tag === 'c-remove-entities')
+            .map(({ tag }) => tag);
+        expect(entityChanges).toEqual(['c-spawn-entity']);
+        expect(positions.at(-1)).toBeCloseTo(20, 3);
+        expect(readDisplayPosition(client).y).toBeCloseTo(66, 3);
+        for (let index = 1; index < positions.length; index += 1) {
+            expect(Math.abs((positions[index] ?? 0) - (positions[index - 1] ?? 0))).toBeLessThan(3);
+        }
+    });
+
+    it('eases ordinary screen-height movement while following an elevated waypoint faster', async () => {
+        const ordinary = makeViewer(ownerId);
+        const elevated = makeViewer(allowedId);
+        const ordinaryWaypoint = waypoint({ position: { x: 0, y: 64, z: 30 } });
+        const elevatedWaypoint = waypoint({
+            id: '55555555-5555-4555-8555-555555555555',
+            position: { x: 0, y: 74, z: 30 }
+        });
+        const ordinaryRenderer = createRenderer();
+        const elevatedRenderer = createRenderer();
+
+        ordinaryRenderer.renderViewer(ordinary.viewer, [ordinaryWaypoint]);
+        elevatedRenderer.renderViewer(elevated.viewer, [elevatedWaypoint]);
+        const { cameraPlaneCoordinates } = await import('./layout.ts');
+        const screenHeight = (client: ReturnType<typeof makeViewer>) =>
+            cameraPlaneCoordinates(client.viewer.camera, readDisplayPosition(client)).vertical;
+        const ordinaryStart = screenHeight(ordinary);
+        const elevatedStart = screenHeight(elevated);
+
+        for (const client of [ordinary, elevated]) {
+            client.viewer.position = { x: 0.1, y: 64, z: 0 };
+            client.viewer.camera = { position: { x: 0.1, y: 65.62, z: 0 }, yaw: 0, pitch: 30 };
+        }
+        ordinaryRenderer.renderViewer(ordinary.viewer, [ordinaryWaypoint]);
+        elevatedRenderer.renderViewer(elevated.viewer, [elevatedWaypoint]);
+
+        const ordinaryMovement = Math.abs(screenHeight(ordinary) - ordinaryStart);
+        const elevatedMovement = Math.abs(screenHeight(elevated) - elevatedStart);
+        expect(ordinaryMovement).toBeLessThan(0.3);
+        expect(elevatedMovement).toBeGreaterThan(ordinaryMovement * 2);
+    });
+
+    it('eases horizontal screen movement when the player shifts from side to side', async () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 0, y: 64, z: 30 } });
+        const { cameraPlaneCoordinates, projectWaypointOnCameraPlane } = await import('./layout.ts');
+        const screenSide = () => cameraPlaneCoordinates(client.viewer.camera, readDisplayPosition(client)).horizontal;
+
+        renderer.renderViewer(client.viewer, [destination]);
+        const initial = screenSide();
+        client.viewer.position = { x: 0.5, y: 64, z: 0 };
+        client.viewer.camera = { position: { x: 0.5, y: 65.62, z: 0 }, yaw: 0, pitch: 0 };
+        renderer.renderViewer(client.viewer, [destination]);
+        const shifted = screenSide();
+        const rawProjected = projectWaypointOnCameraPlane(client.viewer.camera, { x: 0, y: 66, z: 30 }, 3);
+        if (rawProjected === undefined) throw new Error('Expected a forward waypoint projection.');
+        const rawShift = Math.abs(cameraPlaneCoordinates(client.viewer.camera, rawProjected).horizontal - initial);
+
+        client.viewer.position = { x: 0, y: 64, z: 0 };
+        client.viewer.camera = { position: { x: 0, y: 65.62, z: 0 }, yaw: 0, pitch: 0 };
+        renderer.renderViewer(client.viewer, [destination]);
+        const returned = screenSide();
+
+        expect(Math.abs(shifted - initial)).toBeLessThan(rawShift * 0.5);
+        expect(Math.abs(returned - shifted)).toBeLessThan(Math.abs(shifted - initial));
     });
 
     it('ignores tiny stationary camera jitter below the packet resolution', () => {
@@ -180,7 +267,10 @@ describe('WaypointHudRenderer', () => {
         ]);
         const spawn = client.packets[1];
         if (spawn === undefined) throw new Error('Expected the display to be respawned.');
-        expect(packetValue(spawn).position).toEqual([0, 65.62, 13]);
+        const spawnPosition = packetValue(spawn).position as readonly number[];
+        expect(spawnPosition[0]).toBe(0);
+        expect(Math.abs((spawnPosition[1] ?? Infinity) - 65.62)).toBeLessThan(0.5);
+        expect(spawnPosition[2]).toBe(13);
     });
 
     it('shows the colored label and rounded distance in the HUD component', () => {
@@ -327,4 +417,23 @@ function makeViewer(
 function packetValue(packet: ClientboundPacket): Record<string, unknown> {
     if ('val' in packet) return packet.val as Record<string, unknown>;
     throw new TypeError('Expected a tagged packet value.');
+}
+
+function readDisplayPosition(client: ReturnType<typeof makeViewer>): { x: number; y: number; z: number } {
+    let position: [number, number, number] | undefined;
+    for (const packet of client.packets) {
+        const value = packetValue(packet);
+        if (packet.tag === 'c-spawn-entity') {
+            position = [...(value.position as [number, number, number])];
+        } else if (packet.tag === 'c-update-entity-pos' && position !== undefined) {
+            const delta = value.delta as [number, number, number];
+            position = [
+                (position[0] ?? 0) + (delta[0] ?? 0) / 4096,
+                (position[1] ?? 0) + (delta[1] ?? 0) / 4096,
+                (position[2] ?? 0) + (delta[2] ?? 0) / 4096
+            ];
+        }
+    }
+    if (position === undefined) throw new Error('Expected a waypoint display position.');
+    return { x: position[0], y: position[1], z: position[2] };
 }
