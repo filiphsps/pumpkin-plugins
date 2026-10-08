@@ -20,9 +20,11 @@ export function atomicWrite(root: Descriptor, path: string, content: Uint8Array)
     try {
         try {
             for (let offset = 0; offset < content.length; ) {
-                const written = file.write(content.subarray(offset), offset);
-                if (written === 0) throw new Error(`could not write ${path}`);
-                offset += written;
+                const written = file.write(content.subarray(offset), BigInt(offset));
+                if (written === 0n) throw new Error(`could not write ${path}`);
+                const remaining = content.length - offset;
+                if (written > BigInt(remaining)) throw new Error(`invalid write result for ${path}`);
+                offset += Number(written);
             }
         } catch (error) {
             try {

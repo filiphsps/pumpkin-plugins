@@ -19,7 +19,7 @@ export class TcpTransport implements Transport {
     /** {@inheritDoc web/session!Transport#read} */
     read(max: number): Uint8Array | null | 'closed' {
         try {
-            const bytes = this.input.read(max);
+            const bytes = this.input.read(BigInt(max));
             return bytes.length > 0 ? bytes : null;
         } catch (err) {
             if (wasiErrorCode(err) === 'closed') return 'closed';
@@ -29,7 +29,7 @@ export class TcpTransport implements Transport {
 
     /** {@inheritDoc web/session!Transport#writable} */
     writable(): number {
-        return this.output.checkWrite();
+        return toSafeNumber(this.output.checkWrite());
     }
 
     /** {@inheritDoc web/session!Transport#write} */
@@ -47,7 +47,7 @@ export class TcpTransport implements Transport {
                 return false;
             }
             // `check-write` reports 0 until the flush has completed.
-            if (this.output.checkWrite() === 0) return false;
+            if (this.output.checkWrite() === 0n) return false;
             this.socket.shutdown('send');
         } catch {
             // The peer is gone; there is nothing left to deliver.
@@ -72,4 +72,12 @@ export class TcpTransport implements Transport {
             }
         }
     }
+}
+
+function toSafeNumber(value: bigint): number {
+    const number = Number(value);
+    if (!Number.isSafeInteger(number) || number < 0) {
+        throw new RangeError("WASI writable byte count exceeds JavaScript's safe integer range");
+    }
+    return number;
 }

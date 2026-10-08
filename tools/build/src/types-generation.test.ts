@@ -35,12 +35,12 @@ function outputAt(): { dir: string; output: string } {
 }
 
 describe('generateTypes', () => {
-    it('rewrites guest declarations and publishes them at the requested path', () => {
+    it('preserves bigint guest declarations and publishes them at the requested path', () => {
         const { dir, output } = outputAt();
 
         generateTypes('wit', output);
 
-        expect(fs.readFileSync(path.join(output, 'index.d.ts'), 'utf8')).toBe('export type Size = number;');
+        expect(fs.readFileSync(path.join(output, 'index.d.ts'), 'utf8')).toBe('export type Size = bigint;');
         expect(fs.readdirSync(dir)).toEqual(['bindings']);
         expect(componentize).toHaveBeenCalledOnce();
     });

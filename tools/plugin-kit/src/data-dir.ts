@@ -13,7 +13,16 @@ const kindOf = (type: string): FileKind =>
 
 /** The plugin's data folder, which the server preopens as `data` when the plugin may use the filesystem. */
 export class WasiDataDir implements DataFiles {
+    private closed = false;
+
     private constructor(private readonly root: Descriptor) {}
+
+    /** Releases the root descriptor when the plugin unloads. */
+    [Symbol.dispose](): void {
+        if (this.closed) return;
+        this.closed = true;
+        disposeWasiResource(this.root);
+    }
 
     /**
      * Opens the data folder.
@@ -35,8 +44,13 @@ export class WasiDataDir implements DataFiles {
             const time = stat.dataModificationTimestamp;
             return {
                 kind: kindOf(stat.type),
-                size: stat.size,
-                modified: time ? time.seconds * 1000 + Math.floor(time.nanoseconds / 1e6) : 0
+                size: toSafeNumber(stat.size, `${path} size`),
+                modified: time
+                    ? toSafeNumber(
+                          time.seconds * 1_000n + BigInt(Math.floor(time.nanoseconds / 1e6)),
+                          `${path} modification time`
+                      )
+                    : 0
             };
         } catch (err) {
             if (wasiErrorCode(err) === 'no-entry') return undefined;
@@ -117,8 +131,9 @@ export class WasiDataDir implements DataFiles {
     open(path: string): RandomAccessFile {
         const file = this.root.openAt({ symlinkFollow: true }, path, {}, { read: true });
         try {
-            const { size, type } = file.stat();
+            const { size: rawSize, type } = file.stat();
             if (type !== 'regular-file') throw new Error(`${path} is not a regular file`);
+            const size = toSafeNumber(rawSize, `${path} size`);
             let closed = false;
             return {
                 size,
@@ -127,7 +142,7 @@ export class WasiDataDir implements DataFiles {
                     if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(length) || length < 0) {
                         throw new RangeError('Read offset and length must be nonnegative safe integers');
                     }
-                    return file.read(length, offset)[0];
+                    return file.read(BigInt(length), BigInt(offset))[0];
                 },
                 close: () => {
                     if (closed) return;
@@ -140,4 +155,12 @@ export class WasiDataDir implements DataFiles {
             throw error;
         }
     }
+}
+
+function toSafeNumber(value: bigint, label: string): number {
+    const number = Number(value);
+    if (!Number.isSafeInteger(number) || number < 0) {
+        throw new RangeError(`${label} exceeds JavaScript's safe integer range`);
+    }
+    return number;
 }

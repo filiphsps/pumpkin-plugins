@@ -37,19 +37,17 @@ A plugin is built against the API's WIT as `pumpkin-api-ts` ships it, plus the W
 `pumpkin-api-ts` ships its own declarations for `pumpkin:plugin/*`, and TypeScript keeps the first
 declaration of a module it sees. So a plugin's `tsconfig.json` lists the generated
 `build/types/bindings/**/*.d.ts` before `src` in `include` (the generator's template does), which
-makes the generated declarations win (they use `number` for 64-bit values).
+makes the generated declarations win and preserves WIT `u64`/`s64` values as `bigint`.
 
 ## Runtime caveats
 
 Plugins run on QuickJS inside the server's WebAssembly runtime:
 
 - There is no global `TextEncoder`, `TextDecoder` or `fetch`. `fflate` provides `strToU8` and `strFromU8`. Plugins that need HTTP can import `wasi:http` by declaring the `http` capability; the update-check tool already does this.
-- `u64`/`s64` values are plain JS numbers in both directions. Passing a `BigInt` panics the guest,
-  so the build rewrites the generated types from `bigint` to `number`.
-- The base `Plugin` class's `scheduleDelayedTask` and `scheduleRepeatingTask` pass `BigInt`, so
-  they panic. Call `pumpkin:plugin/scheduler` directly with numbers and export your own
-  `handleTask` that handles your task ids and falls back to the API's. A local export takes
-  precedence over `export *`.
+- WIT `u64`/`s64` values are JavaScript `bigint` in both directions. Keep generated `bigint` types;
+  convert explicitly to `number` only when the value is within JavaScript's safe integer range.
+- Scheduler delays and periods are `u64` (`bigint`); handler and task IDs are `u32` (`number`).
+  The plugin-kit scheduler helpers accept safe integer tick counts and pass them as `BigInt`.
 - Plugins that request permissions are prompted for on the server console the first time they
   load. Hot reload can't prompt and denies them, so the first load needs a restart.
 - Two builds of identical source produce different bytes. Anything that signs or uploads a build

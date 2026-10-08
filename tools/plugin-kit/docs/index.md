@@ -13,8 +13,7 @@ Pumpkin API's task handler.
 
 The scheduler helpers use whole, nonnegative tick counts and require repeating intervals of at
 least one tick. Delayed callbacks are released before execution; failed scheduling does not retain
-them. Avoid the Pumpkin API base-class scheduling methods that pass `BigInt` into QuickJS's numeric
-WASI bindings.
+them. Tick delays and periods are sent to WIT as `bigint`; handler and task IDs remain `number`.
 
 ## Data and commands
 

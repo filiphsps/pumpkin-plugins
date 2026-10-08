@@ -13,8 +13,8 @@ export const hostLogger: Logger = {
     error: (message) => logging.log('error', message)
 };
 
-// The base `Plugin` class can't be used for these: its scheduler calls pass `BigInt` where the
-// runtime needs numbers, and its handler maps are private. Ids start far above the ones it hands out.
+// Keep scheduler callbacks in a separate registry because the base `Plugin` class keeps its handler
+// maps private. These handler IDs are u32 values and stay in a range above the IDs it allocates.
 interface ScheduledHandler {
     run: (server: Server) => void;
     repeating: boolean;
@@ -34,7 +34,7 @@ const commandHandlers = new HandlerRegistry<(sender: CommandSender, args: Consum
  */
 export function scheduleRepeating(periodTicks: number, run: (server: Server) => void): number {
     validateTicks(periodTicks, 1);
-    return schedule(run, true, (id) => scheduler.scheduleRepeatingTask(id, periodTicks, periodTicks));
+    return schedule(run, true, (id) => scheduler.scheduleRepeatingTask(id, BigInt(periodTicks), BigInt(periodTicks)));
 }
 
 /**
@@ -45,7 +45,7 @@ export function scheduleRepeating(periodTicks: number, run: (server: Server) => 
  */
 export function scheduleDelayed(delayTicks: number, run: (server: Server) => void): number {
     validateTicks(delayTicks, 0);
-    return schedule(run, false, (id) => scheduler.scheduleDelayedTask(id, delayTicks));
+    return schedule(run, false, (id) => scheduler.scheduleDelayedTask(id, BigInt(delayTicks)));
 }
 
 /**

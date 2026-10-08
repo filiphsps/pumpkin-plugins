@@ -36,25 +36,25 @@ interface FakeUdp {
 function fakeUdp(local: [number, number, number, number] = [192, 168, 1, 50]): FakeUdp {
     let blocks = 0;
     let bindError: string | undefined;
-    let allowed = 1;
+    let allowed = 1n;
     let batches: IncomingDatagram[][] = [];
     const sent: { text: string; to: string | undefined }[] = [];
     const disposed = { socket: 0, incoming: 0, outgoing: 0 };
 
     const incoming = {
-        receive: vi.fn((max: number) => (batches.length > 0 ? (batches.shift() ?? []).slice(0, max) : [])),
+        receive: vi.fn((max: bigint) => (batches.length > 0 ? (batches.shift() ?? []).slice(0, Number(max)) : [])),
         [Symbol.dispose]: vi.fn(() => disposed.incoming++)
     };
     const outgoing = {
         checkSend: vi.fn(() => allowed),
         send: vi.fn((datagrams: OutgoingDatagram[]) => {
-            allowed -= datagrams.length;
+            allowed -= BigInt(datagrams.length);
             for (const { data, remoteAddress } of datagrams)
                 sent.push({
                     text: text(data),
                     to: remoteAddress?.val.address.join('.')
                 });
-            return datagrams.length;
+            return BigInt(datagrams.length);
         }),
         [Symbol.dispose]: vi.fn(() => disposed.outgoing++)
     };
@@ -76,7 +76,7 @@ function fakeUdp(local: [number, number, number, number] = [192, 168, 1, 50]): F
         setLocal: (address) => (local = address),
         blockBind: (times) => (blocks = times),
         failBind: (code) => (bindError = code),
-        allowSend: (count) => (allowed = count),
+        allowSend: (count) => (allowed = BigInt(count)),
         queue: (...next) => (batches = next),
         sent,
         disposed
@@ -117,7 +117,7 @@ function fakeTcp(local: [number, number, number, number] = [192, 168, 1, 50]): F
         [Symbol.dispose]: vi.fn(() => disposed.input++)
     };
     const output = {
-        checkWrite: () => 1024,
+        checkWrite: () => 1024n,
         write: vi.fn((data: Uint8Array) => {
             written = data;
         }),
@@ -146,7 +146,7 @@ function fakeTcp(local: [number, number, number, number] = [192, 168, 1, 50]): F
         read: (given) => (readResult = given),
         readError: (code) => (readFailure = code),
         disposed,
-        writable: () => output.checkWrite(),
+        writable: () => Number(output.checkWrite()),
         get written() {
             return written;
         }

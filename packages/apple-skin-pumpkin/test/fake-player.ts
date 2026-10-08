@@ -72,7 +72,7 @@ export class FakePlayer {
 
     constructor(
         readonly name: string,
-        readonly id: Uuid = { high: 1, low: name.length }
+        readonly id: Uuid = { high: 1n, low: BigInt(name.length) }
     ) {}
 
     /** The payloads sent on one channel, with their numbers read back. */

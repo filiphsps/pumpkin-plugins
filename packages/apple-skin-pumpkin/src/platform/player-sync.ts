@@ -113,7 +113,7 @@ export class PlayerSync {
     }
 }
 
-/** A player's id, as the tracker keys them. A UUID is two numbers here, so this costs no call. */
+/** A player's id, as the tracker keys them. A UUID is two bigint halves, so this costs no call. */
 function playerKey(player: Player): string {
     const { high, low } = player.getId();
     return `${high}:${low}`;

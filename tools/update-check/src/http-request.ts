@@ -4,7 +4,7 @@ import type { Pollable } from 'wasi:io/poll@0.2.3';
 import { strFromU8, strToU8 } from 'fflate';
 
 const MAX_RESPONSE_BYTES = 64 * 1024;
-const READ_CHUNK_BYTES = 4096;
+const READ_CHUNK_BYTES = 4096n;
 
 type Resource = { [Symbol.dispose]?: () => void; drop?: () => void };
 
@@ -38,9 +38,9 @@ export function* marketJsonRequest(url: string): Generator<Pollable, unknown, vo
         request.setPathWithQuery(target.path);
         stage = 'configure request timeouts';
         const options = own(new RequestOptions());
-        options.setConnectTimeout(2_000_000_000);
-        options.setFirstByteTimeout(3_000_000_000);
-        options.setBetweenBytesTimeout(1_000_000_000);
+        options.setConnectTimeout(2_000_000_000n);
+        options.setFirstByteTimeout(3_000_000_000n);
+        options.setBetweenBytesTimeout(1_000_000_000n);
         stage = 'send outgoing request';
         // These owned arguments are consumed even when handle returns an error.
         transfer(request);

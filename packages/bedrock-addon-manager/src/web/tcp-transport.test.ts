@@ -5,11 +5,11 @@ import { TcpTransport } from './tcp-transport.ts';
 
 function fixture() {
     const input = {
-        read: vi.fn<() => Uint8Array>(() => new Uint8Array()),
+        read: vi.fn((_max: bigint) => new Uint8Array()),
         [Symbol.dispose]: vi.fn()
     };
     const output = {
-        checkWrite: vi.fn(() => 1024),
+        checkWrite: vi.fn(() => 1024n),
         write: vi.fn(),
         flush: vi.fn(),
         [Symbol.dispose]: vi.fn()
@@ -47,12 +47,12 @@ describe('TcpTransport', () => {
             throw failure;
         });
         expect(() => transport.read(8)).toThrow(failure);
-        expect(input.read).toHaveBeenCalledWith(8);
+        expect(input.read).toHaveBeenCalledWith(8n);
     });
 
     it('reports output capacity and sends response bytes through the host stream', () => {
         const { output, transport } = fixture();
-        output.checkWrite.mockReturnValue(17);
+        output.checkWrite.mockReturnValue(17n);
         const bytes = new Uint8Array([4, 5, 6]);
 
         expect(transport.writable()).toBe(17);
@@ -62,7 +62,7 @@ describe('TcpTransport', () => {
 
     it('waits for a pending flush before shutting down and releasing the connection', () => {
         const { input, output, socket, transport } = fixture();
-        output.checkWrite.mockReturnValueOnce(0).mockReturnValueOnce(32);
+        output.checkWrite.mockReturnValueOnce(0n).mockReturnValueOnce(32n);
 
         expect(transport.finish()).toBe(false);
         expect(output.flush).toHaveBeenCalledOnce();

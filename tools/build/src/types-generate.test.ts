@@ -34,7 +34,7 @@ function outputAt(): string {
 }
 
 describe('generateTypes', () => {
-    it('replaces stale generated files and numberifies the current declarations', () => {
+    it('replaces stale generated files and preserves bigint declarations', () => {
         const output = outputAt();
         generateTypes('wit', output);
         expect(fs.readdirSync(output).sort()).toEqual(['index.d.ts', 'stale.d.ts']);
@@ -49,7 +49,7 @@ describe('generateTypes', () => {
         generateTypes('updated-wit', output);
 
         expect(fs.readdirSync(output)).toEqual(['index.d.ts']);
-        expect(fs.readFileSync(path.join(output, 'index.d.ts'), 'utf8')).toBe('export type Size = number;');
+        expect(fs.readFileSync(path.join(output, 'index.d.ts'), 'utf8')).toBe('export type Size = bigint;');
         expect(fs.readdirSync(path.dirname(output))).toEqual(['bindings']);
     });
 

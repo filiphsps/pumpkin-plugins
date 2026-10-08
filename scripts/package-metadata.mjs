@@ -47,7 +47,7 @@ const KEY_ORDER = [
 ];
 
 /** Files a tool ships besides `src`, where it has them. */
-const EXTRA_FILES = { 'tools/build': ['wasi-wit.lock.json'] };
+const EXTRA_FILES = { 'tools/build': ['runtime', 'wasi-wit.lock.json'] };
 
 const readJson = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
 

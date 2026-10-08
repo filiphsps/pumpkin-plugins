@@ -51,7 +51,7 @@ let nextTask = 800_000;
 function schedule(callback: () => void): void {
     const id = nextTask++;
     tasks.set(id, callback);
-    scheduleDelayedTask(id, 1);
+    scheduleDelayedTask(id, 1n);
 }
 
 /** Dispatches the fixture's deferred HTTP polls. */

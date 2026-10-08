@@ -62,7 +62,7 @@ export class TcpWebServer implements WebServer {
         try {
             socket.startBind(instanceNetwork(), { tag: 'ipv4', val: { port: settings.port, address } });
             settle(() => socket.finishBind());
-            socket.setListenBacklogSize(128);
+            socket.setListenBacklogSize(128n);
             socket.startListen();
             settle(() => socket.finishListen());
         } catch (err) {

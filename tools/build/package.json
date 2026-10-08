@@ -34,6 +34,7 @@
     "files": [
         "src",
         "bin",
+        "runtime",
         "wasi-wit.lock.json"
     ],
     "scripts": {

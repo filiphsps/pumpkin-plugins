@@ -58,7 +58,8 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                 options.witDir,
                 '--js',
                 bundle,
-                '--opt-size',
+                '--runtime',
+                path.join(import.meta.dirname, '../runtime/quickjs-runtime-bigint.wasm'),
                 '--output',
                 component
             ],

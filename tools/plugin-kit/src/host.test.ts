@@ -23,7 +23,7 @@ describe('host scheduling', () => {
         const run = vi.fn();
         expect(scheduleRepeating(2, run)).toBe(41);
         const id = host.repeating.mock.calls[0][0];
-        expect(host.repeating).toHaveBeenCalledWith(id, 2, 2);
+        expect(host.repeating).toHaveBeenCalledWith(id, 2n, 2n);
         expect(runTask(id, server)).toBe(true);
         expect(runTask(id, server)).toBe(true);
         cancelTask(41);
@@ -40,7 +40,7 @@ describe('host scheduling', () => {
         });
         expect(scheduleDelayed(0, run)).toBe(42);
         const id = host.delayed.mock.calls[0][0];
-        expect(host.delayed).toHaveBeenCalledWith(id, 0);
+        expect(host.delayed).toHaveBeenCalledWith(id, 0n);
         expect(() => runTask(id, server)).toThrow('callback failed');
         expect(runTask(id, server)).toBe(false);
         expect(run).toHaveBeenCalledOnce();

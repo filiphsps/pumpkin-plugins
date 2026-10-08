@@ -70,12 +70,12 @@ class WasiDatagramSocket implements DatagramSocket {
 
     send(to: Endpoint, data: Uint8Array): void {
         // A datagram may only be sent after check-send allowed it; sending without asking traps.
-        if (this.outgoing.checkSend() < 1) throw new Error('the socket cannot send right now');
+        if (this.outgoing.checkSend() < 1n) throw new Error('the socket cannot send right now');
         this.outgoing.send([{ data, remoteAddress: address(to) }]);
     }
 
     receive(): Datagram | undefined {
-        const [first] = this.incoming.receive(RECEIVE_BATCH);
+        const [first] = this.incoming.receive(BigInt(RECEIVE_BATCH));
         if (first?.remoteAddress.tag !== 'ipv4') return undefined;
         const { address: from, port } = first.remoteAddress.val;
         return { from: { address: [from[0], from[1], from[2], from[3]], port }, data: first.data };
@@ -106,7 +106,7 @@ class WasiConnection implements Connection {
 
     read(max: number): Uint8Array | null | 'closed' {
         try {
-            const bytes = this.input.read(max);
+            const bytes = this.input.read(BigInt(max));
             return bytes.length > 0 ? bytes : null;
         } catch (err) {
             if (wasiErrorCode(err) === 'closed') return 'closed';
@@ -115,7 +115,7 @@ class WasiConnection implements Connection {
     }
 
     writable(): number {
-        return this.output.checkWrite();
+        return toSafeNumber(this.output.checkWrite());
     }
 
     write(bytes: Uint8Array): void {
@@ -169,6 +169,14 @@ class WasiDial implements Dial {
         if (this.socket) disposeWasiResource(this.socket);
         this.socket = undefined;
     }
+}
+
+function toSafeNumber(value: bigint): number {
+    const number = Number(value);
+    if (!Number.isSafeInteger(number) || number < 0) {
+        throw new RangeError("WASI writable byte count exceeds JavaScript's safe integer range");
+    }
+    return number;
 }
 
 /**

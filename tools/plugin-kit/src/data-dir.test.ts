@@ -9,15 +9,15 @@ const error = (payload: string) => Object.assign(new Error(payload), { payload }
 function fixture() {
     const entries = { readDirectoryEntry: vi.fn().mockReturnValue(undefined), drop: vi.fn() };
     const file = {
-        stat: vi.fn(() => ({ type: 'regular-file', size: 3 })),
+        stat: vi.fn(() => ({ type: 'regular-file', size: 3n })),
         read: vi.fn(() => [new Uint8Array([1, 2, 3]), true]),
-        write: vi.fn((bytes: Uint8Array, _offset: number) => bytes.length),
+        write: vi.fn((bytes: Uint8Array, _offset: bigint) => BigInt(bytes.length)),
         readDirectory: vi.fn(() => entries),
         drop: vi.fn()
     };
     const root = {
         openAt: vi.fn((_flags: unknown, _path: string, _open: unknown, _descriptor: unknown) => file),
-        statAt: vi.fn((_flags: unknown, _path: string) => ({ type: 'regular-file', size: 3 })),
+        statAt: vi.fn((_flags: unknown, _path: string) => ({ type: 'regular-file', size: 3n })),
         renameAt: vi.fn(),
         unlinkFileAt: vi.fn(),
         removeDirectoryAt: vi.fn(),
@@ -32,6 +32,13 @@ function fixture() {
 beforeEach(() => vi.resetAllMocks());
 
 describe('WasiDataDir', () => {
+    it('releases the data directory descriptor once on disposal', () => {
+        const { dir, root } = fixture();
+        dir[Symbol.dispose]();
+        dir[Symbol.dispose]();
+        expect(root.drop).toHaveBeenCalledOnce();
+    });
+
     it('disposes unused mounts, including when no data mount exists', () => {
         const other = { drop: vi.fn() };
         host.directories.mockReturnValue([[other, 'other']]);
@@ -64,7 +71,7 @@ describe('WasiDataDir', () => {
             throw error('io');
         });
         expect(() => dir.open('a')).toThrow('io');
-        file.stat.mockReturnValueOnce({ type: 'directory', size: 0 });
+        file.stat.mockReturnValueOnce({ type: 'directory', size: 0n });
         expect(() => dir.open('a')).toThrow('not a regular file');
         expect(file.drop).toHaveBeenCalledTimes(2);
     });
@@ -97,7 +104,7 @@ describe('WasiDataDir', () => {
             throw error('exist');
         });
         expect(() => dir.createDirectory('a')).toThrow('exist');
-        root.statAt.mockReturnValue({ type: 'directory', size: 0 });
+        root.statAt.mockReturnValue({ type: 'directory', size: 0n });
         expect(() => dir.createDirectory('a/b')).not.toThrow();
     });
 
@@ -118,14 +125,14 @@ describe('WasiDataDir', () => {
         root.openAt.mockImplementationOnce(() => {
             throw error('exist');
         });
-        file.write.mockReturnValueOnce(1).mockReturnValueOnce(2);
+        file.write.mockReturnValueOnce(1n).mockReturnValueOnce(2n);
         dir.writeFile('config.toml', new Uint8Array([1, 2, 3]));
         const [first, second] = root.openAt.mock.calls;
         expect(first[1]).not.toBe(second[1]);
         expect(second[2]).toEqual({ create: true, exclusive: true });
         expect(file.write.mock.calls.map(([bytes, offset]) => [[...bytes], offset])).toEqual([
-            [[1, 2, 3], 0],
-            [[2, 3], 1]
+            [[1, 2, 3], 0n],
+            [[2, 3], 1n]
         ]);
         expect(file.drop).toHaveBeenCalledOnce();
         expect(root.renameAt).toHaveBeenCalledWith(second[1], root, 'config.toml');
@@ -155,7 +162,7 @@ describe('WasiDataDir', () => {
 
     it('cleans up a write that makes no progress', () => {
         const { dir, root, file } = fixture();
-        file.write.mockReturnValue(0);
+        file.write.mockReturnValue(0n);
         expect(() => dir.writeFile('a', new Uint8Array([1]))).toThrow('could not write a');
         expect(root.renameAt).not.toHaveBeenCalled();
         expect(root.unlinkFileAt).toHaveBeenCalledOnce();
@@ -163,7 +170,7 @@ describe('WasiDataDir', () => {
     });
     it('removes symlinks without following their targets', () => {
         const { dir, root } = fixture();
-        root.statAt.mockReturnValue({ type: 'symbolic-link', size: 0 });
+        root.statAt.mockReturnValue({ type: 'symbolic-link', size: 0n });
         dir.remove('link');
         expect(root.statAt).toHaveBeenCalledWith({}, 'link');
         expect(root.unlinkFileAt).toHaveBeenCalledWith('link');
