@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
     type CommandHandlers,
     type CommandPath,
+    type CommandPlayerReference,
     type CommandTree,
     commandInfos,
     commandPermissionInfos,
@@ -289,6 +290,31 @@ describe('types', () => {
         expect(Object.keys(typed)).toEqual(['map at <x> <z> <world> <label> <tail>']);
     });
 
+    it('supports double coordinates and snapshots player selectors into plain references', () => {
+        const typedCommands = defineCommands('Demo', {
+            teleport: {
+                description: 'Teleport players to a waypoint',
+                permission: 'Demo:command.teleport',
+                arguments: [
+                    { name: 'x', type: 'double', min: -30_000_000, max: 30_000_000 },
+                    { name: 'targets', type: 'players' }
+                ]
+            }
+        });
+
+        expect(flattenCommands(typedCommands).map(({ usage }) => usage)).toEqual(['/teleport <x> <targets>']);
+        const typed: CommandHandlers<typeof typedCommands> = {
+            'teleport <x> <targets>': (_sender, args) => {
+                const x: number = args.x;
+                const targets: readonly CommandPlayerReference[] = args.targets;
+                // @ts-expect-error player selector values are plain references, not WASI resources
+                const invalid: { dispose(): void }[] = args.targets;
+                return [String(x), String(targets.length), String(invalid)];
+            }
+        };
+        expect(Object.keys(typed)).toEqual(['teleport <x> <targets>']);
+    });
+
     it('supports a runnable command with several positional argument variants', () => {
         const overloaded = defineCommands('Demo', {
             locate: {
@@ -391,6 +417,27 @@ describe('argument usage', () => {
                 }
             })
         ).toThrow('Greedy string argument message must be the final argument.');
+    });
+
+    it('rejects non-finite and reversed double bounds', () => {
+        expect(() =>
+            flattenCommands({
+                locate: {
+                    description: 'Locate',
+                    permission: 'Demo:command.locate',
+                    arguments: [{ name: 'x', type: 'double', min: Number.NaN }]
+                }
+            })
+        ).toThrow('Double bounds for x must be finite numbers.');
+        expect(() =>
+            flattenCommands({
+                locate: {
+                    description: 'Locate',
+                    permission: 'Demo:command.locate',
+                    arguments: [{ name: 'x', type: 'double', min: 10, max: -10 }]
+                }
+            })
+        ).toThrow('Minimum bound exceeds maximum bound for x.');
     });
 
     it('rejects empty or conflicting argument variants', () => {

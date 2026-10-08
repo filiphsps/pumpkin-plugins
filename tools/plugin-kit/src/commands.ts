@@ -1,5 +1,6 @@
 import {
     type CommandArgumentSpec,
+    type CommandArgumentValue,
     CommandFailed,
     type CommandHandlers,
     type CommandLine,
@@ -27,7 +28,7 @@ export interface CommandHost<Sender> {
     argument(spec: CommandArgumentSpec): CommandNodeLike;
     /** Registers what runs when a command is used, and returns its id. */
     onRun(
-        run: (sender: Sender, args: Readonly<Record<string, number | string>>) => void,
+        run: (sender: Sender, args: Readonly<Record<string, CommandArgumentValue>>) => void,
         arguments_: readonly CommandArgumentSpec[]
     ): number;
     /** Sends a line back to whoever ran the command. An `error` line is shown in red. */
@@ -64,12 +65,12 @@ export function buildCommands<Sender, T extends CommandTree>(
 ): BuiltCommand[] {
     const lookup = handlers as unknown as Record<
         string,
-        ((sender: Sender, args: Readonly<Record<string, number | string>>) => readonly CommandLine[]) | undefined
+        ((sender: Sender, args: Readonly<Record<string, CommandArgumentValue>>) => readonly CommandLine[]) | undefined
     >;
 
     const handlerFor = (
         key: string
-    ): ((sender: Sender, args: Readonly<Record<string, number | string>>) => readonly CommandLine[]) => {
+    ): ((sender: Sender, args: Readonly<Record<string, CommandArgumentValue>>) => readonly CommandLine[]) => {
         const handler = lookup[key];
         if (!Object.hasOwn(lookup, key) || typeof handler !== 'function') {
             throw new Error(`no handler for /${key}`);
@@ -235,6 +236,10 @@ function sameArgument(left: CommandArgumentSpec, right: CommandArgumentSpec): bo
     if (left.type === 'integer' && right.type === 'integer') {
         return left.min === right.min && left.max === right.max;
     }
+    if (left.type === 'double' && right.type === 'double') {
+        return left.min === right.min && left.max === right.max;
+    }
+    if (left.type === 'players' && right.type === 'players') return true;
     return left.type === 'string' && right.type === 'string' && left.mode === right.mode;
 }
 

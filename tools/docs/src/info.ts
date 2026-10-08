@@ -4,10 +4,12 @@ import type { PumpkinPermission } from './permissions.ts';
 
 export type {
     CommandArgumentSpec,
+    CommandArgumentValue,
     CommandArgumentValues,
     CommandPath,
     CommandPermissionDefault,
     CommandPermissionInfo,
+    CommandPlayerReference,
     CommandSpec,
     CommandTree,
     FlatCommand,

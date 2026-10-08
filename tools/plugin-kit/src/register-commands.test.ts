@@ -3,7 +3,7 @@ import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import { CommandFailed, defineCommands, errorLine } from '@pumpkin-plugins/docs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const host = vi.hoisted(() => ({ onCommand: vi.fn(), color: vi.fn() }));
+const host = vi.hoisted(() => ({ onCommand: vi.fn(), color: vi.fn(), uuidToString: vi.fn(() => 'player-uuid') }));
 vi.mock('./host.ts', () => ({ onCommand: host.onCommand }));
 vi.mock('pumpkin:plugin/text@0.1.0', () => ({
     TextComponent: {
@@ -11,6 +11,7 @@ vi.mock('pumpkin:plugin/text@0.1.0', () => ({
         fromLegacyString: (line: string) => ({ line, colorNamed: host.color })
     }
 }));
+vi.mock('pumpkin:plugin/uuid@0.1.0', () => ({ toString: host.uuidToString }));
 vi.mock('pumpkin:plugin/command@0.1.0', () => {
     class Node {
         private consumed = false;
@@ -248,6 +249,85 @@ describe('registerCommands', () => {
         expect(callback(sender, args as never)).toBe(1);
         expect(sendMessage.mock.calls.map(([component]) => component.line)).toEqual(['-17:spawn point']);
         expect(args.getValue.mock.calls).toEqual([['x'], ['name']]);
+        expect(args[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
+
+    it('decodes doubles and snapshots player selectors before disposing their WASI resources', () => {
+        const argumentTree = defineCommands('Demo', {
+            teleport: {
+                description: 'Teleport to a waypoint',
+                permission: 'Demo:command.teleport',
+                arguments: [
+                    { name: 'x', type: 'double', min: -30_000_000, max: 30_000_000 },
+                    { name: 'targets', type: 'players' }
+                ]
+            }
+        });
+        const player = {
+            getId: () => ({ high: 0, low: 1 }),
+            getName: () => 'Alex',
+            [Symbol.dispose]: vi.fn()
+        };
+        const args = {
+            getValue: vi.fn((name: string) =>
+                name === 'x'
+                    ? { tag: 'num', val: { tag: 'ok', val: { tag: 'float64', val: 12.375 } } }
+                    : { tag: 'players', val: [player] }
+            ),
+            [Symbol.dispose]: vi.fn()
+        };
+        const { ctx, registerCommand } = context();
+        let received: unknown;
+        registerCommands(ctx, argumentTree, {
+            'teleport <x> <targets>': (_sender, value) => {
+                received = value;
+                return [`${value.x}:${value.targets[0]?.name}`];
+            }
+        });
+
+        const commandNode = registerCommand.mock.calls[0]?.[0] as {
+            children: { argumentType?: unknown; children: { argumentType?: unknown }[] }[];
+        };
+        expect(commandNode.children[0]?.argumentType).toEqual({
+            tag: 'double',
+            val: [-30_000_000, 30_000_000]
+        });
+        expect(commandNode.children[0]?.children[0]?.argumentType).toEqual({ tag: 'players' });
+
+        const callback = host.onCommand.mock.calls[0]?.[0] as (
+            sender: CommandSender,
+            consumedArgs: typeof args
+        ) => number;
+        const sendMessage = vi.fn();
+        expect(callback({ sendMessage } as unknown as CommandSender, args as never)).toBe(1);
+        expect(received).toEqual({ x: 12.375, targets: [{ id: 'player-uuid', name: 'Alex' }] });
+        expect(sendMessage.mock.calls.map(([component]) => component.line)).toEqual(['12.375:Alex']);
+        expect(player[Symbol.dispose]).toHaveBeenCalledOnce();
+        expect(args[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
+
+    it('rejects non-finite double values and disposes consumed arguments', () => {
+        const argumentTree = defineCommands('Demo', {
+            locate: {
+                description: 'Locate',
+                permission: 'Demo:command.locate',
+                arguments: [{ name: 'x', type: 'double', min: -10, max: 10 }]
+            }
+        });
+        const args = {
+            getValue: () => ({
+                tag: 'num',
+                val: { tag: 'ok', val: { tag: 'float64', val: Number.POSITIVE_INFINITY } }
+            }),
+            [Symbol.dispose]: vi.fn()
+        };
+        registerCommands(context().ctx, argumentTree, { 'locate <x>': () => [] });
+        const callback = host.onCommand.mock.calls[0]?.[0] as (
+            sender: CommandSender,
+            consumedArgs: typeof args
+        ) => number;
+
+        expect(() => callback({} as CommandSender, args as never)).toThrow();
         expect(args[Symbol.dispose]).toHaveBeenCalledOnce();
     });
 

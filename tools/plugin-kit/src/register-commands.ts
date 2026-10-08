@@ -2,8 +2,10 @@ import { type Arg, Command, CommandNode, type CommandSender, type ConsumedArgs }
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { PermissionDefault } from 'pumpkin:plugin/permission@0.1.0';
 import { TextComponent } from 'pumpkin:plugin/text@0.1.0';
+import * as uuid from 'pumpkin:plugin/uuid@0.1.0';
 import {
     type CommandArgumentSpec,
+    type CommandArgumentValue,
     CommandFailed,
     type CommandHandlers,
     type CommandTree,
@@ -98,14 +100,21 @@ function argumentType(spec: CommandArgumentSpec) {
             val: [spec.min, spec.max] as [number | undefined, number | undefined]
         };
     }
+    if (spec.type === 'double') {
+        return {
+            tag: 'double' as const,
+            val: [spec.min, spec.max] as [number | undefined, number | undefined]
+        };
+    }
+    if (spec.type === 'players') return { tag: 'players' as const };
     return { tag: 'string' as const, val: spec.mode };
 }
 
 function decodeArguments(
     specs: readonly CommandArgumentSpec[],
     consumed: ConsumedArgs
-): Readonly<Record<string, number | string>> {
-    const values: Record<string, number | string> = {};
+): Readonly<Record<string, CommandArgumentValue>> {
+    const values: Record<string, CommandArgumentValue> = {};
     for (const spec of specs) {
         let argument: Arg;
         try {
@@ -127,6 +136,35 @@ function decodeArguments(
                 throw new CommandFailed(`Argument ${spec.name} is outside its allowed range.`);
             }
             values[spec.name] = value;
+            continue;
+        }
+
+        if (spec.type === 'double') {
+            if (argument.tag !== 'num' || argument.val.tag !== 'ok' || argument.val.val.tag !== 'float64') {
+                throw new CommandFailed(`Argument ${spec.name} must be a number.`);
+            }
+            const value = argument.val.val.val;
+            if (
+                !Number.isFinite(value) ||
+                (spec.min !== undefined && value < spec.min) ||
+                (spec.max !== undefined && value > spec.max)
+            ) {
+                throw new CommandFailed(`Argument ${spec.name} is outside its allowed range.`);
+            }
+            values[spec.name] = value;
+            continue;
+        }
+
+        if (spec.type === 'players') {
+            if (argument.tag !== 'players') throw new CommandFailed(`Argument ${spec.name} must select players.`);
+            try {
+                values[spec.name] = argument.val.map((player) => ({
+                    id: uuid.toString(player.getId()),
+                    name: player.getName()
+                }));
+            } finally {
+                for (const player of argument.val) disposeWasiResource(player);
+            }
             continue;
         }
 

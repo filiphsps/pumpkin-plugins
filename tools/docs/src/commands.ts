@@ -44,16 +44,31 @@ type CommandBehavior<Node extends string> =
 /** A subcommand: what it does, and optionally more subcommands below it. */
 export type SubcommandSpec<Node extends string = string> = CommandSpecMetadata<Node> & CommandBehavior<Node>;
 
-/** An integer or string argument supported by the shared command helpers. */
+/** A host-free player identity returned by a player selector argument. */
+export interface CommandPlayerReference {
+    readonly id: string;
+    readonly name: string;
+}
+
+/** An argument supported by the shared command helpers. */
 export type CommandArgumentSpec =
     | { readonly name: string; readonly type: 'integer'; readonly min?: number; readonly max?: number }
+    | { readonly name: string; readonly type: 'double'; readonly min?: number; readonly max?: number }
+    | { readonly name: string; readonly type: 'players' }
     | { readonly name: string; readonly type: 'string'; readonly mode: 'single-word' | 'quotable' | 'greedy' };
+
+/** Runtime values passed to a command handler after host resources are released. */
+export type CommandArgumentValue = number | string | readonly CommandPlayerReference[];
 
 /** Values inferred for a command's declared arguments. */
 export type CommandArgumentValues<Arguments extends readonly CommandArgumentSpec[]> = {
-    readonly [Argument in Arguments[number] as Argument['name']]: Argument extends { readonly type: 'integer' }
+    readonly [Argument in Arguments[number] as Argument['name']]: Argument extends {
+        readonly type: 'integer' | 'double';
+    }
         ? number
-        : string;
+        : Argument extends { readonly type: 'players' }
+          ? readonly CommandPlayerReference[]
+          : string;
 };
 
 /** Subcommands by name. */
@@ -278,7 +293,16 @@ function validateArguments(arguments_: readonly CommandArgumentSpec[]): void {
             if (argument.min !== undefined && argument.max !== undefined && argument.min > argument.max) {
                 throw new Error(`Minimum bound exceeds maximum bound for ${argument.name}.`);
             }
-        } else if (argument.mode === 'greedy' && index !== arguments_.length - 1) {
+        } else if (argument.type === 'double') {
+            for (const bound of [argument.min, argument.max]) {
+                if (bound !== undefined && !Number.isFinite(bound)) {
+                    throw new Error(`Double bounds for ${argument.name} must be finite numbers.`);
+                }
+            }
+            if (argument.min !== undefined && argument.max !== undefined && argument.min > argument.max) {
+                throw new Error(`Minimum bound exceeds maximum bound for ${argument.name}.`);
+            }
+        } else if (argument.type === 'string' && argument.mode === 'greedy' && index !== arguments_.length - 1) {
             throw new Error(`Greedy string argument ${argument.name} must be the final argument.`);
         }
     }

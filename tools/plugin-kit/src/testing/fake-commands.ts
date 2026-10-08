@@ -1,4 +1,4 @@
-import type { CommandArgumentSpec } from '@pumpkin-plugins/docs';
+import type { CommandArgumentSpec, CommandArgumentValue } from '@pumpkin-plugins/docs';
 import type { CommandHost, CommandNodeLike } from '../commands.ts';
 
 /** A node of a fake command tree, with what was attached to it. */
@@ -50,7 +50,7 @@ export class FakeCommandFailure extends Error {}
 export class FakeCommandHost implements CommandHost<FakeSender> {
     private readonly handlers = new Map<
         number,
-        (sender: FakeSender, args: Readonly<Record<string, number | string>>) => void
+        (sender: FakeSender, args: Readonly<Record<string, CommandArgumentValue>>) => void
     >();
 
     root(name: string): FakeNode {
@@ -66,7 +66,7 @@ export class FakeCommandHost implements CommandHost<FakeSender> {
     }
 
     onRun(
-        run: (sender: FakeSender, args: Readonly<Record<string, number | string>>) => void,
+        run: (sender: FakeSender, args: Readonly<Record<string, CommandArgumentValue>>) => void,
         _arguments: readonly CommandArgumentSpec[]
     ): number {
         const id = this.handlers.size + 1;
@@ -91,7 +91,7 @@ export class FakeCommandHost implements CommandHost<FakeSender> {
     run(
         root: FakeNode,
         path: string[],
-        args: Readonly<Record<string, number | string>> = {},
+        args: Readonly<Record<string, CommandArgumentValue>> = {},
         sender?: FakeSender
     ): string[] {
         return this.runAs(root, path, args, sender).lines;
@@ -104,7 +104,7 @@ export class FakeCommandHost implements CommandHost<FakeSender> {
     runAs(
         root: FakeNode,
         path: string[],
-        args: Readonly<Record<string, number | string>> = {},
+        args: Readonly<Record<string, CommandArgumentValue>> = {},
         suppliedSender?: FakeSender
     ): FakeSender {
         let node: FakeNode | undefined = path[0] === root.name ? root : undefined;

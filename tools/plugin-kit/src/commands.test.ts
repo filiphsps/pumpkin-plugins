@@ -285,6 +285,30 @@ describe('buildCommands', () => {
         expect(root).not.toHaveBeenCalled();
     });
 
+    it('allows matching double definitions across positional argument variants', () => {
+        const typedTree = defineCommands('Demo', {
+            locate: {
+                description: 'Find a location',
+                permission: 'Demo:command.locate',
+                argumentVariants: [
+                    [{ name: 'x', type: 'double', min: -30_000_000, max: 30_000_000 }],
+                    [
+                        { name: 'x', type: 'double', min: -30_000_000, max: 30_000_000 },
+                        { name: 'targets', type: 'players' }
+                    ]
+                ]
+            }
+        });
+        const host = new FakeCommandHost();
+        const [root] = buildCommands(host, typedTree, {
+            locate: () => ['default'],
+            'locate <x>': (_sender, { x }) => [String(x)],
+            'locate <x> <targets>': (_sender, { x, targets }) => [`${x}:${targets.length}`]
+        });
+
+        expect(host.usages(root?.node as FakeNode)).toEqual(['/locate', '/locate <x>', '/locate <x> <targets>']);
+    });
+
     it('rejects greedy strings before creating any command nodes unless they are final', () => {
         const invalidTree = defineCommands('Demo', {
             talk: {
