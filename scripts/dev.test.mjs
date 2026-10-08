@@ -10,6 +10,7 @@ import {
     copyPluginBuild,
     listPluginBuilds,
     parseChecksums,
+    parseDevArgs,
     releaseAsset,
     resolvePumpkinBinary,
     runDev
@@ -25,6 +26,13 @@ function tempDir() {
 
 afterEach(() => {
     for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+describe('parseDevArgs', () => {
+    it('selects the nightly build and hot reload mode from command-line arguments', () => {
+        assert.deepEqual(parseDevArgs([]), { hotReload: true, nightly: false });
+        assert.deepEqual(parseDevArgs(['--nightly', '--no-hot-reload']), { hotReload: false, nightly: true });
+    });
 });
 
 describe('assetName', () => {
@@ -71,6 +79,18 @@ describe('resolvePumpkinBinary', () => {
         assets: [
             { name: 'pumpkin-X64-Linux', browser_download_url: 'https://example.test/pumpkin' },
             { name: 'checksums.sha256', browser_download_url: 'https://example.test/checksums' }
+        ]
+    };
+    const nightlyRelease = {
+        tag_name: 'nightly',
+        prerelease: true,
+        draft: false,
+        assets: [
+            {
+                id: 42,
+                name: 'pumpkin-X64-Linux',
+                browser_download_url: 'https://example.test/nightly-pumpkin'
+            }
         ]
     };
 
@@ -126,6 +146,96 @@ describe('resolvePumpkinBinary', () => {
         );
         assert.equal(metadata.release.tag_name, release.tag_name);
         assert.equal(typeof metadata.fetchedAt, 'number');
+    });
+
+    it('resolves the nightly tag and uses its asset id for the binary cache key', async () => {
+        const root = tempDir();
+        const bytes = Buffer.from('nightly pumpkin binary');
+        const digest = createHash('sha256').update(bytes).digest('hex');
+        const releaseWithDigest = {
+            ...nightlyRelease,
+            assets: nightlyRelease.assets.map((asset) =>
+                asset.name === 'pumpkin-X64-Linux' ? { ...asset, digest: `sha256:${digest}` } : asset
+            )
+        };
+        const calls = [];
+        const fetchImpl = async (url) => {
+            calls.push(url);
+            if (url.endsWith('/releases/tags/nightly')) {
+                return { ok: true, json: async () => releaseWithDigest };
+            }
+            return {
+                ok: true,
+                arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+            };
+        };
+
+        const result = await resolvePumpkinBinary({
+            root,
+            platform: 'linux',
+            arch: 'x64',
+            env: {},
+            fetchImpl,
+            nightly: true
+        });
+
+        assert.equal(result.release, 'nightly');
+        assert.equal(path.basename(result.binary), 'nightly-42-pumpkin-X64-Linux');
+        assert.equal(fs.readFileSync(result.binary).toString(), bytes.toString());
+        assert.equal(calls[0], 'https://api.github.com/repos/Pumpkin-MC/Pumpkin/releases/tags/nightly');
+        const metadata = JSON.parse(
+            fs.readFileSync(path.join(root, '.cache', 'pumpkin', 'latest-nightly.json'), 'utf8')
+        );
+        assert.equal(metadata.release.tag_name, 'nightly');
+    });
+
+    it('refreshes nightly metadata on every run to discover replaced nightly assets', async () => {
+        const root = tempDir();
+        const cacheDir = path.join(root, '.cache', 'pumpkin');
+        fs.mkdirSync(cacheDir, { recursive: true });
+        fs.writeFileSync(
+            path.join(cacheDir, 'latest-nightly.json'),
+            JSON.stringify({ fetchedAt: Date.now(), release: nightlyRelease })
+        );
+        fs.writeFileSync(path.join(cacheDir, 'nightly-42-pumpkin-X64-Linux'), 'old nightly binary');
+        const latestBytes = Buffer.from('new nightly pumpkin binary');
+        const digest = createHash('sha256').update(latestBytes).digest('hex');
+        const calls = [];
+        const updatedNightly = {
+            ...nightlyRelease,
+            assets: nightlyRelease.assets.map((asset) => ({
+                ...asset,
+                id: asset.id + 2,
+                ...(asset.name === 'pumpkin-X64-Linux' ? { digest: `sha256:${digest}` } : {})
+            }))
+        };
+        const fetchImpl = async (url) => {
+            calls.push(url);
+            if (url.endsWith('/releases/tags/nightly')) {
+                return { ok: true, json: async () => updatedNightly };
+            }
+            return {
+                ok: true,
+                arrayBuffer: async () =>
+                    latestBytes.buffer.slice(latestBytes.byteOffset, latestBytes.byteOffset + latestBytes.byteLength)
+            };
+        };
+
+        const result = await resolvePumpkinBinary({
+            root,
+            platform: 'linux',
+            arch: 'x64',
+            env: {},
+            fetchImpl,
+            nightly: true
+        });
+
+        assert.equal(result.binary, path.join(cacheDir, 'nightly-44-pumpkin-X64-Linux'));
+        assert.equal(fs.readFileSync(result.binary).toString(), latestBytes.toString());
+        assert.deepEqual(calls, [
+            'https://api.github.com/repos/Pumpkin-MC/Pumpkin/releases/tags/nightly',
+            'https://example.test/nightly-pumpkin'
+        ]);
     });
 
     it('rejects a prerelease response', async () => {
@@ -416,6 +526,7 @@ describe('runDev', () => {
         );
         fs.writeFileSync(output, 'cached build');
         const calls = [];
+        let resolvedOptions;
         const spawnImpl = (command, args, options) => {
             const child = new EventEmitter();
             child.kill = () => {};
@@ -430,10 +541,15 @@ describe('runDev', () => {
             root,
             spawnImpl,
             hotReload: false,
-            resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' })
+            nightly: true,
+            resolveBinary: async (options) => {
+                resolvedOptions = options;
+                return { binary: '/fake/pumpkin', release: 'test release' };
+            }
         });
 
         assert.equal(calls.length, 2);
+        assert.deepEqual(resolvedOptions, { root, nightly: true });
         assert.equal(calls[0].options.env.PUMPKIN_DEV_MODE, '1');
         assert.equal(calls.at(-1).command, '/fake/pumpkin');
         assert.match(

@@ -71,14 +71,17 @@ Run one plugin with `pnpm exec turbo run build --filter=@pumpkin-plugins/<folder
 
 ## Run all plugins on Pumpkin
 
-Run `pnpm dev` to build every plugin and start the latest stable Pumpkin release. GitHub's latest
-release endpoint excludes prereleases, so the `nightly` build is not selected. Release metadata is
-cached in `.cache/pumpkin` for 24 hours, so repeated starts reuse it without another GitHub lookup.
-Set `PUMPKIN_REFRESH_RELEASE=1` to force a one-run refresh. The server binary is also cached there
-and checked against the release's `checksums.sha256`.
+Run `pnpm dev` to build every plugin and start the latest stable Pumpkin release. Run
+`pnpm dev --nightly` or `pnpm dev:nightly` to use Pumpkin's latest nightly build instead. Stable
+release metadata is cached in `.cache/pumpkin` for 24 hours; set `PUMPKIN_REFRESH_RELEASE=1` to force
+a one-run refresh. Nightly metadata refreshes on every start because the `nightly` tag is reused, and
+the binary cache uses the uploaded asset ID to pick up replaced builds. Stable binaries are checked
+against `checksums.sha256`; nightly binaries are checked against their GitHub release asset SHA-256
+digest.
 
 Run `pnpm dev:no-hot-reload` to build once and start the same server with plugin hot reload and
-build watchers disabled. Restart the command after changing a plugin.
+build watchers disabled. Add `--nightly` or run `pnpm dev:nightly:no-hot-reload` to use the latest
+nightly build. Restart the command after changing a plugin.
 
 The dev server lives in `.cache/pumpkin-dev`, so its world and settings remain between runs. Each
 command sets Pumpkin's plugin hot reload to match the selected mode. In hot-reload mode, `pnpm dev`
