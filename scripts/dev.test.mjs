@@ -64,6 +64,28 @@ describe('releaseAsset', () => {
 });
 
 describe('resolvePumpkinBinary', () => {
+    const release = {
+        tag_name: '0.2.0',
+        prerelease: false,
+        draft: false,
+        assets: [
+            { name: 'pumpkin-X64-Linux', browser_download_url: 'https://example.test/pumpkin' },
+            { name: 'checksums.sha256', browser_download_url: 'https://example.test/checksums' }
+        ]
+    };
+
+    function seedReleaseCache(root, cachedRelease = release, fetchedAt = Date.now()) {
+        const cacheDir = path.join(root, '.cache', 'pumpkin');
+        fs.mkdirSync(cacheDir, { recursive: true });
+        fs.writeFileSync(
+            path.join(cacheDir, 'latest-release.json'),
+            JSON.stringify({ fetchedAt, release: cachedRelease })
+        );
+        const binary = path.join(cacheDir, `${cachedRelease.tag_name}-pumpkin-X64-Linux`);
+        fs.writeFileSync(binary, 'cached binary');
+        return { cacheDir, binary };
+    }
+
     it('uses the stable latest endpoint and verifies the downloaded binary', async () => {
         const root = tempDir();
         const bytes = Buffer.from('pumpkin binary');
@@ -99,6 +121,11 @@ describe('resolvePumpkinBinary', () => {
         assert.equal(result.release, '0.2.0');
         assert.equal(fs.readFileSync(result.binary).toString(), bytes.toString());
         assert.equal(calls[0], 'https://api.github.com/repos/Pumpkin-MC/Pumpkin/releases/latest');
+        const metadata = JSON.parse(
+            fs.readFileSync(path.join(root, '.cache', 'pumpkin', 'latest-release.json'), 'utf8')
+        );
+        assert.equal(metadata.release.tag_name, release.tag_name);
+        assert.equal(typeof metadata.fetchedAt, 'number');
     });
 
     it('rejects a prerelease response', async () => {
@@ -113,6 +140,168 @@ describe('resolvePumpkinBinary', () => {
             }),
             /instead of a stable Pumpkin release \(nightly\)/
         );
+    });
+
+    it('rejects malformed release metadata before caching it', async () => {
+        const root = tempDir();
+        await assert.rejects(
+            resolvePumpkinBinary({
+                root,
+                env: {},
+                fetchImpl: async () => ({
+                    ok: true,
+                    json: async () => ({ tag_name: 'stable', prerelease: false, draft: false })
+                })
+            }),
+            /invalid latest stable Pumpkin release metadata/
+        );
+        assert.equal(fs.existsSync(path.join(root, '.cache', 'pumpkin', 'latest-release.json')), false);
+    });
+
+    it('uses fresh release metadata without making a GitHub request', async () => {
+        const root = tempDir();
+        const { binary } = seedReleaseCache(root, release, 1_000_000);
+        const result = await resolvePumpkinBinary({
+            root,
+            platform: 'linux',
+            arch: 'x64',
+            env: {},
+            now: () => 1_000_001,
+            fetchImpl: async () => assert.fail('fresh metadata should avoid GitHub')
+        });
+
+        assert.equal(result.binary, binary);
+        assert.equal(result.release, release.tag_name);
+    });
+
+    it('refreshes release metadata when forced, even while the cache is fresh', async () => {
+        const root = tempDir();
+        seedReleaseCache(root, release, 1_000_000);
+        const calls = [];
+        const result = await resolvePumpkinBinary({
+            root,
+            platform: 'linux',
+            arch: 'x64',
+            env: { PUMPKIN_REFRESH_RELEASE: '1' },
+            now: () => 1_000_001,
+            fetchImpl: async (url) => {
+                calls.push(url);
+                return { ok: true, json: async () => release };
+            }
+        });
+
+        assert.equal(result.release, release.tag_name);
+        assert.deepEqual(calls, ['https://api.github.com/repos/Pumpkin-MC/Pumpkin/releases/latest']);
+    });
+
+    it('refreshes expired release metadata', async () => {
+        const root = tempDir();
+        seedReleaseCache(root, release, 1_000_000);
+        const calls = [];
+        await resolvePumpkinBinary({
+            root,
+            platform: 'linux',
+            arch: 'x64',
+            env: {},
+            now: () => 1_000_000 + 24 * 60 * 60 * 1000,
+            fetchImpl: async (url) => {
+                calls.push(url);
+                return { ok: true, json: async () => release };
+            }
+        });
+
+        assert.deepEqual(calls, ['https://api.github.com/repos/Pumpkin-MC/Pumpkin/releases/latest']);
+    });
+
+    it('uses valid stale metadata after a rate-limit response', async () => {
+        const root = tempDir();
+        const { binary } = seedReleaseCache(root, release, 1_000_000);
+        const warnings = [];
+        const originalWarn = console.warn;
+        console.warn = (...args) => warnings.push(args.join(' '));
+        try {
+            const result = await resolvePumpkinBinary({
+                root,
+                platform: 'linux',
+                arch: 'x64',
+                env: { PUMPKIN_REFRESH_RELEASE: '1' },
+                now: () => 2_000_000,
+                fetchImpl: async () => ({
+                    ok: false,
+                    status: 403,
+                    headers: { get: (name) => (name === 'x-ratelimit-remaining' ? '0' : null) }
+                })
+            });
+            assert.equal(result.binary, binary);
+            assert.match(warnings.join(' '), /using cached release/i);
+        } finally {
+            console.warn = originalWarn;
+        }
+    });
+
+    it('uses valid stale metadata after a network failure', async () => {
+        const root = tempDir();
+        const { binary } = seedReleaseCache(root, release, 1_000_000);
+        const originalWarn = console.warn;
+        console.warn = () => {};
+        try {
+            const result = await resolvePumpkinBinary({
+                root,
+                platform: 'linux',
+                arch: 'x64',
+                env: {},
+                now: () => 1_000_000 + 24 * 60 * 60 * 1000,
+                fetchImpl: async () => {
+                    throw new TypeError('network unavailable');
+                }
+            });
+            assert.equal(result.binary, binary);
+        } finally {
+            console.warn = originalWarn;
+        }
+    });
+
+    it('does not treat an unrelated forbidden response as a rate limit', async () => {
+        const root = tempDir();
+        seedReleaseCache(root, release, 1_000_000);
+        await assert.rejects(
+            resolvePumpkinBinary({
+                root,
+                platform: 'linux',
+                arch: 'x64',
+                env: { PUMPKIN_REFRESH_RELEASE: '1' },
+                now: () => 2_000_000,
+                fetchImpl: async () => ({ ok: false, status: 403, headers: { get: () => null } })
+            }),
+            /Could not get the latest stable Pumpkin release \(HTTP 403\)/
+        );
+    });
+
+    it('keeps network failures as errors when there is no cached release', async () => {
+        await assert.rejects(
+            resolvePumpkinBinary({
+                root: tempDir(),
+                env: {},
+                fetchImpl: async () => {
+                    throw new TypeError('network unavailable');
+                }
+            }),
+            /Could not reach the latest stable Pumpkin release endpoint/
+        );
+    });
+
+    it('uses PUMPKIN_BIN without making GitHub requests', async () => {
+        const root = tempDir();
+        const binary = path.join(root, 'pumpkin');
+        fs.writeFileSync(binary, 'local binary');
+        const result = await resolvePumpkinBinary({
+            root,
+            env: { PUMPKIN_BIN: binary },
+            fetchImpl: async () => assert.fail('PUMPKIN_BIN should avoid GitHub')
+        });
+
+        assert.equal(result.binary, binary);
+        assert.equal(result.release, 'local PUMPKIN_BIN');
     });
 });
 

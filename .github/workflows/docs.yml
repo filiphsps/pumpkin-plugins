@@ -85,6 +85,9 @@ jobs:
             - name: 🧭 Check repository docs
               run: pnpm run check
 
+            - name: 🧪 Test contributor data loader
+              run: node --test docs/.vitepress/team.data.test.mjs
+
             - name: 🏗️ Build the documentation site
               run: pnpm run docs
               env:

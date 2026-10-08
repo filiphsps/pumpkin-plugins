@@ -74,8 +74,10 @@ Run one plugin with `pnpm exec turbo run build --filter=@pumpkin-plugins/<folder
 ## Run all plugins on Pumpkin
 
 Run `pnpm dev` to build every plugin and start the latest stable Pumpkin release. GitHub's latest
-release endpoint excludes prereleases, so the `nightly` build is not selected. The server binary is
-downloaded once into `.cache/pumpkin` and checked against the release's `checksums.sha256`.
+release endpoint excludes prereleases, so the `nightly` build is not selected. Release metadata is
+cached in `.cache/pumpkin` for 24 hours, so repeated starts reuse it without another GitHub lookup.
+Set `PUMPKIN_REFRESH_RELEASE=1` to force a one-run refresh. The server binary is also cached there
+and checked against the release's `checksums.sha256`.
 
 Run `pnpm dev:no-hot-reload` to build once and start the same server with plugin hot reload and
 build watchers disabled. Restart the command after changing a plugin.

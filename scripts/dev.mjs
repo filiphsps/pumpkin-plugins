@@ -6,6 +6,8 @@ import { pathToFileURL } from 'node:url';
 
 const REPOSITORY = 'Pumpkin-MC/Pumpkin';
 const RELEASES_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
+const RELEASE_METADATA_TTL_MS = 24 * 60 * 60 * 1000;
+const RELEASE_METADATA_FILE = 'latest-release.json';
 
 /** Returns the Pumpkin release asset name for a platform. */
 export function assetName(platform, arch) {
@@ -81,18 +83,80 @@ export function copyPluginBuild(plugin, serverPluginsDir) {
     return destination;
 }
 
-async function getLatestRelease(fetchImpl) {
-    const response = await fetchImpl(RELEASES_API, {
-        headers: {
-            Accept: 'application/vnd.github+json',
-            'User-Agent': 'pumpkin-plugins-dev'
-        }
-    });
-    if (!response.ok) throw new Error(`Could not get the latest stable Pumpkin release (HTTP ${response.status})`);
-    const release = await response.json();
-    if (release.prerelease || release.draft) {
-        throw new Error(`GitHub returned a prerelease instead of a stable Pumpkin release (${release.tag_name})`);
+function isValidRelease(release) {
+    return (
+        typeof release?.tag_name === 'string' &&
+        release.tag_name.length > 0 &&
+        release.prerelease === false &&
+        release.draft === false &&
+        Array.isArray(release.assets)
+    );
+}
+
+function readReleaseMetadata(metadataPath) {
+    try {
+        const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+        if (!Number.isFinite(metadata.fetchedAt) || !isValidRelease(metadata.release)) return undefined;
+        return metadata;
+    } catch {
+        return undefined;
     }
+}
+
+function writeReleaseMetadata(metadataPath, metadata) {
+    fs.mkdirSync(path.dirname(metadataPath), { recursive: true });
+    const partial = `${metadataPath}.${process.pid}.partial`;
+    try {
+        fs.writeFileSync(partial, JSON.stringify(metadata));
+        fs.renameSync(partial, metadataPath);
+    } catch (error) {
+        try {
+            fs.rmSync(partial, { force: true });
+        } catch {}
+        throw error;
+    }
+}
+
+async function isRateLimitResponse(response) {
+    if (response.status === 429) return true;
+    if (response.status !== 403) return false;
+    if (
+        response.headers?.get?.('x-ratelimit-remaining') === '0' ||
+        (response.headers?.get?.('retry-after') !== null && response.headers?.get?.('retry-after') !== undefined)
+    )
+        return true;
+    try {
+        const body = await (response.clone?.() ?? response).json();
+        return /rate limit/i.test(body?.message ?? '');
+    } catch {
+        return false;
+    }
+}
+
+async function getLatestRelease(fetchImpl) {
+    let response;
+    try {
+        response = await fetchImpl(RELEASES_API, {
+            headers: {
+                Accept: 'application/vnd.github+json',
+                'User-Agent': 'pumpkin-plugins-dev'
+            }
+        });
+    } catch (cause) {
+        const error = new Error('Could not reach the latest stable Pumpkin release endpoint.', { cause });
+        error.retryable = true;
+        throw error;
+    }
+    if (!response.ok) {
+        const error = new Error(`Could not get the latest stable Pumpkin release (HTTP ${response.status})`);
+        error.retryable = await isRateLimitResponse(response);
+        throw error;
+    }
+    const release = await response.json();
+    if (release?.prerelease || release?.draft) {
+        throw new Error(`GitHub returned a prerelease instead of a stable Pumpkin release (${release?.tag_name})`);
+    }
+    if (!isValidRelease(release)) throw new Error('GitHub returned invalid latest stable Pumpkin release metadata.');
     return release;
 }
 
@@ -108,18 +172,40 @@ export async function resolvePumpkinBinary({
     platform = process.platform,
     arch = process.arch,
     env = process.env,
-    fetchImpl = fetch
+    fetchImpl = fetch,
+    now = Date.now
 }) {
     if (env.PUMPKIN_BIN) {
         if (!fs.existsSync(env.PUMPKIN_BIN)) throw new Error(`PUMPKIN_BIN does not exist: ${env.PUMPKIN_BIN}`);
         return { binary: path.resolve(env.PUMPKIN_BIN), release: 'local PUMPKIN_BIN' };
     }
 
-    const release = await getLatestRelease(fetchImpl);
+    const cacheDir = env.PUMPKIN_CACHE_DIR || path.join(root, '.cache', 'pumpkin');
+    const metadataPath = path.join(cacheDir, RELEASE_METADATA_FILE);
+    const cachedMetadata = readReleaseMetadata(metadataPath);
+    const currentTime = now();
+    const cacheIsFresh =
+        cachedMetadata &&
+        currentTime >= cachedMetadata.fetchedAt &&
+        currentTime - cachedMetadata.fetchedAt < RELEASE_METADATA_TTL_MS;
+    let release;
+    if (cacheIsFresh && env.PUMPKIN_REFRESH_RELEASE !== '1') {
+        release = cachedMetadata.release;
+    } else {
+        try {
+            release = await getLatestRelease(fetchImpl);
+            writeReleaseMetadata(metadataPath, { fetchedAt: now(), release });
+        } catch (error) {
+            if (!cachedMetadata || !error.retryable) throw error;
+            console.warn(
+                `Could not refresh Pumpkin release metadata (${error.message}); using cached release ${cachedMetadata.release.tag_name}.`
+            );
+            release = cachedMetadata.release;
+        }
+    }
     const assetFile = assetName(platform, arch);
     const binaryAsset = releaseAsset(release, assetFile);
     const checksumAsset = releaseAsset(release, 'checksums.sha256');
-    const cacheDir = env.PUMPKIN_CACHE_DIR || path.join(root, '.cache', 'pumpkin');
     const safeTag = String(release.tag_name).replace(/[^\w.+-]/g, '_');
     const target = path.join(cacheDir, `${safeTag}-${assetFile}`);
     if (fs.existsSync(target)) return { binary: target, release: release.tag_name };

@@ -769,6 +769,7 @@ export default defineConfig({
         'README.md',
         '**/CHANGELOG.md',
         '**/AGENTS.md',
+        'plans/**',
         '.agents/**',
         '.github/**',
         '**/node_modules/**',
