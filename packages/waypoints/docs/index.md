@@ -1,32 +1,37 @@
 # Waypoints
 
-Waypoints stores named block positions on the server and lets players share them with public or
-allowlist access. Java players can also show accessible waypoints in the vanilla Locator Bar.
+Waypoints stores shared named positions on the server. Waypoints are restricted by default; an
+operator can make one public or grant access to players, permission nodes, or permission-marker
+groups. Records have no creator ownership.
 
-Install `waypoints.wasm` in the Pumpkin server's `plugins/` directory and restart. Waypoints are
-private by default. The plugin has no config file; it stores versioned records in
-`plugins/data/Waypoints/waypoints.json`.
+Install `waypoints.wasm` in the Pumpkin server's `plugins/` directory and restart. The plugin has
+no config file. It stores versioned records in `plugins/data/Waypoints/waypoints.json` and keeps a
+byte-identical `waypoints.v1.json` backup when migrating the previous schema.
 
-## Create and find a waypoint
+## Create and use waypoints
 
-Use `/wp mark "Home Base"` to save your current block, or `/wp add "Home Base" 120 64 -30` to
-save coordinates. `/wp list` lists waypoints in the current dimension; `/wp list all` includes
-other dimensions. Use the UUID shown in the output for operations such as `/wp show <id>` and
-`/wp remove <id>`.
+Operators can create a waypoint at their exact position with `/wp create "Home Base"`, or provide
+absolute coordinates with `/wp create "Home Base" 120.5 64 -30`. Names are unique across dimensions.
+Use `/wp list` to see enabled waypoints you can access, `/wp info <name>` for details, and `/wp tp
+<name>` to teleport yourself. Operators can use `/wp tp <name> @a` to teleport a player selector.
 
-## Share access
+Only server operators can create, edit, enable, disable, grant, or delete waypoints. Every
+administrative handler checks Pumpkin's operator list even if a command permission was manually
+granted. Player grants resolve online names and store UUIDs. A group grant checks the permission
+marker `Waypoints:group.<slug>`; another permission provider must assign that marker to group
+members.
 
-Owners can keep a waypoint private, make it public, or switch it to allowlist access. Invite and
-revoke online players by name; access records store their player UUIDs. Players can only inspect or
-send waypoints they are allowed to access. Operators have separate admin commands to list or
-remove any saved waypoint.
+## Java waypoint HUD
 
-## Locator and map clients
+Minecraft Java 26.3 players see each enabled waypoint they can access in the same dimension and
+within its optional visibility range. The display shows the waypoint label (or name) in its color
+and the rounded distance in meters. Each player's display packets are private to that player, so
+restricted names and personalized distances are not sent to other clients.
 
-Locator output is opt-in for each waypoint. It is sent only to Java players who can access the
-waypoint and are in its dimension. Bedrock Locator Bar output is unsupported by the pinned Pumpkin
-API. The registered `xaero-share` adapter currently reports unavailable, so send commands return
-readable coordinates and do not claim client import or automatic map synchronization.
+The HUD uses client-only TextDisplay packets on a camera-relative plane about three blocks ahead,
+updated once per server tick. It can lag slightly while moving or turning, and world geometry can
+occlude it. Other Java protocol versions and Bedrock clients do not receive the HUD. The stored item
+icon is not displayed yet.
 
-The store is preserved and writes stop if its JSON is malformed or uses an unsupported schema; fix
-the file before expecting changes to persist.
+Malformed or unsupported storage is preserved and disables writes. Fix the file before expecting
+changes to persist.
