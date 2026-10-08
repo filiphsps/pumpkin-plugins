@@ -100,7 +100,7 @@ describe('WaypointHudRenderer', () => {
         expect(client.packets.at(-1)?.tag).toBe('c-set-entity-metadata');
     });
 
-    it('updates sub-centimeter camera movement instead of letting the HUD step behind the view', () => {
+    it('ignores tiny stationary camera jitter below the packet resolution', () => {
         const renderer = createRenderer();
         const client = makeViewer(ownerId);
         const destination = waypoint({ position: { x: 10, y: 65.62, z: 10 } });
@@ -109,10 +109,34 @@ describe('WaypointHudRenderer', () => {
         client.viewer.camera = { position: client.viewer.camera.position, yaw: 0.02, pitch: 0 };
         renderer.renderViewer(client.viewer, [destination]);
 
-        const movement = client.packets.find(({ tag }) => tag === 'c-update-entity-pos');
-        expect(movement).toBeDefined();
-        if (movement?.tag !== 'c-update-entity-pos') throw new Error('Expected a display movement packet.');
-        expect(movement.val.delta).toEqual([4, 0, 4]);
+        expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
+    });
+
+    it('stabilizes head rotation while standing still and follows it while walking', () => {
+        const renderer = createRenderer();
+        const client = makeViewer(ownerId);
+        const destination = waypoint({ position: { x: 10, y: 65.62, z: 10 } });
+
+        renderer.renderViewer(client.viewer, [destination]);
+        client.viewer.camera = { position: client.viewer.camera.position, yaw: 20, pitch: 60 };
+        renderer.renderViewer(client.viewer, [destination]);
+
+        const stationaryMovement = client.packets.at(-1);
+        if (stationaryMovement?.tag !== 'c-update-entity-pos') {
+            throw new Error('Expected the smoothed stationary camera update.');
+        }
+        expect(stationaryMovement.val.delta[1]).toBe(0);
+        expect(Math.hypot(stationaryMovement.val.delta[0], stationaryMovement.val.delta[2])).toBeLessThan(500);
+
+        client.viewer.position = { x: 0.1, y: 64, z: 0 };
+        client.viewer.camera = { position: { x: 0.1, y: 65.62, z: 0 }, yaw: 20, pitch: 60 };
+        renderer.renderViewer(client.viewer, [destination]);
+
+        const walkingMovement = client.packets.at(-1);
+        if (walkingMovement?.tag !== 'c-update-entity-pos') {
+            throw new Error('Expected the camera to follow while the player moves.');
+        }
+        expect(Math.hypot(walkingMovement.val.delta[0], walkingMovement.val.delta[2])).toBeGreaterThan(500);
     });
 
     it('re-spawns a display when a same-dimension move exceeds the relative packet range', () => {

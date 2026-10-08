@@ -13,6 +13,8 @@ import { type HudCamera, projectWaypointOnCameraPlane } from './layout.ts';
 const DEFAULT_DISPLAY_DEPTH = 3;
 const FIRST_CLIENT_ENTITY_ID = -1_500_000_000;
 const LAST_CLIENT_ENTITY_ID = -2_000_000_000;
+const PLAYER_MOVEMENT_THRESHOLD = 0.01;
+const STATIONARY_YAW_FOLLOW_RATE = 0.05;
 
 /** Per-viewer inputs required to render one private waypoint HUD. */
 export interface WaypointHudViewer {
@@ -45,6 +47,9 @@ interface DisplayState {
 interface ViewerState {
     dimension: string;
     nextEntityId: number;
+    lastPlayerPosition: WaypointPosition;
+    projectionYaw: number;
+    projectionPitch: number;
     readonly displays: Map<string, DisplayState>;
 }
 
@@ -66,6 +71,7 @@ export class WaypointHudRenderer {
     /** Renders one viewer's current authorized projection and diffs its display packets. */
     renderViewer(viewer: WaypointHudViewer, waypoints: readonly Waypoint[]): void {
         const state = this.viewerState(viewer);
+        const camera = this.projectionCamera(viewer, state);
         const visible = projectWaypointsForViewer(waypoints, {
             playerId: viewer.id,
             isOperator: viewer.isOperator,
@@ -76,7 +82,7 @@ export class WaypointHudRenderer {
         const desired = new Map<string, DesiredDisplay>();
 
         for (const waypoint of visible) {
-            const projected = projectWaypointOnCameraPlane(viewer.camera, waypoint.position, this.depth);
+            const projected = projectWaypointOnCameraPlane(camera, waypoint.position, this.depth);
             if (projected === undefined) continue;
             desired.set(waypoint.id, {
                 position: projected,
@@ -128,14 +134,38 @@ export class WaypointHudRenderer {
     private viewerState(viewer: WaypointHudViewer): ViewerState {
         let state = this.viewers.get(viewer.id);
         if (state === undefined) {
-            state = { dimension: viewer.dimension, nextEntityId: FIRST_CLIENT_ENTITY_ID, displays: new Map() };
+            state = {
+                dimension: viewer.dimension,
+                nextEntityId: FIRST_CLIENT_ENTITY_ID,
+                lastPlayerPosition: { ...viewer.position },
+                projectionYaw: viewer.camera.yaw,
+                projectionPitch: viewer.camera.pitch,
+                displays: new Map()
+            };
             this.viewers.set(viewer.id, state);
         } else if (state.dimension !== viewer.dimension) {
             // The client discards the old world's entity table during dimension changes.
             state.displays.clear();
             state.dimension = viewer.dimension;
+            state.lastPlayerPosition = { ...viewer.position };
+            state.projectionYaw = viewer.camera.yaw;
+            state.projectionPitch = viewer.camera.pitch;
         }
         return state;
+    }
+
+    private projectionCamera(viewer: WaypointHudViewer, state: ViewerState): HudCamera {
+        const moved = distance(viewer.position, state.lastPlayerPosition) > PLAYER_MOVEMENT_THRESHOLD;
+        if (moved || !Number.isFinite(state.projectionYaw) || !Number.isFinite(viewer.camera.yaw)) {
+            state.projectionYaw = viewer.camera.yaw;
+        } else {
+            state.projectionYaw = smoothYaw(state.projectionYaw, viewer.camera.yaw, STATIONARY_YAW_FOLLOW_RATE);
+        }
+        if (moved || !Number.isFinite(state.projectionPitch) || !Number.isFinite(viewer.camera.pitch)) {
+            state.projectionPitch = viewer.camera.pitch;
+        }
+        state.lastPlayerPosition = { ...viewer.position };
+        return { ...viewer.camera, yaw: state.projectionYaw, pitch: state.projectionPitch };
     }
 
     private removeUndesired(
@@ -240,4 +270,9 @@ function distance(left: WaypointPosition, right: WaypointPosition): number {
 
 function positionChanged(left: WaypointPosition, right: WaypointPosition): boolean {
     return left.x !== right.x || left.y !== right.y || left.z !== right.z;
+}
+
+function smoothYaw(current: number, target: number, followRate: number): number {
+    const difference = (((target - current + 180) % 360) + 360) % 360 - 180;
+    return current + difference * followRate;
 }
