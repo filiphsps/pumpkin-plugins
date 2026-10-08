@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.7](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.0.6...upnpumpkin-v0.0.7) (2026-10-08)
+
+
+### Features
+
+* **commands:** support positional argument variants ([689de6c](https://github.com/filiphsps/pumpkin-plugins/commit/689de6c52d011449a93ad007409be114e72f7e06))
+* **docs:** collapse generated config files in readmes ([a05d1aa](https://github.com/filiphsps/pumpkin-plugins/commit/a05d1aabdfbd22508deb985b4e20b97a0dde6ad0))
+* **docs:** support typed command arguments ([ee0b90f](https://github.com/filiphsps/pumpkin-plugins/commit/ee0b90fe42eb788246dea3cd549d8c53a428842a))
+* **minecraft-colors:** add ANSI terminal formatting ([bb6eb16](https://github.com/filiphsps/pumpkin-plugins/commit/bb6eb162ff291855286923f42013ffa9bca005ca))
+* **minecraft-colors:** add more named colors ([8e05b09](https://github.com/filiphsps/pumpkin-plugins/commit/8e05b0917c62766e9faaa528649740e1f399bfe8))
+* **minecraft-colors:** add semantic color presets ([72e3839](https://github.com/filiphsps/pumpkin-plugins/commit/72e3839eee71be8bf5398715b17a761065f8837d))
+* **minecraft-colors:** add string formatting helpers ([b99a342](https://github.com/filiphsps/pumpkin-plugins/commit/b99a3424a264b77ca2394f9d05752c705635341e))
+* **plugin-kit:** support typed command arguments ([54544fc](https://github.com/filiphsps/pumpkin-plugins/commit/54544fc3e40ef68dd9d453ffea3fbb61a65c4580))
+
+
+### Bug Fixes
+
+* **dev:** skip market checks and add no-reload mode ([f457446](https://github.com/filiphsps/pumpkin-plugins/commit/f457446d8de405594cf8cfdb73b9534f86f2e02b))
+
 ## [0.0.6](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.0.5...upnpumpkin-v0.0.6) (2026-10-07)
 
 
