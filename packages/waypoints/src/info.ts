@@ -9,7 +9,7 @@ import { PLUGIN_NAME } from './name.ts';
  */
 export const info = {
     name: PLUGIN_NAME,
-    description: 'Server-managed waypoints with access rules, a Java HUD, and vanilla commands',
+    description: 'Server-managed waypoints with access rules, a Java HUD (bedrock coming later), and vanilla commands',
     permissions: [
         { name: 'fs.read.data', reason: 'Read the waypoint store from the plugin data folder.' },
         { name: 'fs.write.data', reason: 'Persist waypoint changes in the plugin data folder.' }
