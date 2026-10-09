@@ -1,6 +1,6 @@
 {
     "name": "@pumpkin-plugins/waypoints",
-    "version": "0.0.0",
+    "version": "0.0.1",
     "private": true,
     "description": "Server-managed waypoints with access rules and vanilla commands",
     "license": "MIT",
