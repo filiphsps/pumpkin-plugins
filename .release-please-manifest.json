@@ -7,5 +7,5 @@
     "packages/distant-horizons-support-pumpkin": "0.0.12",
     "packages/dynamic-lights-pumpkin": "0.0.7",
     "packages/upnpumpkin": "0.0.7",
-    "packages/waypoints": "0.0.0"
+    "packages/waypoints": "0.0.1"
 }
