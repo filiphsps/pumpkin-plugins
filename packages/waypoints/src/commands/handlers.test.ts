@@ -5,7 +5,7 @@ import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { WaypointCatalog } from '../waypoints/catalog.ts';
 import { WaypointStore } from '../waypoints/store.ts';
-import { commandHandlers, waypointNameSuggestions } from './handlers.ts';
+import { commandHandlers, onlinePlayerNameSuggestions, waypointNameSuggestions } from './handlers.ts';
 
 vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({
     hostLogger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
@@ -29,10 +29,12 @@ function setup(isOperator = false, pendingItemIconInput?: string) {
         hasPermission: vi.fn(() => true),
         [Symbol.dispose]: vi.fn()
     } as unknown as Player;
+    const getAllPlayers = vi.fn(() => [player]);
     const opManager = { isOp: vi.fn(() => isOperator), [Symbol.dispose]: vi.fn() };
     const server = {
         getOpManager: () => opManager,
         getWorldByName: vi.fn((name: string) => (name === 'world' ? world : undefined)),
+        getAllPlayers,
         getPlayerByName: vi.fn()
     } as unknown as Server;
     const sender = { asPlayer: () => player, hasPermission: vi.fn(() => true) } as unknown as CommandSender;
@@ -46,7 +48,7 @@ function setup(isOperator = false, pendingItemIconInput?: string) {
         validateItemIcon: () => true
     };
     const handlers = commandHandlers(runtime);
-    return { catalog, files, handlers, opManager, player, runtime, sender, server, world };
+    return { catalog, files, getAllPlayers, handlers, opManager, player, runtime, sender, server, world };
 }
 
 describe('/wp handlers', () => {
@@ -93,6 +95,24 @@ describe('/wp handlers', () => {
                 remaining: 'm'
             })
         ).toEqual(['"Market Place"', 'Meadow']);
+    });
+
+    it('suggests matching online players for access grants', () => {
+        const { getAllPlayers, runtime, sender } = setup(true);
+        const alex = { getName: () => 'Alex', [Symbol.dispose]: vi.fn() } as unknown as Player;
+        const alice = { getName: () => 'Alice', [Symbol.dispose]: vi.fn() } as unknown as Player;
+        getAllPlayers.mockReturnValue([alex, alice]);
+
+        expect(
+            onlinePlayerNameSuggestions(runtime)(sender, {
+                input: '/wp access grant player Spawn Al',
+                cursor: 32,
+                start: 30,
+                remaining: 'Al'
+            })
+        ).toEqual(['Alex', 'Alice']);
+        expect(alex[Symbol.dispose]).toHaveBeenCalledOnce();
+        expect(alice[Symbol.dispose]).toHaveBeenCalledOnce();
     });
 
     it('uses Pumpkin operator status instead of a grantable command permission', () => {

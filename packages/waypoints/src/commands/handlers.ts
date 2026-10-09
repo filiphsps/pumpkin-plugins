@@ -256,6 +256,29 @@ export function waypointNameSuggestions(runtime: WaypointCommandRuntime): Comman
         );
 }
 
+/** Suggests matching online player names to operators managing waypoint access. */
+export function onlinePlayerNameSuggestions(runtime: WaypointCommandRuntime): CommandSuggestionHandler<CommandSender> {
+    return (sender, request) =>
+        withActorContext(
+            runtime,
+            sender,
+            (actor) => {
+                if (!actor.isOperator) return [];
+                const prefix = suggestionPrefix(request.remaining);
+                const players = runtime.server.getAllPlayers();
+                try {
+                    return players
+                        .map((player) => player.getName())
+                        .filter((name) => name.toLowerCase().normalize('NFC').startsWith(prefix))
+                        .sort((left, right) => left.toLowerCase().localeCompare(right.toLowerCase()));
+                } finally {
+                    for (const player of players) disposeWasiResource(player);
+                }
+            },
+            () => []
+        );
+}
+
 function withActor(
     runtime: WaypointCommandRuntime,
     sender: CommandSender,
