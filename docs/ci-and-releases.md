@@ -145,15 +145,15 @@ which trigger the normal pull-request CI checks.
 
 `scripts/release.mjs` runs the pinned Release Please runtime through `pnpm dlx`.
 `scripts/release-commits.mjs` supplies shared commits through its plugin hook before versions and
-changelogs are calculated. Features, fixes and performance improvements appear in the notes.
-After publishing, the runner reloads the manifest before generating PRs. Each plugin's commits
-stop at its own latest release, so refreshing branches does not propose an empty follow-up release.
-If a manifest version has no matching GitHub release or tag, the helper uses the latest published
-release for that plugin with a lower version as the history boundary. It fails if no such release
-exists or if it cannot fetch enough history, rather than publishing incomplete notes. Increase
-`commit-search-depth` in the release configuration if needed. Changelogs stay generated; do not edit
-them by hand. Empty version-only `Release-As` commits need a conventional-commit scope matching the
-component so only that release is affected.
+changelogs are calculated. Features, fixes and performance improvements appear in the notes. After
+publishing, the runner reloads the manifest before generating PRs. Each plugin's commits stop at its
+own latest release, and action commits are trimmed to that same boundary, so first-release notes do
+not repeat in the next release. If a manifest version has no matching GitHub release or tag, the
+helper uses the latest published release for that component with a lower version as the history
+boundary. It fails if no such release exists or if it cannot fetch enough history, rather than
+publishing incomplete notes. Increase `commit-search-depth` in the release configuration if needed.
+Changelogs stay generated; do not edit them by hand. Empty version-only `Release-As` commits need a
+conventional-commit scope matching the component so only that release is affected.
 
 To preview without changing GitHub, set `GITHUB_REPOSITORY` and `GITHUB_TOKEN`, then run:
 
@@ -218,8 +218,9 @@ in `release-please-paused.json` with a reason. The release config check verifies
 paths exist and are not tracked. To resume a package, remove it from that file and add it to both
 release-please files.
 
-Pausing an unreleased plugin also avoids the release helper's full-history scan for first releases.
-The plugin remains in the workspace and normal build and test workflows.
+A first release has no tag boundary, so the release helper scans full history. Pausing an unreleased
+plugin prevents it from triggering that scan on every release run; it remains in the workspace and
+normal build and test workflows.
 
 If you ever create a plugin by hand, do these three things:
 

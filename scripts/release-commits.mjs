@@ -67,6 +67,12 @@ export function releaseCommits(commits, paths, lastReleaseSha, component) {
     });
 }
 
+function commitShasSinceRelease(commits, lastReleaseSha) {
+    const boundary = commits.findIndex((commit) => commit.sha === lastReleaseSha);
+    if (boundary === -1) throw new Error(`Release commit ${lastReleaseSha} is missing from the fetched history`);
+    return new Set(commits.slice(0, boundary).map((commit) => commit.sha));
+}
+
 async function previousPublishedRelease(github, currentTag) {
     if (
         !currentTag ||
@@ -94,18 +100,20 @@ async function previousPublishedRelease(github, currentTag) {
 export function bundledChangesPlugin(github, branch, packages, releasedVersions, maxCommits = 500) {
     return {
         async preconfigure(strategies, commitsByPath, releasesByPath) {
-            for (const path of Object.keys(strategies).filter((path) => path.startsWith('actions/'))) {
+            const actionPaths = Object.keys(strategies).filter((path) => path.startsWith('actions/'));
+            for (const path of actionPaths) {
                 const component = path.split('/').at(-1);
                 commitsByPath[path] = (commitsByPath[path] ?? []).filter((commit) =>
                     releaseAsTargetsComponent(commit, component)
                 );
             }
             const pluginPaths = Object.keys(strategies).filter((path) => path.startsWith('packages/'));
-            if (pluginPaths.length === 0) return strategies;
+            const releasePaths = [...pluginPaths, ...actionPaths];
+            if (releasePaths.length === 0) return strategies;
             const commits = [];
             const boundaries = new Set();
             let initialRelease = false;
-            for (const path of pluginPaths) {
+            for (const path of releasePaths) {
                 const release = releasesByPath[path];
                 if (release?.sha) boundaries.add(release.sha);
                 else if (releasedVersions[path]?.toString() === '0.0.0') initialRelease = true;
@@ -120,7 +128,7 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
                     boundaries.add(previousRelease.sha);
                 }
             }
-            // Fetch unfiltered history: normal per-plugin splitting has already discarded tool commits.
+            // Fetch unfiltered history for plugin dependency commits and action release boundaries.
             for await (const commit of github.mergeCommitIterator(branch, {
                 backfillFiles: true,
                 maxResults: maxCommits + 1
@@ -138,6 +146,12 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
                     releasesByPath[path]?.sha,
                     path.split('/').at(-1)
                 );
+            }
+            for (const path of actionPaths) {
+                const lastReleaseSha = releasesByPath[path]?.sha;
+                if (!lastReleaseSha) continue;
+                const includedShas = commitShasSinceRelease(commits, lastReleaseSha);
+                commitsByPath[path] = (commitsByPath[path] ?? []).filter((commit) => includedShas.has(commit.sha));
             }
             return strategies;
         },

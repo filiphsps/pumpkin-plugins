@@ -24,8 +24,8 @@ const packages = new Map([
 const commit = (sha, files, message = 'fix: ship a change') => ({ sha, files, message });
 
 class TestTagName {
-    constructor(version) {
-        this.component = 'plugin';
+    constructor(version, component = 'plugin') {
+        this.component = component;
         this.version = {
             compare: (other) => version.localeCompare(other.toString(), undefined, { numeric: true }),
             toString: () => version
@@ -33,12 +33,12 @@ class TestTagName {
     }
 
     static parse(tagName) {
-        const match = /^plugin-v(\d+\.\d+\.\d+)$/.exec(tagName);
-        return match ? new TestTagName(match[1]) : undefined;
+        const match = /^([\w-]+)-v(\d+\.\d+\.\d+)$/.exec(tagName);
+        return match ? new TestTagName(match[2], match[1]) : undefined;
     }
 
     toString() {
-        return `plugin-v${this.version.toString()}`;
+        return `${this.component}-v${this.version.toString()}`;
     }
 }
 
@@ -190,7 +190,10 @@ describe('bundled release commits', () => {
                 yield* history;
             }
         };
-        const plugin = bundledChangesPlugin(github, 'master', packages, { 'packages/plugin': '0.0.4' });
+        const plugin = bundledChangesPlugin(github, 'master', packages, {
+            'packages/plugin': '0.0.4',
+            'actions/sign-pumpkin-plugin': '0.0.0'
+        });
         const strategies = { 'packages/plugin': {}, 'actions/sign-pumpkin-plugin': {} };
         const commits = {
             'packages/plugin': [],
@@ -207,20 +210,51 @@ describe('bundled release commits', () => {
         assert.deepEqual(commits['actions/sign-pumpkin-plugin'], []);
     });
 
-    it('leaves action release strategies to Release Please without fetching plugin history', async () => {
+    it('leaves first-release action commits to Release Please', async () => {
         let fetchedHistory = false;
         const github = {
             async *mergeCommitIterator() {
                 fetchedHistory = true;
-                yield null;
+                yield commit('initial', []);
             }
         };
-        const plugin = bundledChangesPlugin(github, 'master', packages, {});
+        const plugin = bundledChangesPlugin(github, 'master', packages, { 'actions/publish-action': '0.0.0' });
         const strategies = { 'actions/publish-action': {} };
         const commits = { 'actions/publish-action': ['simple strategy commits'] };
         assert.equal(await plugin.preconfigure(strategies, commits, {}), strategies);
-        assert.equal(fetchedHistory, false);
+        assert.equal(fetchedHistory, true);
         assert.deepEqual(commits['actions/publish-action'], ['simple strategy commits']);
+    });
+
+    it('trims action notes to the previous published tag when the manifest release SHA is missing', async () => {
+        const history = [
+            commit('after-first-release', ['actions/publish-action/src/index.mjs']),
+            commit('first-release', ['actions/publish-action/version.txt'], 'chore: release publish-action 0.0.1')
+        ];
+        const github = {
+            async *releaseIterator() {
+                yield { tagName: 'publish-action-v0.0.1', sha: 'first-release' };
+            },
+            async *mergeCommitIterator() {
+                yield* history;
+            }
+        };
+        const plugin = bundledChangesPlugin(github, 'master', packages, { 'actions/publish-action': '0.0.2' });
+        const commits = { 'actions/publish-action': history };
+        const releases = {
+            'actions/publish-action': {
+                tag: new TestTagName('0.0.2', 'publish-action'),
+                sha: ''
+            }
+        };
+
+        await plugin.preconfigure({ 'actions/publish-action': {} }, commits, releases);
+
+        assert.equal(releases['actions/publish-action'].sha, 'first-release');
+        assert.deepEqual(
+            commits['actions/publish-action'].map((entry) => entry.sha),
+            ['after-first-release']
+        );
     });
 
     it('rejects truncated initial-release histories rather than quietly omitting changes', async () => {
