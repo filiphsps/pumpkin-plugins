@@ -4,13 +4,7 @@ The metadata action updates fields on an existing Market listing. It does not bu
 plugin, create listings, read `info.ts`, or upload screenshots. Use it after the listing has been
 created and reviewed in Market.
 
-```yaml
-- uses: OWNER/REPOSITORY/actions/update-pumpkin-market-listing@ACTION_REF
-  with:
-    plugin-id: ${{ vars.PUMPKIN_MARKET_PLUGIN_ID }}
-    metadata-file: .github/market-metadata.json
-    api-token: ${{ secrets.MARKET_API_TOKEN }}
-```
+For a workflow example and the complete input list, see the [action README](../README.md).
 
 Provide either `plugin-name` or `plugin-id`. The JSON metadata file uses Market field names; direct
 inputs can be layered over it and override the matching field. The `description` input sets the

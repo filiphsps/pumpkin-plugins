@@ -4,15 +4,7 @@ The signing action adds Pumpkin's Ed25519 signature and release metadata to one 
 plugin `.wasm` files. It signs in place and does not build them. Run it on the exact artifact from
 the build job, before publishing or distributing that artifact.
 
-```yaml
-- uses: OWNER/REPOSITORY/actions/sign-pumpkin-plugin@ACTION_REF
-  with:
-    plugin-name: MyPlugin
-    version: 1.2.3
-    wasm-file: dist/my-plugin.wasm
-    developer-name: Example Developer
-    signing-key: ${{ secrets.PLUGIN_SIGNING_KEY }}
-```
+For a workflow example and the complete input list, see the [action README](../README.md).
 
 For one file, provide the plugin name, version without a leading `v`, and wasm path. For a release
 with several plugins, use `plugins-manifest`, a JSON array of those three values; the developer
