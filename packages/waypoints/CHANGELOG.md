@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.2](https://github.com/filiphsps/pumpkin-plugins/compare/waypoints-v0.0.1...waypoints-v0.0.2) (2026-10-09)
+
+
+### Bug Fixes
+
+* **waypoints:** specify Bedrock support ([33a36bd](https://github.com/filiphsps/pumpkin-plugins/commit/33a36bdb09ad7350b8c204070ec4194a439f3165))
+
 ## 0.0.1 (2026-10-09)
 
 
