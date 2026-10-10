@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.0.7](https://github.com/filiphsps/pumpkin-plugins/compare/apple-skin-pumpkin-v0.0.6...apple-skin-pumpkin-v0.0.7) (2026-10-10)
+
+
+### Features
+
+* **plugin-kit:** support double and player selector arguments ([bfbf5e9](https://github.com/filiphsps/pumpkin-plugins/commit/bfbf5e92957fa2d884778fed05436c1f576c76e0))
+* **plugin-kit:** support dynamic command suggestions ([678396f](https://github.com/filiphsps/pumpkin-plugins/commit/678396fa657faef06152f32240bdb4dbab54290f))
+* **waypoints:** add shared waypoint HUD and access rules ([54f39f1](https://github.com/filiphsps/pumpkin-plugins/commit/54f39f1d01ce916cffd64b7f6af79c651d77d829))
+
+
+### Bug Fixes
+
+* **runtime:** preserve WIT 64-bit values as bigint ([6979f1d](https://github.com/filiphsps/pumpkin-plugins/commit/6979f1ddab17f67919a2b0a89e47bc3ee19b5dd7))
+* **runtime:** release imported Wasm resources ([36a638c](https://github.com/filiphsps/pumpkin-plugins/commit/36a638c0b56658470a71c788df166edc491e2c89))
+* **waypoints:** recover native item argument values ([15a31b2](https://github.com/filiphsps/pumpkin-plugins/commit/15a31b2ae86b2f0caac60f5db03fffea42baf141))
+
 ## [0.0.6](https://github.com/filiphsps/pumpkin-plugins/compare/apple-skin-pumpkin-v0.0.5...apple-skin-pumpkin-v0.0.6) (2026-10-08)
 
 
