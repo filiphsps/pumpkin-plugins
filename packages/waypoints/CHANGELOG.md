@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.3](https://github.com/filiphsps/pumpkin-plugins/compare/waypoints-v0.0.2...waypoints-v0.0.3) (2026-10-10)
+
+
+### Features
+
+* **waypoints:** suggest online players for access grants ([fa3114f](https://github.com/filiphsps/pumpkin-plugins/commit/fa3114f42e5dadb4a5e19b54fe82c242e327ee39))
+
 ## [0.0.2](https://github.com/filiphsps/pumpkin-plugins/compare/waypoints-v0.0.1...waypoints-v0.0.2) (2026-10-09)
 
 
