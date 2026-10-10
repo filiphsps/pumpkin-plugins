@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.13](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.12...distant-horizons-support-pumpkin-v0.0.13) (2026-10-10)
+
+
+### Features
+
+* **plugin-kit:** support dynamic command suggestions ([678396f](https://github.com/filiphsps/pumpkin-plugins/commit/678396fa657faef06152f32240bdb4dbab54290f))
+
 ## [0.0.12](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.11...distant-horizons-support-pumpkin-v0.0.12) (2026-10-08)
 
 
