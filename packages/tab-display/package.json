@@ -1,6 +1,6 @@
 {
     "name": "@pumpkin-plugins/tab-display",
-    "version": "0.0.0",
+    "version": "0.0.1",
     "private": true,
     "description": "Customizes Java tab displays with native Bedrock capability gates",
     "license": "MIT",
