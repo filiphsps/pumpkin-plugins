@@ -140,8 +140,10 @@ function decodeChunked(bytes: Uint8Array): Uint8Array | undefined {
         let lineEnd = at;
         while (lineEnd + 1 < bytes.length && !(bytes[lineEnd] === 13 && bytes[lineEnd + 1] === 10)) lineEnd++;
         if (lineEnd + 1 >= bytes.length) return undefined;
-        const size = Number.parseInt(strFromU8(bytes.subarray(at, lineEnd)).split(';')[0]?.trim() ?? '', 16);
-        if (Number.isNaN(size)) return undefined;
+        const token = strFromU8(bytes.subarray(at, lineEnd)).split(';')[0] ?? '';
+        if (!/^[0-9a-fA-F]+$/.test(token)) throw new Error('invalid chunk size');
+        const size = Number.parseInt(token, 16);
+        if (!Number.isSafeInteger(size)) throw new Error('invalid chunk size');
         if (size === 0) return pieces.reduce(concat, new Uint8Array(0));
         const start = lineEnd + 2;
         if (start + size + 2 > bytes.length) return undefined;
