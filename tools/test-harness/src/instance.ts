@@ -38,6 +38,7 @@ export class PumpkinInstance {
     private readonly exited: Promise<number | null>;
     private hasExited = false;
     private failure?: Error;
+    private stopping?: Promise<void>;
 
     private constructor(
         private readonly child: ChildProcessWithoutNullStreams,
@@ -184,7 +185,12 @@ export class PumpkinInstance {
     }
 
     /** Stops the server (console `stop`, then SIGKILL after 20 s) and removes its directory. */
-    async stop(): Promise<void> {
+    stop(): Promise<void> {
+        this.stopping ??= this.stopOnce();
+        return this.stopping;
+    }
+
+    private async stopOnce(): Promise<void> {
         let killer: ReturnType<typeof setTimeout> | undefined;
         try {
             if (!this.hasExited) {
@@ -194,10 +200,13 @@ export class PumpkinInstance {
             await this.exited;
         } finally {
             if (killer) clearTimeout(killer);
+            try {
+                this.saveLog();
+            } finally {
+                if (process.env.PUMPKIN_KEEP_DIR) console.log(`Kept Pumpkin test directory: ${this.dir}`);
+                else fs.rmSync(this.dir, { recursive: true, force: true });
+            }
         }
-        this.saveLog();
-        if (process.env.PUMPKIN_KEEP_DIR) console.log(`Kept Pumpkin test directory: ${this.dir}`);
-        else fs.rmSync(this.dir, { recursive: true, force: true });
     }
 
     private saveLog(): void {

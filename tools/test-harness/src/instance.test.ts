@@ -1,9 +1,9 @@
-import { spawnSync } from 'node:child_process';
+import { type ChildProcessWithoutNullStreams, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { startPumpkin } from './instance.ts';
 
 const made: string[] = [];
@@ -138,6 +138,29 @@ describe('startPumpkin', () => {
         },
         10_000
     );
+
+    it('coalesces concurrent and repeated stop calls into one shutdown', async () => {
+        fakePumpkin(0);
+        const server = await startPumpkin();
+        const child = Reflect.get(server, 'child') as ChildProcessWithoutNullStreams;
+        const write = vi.spyOn(child.stdin, 'write');
+        await Promise.all([server.stop(), server.stop()]);
+        await server.stop();
+        expect(write.mock.calls).toEqual([['stop\n']]);
+        expect(fs.existsSync(server.dir)).toBe(false);
+    });
+
+    it('removes the server directory even when saving its log fails', async () => {
+        fakePumpkin(0);
+        const server = await startPumpkin();
+        made.push(server.dir);
+        const blocked = path.join(server.dir, 'not-a-log-directory');
+        fs.writeFileSync(blocked, 'file');
+        process.env.PUMPKIN_TEST_LOG_DIR = blocked;
+        delete process.env.PUMPKIN_KEEP_DIR;
+        await expect(server.stop()).rejects.toThrow();
+        expect(fs.existsSync(server.dir)).toBe(false);
+    });
 
     it('keeps INFO readiness logs visible when the parent filters them out', async () => {
         process.env.RUST_LOG = 'warn';
