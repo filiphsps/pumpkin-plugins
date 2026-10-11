@@ -192,7 +192,8 @@ chat. These commands need a player so the plugin can resolve the current world.
 
 Use `/dhs generate` or `/dhs generate <x> <z>` to force a capture into the cache. Add `<radius>`
 after the command or coordinates to set the radius, up to 16_384 sections. Sections already in the
-cache are skipped; the command errors when every requested section is already generated. A forced
+cache are validated and skipped on worker ticks, at most 64 sections per tick. If every requested
+section is valid in the cache, the job reports that all sections are already generated. A forced
 job gets up to 32,768 block samples per tick and pauses ordinary capture sampling while it runs;
 cached request delivery and transfers continue. Progress is reported in chat about every 10%, and
 `/dhs status` shows the active job. Only one forced job can run at a time. This command captures terrain that is

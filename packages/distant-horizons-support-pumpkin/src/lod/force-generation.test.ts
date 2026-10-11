@@ -1,6 +1,6 @@
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { unavailableChunkLoader, unavailableTerrainGenerator } from '@pumpkin-plugins/terrain';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { LodCache } from './cache.ts';
 import { ForcedLodGeneration, type ForcedLodPeer, type ForcedLodPeers } from './force-generation.ts';
 import { MAX_LOD_GENERATION_RADIUS } from './generation.ts';
@@ -106,24 +106,67 @@ describe('forced LOD generation', () => {
         expect(f.reports.at(-1)).toContain('complete: 8 built, 1 skipped (1 already generated)');
     });
 
-    it('errors when every requested in-border LOD section is already generated', () => {
+    it('reports an entirely cached selection after worker verification', () => {
         const f = fixture();
         f.cache.put('world:0:0', { updated: 1, data: new Uint8Array(64) });
 
-        expect(() => f.generation.start(f.peer, 32, 32)).toThrow('All requested LOD sections are already generated.');
+        f.generation.start(f.peer, 32, 32);
+        expect(f.reports).toEqual([]);
+        f.generation.tick(f.peers);
+        expect(f.reports.at(-1)).toBe('All requested LOD sections are already generated.');
         expect(f.generation.status()).toBeUndefined();
+        expect(f.samples()).toBe(0);
     });
 
-    it('checks larger selections for an all-cached request before starting work', () => {
+    it('verifies a 3969-section disk selection incrementally without reading blobs during admission', () => {
+        const f = fixture();
+        for (let x = -31; x <= 31; x++) {
+            for (let z = -31; z <= 31; z++) f.cache.put(`world:${x}:${z}`, { updated: 1, data: new Uint8Array(64) });
+        }
+        f.cache.clearMemory();
+        const read = vi.spyOn(f.files, 'readFile');
+        const get = vi.spyOn(f.cache, 'get');
+
+        f.generation.start(f.peer, 32, 32, 31);
+
+        expect(read).not.toHaveBeenCalled();
+        expect(get).not.toHaveBeenCalled();
+        expect(f.reports).toEqual([]);
+        for (let tick = 0; tick < 63; tick++) {
+            get.mockClear();
+            read.mockClear();
+            f.generation.tick(f.peers);
+            expect(get.mock.calls.length).toBeLessThanOrEqual(64);
+            expect(read.mock.calls.length).toBeLessThanOrEqual(64);
+            if (tick < 62) {
+                expect(f.generation.status()).toBeDefined();
+                expect(f.reports).not.toContain('All requested LOD sections are already generated.');
+            }
+        }
+        expect(f.generation.status()).toBeUndefined();
+        expect(f.reports.at(-1)).toBe('All requested LOD sections are already generated.');
+        expect(f.samples()).toBe(0);
+    });
+
+    it.each(['disconnect', 'world change'])('cancels cache verification on %s without further disk reads', (reason) => {
         const f = fixture();
         for (let x = -8; x <= 8; x++) {
             for (let z = -8; z <= 8; z++) f.cache.put(`world:${x}:${z}`, { updated: 1, data: new Uint8Array(64) });
         }
-
-        expect(() => f.generation.start(f.peer, 32, 32, 8)).toThrow(
-            'All requested LOD sections are already generated.'
-        );
+        f.cache.clearMemory();
+        const read = vi.spyOn(f.files, 'readFile');
+        f.generation.start(f.peer, 32, 32, 8);
+        expect(read).not.toHaveBeenCalled();
+        f.generation.tick(f.peers);
+        expect(read).toHaveBeenCalledTimes(64);
+        read.mockClear();
+        if (reason === 'disconnect') f.generation.left(f.peer.name);
+        else f.peer.level = 'other-world';
+        f.generation.tick(f.peers);
+        expect(read).not.toHaveBeenCalled();
         expect(f.generation.status()).toBeUndefined();
+        expect(f.reports).not.toContain('All requested LOD sections are already generated.');
+        expect(f.samples()).toBe(0);
     });
 
     it('accepts the maximum radius without materializing its section list', () => {
@@ -136,15 +179,16 @@ describe('forced LOD generation', () => {
         f.generation.left(f.peer.name);
     });
 
-    it('rejects a maximum-radius selection when its only in-border section is cached', () => {
+    it('verifies the only cached in-border section of a maximum-radius selection on its first tick', () => {
         const f = fixture();
         f.peer.borderBounds = { minX: 0.5, maxX: 63.5, minZ: 0.5, maxZ: 63.5 };
         f.peer.insideBorder = (x, z) => x >= 0 && x < 64 && z >= 0 && z < 64;
         f.cache.put('world:0:0', { updated: 1, data: new Uint8Array(64) });
 
-        expect(() => f.generation.start(f.peer, 32, 32, MAX_LOD_GENERATION_RADIUS)).toThrow(
-            'All requested LOD sections are already generated.'
-        );
+        f.generation.start(f.peer, 32, 32, MAX_LOD_GENERATION_RADIUS);
+        f.generation.tick(f.peers);
+        expect(f.generation.status()).toBeUndefined();
+        expect(f.reports.at(-1)).toBe('All requested LOD sections are already generated.');
     });
 
     it('finishes a maximum-radius request after visiting its single in-border section', () => {
@@ -174,7 +218,10 @@ describe('forced LOD generation', () => {
         f.cache.clearMemory();
         f.peer.borderBounds = { minX: -63.5, maxX: 127.5, minZ: 0.5, maxZ: 63.5 };
 
+        const read = vi.spyOn(f.files, 'readFile');
         expect(() => f.generation.start(f.peer, 32, 32, 1)).not.toThrow();
+        expect(read).not.toHaveBeenCalled();
+        expect(f.cache.has('world:0:0')).toBe(true);
         f.generation.tick(f.peers);
 
         expect(f.cache.get('world:0:0')?.updated).toBe(1234);

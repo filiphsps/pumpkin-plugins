@@ -91,10 +91,10 @@ export class ForcedLodGeneration {
         if (!Number.isSafeInteger(blockX) || !Number.isSafeInteger(blockZ)) {
             throw new RangeError('Block coordinates must be safe integers.');
         }
-        const { memoryLimit, diskLimit, memoryEntries, diskEntries } = this.cache.stats();
+        const { memoryLimit, diskLimit } = this.cache.stats();
         if (memoryLimit === 0 && diskLimit === 0) throw new Error('Both LOD cache tiers are disabled.');
 
-        const selection = this.validateSelection(peer, blockX, blockZ, radius, memoryEntries + diskEntries);
+        const selection = this.validateSelection(peer, blockX, blockZ, radius);
         return this.begin(peer, blockX, blockZ, radius, selection);
     }
 
@@ -104,14 +104,14 @@ export class ForcedLodGeneration {
         if (!Number.isSafeInteger(blockX) || !Number.isSafeInteger(blockZ)) {
             throw new RangeError('Block coordinates must be safe integers.');
         }
-        const { memoryLimit, diskLimit, memoryEntries, diskEntries } = this.cache.stats();
+        const { memoryLimit, diskLimit } = this.cache.stats();
         if (memoryLimit === 0 && diskLimit === 0) throw new Error('Both LOD cache tiers are disabled.');
 
         const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
         const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
         const key = sectionKey(peer.level, centerX, centerZ);
         if (!this.cache.has(key)) throw new Error('No cached LOD section exists at the selected coordinates.');
-        const selection = this.validateSelection(peer, blockX, blockZ, 0, memoryEntries + diskEntries, key);
+        const selection = this.validateSelection(peer, blockX, blockZ, 0);
         const prepared = peer.terrain.prepare?.(this.region({ x: centerX, z: centerZ }, peer.terrain));
         if (prepared?.status !== 'ready') {
             const reason = prepared && 'reason' in prepared ? ` ${prepared.reason}` : '';
@@ -227,6 +227,7 @@ export class ForcedLodGeneration {
                     job.skippedOutsideBorder++;
                     continue;
                 }
+                // Validate cache blobs within the existing per-tick section budget, never during admission.
                 if (this.cache.get(key)) {
                     job.skippedAlreadyGenerated++;
                     continue;
@@ -355,9 +356,7 @@ export class ForcedLodGeneration {
         peer: ForcedLodPeer,
         blockX: number,
         blockZ: number,
-        radius: number,
-        maxCachedSections: number,
-        ignoredCachedKey?: string
+        radius: number
     ): { bounds: LodSectionBounds; inBorderSections: number } {
         const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
         const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
@@ -375,18 +374,6 @@ export class ForcedLodGeneration {
         if (minX > maxX || minZ > maxZ) throw new Error('No requested LOD sections are inside the world border.');
 
         const inBorderSections = (maxX - minX + 1) * (maxZ - minZ + 1);
-        if (inBorderSections > maxCachedSections) return { bounds: { minX, maxX, minZ, maxZ }, inBorderSections };
-
-        let alreadyGenerated = 0;
-        for (let x = minX; x <= maxX; x++) {
-            for (let z = minZ; z <= maxZ; z++) {
-                const key = sectionKey(peer.level, x, z);
-                if (key !== ignoredCachedKey && this.cache.get(key)) alreadyGenerated++;
-            }
-        }
-        if (alreadyGenerated === inBorderSections) {
-            throw new Error('All requested LOD sections are already generated.');
-        }
         return { bounds: { minX, maxX, minZ, maxZ }, inBorderSections };
     }
 
