@@ -5,8 +5,9 @@ navigation:
 
 # CI and releases
 
-The plugin and release jobs are in `.github/workflows/ci.yml`; action tests have their own
-`.github/workflows/actions.yml`, scoped to action code. The documentation site has its own
+The plugin, action verification and release jobs are in `.github/workflows/ci.yml`; action tests
+run through the reusable `.github/workflows/actions.yml`, scoped to action code. The documentation
+site has its own
 `.github/workflows/docs.yml`, which checks and publishes the VitePress site and mirrors it to
 `gh-pages`. The shared setup (pnpm, Node,
 install, Turborepo cache) is the composite action in `.github/common/bootstrap`. Workflow jobs use
@@ -22,6 +23,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | ✅ Typecheck | code changes | `pnpm typecheck` |
 | 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
 | 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or common plus all four public consumers for shared helper changes, then uploads c8 coverage to Codecov |
+| 🛡️ Action test gate | every CI run, after classification and action tests | Requires every selected action suite to pass; accepts skipped tests only for an empty matrix |
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after lint and typecheck | Builds and collects every plugin, then signs with `sign-pumpkin-plugin` and verifies with `verify-pumpkin-plugin` before upload |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
@@ -43,13 +45,14 @@ workflow.
 `scripts/changed-areas.mjs` diffs the change against what came before it (the pull request base or
 the push's `before` commit). Markdown, `docs/`, component-level `docs/` folders and `LICENSE`
 changes are documentation. Changes under `actions/{name}/` are reported separately from plugin and repository code. An action-only
-change skips the plugin build, integration suites and repository test jobs; the Actions workflow
+change skips the plugin build, integration suites and repository test jobs; CI calls the reusable
+Actions workflow, which
 tests that action when its code changes; common helper changes test common and all four public consumers.
 Common is excluded from release selection. Action tests live beside their implementation in
 `actions/{name}/src/*.test.mjs`; shared helper tests live in `actions/common/src/*.test.mjs`. README,
 changelog and version-file-only changes skip action tests.
 A docs-only change triggers the separate Docs workflow, which checks the docs and builds the site;
-GitHub's path filters skip the main CI workflow and the Actions workflow. Mixed changes still run the
+GitHub's path filters skip the main CI workflow, so it does not call action tests. Mixed changes run the
 relevant code or action checks.
 
 Everything else outside `actions/` is a change to repository code and runs the code jobs, including
@@ -64,8 +67,10 @@ GitHub continues to trigger CI as the README refresh commit is added. The classi
 commit and reruns the repository checks that validate the generated README. Ordinary docs-only PRs
 skip the main CI workflow entirely.
 
-On a push, the release job waits for plugin checks when plugin/repository code changed, or for the
-docs/config check when only actions changed. Release Please only releases a component with
+On a push, the release job waits for the action test gate and docs/config checks. Plugin/repository
+changes also require the existing build, unit test and integration jobs. Empty action matrices
+pass the gate without running action tests, including version-only release changes. Release Please
+only releases a component with
 releasable changes, so running it for changed action code does not create an empty release.
 
 Know this before narrowing a job further: a skipped job takes every job that needs it with it, so no

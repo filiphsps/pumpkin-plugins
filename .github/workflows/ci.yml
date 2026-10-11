@@ -56,6 +56,7 @@ jobs:
         outputs:
             code: ${{ steps.classify.outputs.code }}
             actions: ${{ steps.classify.outputs.actions }}
+            actions_to_test: ${{ steps.classify.outputs.actions_to_test }}
             generated_readmes: ${{ steps.classify.outputs.generated_readmes }}
             integration_scope: ${{ steps.classify.outputs.integration_scope }}
             integration_extra: ${{ steps.classify.outputs.integration_extra }}
@@ -89,6 +90,7 @@ jobs:
               (
                 needs.changes.outputs.code == 'true' ||
                 needs.changes.outputs.actions != '[]' ||
+                needs.changes.outputs.actions_to_test != '[]' ||
                 needs.changes.outputs.generated_readmes == 'true'
               )
             }}
@@ -164,6 +166,42 @@ jobs:
             - name: 🧪 Script tests
               run: pnpm run test:scripts
 
+    action-tests:
+        name: 🧪 Action tests
+        needs: [changes]
+        if: needs.changes.outputs.actions_to_test != '[]'
+        uses: ./.github/workflows/actions.yml
+        with:
+            actions: ${{ needs.changes.outputs.actions_to_test }}
+        secrets:
+            CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+    action-gate:
+        name: 🛡️ Action test gate
+        needs: [changes, action-tests]
+        if: ${{ always() }}
+        timeout-minutes: 5
+        runs-on: ubuntu-26.04
+        steps:
+            - name: 🛡️ Require selected action suites to pass
+              env:
+                  CHANGES_RESULT: ${{ needs.changes.result }}
+                  ACTIONS: ${{ needs.changes.outputs.actions_to_test }}
+                  TEST_RESULT: ${{ needs['action-tests'].result }}
+              run: |
+                  if [[ "$CHANGES_RESULT" != 'success' ]]; then
+                      echo 'Change classification failed.' >&2
+                      exit 1
+                  fi
+                  if [[ "$ACTIONS" == '[]' && "$TEST_RESULT" == 'skipped' ]]; then
+                      exit 0
+                  fi
+                  if [[ "$ACTIONS" != '[]' && "$TEST_RESULT" == 'success' ]]; then
+                      exit 0
+                  fi
+                  echo "Required action verification did not pass: $TEST_RESULT" >&2
+                  exit 1
+
     docs:
         name: 📝 Docs and config
         needs: [changes]
@@ -171,6 +209,7 @@ jobs:
             ${{
               needs.changes.outputs.code == 'true' ||
               needs.changes.outputs.actions != '[]' ||
+              needs.changes.outputs.actions_to_test != '[]' ||
               needs.changes.outputs.generated_readmes == 'true'
             }}
         timeout-minutes: 10
@@ -387,13 +426,14 @@ jobs:
 
     release:
         name: 🚢 Release
-        needs: [changes, build, test, docs, integration]
+        needs: [changes, build, test, docs, integration, action-gate]
         if: >-
             ${{
               always() &&
               github.event_name == 'push' &&
               needs.changes.result == 'success' &&
               needs.docs.result == 'success' &&
+              needs['action-gate'].result == 'success' &&
               (
                 (
                   needs.changes.outputs.code == 'true' &&

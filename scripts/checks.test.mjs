@@ -7,6 +7,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
+import { runInNewContext } from 'node:vm';
+import { parse } from 'yaml';
 
 const scripts = import.meta.dirname;
 const dirs = [];
@@ -446,5 +448,132 @@ describe('check-release-config', () => {
         const withoutTag = files();
         withoutTag['release-please-config.json']['force-tag-creation'] = false;
         assert.match(run('check-release-config.mjs', repo(withoutTag)).out, /"force-tag-creation": true/);
+    });
+});
+
+// Evaluate the actual workflow conditions and shell gate against hosted outcome fixtures.
+describe('action release prerequisites', () => {
+    const ci = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/ci.yml'), 'utf8'));
+    const actions = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/actions.yml'), 'utf8'));
+    const evaluate = (expression, context) =>
+        runInNewContext(expression.trim().replace(/^\$\{\{|\}\}$/g, ''), { always: () => true, ...context });
+
+    it('awaits action verification alongside every existing plugin prerequisite', () => {
+        for (const job of ['changes', 'build', 'test', 'docs', 'integration', 'action-gate']) {
+            assert.ok(ci.jobs.release.needs.includes(job), `Release does not await ${job}`);
+        }
+        assert.deepEqual(ci.jobs['action-gate'].needs, ['changes', 'action-tests']);
+        assert.equal(evaluate(ci.jobs['action-gate'].if, {}), true);
+    });
+
+    it('passes the expanded matrix into the reusable action test workflow', () => {
+        assert.equal(ci.jobs['action-tests']?.uses, './.github/workflows/actions.yml');
+        assert.ok(actions.on.workflow_call.inputs.actions.required);
+        assert.equal(actions.on.workflow_call.inputs.actions.type, 'string');
+        const outputs = { actions: '[]', actions_to_test: '["common"]' };
+        assert.equal(evaluate(ci.jobs['action-tests'].with.actions, { needs: { changes: { outputs } } }), '["common"]');
+        assert.equal(evaluate(ci.jobs['action-tests'].if, { needs: { changes: { outputs } } }), true);
+        assert.equal(
+            evaluate(ci.jobs['action-tests'].if, { needs: { changes: { outputs: { actions_to_test: '[]' } } } }),
+            false
+        );
+        const expression = actions.jobs.test.strategy.matrix.action;
+        const selected = [
+            'common',
+            'publish-to-pumpkin-market',
+            'sign-pumpkin-plugin',
+            'update-pumpkin-market-listing',
+            'verify-pumpkin-plugin'
+        ];
+        assert.deepEqual(
+            Array.from(evaluate(expression, { inputs: { actions: JSON.stringify(selected) }, fromJSON: JSON.parse })),
+            selected
+        );
+        assert.equal(evaluate(actions.jobs.test.if, { inputs: { actions: '[]' } }), false);
+        assert.equal(evaluate(actions.jobs.test.if, { inputs: { actions: '["common"]' } }), true);
+    });
+
+    for (const code of ['true', 'false']) {
+        for (const result of ['success', 'failure', 'cancelled', 'skipped']) {
+            it(`allows ${code === 'true' ? 'mixed' : 'action-only'} release only after a successful action gate (${result})`, () => {
+                const needs = {
+                    changes: { result: 'success', outputs: { code, actions: '["sign-pumpkin-plugin"]' } },
+                    docs: { result: 'success' },
+                    build: { result: code === 'true' ? 'success' : 'skipped' },
+                    test: { result: code === 'true' ? 'success' : 'skipped' },
+                    integration: { result: code === 'true' ? 'success' : 'skipped' },
+                    'action-gate': { result }
+                };
+                assert.equal(
+                    evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }),
+                    result === 'success'
+                );
+            });
+        }
+    }
+
+    it('runs docs/config for version-only releases and common helper changes', () => {
+        for (const [actions, actions_to_test] of [
+            ['["sign-pumpkin-plugin"]', '[]'],
+            ['[]', '["common"]']
+        ]) {
+            const needs = {
+                changes: { outputs: { code: 'false', actions, actions_to_test, generated_readmes: 'false' } }
+            };
+            assert.equal(evaluate(ci.jobs.docs.if, { needs }), true);
+            assert.equal(evaluate(ci.jobs.commits.if, { needs, github: { event_name: 'pull_request' } }), true);
+        }
+    });
+
+    it('preserves version-only, docs-only, common-only, and existing plugin release conditions', () => {
+        for (const [code, selected, docs, expected] of [
+            ['false', '["sign-pumpkin-plugin"]', 'success', true],
+            ['false', '[]', 'skipped', false],
+            ['false', '[]', 'success', false],
+            ['true', '[]', 'success', true]
+        ]) {
+            const needs = {
+                changes: { result: 'success', outputs: { code, actions: selected } },
+                docs: { result: docs },
+                build: { result: 'success' },
+                test: { result: 'success' },
+                integration: { result: 'success' },
+                'action-gate': { result: 'success' }
+            };
+            assert.equal(evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }), expected);
+            if (code === 'true') {
+                for (const required of ['changes', 'build', 'test', 'docs', 'integration']) {
+                    const failing = { ...needs, [required]: { ...needs[required], result: 'failure' } };
+                    assert.equal(
+                        evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs: failing }),
+                        false,
+                        required
+                    );
+                }
+            }
+        }
+    });
+
+    it('executes the gate for required failures, cancellations, and legitimate empty matrices', () => {
+        const gate = ci.jobs['action-gate'];
+        assert.ok(gate, 'Action result gate is missing');
+        const step = gate.steps.find((step) => step.env?.TEST_RESULT);
+        assert.ok(step, 'Action result gate has no test result input');
+        for (const [matrix, result, changes, expected] of [
+            ['["sign-pumpkin-plugin"]', 'success', 'success', 0],
+            ['["common"]', 'failure', 'success', 1],
+            ['["common"]', 'cancelled', 'success', 1],
+            ['["common"]', 'skipped', 'success', 1],
+            ['[]', 'skipped', 'success', 0],
+            ['[]', 'failure', 'success', 1],
+            ['[]', 'cancelled', 'success', 1],
+            ['[]', 'skipped', 'failure', 1]
+        ]) {
+            const outcome = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
+                encoding: 'utf8',
+                env: { ...process.env, ACTIONS: matrix, TEST_RESULT: result, CHANGES_RESULT: changes }
+            });
+            assert.equal(outcome.status, expected, `${matrix}/${result}/${changes}: ${outcome.stderr}`);
+        }
     });
 });

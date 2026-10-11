@@ -1,23 +1,15 @@
 name: Actions
 
 on:
-    pull_request:
-        paths:
-            - 'actions/**'
-            - '!actions/**/*.md'
-            - '!actions/**/docs/**'
-    push:
-        branches:
-            - master
-            - main
-        paths:
-            - 'actions/**'
-            - '!actions/**/*.md'
-            - '!actions/**/docs/**'
-
-concurrency:
-    group: actions-${{ github.ref }}
-    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    workflow_call:
+        inputs:
+            actions:
+                description: JSON array of action suites selected by CI
+                required: true
+                type: string
+        secrets:
+            CODECOV_TOKEN:
+                required: false
 
 env:
     CI: true
@@ -27,40 +19,15 @@ permissions:
     contents: read
 
 jobs:
-    changes:
-        name: 🔍 Changed actions
-        timeout-minutes: 5
-        runs-on: ubuntu-26.04
-        outputs:
-            actions: ${{ steps.classify.outputs.actions_to_test }}
-        steps:
-            - name: 🕶️ Checkout repository
-              uses: actions/checkout@v7.0.1
-              with:
-                  fetch-depth: 0
-
-            - name: 📥 Fetch comparison base
-              env:
-                  BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-              run: git fetch --no-tags origin "$BASE"
-
-            - name: 🔍 Find changed action code
-              id: classify
-              env:
-                  BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-                  HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-              run: node scripts/changed-areas.mjs "$BASE" "$HEAD"
-
     test:
         name: 🧪 Test ${{ matrix.action }}
-        needs: [changes]
-        if: needs.changes.outputs.actions != '[]'
+        if: inputs.actions != '[]'
         timeout-minutes: 15
         runs-on: ubuntu-26.04
         strategy:
             fail-fast: false
             matrix:
-                action: ${{ fromJSON(needs.changes.outputs.actions) }}
+                action: ${{ fromJSON(inputs.actions) }}
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
