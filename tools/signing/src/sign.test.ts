@@ -1,4 +1,4 @@
-import { createPublicKey, type KeyObject, verify } from 'node:crypto';
+import { createPrivateKey, createPublicKey, type KeyObject, sign, verify } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { generateKeyPair, publicKeyOf, signWasm, verifyWasm } from './sign.ts';
 import { METADATA, minimalWasm, SEED } from './testing/fixtures.ts';
@@ -10,6 +10,31 @@ const SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 const KNOWN_PUBLIC_KEY = '03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8';
 const KNOWN_SIGNATURE =
     'baff55fcd5f0a601e81f227ee00f104dfd15696fdee83936f90e058d9a57d05003dc9b7bb29c5c116d7ac667c29100bff29e638fc31e749de0128084f97c9a07';
+
+function signedMetadata(json: string): Buffer {
+    const wasm = minimalWasm();
+    const metadata = Buffer.from(json);
+    const key = createPrivateKey({
+        key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), Buffer.from(SEED, 'hex')]),
+        format: 'der',
+        type: 'pkcs8'
+    });
+    const signature = sign(null, Buffer.concat([wasm, metadata]), key);
+    return appendCustomSections(wasm, [
+        ['pumpkin.metadata', metadata],
+        [
+            'wasm_signature',
+            Buffer.from(
+                JSON.stringify({
+                    version: 1,
+                    algorithm: 'Ed25519',
+                    public_key_hex: publicKeyOf(SEED),
+                    signature_hex: signature.toString('hex')
+                })
+            )
+        ]
+    ]);
+}
 
 describe('keys', () => {
     it('generates a usable pair', () => {
@@ -126,6 +151,79 @@ describe('verifyWasm', () => {
             metadata: METADATA,
             publicKeyHex: publicKeyOf(SEED)
         });
+    });
+
+    it.each(['{}', '[]', 'null'])(
+        'rejects correctly signed non-metadata %s without exposing a typed object',
+        (json) => {
+            expect(verifyWasm(signedMetadata(json))).toMatchObject({
+                signed: true,
+                valid: false,
+                error: expect.stringContaining('metadata')
+            });
+            expect(verifyWasm(signedMetadata(json)).metadata).toBeUndefined();
+        }
+    );
+
+    it.each(Object.keys(METADATA).filter((key) => key !== 'license_key'))(
+        'rejects a correctly signed missing %s',
+        (key) => {
+            const metadata: Record<string, unknown> = { ...METADATA };
+            delete metadata[key];
+            const result = verifyWasm(signedMetadata(JSON.stringify(metadata)));
+            expect(result).toMatchObject({ signed: true, valid: false, error: expect.stringContaining('metadata') });
+            expect(result.metadata).toBeUndefined();
+        }
+    );
+
+    it.each([
+        ['marketplace_url', null],
+        ['plugin_name', 12],
+        ['version', []],
+        ['dev_name', {}],
+        ['issued_at', true],
+        ['plugin_id', '1'],
+        ['dev_id', 1.5],
+        ['user_id', null],
+        ['is_paid', 'false'],
+        ['license_key', false]
+    ])('rejects correctly signed wrong-type %s', (key, value) => {
+        const result = verifyWasm(signedMetadata(JSON.stringify({ ...METADATA, [key]: value })));
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('metadata');
+        expect(result.metadata).toBeUndefined();
+    });
+
+    it.each(['9223372036854775808', '-9223372036854775809', '1.0', '1e0'])(
+        'rejects a signed ID outside the host i64 JSON contract: %s',
+        (id) => {
+            const json = JSON.stringify(METADATA).replace('"plugin_id":0', `"plugin_id":${id}`);
+            const result = verifyWasm(signedMetadata(json));
+            expect(result.valid).toBe(false);
+            expect(result.metadata).toBeUndefined();
+        }
+    );
+
+    it.each(['9223372036854775807', '-9223372036854775808', '-1', '0'])('accepts the host i64 ID %s', (id) => {
+        const json = JSON.stringify(METADATA).replace('"plugin_id":0', `"plugin_id":${id}`);
+        expect(verifyWasm(signedMetadata(json)).valid).toBe(true);
+    });
+
+    it('accepts omitted license keys, empty strings, opaque dates and unknown fields like the host', () => {
+        const metadata: Record<string, unknown> = {
+            ...METADATA,
+            marketplace_url: '',
+            plugin_name: '',
+            version: '',
+            dev_name: '',
+            issued_at: 'opaque date',
+            extra: { plugin_id: 1.5 }
+        };
+        metadata.license_key = undefined;
+        const result = verifyWasm(signedMetadata(JSON.stringify(metadata)));
+        expect(result.valid).toBe(true);
+        expect(result.metadata?.license_key).toBeNull();
+        expect(verifyWasm(signedMetadata(JSON.stringify({ ...METADATA, license_key: 'license' }))).valid).toBe(true);
     });
 
     it('reports unsigned input as not signed', () => {

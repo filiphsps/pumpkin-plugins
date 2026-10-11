@@ -25,9 +25,9 @@ export interface SigningMetadata {
     is_paid: boolean;
     /** Marketplace user id; 0 for independent plugins. */
     user_id: number;
-    /** License key, or null. */
-    license_key: string | null;
-    /** When the build was signed, ISO-8601 UTC. */
+    /** License key; omitted or null when absent, matching the host Option<String>. */
+    license_key?: string | null;
+    /** Signing date text; the host accepts an opaque string. */
     issued_at: string;
 }
 
@@ -134,15 +134,46 @@ function last(sections: WasmSection[], name: string): WasmSection | undefined {
     return [...sections].reverse().find((s) => s.name === name);
 }
 
-function parseJson(data: Uint8Array): Record<string, unknown> | undefined {
+const ID_FIELDS = ['plugin_id', 'dev_id', 'user_id'];
+const MIN_I64 = -(1n << 63n);
+const MAX_I64 = (1n << 63n) - 1n;
+
+function parseJson(data: Uint8Array, metadataIds = false): Record<string, unknown> | undefined {
     try {
-        const value: unknown = JSON.parse(Buffer.from(data).toString('utf8'));
-        return typeof value === 'object' && value !== null && !Array.isArray(value)
+        const invalidIds = new WeakSet<object>();
+        const value: unknown = JSON.parse(
+            Buffer.from(data).toString('utf8'),
+            function (this: object, key: string, field: unknown, context?: { source: string }) {
+                if (metadataIds && ID_FIELDS.includes(key) && typeof field === 'number') {
+                    // Source text preserves the host's i64 range at JavaScript rounding boundaries.
+                    const source = context?.source;
+                    if (!source || !/^-?\d+$/.test(source) || BigInt(source) < MIN_I64 || BigInt(source) > MAX_I64) {
+                        invalidIds.add(this);
+                    }
+                }
+                return field;
+            }
+        );
+        return typeof value === 'object' && value !== null && !Array.isArray(value) && !invalidIds.has(value)
             ? (value as Record<string, unknown>)
             : undefined;
     } catch {
         return undefined;
     }
+}
+
+function isSigningMetadata(
+    value: Record<string, unknown> | undefined
+): value is SigningMetadata & Record<string, unknown> {
+    if (!value) return false;
+    return (
+        ['marketplace_url', 'plugin_name', 'version', 'dev_name', 'issued_at'].every(
+            (key) => typeof value[key] === 'string'
+        ) &&
+        ID_FIELDS.every((key) => typeof value[key] === 'number' && Number.isInteger(value[key])) &&
+        typeof value.is_paid === 'boolean' &&
+        (value.license_key === undefined || value.license_key === null || typeof value.license_key === 'string')
+    );
 }
 
 /**
@@ -163,7 +194,10 @@ export function verifyWasm(wasm: Uint8Array): VerifyResult {
     if (!metadataSection?.data) {
         return { signed: true, valid: false, error: `signature without a ${METADATA_SECTION} section` };
     }
-    const metadata = parseJson(metadataSection.data) as SigningMetadata | undefined;
+    const parsedMetadata = parseJson(metadataSection.data, true);
+    const metadata = isSigningMetadata(parsedMetadata)
+        ? { ...parsedMetadata, license_key: parsedMetadata.license_key ?? null }
+        : undefined;
     const envelope = parseJson(signatureSection.data);
     const base = { signed: true, valid: false, ...(metadata ? { metadata } : {}) };
     if (!envelope) return { ...base, error: 'signature envelope is not a JSON object' };
@@ -189,6 +223,6 @@ export function verifyWasm(wasm: Uint8Array): VerifyResult {
     if (!verify(null, payload, key, Buffer.from(signatureHex, 'hex'))) {
         return { ...withKey, error: 'signature does not match the file contents' };
     }
-    if (!metadata) return { ...withKey, error: 'metadata is not a JSON object' };
+    if (!metadata) return { ...withKey, error: 'metadata does not match the Pumpkin host schema' };
     return { signed: true, valid: true, metadata, publicKeyHex };
 }

@@ -90,6 +90,15 @@ describe('verify-pumpkin-plugin action', () => {
         assert.match(result.outputs, /verified-count<<.*\n2\n/);
     });
 
+    it('rejects genuinely signed malformed metadata without success outputs', () => {
+        const { dir, wasmFile } = fixture();
+        fs.writeFileSync(wasmFile, signWasm(minimalWasm(), { ...METADATA, plugin_name: undefined }, SEED));
+        const result = run(dir);
+        assert.equal(result.ok, false);
+        assert.match(result.out, /metadata/);
+        assert.equal(result.outputs, '');
+    });
+
     it('rejects unsigned files', () => {
         const { dir } = fixture();
         fs.writeFileSync(path.join(dir, 'plugin.wasm'), minimalWasm());
