@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.6](https://github.com/filiphsps/pumpkin-plugins/compare/publish-to-pumpkin-market-v0.0.5...publish-to-pumpkin-market-v0.0.6) (2026-10-11)
+
+
+### Bug Fixes
+
+* **ci:** preserve release fan-out and add recovery workflow ([563ae61](https://github.com/filiphsps/pumpkin-plugins/commit/563ae615434ab8231fb7cb0662dbd4b808b4b967))
+
 ## [0.0.5](https://github.com/filiphsps/pumpkin-plugins/compare/publish-to-pumpkin-market-v0.0.4...publish-to-pumpkin-market-v0.0.5) (2026-10-11)
 
 
