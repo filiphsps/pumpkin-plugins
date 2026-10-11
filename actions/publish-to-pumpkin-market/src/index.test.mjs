@@ -288,6 +288,50 @@ describe('publish-to-market action', () => {
         }
     });
 
+    for (const phase of ['upload', 'search']) {
+        it(`redacts and bounds ${phase} error bodies while escaping workflow commands`, async () => {
+            const secret = 'FAKE-MARKET-TOKEN-SENTINEL';
+            const body = `Bearer ${secret}\r\n::notice::injected%${'x'.repeat(4000)}BODY-TAIL`;
+            const market = await server((request, response) => {
+                if (request.method === 'GET' && request.url.startsWith('/api/v1/rest/plugins/')) {
+                    response.statusCode = 404;
+                    response.end('not found');
+                } else if (request.method === 'GET' && phase === 'upload') {
+                    response.end('[{"id":42,"name":"Published plugin","version":"1.0.0"}]');
+                } else {
+                    response.statusCode = 503;
+                    response.end(body);
+                }
+            });
+            try {
+                const dir = fixture();
+                const outputFile = path.join(dir, 'outputs.txt');
+                const summaryFile = path.join(dir, 'summary.md');
+                const result = await run(
+                    dir,
+                    inputs({
+                        'INPUT_API-TOKEN': secret,
+                        'INPUT_API-URL': market.url,
+                        INPUT_WARN: 'true',
+                        GITHUB_OUTPUT: outputFile,
+                        GITHUB_STEP_SUMMARY: summaryFile
+                    })
+                );
+                const summary = fs.existsSync(summaryFile) ? fs.readFileSync(summaryFile, 'utf8') : '';
+                assert.equal(result.status, 1);
+                assert.doesNotMatch(result.stdout + result.stderr + summary, new RegExp(secret));
+                assert.match(result.stderr, /503/);
+                assert.match(result.stderr, /Bearer \[REDACTED\]%0D%0A::notice::injected%25/);
+                assert.doesNotMatch(result.stderr, /BODY-TAIL|\n::notice::/);
+                assert.ok(result.stderr.length < 1200, `diagnostic length ${result.stderr.length}`);
+                assert.equal(fs.existsSync(outputFile), false);
+                assert.equal(summary, '');
+            } finally {
+                market.instance.close();
+            }
+        });
+    }
+
     it('fails when the WASM path does not exist', async () => {
         const dir = fixture();
         const result = await run(dir, inputs({ 'INPUT_WASM-FILE': 'missing.wasm' }));

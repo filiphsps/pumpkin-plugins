@@ -2,6 +2,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeBody } from '../../common/src/diagnostics.mjs';
 import { getInput, setOutput } from '../../common/src/utils.mjs';
 
 const pluginName = getInput('plugin-name').trim();
@@ -57,7 +58,9 @@ async function publish() {
         body: form
     });
     if (!response.ok)
-        throw new Error(`Market update for ${listing.name} failed (${response.status}): ${await response.text()}`);
+        throw new Error(
+            `Market update for ${listing.name} failed (${response.status}): ${safeBody(await response.text(), token)}`
+        );
 
     setListingOutputs(listing);
     setOutput('status', 'success');
@@ -79,7 +82,10 @@ async function findListingByName(name) {
     searchUrl.searchParams.set('q', name);
     searchUrl.searchParams.set('limit', '20');
     const response = await marketFetch(searchUrl);
-    if (!response.ok) throw new Error(`Could not search Market plugins (${response.status}): ${await response.text()}`);
+    if (!response.ok)
+        throw new Error(
+            `Could not search Market plugins (${response.status}): ${safeBody(await response.text(), token)}`
+        );
     const listings = await response.json();
     if (!Array.isArray(listings)) throw new Error('Market plugin search response was not an array');
     const matches = listings.filter((listing) => isExactName(listing, name) && Number.isInteger(listing.id));
