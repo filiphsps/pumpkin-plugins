@@ -90,9 +90,21 @@ async function findListingByName(name) {
 /** Resolves a numeric or public Market ID to the listing's numeric database ID. */
 async function findListingById(id) {
     const response = await marketFetch(`${marketUrl}/api/v1/rest/plugins/${encodeURIComponent(id)}`);
-    if (!response.ok) return undefined;
-    const listing = await response.json();
-    if (!Number.isInteger(listing?.id) || typeof listing.name !== 'string' || !listing.name) return undefined;
+    if (response.status === 404) return undefined;
+    if (!response.ok) throw new Error(`Could not look up Market plugin ${JSON.stringify(id)} (${response.status})`);
+    let listing;
+    try {
+        listing = await response.json();
+    } catch {
+        throw new Error('Market plugin lookup response was not valid JSON');
+    }
+    if (
+        !Number.isInteger(listing?.id) ||
+        typeof listing.name !== 'string' ||
+        !listing.name ||
+        (listing.version !== null && typeof listing.version !== 'string')
+    )
+        throw new Error('Market plugin lookup response was not a valid listing');
     return listing;
 }
 

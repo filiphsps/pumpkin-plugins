@@ -295,49 +295,161 @@ describe('publish-to-market action', () => {
         assert.match(result.stderr, /WASM file not found/);
     });
 
-    it('publishes through a numeric or public plugin ID without name search', async () => {
-        const requests = [];
-        const market = await server((request, response) => {
-            requests.push(request);
-            if (request.method === 'GET') {
-                response.setHeader('content-type', 'application/json');
-                response.end(
-                    JSON.stringify({ id: 42, public_id: 'public-test-id', name: 'Canonical Plugin', version: '1.0.0' })
+    for (const status of [401, 403, 429, 500]) {
+        it(`fails ID lookup on HTTP ${status} even with warn enabled`, async () => {
+            const requests = [];
+            const market = await server((request, response) => {
+                requests.push({ method: request.method, url: request.url });
+                response.statusCode = status;
+                response.end('lookup failure');
+            });
+            try {
+                const dir = fixture();
+                const outputFile = path.join(dir, 'outputs.txt');
+                const result = await run(
+                    dir,
+                    inputs({
+                        'INPUT_PLUGIN-NAME': '',
+                        'INPUT_PLUGIN-ID': 'public-test-id',
+                        'INPUT_API-TOKEN': 'test-token',
+                        'INPUT_API-URL': market.url,
+                        INPUT_WARN: 'true',
+                        GITHUB_OUTPUT: outputFile
+                    })
                 );
-            } else {
-                let body = '';
-                request.setEncoding('utf8');
-                request.on('data', (chunk) => (body += chunk));
-                request.on('end', () => {
-                    request.body = body;
-                    response.end('{}');
-                });
+                assert.equal(result.status, 1, result.stdout);
+                assert.match(result.stderr, new RegExp(`Could not look up Market plugin.*${status}`));
+                assert.doesNotMatch(result.stdout, /::warning|skipped/);
+                assert.equal(fs.existsSync(outputFile), false);
+                assert.deepEqual(requests, [{ method: 'GET', url: '/api/v1/rest/plugins/public-test-id' }]);
+            } finally {
+                market.instance.close();
             }
         });
-        try {
-            const dir = fixture();
-            const outputFile = path.join(dir, 'outputs.txt');
-            const result = await run(dir, {
-                'INPUT_PLUGIN-ID': 'public-test-id',
-                INPUT_VERSION: '1.2.3',
-                'INPUT_WASM-FILE': 'plugin.wasm',
-                'INPUT_API-TOKEN': 'test-token',
-                'INPUT_API-URL': market.url,
-                GITHUB_OUTPUT: outputFile
-            });
+    }
 
-            assert.equal(result.status, 0, result.stderr);
-            assert.equal(requests.length, 2);
-            assert.equal(requests[0].url, '/api/v1/rest/plugins/public-test-id');
-            assert.equal(requests[1].url, '/api/plugins/42');
-            assert.deepEqual(readOutputs(outputFile), {
-                'listing-id': '42',
-                'listing-name': 'Canonical Plugin',
-                status: 'success',
-                'published-version': '1.2.3'
+    for (const body of [
+        'invalid json',
+        '{}',
+        'null',
+        '[]',
+        '{"id":42,"name":true,"version":"1"}',
+        '{"id":"42","name":"Plugin","version":"1"}',
+        '{"id":42,"name":"Plugin","version":{}}'
+    ]) {
+        it(`rejects an invalid successful ID response: ${body}`, async () => {
+            const requests = [];
+            const market = await server((request, response) => {
+                requests.push(request.method);
+                response.end(body);
             });
-        } finally {
-            market.instance.close();
-        }
-    });
+            try {
+                const dir = fixture();
+                const outputFile = path.join(dir, 'outputs.txt');
+                const result = await run(
+                    dir,
+                    inputs({
+                        'INPUT_PLUGIN-NAME': '',
+                        'INPUT_PLUGIN-ID': '42',
+                        'INPUT_API-TOKEN': 'test-token',
+                        'INPUT_API-URL': market.url,
+                        INPUT_WARN: 'true',
+                        GITHUB_OUTPUT: outputFile
+                    })
+                );
+                assert.equal(result.status, 1, result.stdout);
+                assert.match(result.stderr, /Market plugin lookup response.*(?:JSON|listing)/);
+                assert.doesNotMatch(result.stdout, /::warning|skipped/);
+                assert.equal(fs.existsSync(outputFile), false);
+                assert.deepEqual(requests, ['GET']);
+            } finally {
+                market.instance.close();
+            }
+        });
+    }
+
+    for (const warn of ['false', 'true']) {
+        it(`treats only HTTP 404 as an absent ID listing with warn=${warn}`, async () => {
+            let requests = 0;
+            const market = await server((_request, response) => {
+                requests++;
+                response.statusCode = 404;
+                response.end('not found');
+            });
+            try {
+                const dir = fixture();
+                const outputFile = path.join(dir, 'outputs.txt');
+                const result = await run(
+                    dir,
+                    inputs({
+                        'INPUT_PLUGIN-NAME': '',
+                        'INPUT_PLUGIN-ID': '42',
+                        'INPUT_API-TOKEN': 'test-token',
+                        'INPUT_API-URL': market.url,
+                        INPUT_WARN: warn,
+                        GITHUB_OUTPUT: outputFile
+                    })
+                );
+                assert.equal(result.status, warn === 'true' ? 0 : 1, result.stderr);
+                assert.equal(requests, 1);
+                if (warn === 'true') assert.deepEqual(readOutputs(outputFile), { status: 'skipped' });
+                else assert.equal(fs.existsSync(outputFile), false);
+            } finally {
+                market.instance.close();
+            }
+        });
+    }
+
+    for (const selectedId of ['42', 'public-test-id']) {
+        it(`publishes through plugin ID ${selectedId} without name search`, async () => {
+            const requests = [];
+            const market = await server((request, response) => {
+                requests.push(request);
+                if (request.method === 'GET') {
+                    response.setHeader('content-type', 'application/json');
+                    response.end(
+                        JSON.stringify({
+                            id: 42,
+                            public_id: 'public-test-id',
+                            name: 'Canonical Plugin',
+                            version: '1.0.0'
+                        })
+                    );
+                } else {
+                    let body = '';
+                    request.setEncoding('utf8');
+                    request.on('data', (chunk) => (body += chunk));
+                    request.on('end', () => {
+                        request.body = body;
+                        response.end('{}');
+                    });
+                }
+            });
+            try {
+                const dir = fixture();
+                const outputFile = path.join(dir, 'outputs.txt');
+                const result = await run(dir, {
+                    'INPUT_PLUGIN-ID': selectedId,
+                    INPUT_VERSION: '1.2.3',
+                    'INPUT_WASM-FILE': 'plugin.wasm',
+                    'INPUT_API-TOKEN': 'test-token',
+                    'INPUT_API-URL': market.url,
+                    GITHUB_OUTPUT: outputFile
+                });
+
+                assert.equal(result.status, 0, result.stderr);
+                assert.equal(requests.length, 2);
+                assert.equal(requests[0].url, `/api/v1/rest/plugins/${selectedId}`);
+                assert.equal(requests[1].url, '/api/plugins/42');
+                assert.deepEqual(readOutputs(outputFile), {
+                    'listing-id': '42',
+                    'listing-name': 'Canonical Plugin',
+                    status: 'success',
+                    'published-version': '1.2.3'
+                });
+            } finally {
+                market.instance.close();
+            }
+        });
+    }
 });
