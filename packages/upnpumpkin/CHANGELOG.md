@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.0.8](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.0.7...upnpumpkin-v0.0.8) (2026-10-11)
+
+
+### Features
+
+* **plugin-kit:** support double and player selector arguments ([bfbf5e9](https://github.com/filiphsps/pumpkin-plugins/commit/bfbf5e92957fa2d884778fed05436c1f576c76e0))
+* **plugin-kit:** support dynamic command suggestions ([678396f](https://github.com/filiphsps/pumpkin-plugins/commit/678396fa657faef06152f32240bdb4dbab54290f))
+* **waypoints:** add shared waypoint HUD and access rules ([54f39f1](https://github.com/filiphsps/pumpkin-plugins/commit/54f39f1d01ce916cffd64b7f6af79c651d77d829))
+
+
+### Bug Fixes
+
+* **build:** verify pinned runtime provenance ([04c7590](https://github.com/filiphsps/pumpkin-plugins/commit/04c75909f351abb2bbecd10d7c38ca721753fb1f))
+* **ci:** verify host-specific runtime builds ([825676e](https://github.com/filiphsps/pumpkin-plugins/commit/825676e1fac8934e8ea422c6f77254acd1213b46))
+* **port-mapping:** account for creation during shutdown ([08ff31f](https://github.com/filiphsps/pumpkin-plugins/commit/08ff31fe83b44cb8ca29762bb327b68c3ee96a2f))
+* **port-mapping:** compensate confirmed late creations ([5a9c218](https://github.com/filiphsps/pumpkin-plugins/commit/5a9c2189655791e76e579e5d9616615eb7369031))
+* **port-mapping:** enforce physical mapping identity ([0681c43](https://github.com/filiphsps/pumpkin-plugins/commit/0681c432449f1a2514ff4dc4eae4902c190ad996))
+* **port-mapping:** maintain permanent router mappings ([b42745c](https://github.com/filiphsps/pumpkin-plugins/commit/b42745cb3cb6665579263060a25e23a919a3ddbe))
+* **port-mapping:** reject invalid chunk length tokens ([c356e51](https://github.com/filiphsps/pumpkin-plugins/commit/c356e51c27e13de4b72d9cacb36b6407a097c53b))
+* **port-mapping:** reject truncated framed responses ([fbf6719](https://github.com/filiphsps/pumpkin-plugins/commit/fbf6719e54839b026443deb255e84a3fd76cf60a))
+* **port-mapping:** report listener port on public hosts ([ace727d](https://github.com/filiphsps/pumpkin-plugins/commit/ace727d168614b4417061acb39c19cbb9e0270bd))
+* **port-mapping:** retain mappings for compatible owners ([ba86e79](https://github.com/filiphsps/pumpkin-plugins/commit/ba86e7984bc1428e484f606747011b56484afb47))
+* **port-mapping:** validate chunk delimiters and trailers ([6c906fd](https://github.com/filiphsps/pumpkin-plugins/commit/6c906fd42948dfb388bd2f29e5b604a1eccbfe8b))
+* **port-mapping:** validate SOAP action responses ([eaff6e8](https://github.com/filiphsps/pumpkin-plugins/commit/eaff6e8149b45729d7628b303df139d4602319ea))
+* **runtime:** preserve WIT 64-bit values as bigint ([6979f1d](https://github.com/filiphsps/pumpkin-plugins/commit/6979f1ddab17f67919a2b0a89e47bc3ee19b5dd7))
+* **runtime:** release imported Wasm resources ([36a638c](https://github.com/filiphsps/pumpkin-plugins/commit/36a638c0b56658470a71c788df166edc491e2c89))
+* **upnpumpkin:** cancel cleanup at shutdown deadline ([7869985](https://github.com/filiphsps/pumpkin-plugins/commit/78699858dd137538affbb9c98a2a1b17ce5a36da))
+* **upnpumpkin:** retain received UDP batches ([970b7e2](https://github.com/filiphsps/pumpkin-plugins/commit/970b7e29e67a4fcd39e9469880d5c0a47be3bef5))
+* **upnpumpkin:** retire reloaded mappers across ticks ([feb34f5](https://github.com/filiphsps/pumpkin-plugins/commit/feb34f579f005e5fbd645684b26b1ad161792370))
+* **waypoints:** recover native item argument values ([15a31b2](https://github.com/filiphsps/pumpkin-plugins/commit/15a31b2ae86b2f0caac60f5db03fffea42baf141))
+
 ## [0.0.7](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.0.6...upnpumpkin-v0.0.7) (2026-10-08)
 
 

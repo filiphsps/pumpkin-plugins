@@ -1,6 +1,6 @@
 {
     "name": "@pumpkin-plugins/upnpumpkin",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "private": true,
     "description": "Opens router ports for Pumpkin with UPnP and NAT-PMP",
     "license": "MIT",
