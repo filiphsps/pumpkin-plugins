@@ -15,6 +15,7 @@ import { build } from 'esbuild';
 import { bundlePlugin } from './bundle.ts';
 
 const dirs: string[] = [];
+const MAX_PRODUCTION_COMPONENT_BYTES = 5 * 1024 * 1024;
 const componentize = vi.mocked(execFileSync);
 const esbuild = vi.mocked(build);
 
@@ -57,7 +58,8 @@ describe('bundlePlugin', () => {
                 define: {
                     __PLUGIN_VERSION__: JSON.stringify('1.0.0'),
                     __PUMPKIN_DEV_MODE__: JSON.stringify(true)
-                }
+                },
+                minify: false
             })
         );
     });
@@ -71,6 +73,65 @@ describe('bundlePlugin', () => {
         expect(size).toBe(Buffer.byteLength('component'));
         expect(fs.readFileSync(output, 'utf8')).toBe('component');
         expect(fs.readdirSync(path.dirname(output))).toEqual(['plugin.wasm']);
+        expect(esbuild).toHaveBeenCalledWith(expect.objectContaining({ minify: true }));
+    });
+
+    it('allows a production component exactly at the 5 MiB limit', async () => {
+        const { output } = buildAt();
+        const limit = MAX_PRODUCTION_COMPONENT_BYTES;
+        componentize.mockImplementation((_file, args) => {
+            const outputIndex = args?.indexOf('--output') ?? -1;
+            const staged = args?.[outputIndex + 1];
+            if (!staged) throw new Error('missing componentizer output argument');
+            fs.writeFileSync(staged, '');
+            fs.truncateSync(staged, limit);
+            return Buffer.alloc(0);
+        });
+
+        const size = await bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0' });
+
+        expect(size).toBe(limit);
+        expect(fs.statSync(output).size).toBe(limit);
+    });
+
+    it('rejects oversized production components without replacing the previous artifact', async () => {
+        const { output } = buildAt();
+        const limit = MAX_PRODUCTION_COMPONENT_BYTES;
+        fs.writeFileSync(output, 'known-good artifact');
+        componentize.mockImplementation((_file, args) => {
+            const outputIndex = args?.indexOf('--output') ?? -1;
+            const staged = args?.[outputIndex + 1];
+            if (!staged) throw new Error('missing componentizer output argument');
+            fs.writeFileSync(staged, '');
+            fs.truncateSync(staged, limit + 1);
+            return Buffer.alloc(0);
+        });
+
+        await expect(bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0' })).rejects.toThrow(
+            `Production WebAssembly component is ${MAX_PRODUCTION_COMPONENT_BYTES + 1} bytes; maximum is ${MAX_PRODUCTION_COMPONENT_BYTES} bytes (5 MiB)`
+        );
+
+        expect(fs.readFileSync(output, 'utf8')).toBe('known-good artifact');
+        expect(fs.readdirSync(path.dirname(output))).toEqual(['plugin.wasm']);
+    });
+
+    it('does not apply the production size limit to development components', async () => {
+        const { output } = buildAt();
+        const size = MAX_PRODUCTION_COMPONENT_BYTES + 1;
+        componentize.mockImplementation((_file, args) => {
+            const outputIndex = args?.indexOf('--output') ?? -1;
+            const staged = args?.[outputIndex + 1];
+            if (!staged) throw new Error('missing componentizer output argument');
+            fs.writeFileSync(staged, '');
+            fs.truncateSync(staged, size);
+            return Buffer.alloc(0);
+        });
+
+        await expect(
+            bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0', developmentMode: true })
+        ).resolves.toBe(size);
+
+        expect(fs.statSync(output).size).toBe(size);
     });
 
     it('keeps the previous artifact and removes staging files when componentization fails', async () => {

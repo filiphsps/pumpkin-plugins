@@ -20,6 +20,10 @@ Wasmtime 48 CLI fork of `componentize-qjs`. The fork is needed because the upstr
 fails to link the WASI HTTP types used by plugins. The pinned release's own build script uses a
 componentizer that produces 55 MB plugins and can't run the WASI socket code.
 
+Production bundles are minified and must be at most 5 MiB (5,242,880 bytes) after componentization.
+An oversized build fails before replacing the existing `.wasm` output. Development builds are not
+minified and are exempt from this limit.
+
 | Command | Result |
 | --- | --- |
 | `pumpkin-plugins-build` | `build/<plugin>.wasm`, with the WIT it was built from in `build/wit/` (a copy, since the WASI imports are added) |

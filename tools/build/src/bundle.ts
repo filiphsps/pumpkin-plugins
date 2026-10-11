@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import * as esbuild from 'esbuild';
 
 const require = createRequire(import.meta.url);
+const MAX_PRODUCTION_COMPONENT_BYTES = 5 * 1024 * 1024;
 
 /** Inputs to `bundlePlugin`. */
 export interface BundleOptions {
@@ -41,6 +42,7 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
             outfile: bundle,
             format: 'esm',
             target: 'es2022',
+            minify: !options.developmentMode,
             external: ['pumpkin:plugin/*', 'wasi:*'],
             define: {
                 __PLUGIN_VERSION__: JSON.stringify(options.version),
@@ -66,6 +68,11 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
             { stdio: 'inherit' }
         );
         const size = fs.statSync(component).size;
+        if (!options.developmentMode && size > MAX_PRODUCTION_COMPONENT_BYTES) {
+            throw new Error(
+                `Production WebAssembly component is ${size} bytes; maximum is ${MAX_PRODUCTION_COMPONENT_BYTES} bytes (5 MiB)`
+            );
+        }
         publishComponent(component, output, temporaryDir, () => {
             preserveTemporaryDir = true;
         });
