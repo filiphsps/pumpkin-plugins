@@ -76,9 +76,9 @@ an apply-patch formatted patch. Unknown tool names pass through; unsupported eve
 An adapter must translate its own tool names and payloads into this contract.
 
 The optional before-tool guard catches common use of other package managers and direct edits to
-lockfiles, release-owned files, build output and generated README blocks. Shell matching is a
+lockfiles, release-owned files, build output and generated Markdown blocks in READMEs and custom guides. Shell matching is a
 heuristic, not a shell parser or security boundary. Shell-based file writes bypass edit guards.
-Patch edits to a README containing generated blocks are conservatively refused because the guard
+Patch edits to a Markdown file containing generated blocks are conservatively refused because the guard
 doesn't reconstruct patch hunks; use a precise edit outside the blocks, or regenerate from source.
 Plain Turbo runs receive `--output-logs=errors-only` unless they specify a log level or shell syntax.
 Git authorization remains in AGENTS.md; the guard cannot infer what the user authorized.

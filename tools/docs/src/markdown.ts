@@ -29,3 +29,6 @@ export function code(text: string): string {
         (text.startsWith(' ') && text.endsWith(' ') && Boolean(text.trim()));
     return `${fence}${pad ? ` ${text} ` : text}${fence}`;
 }
+
+export type { GeneratedBlock } from './block-reader.ts';
+export { generatedBlocks, stripGeneratedBlocks } from './block-reader.ts';

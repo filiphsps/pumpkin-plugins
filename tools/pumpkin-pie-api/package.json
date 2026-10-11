@@ -46,8 +46,8 @@
         "test": "vitest run --project unit",
         "test:coverage": "vitest run --project unit --coverage",
         "test:integration": "vitest run --project integration",
-        "readme": "node scripts/generate-docs.ts",
-        "readme:check": "node scripts/generate-docs.ts --check"
+        "readme": "pumpkin-plugins-docs generate docs.ts",
+        "readme:check": "pumpkin-plugins-docs generate docs.ts --check"
     },
     "dependencies": {
         "fflate": "catalog:"

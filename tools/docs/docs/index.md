@@ -69,7 +69,7 @@ markers and reversed pairs are errors. `--check` reports stale content without w
 write failures can still leave earlier targets updated; this is validation before writes, not a
 transaction. Everything outside the generated markers is preserved.
 
-Each document accepts `note` (an empty string omits it), `required: false` to allow absent blocks,
+Each document accepts `note` (omitting it uses a generic generation note; an empty string omits it), `required: false` to allow absent blocks,
 and `markers: 'action'` for existing `<!-- action-inputs:start -->` / `<!-- action-inputs:end -->`
 markers. Plugin README generation retains its existing optional-block behavior.
 
@@ -78,7 +78,7 @@ markers. Plugin README generation retains its existing optional-block behavior.
 | Entry point | Use |
 | --- | --- |
 | `@pumpkin-plugins/docs` | Host-safe plugin metadata, commands, `code` and `table` |
-| `@pumpkin-plugins/docs/markdown` | Host-safe `cell`, `code`, `table` and `TableOptions` |
+| `@pumpkin-plugins/docs/markdown` | Host-safe `cell`, `code`, `table`, generated-block readers and their types |
 | `@pumpkin-plugins/docs/node` | Node-only `generateDocuments`, `DocumentSpec`, `Status`, component discovery and Markdown traversal |
 
 `table(headers, rows)` escapes pipes in headers and values and folds multiline cells into one
@@ -128,3 +128,16 @@ missing. The shared generator still prepares every target before writing and sup
 case-insensitively, ignoring directories. Package metadata checks and generated catalogs use the
 same rule. Repository scripts also reuse component discovery for release registration, bundled
 package lookup, plugin collection, signed artifact installation and development builds.
+
+`generatedBlocks(source)` finds complete blocks in both supported marker syntaxes, returning each
+block's name, syntax, text and `[start, end)` source offsets. `stripGeneratedBlocks(source)` removes
+those blocks while preserving handwritten content. These host-safe `/markdown` helpers are shared
+by generation, Market descriptions and the agent edit guard. Extraction accepts spaced markers and
+leaves incomplete pairs untouched; generation separately enforces its declared marker pairs.
+
+The PumpkinPIE API's [document module](../../pumpkin-pie-api/docs.ts) uses this CLI and the shared
+Markdown helpers to render protocol facts and provider provenance from source metadata. It keeps
+only its component-specific renderer and has no separate file updater or drift-check command.
+
+This package is ESM. VitePress data loaders that import its Node API use `.data.mts` or `.data.mjs`
+so VitePress's loader bundler treats those imports as ESM too.

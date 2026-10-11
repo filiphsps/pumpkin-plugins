@@ -7,7 +7,7 @@ description: Meet the people contributing to Pumpkin Plugins.
 
 <script setup>
 import { VPTeamPage, VPTeamPageTitle, VPTeamMembers } from 'vitepress/theme';
-import { data as members } from './.vitepress/team.data.ts';
+import { data as members } from './.vitepress/team.data.mts';
 </script>
 
 <VPTeamPage>

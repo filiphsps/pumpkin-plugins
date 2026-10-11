@@ -255,3 +255,14 @@ describe('parseStatus', () => {
         assert.deepEqual(parseStatus(''), []);
     });
 });
+
+it('protects generated action sections and custom guide blocks', () => {
+    const action = '<!-- action-inputs:start -->\nTable\n<!-- action-inputs:end -->';
+    assert.match(checkEdit('actions/example/README.md', { oldString: 'Table' }, () => action) ?? '', /pnpm readme/);
+    const guide = '<!-- docs:begin limits -->\nLimits\n<!-- docs:end limits -->';
+    assert.match(checkEdit('tools/example/docs/index.md', { oldString: 'Limits' }, () => guide) ?? '', /pnpm readme/);
+    assert.equal(
+        checkEdit('tools/example/docs/index.md', { oldString: 'Written prose' }, () => `Written prose\n${guide}`),
+        undefined
+    );
+});

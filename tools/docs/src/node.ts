@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readActionMetadata } from './actions.ts';
+import { GENERATED_NOTE } from './blocks.ts';
 import { discoverComponents, localLicenseFile } from './discovery.ts';
 import { type DocumentUpdate, generateDocuments, prepareDocument, type Status, writeDocuments } from './documents.ts';
 import type { PluginInfo } from './info.ts';
@@ -123,7 +124,11 @@ async function prepareComponentReferenceUpdates(root: string, siteUrl: URL): Pro
  */
 export async function generatePluginReadme(pluginDir: string, check = false): Promise<Status> {
     const info = await loadInfo(pluginDir);
-    return generateDocuments([{ file: 'README.md', blocks: renderBlocks(info), required: false }], pluginDir, check);
+    return generateDocuments(
+        [{ file: 'README.md', blocks: renderBlocks(info), required: false, note: GENERATED_NOTE }],
+        pluginDir,
+        check
+    );
 }
 
 async function rows(root: string, group: 'packages' | 'tools'): Promise<PackageRow[]> {

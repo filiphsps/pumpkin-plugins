@@ -1,9 +1,6 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { expect, it } from 'vitest';
 import { PIE_RELEASE } from '../test/provider.ts';
-import { renderDocs, updateDoc } from './docs.ts';
+import { renderDocs } from './docs.ts';
 
 it('renders changed release pins and protocol limits without stale versions', () => {
     const blocks = renderDocs({
@@ -23,22 +20,4 @@ it('renders changed release pins and protocol limits without stale versions', ()
     expect(blocks.provenance).toContain('Example-license');
     expect(blocks.limits).toContain('| Encoded message | 9000 bytes |');
     expect(blocks.limits).toContain('| Expansion TTL cap | 2000 ms |');
-});
-
-it('checks stale blocks without writing, updates only blocks, and detects missing markers', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pie-docs-'));
-    const file = join(dir, 'guide.md');
-    const original = 'Handwritten\n<!-- docs:begin limits -->\nstale\n<!-- docs:end limits -->\nExample\n';
-    try {
-        writeFileSync(file, original);
-        expect(updateDoc(file, { limits: 'Fresh limits' }, true)).toBe(false);
-        expect(readFileSync(file, 'utf8')).toBe(original);
-        expect(updateDoc(file, { limits: 'Fresh limits' }, false)).toBe(true);
-        expect(readFileSync(file, 'utf8')).toMatch(/^Handwritten\n/);
-        expect(readFileSync(file, 'utf8')).toContain('Fresh limits\n<!-- docs:end limits -->\nExample\n');
-        expect(updateDoc(file, { limits: 'Fresh limits' }, true)).toBe(true);
-        expect(() => updateDoc(file, { absent: 'Missing' }, false)).toThrow('missing');
-    } finally {
-        rmSync(dir, { recursive: true, force: true });
-    }
 });

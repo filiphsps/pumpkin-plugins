@@ -1,6 +1,7 @@
 // Decides whether an agent's tool call should be refused, and says what to do instead. Pure functions:
 // run.mjs passes in the normalized tool input and a way to read files.
 
+import { generatedBlocks } from '@pumpkin-plugins/docs/markdown';
 import { isGeneratedPath } from './check.mjs';
 
 /** Matches the start of a command: the beginning of the line or after `&&`, `||`, `;`, `|` or `(`. */
@@ -36,23 +37,16 @@ const PROTECTED_PATHS = [
     }
 ];
 
-const BLOCK = /<!-- docs:begin ([\w-]+) -->[\s\S]*?<!-- docs:end \1 -->/g;
-
-/** The generated blocks of a README, as `[start, end)` ranges with their text. */
-function generatedBlocks(text) {
-    return [...text.matchAll(BLOCK)].map((m) => ({ start: m.index, end: m.index + m[0].length, text: m[0] }));
-}
-
-const GENERATED_README =
-    'This is a generated block of a README. Edit its source instead (a plugin README comes from `src/info.ts`, the package tables from each `package.json`), then run `pnpm readme`.';
+const GENERATED_DOCUMENT =
+    'This is a generated documentation block. Edit its source instead (a plugin README comes from `src/info.ts`, the package tables from each `package.json`), then run `pnpm readme`.';
 
 /**
  * Why a change to `file` must not be made, or undefined when it may.
  *
  * @param {string} file Path relative to the repo root, with forward slashes.
  * @param {{ oldString?: string, content?: string }} change The text being replaced (edits) or the
- *   new file content (writes). Patches pass neither, so generated README blocks cannot be safely
- *   inspected and the whole README is refused when it contains one.
+ *   new file content (writes). Patches pass neither, so generated Markdown blocks cannot be safely
+ *   inspected and the whole document is refused when it contains one.
  * @param {(file: string) => string | undefined} read Current content of a repo file, if it exists.
  * @returns {string | undefined}
  */
@@ -60,27 +54,27 @@ export function checkEdit(file, change, read) {
     if (isGeneratedPath(file)) return 'This is build output or a cache. Change the source and rebuild instead.';
     const rule = PROTECTED_PATHS.find((r) => r.pattern.test(file));
     if (rule) return rule.reason;
-    if (!/(^|\/)README\.md$/.test(file)) return;
+    if (!/\.md$/i.test(file)) return;
 
     const current = read(file);
     if (current === undefined) return;
     const blocks = generatedBlocks(current);
     if (blocks.length === 0) return;
 
-    if (change.oldString === undefined && change.content === undefined) return GENERATED_README;
+    if (change.oldString === undefined && change.content === undefined) return GENERATED_DOCUMENT;
 
     if (change.oldString !== undefined) {
         let from = current.indexOf(change.oldString);
         while (from !== -1) {
             const to = from + change.oldString.length;
-            if (blocks.some((b) => from < b.end && to > b.start)) return GENERATED_README;
+            if (blocks.some((b) => from < b.end && to > b.start)) return GENERATED_DOCUMENT;
             from = current.indexOf(change.oldString, from + 1);
         }
         return;
     }
     if (change.content !== undefined) {
         const next = generatedBlocks(change.content).map((b) => b.text);
-        if (next.length !== blocks.length || blocks.some((b, i) => b.text !== next[i])) return GENERATED_README;
+        if (next.length !== blocks.length || blocks.some((b, i) => b.text !== next[i])) return GENERATED_DOCUMENT;
     }
 }
 

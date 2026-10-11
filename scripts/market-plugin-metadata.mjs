@@ -2,6 +2,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { stripGeneratedBlocks } from '@pumpkin-plugins/docs/markdown';
 
 const [pluginDir] = process.argv.slice(2);
 if (!pluginDir) {
@@ -53,9 +54,7 @@ function marketDescription(pluginDir, summary) {
 }
 
 function describeReadme(readme) {
-    const markdown = readme
-        .replace(/<!--\s*docs:begin ([\w-]+)\s*-->[\s\S]*?<!--\s*docs:end \1\s*-->/gi, '')
-        .replace(/<!--[\s\S]*?-->/g, '');
+    const markdown = stripGeneratedBlocks(readme).replace(/<!--[\s\S]*?-->/g, '');
     const sections = [];
     let section = { depth: 0, heading: undefined, lines: [] };
     let fence;
