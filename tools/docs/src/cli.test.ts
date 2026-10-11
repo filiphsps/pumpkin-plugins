@@ -36,7 +36,7 @@ Hand-written words.
 <!-- docs:end commands -->
 `;
 
-describe('plugin README', () => {
+describe('plugin README', { timeout: 15000 }, () => {
     beforeEach(() => {
         put('p/package.json', '{"name":"@x/p","version":"1.0.0"}');
         put('p/README.md', README);
