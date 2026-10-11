@@ -396,6 +396,9 @@ export class PortMapper {
             }
         } finally {
             entry.pending = undefined;
+            if (!this.owned(entry) && entry.applied && !this.removals.includes(entry.applied)) {
+                this.removals.push(entry.applied);
+            }
         }
     }
 

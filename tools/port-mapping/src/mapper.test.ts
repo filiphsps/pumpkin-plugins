@@ -26,7 +26,7 @@ function setup(igd: FakeIgd | null = new FakeIgd(), extra: Partial<ConstructorPa
     return { net, igd: igd ?? undefined, mapper, log, settle };
 }
 
-function delayMappingReply(net: FakeNetwork) {
+function delayMappingReply(net: FakeNetwork, action = 'AddPortMapping', shouldDelay = () => true) {
     const dial = net.dial.bind(net);
     let blocked = true;
     net.dial = (to) => {
@@ -42,10 +42,10 @@ function delayMappingReply(net: FakeNetwork) {
                     writable: () => connection.writable(),
                     close: () => connection.close(),
                     write: (bytes) => {
-                        mapping ||= strFromU8(bytes).includes('#AddPortMapping');
+                        mapping ||= strFromU8(bytes).includes(`#${action}`);
                         connection.write(bytes);
                     },
-                    read: (max) => (mapping && blocked ? null : connection.read(max))
+                    read: (max) => (mapping && blocked && shouldDelay() ? null : connection.read(max))
                 };
             }
         };
@@ -141,6 +141,34 @@ describe('PortMapper', () => {
         expect(igd?.actions.filter((a) => a === 'AddPortMapping')).toHaveLength(1);
         runSteps(net, mapper.releaseAll());
         expect(igd?.mappings.size).toBe(0);
+        expect(net.leaks).toBe(0);
+    });
+
+    it.each(['AddPortMapping', 'GetExternalIPAddress'])('compensates a mapping released during %s', (action) => {
+        const { igd, mapper, settle, net } = setup(new FakeIgd({ natPmp: false }));
+        const resume = delayMappingReply(net, action, () => (igd?.mappings.size ?? 0) > 0);
+        mapper.request('web', spec);
+        settle(() => igd?.mappings.has('tcp:8123') === true && igd.actions.includes(action));
+        expect(igd?.mappings.size).toBe(1);
+        mapper.release('web');
+        resume();
+        settle(() => igd?.mappings.size === 0);
+        expect(igd?.mappings.size).toBe(0);
+        expect(igd?.actions.filter((a) => a === 'DeletePortMapping')).toHaveLength(1);
+        expect(mapper.state('web')).toBeUndefined();
+        expect(net.leaks).toBe(0);
+    });
+
+    it('finishes stale creation cleanup before opening an incompatible replacement', () => {
+        const { igd, mapper, settle, net } = setup(new FakeIgd({ natPmp: false }));
+        const resume = delayMappingReply(net);
+        mapper.request('web', spec);
+        settle(() => igd?.mappings.has('tcp:8123') === true);
+        mapper.request('web', { ...spec, port: 8124 });
+        resume();
+        settle(() => open(mapper.state('web')));
+        expect([...(igd?.mappings.keys() ?? [])]).toEqual(['tcp:8124']);
+        expect(igd?.mappings.get('tcp:8124')?.internalPort).toBe(8124);
         expect(net.leaks).toBe(0);
     });
 
