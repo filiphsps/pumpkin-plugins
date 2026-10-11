@@ -15,6 +15,15 @@ const PLAYER_ONLY = 'This command can only be used by a player.';
 const INACCESSIBLE = 'Waypoint not found or you do not have access.';
 const STORAGE_ERROR =
     'Waypoint storage is unavailable or the change could not be saved; check the server log. No changes were made.';
+const RESET_PROPERTY_PATCHES: Readonly<Record<string, Partial<Waypoint>>> = {
+    color: { color: '#FFFFFF' },
+    icon: { icon: undefined },
+    label: { label: undefined },
+    description: { description: undefined },
+    'visibility-range': { visibilityRange: undefined },
+    enabled: { enabled: true },
+    access: { access: { mode: 'restricted', grants: [] } }
+};
 
 /** Host APIs and canonical data used by command handlers. */
 export interface WaypointCommandRuntime {
@@ -279,6 +288,14 @@ export function onlinePlayerNameSuggestions(runtime: WaypointCommandRuntime): Co
         );
 }
 
+/** Suggests each property that `/wp reset` can reset, narrowed to the typed prefix. */
+export const resetPropertySuggestions: CommandSuggestionHandler<CommandSender> = (_sender, request) => {
+    const prefix = suggestionPrefix(request.remaining);
+    return Object.keys(RESET_PROPERTY_PATCHES)
+        .filter((property) => property.startsWith(prefix))
+        .sort((left, right) => left.localeCompare(right));
+};
+
 function withActor(
     runtime: WaypointCommandRuntime,
     sender: CommandSender,
@@ -455,16 +472,7 @@ function withOnlinePlayer<T extends readonly CommandLine[]>(
 }
 
 function resetProperty(runtime: WaypointCommandRuntime, name: string, property: string): CommandLine[] {
-    const patches: Record<string, Partial<Waypoint>> = {
-        color: { color: '#FFFFFF' },
-        icon: { icon: undefined },
-        label: { label: undefined },
-        description: { description: undefined },
-        'visibility-range': { visibilityRange: undefined },
-        enabled: { enabled: true },
-        access: { access: { mode: 'restricted', grants: [] } }
-    };
-    const patch = patches[property];
+    const patch = RESET_PROPERTY_PATCHES[property];
     if (patch === undefined) return [errorLine('That property cannot be reset.')];
     return mutationLines(runtime.catalog.update(name, patch), `Reset ${property} for ${name}.`);
 }

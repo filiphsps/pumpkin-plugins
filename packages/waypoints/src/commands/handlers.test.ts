@@ -95,6 +95,38 @@ describe('/wp handlers', () => {
                 remaining: 'm'
             })
         ).toEqual(['"Market Place"', 'Meadow']);
+        expect(
+            waypointNameSuggestions(runtime)(sender, {
+                input: '/wp reset color m',
+                cursor: 17,
+                start: 16,
+                remaining: 'm'
+            })
+        ).toEqual(['"Market Place"', 'Meadow']);
+    });
+
+    it('suggests resettable properties and filters them by the typed prefix', async () => {
+        const suggestionFactory = Reflect.get(await import('./handlers.ts'), 'resetPropertySuggestions') as unknown;
+        expect(suggestionFactory).toEqual(expect.any(Function));
+        if (typeof suggestionFactory !== 'function') return;
+
+        const { sender } = setup(true);
+        const suggest = suggestionFactory as (
+            sender: CommandSender,
+            request: { input: string; cursor: number; start: number; remaining: string }
+        ) => readonly string[];
+        expect(suggest(sender, { input: '/wp reset ', cursor: 10, start: 10, remaining: '' })).toEqual([
+            'access',
+            'color',
+            'description',
+            'enabled',
+            'icon',
+            'label',
+            'visibility-range'
+        ]);
+        expect(suggest(sender, { input: '/wp reset v', cursor: 11, start: 10, remaining: 'v' })).toEqual([
+            'visibility-range'
+        ]);
     });
 
     it('suggests matching online players for access grants', () => {

@@ -17,7 +17,12 @@ import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
-import { commandHandlers, onlinePlayerNameSuggestions, waypointNameSuggestions } from './commands/handlers.ts';
+import {
+    commandHandlers,
+    onlinePlayerNameSuggestions,
+    resetPropertySuggestions,
+    waypointNameSuggestions
+} from './commands/handlers.ts';
 import { itemIconInputFromCommand } from './commands/item-input.ts';
 import { commands } from './commands/spec.ts';
 import { info } from './info.ts';
@@ -114,7 +119,8 @@ class Waypoints extends PluginBase {
         registerCommands(ctx, commands, commandHandlers(commandRuntime), {
             arguments: {
                 name: waypointNameSuggestions(commandRuntime),
-                player: onlinePlayerNameSuggestions(commandRuntime)
+                player: onlinePlayerNameSuggestions(commandRuntime),
+                property: resetPropertySuggestions
             },
             register: (handler) => this.registerCommandSuggestionHandler(handler)
         });

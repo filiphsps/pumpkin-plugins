@@ -73,6 +73,7 @@ vi.mock('./commands/handlers.ts', () => ({
         state.commandRuntime = runtime;
         return {};
     },
+    resetPropertySuggestions: vi.fn(),
     waypointNameSuggestions: vi.fn(() => vi.fn()),
     onlinePlayerNameSuggestions: vi.fn(() => vi.fn())
 }));
@@ -151,6 +152,7 @@ describe('Waypoints plugin HUD lifecycle', () => {
         };
         const handler = vi.fn();
         expect(suggestions.arguments.name).toEqual(expect.any(Function));
+        expect(suggestions.arguments.property).toEqual(expect.any(Function));
         expect(suggestions.arguments.player).toEqual(expect.any(Function));
         expect(suggestions.register(handler)).toBe(91);
         expect(state.suggestionHandler).toBe(handler);
