@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.0.4](https://github.com/filiphsps/pumpkin-plugins/compare/waypoints-v0.0.3...waypoints-v0.0.4) (2026-10-11)
+
+
+### Features
+
+* **waypoints:** autocomplete reset properties ([32ee65b](https://github.com/filiphsps/pumpkin-plugins/commit/32ee65baaf9d09e1c153b32600599d2d904e6c6a))
+
+
+### Bug Fixes
+
+* **build:** verify pinned runtime provenance ([04c7590](https://github.com/filiphsps/pumpkin-plugins/commit/04c75909f351abb2bbecd10d7c38ca721753fb1f))
+* **ci:** verify host-specific runtime builds ([825676e](https://github.com/filiphsps/pumpkin-plugins/commit/825676e1fac8934e8ea422c6f77254acd1213b46))
+* **waypoints:** normalize UUIDs at mutation boundaries ([45b24d5](https://github.com/filiphsps/pumpkin-plugins/commit/45b24d5543f5871c83bcd5948f80fe90c8385f45))
+* **waypoints:** reject canonical UUID duplicates before migration ([ec48e08](https://github.com/filiphsps/pumpkin-plugins/commit/ec48e088bb785ad16c28afd687335ab0d96347b8))
+* **waypoints:** reorder reset arguments ([437ad2b](https://github.com/filiphsps/pumpkin-plugins/commit/437ad2b0b60596933fb260f91a09efb59c83deaa))
+
 ## [0.0.3](https://github.com/filiphsps/pumpkin-plugins/compare/waypoints-v0.0.2...waypoints-v0.0.3) (2026-10-10)
 
 
