@@ -178,7 +178,7 @@ jobs:
                   git push
 
             - name: 🏷️ Update action README version examples
-              run: node scripts/update-action-readmes.mjs
+              run: pnpm exec pumpkin-plugins-docs action-versions
 
             - name: 💾 Commit READMEs to the release PR
               run: |

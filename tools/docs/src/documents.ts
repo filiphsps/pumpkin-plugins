@@ -6,12 +6,21 @@ import { applyBlocks, type BlockOptions } from './blocks.ts';
 export type Status = 'updated' | 'unchanged' | 'stale';
 
 /** One existing Markdown file and its generated blocks. Paths are relative to the supplied root. */
-export interface DocumentSpec extends BlockOptions {
+export interface BlockDocumentSpec extends BlockOptions {
     file: string;
     blocks: Record<string, string>;
     /** Omit to use the plugin note; use an empty string to omit the note. */
     note?: string;
 }
+
+/** A whole-document transformation, used when generated values live outside marked blocks. */
+export interface TransformDocumentSpec {
+    file: string;
+    transform: (source: string) => string;
+}
+
+/** A marked-block update or an explicit transformation of an existing document. */
+export type DocumentSpec = BlockDocumentSpec | TransformDocumentSpec;
 
 /** A validated document update, prepared before any generation writes. */
 export interface DocumentUpdate {
@@ -25,10 +34,13 @@ export function prepareDocument(document: DocumentSpec, root: string): DocumentU
     const file = resolve(root, document.file);
     if (!existsSync(file)) throw new Error(`${file} not found: create the document with generated block markers`);
     const existing = readFileSync(file, 'utf8');
-    const next = applyBlocks(existing, document.blocks, file, document.note, {
-        required: document.required ?? true,
-        markers: document.markers
-    });
+    const next =
+        'transform' in document
+            ? document.transform(existing)
+            : applyBlocks(existing, document.blocks, file, document.note, {
+                  required: document.required ?? true,
+                  markers: document.markers
+              });
     return { file, existing, next };
 }
 

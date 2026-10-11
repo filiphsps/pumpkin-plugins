@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { discoverComponents } from '@pumpkin-plugins/docs/node';
 
 const root = path.resolve(import.meta.dirname, '..');
 
@@ -16,14 +17,9 @@ export async function collectPlugins({ root: repoRoot = root, dist = path.join(r
     fs.rmSync(dist, { recursive: true, force: true });
     fs.mkdirSync(dist, { recursive: true });
 
-    const dirs = fs
-        .readdirSync(path.join(repoRoot, 'packages'), { withFileTypes: true })
-        .filter((d) => d.isDirectory() && fs.existsSync(path.join(repoRoot, 'packages', d.name, 'package.json')));
     const plugins = [];
-
-    for (const { name } of dirs) {
-        const pkgDir = path.join(repoRoot, 'packages', name);
-        const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
+    for (const { slug: name, directory: pkgDir, metadataFile } of discoverComponents(repoRoot, 'packages')) {
+        const pkg = JSON.parse(fs.readFileSync(metadataFile, 'utf8'));
         const output = pkg.pumpkinPlugin?.output;
         if (!output) throw new Error(`packages/${name}/package.json has no pumpkinPlugin.output`);
         const wasm = path.join(pkgDir, output);

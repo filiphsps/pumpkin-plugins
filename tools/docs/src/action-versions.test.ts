@@ -5,20 +5,22 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, it } from 'node:test';
+import { afterEach, describe, it } from 'vitest';
 
-const scripts = import.meta.dirname;
-const dirs = [];
+const cli = path.join(import.meta.dirname, '../bin/pumpkin-plugins-docs.mjs');
+const dirs: string[] = [];
 afterEach(() => {
     for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-function repo(actions) {
+function repo(
+    actions: Record<string, { component: string; manifestVersion: string; releaseAs?: string; readmeVersion: string }>
+) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'update-action-readmes-'));
     dirs.push(dir);
     fs.mkdirSync(path.join(dir, 'actions'), { recursive: true });
-    const packages = {};
-    const manifest = {};
+    const packages: Record<string, unknown> = {};
+    const manifest: Record<string, string> = {};
 
     for (const [name, action] of Object.entries(actions)) {
         const releasePath = `actions/${name}`;
@@ -43,19 +45,19 @@ function repo(actions) {
     return dir;
 }
 
-function run(dir) {
-    const result = spawnSync('node', [path.join(scripts, 'update-action-readmes.mjs')], {
-        env: { ...process.env, PUMPKIN_PLUGINS_ROOT: dir },
+function run(dir: string) {
+    const result = spawnSync(process.execPath, [cli, 'action-versions'], {
+        cwd: dir,
         encoding: 'utf8'
     });
     return { ok: result.status === 0, out: `${result.stdout}${result.stderr}` };
 }
 
-function readme(dir, name) {
+function readme(dir: string, name: string) {
     return fs.readFileSync(path.join(dir, 'actions', name, 'README.md'), 'utf8');
 }
 
-describe('update-action-readmes', () => {
+describe('action version CLI', { timeout: 15000 }, () => {
     it('updates every action using its own manifest or first-release pin', () => {
         const dir = repo({
             'publish-market': {
@@ -75,8 +77,7 @@ describe('update-action-readmes', () => {
         assert.ok(result.ok, result.out);
         assert.match(readme(dir, 'publish-market'), /publish-market-v0\.0\.1/);
         assert.match(readme(dir, 'another-action'), /market-helper-v1\.2\.3/);
-        assert.match(result.out, /Updated actions\/publish-market\/README\.md/);
-        assert.match(result.out, /Updated actions\/another-action\/README\.md/);
+        assert.match(result.out, /Action versions: updated/);
     });
 
     it('is idempotent when all example tags already match', () => {
@@ -93,7 +94,7 @@ describe('update-action-readmes', () => {
         const result = run(dir);
         assert.ok(result.ok, result.out);
         assert.equal(readme(dir, 'publish-market'), before);
-        assert.match(result.out, /already uses publish-market-v0\.0\.1/);
+        assert.match(result.out, /Action versions: unchanged/);
     });
 
     it('fails with a useful error when an action README has no versioned example tag', () => {

@@ -1,43 +1,24 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+    type ComponentGroup,
+    componentApiRoute,
+    discoverComponents,
+    githubPagesUrl,
+    githubRepositoryUrl,
+    readActionMetadata,
+    walkMarkdown
+} from '@pumpkin-plugins/docs/node';
 import { type DefaultTheme, defineConfig } from 'vitepress';
 import { parse as parseYaml } from 'yaml';
-import { githubPagesUrl } from '../../tools/docs/src/site.ts';
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const repository = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).repository;
-const repoUrl = (typeof repository === 'string' ? repository : repository.url)
-    .replace(/^git\+/, '')
-    .replace(/\.git$/, '');
+const repoUrl = githubRepositoryUrl(repository)?.href;
+if (!repoUrl) throw new Error('Root package.json needs a GitHub repository URL');
 const siteUrl = githubPagesUrl(repository);
 const siteBase = siteUrl?.pathname ?? '/';
-const markdown = (file: string) => file.endsWith('.md');
-
-function walkMarkdown(directory: string): string[] {
-    if (!fs.existsSync(directory)) return [];
-    return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-        const absolute = path.join(directory, entry.name);
-        if (entry.isDirectory()) return walkMarkdown(absolute);
-        return markdown(entry.name) ? [absolute] : [];
-    });
-}
-
-function folders(group: string, hasPackageJson = false): string[] {
-    const directory = path.join(repoRoot, group);
-    if (!fs.existsSync(directory)) return [];
-    return fs
-        .readdirSync(directory, { withFileTypes: true })
-        .filter((entry) => {
-            if (!entry.isDirectory() || entry.name.startsWith('_')) return false;
-            const folder = path.join(directory, entry.name);
-            return hasPackageJson
-                ? fs.existsSync(path.join(folder, 'package.json'))
-                : fs.existsSync(path.join(folder, 'action.yml')) || fs.existsSync(path.join(folder, 'action.yaml'));
-        })
-        .map((entry) => entry.name)
-        .sort();
-}
 
 function titleOf(file: string, fallback: string): string {
     const heading = fs
@@ -161,9 +142,8 @@ function menuItemTypeOf(value: unknown): MenuCard['type'] | undefined {
     return type === 'link' || type === 'card' || type === 'spotlight' ? type : undefined;
 }
 
-function components(group: string, hasPackageJson = false): Component[] {
-    return folders(group, hasPackageJson).flatMap((slug) => {
-        const source = path.join(repoRoot, group, slug);
+function components(group: ComponentGroup): Component[] {
+    return discoverComponents(repoRoot, group).flatMap(({ slug, directory: source, metadataFile }) => {
         const readme = path.join(source, 'README.md');
         const docsDirectory = path.join(source, 'docs');
         const docsConfig = docsConfigOf(source);
@@ -182,16 +162,8 @@ function components(group: string, hasPackageJson = false): Component[] {
                       .replace(/\.md$/, '')}`
                 : `/${group}/${slug}/README`;
         const headingSource = customIndex ?? (fs.existsSync(readme) ? readme : docs[0]);
-        const manifest = hasPackageJson
-            ? JSON.parse(fs.readFileSync(path.join(source, 'package.json'), 'utf8'))
-            : undefined;
-        const actionManifestFile = ['action.yml', 'action.yaml']
-            .map((filename) => path.join(source, filename))
-            .find((file) => fs.existsSync(file));
-        const actionManifest =
-            !hasPackageJson && actionManifestFile
-                ? (parseYaml(fs.readFileSync(actionManifestFile, 'utf8')) as Record<string, unknown>)
-                : undefined;
+        const manifest = group !== 'actions' ? JSON.parse(fs.readFileSync(metadataFile, 'utf8')) : undefined;
+        const actionManifest = group === 'actions' ? readActionMetadata(metadataFile) : undefined;
         const fallbackTitle = manifest?.name ?? slug;
         const title = headingSource ? titleOf(headingSource, fallbackTitle) : fallbackTitle;
         const description =
@@ -216,15 +188,9 @@ function components(group: string, hasPackageJson = false): Component[] {
         const iconPath = iconFile ? path.relative(repoRoot, iconFile).split(path.sep).join('/') : undefined;
         if (iconPath && iconFile) navigationAssets.set(iconPath, iconFile);
         const icon = iconPath ? `/${iconPath}` : undefined;
-        const apiDirectory =
-            group === 'packages'
-                ? path.join(repoRoot, 'docs/api/plugins', slug)
-                : group === 'tools'
-                  ? path.join(repoRoot, 'docs/api/tools', manifest?.name ?? slug)
-                  : path.join(repoRoot, 'docs/api/actions', slug);
-        const apiReference = fs.existsSync(path.join(apiDirectory, 'index.md'))
-            ? `/${path.relative(path.join(repoRoot, 'docs'), apiDirectory).split(path.sep).join('/')}/`
-            : undefined;
+        const apiRoute = componentApiRoute(group, slug, manifest?.name);
+        const apiDirectory = path.join(repoRoot, 'docs', apiRoute);
+        const apiReference = fs.existsSync(path.join(apiDirectory, 'index.md')) ? `/${apiRoute}` : undefined;
 
         const customDocs = docs.map((file) => {
             const relative = path.relative(docsDirectory, file).split(path.sep).join('/');
@@ -254,8 +220,8 @@ function components(group: string, hasPackageJson = false): Component[] {
     });
 }
 
-const plugins = components('packages', true);
-const tools = components('tools', true);
+const plugins = components('packages');
+const tools = components('tools');
 const actions = components('actions');
 const componentLandingIcons = new Map(
     [...plugins, ...tools, ...actions].flatMap((item) =>

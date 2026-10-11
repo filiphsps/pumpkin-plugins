@@ -51,6 +51,9 @@
         "test:coverage": "vitest run --coverage",
         "typecheck": "tsc --noEmit"
     },
+    "dependencies": {
+        "yaml": "catalog:"
+    },
     "devDependencies": {
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",

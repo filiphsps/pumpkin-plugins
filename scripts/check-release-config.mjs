@@ -2,6 +2,7 @@
 // See "Registering a plugin for releases" in docs/ci-and-releases.md.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { discoverComponents } from '@pumpkin-plugins/docs/node';
 
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
 const read = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
@@ -16,15 +17,7 @@ if (!paused || typeof paused !== 'object' || Array.isArray(paused)) {
 }
 const pausedEntries = paused && typeof paused === 'object' && !Array.isArray(paused) ? Object.entries(paused) : [];
 
-const discoveredPlugins = fs
-    .readdirSync(path.join(root, 'packages'), { withFileTypes: true })
-    .filter(
-        (d) =>
-            d.isDirectory() &&
-            !d.name.startsWith('_') &&
-            fs.existsSync(path.join(root, 'packages', d.name, 'package.json'))
-    )
-    .map((d) => `packages/${d.name}`);
+const discoveredPlugins = discoverComponents(root, 'packages').map(({ slug }) => `packages/${slug}`);
 const discoveredPluginPaths = new Set(discoveredPlugins);
 const pausedPlugins = new Set();
 for (const [dir, reason] of pausedEntries) {
@@ -41,18 +34,7 @@ for (const [dir, reason] of pausedEntries) {
     pausedPlugins.add(dir);
 }
 const plugins = discoveredPlugins.filter((dir) => !pausedPlugins.has(dir));
-const actions = fs.existsSync(path.join(root, 'actions'))
-    ? fs
-          .readdirSync(path.join(root, 'actions'), { withFileTypes: true })
-          .filter(
-              (d) =>
-                  d.isDirectory() &&
-                  !d.name.startsWith('_') &&
-                  (fs.existsSync(path.join(root, 'actions', d.name, 'action.yml')) ||
-                      fs.existsSync(path.join(root, 'actions', d.name, 'action.yaml')))
-          )
-          .map((d) => `actions/${d.name}`)
-    : [];
+const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
 for (const dir of actions) {
     for (const file of ['README.md', 'CHANGELOG.md', 'version.txt']) {
         if (!fs.existsSync(path.join(root, dir, file))) problems.push(`${dir}/${file} is missing`);

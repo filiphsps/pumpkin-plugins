@@ -40,3 +40,12 @@ export function walkMarkdown(directory: string, options: { exclude?: readonly st
     }
     return walk(resolve(directory)).sort();
 }
+
+/** Find a component-local license file, ignoring directories and accepting common case-insensitive names. */
+export function localLicenseFile(directory: string): string | undefined {
+    if (!existsSync(directory)) return undefined;
+    const file = readdirSync(directory, { withFileTypes: true }).find(
+        (entry) => entry.isFile() && /^license(?:\.md|\.txt)?$/i.test(entry.name)
+    );
+    return file ? join(directory, file.name) : undefined;
+}

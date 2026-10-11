@@ -216,7 +216,9 @@ The package tables show the `license` from each package's `package.json`. A pack
 Packages using the repository's root license show the license as plain text.
 
 Tool README prose is hand-written: each one has a title that is its package name, what it is for,
-and links to relevant guides. The repository-level generator fills its API reference block, and
+and links to relevant guides. Tools can declare custom generated blocks with a typed `documents` module and
+`pumpkin-plugins-docs generate`; see the [generator guide](../tools/docs/docs/index.md).
+The repository-level generator fills each API reference block, and
 `pnpm check` fails when a tool README is missing.
 
 The root README's public documentation link is generated from the same repository URL. The package
@@ -224,7 +226,8 @@ and action tables, site link and component README references are refreshed by `p
 
 ## When it runs
 
-- `pnpm readme` regenerates plugin README content, action input/output tables, root README tables,
+- `pnpm readme` runs component generators and `pumpkin-plugins-docs actions` to refresh action
+  input/output tables, then updates root README tables,
   and site/API references. `pnpm readme:check` fails if any generated content is stale.
 - CI checks that generated content is current. Contributors should run `pnpm readme` and commit the
   generated README changes with the source change.

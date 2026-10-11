@@ -4,30 +4,18 @@
 // READMEs are checked by `pnpm readme:check`. See "Docs match the code" in docs/code-style.md.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { discoverComponents, walkMarkdown } from '@pumpkin-plugins/docs/node';
 
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
 const exists = (...parts) => fs.existsSync(path.join(root, ...parts));
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 const problems = [];
 
-/** Folders of `dir` that are packages. Folders starting with `_` are scratch space. */
-function packageDirs(group) {
-    if (!exists(group)) return [];
-    return fs
-        .readdirSync(path.join(root, group), { withFileTypes: true })
-        .filter((d) => d.isDirectory() && !d.name.startsWith('_') && exists(group, d.name, 'package.json'))
-        .map((d) => `${group}/${d.name}`);
-}
-
-function markdownFiles(dir) {
-    if (dir === 'docs/api' || dir.startsWith('docs/api/')) return [];
-    if (!exists(dir)) return [];
-    return fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((entry) => {
-        const rel = `${dir}/${entry.name}`;
-        if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : markdownFiles(rel);
-        return entry.name.endsWith('.md') ? [rel] : [];
-    });
-}
+const packageDirs = (group) => discoverComponents(root, group).map(({ slug }) => `${group}/${slug}`);
+const markdownFiles = (dir) =>
+    walkMarkdown(path.join(root, dir), { exclude: [path.join(root, 'docs/api')] }).map((file) =>
+        path.relative(root, file).split(path.sep).join('/')
+    );
 
 const packages = [...packageDirs('packages'), ...packageDirs('tools')];
 const generatedPackageOutputs = new Set(
@@ -38,16 +26,7 @@ const generatedPackageOutputs = new Set(
         return target.startsWith(`${dir}/`) ? [target] : [];
     })
 );
-const actions = exists('actions')
-    ? fs
-          .readdirSync(path.join(root, 'actions'), { withFileTypes: true })
-          .filter(
-              (entry) =>
-                  entry.isDirectory() &&
-                  (exists('actions', entry.name, 'action.yml') || exists('actions', entry.name, 'action.yaml'))
-          )
-          .map((entry) => `actions/${entry.name}`)
-    : [];
+const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
 const docs = [
     ...(exists('README.md') ? ['README.md'] : []),
     ...markdownFiles('docs'),

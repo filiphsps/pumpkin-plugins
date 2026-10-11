@@ -1,16 +1,13 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { discoverComponents } from '@pumpkin-plugins/docs/node';
 
 /** Reads workspace package manifests for identifying code bundled into each plugin. */
 export function workspacePackages(root) {
     const packages = new Map();
     for (const group of ['packages', 'tools']) {
-        for (const entry of readdirSync(join(root, group), { withFileTypes: true })) {
-            if (!entry.isDirectory() || entry.name.startsWith('_')) continue;
-            const path = `${group}/${entry.name}`;
-            const manifestPath = join(root, path, 'package.json');
-            if (!existsSync(manifestPath)) continue;
-            const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+        for (const { slug, metadataFile } of discoverComponents(root, group)) {
+            const path = `${group}/${slug}`;
+            const manifest = JSON.parse(readFileSync(metadataFile, 'utf8'));
             packages.set(manifest.name, { path, manifest });
         }
     }

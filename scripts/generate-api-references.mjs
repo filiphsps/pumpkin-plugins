@@ -1,14 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+    componentApiRoute,
+    discoverComponents,
+    githubRepositoryUrl,
+    readActionMetadata,
+    renderActionSections,
+    walkMarkdown
+} from '@pumpkin-plugins/docs/node';
 import { Application, TSConfigReader } from 'typedoc';
-import { parse } from 'yaml';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const apiRoot = path.join(repoRoot, 'docs/api');
 const repository = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).repository;
-const repoUrl = (typeof repository === 'string' ? repository : repository.url)
-    .replace(/^git\+/, '')
-    .replace(/\.git$/, '');
+const repoUrl = githubRepositoryUrl(repository)?.href;
+if (!repoUrl) throw new Error('Root package.json needs a GitHub repository URL');
 const commonOptions = JSON.parse(fs.readFileSync(path.join(repoRoot, 'typedoc.json'), 'utf8'));
 const editLink = (sourcePath) => `${repoUrl}/edit/master/${sourcePath}`;
 
@@ -17,22 +23,13 @@ fs.rmSync(apiRoot, { recursive: true, force: true });
 
 /** Finds source components by their package manifests, without maintaining a separate list. */
 function packages(group) {
-    const directory = path.join(repoRoot, group);
-    if (!fs.existsSync(directory)) return [];
-
-    return fs
-        .readdirSync(directory, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory() && !entry.name.startsWith('_'))
-        .flatMap((entry) => {
-            const componentDirectory = path.join(directory, entry.name);
-            const manifestPath = path.join(componentDirectory, 'package.json');
-            const sourceDirectory = path.join(componentDirectory, 'src');
-            if (!fs.existsSync(manifestPath) || !fs.existsSync(sourceDirectory)) return [];
-
-            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-            return [{ slug: entry.name, directory: componentDirectory, manifest }];
-        })
-        .sort((left, right) => left.slug.localeCompare(right.slug));
+    return discoverComponents(repoRoot, group)
+        .filter(({ directory }) => fs.existsSync(path.join(directory, 'src')))
+        .map(({ slug, directory, metadataFile }) => ({
+            slug,
+            directory,
+            manifest: JSON.parse(fs.readFileSync(metadataFile, 'utf8'))
+        }));
 }
 
 /** Generates a Markdown reference tree from JSDoc comments in a component's source directory. */
@@ -68,27 +65,9 @@ function componentIndex(title, items, routePrefix) {
     return `# ${title}\n\n${list || 'No references are available yet.'}`;
 }
 
-/** Formats action metadata as a Markdown table cell. */
-function tableCell(value) {
-    return String(value ?? '—')
-        .replaceAll('|', '\\|')
-        .replaceAll(/\s*\n\s*/g, ' ');
-}
-
 function actionPage(slug, actionFile, action) {
     const sourceFile = action.runs?.main ?? 'src/index.mjs';
-    const inputs = Object.entries(action.inputs ?? {});
-    const outputs = Object.entries(action.outputs ?? {});
-    const inputRows = inputs.map(([name, input]) => {
-        const required = input.required === true || input.required === 'true' ? 'Yes' : 'No';
-        const defaultValue = Object.hasOwn(input, 'default')
-            ? input.default === ''
-                ? '`(empty string)`'
-                : `\`${tableCell(input.default)}\``
-            : '—';
-        return `| \`${name}\` | ${required} | ${defaultValue} | ${tableCell(input.description)} |`;
-    });
-    const outputRows = outputs.map(([name, output]) => `| \`${name}\` | ${tableCell(output.description)} |`);
+    const sections = renderActionSections(action, { multiline: 'space' });
     const sourcePath = path.relative(repoRoot, actionFile).split(path.sep).join('/');
     const implementationPath = path
         .relative(repoRoot, path.join(path.dirname(actionFile), sourceFile))
@@ -105,15 +84,11 @@ This reference is generated from [\`${path.basename(actionFile)}\`](${repoUrl}/b
 
 ## Inputs
 
-| Input | Required | Default | Description |
-| --- | --- | --- | --- |
-${inputRows.length ? inputRows.join('\n') : '| — | — | — | This action has no inputs. |'}
+${sections.inputs}
 
 ## Outputs
 
-| Output | Description |
-| --- | --- |
-${outputRows.length ? outputRows.join('\n') : '| — | This action has no outputs. |'}
+${sections.outputs}
 
 ## Implementation reference
 
@@ -163,7 +138,7 @@ function fallbackSourcePath(relativePage) {
         const actionDirectory = path.join(repoRoot, 'actions', parts[1]);
         const yamlName = fs.existsSync(path.join(actionDirectory, 'action.yml')) ? 'action.yml' : 'action.yaml';
         if (parts[2] === 'code') {
-            const action = parse(fs.readFileSync(path.join(actionDirectory, yamlName), 'utf8'));
+            const action = readActionMetadata(path.join(actionDirectory, yamlName));
             const moduleParts = parts.slice(3, -1);
             const moduleSource = moduleSourcePath(path.join(actionDirectory, 'src'), moduleParts, ['.mjs', '.js']);
             if (moduleSource) return path.relative(repoRoot, moduleSource).split(path.sep).join('/');
@@ -181,33 +156,22 @@ function fallbackSourcePath(relativePage) {
 /** Adds a native VitePress edit-link target to each generated API Markdown page. */
 function addEditLinks() {
     const sourceUrl = new RegExp(`${repoUrl}/blob/[^/]+/([^\\s)#]+)`);
-    const visit = (directory) => {
-        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-            const file = path.join(directory, entry.name);
-            if (entry.isDirectory()) {
-                visit(file);
-                continue;
-            }
-            if (!entry.name.endsWith('.md')) continue;
-
-            const content = fs.readFileSync(file, 'utf8');
-            if (content.startsWith('---\n')) continue;
-            const relativePage = path.relative(apiRoot, file).split(path.sep).join('/');
-            const sourcePath = content.match(sourceUrl)?.[1] ?? fallbackSourcePath(relativePage);
-            const frontmatter = `---\neditLink: ${JSON.stringify(editLink(sourcePath))}\n---\n\n`;
-            fs.writeFileSync(file, `${frontmatter}${content}`);
-        }
-    };
-    visit(apiRoot);
+    for (const file of walkMarkdown(apiRoot)) {
+        const content = fs.readFileSync(file, 'utf8');
+        if (content.startsWith('---\n')) continue;
+        const relativePage = path.relative(apiRoot, file).split(path.sep).join('/');
+        const sourcePath = content.match(sourceUrl)?.[1] ?? fallbackSourcePath(relativePage);
+        const frontmatter = `---\neditLink: ${JSON.stringify(editLink(sourcePath))}\n---\n\n`;
+        fs.writeFileSync(file, `${frontmatter}${content}`);
+    }
 }
 
 const pluginPackages = packages('packages').filter(({ manifest }) => manifest.pumpkinPlugin);
 const toolPackages = packages('tools');
 
 for (const component of [...pluginPackages, ...toolPackages]) {
-    const group = pluginPackages.includes(component) ? 'plugins' : 'tools';
-    const outputName = group === 'plugins' ? component.slug : component.manifest.name;
-    const out = path.join(apiRoot, group, outputName);
+    const group = pluginPackages.includes(component) ? 'packages' : 'tools';
+    const out = path.join(repoRoot, 'docs', componentApiRoute(group, component.slug, component.manifest.name));
     const sourceDirectory = path.join(component.directory, 'src');
     await generateTypeDoc({
         entryPoints: [sourceDirectory],
@@ -240,19 +204,14 @@ writePage(
     componentIndex('Tool API reference', toolItems, '/api/tools')
 );
 
-const actionDirectory = path.join(repoRoot, 'actions');
-const actions = fs
-    .readdirSync(actionDirectory, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && !entry.name.startsWith('_'))
-    .flatMap((entry) => {
-        const directory = path.join(actionDirectory, entry.name);
-        const yamlFile = ['action.yml', 'action.yaml'].find((name) => fs.existsSync(path.join(directory, name)));
-        const sourceDirectory = path.join(directory, 'src');
-        if (!yamlFile || !fs.existsSync(sourceDirectory)) return [];
-        const file = path.join(directory, yamlFile);
-        return [{ slug: entry.name, directory, file, action: parse(fs.readFileSync(file, 'utf8')) }];
-    })
-    .sort((left, right) => left.slug.localeCompare(right.slug));
+const actions = discoverComponents(repoRoot, 'actions')
+    .filter(({ directory }) => fs.existsSync(path.join(directory, 'src')))
+    .map(({ slug, directory, metadataFile }) => ({
+        slug,
+        directory,
+        file: metadataFile,
+        action: readActionMetadata(metadataFile)
+    }));
 
 for (const { slug, directory, file, action } of actions) {
     const out = path.join(apiRoot, 'actions', slug);

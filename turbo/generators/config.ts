@@ -205,8 +205,8 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                 () =>
                     run(
                         root,
-                        'node',
-                        ['scripts/sync-action-readmes.mjs'],
+                        'pnpm',
+                        ['exec', 'pumpkin-plugins-docs', 'actions'],
                         'Generated action README input/output tables'
                     ),
                 () =>

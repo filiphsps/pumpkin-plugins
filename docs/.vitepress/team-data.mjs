@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { githubRepositoryUrl } from '@pumpkin-plugins/docs/node';
 
 const GITHUB_API = 'https://api.github.com';
 const TEAM_NAME_QUERY = `query ContributorNames($ids: [ID!]!) {
@@ -16,8 +17,9 @@ const TEAM_NAME_QUERY = `query ContributorNames($ids: [ID!]!) {
 /** Loads human contributors at build time, keeping credentials out of the client bundle. */
 export async function loadTeamMembers() {
     const manifest = JSON.parse(fs.readFileSync(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'));
-    const repository = typeof manifest.repository === 'string' ? manifest.repository : manifest.repository.url;
-    const repo = new URL(repository.replace(/^git\+/, '')).pathname.replace(/^\//, '').replace(/\.git$/, '');
+    const repository = githubRepositoryUrl(manifest.repository);
+    if (!repository) throw new Error('Root package.json needs a GitHub repository URL');
+    const repo = repository.pathname.slice(1);
     const headers = {
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28'

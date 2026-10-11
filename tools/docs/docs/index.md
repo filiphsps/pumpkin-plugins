@@ -96,3 +96,35 @@ files recursively, excluding `node_modules`, `.git` and explicit absolute paths.
 Import Node helpers through the `/node` entry point, never from guest plugin code. Keep package
 versions owned by release-please out of generated prose unless regeneration is part of that release
 workflow. Protocol versions and pinned external fixtures can be generated from their own metadata.
+
+## GitHub Action documentation
+
+`pumpkin-plugins-docs actions` generates every action README's input/output sections from
+`action.yml` or `action.yaml`. Run it from the repository root; add `--check` to check for drift.
+The existing `action-inputs` and `action-outputs` markers remain supported, with the same strict
+pair validation as custom documents. All action targets are validated before writing.
+
+The `/node` entry point exports `readActionMetadata(file)`, `renderActionSections(metadata, options?)`
+and `generateActionReadmes(root, check?)`. The README generator and API-reference builder use the
+same action renderer, including required inputs, default values, descriptions and actions without
+inputs or outputs. YAML parsing is shared with the repository catalog and site.
+
+`githubRepositoryUrl(repository)` normalizes a GitHub package repository field;
+`githubPagesUrl(repository)` derives its Pages base URL. `componentApiRoute(group, slug, packageName?)`
+provides the API route used by README links, generated references and the site. Tool routes use the
+package name; plugin and action routes use the folder slug.
+
+The release workflow runs `pnpm exec pumpkin-plugins-docs action-versions` separately to refresh
+example tags from `.release-please-manifest.json`. Unreleased actions use their `release-as` pin
+from `release-please-config.json`. `--check` checks these values without changing files. This
+command is intentionally separate from ordinary README regeneration because it follows release
+metadata rather than action input/output contracts.
+
+For generated values outside block markers, a document can supply `transform(source)` instead of
+`blocks`. The transformation returns the complete next text and can throw when a required value is
+missing. The shared generator still prepares every target before writing and supports drift checks.
+
+`localLicenseFile(directory)` finds a local `LICENSE`, `LICENSE.md` or `LICENSE.txt` file,
+case-insensitively, ignoring directories. Package metadata checks and generated catalogs use the
+same rule. Repository scripts also reuse component discovery for release registration, bundled
+package lookup, plugin collection, signed artifact installation and development builds.

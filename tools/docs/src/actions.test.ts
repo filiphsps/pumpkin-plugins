@@ -4,15 +4,15 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, it } from 'node:test';
+import { afterEach, describe, it } from 'vitest';
 
-const script = path.join(import.meta.dirname, 'sync-action-readmes.mjs');
-const dirs = [];
+const script = path.join(import.meta.dirname, '../bin/pumpkin-plugins-docs.mjs');
+const dirs: string[] = [];
 afterEach(() => {
     for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-function repo(actions) {
+function repo(actions: Record<string, { action: string; readme: string }>) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sync-action-readmes-'));
     dirs.push(root);
     const actionsRoot = path.join(root, 'actions');
@@ -26,22 +26,22 @@ function repo(actions) {
     return root;
 }
 
-function run(root, check = false) {
-    const result = spawnSync('node', [script, ...(check ? ['--check'] : [])], {
-        env: { ...process.env, PUMPKIN_PLUGINS_ROOT: root },
+function run(root: string, check = false) {
+    const result = spawnSync(process.execPath, [script, 'actions', ...(check ? ['--check'] : [])], {
+        cwd: root,
         encoding: 'utf8'
     });
     return { status: result.status, output: `${result.stdout}${result.stderr}` };
 }
 
-function readme(root, name) {
+function readme(root: string, name: string) {
     return fs.readFileSync(path.join(root, 'actions', name, 'README.md'), 'utf8');
 }
 
 const markers =
     '## Inputs\n\n<!-- action-inputs:start -->\nstale input docs\n<!-- action-inputs:end -->\n\n## Outputs\n\n<!-- action-outputs:start -->\nstale output docs\n<!-- action-outputs:end -->\n';
 
-describe('sync-action-readmes', () => {
+describe('action README CLI', { timeout: 15000 }, () => {
     it('generates input and output tables from each action.yml', () => {
         const root = repo({
             'market-action': {
@@ -76,7 +76,7 @@ describe('sync-action-readmes', () => {
 
         const stale = run(root, true);
         assert.equal(stale.status, 1);
-        assert.match(stale.output, /input\/output tables are stale/);
+        assert.match(stale.output, /out of date/);
         assert.equal(readme(root, 'action'), before);
 
         const generated = run(root);

@@ -27,3 +27,17 @@ it('checks all targets without writing and validates every target before updatin
         rmSync(root, { recursive: true, force: true });
     }
 });
+
+it('supports validated whole-document transforms with the same check behavior', () => {
+    const root = mkdtempSync(join(tmpdir(), 'docs-transform-'));
+    try {
+        writeFileSync(join(root, 'README.md'), 'Use action-v1.0.0.');
+        const docs = [{ file: 'README.md', transform: (source: string) => source.replace('v1.0.0', 'v2.0.0') }];
+        expect(generateDocuments(docs, root, true)).toBe('stale');
+        expect(readFileSync(join(root, 'README.md'), 'utf8')).toBe('Use action-v1.0.0.');
+        expect(generateDocuments(docs, root)).toBe('updated');
+        expect(readFileSync(join(root, 'README.md'), 'utf8')).toBe('Use action-v2.0.0.');
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});

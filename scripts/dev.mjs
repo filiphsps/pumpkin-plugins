@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { discoverComponents } from '@pumpkin-plugins/docs/node';
 
 const REPOSITORY = 'Pumpkin-MC/Pumpkin';
 const RELEASES_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
@@ -46,14 +47,8 @@ export function releaseAsset(release, name) {
 
 /** Lists every plugin package and the WASM output declared in its manifest. */
 export function listPluginBuilds(root) {
-    const packagesDir = path.join(root, 'packages');
-    return fs
-        .readdirSync(packagesDir, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => {
-            const packageDir = path.join(packagesDir, entry.name);
-            const manifestPath = path.join(packageDir, 'package.json');
-            if (!fs.existsSync(manifestPath)) return undefined;
+    return discoverComponents(root, 'packages')
+        .map(({ slug, directory: packageDir, metadataFile: manifestPath }) => {
             const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
             const output = manifest.pumpkinPlugin?.output;
             if (typeof output !== 'string') return undefined;
@@ -66,7 +61,7 @@ export function listPluginBuilds(root) {
             ) {
                 throw new Error(`${manifestPath} has an unsafe pumpkinPlugin.output: ${output}`);
             }
-            return { name: entry.name, packageDir, outputPath };
+            return { name: slug, packageDir, outputPath };
         })
         .filter(Boolean)
         .sort((a, b) => a.name.localeCompare(b.name));

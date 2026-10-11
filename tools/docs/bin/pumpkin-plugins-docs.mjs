@@ -2,7 +2,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { generateDocuments, generatePluginReadme, generateRootReadme } from '../src/node.ts';
+import {
+    generateActionReadmes,
+    generateActionVersions,
+    generateDocuments,
+    generatePluginReadme,
+    generateRootReadme
+} from '../src/node.ts';
 
 const args = process.argv.slice(2);
 const check = args.includes('--check');
@@ -13,10 +19,10 @@ const cwd = process.cwd();
 try {
     if (
         args.some((arg) => arg.startsWith('--') && arg !== '--check') ||
-        !['plugin', 'root', 'generate'].includes(command) ||
+        !['plugin', 'root', 'generate', 'actions', 'action-versions'].includes(command) ||
         positional.length > (command === 'generate' ? 2 : 1)
     ) {
-        throw new Error('Usage: pumpkin-plugins-docs [plugin|root|generate MODULE] [--check]');
+        throw new Error('Usage: pumpkin-plugins-docs [plugin|root|actions|action-versions|generate MODULE] [--check]');
     }
     if (command === 'root' && !fs.existsSync(path.join(cwd, 'pnpm-workspace.yaml'))) {
         throw new Error('run `root` from the repository root');
@@ -29,6 +35,12 @@ try {
         if (!Array.isArray(config.documents)) throw new Error(`${file} must export a documents array`);
         status = generateDocuments(config.documents, cwd, check);
         where = 'Custom documents';
+    } else if (command === 'action-versions') {
+        status = generateActionVersions(cwd, check);
+        where = 'Action versions';
+    } else if (command === 'actions') {
+        status = generateActionReadmes(cwd, check);
+        where = 'Action READMEs';
     } else if (command === 'root') {
         status = await generateRootReadme(cwd, check);
         where = 'README.md and component references';

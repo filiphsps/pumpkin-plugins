@@ -5,6 +5,7 @@
 // written by hand. See "Package metadata" in docs/code-style.md.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { discoverComponents, localLicenseFile } from '@pumpkin-plugins/docs/node';
 
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
 const fix = process.argv.includes('--fix');
@@ -59,26 +60,11 @@ function hasEscapedUnicode(source) {
     return false;
 }
 
-function hasLocalLicense(dir) {
-    return (
-        dir !== '.' &&
-        fs
-            .readdirSync(path.join(root, dir), { withFileTypes: true })
-            .some((file) => file.isFile() && /^license(?:\.md|\.txt)?$/i.test(file.name))
-    );
-}
-
-function packageDirs() {
-    const dirs = ['.'];
-    for (const group of ['packages', 'tools']) {
-        for (const entry of fs.readdirSync(path.join(root, group), { withFileTypes: true })) {
-            // Folders starting with `_` are scratch space, not packages.
-            if (!entry.isDirectory() || entry.name.startsWith('_')) continue;
-            if (fs.existsSync(path.join(root, group, entry.name, 'package.json'))) dirs.push(`${group}/${entry.name}`);
-        }
-    }
-    return dirs;
-}
+const hasLocalLicense = (dir) => dir !== '.' && Boolean(localLicenseFile(path.join(root, dir)));
+const packageDirs = () => [
+    '.',
+    ...['packages', 'tools'].flatMap((group) => discoverComponents(root, group).map(({ slug }) => `${group}/${slug}`))
+];
 
 /** What the package.json of `dir` should say, apart from the description. */
 function expected(dir, pkg) {

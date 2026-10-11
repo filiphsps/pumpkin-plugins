@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { githubPagesUrl } from './site.ts';
+import { componentApiRoute, githubPagesUrl, githubRepositoryUrl } from './site.ts';
 
 describe('githubPagesUrl', () => {
     it('derives a project Pages URL from a repository object', () => {
@@ -15,4 +15,14 @@ describe('githubPagesUrl', () => {
     it('returns no URL for unsupported repository metadata', () => {
         expect(githubPagesUrl({ url: 'https://example.com/repo' })).toBeUndefined();
     });
+});
+
+it('normalizes source repository URLs and derives shared API routes', () => {
+    expect(githubRepositoryUrl({ url: 'git+https://github.com/example/repo.git' })?.href).toBe(
+        'https://github.com/example/repo'
+    );
+    expect(githubRepositoryUrl('https://example.com/repo')).toBeUndefined();
+    expect(componentApiRoute('packages', 'plugin')).toBe('api/plugins/plugin/');
+    expect(componentApiRoute('tools', 'tool', '@scope/tool')).toBe('api/tools/@scope/tool/');
+    expect(componentApiRoute('actions', 'action')).toBe('api/actions/action/');
 });

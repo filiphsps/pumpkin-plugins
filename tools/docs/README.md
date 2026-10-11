@@ -1,6 +1,6 @@
 # @pumpkin-plugins/docs
 
-Defines what a plugin says about itself (`PluginInfo`, commands, permissions) and generates plugin READMEs, component API links, the root action and package tables, and custom generated blocks across component documents. It provides the `pumpkin-plugins-docs` command.
+Defines what a plugin says about itself (`PluginInfo`, commands, permissions) and generates plugin READMEs, component API links, the root action and package tables, and custom generated blocks across component documents. It provides the `pumpkin-plugins-docs` command, including action input/output generation.
 
 Use `@pumpkin-plugins/docs/markdown` for shared Markdown formatting and
 `@pumpkin-plugins/docs/node` for file generation, drift checks and source discovery.

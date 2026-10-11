@@ -317,8 +317,9 @@ generator and the checks can't drift:
 | `scripts/check-docs.mjs` | a package has no README, a link, heading or path in the docs doesn't exist, a `pnpm` command isn't a script, a doc page isn't in the docs index, a root script isn't documented, or a CI job isn't in the table above |
 
 `pnpm test:scripts` runs the tests of those three, `scripts/unpin-release-as.mjs`,
-`scripts/update-action-readmes.mjs`, `scripts/changed-areas.mjs`, the bundled release commit selector,
-and the agent hooks, using fixtures and throwaway repos. See "Docs match the code" in
+`scripts/changed-areas.mjs`, the bundled release commit selector,
+and the agent hooks, using fixtures and throwaway repos. Action README generation and example
+version updates are covered by `pnpm --filter @pumpkin-plugins/docs test`. See "Docs match the code" in
 [Code style](code-style.md).
 
 ## Publishing to market.pumpkinmc.org

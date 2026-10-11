@@ -115,7 +115,7 @@ describe('generateRootReadme', () => {
         const generated = read('README.md');
         expect(generated).toContain('| [Plain](actions/plain) | Simple action |');
         expect(generated).toContain("| [A: B](actions/quoted) | Action with a 'quote' |");
-        expect(generated).toContain('| [Folded](actions/folded) | First  Second |');
+        expect(generated).toContain('| [Folded](actions/folded) | First Second |');
         expect(generated).toContain('| [Literal](actions/literal) | First line Second line |');
         expect(generated).toContain('| [Blank](actions/blank) | Starts after a blank |');
         expect(generated).not.toContain('no-metadata');
@@ -132,17 +132,9 @@ describe('generateRootReadme', () => {
     it.each([
         ['missing top-level name', 'description: Description\n', 'is missing its top-level name'],
         ['missing top-level description', 'name: Name\n', 'is missing its top-level description'],
-        [
-            'malformed double-quoted value',
-            'name: "unfinished\ndescription: Description\n',
-            'needs a single-line name value'
-        ],
-        ['invalid double-quoted escape', 'name: "bad\\q"\ndescription: Description\n', 'has an invalid quoted name'],
-        [
-            'malformed single-quoted value',
-            "name: 'unfinished\ndescription: Description\n",
-            'needs a single-line name value'
-        ],
+        ['malformed double-quoted value', 'name: "unfinished\ndescription: Description\n', 'invalid YAML'],
+        ['invalid double-quoted escape', 'name: "bad\\q"\ndescription: Description\n', 'invalid YAML'],
+        ['malformed single-quoted value', "name: 'unfinished\ndescription: Description\n", 'invalid YAML'],
         ['empty quoted value', 'name: ""\ndescription: Description\n', 'has an empty name'],
         ['empty block value', 'name: Name\ndescription: |\n', 'has an empty description']
     ])('rejects %s action metadata', async (_case, contents, message) => {

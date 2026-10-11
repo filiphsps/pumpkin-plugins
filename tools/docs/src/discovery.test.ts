@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import { discoverComponents, walkMarkdown } from './discovery.ts';
+import { discoverComponents, localLicenseFile, walkMarkdown } from './discovery.ts';
 
 it('discovers sorted components by metadata and walks Markdown with explicit exclusions', () => {
     const root = mkdtempSync(join(tmpdir(), 'docs-discovery-'));
@@ -14,6 +14,7 @@ it('discovers sorted components by metadata and walks Markdown with explicit exc
     try {
         put('tools/z/package.json');
         put('tools/a/package.json');
+        put('tools/a/LICENSE.md');
         put('tools/_scratch/package.json');
         put('tools/other/README.md');
         put('actions/y/action.yaml');
@@ -25,6 +26,8 @@ it('discovers sorted components by metadata and walks Markdown with explicit exc
         expect(discoverComponents(root, 'tools').map((item) => item.slug)).toEqual(['a', 'z']);
         expect(discoverComponents(root, 'actions').map((item) => item.slug)).toEqual(['x', 'y']);
         expect(discoverComponents(root, 'packages')).toEqual([]);
+        expect(localLicenseFile(join(root, 'tools/a'))).toBe(join(root, 'tools/a/LICENSE.md'));
+        expect(localLicenseFile(join(root, 'tools/z'))).toBeUndefined();
         expect(walkMarkdown(join(root, 'docs'), { exclude: [join(root, 'docs/api')] })).toEqual([
             join(root, 'docs/index.md'),
             join(root, 'docs/nested/guide.md')
