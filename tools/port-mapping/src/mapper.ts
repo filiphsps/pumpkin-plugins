@@ -5,6 +5,7 @@ import { describeIdentity, type RouterIdentity, RouterRefusedError } from './ide
 import { formatIpv4, type Ipv4, isPublicIpv4, sameIpv4 } from './ipv4.ts';
 import type { Network } from './network.ts';
 import { type Steps, Task } from './task.ts';
+import { UpnpError } from './upnp.ts';
 
 /** What to keep open. */
 export interface MappingSpec {
@@ -94,7 +95,7 @@ const reason = (err: unknown) => (err instanceof Error ? err.message : String(er
  */
 export class PortMapper {
     private readonly entries = new Map<string, Entry>();
-    private removals: NonNullable<PhysicalMapping['applied']>[] = [];
+    private removals: { found: Discovered; request: MappingRequest }[] = [];
     private discovered: Discovered | undefined;
     private job: Task<void> | undefined;
     private discoveryRetryAt = 0;
@@ -175,17 +176,17 @@ export class PortMapper {
         if (this.entries.size === 0 && this.removals.length === 0) return;
         const now = this.net.now();
 
+        const removal = this.removals.shift();
+        if (removal) {
+            this.start(this.close(removal.found, removal.request));
+            return;
+        }
         if (this.publicHost(now)) return;
         if (!this.discovered) {
             if (this.entries.size > 0 && now >= this.discoveryRetryAt) this.start(this.search());
             return;
         }
         const gateway = this.discovered;
-        const removal = this.removals.shift();
-        if (removal) {
-            this.start(this.close(removal.found, removal.request));
-            return;
-        }
         for (const [key, logical] of this.entries) {
             const entry = logical.mapping;
             const due =
@@ -201,14 +202,22 @@ export class PortMapper {
 
     /** Closes every open port. Run it to the end when shutting down. */
     *releaseAll(): Steps<void> {
-        this.job?.cancel();
-        this.job = undefined;
         for (const key of [...this.entries.keys()]) this.release(key);
-        for (const { found, request } of this.removals.splice(0)) {
-            try {
-                yield* found.gateway.deleteMapping(request);
-            } catch {
-                // The lease runs out by itself.
+        let closing = false;
+        try {
+            // Account for creation already sent before deleting its resulting physical mapping.
+            while (this.job?.poll().state === 'running') yield;
+            this.job = undefined;
+            for (let removal = this.removals.shift(); removal; removal = this.removals.shift()) {
+                closing = true;
+                yield* this.close(removal.found, removal.request);
+                closing = false;
+            }
+        } finally {
+            this.job?.cancel();
+            this.job = undefined;
+            if (closing || this.removals.length > 0) {
+                this.warn('cleanup', 'Port mapping cleanup did not finish; remote mappings may remain.');
             }
         }
     }
@@ -332,6 +341,7 @@ export class PortMapper {
     private *open(found: Discovered, key: string, entry: PhysicalMapping): Steps<void> {
         const { gateway } = found;
         const wasOpen = entry.state.kind === 'open';
+        let failure: unknown;
         try {
             const internal = this.net.localAddress(gateway.address);
             if (!internal) throw new Error('this machine has no route to the router');
@@ -377,6 +387,7 @@ export class PortMapper {
                 );
             }
         } catch (err) {
+            failure = err;
             if (!this.owned(entry)) return;
             entry.failures++;
             entry.retryAt = this.net.now() + backoff(entry.failures);
@@ -395,18 +406,32 @@ export class PortMapper {
                 this.discoveryRetryAt = entry.retryAt;
             }
         } finally {
-            entry.pending = undefined;
             if (!this.owned(entry) && entry.applied && !this.removals.includes(entry.applied)) {
                 this.removals.push(entry.applied);
             }
+            if (
+                entry.pending &&
+                !entry.applied &&
+                !(failure instanceof PortInUseError || failure instanceof UpnpError)
+            ) {
+                this.warn(
+                    `cleanup:${key}`,
+                    `Creation of port ${entry.spec.port}: outcome is unknown; attempting best-effort cleanup.`
+                );
+                this.removals.push(entry.pending);
+            }
+            entry.pending = undefined;
         }
     }
 
     private *close(found: Discovered, request: MappingRequest): Steps<void> {
         try {
             yield* found.gateway.deleteMapping(request);
-        } catch {
-            // The lease runs out by itself.
+        } catch (err) {
+            this.warn(
+                `cleanup:${request.protocol}:${request.externalPort}`,
+                `Best-effort cleanup of port ${request.externalPort} failed: ${reason(err)}. Remote mappings may remain.`
+            );
         }
     }
 }

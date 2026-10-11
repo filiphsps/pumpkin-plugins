@@ -2,6 +2,7 @@ import { strFromU8 } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import type { RouterIdentity } from './identify.ts';
 import { PortMapper } from './mapper.ts';
+import { Task } from './task.ts';
 import { FakeIgd } from './testing/fake-igd.ts';
 import { FakeNetwork, runSteps } from './testing/fake-network.ts';
 
@@ -170,6 +171,126 @@ describe('PortMapper', () => {
         expect([...(igd?.mappings.keys() ?? [])]).toEqual(['tcp:8124']);
         expect(igd?.mappings.get('tcp:8124')?.internalPort).toBe(8124);
         expect(net.leaks).toBe(0);
+    });
+
+    it.each([false, true])('waits for in-flight creation before releaseAll cleanup (permanent=%s)', (permanent) => {
+        const { igd, mapper, settle, net } = setup(new FakeIgd({ natPmp: false, permanentLeasesOnly: permanent }));
+        const resume = delayMappingReply(net, 'AddPortMapping', () => (igd?.mappings.size ?? 0) > 0);
+        mapper.request('web', spec);
+        settle(() => igd?.mappings.size === 1);
+        expect(igd?.mappings.get('tcp:8123')?.leaseSeconds).toBe(permanent ? 0 : 3600);
+        const closing = mapper.releaseAll();
+        expect(closing.next().done).toBe(false);
+        resume();
+        runSteps(net, closing);
+        expect(igd?.mappings.size).toBe(0);
+        expect(mapper.mappings()).toEqual([]);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('compensates NAT-PMP creation released before its assigned-port reply', () => {
+        const { igd, mapper, settle, net } = setup(new FakeIgd({ upnp: false, takenPorts: [8123] }), { upnp: false });
+        const openDatagram = net.openDatagram.bind(net);
+        let blocked = true;
+        net.openDatagram = () => {
+            const socket = openDatagram();
+            let mapping = false;
+            return {
+                send: (to, data) => {
+                    mapping ||= data.length === 12 && new DataView(data.buffer, data.byteOffset).getUint32(8) > 0;
+                    socket.send(to, data);
+                },
+                receive: () => (mapping && blocked ? undefined : socket.receive()),
+                close: () => socket.close()
+            };
+        };
+        mapper.request('web', spec);
+        settle(() => igd?.mappings.size === 1);
+        expect(igd?.mappings.has('tcp:9148')).toBe(true);
+        mapper.release('web');
+        blocked = false;
+        settle(() => igd?.mappings.size === 0);
+        expect(igd?.mappings.size).toBe(0);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('accounts for permanent-lease fallback after release of its initial attempt', () => {
+        const { igd, mapper, settle, net } = setup(new FakeIgd({ natPmp: false, permanentLeasesOnly: true }));
+        const resume = delayMappingReply(net);
+        mapper.request('web', spec);
+        settle(() => igd?.actions.includes('AddPortMapping') === true);
+        expect(igd?.mappings.size).toBe(0);
+        mapper.release('web');
+        resume();
+        settle(() => igd?.actions.includes('DeletePortMapping') === true);
+        expect(igd?.actions.filter((a) => a === 'AddPortMapping')).toHaveLength(2);
+        expect(igd?.mappings.size).toBe(0);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('retains a compatible replacement after stale creation completes', () => {
+        const { igd, mapper, settle, net } = setup(new FakeIgd({ natPmp: false }));
+        const resume = delayMappingReply(net);
+        mapper.request('web', spec);
+        settle(() => igd?.mappings.size === 1);
+        mapper.request('web', { ...spec, description: 'Replacement' });
+        resume();
+        settle(() => open(mapper.state('web')));
+        settle(() => false, 1000);
+        expect(igd?.mappings.size).toBe(1);
+        expect(igd?.mappings.get('tcp:8123')?.description).toBe('Replacement');
+        runSteps(net, mapper.releaseAll());
+        expect(igd?.mappings.size).toBe(0);
+    });
+
+    it('attempts bounded cleanup and warns when a released creation reply is lost', () => {
+        const { igd, mapper, settle, net, log } = setup(new FakeIgd({ natPmp: false, permanentLeasesOnly: true }));
+        delayMappingReply(net, 'AddPortMapping', () => (igd?.mappings.size ?? 0) > 0);
+        mapper.request('web', spec);
+        settle(() => igd?.mappings.size === 1);
+        mapper.release('web');
+        settle(() => false, 12_000);
+        expect(igd?.mappings.size).toBe(0);
+        expect(log.some((m) => m.includes('outcome is unknown') && m.includes('best-effort'))).toBe(true);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('cleans up an unacknowledged creation even when its owner releases after timeout', () => {
+        const { igd, mapper, settle, net, log } = setup(new FakeIgd({ natPmp: false }));
+        delayMappingReply(net);
+        mapper.request('web', spec);
+        settle(() => mapper.state('web')?.kind === 'failed');
+        mapper.release('web');
+        settle(() => false, 6000);
+        expect(igd?.mappings.size).toBe(0);
+        expect(log.some((m) => m.includes('outcome is unknown'))).toBe(true);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('bounds unsuccessful deletion and reports that remote cleanup was not confirmed', () => {
+        const { igd, mapper, settle, net, log } = setup(new FakeIgd({ natPmp: false }));
+        delayMappingReply(net, 'DeletePortMapping');
+        mapper.request('web', spec);
+        settle(() => open(mapper.state('web')));
+        mapper.release('web');
+        settle(() => false, 6000);
+        expect(igd?.mappings.size).toBe(0);
+        expect(log.some((m) => m.includes('Best-effort cleanup') && m.includes('failed'))).toBe(true);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('closes transports and reports unresolved cleanup when shutdown is cancelled', () => {
+        const { igd, mapper, settle, net, log } = setup(new FakeIgd({ natPmp: false }));
+        delayMappingReply(net);
+        mapper.request('web', spec);
+        settle(() => igd?.mappings.size === 1);
+        const closing = new Task(mapper.releaseAll());
+        expect(closing.poll().state).toBe('running');
+        closing.cancel();
+        expect(net.leaks).toBe(0);
+        expect(log.some((m) => m.includes('cleanup did not finish'))).toBe(true);
+        // A deadline cannot prove whether the router kept the unacknowledged operation.
+        expect(igd?.mappings.size).toBe(1);
     });
 
     it('rejects an incompatible UPnP target before overwriting an owned physical port', () => {
