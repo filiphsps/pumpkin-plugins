@@ -1,6 +1,6 @@
 {
     "name": "@pumpkin-plugins/apple-skin-pumpkin",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "private": true,
     "description": "AppleSkin server-side support",
     "license": "MIT",
