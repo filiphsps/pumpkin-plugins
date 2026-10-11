@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.5](https://github.com/filiphsps/pumpkin-plugins/compare/publish-to-pumpkin-market-v0.0.4...publish-to-pumpkin-market-v0.0.5) (2026-10-11)
+
+
+### Bug Fixes
+
+* **market-publisher:** fail on ID lookup errors ([98e09e9](https://github.com/filiphsps/pumpkin-plugins/commit/98e09e9809143cb7b46993547565253968324c29))
+* **market-publisher:** redact and bound API failure bodies ([6a318ac](https://github.com/filiphsps/pumpkin-plugins/commit/6a318ac7a29a248060116cd740e1f4ac574a474d))
+
 ## [0.0.4](https://github.com/filiphsps/pumpkin-plugins/compare/publish-to-pumpkin-market-v0.0.3...publish-to-pumpkin-market-v0.0.4) (2026-10-08)
 
 
