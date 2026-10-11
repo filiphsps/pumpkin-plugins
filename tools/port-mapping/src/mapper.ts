@@ -282,7 +282,7 @@ export class PortMapper {
                 kind: 'open',
                 via: 'public',
                 address,
-                port: entry.spec.externalPort ?? entry.spec.port
+                port: entry.spec.port
             };
         }
         return true;

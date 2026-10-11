@@ -84,7 +84,7 @@ describe('PortMapper', () => {
         net.local = [93, 184, 216, 99];
         mapper.request('web', { ...spec, externalPort: 9000 });
         settle(() => open(mapper.state('web')));
-        expect(mapper.state('web')).toEqual({ kind: 'open', via: 'public', address: [93, 184, 216, 99], port: 9000 });
+        expect(mapper.state('web')).toEqual({ kind: 'open', via: 'public', address: [93, 184, 216, 99], port: 8123 });
         expect(net.sockets).toHaveLength(0);
         expect(net.connections).toHaveLength(0);
     });
