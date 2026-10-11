@@ -34,6 +34,7 @@ const errorText = (err: unknown) => (err instanceof Error ? err.message : String
  */
 export class PackScanner {
     private readonly cache = new Map<string, CacheEntry>();
+    private directory: string | undefined;
 
     /** Creates a scanner over the plugin's data folder. */
     constructor(private readonly files: DataFiles) {}
@@ -44,6 +45,10 @@ export class PackScanner {
      * @returns The packs found, in file name order, and what was left out.
      */
     scan(directory: string): ScanResult {
+        if (directory !== this.directory) {
+            this.cache.clear();
+            this.directory = directory;
+        }
         const packs: ScannedPack[] = [];
         const problems: string[] = [];
         const present = new Set<string>();

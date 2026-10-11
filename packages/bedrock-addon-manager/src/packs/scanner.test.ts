@@ -53,6 +53,46 @@ describe('PackScanner', () => {
         });
     });
 
+    it.each(['mcpack', 'mcaddon'])(
+        'keeps equal-metadata %s sources from different directories distinct',
+        (extension) => {
+            const files = new MemoryFiles();
+            const manifestPath = extension === 'mcpack' ? 'manifest.json' : 'RP/manifest.json';
+            for (const [directory, n] of [
+                ['first', 1],
+                ['second', 2]
+            ] as const) {
+                files.put(
+                    `${directory}/same.${extension}`,
+                    zipSync(
+                        {
+                            [manifestPath]: strToU8(JSON.stringify(manifestJson({ uuid: uuid(n) })))
+                        },
+                        { level: 0 }
+                    )
+                );
+            }
+            const stat = files.stat.bind(files);
+            files.stat = (path) => {
+                const info = stat(path);
+                return info?.kind === 'file' ? { ...info, modified: 42 } : info;
+            };
+            expect(files.stat(`first/same.${extension}`)).toEqual(files.stat(`second/same.${extension}`));
+            const scanner = new PackScanner(files);
+            expect(scanner.scan('first').packs[0].manifest.uuid).toBe(uuid(1));
+            const second = scanner.scan('second').packs[0];
+            expect(second.manifest.uuid).toBe(uuid(2));
+            expect(second.path.startsWith('second/')).toBe(true);
+            expect(readManifest(files.readFile(second.path)).uuid).toBe(uuid(2));
+            const reads = files.reads.get(`second/same.${extension}`);
+            expect(scanner.scan('second').packs[0]).toEqual(second);
+            expect(files.reads.get(`second/same.${extension}`)).toBe(reads);
+            const first = scanner.scan('first').packs[0];
+            expect(first.path.startsWith('first/')).toBe(true);
+            expect(first.manifest.uuid).toBe(uuid(1));
+        }
+    );
+
     it('remembers a broken pack too, instead of reparsing it every scan', () => {
         const files = new MemoryFiles().put('packs/broken.mcpack', 'not a zip');
         const scanner = new PackScanner(files);
