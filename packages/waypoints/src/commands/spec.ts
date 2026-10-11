@@ -119,8 +119,8 @@ export const commands = defineCommands(PLUGIN_NAME, {
                 }
             },
             reset: admin('Reset one mutable waypoint property to its default', [
-                name,
-                { name: 'property', type: 'string', mode: 'single-word' }
+                { name: 'property', type: 'string', mode: 'single-word' },
+                name
             ])
         }
     }

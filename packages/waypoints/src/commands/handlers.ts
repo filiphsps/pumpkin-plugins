@@ -231,7 +231,7 @@ export function commandHandlers(runtime: WaypointCommandRuntime): CommandHandler
                     `Updated visibility range for ${name}.`
                 )
             ),
-        'wp reset <name> <property>': (sender, { name, property }) =>
+        'wp reset <property> <name>': (sender, { property, name }) =>
             withOperator(runtime, sender, () => resetProperty(runtime, name, property))
     };
 }

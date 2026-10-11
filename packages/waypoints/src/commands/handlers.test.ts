@@ -179,6 +179,21 @@ describe('/wp handlers', () => {
         expect(catalog.getByName('Taylor')).toBeUndefined();
     });
 
+    it('resets the property named before the waypoint name', () => {
+        const { catalog, handlers, sender } = setup(true);
+        catalog.create({ id: waypointId, name: 'Bert', dimension: 'world', position: { x: 0, y: 64, z: 0 } });
+        catalog.update('Bert', { color: '#112233' });
+        const run = handlers as unknown as Record<
+            string,
+            (sender: CommandSender, args: { property: string; name: string }) => readonly unknown[]
+        >;
+
+        expect(run['wp reset <property> <name>']?.(sender, { property: 'color', name: 'Bert' })).toEqual([
+            'Reset color for Bert.'
+        ]);
+        expect(catalog.getByName('Bert')?.color).toBe('#FFFFFF');
+    });
+
     it.each([
         ['minecraft:golden_apple', 'minecraft:golden_apple'],
         ['golden_apple', 'minecraft:golden_apple']

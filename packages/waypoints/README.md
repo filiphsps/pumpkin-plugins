@@ -71,7 +71,7 @@ Pumpkin asks for these on the server console the first time the plugin loads.
 | `/wp set label <name> <label>` | Set the waypoint display label | `Waypoints:command.admin` | operators (level 3) |
 | `/wp set description <name> <description>` | Set the waypoint description | `Waypoints:command.admin` | operators (level 3) |
 | `/wp set visibility-range <name> <range>` | Set the waypoint rendering range in blocks | `Waypoints:command.admin` | operators (level 3) |
-| `/wp reset <name> <property>` | Reset one mutable waypoint property to its default | `Waypoints:command.admin` | operators (level 3) |
+| `/wp reset <property> <name>` | Reset one mutable waypoint property to its default | `Waypoints:command.admin` | operators (level 3) |
 <!-- docs:end commands -->
 
 ## Configuration

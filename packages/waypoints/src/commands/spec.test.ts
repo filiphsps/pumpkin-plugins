@@ -40,7 +40,7 @@ describe('waypoint commands', () => {
             '/wp set label <name> <label>',
             '/wp set description <name> <description>',
             '/wp set visibility-range <name> <range>',
-            '/wp reset <name> <property>'
+            '/wp reset <property> <name>'
         ]);
         expect(usages.some((usage) => /mark|locator|send|show|admin/.test(usage))).toBe(false);
     });
