@@ -1,0 +1,355 @@
+name: Releases
+
+on:
+    workflow_call:
+
+permissions:
+    contents: read
+
+env:
+    CI: true
+    DO_NOT_TRACK: 1
+
+jobs:
+    release:
+        name: 🚢 Release
+        timeout-minutes: 10
+        runs-on: ubuntu-26.04
+        permissions:
+            contents: read
+        outputs:
+            paths_released: ${{ steps.release.outputs.paths_released }}
+            action_paths_released: ${{ steps.release.outputs.action_paths_released }}
+            release_count: ${{ steps.release.outputs.release_count }}
+            prepared_pr_count: ${{ steps.release.outputs.pr_count }}
+            open_pr_count: ${{ steps.release-prs.outputs.open_pr_count }}
+            all: ${{ toJSON(steps.release.outputs) }}
+            prs: ${{ steps.release-prs.outputs.prs }}
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 🔑 Create release token
+              id: app-token
+              uses: actions/create-github-app-token@v3.2.0
+              with:
+                  client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+                  permission-contents: write
+                  permission-issues: write
+                  permission-pull-requests: write
+
+            - name: 🚢 Release Please with bundled dependency changes
+              id: release
+              env:
+                  # App-token-created PRs trigger CI; GITHUB_TOKEN-created PRs do not.
+                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+              run: pnpm --package=release-please@17.11.2 dlx -c 'node scripts/release.mjs "$(command -v release-please)"'
+
+            - name: 📋 Find open release PRs to prepare
+              id: release-prs
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+                  EXPECTED_PR_COUNT: ${{ steps.release.outputs.pr_count }}
+              run: |
+                  set -euo pipefail
+                  prefix="release-please--branches--${DEFAULT_BRANCH}--components--"
+                  expected="$EXPECTED_PR_COUNT"
+                  if [[ ! "$expected" =~ ^[0-9]+$ ]]; then
+                      echo "::error::Release Please returned an invalid release PR count: $expected"
+                      exit 1
+                  fi
+                  prs='[]'
+                  open_pr_count=0
+                  for attempt in 1 2 3 4 5; do
+                      prs="$(gh pr list --state open --base "$DEFAULT_BRANCH" --limit 1000 --json headRefName \
+                          | jq --compact-output --arg prefix "$prefix" '[.[] | select(.headRefName | startswith($prefix))]')"
+                      open_pr_count="$(jq 'length' <<< "$prs")"
+                      echo "Release PR discovery attempt $attempt: found $open_pr_count open release PR(s); Release Please prepared $expected."
+                      if (( open_pr_count >= expected )); then
+                          break
+                      fi
+                      sleep 3
+                  done
+                  if (( open_pr_count < expected )); then
+                      echo "::error::Found $open_pr_count open release PR(s), but Release Please prepared $expected."
+                      exit 1
+                  fi
+                  echo "Open release PR branches: $(jq --raw-output 'map(.headRefName) | join(", ")' <<< "$prs")"
+                  echo "open_pr_count=$open_pr_count" >> "$GITHUB_OUTPUT"
+                  echo "prs=$prs" >> "$GITHUB_OUTPUT"
+
+    release-fanout-check:
+        name: 🧮 Validate release fan-out
+        needs: [release]
+        if: needs.release.result == 'success'
+        timeout-minutes: 5
+        runs-on: ubuntu-26.04
+        env:
+            RELEASE_COUNT: ${{ needs.release.outputs.release_count }}
+            PREPARED_PR_COUNT: ${{ needs.release.outputs.prepared_pr_count }}
+            OPEN_PR_COUNT: ${{ needs.release.outputs.open_pr_count }}
+            PLUGIN_PATHS: ${{ needs.release.outputs.paths_released }}
+            ACTION_PATHS: ${{ needs.release.outputs.action_paths_released }}
+            RELEASE_METADATA: ${{ needs.release.outputs.all }}
+        steps:
+            - name: 🧮 Require complete release outputs
+              run: |
+                  set -euo pipefail
+                  for count in RELEASE_COUNT PREPARED_PR_COUNT OPEN_PR_COUNT; do
+                      value="${!count}"
+                      if [[ ! "$value" =~ ^[0-9]+$ ]]; then
+                          echo "::error::$count is missing or invalid: $value"
+                          exit 1
+                      fi
+                  done
+                  plugin_count="$(jq -er 'if type == "array" then length else error("expected a JSON array") end' <<< "$PLUGIN_PATHS")"
+                  action_count="$(jq -er 'if type == "array" then length else error("expected a JSON array") end' <<< "$ACTION_PATHS")"
+                  if (( plugin_count + action_count != RELEASE_COUNT )); then
+                      echo "::error::Release output mismatch: count=$RELEASE_COUNT, plugin paths=$plugin_count, action paths=$action_count."
+                      exit 1
+                  fi
+                  if (( OPEN_PR_COUNT < PREPARED_PR_COUNT )); then
+                      echo "::error::Release PR output mismatch: Release Please prepared $PREPARED_PR_COUNT, but only $OPEN_PR_COUNT open release PR(s) were found."
+                      exit 1
+                  fi
+                  jq -e 'type == "object"' <<< "$RELEASE_METADATA" >/dev/null
+                  while IFS= read -r release_path; do
+                      [ -z "$release_path" ] && continue
+                      jq -e --arg key "${release_path}--tag_name" 'has($key) and (.[$key] | type == "string" and length > 0)' \
+                          <<< "$RELEASE_METADATA" >/dev/null || {
+                          echo "::error::Missing tag metadata for $release_path."
+                          exit 1
+                      }
+                  done < <(jq --raw-output '.[]' <<< "$PLUGIN_PATHS"; jq --raw-output '.[]' <<< "$ACTION_PATHS")
+                  echo "Validated $RELEASE_COUNT release(s), $PREPARED_PR_COUNT prepared PR(s), and $OPEN_PR_COUNT open release PR(s)."
+
+    release-pr:
+        name: 📝 Prepare release PR ${{ matrix.pr.headRefName }}
+        needs: [release, release-fanout-check]
+        if: ${{ needs.release.outputs.prs != '' && needs.release.outputs.prs != '[]' }}
+        timeout-minutes: 10
+        runs-on: ubuntu-26.04
+        permissions:
+            contents: read
+        strategy:
+            fail-fast: false
+            matrix:
+                pr: ${{ fromJSON(needs.release.outputs.prs) }}
+        steps:
+            - name: 🔑 Create release PR token
+              id: app-token
+              uses: actions/create-github-app-token@v3.2.0
+              with:
+                  client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+                  permission-contents: write
+
+            # Release Please rewrites each PR branch on updates. Prepare every returned PR.
+            - name: 🕶️ Checkout release PR branch
+              uses: actions/checkout@v7.0.1
+              with:
+                  ref: ${{ matrix.pr.headRefName }}
+                  token: ${{ steps.app-token.outputs.token }}
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 📝 Regenerate READMEs
+              run: pnpm run readme
+
+            # The first-release pin forces version 0.0.1, then must be removed before merge so the
+            # release config check passes and Release Please can handle subsequent versions.
+            - name: 🎉 Retire first-release pins
+              run: |
+                  node scripts/unpin-release-as.mjs
+                  if [ -z "$(git status --porcelain -- release-please-config.json)" ]; then
+                      echo "Nothing to retire"
+                      exit 0
+                  fi
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add -- release-please-config.json
+                  git commit -m "chore: retire first-release pins"
+                  git push
+
+            - name: 🏷️ Update action README version examples
+              run: node scripts/update-action-readmes.mjs
+
+            - name: 💾 Commit READMEs to the release PR
+              run: |
+                  if [ -z "$(git status --porcelain)" ]; then
+                      echo "READMEs are already up to date"
+                      exit 0
+                  fi
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add -- README.md 'packages/*/README.md' 'actions/*/README.md'
+                  git commit -m "docs: update generated READMEs"
+                  git push
+
+    assets:
+        name: 📎 Attach ${{ matrix.path }}
+        needs: [release, release-fanout-check]
+        if: ${{ needs.release.outputs.paths_released != '[]' }}
+        timeout-minutes: 10
+        runs-on: ubuntu-26.04
+        permissions:
+            contents: write
+        strategy:
+            fail-fast: false
+            matrix:
+                path: ${{ fromJSON(needs.release.outputs.paths_released) }}
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            GH_REPO: ${{ github.repository }}
+            TAG: ${{ fromJSON(needs.release.outputs.all)[format('{0}--tag_name', matrix.path)] }}
+            PLUGIN_DIRECTORY: ${{ matrix.path }}
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            # Resolve the same canonical plugin name the Market job uses.
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 📥 Download build artifact
+              uses: actions/download-artifact@v8.0.2
+              with:
+                  name: plugins
+                  path: dist/
+
+            # A master push from before the release PR merged can still be running when its
+            # release job creates the tag, and it would attach the build of that older commit. The
+            # tag says which commit it releases, so only the run for that commit may attach.
+            - name: 🔒 Check the tag is the commit this run built
+              run: |
+                  ref="$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')"
+                  sha="${ref##* }"
+                  if [ "${ref%% *}" = tag ]; then
+                      sha="$(gh api "repos/$GH_REPO/git/tags/$TAG" --jq '.object.sha')"
+                  fi
+                  if [ "$sha" != "$GITHUB_SHA" ]; then
+                      echo "::error::$TAG releases $sha, but this run built $GITHUB_SHA. Not attaching anything."
+                      exit 1
+                  fi
+
+            - name: 🧾 Resolve signing inputs
+              id: plugin
+              env:
+                  RELEASE_TAG: ${{ env.TAG }}
+              run: |
+                  echo "plugin_name=$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")" >> "$GITHUB_OUTPUT"
+                  echo "version=${RELEASE_TAG##*-v}" >> "$GITHUB_OUTPUT"
+                  echo "wasm_file=dist/$(basename "$PLUGIN_DIRECTORY").wasm" >> "$GITHUB_OUTPUT"
+
+            - name: 🔏 Sign release artifact
+              uses: ./actions/sign-pumpkin-plugin
+              with:
+                  plugin-name: ${{ steps.plugin.outputs.plugin_name }}
+                  version: ${{ steps.plugin.outputs.version }}
+                  wasm-file: ${{ steps.plugin.outputs.wasm_file }}
+                  developer-name: Filiph Sandström
+                  signing-key: ${{ secrets.PLUGIN_SIGNING_KEY }}
+
+            - name: 📦 Prepare signed release artifact
+              env:
+                  WASM_FILE: ${{ steps.plugin.outputs.wasm_file }}
+              run: |
+                  mkdir -p signed
+                  cp "$WASM_FILE" signed/
+                  cp "$WASM_FILE.sha256" signed/
+
+            - name: 📤 Upload signed release artifact
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  retention-days: 1
+                  overwrite: true
+                  compression-level: 0
+                  if-no-files-found: error
+                  name: release-${{ env.TAG }}
+                  path: signed/
+
+            - name: 📎 Upload to the release
+              run: |
+                  name="$(basename "$PLUGIN_DIRECTORY")"
+                  gh release upload "$TAG" "signed/$name.wasm" "signed/$name.wasm.sha256" --clobber
+
+    market:
+        name: 🛒 Market ${{ matrix.path }}
+        needs: [release, release-fanout-check, assets]
+        if: ${{ needs.release.outputs.paths_released != '[]' }}
+        timeout-minutes: 10
+        runs-on: ubuntu-26.04
+        strategy:
+            fail-fast: false
+            matrix:
+                path: ${{ fromJSON(needs.release.outputs.paths_released) }}
+        env:
+            TAG: ${{ fromJSON(needs.release.outputs.all)[format('{0}--tag_name', matrix.path)] }}
+            MARKET_RELEASE_NOTES: ${{ fromJSON(needs.release.outputs.all)[format('{0}--body', matrix.path)] }}
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            # The publisher resolves the canonical plugin name from the package's info module.
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 📥 Download build artifact
+              uses: actions/download-artifact@v8.0.2
+              with:
+                  name: release-${{ env.TAG }}
+                  path: dist/
+
+            - name: 🧾 Resolve Market action inputs
+              id: market
+              env:
+                  PLUGIN_DIRECTORY: ${{ matrix.path }}
+                  RELEASE_TAG: ${{ env.TAG }}
+              run: |
+                  echo "plugin_name=$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")" >> "$GITHUB_OUTPUT"
+                  echo "version=${RELEASE_TAG##*-v}" >> "$GITHUB_OUTPUT"
+                  echo "wasm_file=dist/$(basename "$PLUGIN_DIRECTORY").wasm" >> "$GITHUB_OUTPUT"
+
+            # The GitHub release keeps its publisher signature. Market signs each public download,
+            # so send it the verified component without the publisher's signing sections.
+            - name: 🔏 Prepare component for Market signing
+              env:
+                  WASM_FILE: ${{ steps.market.outputs.wasm_file }}
+                  PLUGIN_NAME: ${{ steps.market.outputs.plugin_name }}
+                  PLUGIN_VERSION: ${{ steps.market.outputs.version }}
+              run: node scripts/prepare-market-plugin.mjs "$WASM_FILE" "$PLUGIN_NAME" "$PLUGIN_VERSION"
+
+            # Missing credentials or a not-yet-published listing produce a warning and leave the
+            # GitHub release intact. API failures still fail this job so it can be retried.
+            - name: 🛒 Publish to Pumpkin Market
+              id: publish
+              uses: ./actions/publish-to-pumpkin-market
+              with:
+                  plugin-name: ${{ steps.market.outputs.plugin_name }}
+                  version: ${{ steps.market.outputs.version }}
+                  wasm-file: ${{ steps.market.outputs.wasm_file }}
+                  api-token: ${{ secrets.MARKET_API_TOKEN }}
+                  release-notes: ${{ env.MARKET_RELEASE_NOTES }}
+                  warn: true
+
+            - name: 🧾 Generate Market description and commands
+              if: steps.publish.outputs.status == 'success'
+              env:
+                  PLUGIN_DIRECTORY: ${{ matrix.path }}
+                  METADATA_FILE: ${{ runner.temp }}/market-listing-metadata.json
+              run: node scripts/market-plugin-metadata.mjs "$PLUGIN_DIRECTORY" > "$METADATA_FILE"
+
+            - name: 📝 Update Pumpkin Market listing metadata
+              if: steps.publish.outputs.status == 'success'
+              uses: ./actions/update-pumpkin-market-listing
+              with:
+                  plugin-id: ${{ steps.publish.outputs.listing-id }}
+                  metadata-file: ${{ runner.temp }}/market-listing-metadata.json
+                  api-token: ${{ secrets.MARKET_API_TOKEN }}
+                  update-mode: patch

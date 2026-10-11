@@ -5,9 +5,9 @@ navigation:
 
 # CI and releases
 
-The plugin, action verification and release jobs are in `.github/workflows/ci.yml`; action tests
-run through the reusable `.github/workflows/actions.yml`, scoped to action code. The documentation
-site has its own
+Plugin and action checks are in `.github/workflows/ci.yml`; release orchestration is in the
+reusable `.github/workflows/release.yml`, called after the CI gates pass. Action tests run through
+the reusable `.github/workflows/actions.yml`, scoped to action code. The documentation site has its own
 `.github/workflows/docs.yml`, which checks and publishes the VitePress site and mirrors it to
 `gh-pages`. The shared setup (pnpm, Node,
 install, Turborepo cache) is the composite action in `.github/common/bootstrap`. Most CI jobs use
@@ -29,7 +29,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 🔨 Build | code changes, after lint and typecheck | Builds and collects every plugin, then signs with `sign-pumpkin-plugin` and verifies with `verify-pumpkin-plugin` before upload |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin and action, checks release registration and READMEs, tests the action, then typechecks, builds and integration-tests the plugin |
-| 🚢 Release | plugin or action release changes, on `master` pushes | Runs release-please; action releases create a versioned tag and GitHub release without a plugin artifact |
+| 🚢 Release | plugin or action release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; action releases create a versioned tag and GitHub release without a plugin artifact |
 | 📝 Prepare release PR | all open release PRs on release runs | Keeps plugin READMEs, action README examples and first-release pins for plugins and actions current |
 | 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs and uploads the exact build artifact, publishes it to an existing Market listing, then syncs its description and commands |
 | 🧹 Cleanup artifacts | after successful consumers | Deletes integration and release handoff artifacts after their last use |
@@ -103,9 +103,10 @@ commits. Merging a plugin release PR:
   in the same run.
 
 If GitHub rejects release creation because the tag already belongs to an immutable release, the
-runner treats that release PR as already published, changes its label from pending to tagged, and
-skips its artifact outputs. This lets release-please prepare later release PRs. Other release PRs in
-the same run can still publish; other API errors remain failures.
+runner reuses the existing release metadata only when its target commit matches the release PR.
+That lets the matching run attach the artifact; an older run defers the artifact to the run that
+built the tagged commit. The runner changes the release PR label from pending to tagged either way.
+Other release PRs in the same run can still publish; other API errors remain failures.
 
 Merging an action release PR updates its `version.txt` and `CHANGELOG.md`, tags it
 `<folder>-v<version>`, and creates a GitHub release. Action releases do not run plugin packaging,
@@ -129,7 +130,9 @@ a later release run can miss the previous release and recreate its changelog. Th
 keeps `force-tag-creation` enabled, and the repository check enforces it.
 
 After each Release Please run, a separate matrix job finds every open component release PR and
-prepares its branch, including branches Release Please did not return as changed. It regenerates
+prepares its branch, including branches Release Please did not return as changed. Discovery retries
+briefly and fails if it cannot find all PRs returned by Release Please; a failed GitHub CLI query
+also fails the release workflow instead of silently skipping preparation. It regenerates
 plugin READMEs, generates every action README's input/output tables from its `action.yml`, and
 updates the versioned example tag from that action's Release Please manifest entry. For an action
 that has not had its first release, the README uses its `release-as` version instead of `0.0.0`. The
@@ -171,6 +174,15 @@ pnpm --package=release-please@17.11.2 dlx -c 'node scripts/release.mjs --dry-run
 
 Add `--component=<name>` to preview one plugin or action. `--pull-requests-only` updates release PRs without
 creating tags or GitHub releases.
+
+To finish a plugin release whose GitHub release exists but has no plugin assets, run the
+`Recover plugin release` workflow from `master` and pass its existing tag (for example,
+`upnpumpkin-v0.0.8`). It builds the source at that tag, signs and verifies the plugin with
+`PLUGIN_SIGNING_KEY`, uploads the `.wasm` and `.sha256` assets, then publishes the verified plugin
+and listing metadata to Pumpkin Market using `MARKET_API_TOKEN`. It reuses and verifies a complete
+existing asset pair; a partial pair fails so it cannot silently replace release files.
+If the workflow reports a partial pair, remove the lone asset from the release and rerun it.
+A release marked immutable without its asset pair cannot be recovered through this workflow.
 
 ## Signing
 

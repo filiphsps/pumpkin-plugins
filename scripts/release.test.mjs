@@ -21,20 +21,37 @@ function run(args, overrides = {}) {
                 GitHub: { create: async () => ({
                     repository: { defaultBranch: 'master' },
                     removeIssueLabels: async (labels, number) => record('remove:' + labels.join(',') + ':' + number),
-                    addIssueLabels: async (labels, number) => record('add:' + labels.join(',') + ':' + number)
+                    addIssueLabels: async (labels, number) => record('add:' + labels.join(',') + ':' + number),
+                    releaseIterator: async function* () {
+                        yield {
+                            tagName: 'plugin-v1.0.0', sha: process.env.EXISTING_RELEASE_SHA ?? 'release-sha',
+                            notes: 'Features\\n\\n* Added update checks',
+                            url: 'https://example.com/release', uploadUrl: 'https://example.com/upload'
+                        };
+                    }
                 }) },
                 Manifest: { fromManifest: async () => {
                     const latestReleasePublished = published;
-                    const releaseItems = [{
-                        path: 'packages/plugin', tagName: 'plugin-v1.0.0',
-                        notes: 'Features\\n\\n* Added update checks', url: 'https://example.com/release'
-                    }, {
-                        path: 'actions/publish-action', tagName: 'publish-action-v0.0.1',
-                        notes: 'Features\\n\\n* Add warning mode', url: 'https://example.com/action-release'
-                    }];
-                    const releaseGroups = process.env.RELEASE_ERROR === 'immutable-with-success'
-                        ? [{ error: 'immutable', releases: [] }, { releases: [releaseItems[0]] }]
-                        : [{ error: process.env.RELEASE_ERROR, releases: releaseItems }];
+                    const candidate = (path, tagName, notes, version) => ({
+                        path, sha: 'release-sha', notes,
+                        tag: {
+                            toString: () => tagName,
+                            version: {
+                                toString: () => version,
+                                major: Number(version.split('.')[0]),
+                                minor: Number(version.split('.')[1]),
+                                patch: Number(version.split('.')[2])
+                            }
+                        }
+                    });
+                    const plugin = candidate('packages/plugin', 'plugin-v1.0.0', 'Features\\n\\n* Added update checks', '1.0.0');
+                    const action = candidate('actions/publish-action', 'publish-action-v0.0.1', 'Features\\n\\n* Add warning mode', '0.0.1');
+                    const releaseItems = [plugin, action];
+                    const releaseGroups = process.env.RELEASE_ERROR === 'immutable'
+                        ? [{ error: 'immutable', releases: [plugin] }]
+                        : process.env.RELEASE_ERROR === 'immutable-with-success'
+                          ? [{ error: 'immutable', releases: [plugin] }, { releases: [action] }]
+                          : [{ error: process.env.RELEASE_ERROR, releases: releaseItems }];
                     return {
                     plugins: [], releasedVersions: {}, commitSearchDepth: 500,
                     labels: ['autorelease: pending'], releaseLabels: ['autorelease: tagged'],
@@ -42,13 +59,18 @@ function run(args, overrides = {}) {
                         record('release');
                         const releases = [];
                         for (const group of releaseGroups) {
-                            releases.push(...await this.createReleasesForPullRequest(group, { number: 52 }));
+                            releases.push(
+                                ...await this.createReleasesForPullRequest(group.releases, {
+                                    number: 52,
+                                    error: group.error
+                                })
+                            );
                         }
                         published = true;
                         return releases;
                     },
-                    createReleasesForPullRequest: async (group) => {
-                        if (group.error === 'immutable') {
+                    createReleasesForPullRequest: async (candidates, pullRequest) => {
+                        if (pullRequest.error === 'immutable') {
                             const error = new Error('Validation Failed: tag_name was used by an immutable release');
                             error.status = 422;
                             error.body = {
@@ -61,12 +83,22 @@ function run(args, overrides = {}) {
                             };
                             throw error;
                         }
-                        if (group.error === 'other') {
+                        if (pullRequest.error === 'other') {
                             const error = new Error('Validation Failed: repository rule violation');
                             error.status = 422;
                             throw error;
                         }
-                        return group.releases;
+                        return candidates.map((release) => ({
+                                path: release.path,
+                                tagName: release.tag.toString(),
+                                sha: release.sha,
+                                notes: release.notes,
+                                url: release.path.startsWith('actions/')
+                                    ? 'https://example.com/action-release'
+                                    : 'https://example.com/release',
+                                uploadUrl: 'https://example.com/upload',
+                                version: release.tag.version.toString()
+                            }));
                     },
                     createPullRequests: async () => {
                         record('update-pr');
@@ -94,6 +126,7 @@ function run(args, overrides = {}) {
                     ...process.env,
                     GITHUB_REPOSITORY: 'owner/repo',
                     GITHUB_TOKEN: 'fixture',
+                    GITHUB_SHA: 'release-sha',
                     GITHUB_OUTPUT: output,
                     CALLS_FILE: calls,
                     RELEASE_ERROR: '',
@@ -138,6 +171,12 @@ it('preserves workflow tag and multiline release-note outputs for assets and Mar
     assert.match(result.output, /packages\/plugin--body<<[^\n]+\nFeatures\n\n\* Added update checks\n/);
     assert.match(result.output, /actions\/publish-action--tag_name<<[^\n]+\npublish-action-v0\.0\.1\n/);
     assert.match(result.output, /actions\/publish-action--body<<[^\n]+\nFeatures\n\n\* Add warning mode\n/);
+    assert.match(result.output, /release_count<<[^\n]+\n2\n/);
+    assert.match(result.output, /pr_count<<[^\n]+\n1\n/);
+    assert.match(
+        result.stdout,
+        /Release fan-out: plugin paths=\["packages\/plugin"\], action paths=\["actions\/publish-action"\], release PR count=1/
+    );
 });
 
 it('continues release PR preparation when GitHub reports an immutable release for the tag', () => {
@@ -149,8 +188,25 @@ it('continues release PR preparation when GitHub reports an immutable release fo
         'add:autorelease: tagged:52',
         'update-pr'
     ]);
+    assert.match(result.output, /paths_released<<[^\n]+\n\["packages\/plugin"\]\n/);
+    assert.match(result.output, /packages\/plugin--release_created<<[^\n]+\nfalse\n/);
+    assert.match(result.output, /packages\/plugin--release_recovered<<[^\n]+\ntrue\n/);
+    assert.match(result.output, /release_count<<[^\n]+\n1\n/);
+});
+
+it('fails closed when the existing tag points to a different commit', () => {
+    const result = run([], { RELEASE_ERROR: 'immutable', EXISTING_RELEASE_SHA: 'different-sha' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /but Release Please expects release-sha/);
+    assert.deepEqual(result.calls, ['release']);
+});
+
+it('does not fan out an existing release from a run that built a different commit', () => {
+    const result = run([], { RELEASE_ERROR: 'immutable', GITHUB_SHA: 'older-sha' });
+    assert.equal(result.status, 0, result.stderr);
     assert.match(result.output, /paths_released<<[^\n]+\n\[\]\n/);
-    assert.doesNotMatch(result.output, /packages\/plugin--release_created/);
+    assert.match(result.output, /release_count<<[^\n]+\n0\n/);
+    assert.match(result.stdout, /Deferring plugin-v1\.0\.0 from artifact fan-out/);
 });
 
 it('preserves other releases when one release PR already has an immutable tag', () => {

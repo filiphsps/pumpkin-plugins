@@ -36,7 +36,13 @@ if (
     throw new Error('--component requires --dry-run or --pull-requests-only');
 }
 const load = () => Manifest.fromManifest(github, branch, 'release-please-config.json', '.release-please-manifest.json');
-const outputs = { paths_released: '[]', action_paths_released: '[]', prs: '[]' };
+const outputs = {
+    paths_released: '[]',
+    action_paths_released: '[]',
+    release_count: '0',
+    prs: '[]',
+    pr_count: '0'
+};
 
 function isImmutableReleaseConflict(error) {
     return (
@@ -52,31 +58,80 @@ function isImmutableReleaseConflict(error) {
 if (!args.includes('--dry-run') && !args.includes('--pull-requests-only')) {
     const manifest = await load();
     const createReleasesForPullRequest = manifest.createReleasesForPullRequest.bind(manifest);
+    let existingReleasesByTag;
+    async function existingRelease(tagName) {
+        if (!existingReleasesByTag) {
+            existingReleasesByTag = new Map();
+            for await (const release of github.releaseIterator()) {
+                existingReleasesByTag.set(release.tagName, release);
+            }
+        }
+        return existingReleasesByTag.get(tagName);
+    }
+
     manifest.createReleasesForPullRequest = async (...releaseArgs) => {
         try {
             return await createReleasesForPullRequest(...releaseArgs);
         } catch (error) {
             if (!isImmutableReleaseConflict(error)) throw error;
             const pullRequest = releaseArgs[1];
+            const candidates = releaseArgs[0];
+            if (!Array.isArray(candidates)) throw new Error('Could not resolve release candidates for an existing tag');
+
+            const recovered = [];
+            for (const candidate of candidates) {
+                const tagName = candidate.tag.toString();
+                const release = await existingRelease(tagName);
+                if (!release)
+                    throw new Error(`GitHub rejected ${tagName} as a duplicate, but no existing release was found`);
+                if (release.sha !== candidate.sha) {
+                    throw new Error(
+                        `GitHub release ${tagName} points to ${release.sha}, but Release Please expects ${candidate.sha}`
+                    );
+                }
+                recovered.push({
+                    ...release,
+                    path: candidate.path,
+                    version: candidate.tag.version.toString(),
+                    major: candidate.tag.version.major,
+                    minor: candidate.tag.version.minor,
+                    patch: candidate.tag.version.patch,
+                    prNumber: pullRequest?.number,
+                    recovered: true
+                });
+            }
+
             if (pullRequest?.number && !manifest.skipLabeling) {
                 await github.removeIssueLabels(manifest.labels, pullRequest.number);
                 await github.addIssueLabels(manifest.releaseLabels, pullRequest.number);
             }
             console.warn(
-                'GitHub already has an immutable release for this release PR; marking it tagged and skipping its artifact outputs.'
+                `GitHub already has this release tag; reusing its metadata for the release run: ${recovered
+                    .map((release) => release.tagName)
+                    .join(', ')}`
             );
-            return [];
+            return recovered;
         }
     };
-    const releases = (await manifest.createReleases()).filter(Boolean);
+    const createdReleases = (await manifest.createReleases()).filter(Boolean);
+    const releases = createdReleases.filter((release) => {
+        if (!release.sha) throw new Error(`Release ${release.tagName} has no target commit SHA`);
+        if (release.sha === process.env.GITHUB_SHA) return true;
+        console.log(
+            `Deferring ${release.tagName} from artifact fan-out: tag targets ${release.sha}, but this run built ${process.env.GITHUB_SHA}`
+        );
+        return false;
+    });
     outputs.paths_released = JSON.stringify(
         releases.filter((release) => !release.path.startsWith('actions/')).map((release) => release.path)
     );
     outputs.action_paths_released = JSON.stringify(
         releases.filter((release) => release.path.startsWith('actions/')).map((release) => release.path)
     );
+    outputs.release_count = String(releases.length);
     for (const release of releases) {
-        outputs[`${release.path}--release_created`] = true;
+        outputs[`${release.path}--release_created`] = !release.recovered;
+        if (release.recovered) outputs[`${release.path}--release_recovered`] = true;
         for (const [name, value] of Object.entries(release)) {
             const key = { tagName: 'tag_name', uploadUrl: 'upload_url', notes: 'body', url: 'html_url' }[name] ?? name;
             outputs[`${release.path}--${key}`] = value;
@@ -109,7 +164,9 @@ if (args.includes('--dry-run')) {
         )
     );
 } else {
-    outputs.prs = JSON.stringify((await manifest.createPullRequests()).filter(Boolean));
+    const prs = (await manifest.createPullRequests()).filter(Boolean);
+    outputs.prs = JSON.stringify(prs);
+    outputs.pr_count = String(prs.length);
     if (process.env.GITHUB_OUTPUT) {
         for (const [name, value] of Object.entries(outputs)) {
             const marker = `release_${randomUUID()}`;
@@ -119,5 +176,8 @@ if (args.includes('--dry-run')) {
             );
         }
     }
-    console.log(`Prepared ${JSON.parse(outputs.prs).length} release PR(s)`);
+    console.log(`Prepared ${prs.length} release PR(s)`);
+    console.log(
+        `Release fan-out: plugin paths=${outputs.paths_released}, action paths=${outputs.action_paths_released}, release PR count=${prs.length}`
+    );
 }
