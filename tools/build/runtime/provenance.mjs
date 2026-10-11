@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { release as osRelease } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const runtimeDir = import.meta.dirname;
@@ -64,8 +65,37 @@ function checkInputs(sourceDir, sdkDir) {
     if (!existsSync(targetLib)) throw new Error(`Rust target ${expected.target} is not installed`);
 }
 
-function checkArtifact(outputDir) {
-    requireMatch(hash(join(outputDir, artifactName)), expected.outputSha256, 'Runtime output hash mismatch');
+function checkArtifact(outputDir, wanted = expected.outputSha256) {
+    const actual = hash(join(outputDir, artifactName));
+    requireMatch(actual, wanted, `Runtime output hash mismatch: expected ${wanted}, got ${actual}`);
+}
+
+function verifyShipped(outputDir) {
+    const manifest = JSON.parse(readFileSync(join(outputDir, 'provenance.json'), 'utf8'));
+    if ('buildHost' in manifest || 'buildHostRelease' in manifest) {
+        throw new Error('Candidate provenance cannot verify as shipped runtime');
+    }
+    for (const [key, value] of Object.entries(expected)) {
+        requireMatch(manifest[key], value, `Provenance mismatch: ${key}`);
+    }
+    checkArtifact(outputDir);
+}
+
+function verifyCandidate(outputDir) {
+    const manifest = JSON.parse(readFileSync(join(outputDir, 'provenance.json'), 'utf8'));
+    for (const [key, value] of Object.entries(expected)) {
+        if (key !== 'outputSha256') requireMatch(manifest[key], value, `Provenance mismatch: ${key}`);
+    }
+    if (typeof manifest.outputSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(manifest.outputSha256)) {
+        throw new Error('Invalid runtime candidate output SHA-256');
+    }
+    if (typeof manifest.buildHost !== 'string' || !manifest.buildHost.trim()) {
+        throw new Error('Missing runtime candidate build host');
+    }
+    if (typeof manifest.buildHostRelease !== 'string' || !manifest.buildHostRelease.trim()) {
+        throw new Error('Missing runtime candidate host release');
+    }
+    checkArtifact(outputDir, manifest.outputSha256);
 }
 
 try {
@@ -76,20 +106,24 @@ try {
         checkInputs(resolve(first), resolve(second));
     } else if (command === 'record' && first && second && third) {
         checkInputs(resolve(first), resolve(second));
-        checkArtifact(resolve(third));
+        const outputSha256 = hash(join(resolve(third), artifactName));
+        const buildHost = `${process.platform}-${process.arch}`;
+        const buildHostRelease = osRelease();
         writeFileSync(
             join(third, 'provenance.json'),
-            `${JSON.stringify({ ...expected, buildHost: `${process.platform}-${process.arch}` }, null, 4)}\n`
+            `${JSON.stringify({ ...expected, outputSha256, buildHost, buildHostRelease }, null, 4)}\n`
         );
+        process.stdout.write(`Runtime candidate output SHA-256: ${outputSha256} (${buildHost}, ${buildHostRelease})\n`);
     } else if (command === 'verify' && first && !second) {
         checkPatch();
-        const manifest = JSON.parse(readFileSync(join(first, 'provenance.json'), 'utf8'));
-        for (const [key, value] of Object.entries(expected)) {
-            requireMatch(manifest[key], value, `Provenance mismatch: ${key}`);
-        }
-        checkArtifact(resolve(first));
+        verifyShipped(resolve(first));
+    } else if (command === 'verify-candidate' && first && !second) {
+        checkPatch();
+        verifyCandidate(resolve(first));
     } else {
-        throw new Error('Usage: provenance.mjs inputs SOURCE SDK | record SOURCE SDK OUTPUT | verify OUTPUT');
+        throw new Error(
+            'Usage: provenance.mjs inputs SOURCE SDK | record SOURCE SDK OUTPUT | verify OUTPUT | verify-candidate OUTPUT'
+        );
     }
 } catch (error) {
     process.stderr.write(`${error.message}\n`);

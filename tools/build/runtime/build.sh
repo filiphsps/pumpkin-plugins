@@ -62,7 +62,7 @@ cp "$CARGO_TARGET_DIR/wasm32-wasip2/release/componentize_qjs_runtime.wasm" \
     "$candidate_dir/quickjs-runtime-bigint.wasm"
 chmod 644 "$candidate_dir/quickjs-runtime-bigint.wasm"
 node "$runtime_dir/provenance.mjs" record "$QJS_SOURCE_DIR" "$WASI_SDK_PATH" "$candidate_dir"
-node "$runtime_dir/provenance.mjs" verify "$candidate_dir"
+node "$runtime_dir/provenance.mjs" verify-candidate "$candidate_dir"
 mv -f "$candidate_dir/quickjs-runtime-bigint.wasm" "$output_dir/quickjs-runtime-bigint.wasm"
 mv -f "$candidate_dir/provenance.json" "$output_dir/provenance.json"
 printf 'Verified runtime candidate: %s\n' "$output_dir"

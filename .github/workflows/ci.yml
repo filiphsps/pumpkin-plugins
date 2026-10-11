@@ -144,7 +144,7 @@ jobs:
         name: 🔐 Runtime provenance
         needs: [changes]
         if: needs.changes.outputs.code == 'true'
-        timeout-minutes: 20
+        timeout-minutes: 45
         runs-on: macos-15
         permissions:
             contents: read
@@ -169,11 +169,9 @@ jobs:
                     echo 'required=false' >> "$GITHUB_OUTPUT"
                   fi
 
-            - name: 🟢 Setup Node
+            - name: 🚀 Bootstrap
               if: steps.scope.outputs.required == 'true'
-              uses: actions/setup-node@v7.0.0
-              with:
-                  node-version-file: .node-version
+              uses: ./.github/common/bootstrap
 
             - name: 🔐 Rebuild and verify pinned runtime twice
               id: verify
@@ -204,10 +202,43 @@ jobs:
                     CARGO_TARGET_DIR="$RUNTIME_PROBE_ROOT/target-$attempt" \
                     RUNTIME_OUTPUT_DIR="$RUNTIME_PROBE_ROOT/candidate-$attempt" \
                       sh tools/build/runtime/build.sh
-                    node tools/build/runtime/provenance.mjs verify "$RUNTIME_PROBE_ROOT/candidate-$attempt"
+                    node tools/build/runtime/provenance.mjs verify-candidate "$RUNTIME_PROBE_ROOT/candidate-$attempt"
                   done
-                  cmp "$RUNTIME_PROBE_ROOT/candidate-a/quickjs-runtime-bigint.wasm" \
-                    "$RUNTIME_PROBE_ROOT/candidate-b/quickjs-runtime-bigint.wasm"
+                  candidate_a="$RUNTIME_PROBE_ROOT/candidate-a/quickjs-runtime-bigint.wasm"
+                  candidate_b="$RUNTIME_PROBE_ROOT/candidate-b/quickjs-runtime-bigint.wasm"
+                  hash_a=$(shasum -a 256 "$candidate_a" | cut -d ' ' -f 1)
+                  hash_b=$(shasum -a 256 "$candidate_b" | cut -d ' ' -f 1)
+                  printf 'Runtime build A SHA-256: %s\nRuntime build B SHA-256: %s\n' "$hash_a" "$hash_b"
+                  if ! cmp -s "$candidate_a" "$candidate_b"; then
+                    echo 'Isolated runtime builds differ on this runner' >&2
+                    exit 1
+                  fi
+
+            - name: 🎃 Test candidate runtime on real Pumpkin
+              id: integration
+              if: steps.scope.outputs.required == 'true'
+              env:
+                  RUNTIME_PROBE_ROOT: ${{ runner.temp }}/runtime-provenance
+                  PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/pumpkin-logs
+              run: |
+                  cp "$RUNTIME_PROBE_ROOT/candidate-a/quickjs-runtime-bigint.wasm" \
+                    tools/build/runtime/quickjs-runtime-bigint.wasm
+                  pnpm exec turbo run test:integration --concurrency=4 --force \
+                    --filter=...@pumpkin-plugins/apple-skin-pumpkin \
+                    --filter=...@pumpkin-plugins/bedrock-addon-manager \
+                    --filter=...@pumpkin-plugins/distant-horizons-support-pumpkin \
+                    --filter=...@pumpkin-plugins/dynamic-lights-pumpkin \
+                    --filter=...@pumpkin-plugins/upnpumpkin \
+                    --filter=...@pumpkin-plugins/waypoints
+
+            - name: 📤 Upload server logs
+              if: failure() && steps.scope.outputs.required == 'true'
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  retention-days: 1
+                  name: runtime-pumpkin-logs
+                  path: ${{ runner.temp }}/pumpkin-logs
+                  if-no-files-found: ignore
 
     test:
         name: 🧪 Test

@@ -11,7 +11,10 @@ const require = createRequire(resolve(import.meta.dirname, '../../../package.jso
 const { parse } = require('yaml') as typeof import('yaml');
 interface Step {
     id?: string;
+    name?: string;
     run?: string;
+    uses?: string;
+    env?: Record<string, string>;
     if?: string;
 }
 interface Job {
@@ -48,7 +51,30 @@ describe('runtime provenance CI', () => {
         expect(build?.run).toContain('for attempt in a b');
         expect(build?.run).toContain('tools/build/runtime/build.sh');
         expect(build?.run).toContain('provenance.mjs verify');
+        expect(build?.run).toContain('provenance.mjs verify-candidate');
+        expect(build?.run).toContain('cmp -s');
         expect(build?.run).not.toMatch(/git push|GH_TOKEN|secrets\./);
+    });
+    it('loads the matching candidate runtime in real Pumpkin integration tests', () => {
+        const configured = job();
+        expect(configured.steps.some((step) => step.uses === './.github/common/bootstrap')).toBe(true);
+        const integration = configured.steps.find((step) => step.id === 'integration');
+        expect(integration?.run).toContain('candidate-a/quickjs-runtime-bigint.wasm');
+        expect(integration?.run).toContain('tools/build/runtime/quickjs-runtime-bigint.wasm');
+        expect(integration?.run).toContain('pnpm exec turbo run test:integration');
+        expect(integration?.run).toContain('--force');
+        for (const plugin of [
+            'apple-skin-pumpkin',
+            'bedrock-addon-manager',
+            'distant-horizons-support-pumpkin',
+            'dynamic-lights-pumpkin',
+            'upnpumpkin',
+            'waypoints'
+        ]) {
+            expect(integration?.run).toContain(`@pumpkin-plugins/${plugin}`);
+        }
+        expect(integration?.env?.PUMPKIN_TEST_LOG_DIR).toContain('pumpkin-logs');
+        expect(configured.steps.some((step) => step.uses === 'actions/upload-artifact@v7.0.2')).toBe(true);
     });
     it.each(['success', 'failure', 'cancelled', 'skipped'])(
         'permits a code release only after runtime verification: %s',
