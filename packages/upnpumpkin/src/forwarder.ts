@@ -200,8 +200,12 @@ export class PortForwarder {
         if (!mapper) return;
         const deadline = this.net.now() + SHUTDOWN_BUDGET_MS;
         const closing = new Task(mapper.releaseAll());
-        while (closing.poll().state === 'running' && this.net.now() < deadline) {
-            // Busy-waits: the server is shutting down, so nothing else needs this thread.
+        try {
+            while (closing.poll().state === 'running' && this.net.now() < deadline) {
+                // Busy-waits: the server is shutting down, so nothing else needs this thread.
+            }
+        } finally {
+            closing.cancel();
         }
     }
 

@@ -32,6 +32,35 @@ function setup(config?: string, igd: FakeIgd | null = new FakeIgd()) {
     return { files, log, net, igd: igd ?? undefined, forwarder, settle, ask, keys };
 }
 
+function delayRouterReply(net: FakeNetwork, action = 'DeletePortMapping') {
+    const dial = net.dial.bind(net);
+    let blocked = true;
+    net.dial = (to) => {
+        const original = dial(to);
+        return {
+            abort: () => original.abort(),
+            poll: () => {
+                const connection = original.poll();
+                if (!connection) return undefined;
+                let delayed = false;
+                return {
+                    localAddress: connection.localAddress,
+                    writable: () => connection.writable(),
+                    close: () => connection.close(),
+                    write: (bytes) => {
+                        delayed ||= new TextDecoder().decode(bytes).includes(`#${action}`);
+                        connection.write(bytes);
+                    },
+                    read: (max) => (delayed && blocked ? null : connection.read(max))
+                };
+            }
+        };
+    };
+    return () => {
+        blocked = false;
+    };
+}
+
 const web: PortRequest = { key: 'web', protocol: 'tcp', port: 8123, description: 'Packs' };
 const ensure = (request: PortRequest = web): Request => ({ op: 'ensure', ...request });
 
@@ -234,6 +263,24 @@ describe('PortForwarder', () => {
         net.autoAdvanceMs = 1;
         forwarder.stop();
         expect(keys()).toEqual([]);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('cancels unfinished shutdown cleanup at its deadline and closes the stalled transport', () => {
+        const { forwarder, settle, keys, net, log } = setup(
+            '[bedrock]\nenabled = false\n',
+            new FakeIgd({ natPmp: false })
+        );
+        forwarder.start();
+        settle(() => keys().length === 1);
+        delayRouterReply(net);
+        net.autoAdvanceMs = 1;
+        const before = net.time;
+        forwarder.stop();
+        expect(net.time - before).toBeLessThanOrEqual(3010);
+        expect(net.leaks).toBe(0);
+        expect(log.of('warn').some((m) => m.includes('cleanup did not finish'))).toBe(true);
+        forwarder.stop();
         expect(net.leaks).toBe(0);
     });
 
