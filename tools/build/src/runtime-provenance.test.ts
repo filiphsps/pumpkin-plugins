@@ -1,0 +1,230 @@
+import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+
+const runtime = resolve(import.meta.dirname, '../runtime');
+const dirs: string[] = [];
+const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
+const commit = 'e563c6d6ae50b087980414015663ca9c948c09bb';
+const rust = 'rustc 1.99.0 (b940084d7 2026-09-28)';
+const cargo = 'cargo 1.99.0 (5f94df478 2026-08-27)';
+const clang =
+    'clang version 23.1.0-wasi-sdk (https://github.com/llvm/llvm-project 895aa2c896ada719451be2e3673c83da8ddf1141)';
+const sdkVersion = '34.0\nwasi-libc: 2e6fb9d8ee0c\nllvm: 895aa2c896ad\nllvm-version: 23.1.0\nconfig: f992bcc08219\n';
+
+afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
+function fixture() {
+    const dir = mkdtempSync(join(tmpdir(), 'runtime-provenance-'));
+    dirs.push(dir);
+    const source = join(dir, 'source');
+    const sdk = join(dir, 'sdk');
+    const bin = join(dir, 'bin');
+    const copiedRuntime = join(dir, 'tools/build/runtime');
+    for (const path of [source, join(sdk, 'bin'), bin]) mkdirSync(path, { recursive: true });
+    cpSync(runtime, copiedRuntime, { recursive: true });
+    const git = (...args: string[]) => execFileSync(realGit, ['-C', source, ...args], { stdio: 'pipe' });
+    git('init', '-q');
+    writeFileSync(join(source, 'Cargo.lock'), 'locked dependencies\n');
+    writeFileSync(join(source, 'source.txt'), 'original\n');
+    git('add', '.');
+    git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture');
+    const executable = (name: string, body: string) =>
+        writeFileSync(name, `#!/bin/sh\nset -eu\n${body}\n`, { mode: 0o755 });
+    executable(
+        join(bin, 'git'),
+        `if [ "$3" = rev-parse ] && [ "$4" = HEAD ]; then echo '${commit}'; else exec '${realGit}' "$@"; fi`
+    );
+    executable(join(bin, 'rustc'), `if [ "$1" = --version ]; then echo '${rust}'; else echo '${dir}/target-lib'; fi`);
+    mkdirSync(join(dir, 'target-lib'));
+    executable(
+        join(bin, 'cargo'),
+        `if [ "$1" = --version ]; then echo '${cargo}'; else printf '%s\\n' "$@" > '${dir}/cargo-args'; mkdir -p "$CARGO_TARGET_DIR/wasm32-wasip2/release"; cp '${runtime}/quickjs-runtime-bigint.wasm' "$CARGO_TARGET_DIR/wasm32-wasip2/release/componentize_qjs_runtime.wasm"; fi`
+    );
+    executable(join(sdk, 'bin/clang'), `echo '${clang}'`);
+    writeFileSync(join(sdk, 'VERSION'), sdkVersion);
+    // A real, tiny patch exercises dirty-tree admission independently of the upstream checkout.
+    writeFileSync(join(source, 'source.txt'), 'patched\n');
+    const patch = git('diff', '--binary', 'HEAD');
+    writeFileSync(join(copiedRuntime, 'componentize-qjs-bigint.patch'), patch);
+    writeFileSync(join(source, 'source.txt'), 'original\n');
+    const expectedPath = join(copiedRuntime, 'provenance.json');
+    if (existsSync(expectedPath)) {
+        const expected = JSON.parse(readFileSync(expectedPath, 'utf8'));
+        expected.patchSha256 = createHash('sha256').update(patch).digest('hex');
+        expected.cargoLockSha256 = createHash('sha256').update('locked dependencies\n').digest('hex');
+        writeFileSync(expectedPath, JSON.stringify(expected));
+    }
+    const output = join(dir, 'candidate');
+    const env = {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        QJS_SOURCE_DIR: source,
+        WASI_SDK_PATH: sdk,
+        CARGO_TARGET_DIR: join(dir, 'target'),
+        RUNTIME_OUTPUT_DIR: output
+    };
+    const verify = () =>
+        spawnSync(process.execPath, [join(copiedRuntime, 'provenance.mjs'), 'verify', output], {
+            encoding: 'utf8',
+            timeout: 5000
+        });
+    const run = () =>
+        spawnSync('sh', [join(copiedRuntime, 'build.sh')], {
+            encoding: 'utf8',
+            timeout: 5000,
+            env
+        });
+    return { dir, source, sdk, bin, copiedRuntime, output, run, verify, env, git, executable };
+}
+
+function rejects(f: ReturnType<typeof fixture>, message: string) {
+    const result = f.run();
+    expect(result.status, result.stderr).not.toBe(0);
+    expect(result.stderr).toContain(message);
+}
+
+describe('runtime provenance build', () => {
+    it('builds only locked inputs and emits a verified candidate manifest', () => {
+        const f = fixture();
+        const result = f.run();
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(join(f.dir, 'cargo-args'), 'utf8')).toContain('--locked');
+        const manifest = JSON.parse(readFileSync(join(f.output, 'provenance.json'), 'utf8'));
+        expect(manifest.sourceCommit).toBe(commit);
+        expect(manifest.outputSha256).toBe('75219b89307011c7cd2bd6212e18a7d0ff1ba16d560c130d5173ccacb1880988');
+        expect(
+            createHash('sha256')
+                .update(readFileSync(join(f.output, 'quickjs-runtime-bigint.wasm')))
+                .digest('hex')
+        ).toBe(manifest.outputSha256);
+        expect(f.run().status).toBe(0); // Exactly the declared patch is allowed on repeat builds.
+    }, 15_000);
+    it('rejects unrelated tracked dirt', () => {
+        const f = fixture();
+        writeFileSync(join(f.source, 'source.txt'), 'unrelated\n');
+        rejects(f, 'Source changes differ from the declared patch');
+    });
+    it.each(['extra.txt', '.cargo/config.toml'])('rejects untracked input %s', (name) => {
+        const f = fixture();
+        mkdirSync(join(f.source, '.cargo'), { recursive: true });
+        writeFileSync(join(f.source, name), 'extra');
+        rejects(f, 'Untracked source inputs');
+    });
+    it('rejects ignored source inputs', () => {
+        const f = fixture();
+        writeFileSync(join(f.source, '.git/info/exclude'), 'ignored\n');
+        writeFileSync(join(f.source, 'ignored'), 'extra');
+        rejects(f, 'Untracked source inputs');
+    });
+    it('rejects a different Rust compiler', () => {
+        const f = fixture();
+        f.executable(join(f.bin, 'rustc'), "echo 'rustc 1.98.0'");
+        rejects(f, 'Rust version mismatch');
+    });
+    it('rejects a different Cargo version', () => {
+        const f = fixture();
+        f.executable(join(f.bin, 'cargo'), "echo 'cargo 1.98.0'");
+        rejects(f, 'Cargo version mismatch');
+    });
+    it('rejects a different SDK', () => {
+        const f = fixture();
+        writeFileSync(join(f.sdk, 'VERSION'), '33.0\n');
+        rejects(f, 'wasi-sdk version mismatch');
+    });
+    it('rejects a different SDK compiler', () => {
+        const f = fixture();
+        f.executable(join(f.sdk, 'bin/clang'), "echo 'clang version 22'");
+        rejects(f, 'Clang version mismatch');
+    });
+    it('rejects dependency lock drift', () => {
+        const f = fixture();
+        writeFileSync(join(f.source, 'Cargo.lock'), 'drift');
+        rejects(f, 'Cargo.lock hash mismatch');
+    });
+    it('rejects patch drift', () => {
+        const f = fixture();
+        const patchPath = join(f.copiedRuntime, 'componentize-qjs-bigint.patch');
+        writeFileSync(patchPath, readFileSync(patchPath, 'utf8').replace('+patched', '+different'));
+        rejects(f, 'Patch hash mismatch');
+    });
+    it('rejects an unexpected source commit', () => {
+        const f = fixture();
+        f.executable(join(f.bin, 'git'), 'echo wrong-commit');
+        rejects(f, 'Expected componentize-qjs');
+    });
+    it('rejects a changed output before publishing a manifest', () => {
+        const f = fixture();
+        f.executable(
+            join(f.bin, 'cargo'),
+            `if [ "$1" = --version ]; then echo '${cargo}'; else mkdir -p "$CARGO_TARGET_DIR/wasm32-wasip2/release"; echo invalid > "$CARGO_TARGET_DIR/wasm32-wasip2/release/componentize_qjs_runtime.wasm"; fi`
+        );
+        rejects(f, 'Runtime output hash mismatch');
+    });
+    it('rejects an absent Rust target', () => {
+        const f = fixture();
+        rmSync(join(f.dir, 'target-lib'), { recursive: true });
+        rejects(f, 'is not installed');
+    });
+    it('refuses to overwrite the vendored artifact', () => {
+        const f = fixture();
+        f.env.RUNTIME_OUTPUT_DIR = f.copiedRuntime;
+        rejects(f, 'must not replace the vendored runtime');
+    });
+    it('replaces output links without following them', () => {
+        const f = fixture();
+        mkdirSync(f.output);
+        const unrelated = join(f.dir, 'unrelated');
+        writeFileSync(unrelated, 'preserved');
+        symlinkSync(unrelated, join(f.output, 'quickjs-runtime-bigint.wasm'));
+        expect(f.run().status).toBe(0);
+        expect(readFileSync(unrelated).equals(Buffer.from('preserved'))).toBe(true);
+    });
+    it('does not publish an invalid candidate over an existing valid one', () => {
+        const f = fixture();
+        expect(f.run().status).toBe(0);
+        f.executable(
+            join(f.bin, 'cargo'),
+            `if [ "$1" = --version ]; then echo '${cargo}'; else echo invalid > "$CARGO_TARGET_DIR/wasm32-wasip2/release/componentize_qjs_runtime.wasm"; fi`
+        );
+        rejects(f, 'Runtime output hash mismatch');
+        expect(f.verify().status).toBe(0);
+    });
+    it.each([
+        'sourceCommit',
+        'patchSha256',
+        'cargoLockSha256',
+        'rustVersion',
+        'cargoVersion',
+        'sdkVersion',
+        'clangVersion',
+        'target',
+        'features',
+        'rustFlags',
+        'cFlags',
+        'outputSha256'
+    ])('rejects candidate manifest drift in %s', (key) => {
+        const f = fixture();
+        expect(f.run().status).toBe(0);
+        const path = join(f.output, 'provenance.json');
+        const manifest = JSON.parse(readFileSync(path, 'utf8'));
+        manifest[key] = 'different';
+        writeFileSync(path, JSON.stringify(manifest));
+        const result = f.verify();
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain(`Provenance mismatch: ${key}`);
+    });
+    it('rejects candidate artifact drift', () => {
+        const f = fixture();
+        expect(f.run().status).toBe(0);
+        writeFileSync(join(f.output, 'quickjs-runtime-bigint.wasm'), 'changed');
+        const result = f.verify();
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('Runtime output hash mismatch');
+    });
+});

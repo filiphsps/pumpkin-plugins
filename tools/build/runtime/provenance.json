@@ -1,0 +1,16 @@
+{
+    "schemaVersion": 1,
+    "sourceRepository": "https://github.com/andreiltd/componentize-qjs.git",
+    "sourceCommit": "e563c6d6ae50b087980414015663ca9c948c09bb",
+    "patchSha256": "515a06e47c3c8eb819fb1ec464560cb66dfb9fe25c51ff560534da8de99b4a43",
+    "cargoLockSha256": "03e153b621bf6b830064d6b0931ebe98e28aa93bc833913397fb48720843d656",
+    "rustVersion": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "cargoVersion": "cargo 1.99.0 (5f94df478 2026-08-27)",
+    "sdkVersion": "34.0\nwasi-libc: 2e6fb9d8ee0c\nllvm: 895aa2c896ad\nllvm-version: 23.1.0\nconfig: f992bcc08219",
+    "clangVersion": "clang version 23.1.0-wasi-sdk (https://github.com/llvm/llvm-project 895aa2c896ada719451be2e3673c83da8ddf1141)",
+    "target": "wasm32-wasip2",
+    "features": "component-model-async",
+    "rustFlags": "-Clink-arg=--shared -Clink-arg=--no-entry -Clink-arg=--allow-undefined -Clto=fat -Copt-level=z",
+    "cFlags": "-fPIC -Oz",
+    "outputSha256": "75219b89307011c7cd2bd6212e18a7d0ff1ba16d560c130d5173ccacb1880988"
+}
