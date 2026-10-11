@@ -1,13 +1,31 @@
 import { defineCommands } from '@pumpkin-plugins/docs';
 import { PLUGIN_NAME } from '../name.ts';
 
-/** Permission node required to use the `/plugin` command. */
-export const COMMAND_PERMISSION = `${PLUGIN_NAME}:command.plugin` as const;
+const operatorOnly = { tag: 'op', val: 'three' } as const;
 
-/** The starter command, registered and documented from this declaration. */
+/** Command declarations and permission nodes for TabDisplay. */
 export const commands = defineCommands(PLUGIN_NAME, {
-    plugin: {
-        description: 'Check that the plugin is running',
-        permission: COMMAND_PERMISSION
+    tabdisplay: {
+        description: 'Inspect and reload TabDisplay',
+        permission: `${PLUGIN_NAME}:command`,
+        defaultPermission: operatorOnly,
+        subcommands: {
+            status: {
+                description: 'Show provider state and display capabilities',
+                permission: `${PLUGIN_NAME}:command.status`,
+                defaultPermission: operatorOnly
+            },
+            reload: {
+                description: 'Validate and atomically reload config.toml',
+                permission: `${PLUGIN_NAME}:command.reload`,
+                defaultPermission: operatorOnly
+            },
+            inspect: {
+                description: 'Inspect safe context for one online player',
+                permission: `${PLUGIN_NAME}:command.inspect`,
+                defaultPermission: operatorOnly,
+                arguments: [{ name: 'player', type: 'players' }]
+            }
+        }
     }
 });

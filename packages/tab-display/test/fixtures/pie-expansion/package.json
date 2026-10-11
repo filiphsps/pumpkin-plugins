@@ -1,0 +1,11 @@
+{
+    "name": "tab-display-pie-expansion-fixture",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "pumpkinPlugin": {
+        "entry": "src/plugin.ts",
+        "output": "tab-display-pie-expansion-fixture.wasm",
+        "wasi": []
+    }
+}

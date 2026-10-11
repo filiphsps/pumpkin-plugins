@@ -1,7 +1,14 @@
 import type { ResolvedLine, SessionState } from '@pumpkin-plugins/pumpkin-pie-api';
 import { strToU8 } from 'fflate';
 import { type ConfigValidation, type TabDisplayConfig, type TemplateLineConfig, validateConfig } from './config.ts';
-import type { ApplyResult, PlayerSnapshot, RenderedLine, TabDisplayStatus } from './model.ts';
+import {
+    type ApplyResult,
+    type Capability,
+    JAVA_DISPLAY_VERSION,
+    type PlayerSnapshot,
+    type RenderedLine,
+    type TabDisplayStatus
+} from './model.ts';
 import { assignDenseOrders } from './sorting.ts';
 import { type CompiledTemplate, compileTemplate, renderTemplate } from './templates.ts';
 
@@ -37,6 +44,7 @@ export interface TabDisplayServiceOptions {
     readonly resolver: TabPlaceholderResolver;
     readonly now: () => number;
     readonly config: TabDisplayConfig;
+    readonly sortingCapability?: Capability;
     readonly log?: (message: string) => void;
 }
 
@@ -100,10 +108,20 @@ export class TabDisplayService {
         this.pending = undefined;
         this.nextRefreshTick = this.tickNumber;
         this.lastFailure = undefined;
-        this.appliedNames.clear();
-        this.appliedOrders.clear();
-        this.appliedHeaders.clear();
         return { kind: 'applied' };
+    }
+
+    /** Returns one copied online snapshot and configured placeholder IDs, never resolved values. */
+    inspect(uuid: string): (PlayerSnapshot & { readonly placeholderIds: readonly string[] }) | undefined {
+        const snapshot = this.latestPlayers.find((player) => player.uuid === uuid);
+        if (snapshot === undefined) return undefined;
+        const sources = [
+            ...(snapshot.edition === 'java' && this.config.entry.enabled ? [this.config.entry.text] : []),
+            ...(snapshot.edition === 'java' ? this.config.header.lines.map(({ text }) => text) : []),
+            ...(snapshot.edition === 'java' ? this.config.footer.lines.map(({ text }) => text) : [])
+        ];
+        const placeholderIds = [...new Set(sources.flatMap((source) => compileTemplate(source).placeholderIds))].sort();
+        return { ...copySnapshot(snapshot), placeholderIds };
     }
 
     /** Advances bounded placeholder work and commits only complete display generations. */
@@ -116,7 +134,12 @@ export class TabDisplayService {
             this.lastFailure = 'Could not read the current player snapshot';
             return;
         }
-        this.latestPlayers = snapshots.slice(0, this.config.general.max_players).map(copySnapshot);
+        if (snapshots.length > this.config.general.max_players) {
+            this.pending = undefined;
+            this.lastFailure = `Online player count exceeds general.max_players (${this.config.general.max_players})`;
+            return;
+        }
+        this.latestPlayers = snapshots.map(copySnapshot);
 
         if (!this.config.general.enabled) {
             if (!this.disabled) {
@@ -164,6 +187,16 @@ export class TabDisplayService {
         const state = this.options.resolver.state;
         const javaPlayers = this.latestPlayers.filter(({ edition }) => edition === 'java').length;
         const bedrockPlayers = this.latestPlayers.filter(({ edition }) => edition === 'bedrock').length;
+        const javaVersions = [
+            ...new Set(this.latestPlayers.flatMap(({ javaVersion }) => (javaVersion ? [javaVersion] : [])))
+        ].sort();
+        const unsupportedJavaVersions = [
+            ...new Set(
+                this.latestPlayers
+                    .filter(({ edition, javaVersion }) => edition === 'java' && javaVersion !== JAVA_DISPLAY_VERSION)
+                    .map(({ javaVersion }) => javaVersion ?? 'unknown')
+            )
+        ].sort();
         return {
             enabled: this.config.general.enabled,
             provider: state?.kind ?? 'ready',
@@ -172,11 +205,22 @@ export class TabDisplayService {
             bedrockPlayers,
             pendingJobs: this.pending?.jobs.length ?? 0,
             unresolved: [...this.unresolved].sort(),
+            javaVersions,
             ...(this.lastFailure === undefined ? {} : { lastFailure: this.lastFailure }),
-            java: { kind: 'supported' },
+            java:
+                unsupportedJavaVersions.length > 0
+                    ? {
+                          kind: 'unsupported',
+                          reason: `Java tab display calls are gated to ${JAVA_DISPLAY_VERSION}; live client behavior is unverified (connected: ${unsupportedJavaVersions.join(', ')})`
+                      }
+                    : { kind: 'supported' },
             bedrock: {
                 kind: 'unsupported',
-                reason: 'Personalized headers and custom Java row ordering are not available on native Bedrock clients.'
+                reason: 'TabDisplay leaves the native Bedrock player list unchanged.'
+            },
+            sorting: this.options.sortingCapability ?? {
+                kind: 'unsupported',
+                reason: 'Native Java tab order direction is not verified on a client.'
             }
         };
     }
@@ -311,20 +355,27 @@ export class TabDisplayService {
         }[]
     ): void {
         const snapshots = prepared.map(({ snapshot }) => snapshot);
-        const orders =
+        const orderByUuid =
             this.config.sorting.rules.length === 0
-                ? snapshots.map(({ uuid }) => ({ uuid, order: 0 }))
-                : assignDenseOrders(snapshots, this.config.sorting.rules);
-        const orderByUuid = new Map(orders.map(({ uuid, order }) => [uuid, order]));
+                ? new Map<string, number>()
+                : new Map(
+                      assignDenseOrders(snapshots, this.config.sorting.rules).map(({ uuid, order }) => [uuid, order])
+                  );
 
         for (const item of rendered) {
             const { snapshot } = item;
-            if (item.entry !== undefined) this.applyName(snapshot.uuid, item.entry);
-            else if (this.appliedNames.has(snapshot.uuid)) this.applyName(snapshot.uuid, undefined);
-            const order = orderByUuid.get(snapshot.uuid) ?? 0;
-            if (this.appliedOrders.get(snapshot.uuid) !== order) {
-                this.recordApply(this.options.host.setOrder(snapshot.uuid, order));
-                this.appliedOrders.set(snapshot.uuid, order);
+            if (snapshot.edition === 'java' && item.entry !== undefined) this.applyName(snapshot.uuid, item.entry);
+            else if (snapshot.edition === 'java' && this.appliedNames.has(snapshot.uuid))
+                this.applyName(snapshot.uuid, undefined);
+            if (this.config.sorting.rules.length > 0) {
+                const order = orderByUuid.get(snapshot.uuid) ?? 0;
+                if (this.appliedOrders.get(snapshot.uuid) !== order) {
+                    this.recordApply(this.options.host.setOrder(snapshot.uuid, order));
+                    this.appliedOrders.set(snapshot.uuid, order);
+                }
+            } else if (this.appliedOrders.has(snapshot.uuid)) {
+                this.recordApply(this.options.host.setOrder(snapshot.uuid, 0));
+                this.appliedOrders.delete(snapshot.uuid);
             }
             if (snapshot.edition === 'java') {
                 const key = JSON.stringify([item.header, item.footer]);
@@ -349,7 +400,6 @@ export class TabDisplayService {
             case 'unchanged':
                 return;
             case 'unsupported':
-                this.lastFailure = result.reason;
                 return;
             case 'failed':
                 this.lastFailure = result.error;
@@ -449,6 +499,7 @@ function copySnapshot(snapshot: PlayerSnapshot): PlayerSnapshot {
         uuid: snapshot.uuid,
         name: snapshot.name,
         edition: snapshot.edition,
+        ...(snapshot.javaVersion === undefined ? {} : { javaVersion: snapshot.javaVersion }),
         ...(snapshot.ping === undefined ? {} : { ping: snapshot.ping })
     };
 }

@@ -1,5 +1,5 @@
 import { defaultValues } from '@pumpkin-plugins/config';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { configSchema, validateConfig } from './config.ts';
 import type { ApplyResult, PlayerSnapshot, RenderedLine } from './model.ts';
 import { type TabDisplayHost, TabDisplayService, type TabPlaceholderResolver } from './service.ts';
@@ -46,8 +46,8 @@ function validConfig(value: unknown) {
 }
 
 const viewers: readonly PlayerSnapshot[] = [
-    { uuid: 'uuid-a', name: 'Alex', edition: 'java', ping: 20 },
-    { uuid: 'uuid-b', name: 'Bea', edition: 'java', ping: 30 }
+    { uuid: 'uuid-a', name: 'Alex', edition: 'java', javaVersion: 'v-26-3', ping: 20 },
+    { uuid: 'uuid-b', name: 'Bea', edition: 'java', javaVersion: 'v-26-3', ping: 30 }
 ];
 
 describe('TabDisplayService', () => {
@@ -70,6 +70,62 @@ describe('TabDisplayService', () => {
                 ['uuid-b', 'Bea']
             ])
         );
+        expect(host.orders).toEqual(new Map());
+        expect(service.status().javaVersions).toEqual(['v-26-3']);
+        expect(service.inspect('uuid-a')).toEqual({
+            uuid: 'uuid-a',
+            name: 'Alex',
+            edition: 'java',
+            javaVersion: 'v-26-3',
+            ping: 20,
+            placeholderIds: ['player_name']
+        });
+    });
+
+    it('does not call Java row setters for Bedrock and reports unsupported Java versions', () => {
+        const host = new FakeHost([
+            { uuid: 'bedrock', name: 'Bedrock', edition: 'bedrock' },
+            { uuid: 'old-java', name: 'OldJava', edition: 'java', javaVersion: 'v-1-21-2' }
+        ]);
+        const setName = vi.spyOn(host, 'setEntryName');
+        const setHeaderFooter = vi.spyOn(host, 'setHeaderFooter');
+        const service = new TabDisplayService({
+            host,
+            resolver: { resolveBatch: (requests) => requests.map(({ text }) => ({ text, unresolved: [] })) },
+            now: () => 0,
+            config: validConfig(baseConfig())
+        });
+
+        service.tick();
+
+        expect(setName).toHaveBeenCalledTimes(1);
+        expect(setName).toHaveBeenCalledWith('old-java', expect.anything());
+        expect(setHeaderFooter).toHaveBeenCalledTimes(1);
+        expect(setHeaderFooter).toHaveBeenCalledWith('old-java', expect.anything(), expect.anything());
+        expect(service.status().java).toEqual({
+            kind: 'unsupported',
+            reason: 'Java tab display calls are gated to v-26-3; live client behavior is unverified (connected: v-1-21-2)'
+        });
+        expect(service.status().lastFailure).toBeUndefined();
+    });
+
+    it('restores row names when a valid reload disables entry formatting', () => {
+        const host = new FakeHost(viewers);
+        const service = new TabDisplayService({
+            host,
+            resolver: { resolveBatch: (requests) => requests.map(({ text }) => ({ text, unresolved: [] })) },
+            now: () => 0,
+            config: validConfig(baseConfig())
+        });
+        service.tick();
+
+        const replacement = baseConfig();
+        replacement.entry.enabled = false;
+        expect(service.setConfig(replacement).kind).toBe('applied');
+        service.tick();
+
+        expect(host.names.get('uuid-a')).toBeUndefined();
+        expect(host.names.get('uuid-b')).toBeUndefined();
     });
 
     it('does not apply a partial generation when work exceeds the per-tick budget', () => {
@@ -91,6 +147,25 @@ describe('TabDisplayService', () => {
         expect(host.names.size).toBe(0);
         service.tick();
         expect(host.names.size).toBe(300);
+    });
+
+    it('does not apply a truncated roster when the configured player limit is exceeded', () => {
+        const host = new FakeHost(viewers);
+        const config = baseConfig();
+        config.general.max_players = 1;
+        const service = new TabDisplayService({
+            host,
+            resolver: { resolveBatch: (requests) => requests.map(({ text }) => ({ text, unresolved: [] })) },
+            now: () => 0,
+            config: validConfig(config)
+        });
+
+        service.tick();
+
+        expect(host.names.size).toBe(0);
+        expect(host.headers.size).toBe(0);
+        expect(host.orders.size).toBe(0);
+        expect(service.status().lastFailure).toContain('general.max_players');
     });
 
     it('rejects mismatched placeholder batches without applying shifted player data', () => {

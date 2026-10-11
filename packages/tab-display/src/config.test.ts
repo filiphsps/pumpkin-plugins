@@ -20,7 +20,7 @@ describe('tab display configuration', () => {
         expect(loaded.config.general.version).toBe(1);
         expect(loaded.config.general.refresh_ticks).toBe(20);
         expect(loaded.config.header.lines[0]?.text).toContain('%player_name%');
-        expect(loaded.config.sorting.rules).toEqual([{ kind: 'name', direction: 'ascending' }]);
+        expect(loaded.config.sorting.rules).toEqual([]);
         expect(store.value()).toContain('text =');
     });
 
@@ -40,6 +40,18 @@ describe('tab display configuration', () => {
             expect(result.issues).toContainEqual({
                 path: 'objective.enabled',
                 reason: expect.stringContaining('unsupported')
+            });
+    });
+
+    it('rejects native sorting until a Java client verifies order direction', () => {
+        const config = structuredClone(defaultValues(configSchema));
+        config.sorting.rules = [{ kind: 'name', direction: 'ascending' }];
+        const result = validateConfig(config);
+        expect(result.kind).toBe('invalid');
+        if (result.kind === 'invalid')
+            expect(result.issues).toContainEqual({
+                path: 'sorting.rules',
+                reason: expect.stringContaining('not verified')
             });
     });
 

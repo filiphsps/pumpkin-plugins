@@ -1,5 +1,8 @@
 import type { SessionState } from '@pumpkin-plugins/pumpkin-pie-api';
 
+/** Java client protocol version currently allowed through the tab display adapter gate. */
+export const JAVA_DISPLAY_VERSION = 'v-26-3' as const;
+
 /** Host capability result for an edition-specific feature. */
 export type Capability = { readonly kind: 'supported' } | { readonly kind: 'unsupported'; readonly reason: string };
 
@@ -20,6 +23,7 @@ export interface PlayerSnapshot {
     readonly uuid: string;
     readonly name: string;
     readonly edition: 'java' | 'bedrock' | 'unknown';
+    readonly javaVersion?: string;
     readonly ping?: number;
 }
 
@@ -42,7 +46,9 @@ export interface TabDisplayStatus {
     readonly bedrockPlayers: number;
     readonly pendingJobs: number;
     readonly unresolved: readonly string[];
+    readonly javaVersions: readonly string[];
     readonly lastFailure?: string;
     readonly java: Capability;
     readonly bedrock: Capability;
+    readonly sorting: Capability;
 }

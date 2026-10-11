@@ -41,7 +41,7 @@ export interface ConfigSortRule extends SortRule {}
 
 const defaultHeader: readonly TemplateLineConfig[] = [{ text: 'Welcome %player_name%', color: '#FFB347' }];
 const defaultFooter: readonly TemplateLineConfig[] = [{ text: '%server_online% players online', color: '#AAAAAA' }];
-const defaultRules: readonly ConfigSortRule[] = [{ kind: 'name', direction: 'ascending' }];
+const defaultRules: readonly ConfigSortRule[] = [];
 
 /** Declares the plugin configuration; arrays use TOML arrays of inline tables. */
 export const configSchema = defineConfig(PLUGIN_NAME, {
@@ -104,7 +104,7 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
         }
     }),
     sorting: section({
-        description: 'Global Java player-list ordering. Name and ping are supported in this release.',
+        description: 'Global Java player-list ordering. Rules stay disabled until native client order is verified.',
         fields: { rules: sortRulesField(defaultRules) }
     }),
     objective: section({
@@ -247,7 +247,8 @@ function sortRulesField(defaults: readonly ConfigSortRule[]): Field<readonly Con
         formatInlineTableArray(rules.map((rule) => ({ kind: rule.kind, direction: rule.direction })));
     return {
         type: 'string',
-        description: 'Ordered sorting keys as a TOML array of inline tables. Missing or invalid ping values sort last.',
+        description:
+            'Reserved sorting keys. Non-empty rules are rejected until native Java order direction is verified.',
         default: defaults,
         expected: 'an array of name or ping sort rule tables',
         example: format(defaults),
@@ -377,6 +378,8 @@ function validateSorting(value: unknown, issues: ConfigIssue[]): void {
         }
         seen.add(rule.kind);
     }
+    if (value.rules.length > 0)
+        add(issues, 'sorting.rules', 'unsupported: native Java tab order direction is not verified on a client');
 }
 
 function validateObjective(value: unknown, path: string, issues: ConfigIssue[]): void {
