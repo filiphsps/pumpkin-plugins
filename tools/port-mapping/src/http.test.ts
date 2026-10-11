@@ -95,6 +95,32 @@ describe('httpRequest', () => {
         expect(JSON.parse(result.stdout)).toEqual({ message: 'invalid chunk size', closed: 1 });
     });
 
+    it('waits for a split zero terminator and trailers', () => {
+        const { net, closed } = scripted([
+            text('HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nx\r\n0\r\n'),
+            text('Checksum: yes\r\n'),
+            text('\r\n')
+        ]);
+        expect(runSteps(net, httpRequest(net, to, get)).body).toBe('x');
+        // A malformed later trailer must not be skipped by completing at the zero-size line.
+        expect(closed).toEqual(['closed']);
+        const malformed = scripted([
+            text('HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n'),
+            text('not-a-header\r\n\r\n')
+        ]);
+        expect(() => runSteps(malformed.net, httpRequest(malformed.net, to, get))).toThrow('invalid chunk trailer');
+        expect(malformed.closed).toEqual(['closed']);
+    });
+
+    it.each(['1\r\nx!!0\r\n\r\n', '1\r\nx\r!0\r\n\r\n'])('rejects a chunk without its trailing CRLF: %j', (body) => {
+        const { net, closed } = scripted([
+            text(`HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n${body}`),
+            'closed'
+        ]);
+        expect(() => runSteps(net, httpRequest(net, to, get))).toThrow('invalid chunk delimiter');
+        expect(closed).toEqual(['closed']);
+    });
+
     it('reports error statuses to the caller', () => {
         const { net } = scripted([text('HTTP/1.1 500 X\r\nContent-Length: 2\r\n\r\nno')]);
         expect(runSteps(net, httpRequest(net, to, get))).toMatchObject({ status: 500, body: 'no' });

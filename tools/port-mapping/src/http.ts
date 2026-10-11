@@ -144,9 +144,25 @@ function decodeChunked(bytes: Uint8Array): Uint8Array | undefined {
         if (!/^[0-9a-fA-F]+$/.test(token)) throw new Error('invalid chunk size');
         const size = Number.parseInt(token, 16);
         if (!Number.isSafeInteger(size)) throw new Error('invalid chunk size');
-        if (size === 0) return pieces.reduce(concat, new Uint8Array(0));
+        if (size === 0) {
+            let trailer = lineEnd + 2;
+            for (;;) {
+                let end = trailer;
+                while (end + 1 < bytes.length && !(bytes[end] === 13 && bytes[end + 1] === 10)) end++;
+                if (end + 1 >= bytes.length) return undefined;
+                if (end === trailer) return pieces.reduce(concat, new Uint8Array(0));
+                const line = strFromU8(bytes.subarray(trailer, end));
+                if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+:[\t\x20-\x7e]*$/.test(line)) {
+                    throw new Error('invalid chunk trailer');
+                }
+                trailer = end + 2;
+            }
+        }
         const start = lineEnd + 2;
         if (start + size + 2 > bytes.length) return undefined;
+        if (bytes[start + size] !== 13 || bytes[start + size + 1] !== 10) {
+            throw new Error('invalid chunk delimiter');
+        }
         pieces.push(bytes.subarray(start, start + size));
         at = start + size + 2;
     }
