@@ -227,6 +227,48 @@ describe('HttpSession', () => {
         expect(t.files[0].closed).toBe(1);
     });
 
+    it.each([1, 2])('retains the byte reservation when write %s throws after accepting data', (failAt) => {
+        const first = setup({ writeBudget: 400, chunkSize: 100 });
+        const second = setup({ writeBudget: 400, chunkSize: 100 });
+        const request = get('/packs/a.mcpack');
+        first.transport.inbound.push(request);
+        second.transport.inbound.push(request);
+        const write = first.transport.write.bind(first.transport);
+        let writes = 0;
+        first.transport.write = (bytes) => {
+            write(bytes);
+            if (++writes === failAt) throw new Error('write outcome unknown');
+        };
+        const quota = { bytes: 400, operations: 64 };
+        expect(first.session.tick(quota)).toBe(false);
+        second.session.tick(quota);
+        const bytes = first.transport.written.length + second.transport.written.length + request.length * 2;
+        expect(bytes).toBeLessThanOrEqual(400);
+        expect(first.files[0].closed).toBe(1);
+        first.session.abort();
+        second.session.abort();
+        expect(first.files[0].closed).toBe(1);
+    });
+
+    it('retains the requested byte reservation when a read has an unknown outcome', () => {
+        const first = setup();
+        const second = setup();
+        let attempted = 0;
+        first.transport.read = (max) => {
+            attempted = max;
+            throw new Error('read outcome unknown');
+        };
+        second.transport.inbound.push(get('/packs/a.mcpack'));
+        const quota = { bytes: 400, operations: 64 };
+        expect(first.session.tick(quota)).toBe(false);
+        expect(attempted).toBe(400);
+        expect(quota.bytes).toBe(0);
+        expect(second.session.tick(quota)).toBe(true);
+        expect(second.lookups).toEqual([]);
+        expect(second.transport.written).toEqual([]);
+        second.session.abort();
+    });
+
     it('closes the file when the client disconnects mid-download', () => {
         const t = setup();
         t.transport.inbound.push(get('/packs/a.mcpack'));

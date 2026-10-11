@@ -104,14 +104,16 @@ export class HttpSession {
         if (quota.operations < 3 || quota.bytes <= 0) return false;
         // Reserve the read and up to two file-open/stat calls when the head completes.
         quota.operations -= 3;
-        const chunk = this.transport.read(Math.min(MAX_REQUEST_BYTES - this.received.length, quota.bytes));
+        const max = Math.min(MAX_REQUEST_BYTES - this.received.length, quota.bytes);
+        quota.bytes -= max;
+        const chunk = this.transport.read(max);
+        quota.bytes += max - (chunk === null || chunk === 'closed' ? 0 : chunk.length);
         if (chunk === 'closed') {
             this.abort();
             return false;
         }
         if (chunk === null || chunk.length === 0) return false;
 
-        quota.bytes -= chunk.length;
         this.lastProgress = this.options.now();
         const joined = new Uint8Array(this.received.length + chunk.length);
         joined.set(this.received);
@@ -142,21 +144,21 @@ export class HttpSession {
             if (headPending) {
                 const n = Math.min(space, budget, this.head.length - this.headSent);
                 quota.operations--;
+                quota.bytes -= n;
                 this.transport.write(this.head.subarray(this.headSent, this.headSent + n));
                 this.headSent += n;
                 budget -= n;
-                quota.bytes -= n;
             } else if (this.body && this.body.remaining > 0) {
                 const n = Math.min(space, budget, this.options.chunkSize, this.body.remaining);
                 quota.operations--;
                 const data = this.body.file.read(this.body.offset, n);
                 if (data.length === 0) throw new Error('pack file ended early');
                 quota.operations--;
+                quota.bytes -= data.length;
                 this.transport.write(data);
                 this.body.offset += data.length;
                 this.body.remaining -= data.length;
                 budget -= data.length;
-                quota.bytes -= data.length;
             } else {
                 break;
             }
