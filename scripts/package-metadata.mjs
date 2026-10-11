@@ -49,7 +49,15 @@ const KEY_ORDER = [
 /** Files a tool ships besides `src`, where it has them. */
 const EXTRA_FILES = { 'tools/build': ['runtime', 'wasi-wit.lock.json'] };
 
-const readJson = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
+function hasEscapedUnicode(source) {
+    // Scan JSON string tokens, consuming escaped backslashes so literal "\\u..." stays valid.
+    for (const [token] of source.matchAll(/"(?:[^"\\]|\\.)*"/g)) {
+        for (const unicodeEscape of token.matchAll(/\\(?:u([0-9a-fA-F]{4})|.)/g)) {
+            if (unicodeEscape[1] && Number.parseInt(unicodeEscape[1], 16) >= 0x80) return true;
+        }
+    }
+    return false;
+}
 
 function hasLocalLicense(dir) {
     return (
@@ -108,9 +116,11 @@ const ordered = (pkg) => {
 const problems = [];
 for (const dir of packageDirs()) {
     const file = path.join(dir, 'package.json');
-    const pkg = readJson(file);
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
+    const pkg = JSON.parse(source);
     const want = expected(dir, pkg);
     const issues = [];
+    if (hasEscapedUnicode(source)) issues.push('non-ASCII characters must use literal UTF-8, not Unicode escapes');
 
     for (const [key, value] of Object.entries(want)) {
         if (JSON.stringify(pkg[key]) !== JSON.stringify(value))
