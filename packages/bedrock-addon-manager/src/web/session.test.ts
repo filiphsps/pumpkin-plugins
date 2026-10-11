@@ -215,6 +215,18 @@ describe('HttpSession', () => {
         expect(t.files.map((f) => f.closed)).toEqual([1]);
     });
 
+    it('services deadlines and releases the file even when both shared quotas are exhausted', () => {
+        const t = setup({ writeBudget: 500 });
+        t.transport.inbound.push(get('/packs/a.mcpack'));
+        expect(t.session.tick()).toBe(true);
+        const written = t.transport.written.length;
+        t.clock.now = 1001;
+        expect(t.session.tick({ bytes: 0, operations: 0 })).toBe(false);
+        expect(t.transport.written.length).toBe(written);
+        expect(t.transport.aborted).toBe(true);
+        expect(t.files[0].closed).toBe(1);
+    });
+
     it('closes the file when the client disconnects mid-download', () => {
         const t = setup();
         t.transport.inbound.push(get('/packs/a.mcpack'));

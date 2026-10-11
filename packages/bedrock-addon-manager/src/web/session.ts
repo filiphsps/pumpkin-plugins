@@ -29,6 +29,14 @@ export interface SessionOptions {
     chunkSize: number;
 }
 
+/** One server tick's remaining quota, shared by every active session. */
+export interface TickQuota {
+    /** HTTP bytes read or queued, including request and response heads. File reads are charged on write. */
+    bytes: number;
+    /** Host I/O calls remaining; resource disposal and deadline checks are always serviced. */
+    operations: number;
+}
+
 type State = 'request' | 'send' | 'finish' | 'closed';
 
 /** One HTTP/1.1 exchange: read a request, send one response, close. Driven by `tick()`. */
@@ -55,15 +63,19 @@ export class HttpSession {
      * Moves the exchange forward: reads what has arrived, sends what fits, closes when done.
      * @returns True while the session needs more ticks.
      */
-    tick(): boolean {
+    tick(quota: TickQuota = { bytes: this.options.writeBudget, operations: 64 }): boolean {
         if (this.is('closed')) return false;
         const now = this.options.now();
         if (this.is('request') && now >= this.headDeadline) return this.abort();
         if (now - this.lastProgress > this.options.idleTimeoutMs) return this.abort();
         try {
-            if (this.is('request') && !this.readRequest()) return !this.is('closed');
-            if (this.is('send')) this.send();
-            if (this.is('finish') && this.transport.finish()) this.state = 'closed';
+            if (this.is('request') && !this.readRequest(quota)) return !this.is('closed');
+            if (this.is('send')) this.send(quota);
+            if (this.is('finish') && quota.operations >= 2) {
+                // finish may flush once, or check capacity and shut down the send direction.
+                quota.operations -= 2;
+                if (this.transport.finish()) this.state = 'closed';
+            }
         } catch {
             return this.abort();
         }
@@ -88,14 +100,18 @@ export class HttpSession {
     }
 
     /** Returns true once a request has been read and a response chosen. */
-    private readRequest(): boolean {
-        const chunk = this.transport.read(MAX_REQUEST_BYTES - this.received.length);
+    private readRequest(quota: TickQuota): boolean {
+        if (quota.operations < 3 || quota.bytes <= 0) return false;
+        // Reserve the read and up to two file-open/stat calls when the head completes.
+        quota.operations -= 3;
+        const chunk = this.transport.read(Math.min(MAX_REQUEST_BYTES - this.received.length, quota.bytes));
         if (chunk === 'closed') {
             this.abort();
             return false;
         }
         if (chunk === null || chunk.length === 0) return false;
 
+        quota.bytes -= chunk.length;
         this.lastProgress = this.options.now();
         const joined = new Uint8Array(this.received.length + chunk.length);
         joined.set(this.received);
@@ -112,25 +128,35 @@ export class HttpSession {
         return true;
     }
 
-    private send(): void {
-        let budget = this.options.writeBudget;
+    private send(quota: TickQuota): void {
+        let budget = Math.min(this.options.writeBudget, quota.bytes);
         while (budget > 0) {
+            const headPending = this.headSent < this.head.length;
+            if (!headPending && (!this.body || this.body.remaining === 0)) break;
+            // Capacity + write for heads, with one additional file read for bodies.
+            if (quota.operations < (headPending ? 2 : 3)) break;
+            quota.operations--;
             const space = this.transport.writable();
-            if (space <= 0) return;
+            if (space <= 0) break;
 
-            if (this.headSent < this.head.length) {
+            if (headPending) {
                 const n = Math.min(space, budget, this.head.length - this.headSent);
+                quota.operations--;
                 this.transport.write(this.head.subarray(this.headSent, this.headSent + n));
                 this.headSent += n;
                 budget -= n;
+                quota.bytes -= n;
             } else if (this.body && this.body.remaining > 0) {
                 const n = Math.min(space, budget, this.options.chunkSize, this.body.remaining);
+                quota.operations--;
                 const data = this.body.file.read(this.body.offset, n);
                 if (data.length === 0) throw new Error('pack file ended early');
+                quota.operations--;
                 this.transport.write(data);
                 this.body.offset += data.length;
                 this.body.remaining -= data.length;
                 budget -= data.length;
+                quota.bytes -= data.length;
             } else {
                 break;
             }

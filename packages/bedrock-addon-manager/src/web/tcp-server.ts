@@ -6,13 +6,15 @@ import type { Logger } from '../platform/logger.ts';
 import { wasiErrorCode } from '../platform/wasi-error.ts';
 import { parseIpv4 } from './ipv4.ts';
 import type { WebServer, WebServerSettings } from './server.ts';
-import { HttpSession, type PackLookup, type SessionOptions } from './session.ts';
+import { HttpSession, type PackLookup, type SessionOptions, type TickQuota } from './session.ts';
 import { TcpTransport } from './tcp-transport.ts';
 
 /** Most simultaneous downloads. Further connections wait in the OS backlog. */
 const MAX_CONNECTIONS = 64;
 /** Most connections accepted in one tick, so a burst can't stall the server tick. */
 const ACCEPTS_PER_TICK = 8;
+/** Accepts, request/file reads, open/stat, capacity checks, writes and flush/shutdown calls. */
+const OPERATIONS_PER_TICK = 64;
 /** How often to retry a socket step that reports it would block. */
 const MAX_SETTLE_ATTEMPTS = 100;
 
@@ -44,6 +46,7 @@ function settle<T>(step: () => T): T {
 export class TcpWebServer implements WebServer {
     private listener: TcpSocket | undefined;
     private readonly sessions = new Set<HttpSession>();
+    private cursor = 0;
 
     /** Creates a stopped server. */
     constructor(
@@ -80,21 +83,32 @@ export class TcpWebServer implements WebServer {
     /** {@inheritDoc web/server!WebServer#tick} */
     tick(): void {
         if (!this.listener) return;
-        this.acceptNew(this.listener);
-        for (const session of this.sessions) if (!session.tick()) this.sessions.delete(session);
+        const quota: TickQuota = { bytes: SESSION_LIMITS.writeBudget, operations: OPERATIONS_PER_TICK };
+        this.acceptNew(this.listener, quota);
+        const sessions = [...this.sessions];
+        if (sessions.length === 0) return;
+        const start = this.cursor % sessions.length;
+        // Even exhausted sessions need deadlines/disposal checked; the starting owner rotates.
+        for (let i = 0; i < sessions.length; i++) {
+            const session = sessions[(start + i) % sessions.length];
+            if (session && !session.tick(quota)) this.sessions.delete(session);
+        }
+        this.cursor = (start + 1) % sessions.length;
     }
 
     /** {@inheritDoc web/server!WebServer#stop} */
     stop(): void {
         for (const session of this.sessions) session.abort();
         this.sessions.clear();
+        this.cursor = 0;
         if (this.listener) disposeWasiResource(this.listener);
         this.listener = undefined;
     }
 
-    private acceptNew(listener: TcpSocket): void {
-        for (let i = 0; i < ACCEPTS_PER_TICK && this.sessions.size < MAX_CONNECTIONS; i++) {
+    private acceptNew(listener: TcpSocket, quota: TickQuota): void {
+        for (let i = 0; i < ACCEPTS_PER_TICK && this.sessions.size < MAX_CONNECTIONS && quota.operations > 0; i++) {
             try {
+                quota.operations--;
                 const [socket, input, output] = listener.accept();
                 const transport = new TcpTransport(socket, input, output);
                 this.sessions.add(new HttpSession(transport, this.lookup, { ...SESSION_LIMITS, now: this.now }));

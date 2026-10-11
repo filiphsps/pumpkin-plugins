@@ -2,6 +2,8 @@ import type { TcpSocket } from 'wasi:sockets/tcp@0.2.3';
 import { MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { strToU8 } from 'fflate';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FakeFile } from '../../test/transport.ts';
+import type { PackLookup } from './session.ts';
 import { TcpWebServer } from './tcp-server.ts';
 
 const host = vi.hoisted(() => ({ create: vi.fn() }));
@@ -14,7 +16,11 @@ function client() {
     const disposed = { socket: 0, input: 0, output: 0 };
     const socket = { shutdown: vi.fn(), [Symbol.dispose]: () => disposed.socket++ };
     const input = {
-        read: vi.fn(() => inbound.shift() ?? new Uint8Array()),
+        read: vi.fn((max: bigint) => {
+            const bytes = inbound.shift() ?? new Uint8Array();
+            if (bytes.length > Number(max)) inbound.unshift(bytes.subarray(Number(max)));
+            return bytes.subarray(0, Number(max));
+        }),
         [Symbol.dispose]: () => disposed.input++
     };
     const output = {
@@ -24,6 +30,7 @@ function client() {
         [Symbol.dispose]: () => disposed.output++
     };
     return {
+        socket,
         inbound,
         written,
         disposed,
@@ -33,7 +40,7 @@ function client() {
     };
 }
 
-function setup() {
+function setup(open: PackLookup = () => undefined) {
     const pending: ReturnType<TcpSocket['accept']>[] = [];
     const listener = {
         startBind: vi.fn(),
@@ -50,7 +57,7 @@ function setup() {
     };
     host.create.mockReturnValue(listener);
     const clock = { now: 0 };
-    const lookup = vi.fn(() => undefined);
+    const lookup = vi.fn(open);
     const server = new TcpWebServer(lookup, new MemoryLogger(), () => clock.now);
     server.start({ bind: '127.0.0.1', port: 8123 });
     return { server, clock, pending, listener, lookup };
@@ -58,7 +65,103 @@ function setup() {
 
 beforeEach(() => host.create.mockReset());
 
+function metrics(t: ReturnType<typeof setup>, clients: ReturnType<typeof client>[], files: FakeFile[] = []) {
+    return {
+        bytes: clients.reduce(
+            (n, c) =>
+                n +
+                c.written.reduce((a, b) => a + b, 0) +
+                c.input.read.mock.results.reduce((a, r) => a + (r.type === 'return' ? r.value.length : 0), 0),
+            0
+        ),
+        operations:
+            t.listener.accept.mock.calls.length +
+            t.lookup.mock.calls.length * 2 +
+            files.reduce((n, f) => n + f.reads.length, 0) +
+            clients.reduce(
+                (n, c) =>
+                    n +
+                    c.input.read.mock.calls.length +
+                    c.output.checkWrite.mock.calls.length +
+                    c.output.write.mock.calls.length +
+                    c.output.flush.mock.calls.length +
+                    c.socket.shutdown.mock.calls.length,
+                0
+            )
+    };
+}
+
+function admit(t: ReturnType<typeof setup>, clients: ReturnType<typeof client>[]) {
+    t.pending.push(...clients.map((c) => c.resources));
+    for (let i = 0; i < Math.ceil(clients.length / 8); i++) t.server.tick();
+    t.listener.accept.mockClear();
+    for (const c of clients) c.input.read.mockClear();
+}
+
 describe('TcpWebServer', () => {
+    it.each([1, 16, 64])('caps aggregate HTTP bytes and I/O with %s active downloads', (count) => {
+        const files: FakeFile[] = [];
+        const data = new Uint8Array(2 << 20);
+        const t = setup(() => {
+            const file = new FakeFile(data);
+            files.push(file);
+            return file;
+        });
+        const clients = Array.from({ length: count }, client);
+        admit(t, clients);
+        for (const c of clients) c.inbound.push(strToU8('GET /packs/a.mcpack HTTP/1.1\r\n\r\n'));
+        t.server.tick();
+        const work = metrics(t, clients, files);
+        expect.soft(work.bytes).toBeLessThanOrEqual(1 << 20);
+        expect.soft(work.operations).toBeLessThanOrEqual(64);
+        t.server.stop();
+        expect(files.every((f) => f.closed === 1)).toBe(true);
+    });
+
+    it('bounds one-byte writable loops with the shared operation quota', () => {
+        const t = setup();
+        const c = client();
+        c.output.checkWrite.mockReturnValue(1n);
+        admit(t, [c]);
+        c.inbound.push(strToU8('GET /packs/missing.mcpack HTTP/1.1\r\n\r\n'));
+        t.server.tick();
+        const work = metrics(t, [c]);
+        expect(work.operations).toBeLessThanOrEqual(64);
+        t.server.stop();
+    });
+
+    it('rotates fairly among slow and fast clients while respecting both quotas until completion', () => {
+        const files: FakeFile[] = [];
+        const data = new Uint8Array(2 << 20);
+        const t = setup(() => {
+            const file = new FakeFile(data);
+            files.push(file);
+            return file;
+        });
+        const clients = Array.from({ length: 64 }, client);
+        clients[0].output.checkWrite.mockReturnValue(0n);
+        admit(t, clients);
+        for (const c of clients) c.inbound.push(strToU8('GET /packs/a.mcpack HTTP/1.1\r\n\r\n'));
+        for (let tick = 0; tick < 500; tick++) {
+            const before = metrics(t, clients, files);
+            t.server.tick();
+            const after = metrics(t, clients, files);
+            expect(after.bytes - before.bytes).toBeLessThanOrEqual(1 << 20);
+            expect(after.operations - before.operations).toBeLessThanOrEqual(64);
+            if (tick === 63) expect(clients.slice(1).every((c) => c.written.length > 0)).toBe(true);
+            t.clock.now += 10;
+            if (clients.slice(1).every((c) => c.disposed.socket === 1)) break;
+        }
+        expect(clients.slice(1).every((c) => c.disposed.socket === 1)).toBe(true);
+        expect(files.filter((f) => f.closed === 1)).toHaveLength(63);
+        expect(clients[0].disposed.socket).toBe(0);
+        t.clock.now += 15_001;
+        t.server.tick();
+        expect(files.every((f) => f.closed === 1)).toBe(true);
+        expect(clients[0].disposed.socket).toBe(1);
+        t.server.stop();
+    });
+
     it('releases trickled head slots at the absolute deadline and admits a replacement client', () => {
         const t = setup();
         const clients = Array.from({ length: 64 }, client);
