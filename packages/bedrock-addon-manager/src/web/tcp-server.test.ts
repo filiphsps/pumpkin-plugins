@@ -6,7 +6,8 @@ import { FakeFile } from '../../test/transport.ts';
 import type { PackLookup } from './session.ts';
 import { TcpWebServer } from './tcp-server.ts';
 
-const host = vi.hoisted(() => ({ create: vi.fn() }));
+const host = vi.hoisted(() => ({ create: vi.fn(), now: vi.fn(() => 0n) }));
+vi.mock('wasi:clocks/monotonic-clock@0.2.3', () => ({ now: host.now }));
 vi.mock('wasi:sockets/instance-network@0.2.3', () => ({ instanceNetwork: () => ({}) }));
 vi.mock('wasi:sockets/tcp-create-socket@0.2.3', () => ({ createTcpSocket: host.create }));
 
@@ -40,7 +41,7 @@ function client() {
     };
 }
 
-function setup(open: PackLookup = () => undefined) {
+function setup(open: PackLookup = () => undefined, defaultClock = false) {
     const pending: ReturnType<TcpSocket['accept']>[] = [];
     const listener = {
         startBind: vi.fn(),
@@ -58,12 +59,15 @@ function setup(open: PackLookup = () => undefined) {
     host.create.mockReturnValue(listener);
     const clock = { now: 0 };
     const lookup = vi.fn(open);
-    const server = new TcpWebServer(lookup, new MemoryLogger(), () => clock.now);
+    const server = new TcpWebServer(lookup, new MemoryLogger(), defaultClock ? undefined : () => clock.now);
     server.start({ bind: '127.0.0.1', port: 8123 });
     return { server, clock, pending, listener, lookup };
 }
 
-beforeEach(() => host.create.mockReset());
+beforeEach(() => {
+    host.create.mockReset();
+    host.now.mockReset().mockReturnValue(0n);
+});
 
 function metrics(t: ReturnType<typeof setup>, clients: ReturnType<typeof client>[], files: FakeFile[] = []) {
     return {
@@ -99,6 +103,23 @@ function admit(t: ReturnType<typeof setup>, clients: ReturnType<typeof client>[]
 }
 
 describe('TcpWebServer', () => {
+    it('uses monotonic time for default deadlines when the wall clock moves backwards', () => {
+        const wallClock = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+        const t = setup(undefined, true);
+        const c = client();
+        try {
+            t.pending.push(c.resources);
+            t.server.tick();
+            host.now.mockReturnValue(15_000_000_000n);
+            wallClock.mockReturnValue(50_000);
+            t.server.tick();
+            expect(c.disposed).toEqual({ socket: 1, input: 1, output: 1 });
+        } finally {
+            t.server.stop();
+            wallClock.mockRestore();
+        }
+    });
+
     it.each([1, 16, 64])('caps aggregate HTTP bytes and I/O with %s active downloads', (count) => {
         const files: FakeFile[] = [];
         const data = new Uint8Array(2 << 20);

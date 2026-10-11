@@ -1,3 +1,4 @@
+import { now as monotonicNow } from 'wasi:clocks/monotonic-clock@0.2.3';
 import { instanceNetwork } from 'wasi:sockets/instance-network@0.2.3';
 import type { TcpSocket } from 'wasi:sockets/tcp@0.2.3';
 import { createTcpSocket } from 'wasi:sockets/tcp-create-socket@0.2.3';
@@ -52,7 +53,7 @@ export class TcpWebServer implements WebServer {
     constructor(
         private readonly lookup: PackLookup,
         private readonly log: Logger,
-        private readonly now: () => number = Date.now
+        private readonly now: () => number = () => Number(monotonicNow() / 1_000_000n)
     ) {}
 
     /** {@inheritDoc web/server!WebServer#start} */
