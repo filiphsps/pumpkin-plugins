@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.3](https://github.com/filiphsps/pumpkin-plugins/compare/verify-pumpkin-plugin-v0.0.2...verify-pumpkin-plugin-v0.0.3) (2026-10-11)
+
+
+### Bug Fixes
+
+* **signing:** validate signed metadata against host schema ([35238ff](https://github.com/filiphsps/pumpkin-plugins/commit/35238ff1db42ec788f845f40c3c7cfebc607a71e))
+
 ## [0.0.2](https://github.com/filiphsps/pumpkin-plugins/compare/verify-pumpkin-plugin-v0.0.1...verify-pumpkin-plugin-v0.0.2) (2026-10-07)
 
 
