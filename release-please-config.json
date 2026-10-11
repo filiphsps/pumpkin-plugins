@@ -35,8 +35,7 @@
             "component": "dynamic-lights-pumpkin"
         },
         "packages/tab-display": {
-            "component": "tab-display",
-            "release-as": "0.0.1"
+            "component": "tab-display"
         },
         "packages/upnpumpkin": {
             "component": "upnpumpkin"
