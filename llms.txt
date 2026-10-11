@@ -65,6 +65,8 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Plugin kit README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/plugin-kit/README.md): Additional component overview and usage details.
 - [Port mapping library](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/port-mapping/docs/index.md): UPnP and NAT-PMP port mapping
 - [Port mapping library README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/port-mapping/README.md): Additional component overview and usage details.
+- [PumpkinPIE API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-pie-api/docs/index.md): Validated PumpkinPIE client, expansions and provider lifecycle
+- [PumpkinPIE API README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-pie-api/README.md): Additional component overview and usage details.
 - [Pumpkin plugin signing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/docs/index.md): Ed25519 signing for plugin builds
 - [Pumpkin plugin signing README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/README.md): Additional component overview and usage details.
 - [Terrain capture](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/docs/index.md): Shared terrain capture and access contracts
@@ -106,6 +108,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Minecraft colors API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/minecraft-colors/): Chalk-like Minecraft text formatting for plugins
 - [Plugin kit API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/plugin-kit/): Host helpers shared by plugins
 - [Port mapping library API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/port-mapping/): UPnP and NAT-PMP port mapping
+- [PumpkinPIE API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/pumpkin-pie-api/): Validated PumpkinPIE client, expansions and provider lifecycle
 - [Pumpkin plugin signing API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/signing/): Ed25519 signing for plugin builds
 - [Terrain capture API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/terrain/): Shared terrain capture and access contracts
 - [Pumpkin test harness API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/test-harness/): Runs plugins on a real Pumpkin in vitest
