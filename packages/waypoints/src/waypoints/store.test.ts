@@ -93,6 +93,33 @@ describe(WaypointStore.name, () => {
         }
     );
 
+    it.each([1, 2])('keeps a unique uppercase v%s identity mutable across reloads', (version) => {
+        const lower = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        const upper = lower.toUpperCase();
+        const record = version === 1 ? legacyWaypoint({ id: upper }) : { ...waypoint(lower), id: upper };
+        const files = new MemoryFiles().put('waypoints.json', JSON.stringify({ version, waypoints: [record] }));
+        const store = new WaypointStore(files, new MemoryLogger());
+        expect(store.isAvailable).toBe(true);
+        expect(store.get(upper)?.id).toBe(lower);
+        expect(store.update(upper, (current) => ({ ...current, id: upper, label: 'Changed' }))).toBe(true);
+        expect(store.reload()).toBe(true);
+        expect(store.get(lower)?.label).toBe('Changed');
+        expect(store.remove(upper)).toBe(true);
+        expect(new WaypointStore(files, new MemoryLogger()).list()).toEqual([]);
+    });
+
+    it('normalizes directly added UUIDs and rejects case-only duplicate mutations', () => {
+        const lower = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        const upper = lower.toUpperCase();
+        const files = new MemoryFiles();
+        const store = new WaypointStore(files, new MemoryLogger());
+        expect(store.add({ ...waypoint(lower), id: upper })).toBe(true);
+        expect(store.list()[0]?.id).toBe(lower);
+        expect(store.add(waypoint(lower, 'Other'))).toBe(false);
+        expect(store.update(upper, (current) => ({ ...current, id: waypointId }))).toBe(false);
+        expect(new WaypointStore(files, new MemoryLogger()).list()).toEqual([waypoint(lower)]);
+    });
+
     it('writes four-space indented JSON with a trailing newline', () => {
         const files = new MemoryFiles();
         const store = new WaypointStore(files, new MemoryLogger());

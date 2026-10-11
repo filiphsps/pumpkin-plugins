@@ -1,6 +1,7 @@
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { WaypointCatalog } from './catalog.ts';
+import { createWaypoint } from './model.ts';
 import { WaypointStore } from './store.ts';
 
 const id = '11111111-1111-4111-8111-111111111111';
@@ -31,6 +32,24 @@ describe(WaypointCatalog.name, () => {
             name: 'Main Base',
             position: { x: 1.5, y: 64.25, z: -2.75 }
         });
+    });
+
+    it('updates and deletes an uppercase disk UUID after reload', () => {
+        const { files, catalog } = setup();
+        const upper = 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA';
+        const waypoint = createWaypoint({
+            id: upper,
+            name: 'Disk',
+            dimension: 'world',
+            position: { x: 0, y: 64, z: 0 }
+        });
+        files.put('waypoints.json', JSON.stringify({ version: 2, waypoints: [{ ...waypoint, id: upper }] }));
+        expect(catalog.reload()).toBe(true);
+        expect(catalog.getById(upper)?.id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+        expect(catalog.update('Disk', { label: 'New label' }).status).toBe('updated');
+        expect(catalog.reload()).toBe(true);
+        expect(catalog.getByName('Disk')?.label).toBe('New label');
+        expect(catalog.remove('Disk').status).toBe('removed');
     });
 
     it('rejects normalized collisions without changing the existing catalog', () => {

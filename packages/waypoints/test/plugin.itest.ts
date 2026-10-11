@@ -78,7 +78,7 @@ describe(info.name, () => {
                 version: 2,
                 waypoints: [
                     {
-                        id: '33333333-3333-4333-8333-333333333333',
+                        id: 'AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA',
                         name: 'Reloaded',
                         dimension: 'world',
                         position: { x: 1, y: 64, z: 2 },
@@ -94,5 +94,24 @@ describe(info.name, () => {
         server.command('wp reload');
         await server.waitForLog(/Reloaded waypoints from disk\./, 5000, reloadFrom);
         expect(server.errors()).toEqual([]);
+
+        const loaded = readFileSync(join(directory, 'waypoints.json'), 'utf8');
+        const record = JSON.parse(loaded).waypoints[0];
+        const duplicate = JSON.stringify({
+            version: 2,
+            waypoints: [record, { ...record, id: record.id.toLowerCase(), name: 'Duplicate' }]
+        });
+        writeFileSync(join(directory, 'waypoints.json'), duplicate);
+        const invalidFrom = server.lines.length;
+        server.command('wp reload');
+        await server.waitForLog(/Could not reload waypoint data; current data remains active\./, 5000, invalidFrom);
+        expect(readFileSync(join(directory, 'waypoints.json'), 'utf8')).toBe(duplicate);
+        expect(readFileSync(join(directory, 'waypoints.v1.json'), 'utf8')).toBe(legacyStore);
+        expect(server.errors()).toHaveLength(1);
+        expect(server.errors()[0]).toContain('duplicate waypoint UUID aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+        writeFileSync(join(directory, 'waypoints.json'), loaded);
+        const restoredFrom = server.lines.length;
+        server.command('wp reload');
+        await server.waitForLog(/Reloaded waypoints from disk\./, 5000, restoredFrom);
     });
 });

@@ -59,15 +59,17 @@ export class WaypointStore {
 
     /** Looks up a waypoint by immutable UUID. */
     get(id: string): Waypoint | undefined {
-        const waypoint = this.waypoints.get(id);
+        const waypoint = this.waypoints.get(id.toLowerCase());
         return waypoint === undefined ? undefined : cloneWaypoint(waypoint);
     }
 
     /** Adds a valid waypoint with a unique UUID and normalized name. */
     add(waypoint: Waypoint): boolean {
-        if (!this.available || !isWaypoint(waypoint) || this.waypoints.has(waypoint.id)) return false;
+        if (!this.available || !isWaypoint(waypoint)) return false;
+        const id = waypoint.id.toLowerCase();
+        if (this.waypoints.has(id)) return false;
         if (this.nameInUse(waypoint.name)) return false;
-        const next = [...this.waypoints.values(), cloneWaypoint(waypoint)];
+        const next = [...this.waypoints.values(), { ...cloneWaypoint(waypoint), id }];
         this.persist(next);
         this.replace(next);
         return true;
@@ -76,12 +78,13 @@ export class WaypointStore {
     /** Replaces one waypoint while keeping its UUID and name unique. */
     update(id: string, change: (waypoint: Waypoint) => Waypoint): boolean {
         if (!this.available) return false;
+        id = id.toLowerCase();
         const current = this.waypoints.get(id);
         if (current === undefined) return false;
         const changed = change(cloneWaypoint(current));
-        if (!isWaypoint(changed) || changed.id !== id || this.nameInUse(changed.name, id)) return false;
+        if (!isWaypoint(changed) || changed.id.toLowerCase() !== id || this.nameInUse(changed.name, id)) return false;
         const next = [...this.waypoints.values()].map((waypoint) =>
-            waypoint.id === id ? cloneWaypoint(changed) : waypoint
+            waypoint.id === id ? { ...cloneWaypoint(changed), id } : waypoint
         );
         this.persist(next);
         this.replace(next);
@@ -90,6 +93,7 @@ export class WaypointStore {
 
     /** Removes a waypoint by UUID, writing before changing memory. */
     remove(id: string): boolean {
+        id = id.toLowerCase();
         if (!this.available || !this.waypoints.has(id)) return false;
         const next = [...this.waypoints.values()].filter((waypoint) => waypoint.id !== id);
         this.persist(next);
