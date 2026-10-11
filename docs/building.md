@@ -14,8 +14,8 @@ by the `pumpkinPlugin` key in each plugin's `package.json`:
 "pumpkinPlugin": { "entry": "src/plugin.ts", "output": "build/my-plugin.wasm", "wasi": [] }
 ```
 
-It uses the WIT from the pinned `@pumpkinmc/pumpkin-api-ts` (the version is the `catalog:` entry in
-`pnpm-workspace.yaml`, and it must match the Pumpkin server's plugin ABI), esbuild and the
+It uses the API code and WIT selected by `pumpkin-api-targets.json` (the default release keeps the
+`catalog:` dependency in `pnpm-workspace.yaml`, paired with its pinned Pumpkin server), esbuild and the
 Wasmtime 48 CLI fork of `componentize-qjs`. The fork is needed because the upstream Wasmtime 47 CLI
 fails to link the WASI HTTP types used by plugins. The pinned release's own build script uses a
 componentizer that produces 55 MB plugins and can't run the WASI socket code.
@@ -30,14 +30,58 @@ same files. Run `pnpm typecheck` once after a fresh checkout so your editor find
 The shared `plugin-kit` package does the same for its own source, generating declarations for its
 filesystem imports in its ignored `build/types/` directory.
 
-`PUMPKIN_API_DIR` points the tool at a different `pumpkin-api-ts` checkout.
+## API targets
 
-A plugin is built against the API's WIT as `pumpkin-api-ts` ships it, plus the WASI imports it asks for.
+`pumpkin-api-targets.json` records named API/WIT/server tuples. `release` is the default; `nightly`
+is a pinned compatibility snapshot. Set `PUMPKIN_API_TARGET` for root commands:
 
-`pumpkin-api-ts` ships its own declarations for `pumpkin:plugin/*`, and TypeScript keeps the first
-declaration of a module it sees. So a plugin's `tsconfig.json` lists the generated
-`build/types/bindings/**/*.d.ts` before `src` in `include` (the generator's template does), which
-makes the generated declarations win and preserves WIT `u64`/`s64` values as `bigint`.
+```sh
+PUMPKIN_API_TARGET=nightly pnpm typecheck
+PUMPKIN_API_TARGET=nightly pnpm build
+PUMPKIN_API_TARGET=nightly pnpm test:integration
+```
+
+The root task runner resolves Git sources at their full commits and caches them under
+`.cache/api-sources`. It sets source paths and content hashes before invoking Turbo. API imports
+use that source in esbuild and through a generated `build/types/api.ts` forwarding module in
+TypeScript. Git checkouts that omit the API's referenced generated bindings are copied to
+`.cache/api-prepared` and given declarations from the selected WIT; local source trees are never
+modified. The generated WIT bindings are listed first in `tsconfig.json` so their `bigint`
+declarations take precedence over the API package's bundled declarations.
+
+Use one target at a time in a checkout: targets share `build/**`. CI matrix jobs have separate
+checkouts. `pnpm package` requires `release` and rejects local API/WIT overrides; CI signing and release artifacts use that target.
+
+For local API changes, set `PUMPKIN_API_DIR` to the package root. `PUMPKIN_WIT_DIR` points directly
+to the WIT folder containing `plugin.wit` and can select a separate host checkout:
+
+```sh
+PUMPKIN_API_DIR=/path/to/pumpkin-api-ts \
+PUMPKIN_WIT_DIR=/path/to/Pumpkin/crates/pumpkin-plugin-wit/v0.1 \
+PUMPKIN_API_TARGET=nightly pnpm build
+```
+
+Root commands hash the local files on every invocation, including uncommitted changes. Direct
+`pnpm exec turbo run` calls with local overrides must supply updated `PUMPKIN_API_REVISION` and
+`PUMPKIN_WIT_REVISION` values or use `--force` to bypass cached task results. Package-local build
+commands run directly and do not use Turbo's cache.
+
+To add another release line, add a named profile and optionally include it in `compatibility`.
+Profiles require full Git commits for API, WIT, and server, plus server platform digests or a stable
+release's `checksums.sha256`. A profile with `api.installedVersion` uses the installed catalog
+package and verifies its version; other profiles fetch their API source. `wit.installedPath` selects a WIT folder in the installed catalog
+package independently of any API code override; without it the WIT repository/ref/path is resolved independently. API source and WIT are
+independent: use the pinned server's embedded WIT when the standalone WIT repo lags behind it.
+Advance nightly by reviewing and changing the complete tuple, then run both profiles' typechecks,
+builds, and real-server suites. The `nightly` download URL is rolling; if upstream replaces the
+binary, a digest mismatch fails rather than accepting the new ABI. Refresh the profile after
+verifying its new source/binary pairing.
+
+A downstream `pumpkin-api-ts` fork fits the same repository/ref fields. Keep upstreamable patches
+as isolated commits or branches for upstream PRs, and local extensions as separate downstream
+commits. Retain the upstream remote, sync it regularly, and remove equivalent downstream patches
+when accepted upstream. Publish immutable commit-addressed fork artifacts if distributing packages;
+the upstream rolling `CI` tarball deletes old assets and is unsuitable for durable pins.
 
 ## Runtime caveats
 
@@ -71,17 +115,15 @@ Run one plugin with `pnpm exec turbo run build --filter=@pumpkin-plugins/<folder
 
 ## Run all plugins on Pumpkin
 
-Run `pnpm dev` to build every plugin and start the latest stable Pumpkin release. Run
-`pnpm dev --nightly` or `pnpm dev:nightly` to use Pumpkin's latest nightly build instead. Stable
-release metadata is cached in `.cache/pumpkin` for 24 hours; set `PUMPKIN_REFRESH_RELEASE=1` to force
-a one-run refresh. Nightly metadata refreshes on every start because the `nightly` tag is reused, and
-the binary cache uses the uploaded asset ID to pick up replaced builds. Stable binaries are checked
-against `checksums.sha256`; nightly binaries are checked against their GitHub release asset SHA-256
-digest.
+Run `pnpm dev` to build every plugin and start the server paired with the default API profile.
+Run `pnpm dev --nightly`, `pnpm dev:nightly`, or `pnpm dev --api-target nightly` to select the pinned
+nightly API/WIT/server tuple. Other configured profile names work with `--api-target` or
+`PUMPKIN_API_TARGET`. Binaries use the same resolver and checksum verification as integration tests.
 
-Run `pnpm dev:no-hot-reload` to build once and start the same server with plugin hot reload and
-build watchers disabled. Add `--nightly` or run `pnpm dev:nightly:no-hot-reload` to use the latest
-nightly build. Restart the command after changing a plugin.
+Run `pnpm dev:no-hot-reload` to build once with plugin hot reload and watchers disabled. Add
+`--nightly` or run `pnpm dev:nightly:no-hot-reload` for the nightly tuple. Restart after changing a
+local API/WIT checkout: Turbo watches workspace plugin sources. Watch builds bypass task caches to
+avoid reusing artifacts after API source changes during a running session.
 
 The dev server lives in `.cache/pumpkin-dev`, so its world and settings remain between runs. Each
 command sets Pumpkin's plugin hot reload to match the selected mode. In hot-reload mode, `pnpm dev`
@@ -91,7 +133,7 @@ while build outputs live under each package. A file linked to a build output wou
 when the target changes. Automatic Market update checks are disabled for these development builds.
 Reloading plugins that request permissions still requires granting permissions on their initial load.
 
-Set `PUMPKIN_BIN` to use a local server binary instead of downloading the latest release. Set
+Set `PUMPKIN_BIN` to use a local server binary instead of downloading the selected profile's server. Set
 `PUMPKIN_CACHE_DIR` to change the binary cache directory. To reset the dev server's world, config and
 plugins, stop the server and remove `.cache/pumpkin-dev`.
 
@@ -108,17 +150,15 @@ Things to know when changing `turbo.json`:
   package a package depends on (including `devDependencies` such as `tools/build`, whose
   `wasi-wit.lock.json` and `src/` decide what a plugin is built from) invalidates exactly its
   dependents. New tools need nothing added, as long as a plugin lists them in its `package.json`.
-  `globalDependencies` is only for inputs outside any package: `tsconfig.base.json` and
-  `pnpm-workspace.yaml` (the API version). The lockfile and the root `package.json` invalidate
+  `globalDependencies` covers shared root inputs: `tsconfig.base.json`, `pnpm-workspace.yaml`,
+  `pumpkin-api-targets.json`, and the shared target resolver. The lockfile and the root `package.json` invalidate
   everything, and so do the packages the root `package.json` depends on (`tools/docs` and
   `tools/signing`), because Turborepo treats those as global.
-- **Environment variables.** Turborepo runs tasks in strict env mode, so a variable a task reads
-  has to be declared, or it never reaches the task. `PUMPKIN_API_DIR` (another `pumpkin-api-ts`
-  checkout) changes what `build` and `typecheck` produce, so it is in their `env` and part of their
-  cache key. The `PUMPKIN_*` variables the test harness and the build's download cache read are in
-  `globalPassThroughEnv`; they don't affect cache keys, which is fine because they only say where
-  things are or what to run in uncached tasks. `TMPDIR` isn't passed through, so tests run under Turborepo create their
-  temp directories in `/tmp`.
+- **Environment variables.** Turbo's strict mode requires declaring every task input. Build and
+  typecheck keys include `PUMPKIN_API_TARGET`, `PUMPKIN_API_DIR`, `PUMPKIN_API_ENTRY`, `PUMPKIN_WIT_DIR`,
+  `PUMPKIN_API_REVISION`, and `PUMPKIN_WIT_REVISION`; integration receives the same selection.
+  Root commands compute the revision hashes before task caching. Server/cache/log overrides are
+  passed through to uncached server tasks. `TMPDIR` is not passed through.
 - **`^` dependencies need a task the root doesn't have.** The root scripts share names with tasks
   (`"build": "turbo run build"`), so `dependsOn: ["^build"]` would make the root package a
   dependency of itself and fail or loop. `transit` is not a root script, which is why it can use

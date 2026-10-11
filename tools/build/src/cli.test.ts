@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bundlePlugin } from './bundle.ts';
 import { main, run } from './cli.ts';
 import { BuildError } from './errors.ts';
@@ -9,6 +9,13 @@ import { generateTypes } from './types.ts';
 
 vi.mock('./bundle.ts', () => ({ bundlePlugin: vi.fn() }));
 vi.mock('./types.ts', () => ({ generateTypes: vi.fn() }));
+
+beforeEach(() => {
+    vi.stubEnv('PUMPKIN_API_TARGET', 'release');
+    vi.stubEnv('PUMPKIN_API_ENTRY', undefined);
+    vi.stubEnv('PUMPKIN_WIT_DIR', undefined);
+});
+afterEach(() => vi.unstubAllEnvs());
 
 describe('run arguments', () => {
     it('rejects unsupported arguments before reading package configuration', async () => {
@@ -35,12 +42,17 @@ describe('run arguments', () => {
     it('generates guest types without requiring a plugin entry point or output', async () => {
         const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-types-'));
         const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
+        fs.mkdirSync(path.join(apiDir, 'wit/v0.1'), { recursive: true });
+        fs.writeFileSync(path.join(apiDir, 'package.json'), JSON.stringify({ main: 'index.ts' }));
+        fs.writeFileSync(path.join(apiDir, 'index.ts'), 'export {};');
+        fs.writeFileSync(path.join(apiDir, 'wit/v0.1/plugin.wit'), 'world plugin {}');
         const realApiDir = process.env.PUMPKIN_API_DIR;
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
             JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } })
         );
         process.env.PUMPKIN_API_DIR = apiDir;
+        vi.stubEnv('PUMPKIN_WIT_DIR', path.join(apiDir, 'wit/v0.1'));
         vi.mocked(generateTypes).mockClear();
 
         try {
@@ -60,6 +72,10 @@ describe('run arguments', () => {
     it('builds the configured entry and reports the output size', async () => {
         const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-build-'));
         const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
+        fs.mkdirSync(path.join(apiDir, 'wit/v0.1'), { recursive: true });
+        fs.writeFileSync(path.join(apiDir, 'package.json'), JSON.stringify({ main: 'index.ts' }));
+        fs.writeFileSync(path.join(apiDir, 'index.ts'), 'export {};');
+        fs.writeFileSync(path.join(apiDir, 'wit/v0.1/plugin.wit'), 'world plugin {}');
         const realApiDir = process.env.PUMPKIN_API_DIR;
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
@@ -69,6 +85,7 @@ describe('run arguments', () => {
             })
         );
         process.env.PUMPKIN_API_DIR = apiDir;
+        vi.stubEnv('PUMPKIN_WIT_DIR', path.join(apiDir, 'wit/v0.1'));
         vi.mocked(bundlePlugin).mockClear().mockResolvedValue(2048);
         const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -79,6 +96,7 @@ describe('run arguments', () => {
                 entry: path.join(pluginDir, 'src/plugin.ts'),
                 output: path.join(pluginDir, 'build/plugin.wasm'),
                 witDir: path.join(apiDir, 'wit', 'v0.1'),
+                apiEntry: path.join(apiDir, 'index.ts'),
                 version: '1.2.3',
                 developmentMode: false
             });
@@ -98,6 +116,10 @@ describe('run arguments', () => {
     it('marks bundles created for pnpm dev as development builds', async () => {
         const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-dev-build-'));
         const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
+        fs.mkdirSync(path.join(apiDir, 'wit/v0.1'), { recursive: true });
+        fs.writeFileSync(path.join(apiDir, 'package.json'), JSON.stringify({ main: 'index.ts' }));
+        fs.writeFileSync(path.join(apiDir, 'index.ts'), 'export {};');
+        fs.writeFileSync(path.join(apiDir, 'wit/v0.1/plugin.wit'), 'world plugin {}');
         const realApiDir = process.env.PUMPKIN_API_DIR;
         const realDevMode = process.env.PUMPKIN_DEV_MODE;
         fs.writeFileSync(
@@ -108,6 +130,7 @@ describe('run arguments', () => {
             })
         );
         process.env.PUMPKIN_API_DIR = apiDir;
+        vi.stubEnv('PUMPKIN_WIT_DIR', path.join(apiDir, 'wit/v0.1'));
         process.env.PUMPKIN_DEV_MODE = '1';
         vi.mocked(bundlePlugin).mockClear().mockResolvedValue(2048);
         const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -119,6 +142,7 @@ describe('run arguments', () => {
                 entry: path.join(pluginDir, 'src/plugin.ts'),
                 output: path.join(pluginDir, 'build/plugin.wasm'),
                 witDir: path.join(apiDir, 'wit', 'v0.1'),
+                apiEntry: path.join(apiDir, 'index.ts'),
                 version: '1.2.3',
                 developmentMode: true
             });
@@ -157,6 +181,10 @@ describe('main error handling', () => {
     it('rethrows unexpected errors without printing a build error', async () => {
         const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-error-'));
         const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
+        fs.mkdirSync(path.join(apiDir, 'wit/v0.1'), { recursive: true });
+        fs.writeFileSync(path.join(apiDir, 'package.json'), JSON.stringify({ main: 'index.ts' }));
+        fs.writeFileSync(path.join(apiDir, 'index.ts'), 'export {};');
+        fs.writeFileSync(path.join(apiDir, 'wit/v0.1/plugin.wit'), 'world plugin {}');
         const realApiDir = process.env.PUMPKIN_API_DIR;
         const unexpectedError = new Error('componentizer failed');
         fs.writeFileSync(
@@ -167,6 +195,7 @@ describe('main error handling', () => {
             })
         );
         process.env.PUMPKIN_API_DIR = apiDir;
+        vi.stubEnv('PUMPKIN_WIT_DIR', path.join(apiDir, 'wit/v0.1'));
         vi.mocked(bundlePlugin).mockRejectedValue(unexpectedError);
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
         const processExit = vi.spyOn(process, 'exit').mockImplementation(() => {

@@ -46,6 +46,7 @@ describe('bundlePlugin', () => {
 
         await bundlePlugin({
             entry: 'src/plugin.ts',
+            apiEntry: 'src/api.ts',
             output,
             witDir: 'wit',
             version: '1.0.0',
@@ -66,7 +67,13 @@ describe('bundlePlugin', () => {
         const { output } = buildAt();
         fs.writeFileSync(output, 'old artifact');
 
-        const size = await bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0' });
+        const size = await bundlePlugin({
+            apiEntry: 'src/api.ts',
+            entry: 'src/plugin.ts',
+            output,
+            witDir: 'wit',
+            version: '1.0.0'
+        });
 
         expect(size).toBe(Buffer.byteLength('component'));
         expect(fs.readFileSync(output, 'utf8')).toBe('component');
@@ -84,9 +91,9 @@ describe('bundlePlugin', () => {
             throw new Error('componentizer failed');
         });
 
-        await expect(bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0' })).rejects.toThrow(
-            'componentizer failed'
-        );
+        await expect(
+            bundlePlugin({ apiEntry: 'src/api.ts', entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0' })
+        ).rejects.toThrow('componentizer failed');
 
         expect(fs.readFileSync(output, 'utf8')).toBe('known-good artifact');
         expect(fs.readdirSync(path.dirname(output))).toEqual(['plugin.wasm']);
@@ -99,7 +106,13 @@ describe('bundlePlugin', () => {
             throw Object.assign(new Error('access denied'), { code: 'EACCES' });
         });
 
-        const size = await bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0' });
+        const size = await bundlePlugin({
+            apiEntry: 'src/api.ts',
+            entry: 'src/plugin.ts',
+            output,
+            witDir: 'wit',
+            version: '1.0.0'
+        });
 
         expect(size).toBe(Buffer.byteLength('component'));
         expect(fs.readFileSync(output, 'utf8')).toBe('component');
@@ -123,9 +136,9 @@ describe('bundlePlugin', () => {
             })
             .mockImplementationOnce((source, destination) => actualRename(source, destination));
 
-        await expect(bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0' })).rejects.toThrow(
-            'disk full'
-        );
+        await expect(
+            bundlePlugin({ apiEntry: 'src/api.ts', entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0' })
+        ).rejects.toThrow('disk full');
 
         expect(fs.readFileSync(output, 'utf8')).toBe('known-good artifact');
         expect(fs.readdirSync(path.dirname(output))).toEqual(['plugin.wasm']);
@@ -152,6 +165,7 @@ describe('bundlePlugin', () => {
 
         const failure: unknown = await bundlePlugin({
             entry: 'src/plugin.ts',
+            apiEntry: 'src/api.ts',
             output,
             witDir: 'wit',
             version: '1.0.0'
@@ -178,8 +192,20 @@ describe('bundlePlugin', () => {
         });
 
         await Promise.all([
-            bundlePlugin({ entry: 'src/first.ts', output: first.output, witDir: 'wit', version: '1.0.0' }),
-            bundlePlugin({ entry: 'src/second.ts', output: second.output, witDir: 'wit', version: '1.0.0' })
+            bundlePlugin({
+                apiEntry: 'src/api.ts',
+                entry: 'src/first.ts',
+                output: first.output,
+                witDir: 'wit',
+                version: '1.0.0'
+            }),
+            bundlePlugin({
+                apiEntry: 'src/api.ts',
+                entry: 'src/second.ts',
+                output: second.output,
+                witDir: 'wit',
+                version: '1.0.0'
+            })
         ]);
 
         expect(new Set(bundles).size).toBe(2);

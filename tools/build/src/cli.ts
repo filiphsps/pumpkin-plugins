@@ -1,5 +1,6 @@
-import { createRequire } from 'node:module';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { resolveBuildTarget } from '../../../scripts/pumpkin-targets.mjs';
 import { bundlePlugin } from './bundle.ts';
 import { wasiInterfaces } from './capabilities.ts';
 import { BuildError } from './errors.ts';
@@ -22,17 +23,18 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
     const config = readPluginConfig(pluginDir);
     const buildFields = args.includes('--types-only') ? undefined : requireBuildFields(config);
     const buildDir = path.join(pluginDir, 'build');
-    const apiRoot = process.env.PUMPKIN_API_DIR
-        ? path.resolve(process.env.PUMPKIN_API_DIR)
-        : path.dirname(
-              createRequire(path.join(pluginDir, 'package.json')).resolve('@pumpkinmc/pumpkin-api-ts/package.json')
-          );
+    let inputs: Awaited<ReturnType<typeof resolveBuildTarget>>;
+    try {
+        inputs = await resolveBuildTarget(pluginDir);
+    } catch (error) {
+        throw new BuildError(error instanceof Error ? error.message : String(error));
+    }
     const interfaces = wasiInterfaces(config.wasi);
     const wasiLock = readLock();
     const wasiWit =
         interfaces.length > 0 ? await ensureWasiWit({ cacheDir: cacheDir(pluginDir), lock: wasiLock }) : undefined;
     const wasiFiles = Object.keys(wasiLock.files);
-    const apiWit = path.join(apiRoot, 'wit/v0.1');
+    const apiWit = inputs.witRoot;
 
     // Types go to build/types so `types` and `build` can run in parallel (turbo) without sharing files.
     if (!buildFields) {
@@ -44,6 +46,8 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
             target: path.join(buildDir, 'types', 'wit')
         });
         generateTypes(witDir, path.join(buildDir, 'types', 'bindings'));
+        fs.mkdirSync(path.join(buildDir, 'types'), { recursive: true });
+        fs.writeFileSync(path.join(buildDir, 'types', 'api.ts'), `export * from ${JSON.stringify(inputs.apiEntry)};\n`);
         return;
     }
 
@@ -60,6 +64,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
         entry: path.resolve(pluginDir, entry),
         output: path.resolve(pluginDir, output),
         witDir,
+        apiEntry: inputs.apiEntry,
         version: config.version,
         developmentMode: process.env.PUMPKIN_DEV_MODE === '1'
     });

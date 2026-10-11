@@ -71,15 +71,23 @@ on ports of its own, three times over, before the start is failed.
 
 ## The server binary
 
-The release is pinned in `tools/test-harness/src/pumpkin-version.ts`, and it should match the
-`pumpkin-api-ts` version in `pnpm-workspace.yaml`. Which binary runs:
+Root unit and coverage commands also resolve the selected API runtime and give Vitest an explicit
+module alias. Their Turbo keys include the local source content hashes, so API edits invalidate
+unit results. Package-local Vitest configs resolve the same profile even without the root runner.
 
-1. `PUMPKIN_BIN`, if set.
-2. Otherwise the pinned release, downloaded once into `.cache/pumpkin` and verified against the
-   release's `checksums.sha256`.
+The server is selected from `pumpkin-api-targets.json` by `PUMPKIN_API_TARGET` (default `release`),
+using the same profile as the build and typecheck. `PUMPKIN_BIN` overrides the binary; otherwise the
+harness downloads into `.cache/pumpkin`. Stable releases use `checksums.sha256`; nightly profiles
+use pinned platform SHA-256 digests and a cache identity containing server commit and digest. Cached
+nightly binaries are reverified on use. A replaced upstream nightly asset fails checksum validation.
+
+Run `PUMPKIN_API_TARGET=nightly pnpm test:integration` to build and test the complete pinned nightly
+tuple. Use one target per checkout; switch targets through root commands to regenerate build inputs.
+A local `PUMPKIN_BIN` override is the caller's responsibility to pair with the selected WIT.
 
 | Variable | Effect |
 | --- | --- |
+| `PUMPKIN_API_TARGET` | Select a named API/WIT/server profile |
 | `PUMPKIN_BIN` | Use this binary instead of downloading |
 | `PUMPKIN_CACHE_DIR` | Where downloaded binaries are cached |
 | `PUMPKIN_KEEP_DIR=1` | Keep each test server directory for inspection |

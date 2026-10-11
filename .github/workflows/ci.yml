@@ -44,6 +44,7 @@ concurrency:
 env:
     CI: true
     DO_NOT_TRACK: 1
+    PUMPKIN_API_TARGET: release
 
 permissions:
     contents: read
@@ -59,6 +60,7 @@ jobs:
             generated_readmes: ${{ steps.classify.outputs.generated_readmes }}
             integration_scope: ${{ steps.classify.outputs.integration_scope }}
             integration_extra: ${{ steps.classify.outputs.integration_extra }}
+            api_targets: ${{ steps.targets.outputs.matrix }}
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -79,6 +81,10 @@ jobs:
                   BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
                   HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
               run: node scripts/changed-areas.mjs "$BASE" "$HEAD"
+
+            - name: 🎯 API compatibility targets
+              id: targets
+              run: node --input-type=module -e 'import { compatibilityTargets } from "./scripts/pumpkin-targets.mjs"; console.log(`matrix=${JSON.stringify(compatibilityTargets())}`)' >> "$GITHUB_OUTPUT"
 
     commits:
         name: 💬 Commit messages
@@ -137,6 +143,38 @@ jobs:
 
             - name: ✅ Typecheck
               run: pnpm run typecheck
+
+    compatibility:
+        name: 🎯 API compatibility (${{ matrix.target }})
+        needs: [changes]
+        if: needs.changes.outputs.code == 'true'
+        timeout-minutes: 40
+        runs-on: ubuntu-26.04
+        strategy:
+            fail-fast: false
+            matrix:
+                target: ${{ fromJSON(needs.changes.outputs.api_targets) }}
+        env:
+            PUMPKIN_API_TARGET: ${{ matrix.target }}
+            PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/pumpkin-logs
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 🎯 Typecheck, build, and test the paired server
+              run: node scripts/run-target.mjs typecheck build test:integration --concurrency=4 --output-logs=errors-only
+
+            - name: 📋 Preserve failing server logs
+              if: failure()
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  name: pumpkin-logs-${{ matrix.target }}
+                  path: ${{ runner.temp }}/pumpkin-logs
+                  if-no-files-found: ignore
+                  retention-days: 3
 
     test:
         name: 🧪 Test

@@ -16,8 +16,9 @@ plugin source and package configuration rather than generated files.
 
 ## Build constraints
 
-The tool uses the pinned Pumpkin API WIT and QuickJS/WASI componentizer. Keep the workspace's
-Pumpkin API version aligned with the test harness server version. Plugin code runs in QuickJS;
+The tool uses the selected API code and WIT from `pumpkin-api-targets.json` and QuickJS/WASI componentizer. Keep the API/WIT/server tuple aligned. Root commands select `release` by default;
+`PUMPKIN_API_TARGET=nightly pnpm build` selects the pinned nightly tuple. Local API and WIT overrides
+are hashed by the root runner before Turbo caches a task. Plugin code runs in QuickJS;
 browser globals such as `fetch`, `TextEncoder`, and `TextDecoder` are not available. Requested WASI
 capabilities and Pumpkin permissions must match the APIs the plugin uses.
 

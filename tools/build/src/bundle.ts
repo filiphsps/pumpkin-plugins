@@ -14,6 +14,8 @@ export interface BundleOptions {
     output: string;
     /** The WIT the component is built against. */
     witDir: string;
+    /** Selected API runtime entry, independent of generated WIT declarations. */
+    apiEntry: string;
     /** Injected as `__PLUGIN_VERSION__`. */
     version: string;
     /** Whether this is a development build. */
@@ -42,6 +44,7 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
             format: 'esm',
             target: 'es2022',
             external: ['pumpkin:plugin/*', 'wasi:*'],
+            alias: { '@pumpkinmc/pumpkin-api-ts': options.apiEntry },
             define: {
                 __PLUGIN_VERSION__: JSON.stringify(options.version),
                 __PUMPKIN_DEV_MODE__: JSON.stringify(options.developmentMode ?? false)
