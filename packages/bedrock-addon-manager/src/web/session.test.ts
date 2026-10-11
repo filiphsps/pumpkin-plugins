@@ -173,6 +173,37 @@ describe('HttpSession', () => {
         expect(t.transport.aborted).toBe(true);
     });
 
+    it('drops an incomplete head at its absolute deadline despite trickle progress', () => {
+        const t = setup();
+        for (const now of [0, 900, 999]) {
+            t.clock.now = now;
+            t.transport.inbound.push(strToU8('G'));
+            expect(t.session.tick()).toBe(true);
+        }
+        t.clock.now = 1000;
+        t.transport.inbound.push(get('/packs/a.mcpack'));
+        expect(t.session.tick()).toBe(false);
+        expect(t.transport.aborted).toBe(true);
+        expect(t.lookups).toEqual([]);
+        expect(t.files).toEqual([]);
+    });
+
+    it('allows a completed head and a progressing download to outlive the head deadline', () => {
+        const t = setup({ writeBudget: 500 });
+        t.clock.now = 999;
+        t.transport.inbound.push(get('/packs/a.mcpack'));
+        for (let i = 0; i < 20; i++) {
+            t.transport.space = 500;
+            const active = t.session.tick();
+            t.clock.now += 500;
+            if (!active) break;
+        }
+        expect(t.transport.response().body).toEqual(PACK);
+        expect(t.clock.now).toBeGreaterThan(1000);
+        expect(t.transport.aborted).toBe(false);
+        expect(t.files[0].closed).toBe(1);
+    });
+
     it('drops a download whose client stopped reading', () => {
         const t = setup();
         t.transport.inbound.push(get('/packs/a.mcpack'));

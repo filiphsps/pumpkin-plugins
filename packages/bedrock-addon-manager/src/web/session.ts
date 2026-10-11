@@ -39,6 +39,7 @@ export class HttpSession {
     private headSent = 0;
     private body: ResponseBody | undefined;
     private lastProgress: number;
+    private readonly headDeadline: number;
 
     /** Starts waiting for a request on the transport. */
     constructor(
@@ -47,6 +48,7 @@ export class HttpSession {
         private readonly options: SessionOptions
     ) {
         this.lastProgress = options.now();
+        this.headDeadline = this.lastProgress + options.idleTimeoutMs;
     }
 
     /**
@@ -55,7 +57,9 @@ export class HttpSession {
      */
     tick(): boolean {
         if (this.is('closed')) return false;
-        if (this.options.now() - this.lastProgress > this.options.idleTimeoutMs) return this.abort();
+        const now = this.options.now();
+        if (this.is('request') && now >= this.headDeadline) return this.abort();
+        if (now - this.lastProgress > this.options.idleTimeoutMs) return this.abort();
         try {
             if (this.is('request') && !this.readRequest()) return !this.is('closed');
             if (this.is('send')) this.send();
