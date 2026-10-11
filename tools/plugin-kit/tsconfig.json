@@ -1,5 +1,10 @@
 {
     "extends": "../../tsconfig.base.json",
-    "compilerOptions": { "types": ["node"] },
+    "compilerOptions": {
+        "types": ["node"],
+        "paths": {
+            "@pumpkinmc/pumpkin-api-ts": ["./build/types/api.ts"]
+        }
+    },
     "include": ["build/types/bindings/**/*.d.ts", "src", "vitest.config.ts", "../../tools/build/globals.d.ts"]
 }

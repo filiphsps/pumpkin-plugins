@@ -1,15 +1,14 @@
 import * as fs from 'node:fs';
-import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { startPumpkin } from '@pumpkin-plugins/test-harness';
 import { expect, it } from 'vitest';
+import { resolveBuildTarget } from '../../../scripts/pumpkin-targets.mjs';
 import { bundlePlugin } from '../../../tools/build/src/bundle.ts';
 
 it('releases repeated world acquisitions in the bundled QuickJS runtime', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-resource-lifetime-'));
-    const require = createRequire(import.meta.url);
-    const api = require.resolve('@pumpkinmc/pumpkin-api-ts');
+    const { apiEntry: api, witRoot } = await resolveBuildTarget(process.cwd());
     const entry = path.join(directory, 'probe.ts');
     const output = path.join(directory, 'probe.wasm');
     const disposer = path.resolve('../../tools/plugin-kit/src/wasi-resource.ts');
@@ -55,7 +54,8 @@ export * from ${JSON.stringify(api)};
         await bundlePlugin({
             entry,
             output,
-            witDir: path.join(path.dirname(require.resolve('@pumpkinmc/pumpkin-api-ts/package.json')), 'wit/v0.1'),
+            witDir: witRoot,
+            apiEntry: api,
             version: '0.0.0'
         });
         const server = await startPumpkin({ name: 'resource-lifetime', plugins: [output] });
