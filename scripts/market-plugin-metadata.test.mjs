@@ -53,6 +53,41 @@ describe('market-plugin-metadata', () => {
         });
     });
 
+    it('adds README content without its installation or commands sections', () => {
+        const dir = plugin({
+            description: 'A short listing summary',
+            commands: []
+        });
+        fs.writeFileSync(
+            path.join(dir, 'README.md'),
+            `# ExamplePlugin
+
+<!-- docs:begin summary -->
+A short listing summary
+<!-- docs:end summary -->
+
+## Installation
+
+This GitHub release installation text does not belong in the Market description.
+
+## Commands
+
+This command list is uploaded separately.
+
+## Features
+
+Players can share named locations and control who can see each one.
+`
+        );
+
+        const result = run(dir);
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(
+            JSON.parse(result.stdout).translatedDescriptions['en-US'],
+            'A short listing summary\n\n## Features\n\nPlayers can share named locations and control who can see each one.'
+        );
+    });
+
     it('supports a custom info path and a plugin with no commands', () => {
         const dir = plugin(
             { description: 'No command listing', commands: [] },

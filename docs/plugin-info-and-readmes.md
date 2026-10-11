@@ -186,6 +186,10 @@ in a plugin's `README.md`:
 Everything outside the markers is yours to write. A block the README doesn't contain is skipped.
 Unbalanced or duplicated markers are an error.
 
+Market publishing combines `info.description` with the plugin README's written content. It omits
+generated `docs:` blocks, `## Installation` and `## Commands` sections; command metadata comes
+separately from `info.commands`.
+
 The README has to exist. `pnpm gen` creates it from `turbo/generators/templates/plugin/README.md.hbs`,
 a barebones file with a title and the four blocks, and the first `pnpm readme` fills them in. A
 missing README is an error rather than something the tool invents.

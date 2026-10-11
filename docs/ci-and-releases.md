@@ -336,10 +336,12 @@ rebuilding it. It runs directly on GitHub Actions' Node 24 runtime.
 In this repo, the `market` job downloads the `.wasm` produced by the build job, resolves the plugin's
 canonical name from its info module, and passes the per-plugin Release Please version and changelog
 to the action using its local path. After a successful publish, the job generates localized
-description and command metadata from that module and calls the metadata action with the numeric
-listing ID returned by the publisher. The metadata action sends a patch, so it leaves the listing's
-other fields to the Market listing editor. Builds aren't byte-reproducible, so the job must upload
-the artifact rather than rebuild.
+description from `info.description` and the plugin README, and generates command metadata from
+`info.commands`. The description omits generated README blocks plus the `Installation` and
+`Commands` sections. The job then calls the metadata action with the numeric listing ID returned by
+the publisher. The metadata action sends a patch, so it leaves the listing's other fields to the
+Market listing editor. Builds aren't byte-reproducible, so the job must upload the artifact rather
+than rebuild.
 
 The action looks up the canonical plugin name using PPM's flow: try the direct plugin endpoint, then
 search a limited result set and require an exact name match. It never creates a listing: listing
