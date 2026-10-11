@@ -57,6 +57,22 @@ export interface NewWaypoint {
     readonly access?: WaypointAccess;
 }
 
+/** Runtime defaults for waypoint metadata, shared by creation and operator reset commands. */
+export const WAYPOINT_METADATA_DEFAULTS = {
+    label: undefined,
+    description: undefined,
+    color: '#FFFFFF',
+    icon: undefined,
+    visibilityRange: undefined,
+    enabled: true,
+    access: { mode: 'restricted', grants: [] }
+} as const satisfies Partial<
+    Pick<Waypoint, 'label' | 'description' | 'color' | 'icon' | 'visibilityRange' | 'enabled' | 'access'>
+>;
+
+/** A metadata key with a canonical default value. */
+export type WaypointMetadataKey = keyof typeof WAYPOINT_METADATA_DEFAULTS;
+
 /** Normalizes a waypoint key while preserving its display spelling. */
 export function normalizeWaypointName(name: string): string {
     if (typeof name !== 'string') throw new TypeError('Waypoint name must be text.');
@@ -89,15 +105,20 @@ export function createWaypoint(input: NewWaypoint): Waypoint {
     }
 
     const position = normalizePosition(input.position);
-    const color = normalizeColor(input.color ?? '#FFFFFF');
-    const icon = normalizeIcon(input.icon);
-    const label = normalizeText(input.label, 'label');
-    const description = normalizeText(input.description, 'description');
-    const visibilityRange = normalizeVisibilityRange(input.visibilityRange);
+    const color = normalizeColor(input.color ?? WAYPOINT_METADATA_DEFAULTS.color);
+    const icon = normalizeIcon(input.icon === undefined ? WAYPOINT_METADATA_DEFAULTS.icon : input.icon);
+    const label = normalizeText(input.label === undefined ? WAYPOINT_METADATA_DEFAULTS.label : input.label, 'label');
+    const description = normalizeText(
+        input.description === undefined ? WAYPOINT_METADATA_DEFAULTS.description : input.description,
+        'description'
+    );
+    const visibilityRange = normalizeVisibilityRange(
+        input.visibilityRange === undefined ? WAYPOINT_METADATA_DEFAULTS.visibilityRange : input.visibilityRange
+    );
     if (input.enabled !== undefined && typeof input.enabled !== 'boolean') {
         throw new TypeError('Waypoint enabled state must be boolean.');
     }
-    const access = normalizeAccess(input.access ?? { mode: 'restricted', grants: [] });
+    const access = normalizeAccess(input.access ?? WAYPOINT_METADATA_DEFAULTS.access);
     const waypoint: Waypoint = {
         id: input.id.toLowerCase(),
         name,
@@ -108,7 +129,7 @@ export function createWaypoint(input: NewWaypoint): Waypoint {
         color,
         ...(icon === undefined ? {} : { icon }),
         ...(visibilityRange === undefined ? {} : { visibilityRange }),
-        enabled: input.enabled ?? true,
+        enabled: input.enabled ?? WAYPOINT_METADATA_DEFAULTS.enabled,
         access
     };
     if (!isWaypoint(waypoint)) throw new TypeError('Waypoint data is invalid.');

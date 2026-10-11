@@ -23,6 +23,53 @@ describe('waypoint model', () => {
         });
     });
 
+    it('exposes the metadata defaults used for waypoint fields omitted at creation', async () => {
+        const defaults = Reflect.get(await import('./model.ts'), 'WAYPOINT_METADATA_DEFAULTS') as unknown;
+        expect(defaults).toEqual({
+            label: undefined,
+            description: undefined,
+            color: '#FFFFFF',
+            icon: undefined,
+            visibilityRange: undefined,
+            enabled: true,
+            access: { mode: 'restricted', grants: [] }
+        });
+        if (typeof defaults !== 'object' || defaults === null) return;
+
+        const waypoint = createWaypoint({
+            id,
+            name: 'Home',
+            dimension: 'world',
+            position: { x: 1, y: 2, z: 3 }
+        });
+        expect({
+            label: waypoint.label,
+            description: waypoint.description,
+            color: waypoint.color,
+            icon: waypoint.icon,
+            visibilityRange: waypoint.visibilityRange,
+            enabled: waypoint.enabled,
+            access: waypoint.access
+        }).toEqual(defaults);
+    });
+
+    it.each([
+        ['label', { label: null }],
+        ['description', { description: null }],
+        ['icon', { icon: null }],
+        ['visibilityRange', { visibilityRange: null }]
+    ])('rejects null for optional metadata field %s', (_field, metadata) => {
+        expect(() =>
+            createWaypoint({
+                id,
+                name: 'Home',
+                dimension: 'world',
+                position: { x: 1, y: 2, z: 3 },
+                ...metadata
+            } as unknown as NewWaypoint)
+        ).toThrow();
+    });
+
     it('uses Unicode-normalized case-insensitive name keys', () => {
         expect(waypointNameKey(' Café ')).toBe(waypointNameKey('cafe\u0301'));
         expect(normalizeWaypointName('  Home Base  ')).toBe('Home Base');

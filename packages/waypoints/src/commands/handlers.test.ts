@@ -110,20 +110,24 @@ describe('/wp handlers', () => {
         expect(suggestionFactory).toEqual(expect.any(Function));
         if (typeof suggestionFactory !== 'function') return;
 
+        const metadataDefaults = Reflect.get(
+            await import('../waypoints/model.ts'),
+            'WAYPOINT_METADATA_DEFAULTS'
+        ) as unknown;
+        expect(metadataDefaults).toEqual(expect.any(Object));
+        if (typeof metadataDefaults !== 'object' || metadataDefaults === null) return;
+
         const { sender } = setup(true);
         const suggest = suggestionFactory as (
             sender: CommandSender,
             request: { input: string; cursor: number; start: number; remaining: string }
         ) => readonly string[];
-        expect(suggest(sender, { input: '/wp reset ', cursor: 10, start: 10, remaining: '' })).toEqual([
-            'access',
-            'color',
-            'description',
-            'enabled',
-            'icon',
-            'label',
-            'visibility-range'
-        ]);
+        const expectedProperties = Object.keys(metadataDefaults)
+            .map((property) => property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`))
+            .sort();
+        expect(suggest(sender, { input: '/wp reset ', cursor: 10, start: 10, remaining: '' })).toEqual(
+            expectedProperties
+        );
         expect(suggest(sender, { input: '/wp reset v', cursor: 11, start: 10, remaining: 'v' })).toEqual([
             'visibility-range'
         ]);
@@ -224,6 +228,26 @@ describe('/wp handlers', () => {
             'Reset color for Bert.'
         ]);
         expect(catalog.getByName('Bert')?.color).toBe('#FFFFFF');
+    });
+
+    it('resets visibility-range using its command name for the camel-cased field', () => {
+        const { catalog, handlers, sender } = setup(true);
+        catalog.create({
+            id: waypointId,
+            name: 'Bert',
+            dimension: 'world',
+            position: { x: 0, y: 64, z: 0 },
+            visibilityRange: 32
+        });
+        const run = handlers as unknown as Record<
+            string,
+            (sender: CommandSender, args: { property: string; name: string }) => readonly unknown[]
+        >;
+
+        expect(run['wp reset <property> <name>']?.(sender, { property: 'visibility-range', name: 'Bert' })).toEqual([
+            'Reset visibility-range for Bert.'
+        ]);
+        expect(catalog.getByName('Bert')?.visibilityRange).toBeUndefined();
     });
 
     it.each([

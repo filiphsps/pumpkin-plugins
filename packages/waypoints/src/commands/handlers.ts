@@ -6,8 +6,15 @@ import type { CommandSuggestionHandler } from '@pumpkin-plugins/plugin-kit/comma
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { PLUGIN_NAME } from '../name';
 import { canAccessWaypoint } from '../waypoints/access';
-import type { MutationResult, WaypointCatalog } from '../waypoints/catalog.ts';
-import { type AccessGrant, normalizeColor, type Waypoint, waypointNameKey } from '../waypoints/model';
+import type { MutationResult, WaypointCatalog, WaypointMetadataPatch } from '../waypoints/catalog.ts';
+import {
+    type AccessGrant,
+    normalizeColor,
+    WAYPOINT_METADATA_DEFAULTS,
+    type Waypoint,
+    type WaypointMetadataKey,
+    waypointNameKey
+} from '../waypoints/model';
 import type { commands } from './spec.ts';
 
 const OPERATOR_ONLY = 'Only server operators can manage waypoints.';
@@ -15,16 +22,6 @@ const PLAYER_ONLY = 'This command can only be used by a player.';
 const INACCESSIBLE = 'Waypoint not found or you do not have access.';
 const STORAGE_ERROR =
     'Waypoint storage is unavailable or the change could not be saved; check the server log. No changes were made.';
-const RESET_PROPERTY_PATCHES: Readonly<Record<string, Partial<Waypoint>>> = {
-    color: { color: '#FFFFFF' },
-    icon: { icon: undefined },
-    label: { label: undefined },
-    description: { description: undefined },
-    'visibility-range': { visibilityRange: undefined },
-    enabled: { enabled: true },
-    access: { access: { mode: 'restricted', grants: [] } }
-};
-
 /** Host APIs and canonical data used by command handlers. */
 export interface WaypointCommandRuntime {
     readonly server: Server;
@@ -291,7 +288,8 @@ export function onlinePlayerNameSuggestions(runtime: WaypointCommandRuntime): Co
 /** Suggests each property that `/wp reset` can reset, narrowed to the typed prefix. */
 export const resetPropertySuggestions: CommandSuggestionHandler<CommandSender> = (_sender, request) => {
     const prefix = suggestionPrefix(request.remaining);
-    return Object.keys(RESET_PROPERTY_PATCHES)
+    return Object.keys(WAYPOINT_METADATA_DEFAULTS)
+        .map(metadataPropertyName)
         .filter((property) => property.startsWith(prefix))
         .sort((left, right) => left.localeCompare(right));
 };
@@ -339,6 +337,10 @@ function suggestionPrefix(remaining: string): string {
         .replace(/\\(["\\])/g, '$1')
         .toLowerCase()
         .normalize('NFC');
+}
+
+function metadataPropertyName(property: string): string {
+    return property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 }
 
 function quoteWaypointName(name: string): string {
@@ -472,7 +474,10 @@ function withOnlinePlayer<T extends readonly CommandLine[]>(
 }
 
 function resetProperty(runtime: WaypointCommandRuntime, name: string, property: string): CommandLine[] {
-    const patch = RESET_PROPERTY_PATCHES[property];
+    const key = (Object.keys(WAYPOINT_METADATA_DEFAULTS) as WaypointMetadataKey[]).find(
+        (metadataProperty) => metadataPropertyName(metadataProperty) === property
+    );
+    const patch = key === undefined ? undefined : ({ [key]: WAYPOINT_METADATA_DEFAULTS[key] } as WaypointMetadataPatch);
     if (patch === undefined) return [errorLine('That property cannot be reset.')];
     return mutationLines(runtime.catalog.update(name, patch), `Reset ${property} for ${name}.`);
 }

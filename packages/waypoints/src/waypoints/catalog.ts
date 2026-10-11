@@ -1,4 +1,11 @@
-import { createWaypoint, type NewWaypoint, normalizeWaypointName, type Waypoint, waypointNameKey } from './model.ts';
+import {
+    createWaypoint,
+    type NewWaypoint,
+    normalizeWaypointName,
+    type Waypoint,
+    type WaypointMetadataKey,
+    waypointNameKey
+} from './model.ts';
 import type { WaypointStore } from './store.ts';
 
 /** Result of a persisted catalog mutation. */
@@ -12,9 +19,7 @@ export type WaypointMutationStatus =
     | 'invalid';
 
 /** Mutable waypoint fields that can be set or reset by an operator. */
-export type WaypointMetadataPatch = Partial<
-    Pick<Waypoint, 'label' | 'description' | 'color' | 'icon' | 'visibilityRange' | 'enabled' | 'access'>
->;
+export type WaypointMetadataPatch = Partial<Pick<Waypoint, WaypointMetadataKey>>;
 
 /** Owns name lookup and persisted mutations while keeping waypoint identity stable. */
 export class WaypointCatalog {
