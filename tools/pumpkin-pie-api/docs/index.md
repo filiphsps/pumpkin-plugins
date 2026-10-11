@@ -6,66 +6,154 @@ Install the provider separately using its
 [releases](https://github.com/Rennex07/PumpkinPIE/releases). This TypeScript workspace package
 provides a synchronous protocol 0 client, expansion router and
 plugin-wide recovery session. It is a private workspace package. Its production dependency tree
-contains only `fflate`; it imports no Pumpkin, WIT, WASI, Node or TabDisplay modules.
+contains only `fflate`; the host transport is injected by each consumer.
 
-## Consumer and expansion example
+## Add the workspace dependencies
 
-Add this package and `@pumpkin-plugins/plugin-kit` as workspace dependencies of the consuming plugin.
-Inject the host adapter; the API package itself never imports it:
+Replace `your-plugin` with an existing plugin's package name:
+
+```sh
+pnpm --filter @pumpkin-plugins/your-plugin add '@pumpkin-plugins/pumpkin-pie-api@workspace:*' '@pumpkin-plugins/plugin-kit@workspace:*'
+```
+
+This package is private and source-exported; it is not available through a standalone npm install.
+Install a compatible PumpkinPIE provider in the server's `plugins/` directory and restart the server.
+The [integration fixture](#pinned-provider-integration-fixture) records the provider/server pair
+verified in this repo. Plugin code imports `ipcSend` from the host adapter; the API itself stays
+host-independent.
+
+## Resolve a line
+
+Use a standalone client for an occasional lookup. Call `ping()` before relying on the provider:
 
 ```ts
-import { PieSession } from '@pumpkin-plugins/pumpkin-pie-api';
+import { PieClient } from '@pumpkin-plugins/pumpkin-pie-api';
 import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
 
-const pie = new PieSession({
-    send: ipcSend,
-    now: () => Date.now(), // Prefer the host's monotonic clock when available.
-    onTransition: state => {
-        // Log availability transitions here; never log IPC payloads or private values.
-    }
-});
-pie.registerExpansion('example', {
-    greeting: context => context.viewer ? `Hello ${context.viewer}` : undefined
-}, { kind: 'ttl', ms: 5000 });
+const pie = new PieClient(ipcSend);
+const provider = pie.ping(); // Throws IncompatibleError for any protocol other than 0.
+const line = pie.resolve('Hello %player_name% — %server_online% online', 'Steve');
+```
 
-// Call from plugin load and from ONE shared scheduled task (e.g. every second).
-export function refresh(): void {
-    pie.tick();
-    if (pie.state.kind !== 'ready') return;
-    const lines = pie.client.resolveBatch([
-        { text: '%player_name%: %example_greeting%', viewer: 'Steve' },
-        { text: '%server_online% online' }
-    ]);
-    // Use the full result or discard it on failure. Unresolved tokens remain in text.
-    // Presentation and fallback policy belong to the consumer.
-}
+Read `line.text` for presentation and `line.unresolved` for raw unresolved identifiers. A token that
+cannot resolve remains in the text as written. For example, `%player_name%` needs an online subject,
+while server placeholders can resolve with the viewer omitted. Literal text is still sent; skip
+literal-only work in consumer scheduling if appropriate.
 
-// Export this from the plugin's guest entrypoint; sender must be the actual host sender.
-export function handleIpcMessage(sender: string, message: Uint8Array): Uint8Array {
-    return pie.router.handle(sender, message);
-}
+`viewer` is the placeholder **subject's current player name**, never its UUID. A consumer rendering
+information about several players passes each subject's name, which may differ from the screen
+viewer's name. Refresh names when players change them. It is context, not an authorization credential.
+`provider.version` is diagnostic; `provider.protocol` determines compatibility.
 
-// Call on unload. Upstream removes ALL namespaces owned by this calling plugin.
-export function unload(): void {
-    pie.stop();
+## Look up one value
+
+Use an identifier without percent signs. Pass an argument separately for an argument-dependent
+placeholder:
+
+```ts
+import { PieClient } from '@pumpkin-plugins/pumpkin-pie-api';
+import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
+
+const pie = new PieClient(ipcSend);
+pie.ping();
+const permission = pie.getValue('player_has_permission', 'Steve', 'Example:use');
+const allowed = permission.known && permission.value === 'true';
+
+function valueOrFallback(id: string, subjectName: string): string {
+    const result = pie.getValue(id, subjectName);
+    return result.known ? result.value : '(unknown)';
 }
 ```
 
-If the plugin already handles other IPC, route its PIE callbacks here and preserve its other handlers.
-Catch client errors at the consumer boundary; `tick()` handles provider failures itself. After a client
-failure, discard that refresh and choose fallback presentation. Do not substitute partial results.
-The example's `refresh`, `handleIpcMessage` and `unload` functions show adapter boundaries, not automatic
-lifecycle registration. Connect them to the plugin's existing lifecycle and task handlers.
+An unknown lookup is `{ known: false }`. A known empty value is `{ known: true, value: '' }` and stays
+empty in this example; a truthiness fallback would erase that distinction. Both `getValue` and
+`resolve` accept an optional third `argument` parameter. `pie.list()` returns built-in and
+contributed advertised placeholders with their identifiers, descriptions, namespaces and sources.
 
-`viewer` means the placeholder **subject's current player name**, never its UUID. A tab renderer
-chooses whether that subject is the screen viewer or the listed player. An omitted viewer resolves
-without player context. Resolve player names again when they change.
+## Resolve several subjects
 
-`getValue(id, viewer?, argument?)` supports argument-dependent placeholders and returns either
-`{ known: false }` or `{ known: true, value: string }`; a known empty string is distinct from unknown.
-`resolve(text, viewer?, argument?)` sends even literal text. Consumers may skip literal-only work in
-scheduling. `list()` returns advertised placeholders, and `ping()` negotiates protocol 0. Plugin
-version strings are diagnostic; unsupported protocol versions throw `IncompatibleError`.
+Build one request per subject and keep the returned lines in the same order:
+
+```ts
+import { type Line, PieClient } from '@pumpkin-plugins/pumpkin-pie-api';
+import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
+
+const pie = new PieClient(ipcSend);
+pie.ping();
+const subjects = ['Steve', 'Alex'];
+const requests: Line[] = subjects.map(name => ({
+    text: '%player_name%: %player_ping%ms',
+    viewer: name
+}));
+const resolved = pie.resolveBatch(requests);
+const rows = subjects.map((name, index) => ({ subject: name, line: resolved[index] }));
+```
+
+`resolveBatch` validates every input, sends one message, and checks every output plus the exact
+result count before returning. If it throws, discard that refresh before mapping or applying any
+row. An oversized line cannot silently shift another subject's content into its position.
+
+For larger input sets, replace the batch call with `pie.resolveMany(requests)`. It partitions valid
+lines by encoded message bytes and line count and restores their order. The whole operation throws
+on any failed chunk, so no partial overall result is returned. Limits apply to UTF-8 bytes, including
+JSON escaping; partitioning does not make an individually oversized line valid.
+
+## Consumer and expansion lifecycle
+
+For recurring resolution and contributed placeholders, use one `PieSession` with one shared task.
+The factory below takes the plugin's monotonic millisecond clock and returns explicit lifecycle
+adapters. `greeting` uses only local callback context and declines when no subject is supplied:
+
+```ts
+import {
+    IncompatibleError, type Line, PieSession, ProtocolError,
+    RejectedError, type ResolvedLine, UnavailableError
+} from '@pumpkin-plugins/pumpkin-pie-api';
+import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
+
+export function createPlaceholderApi(now: () => number) {
+    const pie = new PieSession({
+        send: ipcSend,
+        now,
+        onTransition: state => {
+            // Connect transition-only availability logging here; omit IPC payloads.
+        }
+    });
+    pie.registerExpansion('example', {
+        greeting: context => context.viewer ? `Hello ${context.viewer}` : undefined
+    }, { kind: 'ttl', ms: 5000 });
+
+    function refresh(requests: readonly Line[]): readonly ResolvedLine[] | undefined {
+        pie.tick();
+        if (pie.state.kind !== 'ready') return undefined;
+        try {
+            return pie.client.resolveMany(requests);
+        } catch (error) {
+            if (error instanceof UnavailableError || error instanceof IncompatibleError ||
+                error instanceof RejectedError || error instanceof ProtocolError) return undefined;
+            throw error; // Surface invalid local input and accidental callback re-entry.
+        }
+    }
+
+    return {
+        refresh,
+        handleIpcMessage: (sender: string, message: Uint8Array) => pie.router.handle(sender, message),
+        appliedCache: () => pie.appliedCache('example'),
+        stop: () => pie.stop()
+    };
+}
+```
+
+Call `refresh` after plugin load and from the plugin's shared scheduled task. A return of `undefined`
+means no result is available; the caller chooses fallback presentation. A returned array is complete
+and retains unresolved tokens. The next `tick()` performs negotiation and desired registration,
+and periodic ticks handle recovery. `appliedCache()` exposes the provider's applied policy, rather
+than assuming the requested TTL was accepted unchanged.
+
+Export the plugin's `handleIpcMessage(sender, message)` and delegate PIE callbacks to the returned
+adapter, passing the actual host sender. Preserve existing handlers for other IPC protocols.
+Call `stop()` on unload; it unregisters all namespaces owned by the calling plugin once when
+reachable. These adapters do not automatically register lifecycle hooks or tasks.
 
 ## Expansion ownership and callback safety
 
@@ -92,7 +180,8 @@ accidental re-entry before sending and resets with `finally`, including resolver
 failures return a generic rejection without secrets. There is no timeout or cancellation: this tool
 cannot protect the server from a third-party callback that hangs.
 
-Standalone `PieClient.registerExpansion(registration)` returns the provider's applied cache policy.
+Standalone `PieClient.registerExpansion(registration)` returns registration details; read its `.cache`
+field for the provider's applied cache policy.
 TTL requests may exceed 60000 ms, but the provider clamps them; TTL zero may be echoed as `never`.
 `PieSession.appliedCache(namespace)` exposes the latest applied policy, and clears it during outages.
 There is no second stale-value cache in this library.
@@ -147,7 +236,37 @@ import { FakeTransport } from '@pumpkin-plugins/pumpkin-pie-api/testing';
 const transport = new FakeTransport();
 transport.enqueue({ ok: true, value: { known: true, value: '' } });
 const client = new PieClient(transport.send);
-client.getValue('example_empty'); // { known: true, value: '' }
+const value = client.getValue('example_empty'); // { known: true, value: '' }
+```
+
+Test recovery with a virtual clock instead of sleeping. Initial failure is retried after one second:
+
+```ts
+import { expect, it } from 'vitest';
+import { PieSession } from '@pumpkin-plugins/pumpkin-pie-api';
+import { FakeClock, FakeTransport } from '@pumpkin-plugins/pumpkin-pie-api/testing';
+
+it('recovers when the provider becomes available', () => {
+    const clock = new FakeClock();
+    const transport = new FakeTransport();
+    transport.enqueue(new Error('provider is not loaded'));
+    transport.enqueue({
+        ok: true,
+        ping: { protocol: 0, name: 'PumpkinPIE', version: '0.2.3', placeholders: 11, expansions: 0 }
+    });
+    const pie = new PieSession({ send: transport.send, now: clock.now });
+    pie.tick();
+    expect(pie.state.kind).toBe('unavailable');
+    clock.advance(999);
+    pie.tick();
+    expect(pie.state.kind).toBe('unavailable');
+    clock.advance(1);
+    pie.tick();
+    expect(pie.state.kind).toBe('ready');
+    expect(transport.messages.map(message => message.request)).toEqual([
+        { op: 'ping' }, { op: 'ping' }
+    ]);
+});
 ```
 
 The original TypeScript implementation follows the public
@@ -195,7 +314,6 @@ Additional integration files can use `inject('pieProviderPath')` from Vitest aft
 and pass it to `startPumpkin({ plugins: [providerPath, consumerPath] })`. Build any guest consumer
 before that test. Do not substitute Node unit transports for the compiled consumer's host IPC.
 
-These provider tests do **not** yet prove the TypeScript client's guest IPC, expansion callbacks,
-or TabDisplay's player-context mapping. Plan 015's full real-IPC gate remains **BLOCKED** pending
-Plan 016's compiled consumer/provider fixture and scenarios. The targeted release is now available
-to those tests, and its artifact provenance and ABI load have been verified.
+These provider tests verify release provenance, ABI loading and console behavior. Compiled consumer
+IPC, expansion callbacks, outage/recovery and per-subject mapping still require guest integration
+coverage. The targeted release is available to those tests through the shared provider path.
