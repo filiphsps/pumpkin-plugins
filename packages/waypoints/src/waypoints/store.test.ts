@@ -63,6 +63,36 @@ describe(WaypointStore.name, () => {
         expect(store.isAvailable).toBe(true);
     });
 
+    it.each([1, 2])(
+        'rejects case-only UUID duplicates in v%s without touching files or active reload data',
+        (version) => {
+            const lower = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+            const record = version === 1 ? legacyWaypoint({ id: lower }) : waypoint(lower);
+            const original = JSON.stringify({
+                version,
+                waypoints: [record, { ...record, id: lower.toUpperCase(), name: 'Other' }]
+            });
+            const files = new MemoryFiles().put('waypoints.json', original);
+            const invalid = new WaypointStore(files, new MemoryLogger());
+            expect(invalid.isAvailable).toBe(false);
+            expect(invalid.error).toContain('duplicate waypoint UUID');
+            expect(files.text('waypoints.json')).toBe(original);
+            expect(files.text('waypoints.v1.json')).toBeUndefined();
+            files.put('waypoints.v1.json', 'existing backup');
+            expect(new WaypointStore(files, new MemoryLogger()).error).toContain('duplicate waypoint UUID');
+            expect(files.text('waypoints.v1.json')).toBe('existing backup');
+
+            const activeFiles = new MemoryFiles();
+            const active = new WaypointStore(activeFiles, new MemoryLogger());
+            active.add(waypoint());
+            activeFiles.put('waypoints.json', original);
+            expect(active.reload()).toBe(false);
+            expect(active.list()).toEqual([waypoint()]);
+            expect(activeFiles.text('waypoints.json')).toBe(original);
+            expect(activeFiles.text('waypoints.v1.json')).toBeUndefined();
+        }
+    );
+
     it('writes four-space indented JSON with a trailing newline', () => {
         const files = new MemoryFiles();
         const store = new WaypointStore(files, new MemoryLogger());

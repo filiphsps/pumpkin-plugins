@@ -152,13 +152,14 @@ export class WaypointStore {
             });
         });
 
-        const serialized = serialize(migrated);
+        const validated = validateV2(migrated);
+        const serialized = serialize(validated);
         this.backupBeforeMigration(originalBytes);
         this.files.writeFile(STORE_FILE, serialized);
         if (!sameBytes(this.files.readFile(STORE_FILE), serialized)) {
             throw new Error(`could not verify migrated ${STORE_FILE}; the original is preserved in ${V1_BACKUP_FILE}`);
         }
-        this.replace(migrated);
+        this.replace(validated);
     }
 
     private backupBeforeMigration(originalBytes: Uint8Array): void {
@@ -226,11 +227,12 @@ function validateV2(values: unknown[]): Waypoint[] {
     for (const value of values) {
         if (!isWaypoint(value)) throw new Error('one or more v2 waypoint records are invalid');
         const nameKey = waypointNameKey(value.name);
-        if (ids.has(value.id)) throw new Error(`duplicate waypoint UUID ${value.id}`);
+        const id = value.id.toLowerCase();
+        if (ids.has(id)) throw new Error(`duplicate waypoint UUID ${id}`);
         if (names.has(nameKey)) throw new Error(`duplicate normalized waypoint name ${value.name}`);
-        ids.add(value.id);
+        ids.add(id);
         names.add(nameKey);
-        waypoints.push(cloneWaypoint(value));
+        waypoints.push({ ...cloneWaypoint(value), id });
     }
     return waypoints;
 }
@@ -259,11 +261,12 @@ function validateV1(values: unknown[]): LegacyWaypoint[] {
         ) {
             throw new Error('one or more v1 waypoint records are invalid');
         }
-        if (ids.has(value.id)) throw new Error(`duplicate waypoint UUID ${value.id}`);
-        ids.add(value.id);
+        const id = value.id.toLowerCase();
+        if (ids.has(id)) throw new Error(`duplicate waypoint UUID ${id}`);
+        ids.add(id);
         const name = normalizeWaypointName(value.name);
         records.push({
-            id: value.id,
+            id,
             name,
             dimension: value.dimension,
             x: value.x,
