@@ -2,6 +2,7 @@ import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import { makeMcpack, manifestJson, noise } from '../../test/fixtures.ts';
 import { MemoryFiles } from '../../test/memory-files.ts';
+import { readManifest } from './manifest.ts';
 import { PackScanner } from './scanner.ts';
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -106,6 +107,45 @@ describe('PackScanner', () => {
             );
             const { packs } = new PackScanner(files).scan('packs');
             expect(packs.map((p) => p.fileName).sort()).toEqual(['Pair - Hi.mcpack', 'Pair - Lo.mcpack']);
+        });
+
+        it('reserves equal leaf names before extracting conflicting bytes', () => {
+            const files = new MemoryFiles().put(
+                'packs/Pair.mcaddon',
+                addon({
+                    'a/RP/manifest.json': manifest(1),
+                    'b/RP/manifest.json': manifest(2)
+                })
+            );
+            const scanner = new PackScanner(files);
+            for (let scan = 0; scan < 2; scan++) {
+                const { packs, problems } = scanner.scan('packs');
+                expect(packs.map((p) => p.manifest.uuid)).toEqual([uuid(1)]);
+                expect(readManifest(files.readFile(packs[0].path)).uuid).toBe(uuid(1));
+                expect(problems).toEqual([
+                    'Pair.mcaddon: Pair - RP.mcpack is already taken by Pair.mcaddon; skipping it'
+                ]);
+            }
+        });
+
+        it('reserves direct and earlier bundle names before writing colliding candidates', () => {
+            const files = new MemoryFiles()
+                .put('packs/A - RP.mcpack', pack(1))
+                .put('packs/A.mcaddon', addon({ 'RP/manifest.json': manifest(2), 'Other/manifest.json': manifest(3) }))
+                .put('packs/A - RP.mcaddon', addon({ 'RP/manifest.json': manifest(4) }));
+            const scanner = new PackScanner(files);
+            for (let scan = 0; scan < 2; scan++) {
+                const { packs } = scanner.scan('packs');
+                expect(packs.map((p) => p.manifest.uuid)).toEqual([uuid(1), uuid(3)]);
+                for (const p of packs) expect(readManifest(files.readFile(p.path)).uuid).toBe(p.manifest.uuid);
+                expect(files.stat('packs/.extracted/A.mcaddon/A - RP.mcpack')).toBeUndefined();
+                expect(files.stat('packs/.extracted/A - RP.mcaddon/A - RP.mcpack')).toBeUndefined();
+            }
+            files.remove('packs/A - RP.mcpack');
+            const { packs } = scanner.scan('packs');
+            expect(packs.map((p) => p.manifest.uuid)).toEqual([uuid(4), uuid(3)]);
+            for (const p of packs) expect(readManifest(files.readFile(p.path)).uuid).toBe(p.manifest.uuid);
+            expect(files.stat('packs/.extracted/A.mcaddon/A - RP.mcpack')).toBeUndefined();
         });
 
         it('says when a bundle has no resource pack and when it is not a zip', () => {

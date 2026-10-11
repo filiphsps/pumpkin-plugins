@@ -18,6 +18,7 @@ interface CacheEntry {
     size: number;
     modified: number;
     outcome: ScanResult;
+    reservations: string;
 }
 
 const isMcpack = (name: string) => /\.mcpack$/i.test(name);
@@ -52,20 +53,32 @@ export class PackScanner {
         const sources = this.files.list(directory).filter((n) => isMcpack(n) || isMcaddon(n));
         sources.sort((a, b) => Number(isMcaddon(a)) - Number(isMcaddon(b)) || (a < b ? -1 : a > b ? 1 : 0));
         for (const source of sources) {
+            if (isMcpack(source) && this.files.stat(`${directory}/${source}`)?.kind === 'file') {
+                taken.set(source, source);
+            }
+        }
+        for (const source of sources) {
             const info = this.files.stat(`${directory}/${source}`);
             if (info?.kind !== 'file') continue;
             present.add(source);
 
+            const reservations = isMcaddon(source) ? JSON.stringify([...taken]) : '';
             let entry = this.cache.get(source);
-            if (entry?.size !== info.size || entry.modified !== info.modified) {
-                entry = { size: info.size, modified: info.modified, outcome: this.read(directory, source, info) };
+            if (entry?.size !== info.size || entry.modified !== info.modified || entry.reservations !== reservations) {
+                entry = {
+                    size: info.size,
+                    modified: info.modified,
+                    reservations,
+                    outcome: this.read(directory, source, info, taken)
+                };
                 this.cache.set(source, entry);
             }
 
             problems.push(...entry.outcome.problems);
             for (const pack of entry.outcome.packs) {
                 const first = taken.get(pack.fileName);
-                if (first) problems.push(`${source}: ${pack.fileName} is already taken by ${first}; skipping it`);
+                if (first && first !== source)
+                    problems.push(`${source}: ${pack.fileName} is already taken by ${first}; skipping it`);
                 else {
                     taken.set(pack.fileName, source);
                     packs.push(pack);
@@ -78,7 +91,12 @@ export class PackScanner {
         return { packs, problems };
     }
 
-    private read(directory: string, source: string, info: { size: number; modified: number }): ScanResult {
+    private read(
+        directory: string,
+        source: string,
+        info: { size: number; modified: number },
+        taken: ReadonlyMap<string, string>
+    ): ScanResult {
         const path = `${directory}/${source}`;
         try {
             const bytes = this.files.readFile(path);
@@ -89,14 +107,20 @@ export class PackScanner {
                     problems: []
                 };
             }
-            return this.extract(directory, source, info.modified, bytes);
+            return this.extract(directory, source, info.modified, bytes, taken);
         } catch (err) {
             const reason = err instanceof ManifestError ? err.message : `could not be read (${errorText(err)})`;
             return { packs: [], problems: [`${source}: ${reason}`] };
         }
     }
 
-    private extract(directory: string, source: string, modified: number, bytes: Uint8Array): ScanResult {
+    private extract(
+        directory: string,
+        source: string,
+        modified: number,
+        bytes: Uint8Array,
+        taken: ReadonlyMap<string, string>
+    ): ScanResult {
         const { packs: found, skipped } = readAddon(bytes);
         const problems = skipped.map((s) => `${source}: left out ${s}`);
         if (found.length === 0) problems.push(`${source}: has no resource pack`);
@@ -105,8 +129,15 @@ export class PackScanner {
         this.clearFolder(folder);
         const packs: ScannedPack[] = [];
         if (found.length > 0) this.files.createDirectory(folder);
+        const reserved = new Map(taken);
         for (const pack of found) {
             const fileName = found.length === 1 ? `${stem(source)}.mcpack` : `${stem(source)} - ${pack.name}.mcpack`;
+            const first = reserved.get(fileName);
+            if (first) {
+                problems.push(`${source}: ${fileName} is already taken by ${first}; skipping it`);
+                continue;
+            }
+            reserved.set(fileName, source);
             const path = `${folder}/${fileName}`;
             this.files.writeFile(path, pack.bytes);
             packs.push({ fileName, path, size: pack.bytes.length, modified, manifest: pack.manifest });
