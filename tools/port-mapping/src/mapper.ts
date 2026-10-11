@@ -56,8 +56,13 @@ export interface MapperOptions extends Omit<DiscoveryOptions, 'searchMs'> {
 
 interface Entry {
     spec: MappingSpec;
+    mapping: PhysicalMapping;
+}
+
+interface PhysicalMapping {
+    spec: MappingSpec;
     state: MappingState;
-    applied?: { request: MappingRequest; result: MappingResult };
+    applied?: { found: Discovered; request: MappingRequest; result: MappingResult };
     renewAt?: number;
     retryAt: number;
     failures: number;
@@ -86,7 +91,7 @@ const reason = (err: unknown) => (err instanceof Error ? err.message : String(er
  */
 export class PortMapper {
     private readonly entries = new Map<string, Entry>();
-    private removals: MappingRequest[] = [];
+    private removals: NonNullable<PhysicalMapping['applied']>[] = [];
     private discovered: Discovered | undefined;
     private job: Task<void> | undefined;
     private discoveryRetryAt = 0;
@@ -110,32 +115,39 @@ export class PortMapper {
      */
     request(key: string, spec: MappingSpec): MappingState {
         const existing = this.entries.get(key);
-        if (existing && sameSpec(existing.spec, spec)) return existing.state;
+        if (existing && sameSpec(existing.spec, spec)) return existing.mapping.state;
         if (existing) this.release(key);
         const state: MappingState = this.refusal
             ? { kind: 'failed', reason: refusedText(this.refusal) }
             : this.lastDiscoveryFailure && !this.discovered && this.net.now() < this.discoveryRetryAt
               ? { kind: 'failed', reason: this.lastDiscoveryFailure }
               : { kind: 'pending' };
-        this.entries.set(key, { spec, state, retryAt: 0, failures: 0 });
-        return state;
+        const shared = [...this.entries.values()].find(
+            ({ spec: other }) =>
+                other.protocol === spec.protocol &&
+                other.port === spec.port &&
+                (other.externalPort ?? other.port) === (spec.externalPort ?? spec.port)
+        );
+        const mapping = shared?.mapping ?? { spec, state, retryAt: 0, failures: 0 };
+        this.entries.set(key, { spec, mapping });
+        return mapping.state;
     }
 
     /** Stops keeping a port open. The router is told on a later tick. */
     release(key: string): void {
         const entry = this.entries.get(key);
         this.entries.delete(key);
-        if (entry?.applied) this.removals.push(entry.applied.request);
+        if (entry?.mapping.applied && !this.owned(entry.mapping)) this.removals.push(entry.mapping.applied);
     }
 
     /** Every mapping that was requested, with its state. */
     mappings(): { key: string; spec: MappingSpec; state: MappingState }[] {
-        return [...this.entries].map(([key, { spec, state }]) => ({ key, spec, state }));
+        return [...this.entries].map(([key, { spec, mapping }]) => ({ key, spec, state: mapping.state }));
     }
 
     /** The state of a mapping, or undefined when it was never requested. */
     state(key: string): MappingState | undefined {
-        return this.entries.get(key)?.state;
+        return this.entries.get(key)?.mapping.state;
     }
 
     /** What has been learned about the network so far. */
@@ -167,10 +179,11 @@ export class PortMapper {
         const gateway = this.discovered;
         const removal = this.removals.shift();
         if (removal) {
-            this.start(this.close(gateway, removal));
+            this.start(this.close(removal.found, removal.request));
             return;
         }
-        for (const [key, entry] of this.entries) {
+        for (const [key, logical] of this.entries) {
+            const entry = logical.mapping;
             const due =
                 entry.state.kind === 'open'
                     ? entry.renewAt !== undefined && now >= entry.renewAt
@@ -187,15 +200,17 @@ export class PortMapper {
         this.job?.cancel();
         this.job = undefined;
         for (const key of [...this.entries.keys()]) this.release(key);
-        const gateway = this.discovered;
-        if (!gateway) return;
-        for (const request of this.removals.splice(0)) {
+        for (const { found, request } of this.removals.splice(0)) {
             try {
-                yield* gateway.gateway.deleteMapping(request);
+                yield* found.gateway.deleteMapping(request);
             } catch {
                 // The lease runs out by itself.
             }
         }
+    }
+
+    private owned(mapping: PhysicalMapping): boolean {
+        return [...this.entries.values()].some((entry) => entry.mapping === mapping);
     }
 
     private start(steps: Steps<void>): void {
@@ -211,7 +226,12 @@ export class PortMapper {
         const address = this.local.address;
         if (!address || !isPublicIpv4(address)) return false;
         for (const entry of this.entries.values()) {
-            entry.state = { kind: 'open', via: 'public', address, port: entry.spec.externalPort ?? entry.spec.port };
+            entry.mapping.state = {
+                kind: 'open',
+                via: 'public',
+                address,
+                port: entry.spec.externalPort ?? entry.spec.port
+            };
         }
         return true;
     }
@@ -243,7 +263,8 @@ export class PortMapper {
     private refuse({ identity, reason: why }: RouterRefusedError): void {
         this.refusal = { identity, reason: why };
         this.discoveryRetryAt = Number.POSITIVE_INFINITY;
-        for (const entry of this.entries.values()) entry.state = { kind: 'failed', reason: refusedText(this.refusal) };
+        for (const entry of this.entries.values())
+            entry.mapping.state = { kind: 'failed', reason: refusedText(this.refusal) };
         this.options.onRefused?.(this.refusal);
     }
 
@@ -261,11 +282,11 @@ export class PortMapper {
         this.discoveryFailures++;
         this.lastDiscoveryFailure = text;
         this.discoveryRetryAt = this.net.now() + backoff(this.discoveryFailures);
-        for (const entry of this.entries.values()) entry.state = { kind: 'failed', reason: text };
+        for (const entry of this.entries.values()) entry.mapping.state = { kind: 'failed', reason: text };
         this.warn('discovery', `No router could open ports: ${text}.`);
     }
 
-    private *open(found: Discovered, key: string, entry: Entry): Steps<void> {
+    private *open(found: Discovered, key: string, entry: PhysicalMapping): Steps<void> {
         const { gateway } = found;
         const wasOpen = entry.state.kind === 'open';
         try {
@@ -282,7 +303,7 @@ export class PortMapper {
                 };
                 try {
                     const result = yield* gateway.addMapping(request, internal);
-                    entry.applied = { request: { ...request, externalPort: result.externalPort }, result };
+                    entry.applied = { found, request: { ...request, externalPort: result.externalPort }, result };
                     break;
                 } catch (err) {
                     if (!(err instanceof PortInUseError) || attempt >= PORT_TRIES) throw err;
@@ -290,7 +311,7 @@ export class PortMapper {
                 }
             }
             const address = yield* gateway.externalAddress();
-            if (this.entries.get(key) !== entry) return;
+            if (!this.owned(entry)) return;
             const { result } = entry.applied;
             entry.state = { kind: 'open', via: gateway.kind, address, port: result.externalPort };
             entry.failures = 0;
@@ -302,7 +323,7 @@ export class PortMapper {
                 );
             }
         } catch (err) {
-            if (this.entries.get(key) !== entry) return;
+            if (!this.owned(entry)) return;
             entry.failures++;
             entry.retryAt = this.net.now() + backoff(entry.failures);
             entry.renewAt = undefined;

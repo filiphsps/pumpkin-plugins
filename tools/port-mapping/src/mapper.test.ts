@@ -1,3 +1,4 @@
+import { strFromU8 } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import type { RouterIdentity } from './identify.ts';
 import { PortMapper } from './mapper.ts';
@@ -23,6 +24,35 @@ function setup(igd: FakeIgd | null = new FakeIgd(), extra: Partial<ConstructorPa
         mapper.tick();
     };
     return { net, igd: igd ?? undefined, mapper, log, settle };
+}
+
+function delayMappingReply(net: FakeNetwork) {
+    const dial = net.dial.bind(net);
+    let blocked = true;
+    net.dial = (to) => {
+        const original = dial(to);
+        return {
+            abort: () => original.abort(),
+            poll: () => {
+                const connection = original.poll();
+                if (!connection) return undefined;
+                let mapping = false;
+                return {
+                    localAddress: connection.localAddress,
+                    writable: () => connection.writable(),
+                    close: () => connection.close(),
+                    write: (bytes) => {
+                        mapping ||= strFromU8(bytes).includes('#AddPortMapping');
+                        connection.write(bytes);
+                    },
+                    read: (max) => (mapping && blocked ? null : connection.read(max))
+                };
+            }
+        };
+    };
+    return () => {
+        blocked = false;
+    };
 }
 
 const open = (state: unknown) => (state as { kind: string }).kind === 'open';
@@ -77,6 +107,41 @@ describe('PortMapper', () => {
         settle(() => igd?.mappings.size === 0);
         expect(igd?.mappings.size).toBe(0);
         expect(mapper.state('web')).toBeUndefined();
+    });
+
+    it.each([true, false])('retains a compatible physical mapping until its final owner releases (UPnP=%s)', (upnp) => {
+        const { igd, mapper, settle, net } = setup(new FakeIgd({ upnp }), { upnp });
+        mapper.request('own:java', spec);
+        mapper.request('plugin:client:web', { ...spec, externalPort: 8123, description: 'Client' });
+        settle(() => open(mapper.state('own:java')) && open(mapper.state('plugin:client:web')));
+        const adds = upnp
+            ? igd?.actions.filter((a) => a === 'AddPortMapping').length
+            : net.sent.filter((s) => s.data.length === 12).length;
+        expect(adds).toBe(1);
+        mapper.release('own:java');
+        settle(() => false, 1000);
+        expect(igd?.mappings.get('tcp:8123')?.internalPort).toBe(8123);
+        expect(mapper.state('plugin:client:web')).toMatchObject({ kind: 'open', port: 8123 });
+        mapper.release('plugin:client:web');
+        settle(() => igd?.mappings.size === 0);
+        expect(igd?.mappings.size).toBe(0);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('retains a pending mapping when its initiating owner leaves but another owner remains', () => {
+        const { igd, mapper, settle, net } = setup(new FakeIgd({ natPmp: false }));
+        const resume = delayMappingReply(net);
+        mapper.request('first', spec);
+        mapper.request('second', { ...spec, description: 'Other owner' });
+        settle(() => igd?.mappings.has('tcp:8123') === true);
+        mapper.release('first');
+        resume();
+        settle(() => open(mapper.state('second')));
+        expect(mapper.state('second')).toMatchObject({ kind: 'open', port: 8123 });
+        expect(igd?.actions.filter((a) => a === 'AddPortMapping')).toHaveLength(1);
+        runSteps(net, mapper.releaseAll());
+        expect(igd?.mappings.size).toBe(0);
+        expect(net.leaks).toBe(0);
     });
 
     it('renews the lease at half its length', () => {
