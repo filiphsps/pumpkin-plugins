@@ -25,7 +25,7 @@ export interface SigningMetadata {
     is_paid: boolean;
     /** Marketplace user id; 0 for independent plugins. */
     user_id: number;
-    /** License key; omitted or null when absent, matching the host Option<String>. */
+    /** License key, or null when absent, matching the host's optional string. */
     license_key?: string | null;
     /** Signing date text; the host accepts an opaque string. */
     issued_at: string;
