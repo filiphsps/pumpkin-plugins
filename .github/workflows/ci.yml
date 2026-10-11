@@ -140,6 +140,75 @@ jobs:
             - name: ✅ Typecheck
               run: pnpm run typecheck
 
+    runtime-provenance:
+        name: 🔐 Runtime provenance
+        needs: [changes]
+        if: needs.changes.outputs.code == 'true'
+        timeout-minutes: 20
+        runs-on: macos-15
+        permissions:
+            contents: read
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+              with:
+                  fetch-depth: 0
+
+            - name: 🔍 Select runtime inputs
+              id: scope
+              env:
+                  BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+                  HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+              run: |
+                  changed=$(git diff --name-only "$BASE" "$HEAD" -- \
+                    tools/build/runtime tools/build/src/runtime-provenance.test.ts \
+                    tools/build/src/runtime-ci.test.ts .github/workflows/ci.yml)
+                  if [ -n "$changed" ]; then
+                    echo 'required=true' >> "$GITHUB_OUTPUT"
+                  else
+                    echo 'required=false' >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: 🟢 Setup Node
+              if: steps.scope.outputs.required == 'true'
+              uses: actions/setup-node@v7.0.0
+              with:
+                  node-version-file: .node-version
+
+            - name: 🔐 Rebuild and verify pinned runtime twice
+              id: verify
+              if: steps.scope.outputs.required == 'true'
+              env:
+                  RUNTIME_PROBE_ROOT: ${{ runner.temp }}/runtime-provenance
+              run: |
+                  set -eu
+                  mkdir -p "$RUNTIME_PROBE_ROOT/sdk"
+                  rustup toolchain install 1.99.0 --profile minimal --target wasm32-wasip2
+                  export PATH="$(dirname "$(rustup which --toolchain 1.99.0 rustc)"):$PATH"
+                  curl --fail --location --retry 3 \
+                    https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-arm64-macos.tar.gz \
+                    --output "$RUNTIME_PROBE_ROOT/sdk.tar.gz"
+                  printf '%s  %s\n' \
+                    9c59398106b417f8f14913380fdf0097a8cc0ff4af9eb3ce0065a859e88d49e9 \
+                    "$RUNTIME_PROBE_ROOT/sdk.tar.gz" | shasum -a 256 -c
+                  tar -xzf "$RUNTIME_PROBE_ROOT/sdk.tar.gz" -C "$RUNTIME_PROBE_ROOT/sdk" --strip-components=1
+                  node tools/build/runtime/provenance.mjs verify tools/build/runtime
+                  for attempt in a b; do
+                    source_dir="$RUNTIME_PROBE_ROOT/source-$attempt"
+                    git init -q "$source_dir"
+                    git -C "$source_dir" remote add origin https://github.com/andreiltd/componentize-qjs.git
+                    git -C "$source_dir" fetch --depth=1 origin e563c6d6ae50b087980414015663ca9c948c09bb
+                    git -C "$source_dir" checkout --detach FETCH_HEAD
+                    QJS_SOURCE_DIR="$source_dir" \
+                    WASI_SDK_PATH="$RUNTIME_PROBE_ROOT/sdk" \
+                    CARGO_TARGET_DIR="$RUNTIME_PROBE_ROOT/target-$attempt" \
+                    RUNTIME_OUTPUT_DIR="$RUNTIME_PROBE_ROOT/candidate-$attempt" \
+                      sh tools/build/runtime/build.sh
+                    node tools/build/runtime/provenance.mjs verify "$RUNTIME_PROBE_ROOT/candidate-$attempt"
+                  done
+                  cmp "$RUNTIME_PROBE_ROOT/candidate-a/quickjs-runtime-bigint.wasm" \
+                    "$RUNTIME_PROBE_ROOT/candidate-b/quickjs-runtime-bigint.wasm"
+
     test:
         name: 🧪 Test
         needs: [changes]
@@ -426,7 +495,7 @@ jobs:
 
     release:
         name: 🚢 Release
-        needs: [changes, build, test, docs, integration, action-gate]
+        needs: [changes, build, test, docs, integration, action-gate, runtime-provenance]
         if: >-
             ${{
               always() &&
@@ -437,6 +506,7 @@ jobs:
               (
                 (
                   needs.changes.outputs.code == 'true' &&
+                  needs['runtime-provenance'].result == 'success' &&
                   needs.build.result == 'success' &&
                   needs.test.result == 'success' &&
                   needs.integration.result == 'success'

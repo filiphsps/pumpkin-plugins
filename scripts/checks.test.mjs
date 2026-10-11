@@ -502,6 +502,7 @@ describe('action release prerequisites', () => {
                     build: { result: code === 'true' ? 'success' : 'skipped' },
                     test: { result: code === 'true' ? 'success' : 'skipped' },
                     integration: { result: code === 'true' ? 'success' : 'skipped' },
+                    'runtime-provenance': { result: code === 'true' ? 'success' : 'skipped' },
                     'action-gate': { result }
                 };
                 assert.equal(
@@ -538,6 +539,7 @@ describe('action release prerequisites', () => {
                 build: { result: 'success' },
                 test: { result: 'success' },
                 integration: { result: 'success' },
+                'runtime-provenance': { result: code === 'true' ? 'success' : 'skipped' },
                 'action-gate': { result: 'success' }
             };
             assert.equal(evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }), expected);

@@ -10,8 +10,8 @@ run through the reusable `.github/workflows/actions.yml`, scoped to action code.
 site has its own
 `.github/workflows/docs.yml`, which checks and publishes the VitePress site and mirrors it to
 `gh-pages`. The shared setup (pnpm, Node,
-install, Turborepo cache) is the composite action in `.github/common/bootstrap`. Workflow jobs use
-`ubuntu-24.04` to keep their runner image stable as `ubuntu-latest` migrates to Ubuntu 26.
+install, Turborepo cache) is the composite action in `.github/common/bootstrap`. Most CI jobs use
+`ubuntu-26.04`; runtime provenance uses `macos-15` to match the verified macOS arm64 build procedure.
 
 ## Jobs
 
@@ -21,6 +21,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 💬 Commit messages | code, action, or generated README changes on PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
+| 🔐 Runtime provenance | runtime inputs, provenance tests or CI workflow changes | Checks the vendored manifest and rebuilds twice with pinned Rust 1.99.0 and checksum-verified wasi-sdk 34 on macOS arm64; both candidates must match the shipped hash |
 | 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
 | 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or common plus all four public consumers for shared helper changes, then uploads c8 coverage to Codecov |
 | 🛡️ Action test gate | every CI run, after classification and action tests | Requires every selected action suite to pass; accepts skipped tests only for an empty matrix |
@@ -68,7 +69,8 @@ commit and reruns the repository checks that validate the generated README. Ordi
 skip the main CI workflow entirely.
 
 On a push, the release job waits for the action test gate and docs/config checks. Plugin/repository
-changes also require the existing build, unit test and integration jobs. Empty action matrices
+changes also require runtime provenance, build, unit test and integration jobs. The provenance job
+returns success without rebuilding when the change does not touch runtime inputs. Empty action matrices
 pass the gate without running action tests, including version-only release changes. Release Please
 only releases a component with
 releasable changes, so running it for changed action code does not create an empty release.
