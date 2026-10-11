@@ -21,7 +21,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
 | 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
-| 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or `actions/common/` for shared helpers, then uploads c8 coverage to Codecov |
+| 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or common plus all four public consumers for shared helper changes, then uploads c8 coverage to Codecov |
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after lint and typecheck | Builds and collects every plugin, then signs with `sign-pumpkin-plugin` and verifies with `verify-pumpkin-plugin` before upload |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
@@ -44,7 +44,8 @@ workflow.
 the push's `before` commit). Markdown, `docs/`, component-level `docs/` folders and `LICENSE`
 changes are documentation. Changes under `actions/{name}/` are reported separately from plugin and repository code. An action-only
 change skips the plugin build, integration suites and repository test jobs; the Actions workflow
-tests only that action when its code changes. Action tests live beside their implementation in
+tests that action when its code changes; common helper changes test common and all four public consumers.
+Common is excluded from release selection. Action tests live beside their implementation in
 `actions/{name}/src/*.test.mjs`; shared helper tests live in `actions/common/src/*.test.mjs`. README,
 changelog and version-file-only changes skip action tests.
 A docs-only change triggers the separate Docs workflow, which checks the docs and builds the site;

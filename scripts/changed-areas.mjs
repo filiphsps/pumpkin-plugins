@@ -7,6 +7,13 @@ import { appendFileSync } from 'node:fs';
 /** A changed file matching any of these is documentation, which nothing that builds or tests reads. */
 const DOCS = [/\.md$/, /^docs\//, /^LICENSE$/, /^(packages|tools|actions)\/[^/]+\/docs(?:\/|$)/];
 
+const COMMON_CONSUMERS = [
+    'publish-to-pumpkin-market',
+    'sign-pumpkin-plugin',
+    'update-pumpkin-market-listing',
+    'verify-pumpkin-plugin'
+];
+
 const [base, head = 'HEAD'] = process.argv.slice(2);
 if (!base) {
     console.error('Usage: changed-areas.mjs <base> [head]');
@@ -29,9 +36,11 @@ if (commitLog.status !== 0) {
 const generatedReadmes = commitLog.stdout.split('\n').includes('docs: update generated READMEs');
 const isDocs = (file) => DOCS.some((pattern) => pattern.test(file));
 const actionPaths = changed.filter((file) => !isDocs(file) && /^actions\/[^/]+\//.test(file));
-const actions = [...new Set(actionPaths.map((file) => file.split('/')[1]))].sort();
+const actions = [...new Set(actionPaths.map((file) => file.split('/')[1]))].filter((name) => name !== 'common').sort();
 const actionCodePaths = actionPaths.filter((file) => !file.endsWith('/version.txt'));
-const actionsToTest = [...new Set(actionCodePaths.map((file) => file.split('/')[1]))].sort();
+const tests = new Set(actionCodePaths.map((file) => file.split('/')[1]));
+if (tests.has('common')) for (const consumer of COMMON_CONSUMERS) tests.add(consumer);
+const actionsToTest = [...tests].sort();
 const code = changed.filter((file) => !isDocs(file) && !/^actions\/[^/]+\//.test(file));
 const integrationScope =
     code.length > 0 &&

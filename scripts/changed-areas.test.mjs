@@ -237,6 +237,50 @@ describe('changed-areas', () => {
         );
     });
 
+    for (const deleted of [false, true]) {
+        it(`tests common and all public consumers when a helper is ${deleted ? 'deleted' : 'changed'}`, () => {
+            const dir = repo({ 'actions/common/src/input.mjs': 'export {};\n' });
+            const base = change(dir, {
+                'actions/common/src/input.mjs': deleted ? null : 'export const changed = true;\n'
+            });
+            const result = run(dir, base, 'HEAD');
+            assert.ok(result.ok, result.log);
+            assert.equal(
+                result.outputs,
+                'code=false\nactions=[]\nactions_to_test=["common","publish-to-pumpkin-market","sign-pumpkin-plugin","update-pumpkin-market-listing","verify-pumpkin-plugin"]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n'
+            );
+        });
+    }
+
+    it('keeps common docs and version-only changes out of consumer tests and releases', () => {
+        const dir = repo({ 'actions/common/README.md': '# Common\n', 'actions/common/version.txt': '1\n' });
+        const base = change(dir, {
+            'actions/common/README.md': '# Common\nMore\n',
+            'actions/common/version.txt': '2\n'
+        });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=false\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n'
+        );
+    });
+
+    it('expands common consumers alongside mixed plugin and public action changes', () => {
+        const dir = repo({ 'actions/common/src/input.mjs': 'export {};\n' });
+        const base = change(dir, {
+            'actions/common/src/input.mjs': 'export const changed = true;\n',
+            'actions/sign-pumpkin-plugin/src/index.mjs': 'export {};\n',
+            'packages/plug/src/plugin.ts': 'export {};\n'
+        });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=true\nactions=["sign-pumpkin-plugin"]\nactions_to_test=["common","publish-to-pumpkin-market","sign-pumpkin-plugin","update-pumpkin-market-listing","verify-pumpkin-plugin"]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n'
+        );
+    });
+
     it('detects the generated README commit that should rerun CI documentation checks', () => {
         const dir = repo({ 'packages/plug/README.md': '# Plug\n' });
         const base = git(dir, 'rev-parse', 'HEAD').trim();
