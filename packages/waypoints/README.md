@@ -135,6 +135,7 @@ unchanged text is not resent for appearance-only updates.
 
 This approximates a first-person HUD: network latency, client view bobbing, and third-person camera
 offsets can still affect alignment. The server cannot read client FOV or reliably detect Java item-use
-state, so spyglass and modded zoom enlarge the labels. Other Java protocol versions and Bedrock clients
-do not receive the HUD. Icons use vanilla 26.3 atlas textures; block items use a representative model
-texture, and custom item IDs require the corresponding `item/<path>` sprite in the client's resource pack.
+state, so spyglass and modded zoom enlarge the labels. Other Java protocol versions do not receive the
+HUD. Bedrock support depends on the Pumpkin API and will be added when the API makes it possible.
+Icons use vanilla 26.3 atlas textures; block items use a representative model texture, and custom item
+IDs require the corresponding `item/<path>` sprite in the client's resource pack.
