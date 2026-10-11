@@ -54,6 +54,7 @@
         "docs:types:plugins": "pnpm --filter './packages/*' --parallel run types",
         "docs:preview": "vitepress preview docs",
         "check": "node scripts/check-release-config.mjs && node scripts/package-metadata.mjs && node scripts/check-docs.mjs",
+        "fix": "node scripts/check-release-config.mjs && node scripts/package-metadata.mjs --fix && pnpm readme && node scripts/check-docs.mjs && pnpm lint:fix",
         "package": "turbo run build && node scripts/collect-plugins.mjs"
     },
     "devDependencies": {

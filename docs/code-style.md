@@ -82,6 +82,10 @@ is fixed.
 
 ## Docs match the code
 
+`pnpm fix` checks release configuration, applies derived package metadata fixes, regenerates
+READMEs, checks documentation, and finishes with `pnpm lint:fix`. Release registration and
+hand-written documentation errors still require manual correction.
+
 A change that makes a doc wrong is not finished until the doc is fixed, and the checks keep it honest:
 
 - `pnpm readme:check` fails when generated README content is stale: plugin documentation, root
