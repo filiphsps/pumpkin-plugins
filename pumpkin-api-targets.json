@@ -1,0 +1,54 @@
+{
+    "default": "release",
+    "compatibility": ["release", "nightly"],
+    "targets": {
+        "release": {
+            "api": {
+                "repository": "Pumpkin-MC/pumpkin-api-ts",
+                "ref": "1a9c0d3b8b5911e9bafe1b2a90d4a1b5927a3a2c",
+                "entry": "dist/index.ts",
+                "installedVersion": "0.1.1"
+            },
+            "wit": {
+                "repository": "Pumpkin-MC/pumpkin-plugin-wit",
+                "ref": "4d7a501943bb99f0f02a339128833f58ed37d0cc",
+                "path": "v0.1",
+                "installedPath": "wit/v0.1"
+            },
+            "server": {
+                "repository": "Pumpkin-MC/Pumpkin",
+                "ref": "204a94ed895f041a845630d5a23c094705a0704e",
+                "tag": "0.2.0+26.3-26.51",
+                "checksums": "checksums.sha256"
+            }
+        },
+        "nightly": {
+            "api": {
+                "repository": "Pumpkin-MC/pumpkin-api-ts",
+                "ref": "18a970541da513571c291f23576c3c16f942b079",
+                "entry": "dist/index.ts"
+            },
+            "wit": {
+                "repository": "Pumpkin-MC/Pumpkin",
+                "ref": "f1c0871f492182a228fa585e9d7c74e683e242f9",
+                "path": "crates/pumpkin-plugin-wit/v0.1"
+            },
+            "server": {
+                "repository": "Pumpkin-MC/Pumpkin",
+                "ref": "f1c0871f492182a228fa585e9d7c74e683e242f9",
+                "tag": "nightly",
+                "sha256": {
+                    "pumpkin-aarch64-android": "208308813f337129f8a73239244929339687fca7d426dd6b86c25e5a8155d45e",
+                    "pumpkin-ARM64-Linux": "9d78434416487e52269671a69c10423f3a618cdae48bfec6bc1068f3feb6cfb8",
+                    "pumpkin-ARM64-Linux-musl": "5707a9fb358956f6a7a6c637a9bc19ce215f09a9b2ee1cdfcd14e7056a746168",
+                    "pumpkin-ARM64-macOS": "93ea764fdc7027eaba94e2e5499755ebb006626e0c80ae166e3f91858aefebea",
+                    "pumpkin-ARM64-Windows.exe": "05b73f2b6bf3d90113315e33f68084ee9d5f4cf0d3cf809aba3b92eb59dcd6e3",
+                    "pumpkin-X64-Linux": "bff2aaede4f8695b688aa7e088f31f9e762ee567c1d6f9f15da64ad63ba66d64",
+                    "pumpkin-X64-Linux-musl": "3b9d9709c9353971cfed66a3c347a635ed20743baf4205e1ae4b000ef5133549",
+                    "pumpkin-X64-macOS": "c620a0f65966d108ed4f4f5a1839ad10dc3153e797f23af38c3e64cec6882aab",
+                    "pumpkin-X64-Windows.exe": "fbfc27e49800a18f4f9a8492fecac456493a723967c65ce45f01c19f8f08c9e8"
+                }
+            }
+        }
+    }
+}
