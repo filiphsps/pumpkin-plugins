@@ -1,6 +1,8 @@
+import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { startPumpkin } from './instance.ts';
 
@@ -65,7 +67,78 @@ process.stdin.resume();
             .map((run) => run.split(':')[1]);
 }
 
+/** Runs unsafe process failures behind an external timeout and an isolated temp root. */
+function failureProbe(kind: 'EACCES' | 'interpreter' | 'early exit' | 'stdin') {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-failure-probe-'));
+    made.push(dir);
+    const temp = path.join(dir, 'temp');
+    const logs = path.join(dir, 'logs');
+    fs.mkdirSync(temp);
+    const binary = path.join(dir, 'pumpkin');
+    const source =
+        kind === 'interpreter'
+            ? '#!/no/such/pumpkin-interpreter\n'
+            : `#!/usr/bin/env node
+${kind === 'early exit' ? "console.error('fixture early exit'); process.exit(7);" : "console.log('Server is now running'); process.stdin.once('data', () => process.exit(0)); process.stdin.resume();"}
+`;
+    fs.writeFileSync(binary, source, { mode: kind === 'EACCES' ? 0o644 : 0o755 });
+    const module = pathToFileURL(path.join(import.meta.dirname, 'instance.ts')).href;
+    const program = `
+import { startPumpkin } from ${JSON.stringify(module)};
+let server;
+try {
+    server = await startPumpkin({ name: 'failure-probe', readyTimeoutMs: 500 });
+    if (${JSON.stringify(kind)} !== 'stdin') throw new Error('unexpected readiness');
+    setImmediate(() => {
+        server.child.stdin.emit('error', new Error('fixture stdin failure'));
+        server.command('list');
+    });
+    await server.waitForLog(/never emitted/, 500);
+    throw new Error('unexpected log');
+} catch (error) {
+    console.log('PROBE_FAILURE=' + error.message);
+} finally {
+    if (server) await Promise.all([server.stop(), server.stop()]);
+}
+`;
+    const result = spawnSync(
+        process.execPath,
+        ['--experimental-transform-types', '--input-type=module', '--eval', program],
+        {
+            env: {
+                ...process.env,
+                TMPDIR: temp,
+                PUMPKIN_BIN: binary,
+                PUMPKIN_TEST_LOG_DIR: logs,
+                PUMPKIN_KEEP_DIR: ''
+            },
+            encoding: 'utf8',
+            timeout: 6000
+        }
+    );
+    return { result, leftovers: fs.readdirSync(temp), logs: fs.existsSync(logs) ? fs.readdirSync(logs) : [] };
+}
+
 describe('startPumpkin', () => {
+    it.each([
+        ['EACCES', /EACCES/],
+        ['interpreter', /ENOENT/],
+        ['early exit', /exited before.*\n.*fixture early exit/s],
+        ['stdin', /fixture stdin failure/]
+    ] as const)(
+        'settles %s failures and cleans its directory without an unhandled event',
+        (kind, reason) => {
+            const probe = failureProbe(kind);
+            expect(probe.result.error, probe.result.stderr).toBeUndefined();
+            expect(probe.result.status, probe.result.stderr).toBe(0);
+            expect(probe.result.stdout).toMatch(reason);
+            expect(probe.result.stderr).not.toContain('Unhandled');
+            expect(probe.leftovers).toEqual([]);
+            expect(probe.logs).toHaveLength(1);
+        },
+        10_000
+    );
+
     it('keeps INFO readiness logs visible when the parent filters them out', async () => {
         process.env.RUST_LOG = 'warn';
         fakePumpkin(0, [], true);

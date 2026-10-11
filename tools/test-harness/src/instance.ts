@@ -37,6 +37,7 @@ export class PumpkinInstance {
     private readonly log = new LogBuffer();
     private readonly exited: Promise<number | null>;
     private hasExited = false;
+    private failure?: Error;
 
     private constructor(
         private readonly child: ChildProcessWithoutNullStreams,
@@ -45,11 +46,29 @@ export class PumpkinInstance {
     ) {
         children.add(child);
         this.exited = new Promise((resolve) => {
-            child.once('exit', (code) => {
+            let settled = false;
+            const settle = (code: number | null) => {
+                if (settled) return;
+                settled = true;
                 this.hasExited = true;
                 children.delete(child);
                 this.log.notify();
                 resolve(code);
+            };
+            child.once('error', (error) => {
+                this.failure ??= error;
+                settle(null);
+            });
+            child.once('exit', () => {
+                this.hasExited = true;
+                this.log.notify();
+            });
+            // Close follows exit after stdout/stderr have drained; failed spawn may emit no exit.
+            child.once('close', settle);
+            child.stdin.on('error', (error) => {
+                this.failure ??= error;
+                this.log.notify();
+                if (!this.hasExited) child.kill('SIGKILL');
             });
         });
         this.log.attach(child.stdout);
@@ -138,8 +157,21 @@ export class PumpkinInstance {
      * @returns The first matching line.
      * @throws {Error} When the server exits or the time runs out first.
      */
-    waitForLog(pattern: RegExp, timeoutMs = 30_000, fromIndex = 0): Promise<string> {
-        return this.log.waitFor(pattern, { timeoutMs, fromIndex, isOver: () => this.hasExited, process: 'Pumpkin' });
+    async waitForLog(pattern: RegExp, timeoutMs = 30_000, fromIndex = 0): Promise<string> {
+        try {
+            return await this.log.waitFor(pattern, {
+                timeoutMs,
+                fromIndex,
+                isOver: () => this.hasExited || Boolean(this.failure),
+                process: 'Pumpkin'
+            });
+        } catch (error) {
+            if (this.failure)
+                throw new Error(`Pumpkin failed: ${this.failure.message}\n${(error as Error).message}`, {
+                    cause: this.failure
+                });
+            throw error;
+        }
     }
 
     /**
@@ -147,16 +179,21 @@ export class PumpkinInstance {
      * @param text - The command, for example `list`.
      */
     command(text: string): void {
+        if (this.hasExited || this.failure || this.child.stdin.destroyed || this.child.stdin.writableEnded) return;
         this.child.stdin.write(`${text}\n`);
     }
 
     /** Stops the server (console `stop`, then SIGKILL after 20 s) and removes its directory. */
     async stop(): Promise<void> {
-        if (!this.hasExited) {
-            this.child.stdin.write('stop\n');
-            const killer = setTimeout(() => this.child.kill('SIGKILL'), 20_000);
+        let killer: ReturnType<typeof setTimeout> | undefined;
+        try {
+            if (!this.hasExited) {
+                this.command('stop');
+                killer = setTimeout(() => this.child.kill('SIGKILL'), 20_000);
+            }
             await this.exited;
-            clearTimeout(killer);
+        } finally {
+            if (killer) clearTimeout(killer);
         }
         this.saveLog();
         if (process.env.PUMPKIN_KEEP_DIR) console.log(`Kept Pumpkin test directory: ${this.dir}`);
