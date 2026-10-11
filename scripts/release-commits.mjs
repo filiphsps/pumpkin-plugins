@@ -93,6 +93,24 @@ async function previousPublishedRelease(github, currentTag) {
     return previousRelease;
 }
 
+async function firstPackageCommitSha(github, branch, path) {
+    const api = github.getGitHubApi?.();
+    const listCommits = api?.octokit?.rest?.repos?.listCommits;
+    if (!api?.repository?.owner || !api.repository.repo || !listCommits || !api.octokit.paginate) {
+        throw new Error(`Cannot find the package introduction commit for ${path}`);
+    }
+    const commits = await api.octokit.paginate(listCommits, {
+        owner: api.repository.owner,
+        repo: api.repository.repo,
+        sha: branch,
+        path: `${path}/package.json`,
+        per_page: 100
+    });
+    const firstCommit = commits.at(-1);
+    if (!firstCommit?.sha) throw new Error(`Cannot find the package introduction commit for ${path}`);
+    return firstCommit.sha;
+}
+
 /** Adds bundled dependency commits before Release Please computes versions, PR bodies and changelogs. */
 export function bundledChangesPlugin(github, branch, packages, releasedVersions, maxCommits = 500) {
     return {
@@ -109,12 +127,12 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
             if (releasePaths.length === 0) return strategies;
             const commits = [];
             const boundaries = new Set();
-            let initialRelease = false;
             for (const path of releasePaths) {
                 const release = releasesByPath[path];
                 if (release?.sha) boundaries.add(release.sha);
-                else if (releasedVersions[path]?.toString() === '0.0.0') initialRelease = true;
-                else {
+                else if (releasedVersions[path]?.toString() === '0.0.0') {
+                    if (path.startsWith('packages/')) boundaries.add(await firstPackageCommitSha(github, branch, path));
+                } else {
                     const previousRelease = await previousPublishedRelease(github, release?.tag);
                     if (!previousRelease?.sha) {
                         throw new Error(
@@ -134,7 +152,7 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
                     throw new Error(`Release history exceeds ${maxCommits} commits; increase commit-search-depth`);
                 commits.push(commit);
                 boundaries.delete(commit.sha);
-                if (!initialRelease && boundaries.size === 0) break;
+                if (boundaries.size === 0) break;
             }
             for (const path of pluginPaths) {
                 commitsByPath[path] = releaseCommits(

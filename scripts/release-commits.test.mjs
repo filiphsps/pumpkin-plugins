@@ -226,6 +226,46 @@ describe('bundled release commits', () => {
         assert.deepEqual(commits['actions/publish-action'], ['simple strategy commits']);
     });
 
+    it('limits first-release history to the commit that added the package', async () => {
+        const history = [
+            commit('after-addition', ['packages/plugin/src/plugin.ts']),
+            commit('added', ['packages/plugin/package.json', 'packages/plugin/src/plugin.ts']),
+            ...Array.from({ length: 500 }, (_, index) => commit(`older-${index}`, ['README.md']))
+        ];
+        const github = {
+            getGitHubApi() {
+                return {
+                    repository: { owner: 'owner', repo: 'repo' },
+                    octokit: {
+                        rest: { repos: { listCommits: 'listCommits' } },
+                        async paginate(_endpoint, options) {
+                            assert.deepEqual(options, {
+                                owner: 'owner',
+                                repo: 'repo',
+                                sha: 'master',
+                                path: 'packages/plugin/package.json',
+                                per_page: 100
+                            });
+                            return [{ sha: 'manifest-update' }, { sha: 'added' }];
+                        }
+                    }
+                };
+            },
+            async *mergeCommitIterator(_branch, { maxResults }) {
+                yield* history.slice(0, maxResults);
+            }
+        };
+        const plugin = bundledChangesPlugin(github, 'master', packages, { 'packages/plugin': '0.0.0' });
+        const commits = { 'packages/plugin': [] };
+
+        await plugin.preconfigure({ 'packages/plugin': {} }, commits, {});
+
+        assert.deepEqual(
+            commits['packages/plugin'].map((entry) => entry.sha),
+            ['after-addition', 'added']
+        );
+    });
+
     it('trims action notes to the previous published tag when the manifest release SHA is missing', async () => {
         const history = [
             commit('after-first-release', ['actions/publish-action/src/index.mjs']),
@@ -259,6 +299,17 @@ describe('bundled release commits', () => {
 
     it('rejects truncated initial-release histories rather than quietly omitting changes', async () => {
         const github = {
+            getGitHubApi() {
+                return {
+                    repository: { owner: 'owner', repo: 'repo' },
+                    octokit: {
+                        rest: { repos: { listCommits: 'listCommits' } },
+                        async paginate() {
+                            return [{ sha: 'two' }];
+                        }
+                    }
+                };
+            },
             async *mergeCommitIterator() {
                 yield commit('one', []);
                 yield commit('two', []);

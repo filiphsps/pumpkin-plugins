@@ -158,11 +158,13 @@ which trigger the normal pull-request CI checks.
 `scripts/release-commits.mjs` supplies shared commits through its plugin hook before versions and
 changelogs are calculated. Features, fixes and performance improvements appear in the notes. After
 publishing, the runner reloads the manifest before generating PRs. Each plugin's commits stop at its
-own latest release, and action commits are trimmed to that same boundary, so first-release notes do
-not repeat in the next release. If a manifest version has no matching GitHub release or tag, the
-helper uses the latest published release for that component with a lower version as the history
-boundary. It fails if no such release exists or if it cannot fetch enough history, rather than
-publishing incomplete notes. Increase `commit-search-depth` in the release configuration if needed.
+own latest release, and first-release notes start at the commit that added the plugin's `package.json`.
+Action commits are trimmed to their latest release boundary, so first-release notes do not repeat in
+the next release. If a manifest version has no matching GitHub release or tag, the helper uses the
+latest published release for that component with a lower version as the history boundary. It fails
+if no such release or package introduction commit exists, or if it cannot fetch enough history,
+rather than publishing incomplete notes. Increase `commit-search-depth` in the release configuration
+if a component has more than that many commits since its boundary.
 Changelogs stay generated; do not edit them by hand. Empty version-only `Release-As` commits need a
 conventional-commit scope matching the component so only that release is affected.
 
