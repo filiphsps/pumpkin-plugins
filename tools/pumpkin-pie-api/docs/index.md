@@ -153,8 +153,45 @@ at source commit `6f89a3ab002d4e19b3238789f620a0cbf7a85224` (workspace version 0
 No Rust implementation is translated or vendored. PumpkinPIE is GPL-3.0-only; this workspace tool
 is MIT. Provider artifacts must stay external/ignored with source commit, license and SHA-256 recorded.
 
-Local unit and type tests do **not** prove real IPC. Plan 016's TabDisplay/PIE integration fixture is
-not implemented yet, so the real-provider gate remains **BLOCKED**. No provider artifact was loaded
-or hashed for this work. The required ABI remains `@pumpkinmc/pumpkin-api-ts` v0.1.1 on Pumpkin
-`0.2.0+26.3-26.51`; neither pin was changed. Close this gate only after the pinned provider's real IPC,
-callback guard, outage/recovery and batch-context tests pass and its artifact SHA-256 is recorded.
+## Pinned provider integration fixture
+
+Run the package's integration project from the repo root:
+
+```sh
+pnpm --filter @pumpkin-plugins/pumpkin-pie-api test:integration
+```
+
+Global setup downloads the exact
+[PumpkinPIE v0.2.3 release](https://github.com/Rennex07/PumpkinPIE/releases/tag/v0.2.3), never `latest`,
+and verifies its SHA-256 before loading it. The provider and server are resolved before workers start.
+The provider is cached at `.cache/pumpkin-pie/v0.2.3-pumpkin_pie_plugin.wasm`; cached bytes are also
+verified on every resolution. An interrupted or rejected download never becomes the cached artifact.
+A checksum mismatch fails the run rather than silently selecting another release. The WASM stays
+ignored and outside the MIT package's production exports and shipped source files.
+
+| Provenance | Pin |
+| --- | --- |
+| Provider asset | `pumpkin_pie_plugin.wasm` |
+| Release tag | `v0.2.3` |
+| Provider source commit | `b7cbb14417b397bca71a36b62efa8caa1ba72354` |
+| SHA-256 | `04c23e0ce814a461eb07efc3641457b893ad4519a073d6bad3dc5799b4d1e61f` |
+| Provider license | GPL-3.0-only |
+| Target Pumpkin release | `0.2.0+26.3-26.51` |
+| Target Pumpkin source commit | `204a94ed895f041a845630d5a23c094705a0704e` |
+| Workspace API artifact | `@pumpkinmc/pumpkin-api-ts` v0.1.1 |
+
+The fixture runs on the harness's checksum-verified pinned server (or explicit `PUMPKIN_BIN`
+override), with no ABI upgrade. It fails if the harness release pin no longer matches the provider.
+Tests prove the published provider loads, resolves `%server_online%` from the console, and preserves
+unknown tokens and their unresolved identifiers. They also verify that the valid cache is reused
+without downloading. Unit tests exercise failed downloads and corrupt cached artifacts without
+network access; `pnpm test` and coverage select only the unit project.
+
+Additional integration files can use `inject('pieProviderPath')` from Vitest after this global setup
+and pass it to `startPumpkin({ plugins: [providerPath, consumerPath] })`. Build any guest consumer
+before that test. Do not substitute Node unit transports for the compiled consumer's host IPC.
+
+These provider tests do **not** yet prove the TypeScript client's guest IPC, expansion callbacks,
+or TabDisplay's player-context mapping. Plan 015's full real-IPC gate remains **BLOCKED** pending
+Plan 016's compiled consumer/provider fixture and scenarios. The targeted release is now available
+to those tests, and its artifact provenance and ABI load have been verified.
