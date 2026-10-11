@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.13](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.12...distant-horizons-support-pumpkin-v0.0.13) (2026-10-11)
+
+
+### Features
+
+* **plugin-kit:** support dynamic command suggestions ([678396f](https://github.com/filiphsps/pumpkin-plugins/commit/678396fa657faef06152f32240bdb4dbab54290f))
+
+
+### Bug Fixes
+
+* **build:** verify pinned runtime provenance ([04c7590](https://github.com/filiphsps/pumpkin-plugins/commit/04c75909f351abb2bbecd10d7c38ca721753fb1f))
+* **ci:** verify host-specific runtime builds ([825676e](https://github.com/filiphsps/pumpkin-plugins/commit/825676e1fac8934e8ea422c6f77254acd1213b46))
+* **distant-horizons:** defer cache verification to worker ticks ([c442058](https://github.com/filiphsps/pumpkin-plugins/commit/c44205826171adb2708c26a94827d3832bf007a0))
+
 ## [0.0.12](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.11...distant-horizons-support-pumpkin-v0.0.12) (2026-10-08)
 
 
