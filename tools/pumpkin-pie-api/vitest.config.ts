@@ -9,7 +9,10 @@ export default defineConfig({
             reporter: ['text', 'lcov']
         },
         projects: [
-            { extends: true, test: { name: 'unit', include: ['src/**/*.test.ts', 'test/**/*.test.ts'] } },
+            {
+                extends: true,
+                test: { name: 'unit', include: ['src/**/*.test.ts', 'test/**/*.test.ts', 'scripts/**/*.test.ts'] }
+            },
             {
                 extends: true,
                 test: {

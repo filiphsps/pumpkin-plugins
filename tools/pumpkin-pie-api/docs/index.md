@@ -1,26 +1,16 @@
 # PumpkinPIE API
 
-`@pumpkin-plugins/pumpkin-pie-api` integrates with
-[PumpkinPIE](https://github.com/Rennex07/PumpkinPIE), the upstream placeholder provider.
-Install the provider separately using its
-[releases](https://github.com/Rennex07/PumpkinPIE/releases). This TypeScript workspace package
-provides a synchronous protocol 0 client, expansion router and
-plugin-wide recovery session. It is a private workspace package. Its production dependency tree
-contains only `fflate`; the host transport is injected by each consumer.
+<!-- docs:begin overview -->
+<!-- Generated from protocol/session constants, test/provider.ts and package.json. Run `pnpm readme`. -->
 
-## Add the workspace dependencies
+Host-independent TypeScript client, expansion router and recovery session for
+[PumpkinPIE](https://github.com/Rennex07/PumpkinPIE) protocol 0.
+<!-- docs:end overview -->
 
-Replace `your-plugin` with an existing plugin's package name:
-
-```sh
-pnpm --filter @pumpkin-plugins/your-plugin add '@pumpkin-plugins/pumpkin-pie-api@workspace:*' '@pumpkin-plugins/plugin-kit@workspace:*'
-```
-
-This package is private and source-exported; it is not available through a standalone npm install.
-Install a compatible PumpkinPIE provider in the server's `plugins/` directory and restart the server.
-The [integration fixture](#pinned-provider-integration-fixture) records the provider/server pair
-verified in this repo. Plugin code imports `ipcSend` from the host adapter; the API itself stays
-host-independent.
+Private workspace package. Its production dependency tree contains only `fflate`;
+the host transport is injected by each consumer. See the upstream
+[repository](https://github.com/Rennex07/PumpkinPIE) and
+[releases](https://github.com/Rennex07/PumpkinPIE/releases).
 
 ## Resolve a line
 
@@ -31,7 +21,7 @@ import { PieClient } from '@pumpkin-plugins/pumpkin-pie-api';
 import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
 
 const pie = new PieClient(ipcSend);
-const provider = pie.ping(); // Throws IncompatibleError for any protocol other than 0.
+const provider = pie.ping(); // Throws IncompatibleError for an unsupported protocol.
 const line = pie.resolve('Hello %player_name% — %server_online% online', 'Steve');
 ```
 
@@ -182,7 +172,8 @@ cannot protect the server from a third-party callback that hangs.
 
 Standalone `PieClient.registerExpansion(registration)` returns registration details; read its `.cache`
 field for the provider's applied cache policy.
-TTL requests may exceed 60000 ms, but the provider clamps them; TTL zero may be echoed as `never`.
+TTL requests may exceed the [protocol cap](#batches-and-byte-limits), but the provider clamps them;
+TTL zero may be echoed as `never`.
 `PieSession.appliedCache(namespace)` exposes the latest applied policy, and clears it during outages.
 There is no second stale-value cache in this library.
 
@@ -193,13 +184,20 @@ Coordinate ownership centrally rather than letting independent components unregi
 
 ## Scheduling, recovery and failures
 
+<!-- docs:begin scheduling -->
+<!-- Generated from protocol/session constants, test/provider.ts and package.json. Run `pnpm readme`. -->
+
 The session starts unavailable. Call `tick()` explicitly with a monotonic millisecond clock; there
-are no global timers. Failed attempts back off from 1 second to 30 seconds. Successful sessions ping
-and renew desired registrations every 30 seconds by default (`pingIntervalMs`: 1000–30000).
+are no global timers. Failed attempts use exponential backoff (1000–30000 ms).
+Successful sessions ping and renew desired registrations every
+30000 ms by default (`pingIntervalMs`: 1000–30000 ms).
+<!-- docs:end scheduling -->
+
 Periodic registration detects identical-version provider replacement and restores namespaces; the
 wire has no restart epoch. Renewal can invalidate the provider's expansion cache. `onTransition`
 fires only when availability changes, suitable for transition warnings without repeated logs.
-An incompatible provider is retried without registering namespaces until protocol 0 is available.
+An incompatible provider is retried without registering namespaces until a compatible protocol
+is available.
 
 Errors distinguish local `InputError`, transport `UnavailableError`, provider `RejectedError`,
 unsupported `IncompatibleError`, malformed/mismatched `ProtocolError`, and callback `ReentryError`.
@@ -213,9 +211,20 @@ Messages are UTF-8 JSON objects with `op`, no invented version field. Successful
 the correct result wrapper. Unknown additive fields are ignored. Invalid UTF-8, JSON, required
 fields, counts, cache policies, contradictory values or result variants fail validation.
 
-Limits are 1 MiB per encoded message, 32 KiB per input/output text, 128 bytes per identifier, name,
-namespace, viewer or argument, and 8192 lines per batch. Unicode is counted in UTF-8 bytes, and JSON
-escaping overhead counts toward message size. Unpaired UTF-16 surrogates are refused locally.
+<!-- docs:begin limits -->
+<!-- Generated from protocol/session constants, test/provider.ts and package.json. Run `pnpm readme`. -->
+
+| Limit | Maximum |
+| --- | --- |
+| Encoded message | 1048576 bytes |
+| Input/output text | 32768 bytes |
+| Identifier, name, namespace, viewer or argument | 128 bytes |
+| Lines per batch | 8192 |
+| Expansion TTL cap | 60000 ms |
+<!-- docs:end limits -->
+
+Unicode is counted in UTF-8 bytes, and JSON escaping overhead counts toward message size.
+Unpaired UTF-16 surrogates are refused locally.
 The whole batch is validated before sending. Every output is checked, and result count must match
 exactly before mapping positions: upstream silently drops oversized input lines.
 
@@ -243,7 +252,7 @@ Test recovery with a virtual clock instead of sleeping. Initial failure is retri
 
 ```ts
 import { expect, it } from 'vitest';
-import { PieSession } from '@pumpkin-plugins/pumpkin-pie-api';
+import { PIE_PROVIDER, PROTOCOL_VERSION, PieSession } from '@pumpkin-plugins/pumpkin-pie-api';
 import { FakeClock, FakeTransport } from '@pumpkin-plugins/pumpkin-pie-api/testing';
 
 it('recovers when the provider becomes available', () => {
@@ -252,7 +261,7 @@ it('recovers when the provider becomes available', () => {
     transport.enqueue(new Error('provider is not loaded'));
     transport.enqueue({
         ok: true,
-        ping: { protocol: 0, name: 'PumpkinPIE', version: '0.2.3', placeholders: 11, expansions: 0 }
+        ping: { protocol: PROTOCOL_VERSION, name: PIE_PROVIDER, version: 'test-provider', placeholders: 0, expansions: 0 }
     });
     const pie = new PieSession({ send: transport.send, now: clock.now });
     pie.tick();
@@ -269,13 +278,6 @@ it('recovers when the provider becomes available', () => {
 });
 ```
 
-The original TypeScript implementation follows the public
-[protocol contract](https://github.com/Rennex07/PumpkinPIE/blob/6f89a3ab002d4e19b3238789f620a0cbf7a85224/docs/protocol.md)
-and [wire definitions](https://github.com/Rennex07/PumpkinPIE/blob/6f89a3ab002d4e19b3238789f620a0cbf7a85224/crates/pumpkin-pie/src/protocol.rs)
-at source commit `6f89a3ab002d4e19b3238789f620a0cbf7a85224` (workspace version 0.2.3).
-No Rust implementation is translated or vendored. PumpkinPIE is GPL-3.0-only; this workspace tool
-is MIT. Provider artifacts must stay external/ignored with source commit, license and SHA-256 recorded.
-
 ## Pinned provider integration fixture
 
 Run the package's integration project from the repo root:
@@ -284,24 +286,33 @@ Run the package's integration project from the repo root:
 pnpm --filter @pumpkin-plugins/pumpkin-pie-api test:integration
 ```
 
+<!-- docs:begin provenance -->
+<!-- Generated from protocol/session constants, test/provider.ts and package.json. Run `pnpm readme`. -->
+
 Global setup downloads the exact
 [PumpkinPIE v0.2.3 release](https://github.com/Rennex07/PumpkinPIE/releases/tag/v0.2.3), never `latest`,
 and verifies its SHA-256 before loading it. The provider and server are resolved before workers start.
 The provider is cached at `.cache/pumpkin-pie/v0.2.3-pumpkin_pie_plugin.wasm`; cached bytes are also
 verified on every resolution. An interrupted or rejected download never becomes the cached artifact.
-A checksum mismatch fails the run rather than silently selecting another release. The WASM stays
-ignored and outside the MIT package's production exports and shipped source files.
+A checksum mismatch fails the run rather than silently selecting another release.
 
 | Provenance | Pin |
 | --- | --- |
 | Provider asset | `pumpkin_pie_plugin.wasm` |
 | Release tag | `v0.2.3` |
-| Provider source commit | `b7cbb14417b397bca71a36b62efa8caa1ba72354` |
+| Provider source commit | [`b7cbb14417b397bca71a36b62efa8caa1ba72354`](https://github.com/Rennex07/PumpkinPIE/tree/b7cbb14417b397bca71a36b62efa8caa1ba72354) |
 | SHA-256 | `04c23e0ce814a461eb07efc3641457b893ad4519a073d6bad3dc5799b4d1e61f` |
 | Provider license | GPL-3.0-only |
 | Target Pumpkin release | `0.2.0+26.3-26.51` |
 | Target Pumpkin source commit | `204a94ed895f041a845630d5a23c094705a0704e` |
-| Workspace API artifact | `@pumpkinmc/pumpkin-api-ts` v0.1.1 |
+| Target API artifact | `@pumpkinmc/pumpkin-api-ts` v0.1.1 |
+| Workspace tool license | MIT |
+
+The pinned provider's [protocol contract](https://github.com/Rennex07/PumpkinPIE/blob/b7cbb14417b397bca71a36b62efa8caa1ba72354/docs/protocol.md)
+and [wire definitions](https://github.com/Rennex07/PumpkinPIE/blob/b7cbb14417b397bca71a36b62efa8caa1ba72354/crates/pumpkin-pie/src/protocol.rs)
+document the external protocol. No Rust implementation is translated or vendored.
+Provider artifacts stay external and ignored, outside the workspace tool's production exports and shipped source files.
+<!-- docs:end provenance -->
 
 The fixture runs on the harness's checksum-verified pinned server (or explicit `PUMPKIN_BIN`
 override), with no ABI upgrade. It fails if the harness release pin no longer matches the provider.

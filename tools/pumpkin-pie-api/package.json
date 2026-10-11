@@ -45,12 +45,15 @@
         "typecheck": "tsc --noEmit",
         "test": "vitest run --project unit",
         "test:coverage": "vitest run --project unit --coverage",
-        "test:integration": "vitest run --project integration"
+        "test:integration": "vitest run --project integration",
+        "readme": "node scripts/generate-docs.ts",
+        "readme:check": "node scripts/generate-docs.ts --check"
     },
     "dependencies": {
         "fflate": "catalog:"
     },
     "devDependencies": {
+        "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",

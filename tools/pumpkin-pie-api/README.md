@@ -1,7 +1,11 @@
 # @pumpkin-plugins/pumpkin-pie-api
 
+<!-- docs:begin overview -->
+<!-- Generated from protocol/session constants, test/provider.ts and package.json. Run `pnpm readme`. -->
+
 Host-independent TypeScript client, expansion router and recovery session for
 [PumpkinPIE](https://github.com/Rennex07/PumpkinPIE) protocol 0.
+<!-- docs:end overview -->
 
 PumpkinPIE is the separately installed placeholder provider. Get its plugin and upstream
 documentation from the [PumpkinPIE repository](https://github.com/Rennex07/PumpkinPIE);
@@ -11,13 +15,7 @@ Private workspace package; see the [guide](docs/index.md).
 
 ## Quick start
 
-Add the API and host adapter to a plugin in this workspace:
-
-```sh
-pnpm --filter @pumpkin-plugins/your-plugin add '@pumpkin-plugins/pumpkin-pie-api@workspace:*' '@pumpkin-plugins/plugin-kit@workspace:*'
-```
-
-With the upstream provider loaded, inject `ipcSend`, negotiate protocol 0, and resolve text:
+With the upstream provider loaded, inject `ipcSend`, negotiate compatibility, and resolve text:
 
 ```ts
 import { PieClient } from '@pumpkin-plugins/pumpkin-pie-api';

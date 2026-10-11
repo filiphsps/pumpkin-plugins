@@ -630,6 +630,9 @@ importers:
         specifier: 'catalog:'
         version: 0.8.3
     devDependencies:
+      '@pumpkin-plugins/docs':
+        specifier: workspace:*
+        version: link:../docs
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../test-harness

@@ -12,6 +12,7 @@ import {
     UnavailableError,
     validateCache
 } from './protocol.ts';
+import { SESSION_TIMING } from './session-timing.ts';
 
 /** Availability state, without cached placeholder values or error payloads. */
 export type SessionState =
@@ -35,15 +36,19 @@ export class PieSession {
     private readonly applied = new Map<string, Cache>();
     private readonly guard = new CallbackGuard();
     private nextAttempt = -Infinity;
-    private backoff = 1000;
+    private backoff: number = SESSION_TIMING.initialRetryMs;
     private stopped = false;
     private reachable = false;
     private readonly interval: number;
     /** One session per calling plugin; no global timers or watcher per line. */
     constructor(private readonly options: SessionOptions) {
-        this.interval = options.pingIntervalMs ?? 30000;
-        if (!Number.isFinite(this.interval) || this.interval < 1000 || this.interval > 30000)
-            throw new InputError('Ping interval must be 1000–30000 ms');
+        this.interval = options.pingIntervalMs ?? SESSION_TIMING.defaultPingMs;
+        if (
+            !Number.isFinite(this.interval) ||
+            this.interval < SESSION_TIMING.minPingMs ||
+            this.interval > SESSION_TIMING.maxPingMs
+        )
+            throw new InputError(`Ping interval must be ${SESSION_TIMING.minPingMs}–${SESSION_TIMING.maxPingMs} ms`);
         const provider = options.provider ?? PIE_PROVIDER;
         this.client = new PieClient(options.send, { guard: this.guard, provider });
         this.router = new ExpansionRouter(this.guard, provider);
@@ -71,7 +76,7 @@ export class PieSession {
         this.desired.set(key, { namespace: key, placeholders: names, cache: policy });
         this.nextAttempt = -Infinity;
     }
-    /** Ping and renew registrations when due, with 1–30 second retry backoff. */
+    /** Ping and renew registrations when due, with bounded retry backoff. */
     tick(): void {
         this.guard.assertOutside();
         if (this.stopped) return;
@@ -88,14 +93,14 @@ export class PieSession {
                 applied.set(key, this.client.registerExpansion(registration).cache);
             this.applied.clear();
             for (const [key, policy] of applied) this.applied.set(key, policy);
-            this.backoff = 1000;
+            this.backoff = SESSION_TIMING.initialRetryMs;
             this.nextAttempt = now + this.interval;
             state = { kind: 'ready', info };
         } catch (error) {
             if (error instanceof UnavailableError || error instanceof IncompatibleError) this.reachable = false;
             this.applied.clear();
             this.nextAttempt = now + this.backoff;
-            this.backoff = Math.min(this.backoff * 2, 30000);
+            this.backoff = Math.min(this.backoff * 2, SESSION_TIMING.maxRetryMs);
             state = { kind: error instanceof IncompatibleError ? 'incompatible' : 'unavailable' };
         }
         this.transition(state);
