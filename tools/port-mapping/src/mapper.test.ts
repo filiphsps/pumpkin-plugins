@@ -361,6 +361,57 @@ describe('PortMapper', () => {
         expect(net.leaks).toBe(0);
     });
 
+    it('reasserts permanent mappings at the bounded maintenance cadence and refreshes WAN state', () => {
+        const { igd, mapper, settle, net } = setup(new FakeIgd({ natPmp: false, permanentLeasesOnly: true }));
+        const adds = () => igd?.actions.filter((a) => a === 'AddPortMapping').length;
+        mapper.request('first', spec);
+        mapper.request('second', { ...spec, description: 'Other owner' });
+        settle(() => open(mapper.state('first')));
+        expect(adds()).toBe(2); // Initial finite-lease attempt, then permanent fallback.
+        igd?.mappings.clear();
+        if (igd) igd.options.externalAddress = [93, 184, 216, 35];
+        settle(() => false, 59_000);
+        expect(adds()).toBe(2);
+        settle(() => igd?.mappings.size === 1, 2000);
+        expect(adds()).toBe(3);
+        expect(igd?.mappings.get('tcp:8123')?.leaseSeconds).toBe(0);
+        expect(mapper.state('second')).toMatchObject({ address: [93, 184, 216, 35] });
+        expect(mapper.info().externalAddress).toEqual([93, 184, 216, 35]);
+        mapper.release('first');
+        settle(() => false, 1000);
+        expect(igd?.mappings.size).toBe(1);
+        runSteps(net, mapper.releaseAll());
+        expect(igd?.mappings.size).toBe(0);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('performs one permanent reassertion after a long idle interval rather than catching up every missed period', () => {
+        const { igd, mapper, settle, net } = setup(new FakeIgd({ natPmp: false, permanentLeasesOnly: true }));
+        mapper.request('web', spec);
+        settle(() => open(mapper.state('web')));
+        net.time += 60 * 60_000;
+        settle(() => false, 1000);
+        expect(igd?.actions.filter((a) => a === 'AddPortMapping')).toHaveLength(3);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('backs off a failed permanent reassertion before recovering the owned mapping', () => {
+        const { igd, mapper, settle, net } = setup(new FakeIgd({ natPmp: false, permanentLeasesOnly: true }));
+        mapper.request('web', spec);
+        settle(() => open(mapper.state('web')));
+        if (igd) igd.options.failMappingWith = 501;
+        net.time += 60_000;
+        settle(() => mapper.state('web')?.kind === 'failed', 1000);
+        expect(mapper.state('web')?.kind).toBe('failed');
+        const adds = igd?.actions.filter((a) => a === 'AddPortMapping').length;
+        settle(() => false, 29_000);
+        expect(igd?.actions.filter((a) => a === 'AddPortMapping')).toHaveLength(adds ?? 0);
+        if (igd) igd.options.failMappingWith = undefined;
+        settle(() => open(mapper.state('web')), 60_000);
+        expect(mapper.state('web')).toMatchObject({ kind: 'open' });
+        expect(net.leaks).toBe(0);
+    });
+
     it('asks for another public port when the first is taken', () => {
         const { igd, mapper, settle } = setup(new FakeIgd({ takenPorts: [8123] }));
         mapper.request('web', spec);

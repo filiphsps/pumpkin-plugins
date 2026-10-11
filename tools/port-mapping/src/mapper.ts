@@ -352,7 +352,7 @@ export class PortMapper {
                     internalPort: entry.spec.port,
                     externalPort,
                     description: entry.spec.description,
-                    leaseSeconds: this.options.leaseSeconds
+                    leaseSeconds: entry.applied?.result.leaseSeconds === 0 ? 0 : this.options.leaseSeconds
                 };
                 const owner = this.ownerOf(found, request, internal, entry);
                 if (owner) {
@@ -377,10 +377,13 @@ export class PortMapper {
             const address = yield* gateway.externalAddress();
             if (!this.owned(entry)) return;
             const { result } = entry.applied;
+            found.externalAddress = address;
             entry.state = { kind: 'open', via: gateway.kind, address, port: result.externalPort };
             entry.failures = 0;
             this.warned.delete(`open:${key}`);
-            entry.renewAt = result.leaseSeconds > 0 ? this.net.now() + (result.leaseSeconds * 1000) / 2 : undefined;
+            // Permanent leases still need recovery after router reboot or WAN address changes.
+            entry.renewAt =
+                this.net.now() + (result.leaseSeconds > 0 ? (result.leaseSeconds * 1000) / 2 : LOCAL_CHECK_MS);
             if (!wasOpen) {
                 this.options.log?.(
                     `Opened ${entry.spec.protocol.toUpperCase()} port ${entry.spec.port} as ${formatIpv4(address)}:${result.externalPort} (${gateway.kind}).`
