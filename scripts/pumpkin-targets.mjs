@@ -216,3 +216,11 @@ export async function targetEnvironment(root = REPO_ROOT, env = process.env) {
         PUMPKIN_WIT_REVISION: fingerprint(inputs.witRoot)
     };
 }
+
+/** Resolves the API module Vitest must execute for the selected profile. */
+export async function testApiAlias(root = REPO_ROOT, env = process.env) {
+    const entry =
+        env.PUMPKIN_API_ENTRY ||
+        (await resolveBuildTarget(path.join(root, 'tools/plugin-kit'), { root, env })).apiEntry;
+    return { '@pumpkinmc/pumpkin-api-ts': entry };
+}

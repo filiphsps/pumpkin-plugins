@@ -26,3 +26,6 @@ export function resolveBuildTarget(
 }>;
 /** Computes content identities for a Turbo invocation. */
 export function targetEnvironment(root?: string, env?: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv>;
+
+/** Selects the API runtime import used by Vitest. */
+export function testApiAlias(root?: string, env?: NodeJS.ProcessEnv): Promise<Record<string, string>>;
