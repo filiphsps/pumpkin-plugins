@@ -3,46 +3,8 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-
-const REPOSITORY = 'Pumpkin-MC/Pumpkin';
-const RELEASES_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
-const NIGHTLY_API = `https://api.github.com/repos/${REPOSITORY}/releases/tags/nightly`;
-const RELEASE_METADATA_TTL_MS = 24 * 60 * 60 * 1000;
-const RELEASE_METADATA_FILE = 'latest-release.json';
-const NIGHTLY_METADATA_FILE = 'latest-nightly.json';
-
-/** Returns the Pumpkin release asset name for a platform. */
-export function assetName(platform, arch) {
-    const names = {
-        'darwin-arm64': 'pumpkin-ARM64-macOS',
-        'linux-x64': 'pumpkin-X64-Linux',
-        'linux-arm64': 'pumpkin-ARM64-Linux',
-        'win32-x64': 'pumpkin-X64-Windows.exe',
-        'win32-arm64': 'pumpkin-ARM64-Windows.exe'
-    };
-    const asset = names[`${platform}-${arch}`];
-    if (!asset) throw new Error(`No Pumpkin release binary for ${platform}-${arch}`);
-    return asset;
-}
-
-/** Parses a sha256sum manifest into a map of asset name to digest. */
-export function parseChecksums(text) {
-    const checksums = new Map();
-    for (const line of text.split('\n')) {
-        const match = /^([0-9a-f]{64})\s+\*?(.+?)\s*$/i.exec(line);
-        if (match) checksums.set(match[2], match[1].toLowerCase());
-    }
-    return checksums;
-}
-
-/** Finds a release asset by name. */
-export function releaseAsset(release, name) {
-    const asset = release.assets?.find((candidate) => candidate.name === name);
-    if (!asset?.browser_download_url) {
-        throw new Error(`Pumpkin release ${release.tag_name ?? '(unknown)'} is missing ${name}`);
-    }
-    return asset;
-}
+import { resolvePumpkinBinary as resolvePinnedBinary } from '../tools/test-harness/src/binary.ts';
+import { readTarget, targetEnvironment } from './pumpkin-targets.mjs';
 
 /** Lists every plugin package and the WASM output declared in its manifest. */
 export function listPluginBuilds(root) {
@@ -85,200 +47,12 @@ export function copyPluginBuild(plugin, serverPluginsDir) {
     return destination;
 }
 
-function isValidRelease(release) {
-    return (
-        typeof release?.tag_name === 'string' &&
-        release.tag_name.length > 0 &&
-        release.prerelease === false &&
-        release.draft === false &&
-        Array.isArray(release.assets)
-    );
-}
-
-function isValidNightlyRelease(release) {
-    return (
-        release?.tag_name === 'nightly' &&
-        release.prerelease === true &&
-        release.draft === false &&
-        Array.isArray(release.assets)
-    );
-}
-
-function readReleaseMetadata(metadataPath, isValid = isValidRelease) {
-    try {
-        const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
-        if (!Number.isFinite(metadata.fetchedAt) || !isValid(metadata.release)) return undefined;
-        return metadata;
-    } catch {
-        return undefined;
-    }
-}
-
-function writeReleaseMetadata(metadataPath, metadata) {
-    fs.mkdirSync(path.dirname(metadataPath), { recursive: true });
-    const partial = `${metadataPath}.${process.pid}.partial`;
-    try {
-        fs.writeFileSync(partial, JSON.stringify(metadata));
-        fs.renameSync(partial, metadataPath);
-    } catch (error) {
-        try {
-            fs.rmSync(partial, { force: true });
-        } catch {}
-        throw error;
-    }
-}
-
-async function isRateLimitResponse(response) {
-    if (response.status === 429) return true;
-    if (response.status !== 403) return false;
-    if (
-        response.headers?.get?.('x-ratelimit-remaining') === '0' ||
-        (response.headers?.get?.('retry-after') !== null && response.headers?.get?.('retry-after') !== undefined)
-    )
-        return true;
-    try {
-        const body = await (response.clone?.() ?? response).json();
-        return /rate limit/i.test(body?.message ?? '');
-    } catch {
-        return false;
-    }
-}
-
-async function getLatestRelease(fetchImpl) {
-    let response;
-    try {
-        response = await fetchImpl(RELEASES_API, {
-            headers: {
-                Accept: 'application/vnd.github+json',
-                'User-Agent': 'pumpkin-plugins-dev'
-            }
-        });
-    } catch (cause) {
-        const error = new Error('Could not reach the latest stable Pumpkin release endpoint.', { cause });
-        error.retryable = true;
-        throw error;
-    }
-    if (!response.ok) {
-        const error = new Error(`Could not get the latest stable Pumpkin release (HTTP ${response.status})`);
-        error.retryable = await isRateLimitResponse(response);
-        throw error;
-    }
-    const release = await response.json();
-    if (release?.prerelease || release?.draft) {
-        throw new Error(`GitHub returned a prerelease instead of a stable Pumpkin release (${release?.tag_name})`);
-    }
-    if (!isValidRelease(release)) throw new Error('GitHub returned invalid latest stable Pumpkin release metadata.');
-    return release;
-}
-
-async function getLatestNightly(fetchImpl) {
-    let response;
-    try {
-        response = await fetchImpl(NIGHTLY_API, {
-            headers: {
-                Accept: 'application/vnd.github+json',
-                'User-Agent': 'pumpkin-plugins-dev'
-            }
-        });
-    } catch (cause) {
-        const error = new Error('Could not reach the latest Pumpkin nightly endpoint.', { cause });
-        error.retryable = true;
-        throw error;
-    }
-    if (!response.ok) {
-        const error = new Error(`Could not get the latest Pumpkin nightly build (HTTP ${response.status})`);
-        error.retryable = await isRateLimitResponse(response);
-        throw error;
-    }
-    const release = await response.json();
-    if (!isValidNightlyRelease(release)) {
-        throw new Error(
-            `GitHub returned invalid latest Pumpkin nightly metadata (${release?.tag_name ?? '(unknown)'})`
-        );
-    }
-    return release;
-}
-
-async function fetchText(fetchImpl, url) {
-    const response = await fetchImpl(url);
-    if (!response.ok) throw new Error(`GET ${url} failed: HTTP ${response.status}`);
-    return response.text();
-}
-
-/** Resolves the newest stable or nightly Pumpkin binary, verifies its checksum, and caches it. */
-export async function resolvePumpkinBinary({
-    root,
-    platform = process.platform,
-    arch = process.arch,
-    env = process.env,
-    fetchImpl = fetch,
-    now = Date.now,
-    nightly = false
-}) {
-    if (env.PUMPKIN_BIN) {
-        if (!fs.existsSync(env.PUMPKIN_BIN)) throw new Error(`PUMPKIN_BIN does not exist: ${env.PUMPKIN_BIN}`);
-        return { binary: path.resolve(env.PUMPKIN_BIN), release: 'local PUMPKIN_BIN' };
-    }
-
-    const cacheDir = env.PUMPKIN_CACHE_DIR || path.join(root, '.cache', 'pumpkin');
-    const metadataPath = path.join(cacheDir, nightly ? NIGHTLY_METADATA_FILE : RELEASE_METADATA_FILE);
-    const isValidMetadata = nightly ? isValidNightlyRelease : isValidRelease;
-    const cachedMetadata = readReleaseMetadata(metadataPath, isValidMetadata);
-    const currentTime = now();
-    const cacheIsFresh =
-        !nightly &&
-        cachedMetadata &&
-        currentTime >= cachedMetadata.fetchedAt &&
-        currentTime - cachedMetadata.fetchedAt < RELEASE_METADATA_TTL_MS;
-    let release;
-    if (cacheIsFresh && env.PUMPKIN_REFRESH_RELEASE !== '1') {
-        release = cachedMetadata.release;
-    } else {
-        try {
-            release = nightly ? await getLatestNightly(fetchImpl) : await getLatestRelease(fetchImpl);
-            writeReleaseMetadata(metadataPath, { fetchedAt: now(), release });
-        } catch (error) {
-            if (!cachedMetadata || !error.retryable) throw error;
-            console.warn(
-                `Could not refresh Pumpkin release metadata (${error.message}); using cached release ${cachedMetadata.release.tag_name}.`
-            );
-            release = cachedMetadata.release;
-        }
-    }
-    const assetFile = assetName(platform, arch);
-    const binaryAsset = releaseAsset(release, assetFile);
-    if (nightly && !Number.isSafeInteger(binaryAsset.id)) {
-        throw new Error(`Pumpkin nightly asset ${assetFile} is missing its release asset ID`);
-    }
-    const safeTag = String(release.tag_name).replace(/[^\w.+-]/g, '_');
-    const assetVersion = nightly ? `${safeTag}-${binaryAsset.id}` : safeTag;
-    const target = path.join(cacheDir, `${assetVersion}-${assetFile}`);
-    if (fs.existsSync(target)) return { binary: target, release: release.tag_name };
-
-    let expected;
-    if (nightly) {
-        const digest = /^sha256:([0-9a-f]{64})$/i.exec(binaryAsset.digest ?? '');
-        expected = digest?.[1].toLowerCase();
-        if (!expected) throw new Error(`Pumpkin nightly metadata for ${assetFile} has no valid SHA-256 digest`);
-    } else {
-        const checksumAsset = releaseAsset(release, 'checksums.sha256');
-        const sums = parseChecksums(await fetchText(fetchImpl, checksumAsset.browser_download_url));
-        expected = sums.get(assetFile);
-        if (!expected) throw new Error(`checksums.sha256 for ${release.tag_name} has no entry for ${assetFile}`);
-    }
-
-    console.log(`Downloading Pumpkin ${release.tag_name} (${assetFile})...`);
-    const response = await fetchImpl(binaryAsset.browser_download_url);
-    if (!response.ok) throw new Error(`Downloading ${assetFile} failed: HTTP ${response.status}`);
-    const bytes = Buffer.from(await response.arrayBuffer());
-    const actual = createHash('sha256').update(bytes).digest('hex');
-    if (actual !== expected) throw new Error(`Checksum mismatch for ${assetFile}: expected ${expected}, got ${actual}`);
-
-    fs.mkdirSync(cacheDir, { recursive: true });
-    const partial = `${target}.${process.pid}.partial`;
-    fs.writeFileSync(partial, bytes, { mode: 0o755 });
-    fs.renameSync(partial, target);
-    return { binary: target, release: release.tag_name };
+/** Resolves the pinned server paired with the selected API profile. */
+export async function resolvePumpkinBinary({ root = path.resolve(import.meta.dirname, '..'), apiTarget } = {}) {
+    return {
+        binary: await resolvePinnedBinary({ root, target: apiTarget }),
+        release: readTarget(root, apiTarget).server.tag
+    };
 }
 
 function fileHash(file) {
@@ -416,14 +190,20 @@ export async function runDev({
     spawnImpl = spawn,
     resolveBinary = resolvePumpkinBinary,
     hotReload = true,
-    nightly = false
+    nightly = false,
+    apiTarget = nightly ? 'nightly' : process.env.PUMPKIN_API_TARGET || 'release',
+    prepareEnvironment = targetEnvironment
 } = {}) {
     const plugins = listPluginBuilds(root);
     if (plugins.length === 0) throw new Error('No plugin packages with pumpkinPlugin.output were found');
 
     const serverDir = path.join(root, '.cache', 'pumpkin-dev');
     const serverPluginsDir = createServerDirectory(serverDir, hotReload);
-    const devEnv = { ...process.env, PUMPKIN_DEV_MODE: '1' };
+    const devEnv = await prepareEnvironment(root, {
+        ...process.env,
+        PUMPKIN_API_TARGET: apiTarget,
+        PUMPKIN_DEV_MODE: '1'
+    });
     let outputs;
     let turbo;
     let server;
@@ -450,9 +230,7 @@ export async function runDev({
     process.once('SIGTERM', onTerminate);
 
     try {
-        console.log(
-            `Building every plugin, then launching the latest ${nightly ? 'nightly build' : 'stable release'}.`
-        );
+        console.log(`Building every plugin for Pumpkin target ${apiTarget}.`);
         const initialBuild = startInitialBuild(root, spawnImpl, devEnv);
         turbo = initialBuild;
         const buildResult = initialBuild.done.then(({ code, signal }) => {
@@ -460,7 +238,7 @@ export async function runDev({
                 throw new Error(`turbo run build exited (${signal ?? code ?? 'unknown status'})`);
             }
         });
-        const startup = Promise.all([buildResult, resolveBinary({ root, nightly })]);
+        const startup = Promise.all([buildResult, resolveBinary({ root, apiTarget })]);
         const startupResult = await Promise.race([startup, shutdown]);
         if (shuttingDown) return;
         const [, resolvedBinary] = startupResult;
@@ -471,7 +249,7 @@ export async function runDev({
             outputs = watchBuildOutputs(plugins, serverPluginsDir);
             turbo = spawnChild(
                 pnpmCommand(),
-                ['exec', 'turbo', 'watch', 'build', '--ui=stream', '--log-order=stream'],
+                ['exec', 'turbo', 'watch', 'build', '--force', '--ui=stream', '--log-order=stream'],
                 {
                     cwd: root,
                     stdio: 'inherit',
@@ -504,17 +282,26 @@ export async function runDev({
 
 /** Parses dev server command-line arguments. */
 export function parseDevArgs(args) {
-    return {
-        hotReload: !args.includes('--no-hot-reload'),
-        nightly: args.includes('--nightly')
-    };
+    const index = args.indexOf('--api-target');
+    if (index >= 0 && (!args[index + 1] || args[index + 1].startsWith('--')))
+        throw new Error('--api-target requires a target');
+    const nightly = args.includes('--nightly');
+    const apiTarget = index >= 0 ? args[index + 1] : nightly ? 'nightly' : process.env.PUMPKIN_API_TARGET || 'release';
+    if (nightly && apiTarget !== 'nightly') throw new Error('--nightly and --api-target conflict');
+    const known = new Set(['--no-hot-reload', '--nightly', '--api-target']);
+    const unknown = args.find((arg, i) => !(index >= 0 && i === index + 1) && !known.has(arg));
+    if (unknown) throw new Error(`Unknown dev argument: ${unknown}`);
+    return { hotReload: !args.includes('--no-hot-reload'), nightly, apiTarget };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-    const { hotReload, nightly } = parseDevArgs(process.argv.slice(2));
-    const command = hotReload ? 'pnpm dev' : 'pnpm dev:no-hot-reload';
-    runDev({ hotReload, nightly }).catch((error) => {
+    let command = 'pnpm dev';
+    try {
+        const options = parseDevArgs(process.argv.slice(2));
+        if (!options.hotReload) command = 'pnpm dev:no-hot-reload';
+        await runDev(options);
+    } catch (error) {
         console.error(`${command}: ${error.message}`);
         process.exitCode = 1;
-    });
+    }
 }

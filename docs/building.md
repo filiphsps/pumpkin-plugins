@@ -115,17 +115,15 @@ Run one plugin with `pnpm exec turbo run build --filter=@pumpkin-plugins/<folder
 
 ## Run all plugins on Pumpkin
 
-Run `pnpm dev` to build every plugin and start the latest stable Pumpkin release. Run
-`pnpm dev --nightly` or `pnpm dev:nightly` to use Pumpkin's latest nightly build instead. Stable
-release metadata is cached in `.cache/pumpkin` for 24 hours; set `PUMPKIN_REFRESH_RELEASE=1` to force
-a one-run refresh. Nightly metadata refreshes on every start because the `nightly` tag is reused, and
-the binary cache uses the uploaded asset ID to pick up replaced builds. Stable binaries are checked
-against `checksums.sha256`; nightly binaries are checked against their GitHub release asset SHA-256
-digest.
+Run `pnpm dev` to build every plugin and start the server paired with the default API profile.
+Run `pnpm dev --nightly`, `pnpm dev:nightly`, or `pnpm dev --api-target nightly` to select the pinned
+nightly API/WIT/server tuple. Other configured profile names work with `--api-target` or
+`PUMPKIN_API_TARGET`. Binaries use the same resolver and checksum verification as integration tests.
 
-Run `pnpm dev:no-hot-reload` to build once and start the same server with plugin hot reload and
-build watchers disabled. Add `--nightly` or run `pnpm dev:nightly:no-hot-reload` to use the latest
-nightly build. Restart the command after changing a plugin.
+Run `pnpm dev:no-hot-reload` to build once with plugin hot reload and watchers disabled. Add
+`--nightly` or run `pnpm dev:nightly:no-hot-reload` for the nightly tuple. Restart after changing a
+local API/WIT checkout: Turbo watches workspace plugin sources. Watch builds bypass task caches to
+avoid reusing artifacts after API source changes during a running session.
 
 The dev server lives in `.cache/pumpkin-dev`, so its world and settings remain between runs. Each
 command sets Pumpkin's plugin hot reload to match the selected mode. In hot-reload mode, `pnpm dev`
@@ -135,7 +133,7 @@ while build outputs live under each package. A file linked to a build output wou
 when the target changes. Automatic Market update checks are disabled for these development builds.
 Reloading plugins that request permissions still requires granting permissions on their initial load.
 
-Set `PUMPKIN_BIN` to use a local server binary instead of downloading the latest release. Set
+Set `PUMPKIN_BIN` to use a local server binary instead of downloading the selected profile's server. Set
 `PUMPKIN_CACHE_DIR` to change the binary cache directory. To reset the dev server's world, config and
 plugins, stop the server and remove `.cache/pumpkin-dev`.
 
