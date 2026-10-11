@@ -1,7 +1,7 @@
 import type { InputStream, OutputStream } from 'wasi:io/streams@0.2.3';
 import type { IpSocketAddress, Network as WasiNet } from 'wasi:sockets/network@0.2.3';
 import type { TcpSocket } from 'wasi:sockets/tcp@0.2.3';
-import type { UdpSocket } from 'wasi:sockets/udp@0.2.3';
+import type { IncomingDatagram, UdpSocket } from 'wasi:sockets/udp@0.2.3';
 import { wasiErrorCode } from '@pumpkin-plugins/plugin-kit/wasi-error';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import type { Connection, Datagram, DatagramSocket, Dial, Endpoint, Ipv4, Network } from '../port-mapping.ts';
@@ -61,6 +61,7 @@ function bindAnyPort(socket: UdpSocket, network: WasiNet): void {
 
 class WasiDatagramSocket implements DatagramSocket {
     private closed = false;
+    private pending: IncomingDatagram[] = [];
 
     constructor(
         private readonly socket: UdpSocket,
@@ -75,15 +76,20 @@ class WasiDatagramSocket implements DatagramSocket {
     }
 
     receive(): Datagram | undefined {
-        const [first] = this.incoming.receive(BigInt(RECEIVE_BATCH));
-        if (first?.remoteAddress.tag !== 'ipv4') return undefined;
-        const { address: from, port } = first.remoteAddress.val;
-        return { from: { address: [from[0], from[1], from[2], from[3]], port }, data: first.data };
+        if (this.closed) return undefined;
+        if (this.pending.length === 0) this.pending = this.incoming.receive(BigInt(RECEIVE_BATCH));
+        for (let packet = this.pending.shift(); packet; packet = this.pending.shift()) {
+            if (packet.remoteAddress.tag !== 'ipv4') continue;
+            const { address: from, port } = packet.remoteAddress.val;
+            return { from: { address: [from[0], from[1], from[2], from[3]], port }, data: packet.data };
+        }
+        return undefined;
     }
 
     close(): void {
         if (this.closed) return;
         this.closed = true;
+        this.pending = [];
         for (const resource of [this.incoming, this.outgoing, this.socket]) {
             try {
                 disposeWasiResource(resource);

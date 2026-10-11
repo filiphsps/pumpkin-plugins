@@ -1,5 +1,7 @@
 import type { TcpSocket } from 'wasi:sockets/tcp@0.2.3';
 import type { IncomingDatagram, OutgoingDatagram, UdpSocket } from 'wasi:sockets/udp@0.2.3';
+import { discover } from '@pumpkin-plugins/port-mapping';
+import { FakeIgd, FakeNetwork, runSteps } from '@pumpkin-plugins/port-mapping/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { type Sockets, WasiNetwork } from './wasi-network.ts';
 
@@ -17,6 +19,8 @@ const datagram = (address: [number, number, number, number], port: number, body:
 
 interface FakeUdp {
     socket: UdpSocket;
+    /** Calls into the incoming host stream. */
+    readonly incoming: { receive(max: bigint): IncomingDatagram[] };
     /** The address the socket reports itself as. */
     setLocal(address: [number, number, number, number]): void;
     /** Make the next `finishBind` calls report `would-block`. */
@@ -73,6 +77,7 @@ function fakeUdp(local: [number, number, number, number] = [192, 168, 1, 50]): F
     };
     return {
         socket: socket as unknown as UdpSocket,
+        incoming,
         setLocal: (address) => (local = address),
         blockBind: (times) => (blocks = times),
         failBind: (code) => (bindError = code),
@@ -183,13 +188,67 @@ describe('a datagram socket', () => {
         expect(udp.sent).toEqual([]);
     });
 
-    it('reads the first datagram of a batch and then nothing', () => {
+    it('delivers every datagram in a received batch in order', () => {
         const udp = fakeUdp();
         udp.queue([datagram([192, 168, 1, 1], 1900, 'first'), datagram([10, 0, 0, 1], 1900, 'second')]);
         const socket = adapter(fakeTcp(), udp).openDatagram();
 
         expect(socket.receive()).toEqual({ from: router, data: bytes('first') });
+        expect(socket.receive()).toEqual({ from: { address: [10, 0, 0, 1], port: 1900 }, data: bytes('second') });
         expect(socket.receive()).toBeUndefined();
+    });
+
+    it('skips an unsupported address family without losing the valid packet behind it', () => {
+        const udp = fakeUdp();
+        udp.queue([
+            {
+                data: bytes('ipv6'),
+                remoteAddress: {
+                    tag: 'ipv6',
+                    val: { port: 1900, flowInfo: 0, scopeId: 0, address: [0, 0, 0, 0, 0, 0, 0, 1] }
+                }
+            },
+            datagram([192, 168, 1, 1], 1900, 'valid')
+        ]);
+        const socket = adapter(fakeTcp(), udp).openDatagram();
+        expect(socket.receive()).toEqual({ from: router, data: bytes('valid') });
+        expect(socket.receive()).toBeUndefined();
+    });
+
+    it('delivers a valid SSDP response behind an unrelated packet to discovery', () => {
+        const igd = new FakeIgd({ natPmp: false });
+        const fake = new FakeNetwork([igd]);
+        const udp = fakeUdp();
+        udp.allowSend(100);
+        const reply = igd.handleDatagram(
+            { address: [239, 255, 255, 250], port: 1900 },
+            bytes('M-SEARCH * HTTP/1.1\r\nST: ssdp:all\r\n\r\n')
+        )[0];
+        expect(reply).toBeDefined();
+        udp.queue([
+            datagram([192, 168, 1, 1], 1900, 'unrelated'),
+            {
+                data: reply ?? new Uint8Array(),
+                remoteAddress: { tag: 'ipv4', val: { address: [192, 168, 1, 1], port: 1900 } }
+            }
+        ]);
+        const socket = adapter(fakeTcp(), udp).openDatagram();
+        fake.openDatagram = () => socket;
+        const found = runSteps(fake, discover(fake, { upnp: true, natPmp: false }));
+        expect(found.gateway.address).toEqual([192, 168, 1, 1]);
+        expect(udp.disposed.incoming).toBe(1);
+        expect(fake.leaks).toBe(0);
+    });
+
+    it('discards retained bytes on close and does not read disposed resources', () => {
+        const udp = fakeUdp();
+        udp.queue([datagram([192, 168, 1, 1], 1900, 'first'), datagram([192, 168, 1, 1], 1900, 'second')]);
+        const socket = adapter(fakeTcp(), udp).openDatagram();
+        expect(socket.receive()?.data).toEqual(bytes('first'));
+        socket.close();
+        expect(socket.receive()).toBeUndefined();
+        expect(udp.incoming.receive).toHaveBeenCalledTimes(1);
+        expect(udp.incoming.receive).toHaveBeenCalledWith(16n);
     });
 
     it('releases the streams and the socket, and can be closed twice', () => {
