@@ -21,30 +21,20 @@ const tag = ansi.named.name(PLUGIN_NAME);
 export class PlayerSync {
     private readonly sent = new SyncTracker();
     private readonly lastRegeneration = new Map<string, boolean>();
+    private readonly failed = new Set<string>();
 
     constructor(private readonly log: Logger) {}
 
     /** Sends a joining player's values, and whether their world heals them by food. */
     joined(player: Player): void {
-        const id = playerKey(player);
-        this.sent.forget(id);
-        this.lastRegeneration.delete(id);
-        const sent = this.withJavaClient(player, (java) => {
-            this.log.debug(`${tag} ${ansi.named.name(player.getName())} joined, sending their current hunger.`);
-            this.sendRegeneration(player, id, java);
-            this.send(player, id, java);
-        });
-        if (!sent) {
-            this.log.debug(
-                `${tag} ${ansi.named.name(player.getName())} is not on Java Edition, so there is nothing to sync.`
-            );
-        }
+        this.syncPlayer(player, true);
     }
 
     /** Forgets a player who left, so that their next join starts from scratch. */
     left(player: Player): void {
         this.sent.forget(playerKey(player));
         this.lastRegeneration.delete(playerKey(player));
+        this.failed.delete(playerKey(player));
         this.log.debug(`${tag} ${ansi.named.name(player.getName())} left, forgetting their hunger.`);
     }
 
@@ -54,21 +44,53 @@ export class PlayerSync {
      */
     tick(server: Server): void {
         const online = new Set<string>();
-        for (const player of server.getAllPlayers()) {
-            try {
-                const id = playerKey(player);
-                online.add(id);
-                this.withJavaClient(player, (java) => {
-                    this.send(player, id, java);
-                    this.sendRegeneration(player, id, java);
-                });
-            } finally {
-                // Release handles when the runtime exposes explicit disposal.
-                disposeWasiResource(player);
-            }
-        }
+        for (const player of server.getAllPlayers()) this.syncPlayer(player, false, online);
         this.sent.retain(online);
         for (const id of this.lastRegeneration.keys()) if (!online.has(id)) this.lastRegeneration.delete(id);
+        for (const id of this.failed) if (id !== 'unknown' && !online.has(id)) this.failed.delete(id);
+    }
+
+    private syncPlayer(player: Player, joined: boolean, online?: Set<string>): void {
+        let id: string | undefined;
+        try {
+            try {
+                id = playerKey(player);
+                online?.add(id);
+                const key = id;
+                if (joined) {
+                    this.sent.forget(key);
+                    this.lastRegeneration.delete(key);
+                }
+                const sent = this.withJavaClient(player, (java) => {
+                    if (joined) {
+                        this.log.debug(
+                            `${tag} ${ansi.named.name(player.getName())} joined, sending their current hunger.`
+                        );
+                        this.sendRegeneration(player, key, java);
+                    }
+                    this.send(player, key, java);
+                    if (!joined) this.sendRegeneration(player, key, java);
+                });
+                if (joined && !sent) {
+                    this.log.debug(
+                        `${tag} ${ansi.named.name(player.getName())} is not on Java Edition, so there is nothing to sync.`
+                    );
+                }
+            } finally {
+                // List results are owned here; joining event handles belong to the event dispatcher.
+                if (online) disposeWasiResource(player);
+            }
+            this.failed.delete(id ?? 'unknown');
+        } catch (error) {
+            const key = id ?? 'unknown';
+            if (this.failed.has(key)) return;
+            this.failed.add(key);
+            try {
+                this.log.warn(`${tag} Could not sync player ${key}: ${String(error).slice(0, 500)}`);
+            } catch {
+                // Failure reporting must not prevent another player's sync or disposal.
+            }
+        }
     }
 
     private send(player: Player, id: string, java: JavaPlayer): void {

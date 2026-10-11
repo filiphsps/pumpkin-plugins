@@ -26,7 +26,7 @@ describe('PlayerSync', () => {
         player.beforeSend = (sent) => {
             if (sent === channel) throw new Error('fixture send failure');
         };
-        expect(() => sync.tick(server.host)).toThrow('fixture send failure');
+        expect(() => sync.tick(server.host)).not.toThrow();
         expect(player.disposals).toBe(2);
         player.beforeSend = undefined;
         player.sent.length = 0;
@@ -44,7 +44,7 @@ describe('PlayerSync', () => {
         player.beforeSend = (sent) => {
             if (sent === channel) throw new Error('fixture join failure');
         };
-        expect(() => sync.joined(player.host)).toThrow('fixture join failure');
+        expect(() => sync.joined(player.host)).not.toThrow();
         expect(player.disposals).toBe(2);
         player.beforeSend = undefined;
         player.sent.length = 0;
@@ -53,6 +53,116 @@ describe('PlayerSync', () => {
 
         expect(player.channels).toEqual([SATURATION, EXHAUSTION]);
         expect(player.disposals).toBe(5);
+    });
+
+    it.each([SATURATION, EXHAUSTION, REGENERATION])(
+        'isolates a %s send failure and disposes every player',
+        (channel) => {
+            const { player, sync } = setup();
+            const later = new FakePlayer('grace');
+            const server = new FakeServer([player, later]);
+            player.beforeSend = (sent) => {
+                if (sent === channel) throw new Error('fixture failure');
+            };
+
+            expect(() => sync.tick(server.host)).not.toThrow();
+
+            expect(later.channels).toEqual([SATURATION, EXHAUSTION, REGENERATION]);
+            expect(later.disposals).toBe(3);
+            expect(player.disposals).toBe(channel === REGENERATION ? 3 : 2);
+            player.beforeSend = undefined;
+            player.sent.length = 0;
+            later.sent.length = 0;
+            sync.tick(server.host);
+            expect(player.channels).toEqual(
+                channel === REGENERATION ? [REGENERATION] : [SATURATION, EXHAUSTION, REGENERATION]
+            );
+            expect(later.sent).toEqual([]);
+        }
+    );
+
+    it('recovers a failed regeneration join send on the next tick', () => {
+        const { player, server, sync } = setup();
+        player.beforeSend = () => {
+            throw new Error('join regeneration failure');
+        };
+        expect(() => sync.joined(player.host)).not.toThrow();
+        expect(player.disposals).toBe(2);
+        player.beforeSend = undefined;
+        sync.tick(server.host);
+        expect(player.channels).toEqual([SATURATION, EXHAUSTION, REGENERATION]);
+        expect(player.disposals).toBe(5);
+    });
+
+    it.each([
+        ['identity', 1],
+        ['java', 1],
+        ['saturation', 2],
+        ['exhaustion', 2],
+        ['world', 2],
+        ['rule', 3],
+        ['dispose', 3]
+    ] as const)('continues after a player %s failure', (failure, disposals) => {
+        const { player, sync } = setup();
+        const later = new FakePlayer('grace');
+        const fail = () => {
+            throw new Error(`fixture ${failure} failure`);
+        };
+        if (failure === 'identity') player.getId = fail;
+        else if (failure === 'java') player.asJava = fail;
+        else if (failure === 'saturation') player.getSaturation = fail;
+        else if (failure === 'exhaustion') player.getExhaustion = fail;
+        else if (failure === 'world') player.getWorld = fail;
+        else if (failure === 'rule') {
+            const world = player.getWorld();
+            world.getGameRule = fail;
+            player.getWorld = () => world;
+        } else
+            Object.defineProperty(player, Symbol.dispose, {
+                value: () => {
+                    player.disposals++;
+                    fail();
+                }
+            });
+        expect(() => sync.tick(new FakeServer([player, later]).host)).not.toThrow();
+        expect(later.channels).toEqual([SATURATION, EXHAUSTION, REGENERATION]);
+        expect(later.disposals).toBe(3);
+        expect(player.disposals).toBe(disposals);
+    });
+
+    it('continues serving later players even when failure reporting throws', () => {
+        const { player, sync, log } = setup();
+        const later = new FakePlayer('grace');
+        player.beforeSend = () => {
+            throw new Error('fixture send failure');
+        };
+        log.warn = () => {
+            throw new Error('fixture logger failure');
+        };
+        expect(() => sync.tick(new FakeServer([player, later]).host)).not.toThrow();
+        expect(later.channels).toEqual([SATURATION, EXHAUSTION, REGENERATION]);
+        expect(player.disposals).toBe(2);
+        expect(later.disposals).toBe(3);
+    });
+
+    it('reports one bounded warning per failure streak and resumes silent successful ticks', () => {
+        const { player, server, sync, log } = setup();
+        const fail = () => {
+            throw new Error('x'.repeat(2000));
+        };
+        player.beforeSend = fail;
+        for (let tick = 0; tick < 3; tick++) expect(() => sync.tick(server.host)).not.toThrow();
+        expect(log.of('warn')).toHaveLength(1);
+        expect(log.of('warn')[0]?.length).toBeLessThan(650);
+        player.beforeSend = undefined;
+        sync.tick(server.host);
+        player.sent.length = 0;
+        sync.tick(server.host);
+        expect(player.sent).toEqual([]);
+        player.saturation = 4;
+        player.beforeSend = fail;
+        sync.tick(server.host);
+        expect(log.of('warn')).toHaveLength(2);
     });
 
     it('tells the client whether natural regeneration is on in the world it joined', () => {
