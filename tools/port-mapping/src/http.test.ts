@@ -121,6 +121,36 @@ describe('httpRequest', () => {
         expect(closed).toEqual(['closed']);
     });
 
+    it.each(['1\r\n', '3\r\nx', '1\r\nx\r\n', '0\r\n', '0\r\nChecksum: yes\r\n'])(
+        'rejects a chunked body closed before completion: %j',
+        (body) => {
+            const { net, closed } = scripted([
+                text(`HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n${body}`),
+                'closed'
+            ]);
+            expect(() => runSteps(net, httpRequest(net, to, get))).toThrow('truncated chunked body');
+            expect(closed).toEqual(['closed']);
+        }
+    );
+
+    it.each(['-1', '+1', '1x', '1.5', '', '9007199254740992'])('rejects invalid Content-Length %j', (length) => {
+        const { net, closed } = scripted([text(`HTTP/1.1 200 OK\r\nContent-Length: ${length}\r\n\r\nx`), 'closed']);
+        expect(() => runSteps(net, httpRequest(net, to, get))).toThrow('invalid Content-Length');
+        expect(closed).toEqual(['closed']);
+    });
+
+    it('rejects a peer closing before Content-Length bytes arrive', () => {
+        const { net, closed } = scripted([text('HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhi'), 'closed']);
+        expect(() => runSteps(net, httpRequest(net, to, get))).toThrow('truncated Content-Length body');
+        expect(closed).toEqual(['closed']);
+    });
+
+    it('accepts zero Content-Length without waiting for peer closure', () => {
+        const { net, closed } = scripted([text('HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n')]);
+        expect(runSteps(net, httpRequest(net, to, get)).body).toBe('');
+        expect(closed).toEqual(['closed']);
+    });
+
     it('reports error statuses to the caller', () => {
         const { net } = scripted([text('HTTP/1.1 500 X\r\nContent-Length: 2\r\n\r\nno')]);
         expect(runSteps(net, httpRequest(net, to, get))).toMatchObject({ status: 500, body: 'no' });

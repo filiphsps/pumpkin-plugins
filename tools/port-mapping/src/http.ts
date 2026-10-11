@@ -118,8 +118,8 @@ function isComplete(bytes: Uint8Array): boolean {
     const bodyLength = bytes.length - end - 4;
     if (fields['transfer-encoding']?.toLowerCase() === 'chunked')
         return decodeChunked(bytes.subarray(end + 4)) !== undefined;
-    const expected = fields['content-length'];
-    return expected !== undefined && bodyLength >= Number(expected);
+    const expected = contentLength(fields);
+    return expected !== undefined && bodyLength >= expected;
 }
 
 function parseResponse(bytes: Uint8Array): { status: number; body: string } {
@@ -127,9 +127,27 @@ function parseResponse(bytes: Uint8Array): { status: number; body: string } {
     if (end === -1) throw new Error('the answer is not HTTP');
     const { status, fields } = headers(strFromU8(bytes.subarray(0, end), true));
     let body = bytes.subarray(end + 4);
-    if (fields['transfer-encoding']?.toLowerCase() === 'chunked') body = decodeChunked(body) ?? body;
-    else if (fields['content-length'] !== undefined) body = body.subarray(0, Number(fields['content-length']));
+    if (fields['transfer-encoding']?.toLowerCase() === 'chunked') {
+        const decoded = decodeChunked(body);
+        if (decoded === undefined) throw new Error('truncated chunked body');
+        body = decoded;
+    } else {
+        const expected = contentLength(fields);
+        if (expected !== undefined) {
+            if (body.length < expected) throw new Error('truncated Content-Length body');
+            body = body.subarray(0, expected);
+        }
+    }
     return { status, body: strFromU8(body) };
+}
+
+function contentLength(fields: Record<string, string>): number | undefined {
+    const token = fields['content-length'];
+    if (token === undefined) return undefined;
+    if (!/^[0-9]+$/.test(token) || !Number.isSafeInteger(Number(token))) {
+        throw new Error('invalid Content-Length');
+    }
+    return Number(token);
 }
 
 /** Joins the pieces of a chunked body, or returns undefined while the last chunk hasn't arrived. */
