@@ -18,6 +18,7 @@ afterEach(() => {
 function setupCache(): string {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-binary-'));
     cacheDirs.push(dir);
+    vi.stubEnv('PUMPKIN_API_TARGET', 'release');
     vi.stubEnv('PUMPKIN_BIN', undefined);
     vi.stubEnv('PUMPKIN_CACHE_DIR', dir);
     return dir;
@@ -105,4 +106,54 @@ describe('resolvePumpkinBinary', () => {
             expect(fs.readdirSync(cache)).toEqual([]);
         }
     );
+});
+
+describe('pinned nightly binary', () => {
+    it('uses the profile digest without fetching a checksum manifest and detects cache corruption', async () => {
+        const cache = setupCache();
+        vi.stubEnv('PUMPKIN_API_TARGET', 'nightly');
+        const bytes = Buffer.from('test nightly server');
+        const digest = createHash('sha256').update(bytes).digest('hex');
+        const profiles = await import('../../../scripts/pumpkin-targets.mjs');
+        const original = profiles.readTarget();
+        const selected = {
+            ...original,
+            server: { ...original.server, sha256: { [assetName(process.platform, process.arch)]: digest } }
+        };
+        const profile = vi.spyOn(profiles, 'readTarget').mockReturnValue(selected);
+        const requested: string[] = [];
+        vi.stubGlobal('fetch', async (url: string) => {
+            requested.push(String(url));
+            return new Response(bytes);
+        });
+        try {
+            const binary = await resolvePumpkinBinary();
+            expect(binary).toContain(digest);
+            expect(fs.readFileSync(binary)).toEqual(bytes);
+            expect(requested).toHaveLength(1);
+            expect(requested[0]).toContain('/nightly/');
+            fs.writeFileSync(binary, 'corrupted cache');
+            await expect(resolvePumpkinBinary()).rejects.toThrow(/Checksum mismatch/);
+            expect(fs.readdirSync(cache)).toEqual([]);
+        } finally {
+            profile.mockRestore();
+        }
+    });
+    it('rejects an unsupported platform pin before making any network request', async () => {
+        setupCache();
+        vi.stubEnv('PUMPKIN_API_TARGET', 'nightly');
+        const profiles = await import('../../../scripts/pumpkin-targets.mjs');
+        const original = profiles.readTarget();
+        const profile = vi
+            .spyOn(profiles, 'readTarget')
+            .mockReturnValue({ ...original, server: { ...original.server, sha256: {} } });
+        const fetchMock = vi.fn();
+        vi.stubGlobal('fetch', fetchMock);
+        try {
+            await expect(resolvePumpkinBinary()).rejects.toThrow(/no pinned digest/i);
+            expect(fetchMock).not.toHaveBeenCalled();
+        } finally {
+            profile.mockRestore();
+        }
+    });
 });

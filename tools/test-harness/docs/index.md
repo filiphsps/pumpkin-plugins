@@ -7,7 +7,8 @@ plugin loading, permissions, commands, network bindings, and runtime compatibili
 ## Start a test server
 
 Build the plugin first, then point the harness at its `.wasm` artifact and start Pumpkin from the
-test. The harness resolves the pinned server release, creates a temporary server directory, waits
+test. The harness resolves the server paired with `PUMPKIN_API_TARGET` (default `release`) in
+`pumpkin-api-targets.json`, creates a temporary server directory, waits
 for the ready log, and exposes ports, plugin data paths, command input, and captured logs through
 the returned instance.
 
