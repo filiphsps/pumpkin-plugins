@@ -22,7 +22,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 ## Repository maintenance
 
 - [Agent tooling](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agent-tooling.md): The repo keeps agent instructions, skills and executable checks separate.
-- [CI and releases](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/ci-and-releases.md): The plugin, action verification and release jobs are in .github/workflows/ci.yml; action tests run through the reusable .github/workflows/actions.yml, scoped to action code.
+- [CI and releases](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/ci-and-releases.md): Plugin and action checks are in .github/workflows/ci.yml; release orchestration is in the reusable .github/workflows/release.yml, called after the CI gates pass.
 
 ## Server operations
 
