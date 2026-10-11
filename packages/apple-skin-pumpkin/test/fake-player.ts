@@ -16,6 +16,7 @@ class FakeJavaClient {
     constructor(private readonly player: FakePlayer) {}
 
     sendCustomPayload(channel: string, data: Uint8Array): void {
+        this.player.beforeSend?.(channel);
         this.player.sent.push({ channel, data });
     }
 
@@ -54,6 +55,9 @@ export class FakePlayer {
 
     /** How many of this player's handles the plugin has released. Anything it keeps is a leak. */
     disposals = 0;
+
+    /** Optional failure injection before a payload is accepted. */
+    beforeSend?: (channel: string) => void;
 
     /** Their saturation level, which a test moves to fake eating. */
     saturation = 5;

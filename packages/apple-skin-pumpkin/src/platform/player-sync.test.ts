@@ -21,6 +21,40 @@ describe('PlayerSync', () => {
         expect(player.floats(EXHAUSTION)).toEqual([Math.fround(0.4)]);
     });
 
+    it.each([SATURATION, EXHAUSTION])('retries unchanged hunger after a tick send fails on %s', (channel) => {
+        const { player, server, sync } = setup();
+        player.beforeSend = (sent) => {
+            if (sent === channel) throw new Error('fixture send failure');
+        };
+        expect(() => sync.tick(server.host)).toThrow('fixture send failure');
+        expect(player.disposals).toBe(2);
+        player.beforeSend = undefined;
+        player.sent.length = 0;
+
+        sync.tick(server.host);
+
+        expect(player.channels).toEqual([SATURATION, EXHAUSTION, REGENERATION]);
+        expect(player.floats(SATURATION)).toEqual([5]);
+        expect(player.floats(EXHAUSTION)).toEqual([Math.fround(0.4)]);
+        expect(player.disposals).toBe(5);
+    });
+
+    it.each([SATURATION, EXHAUSTION])('retries unchanged hunger after a join send fails on %s', (channel) => {
+        const { player, server, sync } = setup();
+        player.beforeSend = (sent) => {
+            if (sent === channel) throw new Error('fixture join failure');
+        };
+        expect(() => sync.joined(player.host)).toThrow('fixture join failure');
+        expect(player.disposals).toBe(2);
+        player.beforeSend = undefined;
+        player.sent.length = 0;
+
+        sync.tick(server.host);
+
+        expect(player.channels).toEqual([SATURATION, EXHAUSTION]);
+        expect(player.disposals).toBe(5);
+    });
+
     it('tells the client whether natural regeneration is on in the world it joined', () => {
         const { player, sync } = setup();
         player.worldName = 'arena';

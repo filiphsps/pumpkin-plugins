@@ -72,16 +72,22 @@ export class PlayerSync {
     }
 
     private send(player: Player, id: string, java: JavaPlayer): void {
-        const update = this.sent.update(id, player.getSaturation(), player.getExhaustion());
-        if (update.saturation === undefined && update.exhaustion === undefined) return;
-        const who = player.getName();
-        if (update.saturation !== undefined) {
-            java.sendCustomPayload(SATURATION_CHANNEL, float32be(update.saturation));
-            this.log.debug(`${tag} ${ansi.named.name(who)}: saturation ${ansi.named.number(update.saturation)}.`);
-        }
-        if (update.exhaustion !== undefined) {
-            java.sendCustomPayload(EXHAUSTION_CHANNEL, float32be(update.exhaustion));
-            this.log.debug(`${tag} ${ansi.named.name(who)}: exhaustion ${ansi.named.number(update.exhaustion)}.`);
+        try {
+            const update = this.sent.update(id, player.getSaturation(), player.getExhaustion());
+            if (update.saturation === undefined && update.exhaustion === undefined) return;
+            const who = player.getName();
+            if (update.saturation !== undefined) {
+                java.sendCustomPayload(SATURATION_CHANNEL, float32be(update.saturation));
+                this.log.debug(`${tag} ${ansi.named.name(who)}: saturation ${ansi.named.number(update.saturation)}.`);
+            }
+            if (update.exhaustion !== undefined) {
+                java.sendCustomPayload(EXHAUSTION_CHANNEL, float32be(update.exhaustion));
+                this.log.debug(`${tag} ${ansi.named.name(who)}: exhaustion ${ansi.named.number(update.exhaustion)}.`);
+            }
+        } catch (error) {
+            // A partial send cannot establish the baseline for either hunger field.
+            this.sent.forget(id);
+            throw error;
         }
     }
 
