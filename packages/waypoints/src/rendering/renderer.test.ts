@@ -115,9 +115,9 @@ describe('WaypointHudRenderer', () => {
     });
 
     it('abbreviates long distances and bounds HUD labels without changing stored text', () => {
-        const destination = waypoint({ label: 'A'.repeat(80) + '🌍' });
+        const destination = waypoint({ label: `${'A'.repeat(80)}🌍` });
         const json = JSON.parse(createWaypointHudTextJson(destination, 12_345));
-        expect(json.extra[0].text).toBe('A'.repeat(31) + '…');
+        expect(json.extra[0].text).toBe(`${'A'.repeat(31)}…`);
         expect(json.extra[1].text).toBe(' (12.3km)');
         expect(destination.label).toHaveLength(82);
     });
