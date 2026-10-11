@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { safeBody } from '../../common/src/diagnostics.mjs';
 import { getInput, setOutput } from '../../common/src/utils.mjs';
 
 const pluginName = getInput('plugin-name').trim();
@@ -270,11 +271,6 @@ function isStringRecord(value) {
 
 function marketFetch(url, options = {}) {
     return fetch(url, { ...options, signal: AbortSignal.timeout(30_000) });
-}
-
-function safeBody(body, secret) {
-    const redacted = secret ? body.replaceAll(secret, '[REDACTED]') : body;
-    return redacted.slice(0, 1000);
 }
 
 function escapeWorkflowCommand(value) {
