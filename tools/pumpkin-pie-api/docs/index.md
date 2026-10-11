@@ -1,6 +1,10 @@
 # PumpkinPIE API
 
-`@pumpkin-plugins/pumpkin-pie-api` provides a synchronous protocol 0 client, expansion router and
+`@pumpkin-plugins/pumpkin-pie-api` integrates with
+[PumpkinPIE](https://github.com/Rennex07/PumpkinPIE), the upstream placeholder provider.
+Install the provider separately using its
+[releases](https://github.com/Rennex07/PumpkinPIE/releases). This TypeScript workspace package
+provides a synchronous protocol 0 client, expansion router and
 plugin-wide recovery session. It is a private workspace package. Its production dependency tree
 contains only `fflate`; it imports no Pumpkin, WIT, WASI, Node or TabDisplay modules.
 

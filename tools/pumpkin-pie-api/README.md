@@ -1,6 +1,11 @@
 # @pumpkin-plugins/pumpkin-pie-api
 
-Host-independent PumpkinPIE protocol 0 client, expansion router and recovery session.
+Host-independent TypeScript client, expansion router and recovery session for
+[PumpkinPIE](https://github.com/Rennex07/PumpkinPIE) protocol 0.
+
+PumpkinPIE is the separately installed placeholder provider. Get its plugin and upstream
+documentation from the [PumpkinPIE repository](https://github.com/Rennex07/PumpkinPIE);
+see [upstream releases](https://github.com/Rennex07/PumpkinPIE/releases) for provider downloads.
 
 Private workspace package; see the [guide](docs/index.md).
 
