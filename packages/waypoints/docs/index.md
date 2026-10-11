@@ -1,8 +1,10 @@
 # Waypoints
 
-Waypoints stores shared named positions on the server. Waypoints are restricted by default; an
-operator can make one public or grant access to players, permission nodes, or permission-marker
-groups. Records have no creator ownership.
+Waypoints stores shared named locations on the server. Each waypoint can have a display label,
+description, color, item icon, and optional HUD visibility range. Waypoints are restricted by
+default; operators can make them public or grant access to specific players, permission nodes, or
+permission-marker groups. Players can find and teleport to enabled waypoints they can access. Records
+have no creator ownership.
 
 Install `waypoints.wasm` in the Pumpkin server's `plugins/` directory and restart. The plugin has
 no config file. It stores versioned records in `plugins/data/Waypoints/waypoints.json` and keeps a
@@ -11,7 +13,7 @@ byte-identical `waypoints.v1.json` backup when migrating the previous schema.
 ## Create and use waypoints
 
 Operators can create a waypoint at their exact position with `/wp create "Home Base"`, or provide
-absolute coordinates with `/wp create "Home Base" 120.5 64 -30`. Names are unique across dimensions.
+absolute coordinates with `/wp create "Home Base" 120.5 64 -30`. Names are unique across all dimensions.
 Use `/wp list` to see enabled waypoints you can access, `/wp info <name>` for details, and
 `/wp tp <name>` to teleport yourself. Operators can use `/wp tp <name> @a` to teleport a player selector.
 
@@ -56,5 +58,3 @@ texture, and custom item IDs require the corresponding `item/<path>` sprite in t
 
 Malformed or unsupported storage is preserved and disables writes. Fix the file before expecting
 changes to persist.
-
-See the [preview setup and test checklist](hud-preview.md) for building and trying the current HUD.
