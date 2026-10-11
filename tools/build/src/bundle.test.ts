@@ -57,7 +57,8 @@ describe('bundlePlugin', () => {
             expect.objectContaining({
                 define: {
                     __PLUGIN_VERSION__: JSON.stringify('1.0.0'),
-                    __PUMPKIN_DEV_MODE__: JSON.stringify(true)
+                    __PUMPKIN_DEV_MODE__: JSON.stringify(true),
+                    'process.env.NODE_ENV': JSON.stringify('development')
                 },
                 minify: false
             })
@@ -73,7 +74,12 @@ describe('bundlePlugin', () => {
         expect(size).toBe(Buffer.byteLength('component'));
         expect(fs.readFileSync(output, 'utf8')).toBe('component');
         expect(fs.readdirSync(path.dirname(output))).toEqual(['plugin.wasm']);
-        expect(esbuild).toHaveBeenCalledWith(expect.objectContaining({ minify: true }));
+        expect(esbuild).toHaveBeenCalledWith(
+            expect.objectContaining({
+                minify: true,
+                define: expect.objectContaining({ 'process.env.NODE_ENV': JSON.stringify('production') })
+            })
+        );
     });
 
     it('allows a production component exactly at the 5 MiB limit', async () => {

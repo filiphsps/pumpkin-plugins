@@ -46,7 +46,8 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
             external: ['pumpkin:plugin/*', 'wasi:*'],
             define: {
                 __PLUGIN_VERSION__: JSON.stringify(options.version),
-                __PUMPKIN_DEV_MODE__: JSON.stringify(options.developmentMode ?? false)
+                __PUMPKIN_DEV_MODE__: JSON.stringify(options.developmentMode ?? false),
+                'process.env.NODE_ENV': JSON.stringify(options.developmentMode ? 'development' : 'production')
             }
         });
         const componentizerPackage = path.dirname(require.resolve('@di-framework/componentize-qjs/package.json'));
