@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, it } from 'node:test';
-import { readTarget } from './pumpkin-targets.mjs';
+import { readTarget, resolveBuildTarget } from './pumpkin-targets.mjs';
 
 const dirs = [];
 afterEach(() => {
@@ -59,6 +59,24 @@ it('rejects mutable source refs and unpinned nightly binaries before resolving i
     fs.writeFileSync(file, JSON.stringify(config));
     assert.throws(() => readTarget(root, 'future'), /digest/);
 });
+it('resolves API code and WIT from independent local checkouts', async () => {
+    const { root, api, wit, env } = fixture();
+    const result = await resolveBuildTarget(root, { root, env });
+    assert.equal(result.apiEntry, path.join(api, 'dist/index.ts'));
+    assert.equal(result.witRoot, wit);
+    fs.rmSync(path.join(wit, 'plugin.wit'));
+    await assert.rejects(resolveBuildTarget(root, { root, env }), /plugin.wit/);
+});
+it('materializes missing API declarations from selected WIT without editing a local checkout', async () => {
+    const { root, api, env } = fixture();
+    fs.writeFileSync(
+        path.join(api, 'dist/index.ts'),
+        '/// <reference path="./bindings/index.d.ts" />\nexport const value = 42;'
+    );
+    const inputs = await resolveBuildTarget(root, { root, env });
+    assert.ok(fs.existsSync(path.join(path.dirname(inputs.apiEntry), 'bindings/index.d.ts')));
+    assert.equal(fs.existsSync(path.join(api, 'dist/bindings')), false);
+});
 it('rejects profile typos and paths escaping the source tree', () => {
     const { root } = fixture();
     const file = path.join(root, 'pumpkin-api-targets.json');
@@ -70,4 +88,18 @@ it('rejects profile typos and paths escaping the source tree', () => {
     config.targets.future.wit.path = '../outside';
     fs.writeFileSync(file, JSON.stringify(config));
     assert.throws(() => readTarget(root, 'future'), /relative path/);
+});
+it('keeps installed release WIT when only the API runtime checkout is overridden', async () => {
+    const { root, api, env } = fixture();
+    const file = path.join(root, 'pumpkin-api-targets.json');
+    const config = JSON.parse(fs.readFileSync(file, 'utf8'));
+    config.targets.future.wit.installedPath = 'wit/v0.1';
+    fs.writeFileSync(file, JSON.stringify(config));
+    const installed = path.join(root, 'tools/plugin-kit/node_modules/@pumpkinmc/pumpkin-api-ts');
+    fs.mkdirSync(path.join(installed, 'wit/v0.1'), { recursive: true });
+    fs.writeFileSync(path.join(installed, 'package.json'), JSON.stringify({ name: '@pumpkinmc/pumpkin-api-ts' }));
+    fs.writeFileSync(path.join(installed, 'wit/v0.1/plugin.wit'), 'world plugin {}');
+    const inputs = await resolveBuildTarget(root, { root, env: { ...env, PUMPKIN_WIT_DIR: undefined } });
+    assert.equal(inputs.apiRoot, api);
+    assert.equal(fs.realpathSync(inputs.witRoot), fs.realpathSync(path.join(installed, 'wit/v0.1')));
 });

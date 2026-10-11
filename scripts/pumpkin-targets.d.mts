@@ -14,3 +14,13 @@ export interface Target {
 export function readTarget(root?: string, name?: string): Target;
 /** Returns validated CI target names. */
 export function compatibilityTargets(root?: string): string[];
+/** Resolves the selected source inputs. */
+export function resolveBuildTarget(
+    pluginDir: string,
+    options?: { root?: string; env?: NodeJS.ProcessEnv }
+): Promise<{
+    target: Target;
+    apiRoot: string;
+    apiEntry: string;
+    witRoot: string;
+}>;
