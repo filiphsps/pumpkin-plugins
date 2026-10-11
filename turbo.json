@@ -1,7 +1,13 @@
 {
     "$schema": "https://v2-11-7.turborepo.dev/schema.json",
     "agentGuidance": false,
-    "globalDependencies": ["pnpm-workspace.yaml", "tsconfig.base.json"],
+    "globalDependencies": [
+        "pnpm-workspace.yaml",
+        "tsconfig.base.json",
+        "pumpkin-api-targets.json",
+        "scripts/pumpkin-targets.mjs",
+        "scripts/pumpkin-targets.d.mts"
+    ],
     "globalPassThroughEnv": [
         "PUMPKIN_BIN",
         "PUMPKIN_CACHE_DIR",
@@ -15,24 +21,63 @@
         },
         "build": {
             "dependsOn": ["transit"],
-            "env": ["PUMPKIN_API_DIR", "PUMPKIN_DEV_MODE"],
+            "env": [
+                "PUMPKIN_API_TARGET",
+                "PUMPKIN_API_DIR",
+                "PUMPKIN_API_ENTRY",
+                "PUMPKIN_WIT_DIR",
+                "PUMPKIN_API_REVISION",
+                "PUMPKIN_WIT_REVISION",
+                "PUMPKIN_DEV_MODE"
+            ],
             "outputs": ["build/**", "!build/types/**"]
         },
         "typecheck": {
             "dependsOn": ["transit"],
-            "env": ["PUMPKIN_API_DIR"],
+            "env": [
+                "PUMPKIN_API_TARGET",
+                "PUMPKIN_API_DIR",
+                "PUMPKIN_API_ENTRY",
+                "PUMPKIN_WIT_DIR",
+                "PUMPKIN_API_REVISION",
+                "PUMPKIN_WIT_REVISION"
+            ],
             "outputs": ["build/types/**"]
         },
         "test": {
-            "dependsOn": ["transit"]
+            "dependsOn": ["transit"],
+            "env": [
+                "PUMPKIN_API_TARGET",
+                "PUMPKIN_API_DIR",
+                "PUMPKIN_API_ENTRY",
+                "PUMPKIN_WIT_DIR",
+                "PUMPKIN_API_REVISION",
+                "PUMPKIN_WIT_REVISION"
+            ]
         },
         "test:coverage": {
             "dependsOn": ["transit"],
-            "outputs": ["coverage/**"]
+            "outputs": ["coverage/**"],
+            "env": [
+                "PUMPKIN_API_TARGET",
+                "PUMPKIN_API_DIR",
+                "PUMPKIN_API_ENTRY",
+                "PUMPKIN_WIT_DIR",
+                "PUMPKIN_API_REVISION",
+                "PUMPKIN_WIT_REVISION"
+            ]
         },
         "test:integration": {
             "dependsOn": ["build"],
-            "cache": false
+            "cache": false,
+            "env": [
+                "PUMPKIN_API_TARGET",
+                "PUMPKIN_API_DIR",
+                "PUMPKIN_API_ENTRY",
+                "PUMPKIN_WIT_DIR",
+                "PUMPKIN_API_REVISION",
+                "PUMPKIN_WIT_REVISION"
+            ]
         },
         "readme": {
             "cache": false

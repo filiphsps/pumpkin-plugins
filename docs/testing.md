@@ -71,6 +71,10 @@ on ports of its own, three times over, before the start is failed.
 
 ## The server binary
 
+Root unit and coverage commands also resolve the selected API runtime and give Vitest an explicit
+module alias. Their Turbo keys include the local source content hashes, so API edits invalidate
+unit results. Package-local Vitest configs resolve the same profile even without the root runner.
+
 The server is selected from `pumpkin-api-targets.json` by `PUMPKIN_API_TARGET` (default `release`),
 using the same profile as the build and typecheck. `PUMPKIN_BIN` overrides the binary; otherwise the
 harness downloads into `.cache/pumpkin`. Stable releases use `checksums.sha256`; nightly profiles
