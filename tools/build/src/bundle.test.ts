@@ -60,6 +60,7 @@ describe('bundlePlugin', () => {
                     __PUMPKIN_DEV_MODE__: JSON.stringify(true),
                     'process.env.NODE_ENV': JSON.stringify('development')
                 },
+                treeShaking: true,
                 minify: false
             })
         );
@@ -77,6 +78,7 @@ describe('bundlePlugin', () => {
         expect(esbuild).toHaveBeenCalledWith(
             expect.objectContaining({
                 minify: true,
+                treeShaking: true,
                 define: expect.objectContaining({ 'process.env.NODE_ENV': JSON.stringify('production') })
             })
         );

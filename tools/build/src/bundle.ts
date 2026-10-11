@@ -43,6 +43,7 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
             format: 'esm',
             target: 'es2022',
             minify: !options.developmentMode,
+            treeShaking: true,
             external: ['pumpkin:plugin/*', 'wasi:*'],
             define: {
                 __PLUGIN_VERSION__: JSON.stringify(options.version),
