@@ -144,6 +144,60 @@ describe('PortMapper', () => {
         expect(net.leaks).toBe(0);
     });
 
+    it('rejects an incompatible UPnP target before overwriting an owned physical port', () => {
+        const { igd, mapper, settle } = setup();
+        mapper.request('first', { ...spec, externalPort: 9000 });
+        settle(() => open(mapper.state('first')));
+        mapper.request('second', { ...spec, port: 8124, externalPort: 9000 });
+        settle(() => mapper.state('second')?.kind !== 'pending');
+        expect(mapper.state('second')).toMatchObject({
+            kind: 'failed',
+            reason: expect.stringContaining('already owned')
+        });
+        expect(igd?.mappings.get('tcp:9000')?.internalPort).toBe(8123);
+        expect(igd?.actions.filter((a) => a === 'AddPortMapping')).toHaveLength(1);
+        mapper.release('second');
+        settle(() => false, 1000);
+        expect(igd?.mappings.has('tcp:9000')).toBe(true);
+    });
+
+    it('requires the same internal client when sharing an UPnP target', () => {
+        const { igd, mapper, settle, net } = setup();
+        mapper.request('first', spec);
+        settle(() => open(mapper.state('first')));
+        net.local = [192, 168, 1, 51];
+        mapper.request('second', spec);
+        settle(() => mapper.state('second')?.kind !== 'pending');
+        expect(mapper.state('second')).toMatchObject({
+            kind: 'failed',
+            reason: expect.stringContaining('already owned')
+        });
+        expect(igd?.mappings.get('tcp:8123')?.client).toBe('192.168.1.50');
+    });
+
+    it.each([true, false])(
+        'shares the assigned physical identity rather than re-adding a requested alias (UPnP=%s)',
+        (upnp) => {
+            const { igd, mapper, settle, net } = setup(new FakeIgd({ upnp, takenPorts: [8123] }), { upnp });
+            mapper.request('first', spec);
+            settle(() => open(mapper.state('first')));
+            const assigned = upnp ? 33024 : 9148;
+            expect(mapper.state('first')).toMatchObject({ port: assigned });
+            mapper.request('second', { ...spec, externalPort: upnp ? assigned : 10000, description: 'Alias' });
+            settle(() => open(mapper.state('second')));
+            expect(mapper.state('second')).toMatchObject({ port: assigned });
+            const adds = upnp
+                ? igd?.actions.filter((a) => a === 'AddPortMapping').length
+                : net.sent.filter((s) => s.data.length === 12).length;
+            expect(adds).toBe(upnp ? 2 : 1);
+            mapper.release('first');
+            settle(() => false, 1000);
+            expect(igd?.mappings.has(`tcp:${assigned}`)).toBe(true);
+            runSteps(net, mapper.releaseAll());
+            expect(igd?.mappings.size).toBe(0);
+        }
+    );
+
     it('renews the lease at half its length', () => {
         const { igd, mapper, settle, net } = setup(new FakeIgd(), { leaseSeconds: 100 });
         mapper.request('web', spec);

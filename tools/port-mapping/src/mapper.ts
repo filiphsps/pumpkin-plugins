@@ -2,7 +2,7 @@ import { type Discovered, type DiscoveryOptions, discover } from './discover.ts'
 import type { GatewayKind, MappingRequest, MappingResult, Protocol } from './gateway.ts';
 import { PortInUseError } from './gateway.ts';
 import { describeIdentity, type RouterIdentity, RouterRefusedError } from './identify.ts';
-import { formatIpv4, type Ipv4, isPublicIpv4 } from './ipv4.ts';
+import { formatIpv4, type Ipv4, isPublicIpv4, sameIpv4 } from './ipv4.ts';
 import type { Network } from './network.ts';
 import { type Steps, Task } from './task.ts';
 
@@ -62,11 +62,14 @@ interface Entry {
 interface PhysicalMapping {
     spec: MappingSpec;
     state: MappingState;
-    applied?: { found: Discovered; request: MappingRequest; result: MappingResult };
+    pending?: { found: Discovered; request: MappingRequest; internalClient: Ipv4 };
+    applied?: { found: Discovered; request: MappingRequest; result: MappingResult; internalClient: Ipv4 };
     renewAt?: number;
     retryAt: number;
     failures: number;
 }
+
+class OwnershipConflictError extends Error {}
 
 const RETRY_MS = 30_000;
 const MAX_RETRY_MS = 10 * 60_000;
@@ -123,10 +126,11 @@ export class PortMapper {
               ? { kind: 'failed', reason: this.lastDiscoveryFailure }
               : { kind: 'pending' };
         const shared = [...this.entries.values()].find(
-            ({ spec: other }) =>
+            ({ spec: other, mapping }) =>
                 other.protocol === spec.protocol &&
                 other.port === spec.port &&
-                (other.externalPort ?? other.port) === (spec.externalPort ?? spec.port)
+                (other.externalPort ?? other.port) === (spec.externalPort ?? spec.port) &&
+                this.sameClient(mapping)
         );
         const mapping = shared?.mapping ?? { spec, state, retryAt: 0, failures: 0 };
         this.entries.set(key, { spec, mapping });
@@ -207,6 +211,45 @@ export class PortMapper {
                 // The lease runs out by itself.
             }
         }
+    }
+
+    private sameClient(mapping: PhysicalMapping): boolean {
+        const binding = mapping.applied ?? mapping.pending;
+        if (!binding) return true;
+        const internal = this.net.localAddress(binding.found.gateway.address);
+        return internal !== undefined && sameIpv4(binding.internalClient, internal);
+    }
+
+    private ownerOf(
+        found: Discovered,
+        request: MappingRequest,
+        internal: Ipv4,
+        except: PhysicalMapping
+    ): PhysicalMapping | undefined {
+        for (const { mapping } of this.entries.values()) {
+            const applied = mapping.applied;
+            if (
+                mapping === except ||
+                !applied ||
+                applied.found.gateway.kind !== found.gateway.kind ||
+                !sameIpv4(applied.found.gateway.address, found.gateway.address) ||
+                applied.request.protocol !== request.protocol
+            )
+                continue;
+            const sameClient = sameIpv4(applied.internalClient, internal);
+            const samePort =
+                found.gateway.kind === 'upnp'
+                    ? applied.result.externalPort === request.externalPort
+                    : applied.request.internalPort === request.internalPort && sameClient;
+            if (!samePort) continue;
+            if (!sameClient || applied.request.internalPort !== request.internalPort) {
+                throw new OwnershipConflictError(
+                    `port ${request.externalPort} is already owned by another internal target`
+                );
+            }
+            return mapping;
+        }
+        return undefined;
     }
 
     private owned(mapping: PhysicalMapping): boolean {
@@ -301,9 +344,20 @@ export class PortMapper {
                     description: entry.spec.description,
                     leaseSeconds: this.options.leaseSeconds
                 };
+                const owner = this.ownerOf(found, request, internal, entry);
+                if (owner) {
+                    for (const logical of this.entries.values()) if (logical.mapping === entry) logical.mapping = owner;
+                    return;
+                }
+                entry.pending = { found, request, internalClient: internal };
                 try {
                     const result = yield* gateway.addMapping(request, internal);
-                    entry.applied = { found, request: { ...request, externalPort: result.externalPort }, result };
+                    entry.applied = {
+                        found,
+                        request: { ...request, externalPort: result.externalPort },
+                        result,
+                        internalClient: internal
+                    };
                     break;
                 } catch (err) {
                     if (!(err instanceof PortInUseError) || attempt >= PORT_TRIES) throw err;
@@ -336,8 +390,12 @@ export class PortMapper {
                 `Could not open ${entry.spec.protocol.toUpperCase()} port ${entry.spec.port}: ${reason(err)}.`
             );
             // The router may have gone or changed; look for it again when it is time to retry.
-            this.discovered = undefined;
-            this.discoveryRetryAt = entry.retryAt;
+            if (!(err instanceof OwnershipConflictError)) {
+                this.discovered = undefined;
+                this.discoveryRetryAt = entry.retryAt;
+            }
+        } finally {
+            entry.pending = undefined;
         }
     }
 
