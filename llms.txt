@@ -45,6 +45,8 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [DynamicLightsPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/docs/index.md): Server-side dynamic lights for held light sources
 - [DynamicLightsPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/README.md): Additional component overview and usage details.
 - [DynamicLightsPumpkin: Configure light sources](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/docs/configuration.md): Settings live in plugins/data/DynamicLightsPumpkin/config.toml.
+- [TabDisplay](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/tab-display/docs/index.md): Customizes Java tab displays with native Bedrock capability gates
+- [TabDisplay README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/tab-display/README.md): Additional component overview and usage details.
 - [UPnPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/index.md): Opens router ports for Pumpkin with UPnP and NAT-PMP
 - [UPnPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/README.md): Additional component overview and usage details.
 - [UPnPumpkin: Troubleshoot port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/troubleshooting.md): Confirm UPnP or NAT-PMP is enabled in the router settings and that the server host shares the router's local network.
@@ -100,6 +102,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [BedrockAddonManager API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/bedrock-addon-manager/): Serves Bedrock packs over HTTP; Pumpkin can't send them to players yet
 - [Distant Horizons Support Pumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/distant-horizons-support-pumpkin/): Unofficial Distant Horizons server support for Pumpkin
 - [DynamicLightsPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/dynamic-lights-pumpkin/): Server-side dynamic lights for held light sources
+- [TabDisplay API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/tab-display/): Customizes Java tab displays with native Bedrock capability gates
 - [UPnPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/upnpumpkin/): Opens router ports for Pumpkin with UPnP and NAT-PMP
 - [Waypoints API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/waypoints/): Server-managed waypoints with access rules and a Java 26.3 HUD
 - [Plugin build tool API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/build/): Shared build tool for the plugins
