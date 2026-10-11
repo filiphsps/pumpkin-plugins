@@ -202,3 +202,17 @@ function fingerprint(root) {
     visit(root);
     return hash.digest('hex');
 }
+
+/** Prepares one task invocation with source content identities for Turbo's cache. */
+export async function targetEnvironment(root = REPO_ROOT, env = process.env) {
+    const inputs = await resolveBuildTarget(path.join(root, 'tools/plugin-kit'), { root, env });
+    return {
+        ...env,
+        PUMPKIN_API_TARGET: inputs.target.name,
+        PUMPKIN_API_DIR: inputs.apiRoot,
+        PUMPKIN_API_ENTRY: inputs.apiEntry,
+        PUMPKIN_WIT_DIR: inputs.witRoot,
+        PUMPKIN_API_REVISION: fingerprint(inputs.apiRoot),
+        PUMPKIN_WIT_REVISION: fingerprint(inputs.witRoot)
+    };
+}

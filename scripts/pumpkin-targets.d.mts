@@ -24,3 +24,5 @@ export function resolveBuildTarget(
     apiEntry: string;
     witRoot: string;
 }>;
+/** Computes content identities for a Turbo invocation. */
+export function targetEnvironment(root?: string, env?: NodeJS.ProcessEnv): Promise<NodeJS.ProcessEnv>;
