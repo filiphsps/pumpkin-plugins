@@ -118,6 +118,120 @@ describe('PortForwarder', () => {
         });
     });
 
+    it('returns from router reload without polling cleanup and waits for it before replacement creation', () => {
+        const { files, forwarder, settle, keys, net, igd } = setup(
+            '[bedrock]\nenabled = false\n',
+            new FakeIgd({ natPmp: false })
+        );
+        forwarder.start();
+        settle(() => keys().length === 1);
+        const resume = delayRouterReply(net);
+        files.put(CONFIG_FILE, '[router]\nlease_seconds = 600\n[java]\nport = 25570\n[bedrock]\nenabled = false\n');
+        net.autoAdvanceMs = 1;
+        const before = net.time;
+        forwarder.reload();
+        expect(net.time - before).toBeLessThan(50);
+        expect(igd?.actions.filter((a) => a === 'DeletePortMapping')).toHaveLength(0);
+        forwarder.tick();
+        expect(igd?.actions.filter((a) => a === 'DeletePortMapping')).toHaveLength(1);
+        expect(igd?.actions.filter((a) => a === 'AddPortMapping')).toHaveLength(1);
+        resume();
+        settle(() => keys().join() === 'tcp:25570');
+        settle(() => forwarder.snapshot.mappings[0]?.state.kind === 'open');
+        expect(keys()).toEqual(['tcp:25570']);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('bounds repeated reloads while one old mapper retires and applies the final configuration', () => {
+        const { files, forwarder, settle, keys, net, igd } = setup(
+            '[bedrock]\nenabled = false\n',
+            new FakeIgd({ natPmp: false })
+        );
+        forwarder.start();
+        settle(() => keys().length === 1);
+        const resume = delayRouterReply(net);
+        net.autoAdvanceMs = 1;
+        const before = net.time;
+        const connections = net.connections.length;
+        for (let i = 0; i < 50; i++) {
+            files.put(
+                CONFIG_FILE,
+                `[router]\nlease_seconds = ${600 + i}\n[java]\nport = ${26000 + i}\n[bedrock]\nenabled = false\n`
+            );
+            forwarder.reload();
+            forwarder.tick();
+        }
+        expect(net.time - before).toBeLessThan(500);
+        expect(net.connections.length - connections).toBe(1);
+        expect(igd?.actions.filter((a) => a === 'AddPortMapping')).toHaveLength(1);
+        resume();
+        settle(() => keys().join() === 'tcp:26049');
+        settle(() => forwarder.snapshot.mappings[0]?.state.kind === 'open');
+        expect(keys()).toEqual(['tcp:26049']);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('cancels stalled retirement at its tick deadline and allows the replacement to progress', () => {
+        const { files, forwarder, settle, keys, net, log } = setup(
+            '[bedrock]\nenabled = false\n',
+            new FakeIgd({ natPmp: false })
+        );
+        forwarder.start();
+        settle(() => keys().length === 1);
+        delayRouterReply(net);
+        net.autoAdvanceMs = 1;
+        files.put(CONFIG_FILE, '[router]\nlease_seconds = 600\n[java]\nport = 25570\n[bedrock]\nenabled = false\n');
+        forwarder.reload();
+        forwarder.tick();
+        const cleanupConnection = net.connections.at(-1);
+        expect(cleanupConnection?.closed).toBe(false);
+        net.time += 3000;
+        forwarder.tick();
+        expect(cleanupConnection?.closed).toBe(true);
+        expect(log.of('warn').some((m) => m.includes('cleanup did not finish'))).toBe(true);
+        settle(() => keys().join() === 'tcp:25570');
+        settle(() => forwarder.snapshot.mappings[0]?.state.kind === 'open');
+        expect(net.leaks).toBe(0);
+    });
+
+    it('accounts for in-flight old creation before handing a reload to its replacement', () => {
+        const { files, forwarder, settle, keys, net } = setup(
+            '[bedrock]\nenabled = false\n',
+            new FakeIgd({ natPmp: false })
+        );
+        const resume = delayRouterReply(net, 'AddPortMapping');
+        forwarder.start();
+        settle(() => keys().length === 1);
+        files.put(CONFIG_FILE, '[router]\nlease_seconds = 600\n[java]\nport = 25570\n[bedrock]\nenabled = false\n');
+        forwarder.reload();
+        forwarder.tick();
+        expect(keys()).toEqual(['tcp:25565']);
+        resume();
+        settle(() => keys().join() === 'tcp:25570');
+        settle(() => forwarder.snapshot.mappings[0]?.state.kind === 'open');
+        expect(keys()).toEqual(['tcp:25570']);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('stops a retiring mapper without starting its unpolled replacement', () => {
+        const { files, forwarder, settle, keys, net, igd } = setup(
+            '[bedrock]\nenabled = false\n',
+            new FakeIgd({ natPmp: false })
+        );
+        forwarder.start();
+        settle(() => keys().length === 1);
+        delayRouterReply(net);
+        files.put(CONFIG_FILE, '[router]\nlease_seconds = 600\n[bedrock]\nenabled = false\n');
+        forwarder.reload();
+        forwarder.tick();
+        net.autoAdvanceMs = 1;
+        const before = net.time;
+        forwarder.stop();
+        expect(net.time - before).toBeLessThanOrEqual(3010);
+        expect(net.leaks).toBe(0);
+        expect(igd?.actions.filter((a) => a === 'AddPortMapping')).toHaveLength(1);
+    });
+
     describe('requests from other plugins', () => {
         it('opens a port and reports where it is reachable', () => {
             const { forwarder, settle, ask, keys, log } = setup(

@@ -1,6 +1,8 @@
+import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { routerConfig, upnpServers } from './running.ts';
+import { PLUGIN_NAME, routerConfig, upnpServers } from './running.ts';
 
 const { router: startRouter, start } = upnpServers();
 
@@ -60,12 +62,20 @@ describe.skipIf(hasPublicAddress)('port forwarding', () => {
         expect(server.errors()).toEqual([]);
     });
 
-    it('opens the ports that changed on /upnp reload', async () => {
+    it('retires the old router mapper and opens changed ports on /upnp reload', async () => {
         const router = await startRouter({ natPmp: false });
         const server = await start('reload', routerConfig(router, '\n[bedrock]\nenabled = false\n'));
         await server.waitForLog(/Opened TCP port 25565/);
+        await fs.writeFile(
+            path.join(server.pluginDataDir(PLUGIN_NAME), 'config.toml'),
+            routerConfig(router, '\nlease_seconds = 600\n[java]\nport = 25570\n[bedrock]\nenabled = false\n')
+        );
+        const from = server.lines.length;
         server.command('upnp reload');
-        await server.waitForLog(/Reloaded the config\. 1 port is being kept open\./);
-        expect([...router.igd.mappings.keys()]).toEqual(['tcp:25565']);
+        await server.waitForLog(/Reloaded the config\. 1 port is being kept open\./, 10_000, from);
+        await server.waitForLog(/Opened TCP port 25570/, 10_000, from);
+        expect([...router.igd.mappings.keys()]).toEqual(['tcp:25570']);
+        expect(router.igd.actions.filter((a) => a === 'DeletePortMapping')).toHaveLength(1);
+        expect(server.errors()).toEqual([]);
     });
 });

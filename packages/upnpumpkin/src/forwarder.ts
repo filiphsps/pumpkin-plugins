@@ -54,6 +54,8 @@ export class PortForwarder {
     private settings: Config | undefined;
     private mapper: PortMapper | undefined;
     private mapperSettings = '';
+    private mapperDriven = false;
+    private retiring: { task: Task<void>; deadline: number } | undefined;
     private readonly requests = new Map<string, PluginRequest>();
     private lastPrune = 0;
 
@@ -93,14 +95,24 @@ export class PortForwarder {
         this.settings = loadPluginConfig(this.files, this.log);
         const { router } = this.settings;
         const key = JSON.stringify(router);
-        if (this.mapper && key !== this.mapperSettings) this.closeMapper();
+        if (this.mapper && key !== this.mapperSettings) this.retireMapper();
         if (!this.mapper) this.openMapper(key);
         this.applyOwnPorts();
     }
 
     /** Runs once per game tick. */
     tick(): void {
+        if (this.retiring) {
+            const { task, deadline } = this.retiring;
+            const state = task.poll();
+            if (state.state === 'running') {
+                if (this.net.now() < deadline) return;
+                task.cancel();
+            }
+            this.retiring = undefined;
+        }
         if (!this.mapper) return;
+        this.mapperDriven = true;
         this.mapper.tick();
         const now = this.net.now();
         if (now - this.lastPrune >= PRUNE_EVERY_MS) {
@@ -194,15 +206,26 @@ export class PortForwarder {
         for (const [key, { spec }] of this.requests) this.mapper.request(key, spec);
     }
 
-    private closeMapper(): void {
+    private retireMapper(): void {
         const mapper = this.mapper;
         this.mapper = undefined;
-        if (!mapper) return;
+        // Replacements are not ticked until retirement settles. Repeated reloads can therefore
+        // discard an unstarted replacement without allocating another cleanup task or transport.
+        if (mapper && this.mapperDriven) {
+            this.retiring = { task: new Task(mapper.releaseAll()), deadline: this.net.now() + SHUTDOWN_BUDGET_MS };
+        }
+        this.mapperDriven = false;
+    }
+
+    private closeMapper(): void {
+        this.retireMapper();
+        const closing = this.retiring?.task;
+        this.retiring = undefined;
+        if (!closing) return;
         const deadline = this.net.now() + SHUTDOWN_BUDGET_MS;
-        const closing = new Task(mapper.releaseAll());
         try {
             while (closing.poll().state === 'running' && this.net.now() < deadline) {
-                // Busy-waits: the server is shutting down, so nothing else needs this thread.
+                // Only unload drains synchronously; live reload advances retirement on ticks.
             }
         } finally {
             closing.cancel();
