@@ -1,4 +1,4 @@
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import type { Gateway, MappingRequest, MappingResult } from './gateway.ts';
 import { PortInUseError } from './gateway.ts';
 import { httpRequest } from './http.ts';
@@ -112,17 +112,33 @@ export function soapEnvelope(serviceType: string, action: string, args: [string,
  * @returns The fields of the response, by name.
  * @throws {UpnpError} When the answer is a fault.
  */
-export function parseSoapResponse(xml: string): Record<string, string> {
+export function parseSoapResponse(xml: string, action: string, status = 200): Record<string, string> {
+    if (XMLValidator.validate(xml) !== true) throw new Error('invalid SOAP XML');
     const envelope = (parser.parse(xml) as { Envelope?: { Body?: Record<string, unknown> } }).Envelope;
-    const body = envelope?.Body ?? {};
+    const body = envelope?.Body;
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+        throw new Error('the router did not return a SOAP Envelope/Body');
+    }
     const fault = body.Fault as
         | { detail?: { UPnPError?: { errorCode?: string; errorDescription?: string } } }
         | undefined;
     if (fault) {
         const detail = fault.detail?.UPnPError;
-        throw new UpnpError(Number(detail?.errorCode ?? 0), detail?.errorDescription ?? 'the router reported an error');
+        const code = detail?.errorCode ?? '';
+        if (!/^\d+$/.test(code) || !Number.isSafeInteger(Number(code)) || Number(code) === 0) {
+            throw new Error('the router returned an unrecognized SOAP fault');
+        }
+        throw new UpnpError(Number(code), detail?.errorDescription ?? 'the router reported an error');
     }
-    const response = Object.values(body)[0];
+    if (status !== 200) throw new Error(`the router answered ${status} without a recognized SOAP fault`);
+    const expected = `${action}Response`;
+    if (!Object.hasOwn(body, expected) || Object.keys(body).length !== 1) {
+        throw new Error(`the router did not return ${expected}`);
+    }
+    const response = body[expected];
+    if (response !== '' && (typeof response !== 'object' || response === null || Array.isArray(response))) {
+        throw new Error(`invalid ${expected}`);
+    }
     const fields: Record<string, string> = {};
     if (typeof response === 'object' && response !== null)
         for (const [name, value] of Object.entries(response)) fields[name] = String(value);
@@ -213,6 +229,6 @@ export class UpnpGateway implements Gateway {
         });
         if (response.status !== 200 && response.status !== 500)
             throw new Error(`the router answered ${response.status}`);
-        return parseSoapResponse(response.body);
+        return parseSoapResponse(response.body, name, response.status);
     }
 }
