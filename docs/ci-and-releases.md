@@ -20,6 +20,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 💬 Commit messages | code, action, or generated README changes on PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
+| 🎯 API compatibility | code changes | Isolated profile matrix from `pumpkin-api-targets.json`; typechecks, builds, and runs all real-server suites for each tuple; does not sign or publish |
 | 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
 | 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or `actions/common/` for shared helpers, then uploads c8 coverage to Codecov |
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
