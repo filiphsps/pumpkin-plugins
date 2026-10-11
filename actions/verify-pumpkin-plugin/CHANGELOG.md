@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.4](https://github.com/filiphsps/pumpkin-plugins/compare/verify-pumpkin-plugin-v0.0.3...verify-pumpkin-plugin-v0.0.4) (2026-10-11)
+
+
+### Bug Fixes
+
+* **ci:** preserve release fan-out and add recovery workflow ([563ae61](https://github.com/filiphsps/pumpkin-plugins/commit/563ae615434ab8231fb7cb0662dbd4b808b4b967))
+
 ## [0.0.3](https://github.com/filiphsps/pumpkin-plugins/compare/verify-pumpkin-plugin-v0.0.2...verify-pumpkin-plugin-v0.0.3) (2026-10-11)
 
 
