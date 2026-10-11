@@ -1,0 +1,59 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { applyBlocks, type BlockOptions } from './blocks.ts';
+
+/** Result of generation; check mode returns stale without writing. */
+export type Status = 'updated' | 'unchanged' | 'stale';
+
+/** One existing Markdown file and its generated blocks. Paths are relative to the supplied root. */
+export interface DocumentSpec extends BlockOptions {
+    file: string;
+    blocks: Record<string, string>;
+    /** Omit to use the plugin note; use an empty string to omit the note. */
+    note?: string;
+}
+
+/** A validated document update, prepared before any generation writes. */
+export interface DocumentUpdate {
+    file: string;
+    existing: string;
+    next: string;
+}
+
+/** Read and validate one document; custom documents require all blocks unless explicitly opted out. */
+export function prepareDocument(document: DocumentSpec, root: string): DocumentUpdate {
+    const file = resolve(root, document.file);
+    if (!existsSync(file)) throw new Error(`${file} not found: create the document with generated block markers`);
+    const existing = readFileSync(file, 'utf8');
+    const next = applyBlocks(existing, document.blocks, file, document.note, {
+        required: document.required ?? true,
+        markers: document.markers
+    });
+    return { file, existing, next };
+}
+
+/** Apply validated document updates or report drift without writing. */
+export function writeDocuments(updates: readonly DocumentUpdate[], check = false): Status {
+    let status: Status = 'unchanged';
+    for (const update of updates) {
+        if (update.existing === update.next) continue;
+        if (check) status = 'stale';
+        else {
+            writeFileSync(update.file, update.next);
+            status = 'updated';
+        }
+    }
+    return status;
+}
+
+/** Validate every target before updating blocks; duplicate targets and malformed markers fail without writes. */
+export function generateDocuments(documents: readonly DocumentSpec[], root: string, check = false): Status {
+    const seen = new Set<string>();
+    const updates = documents.map((document) => {
+        const file = resolve(root, document.file);
+        if (seen.has(file)) throw new Error(`Duplicate documentation target: ${file}`);
+        seen.add(file);
+        return prepareDocument(document, root);
+    });
+    return writeDocuments(updates, check);
+}

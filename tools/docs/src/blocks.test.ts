@@ -37,3 +37,16 @@ describe('applyBlocks', () => {
         expect(applyBlocks(readme, { commands: 'NEW' }, 'README.md', '<!-- hi -->')).toContain('<!-- hi -->');
     });
 });
+
+it('requires configured blocks and validates legacy action marker pairs', () => {
+    expect(() => applyBlocks('No markers', { facts: 'New' }, 'guide.md', '', { required: true })).toThrow(
+        'docs:begin facts'
+    );
+    const text = 'Intro\n<!-- action-inputs:start -->\nold\n<!-- action-inputs:end -->\nUsage';
+    expect(applyBlocks(text, { inputs: 'New' }, 'R.md', '', { markers: 'action', required: true })).toBe(
+        'Intro\n<!-- action-inputs:start -->\nNew\n<!-- action-inputs:end -->\nUsage'
+    );
+    expect(() => applyBlocks(`${text}${text}`, { inputs: 'New' }, 'R.md', '', { markers: 'action' })).toThrow(
+        'found 2 and 2'
+    );
+});

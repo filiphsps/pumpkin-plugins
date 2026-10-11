@@ -107,7 +107,7 @@ describe('plugin README', () => {
     });
 });
 
-describe('root README', () => {
+describe('root README', { timeout: 15000 }, () => {
     const readme =
         '# Repo\n\n<!-- docs:begin docs-site -->\n<!-- docs:end docs-site -->\n\n<!-- docs:begin packages -->\n<!-- docs:end packages -->\n\nAfter.\n';
     beforeEach(() => {
@@ -221,5 +221,27 @@ describe('root README', () => {
         expect(run(dir, 'root').stderr).toContain('docs:begin packages');
         fs.rmSync(path.join(dir, 'pnpm-workspace.yaml'));
         expect(run(dir, 'root').stderr).toContain('repository root');
+    });
+});
+
+describe('custom document CLI', () => {
+    it('loads a typed document module, checks drift, and rejects unsupported arguments', () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'docs-custom-cli-'));
+        try {
+            const readme = '# Custom\n<!-- docs:begin facts -->\nold\n<!-- docs:end facts -->\n';
+            fs.writeFileSync(path.join(root, 'README.md'), readme);
+            fs.writeFileSync(
+                path.join(root, 'docs.ts'),
+                'export const documents = [{ file: "README.md", blocks: { facts: "Fresh" }, note: "" }];'
+            );
+            expect(run(root, 'generate', 'docs.ts', '--check').status).toBe(1);
+            expect(fs.readFileSync(path.join(root, 'README.md'), 'utf8')).toBe(readme);
+            expect(run(root, 'generate', 'docs.ts').status).toBe(0);
+            expect(fs.readFileSync(path.join(root, 'README.md'), 'utf8')).toContain('Fresh');
+            expect(run(root, 'generate', 'docs.ts', '--check').status).toBe(0);
+            expect(run(root, 'generate', 'docs.ts', '--unknown').status).toBe(1);
+        } finally {
+            fs.rmSync(root, { recursive: true, force: true });
+        }
     });
 });

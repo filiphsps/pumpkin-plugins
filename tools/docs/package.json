@@ -32,7 +32,9 @@
     "module": "./src/info.ts",
     "types": "./src/info.ts",
     "exports": {
-        ".": "./src/info.ts"
+        ".": "./src/info.ts",
+        "./markdown": "./src/markdown.ts",
+        "./node": "./src/node.ts"
     },
     "bin": {
         "pumpkin-plugins-docs": "bin/pumpkin-plugins-docs.mjs"
