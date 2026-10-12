@@ -176,6 +176,9 @@ catalogs:
     c8:
       specifier: 12.0.0
       version: 12.0.0
+    esbuild:
+      specifier: 0.28.2
+      version: 0.28.2
     fflate:
       specifier: 0.8.3
       version: 0.8.3
@@ -545,8 +548,11 @@ importers:
       '@di-framework/componentize-qjs':
         specifier: 0.4.4-di.3
         version: 0.4.4-di.3
+      '@pumpkin-plugins/static-hermes-runtime':
+        specifier: workspace:*
+        version: link:../static-hermes-runtime
       esbuild:
-        specifier: 0.28.2
+        specifier: 'catalog:'
         version: 0.28.2
     devDependencies:
       '@types/node':
@@ -704,6 +710,24 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@types/node@24.19.1)(@vitest/coverage-v8@5.0.3)(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.6.1)(yaml@2.9.1))
+
+  tools/static-hermes-runtime:
+    devDependencies:
+      '@pumpkin-plugins/test-harness':
+        specifier: workspace:*
+        version: link:../test-harness
+      '@pumpkinmc/pumpkin-api-ts':
+        specifier: 'catalog:'
+        version: https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      esbuild:
+        specifier: 'catalog:'
+        version: 0.28.2
       vitest:
         specifier: 'catalog:'
         version: 5.0.3(@types/node@24.19.1)(@vitest/coverage-v8@5.0.3)(vite@8.3.2(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.6.1)(yaml@2.9.1))

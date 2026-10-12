@@ -48,7 +48,19 @@ const KEY_ORDER = [
 ];
 
 /** Files a tool ships besides `src`, where it has them. */
-const EXTRA_FILES = { 'tools/build': ['runtime', 'wasi-wit.lock.json'] };
+const EXTRA_FILES = {
+    'tools/build': ['runtime', 'wasi-wit.lock.json'],
+    'tools/static-hermes-runtime': [
+        'bin',
+        'cmake',
+        'hermes-patches',
+        'hermes-source.json',
+        'toolchain-versions.json',
+        'wasi-sdk.json',
+        'native',
+        'README.md'
+    ]
+};
 
 function hasEscapedUnicode(source) {
     // Scan JSON string tokens, consuming escaped backslashes so literal "\\u..." stays valid.

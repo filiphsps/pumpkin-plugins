@@ -45,7 +45,8 @@
     "dependencies": {
         "@bytecodealliance/jco": "1.36.1",
         "@di-framework/componentize-qjs": "0.4.4-di.3",
-        "esbuild": "0.28.2"
+        "esbuild": "catalog:",
+        "@pumpkin-plugins/static-hermes-runtime": "workspace:*"
     },
     "devDependencies": {
         "@types/node": "catalog:",
