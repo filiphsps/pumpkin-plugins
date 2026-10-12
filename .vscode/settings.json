@@ -1,4 +1,5 @@
 {
+    "biome.requireConfiguration": true,
     "cSpell.words": [
         "appleskin",
         "barebones",
@@ -43,5 +44,32 @@
         "Wasmtime",
         "worktree",
         "Xaero's"
-    ]
+    ],
+    "editor.formatOnPaste": false,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
+    "editor.renderLineHighlight": "all",
+    "editor.renderWhitespace": "all",
+    "explorer.decorations.badges": true,
+    "explorer.decorations.colors": true,
+    "files.insertFinalNewline": true,
+    "git.autofetch": "all",
+    "git.decorations.enabled": true,
+    "git.ignoreMissingGitWarning": false,
+    "git.pullBeforeCheckout": true,
+    "github.copilot.chat.commitMessageGeneration.instructions": [
+        {
+            "text": "Use conventional commit message format."
+        }
+    ],
+    "js/ts.experimental.useTsgo": true,
+    "js/ts.suggest.jsdoc.enabled": true,
+    "js/ts.suggestionActions.enabled": true,
+    "js/ts.updateImportsOnFileMove.enabled": "always",
+    "js/ts.updateImportsOnPaste.enabled": true,
+    "notebook.defaultFormatter": "biomejs.biome",
+    "notebook.output.wordWrap": true,
+    "npm.packageManager": "pnpm",
+    "npm.scriptRunner": "pnpm",
+    "terminal.integrated.fontLigatures.enabled": true
 }
