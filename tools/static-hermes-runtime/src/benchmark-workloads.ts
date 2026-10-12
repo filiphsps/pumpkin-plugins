@@ -1,7 +1,8 @@
-type WorkloadProvenance = 'synthetic guest fixture' | 'real Pumpkin API';
+/** Describes whether a workload uses a guest-side fixture or the real Pumpkin API. */
+export type WorkloadProvenance = 'synthetic guest fixture' | 'real Pumpkin API';
 
 /** Timings and deterministic output for one measured workload. */
-interface BenchmarkWorkload {
+export interface BenchmarkWorkload {
     name: string;
     area: string;
     provenance: WorkloadProvenance;

@@ -43,6 +43,7 @@ describe('generateTypes', () => {
         expect(fs.readFileSync(path.join(output, 'index.d.ts'), 'utf8')).toBe('export type Size = bigint;');
         expect(fs.readdirSync(dir)).toEqual(['bindings']);
         expect(componentize).toHaveBeenCalledOnce();
+        expect(componentize.mock.calls[0]?.[1]).toContain('--quiet');
     });
 
     it('keeps existing declarations and removes staging files if jco fails', () => {
