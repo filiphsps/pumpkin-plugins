@@ -14,7 +14,7 @@ The build tool bundles the same benchmark plugin source for each engine:
 
 Here, “Static Hermes” means Hermes linked into the WASI component. The plugin’s JavaScript is compiled to Hermes bytecode before the component runs; the benchmark does not translate JavaScript into native Wasm instructions. JIT is disabled for the WASI build. All three are Wasm components executed by Pumpkin’s runtime, not native desktop engine binaries.
 
-Production builds minify the bundle and enforce the repository’s 5 MiB component limit (5,242,880 bytes). Build flags, toolchain pins, and runtime details are in the [Static Hermes runtime guide](../README.md) and [build guide](../../../docs/building.md).
+Production builds minify the bundle and enforce the repository’s 5 MiB component limit (5,242,880 bytes). Build flags, toolchain pins, and runtime details are in the [Static Hermes Runtime guide](../README.md) and [build guide](../../../docs/building.md).
 
 ## Run the comparison
 
@@ -174,5 +174,5 @@ The maintained implementation is in [engine-comparison.test.ts](../test/engine-c
 
 - [QuickJS official documentation](https://bellard.org/quickjs/quickjs.html): engine overview, interpreter/compiler, bytecode, and memory handling.
 - [Hermes official build and execution guide](https://github.com/facebook/hermes/blob/main/doc/BuildingAndRunning.md): Hermes bytecode compiler and execution modes.
-- [Pumpkin plugin build guide](../../../docs/building.md) and [Static Hermes runtime guide](../README.md): this repository’s component build, engine profiles, and WASI configuration.
+- [Pumpkin plugin build guide](../../../docs/building.md) and [Static Hermes Runtime guide](../README.md): this repository’s component build, engine profiles, and WASI configuration.
 - [PR 99 engine-comparison job](https://github.com/filiphsps/pumpkin-plugins/actions/runs/38254750702/job/114834399434?pr=99): source revision, runner context, component sizes, and workload output for the example above.

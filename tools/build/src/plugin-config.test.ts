@@ -44,7 +44,7 @@ describe('readPluginConfig', () => {
         expect(config.engine).toBe('quickjs');
     });
 
-    it('supports selecting the lean Static Hermes runtime', () => {
+    it('supports selecting the lean Static Hermes Runtime', () => {
         const config = readPluginConfig(
             packageWith({ version: '1.2.3', pumpkinPlugin: { engine: 'static-hermes', staticHermesRuntime: 'lean' } })
         );
@@ -52,7 +52,7 @@ describe('readPluginConfig', () => {
         expect(config.staticHermesRuntime).toBe('lean');
     });
 
-    it('uses the default engine when selecting a Static Hermes runtime profile', () => {
+    it('uses the default engine when selecting a Static Hermes Runtime profile', () => {
         const config = readPluginConfig(
             packageWith({ version: '1.2.3', pumpkinPlugin: { staticHermesRuntime: 'lean' } })
         );

@@ -6,7 +6,7 @@ import { startPumpkin } from '@pumpkin-plugins/test-harness';
 import { expect, it } from 'vitest';
 import { bundlePlugin } from '../../../tools/build/src/bundle.ts';
 
-it('releases repeated world acquisitions in the bundled Static Hermes runtime', async () => {
+it('releases repeated world acquisitions in the bundled Static Hermes Runtime', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-resource-lifetime-'));
     const require = createRequire(import.meta.url);
     const api = require.resolve('@pumpkinmc/pumpkin-api-ts');

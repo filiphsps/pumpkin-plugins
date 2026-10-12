@@ -64,7 +64,7 @@ it('preserves the selected engine so release recovery can prepare its toolchain'
     }
 });
 
-it('uses QuickJS for legacy release sources without the Static Hermes runtime', async () => {
+it('uses QuickJS for legacy release sources without the Static Hermes Runtime', async () => {
     const root = fixture({ includeStaticHermesRuntime: false });
     try {
         assert.equal((await resolvePluginRelease(root, 'upnpumpkin-v0.0.8')).engine, 'quickjs');

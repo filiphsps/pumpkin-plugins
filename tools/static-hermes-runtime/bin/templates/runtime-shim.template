@@ -973,7 +973,7 @@ Object exportsObject(Runtime &runtime) {
 
 Value callExport(const char *name, const Value *args, std::size_t count) {
     if (!jsRuntime)
-        throw std::runtime_error("Static Hermes runtime is not initialized");
+        throw std::runtime_error("Static Hermes Runtime is not initialized");
     auto exports = exportsObject(*jsRuntime);
     return exports.getPropertyAsFunction(*jsRuntime, name)
         .call(*jsRuntime, args, count);

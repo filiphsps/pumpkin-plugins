@@ -1,4 +1,4 @@
-# Static Hermes runtime
+# Static Hermes Runtime
 
 `@pumpkin-plugins/static-hermes-runtime` supplies the Static Hermes backend used by the plugin
 build tool. It compiles bundled JavaScript to Hermes bytecode, embeds that bytecode in a

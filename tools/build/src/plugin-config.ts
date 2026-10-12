@@ -6,7 +6,7 @@ import { BuildError } from './errors.ts';
 
 /** JavaScript runtime used to build a plugin component. */
 export type PluginEngine = 'quickjs' | 'static-hermes';
-/** Static Hermes runtime profile linked into the plugin component. */
+/** Static Hermes Runtime profile linked into the plugin component. */
 export type StaticHermesRuntime = StaticHermesRuntimeVariant;
 
 /** What a package declares under `pumpkinPlugin` in its `package.json`. */

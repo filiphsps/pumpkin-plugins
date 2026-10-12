@@ -16,7 +16,7 @@ by the `pumpkinPlugin` key in each plugin's `package.json`:
 
 `engine` is optional and defaults to `static-hermes`. Set it to `quickjs` to build a QuickJS plugin;
 both engines are supported. Current plugin packages use the Static Hermes default. See the
-[Static Hermes runtime guide](../tools/static-hermes-runtime/README.md) for toolchain setup and
+[Static Hermes Runtime guide](../tools/static-hermes-runtime/README.md) for toolchain setup and
 supported API calls. Development, integration and release builds use the configured engine. The
 build tool provisions Static Hermes's pinned WASI SDK and `wit-bindgen` under `.cache/hermes/` when
 needed, then prepares Hermes automatically when Static Hermes is selected.

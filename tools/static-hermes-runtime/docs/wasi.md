@@ -151,7 +151,7 @@ permitted to use; the host policy remains authoritative.
 The JavaScript call path is:
 
 1. The plugin calls an imported function or resource method generated from the WIT declarations.
-2. The facade calls a JSI host function installed by the Static Hermes runtime shim.
+2. The facade calls a JSI host function installed by the Static Hermes Runtime shim.
 3. The native adapter converts JavaScript values to the WIT C representation, then calls the
    function emitted by `wit-bindgen`.
 4. The generated binding crosses the component boundary using the Canonical ABI; the host's WASI

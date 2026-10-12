@@ -1,4 +1,4 @@
-# Static Hermes runtime
+# Static Hermes Runtime
 
 This package supplies the Static Hermes backend for Pumpkin plugin components. It compiles bundled
 JavaScript to Hermes bytecode with `hermesc`, then links the bytecode, Hermes, the JSI shim, and
