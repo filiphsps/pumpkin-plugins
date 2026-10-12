@@ -10,7 +10,7 @@ This page describes the WASI path implemented by this repository. It focuses on 
 0.2.3 interfaces and the Static Hermes adapter. It is not a reference for every WASI proposal or
 for every service the Pumpkin server may expose. For the general plugin build flow, see
 [Building](../../../docs/building.md); for the engine comparison, see
-[Benchmarking](benchmarking.md).
+[Benchmarking](../../../docs/benchmarking.md).
 
 Static Hermes is the default build engine; QuickJS remains supported. Both use the plugin's
 configured WASI imports, but the JavaScript facades and JSI adapters described here are specific to
@@ -89,9 +89,11 @@ Adapter selection is a build detail, not a per-method permission boundary.
 
 The key source files are [`capabilities.ts`](../../build/src/capabilities.ts),
 [`wasi-wit.ts`](../../build/src/wasi-wit.ts), [`wit.ts`](../../build/src/wit.ts),
-[`bundle.ts`](../../build/src/bundle.ts), and the Static Hermes
-[`WIT adapter generator`](../bin/wit-api.mjs). The interfaces and WIT imports follow the
-[Component Model][^component-model], rather than the older WASI Preview 1 module ABI.
+[`bundle.ts`](../../build/src/bundle.ts), and the Static Hermes typed
+[`WIT parser`](../src/wit/parser.ts), [`resolver`](../src/wit/resolver.ts),
+[`analysis`](../src/wit/analysis.ts), and [`generation`](../src/wit/generation.ts). The interfaces
+and WIT imports follow the [Component Model][^component-model], rather than the older WASI Preview
+1 module ABI.
 
 ## Capability bundles
 
@@ -232,7 +234,7 @@ permissions must be verified against the Pumpkin server version used for deploym
 | Build reports an unknown WASI capability | `pumpkinPlugin.wasi` accepts only `http`, `filesystem`, `sockets`, and `udp`. |
 | TypeScript cannot resolve a `wasi:*` import | Confirm the matching capability is declared and regenerate guest declarations with the plugin's typecheck/build workflow. |
 | Build says an interface is not imported by the plugin WIT world | The module import does not match the selected capability bundle or its locked WIT dependencies. |
-| Build reports no Static Hermes adapter for an operation | Check the selected method's WIT input/result types against the converter in `wit-api.mjs`; add adapter support and coverage if the interface is being extended. |
+| Build reports no Static Hermes adapter for an operation | Check the selected method's resolved WIT input/result types and adapter plan in `src/wit/analysis.ts`; add adapter support and coverage if the interface is being extended. |
 | First build cannot download WIT files | The first build needs network access unless the verified WASI 0.2.3 files are already cached. Check the URL and SHA-256 entry in the lock. |
 | Component builds but fails when loaded or called | Check that the Pumpkin server resolves the imported interface and that `info.permissions` grants the matching operation. Inspect the server's error for a denied host capability. |
 | A WASI resource throws after use | Check ownership transfer and disposal paths. Do not reuse a consumed resource; release resources on success and error paths. |
@@ -282,7 +284,7 @@ permissions must be verified against the Pumpkin server version used for deploym
   cleanup rather than assuming a browser-style global API.
 
 There are no WASI-call timing numbers in this guide. The repository's
-[engine comparison](benchmarking.md) measures guest-side JavaScript workloads and selected Pumpkin
+[engine comparison](../../../docs/benchmarking.md) measures guest-side JavaScript workloads and selected Pumpkin
 API behavior; it does not measure a WASI operation. Its engine ratios therefore cannot be used as
 WASI boundary-throughput results. Performance statements above are implementation-based reasoning,
 not benchmark findings.
@@ -299,8 +301,14 @@ The build and adapter have separate sources of truth:
 | Plugin-world imports and exact WIT file preparation | [`tools/build/src/wit.ts`](../../build/src/wit.ts) |
 | TypeScript declarations from the prepared world | [`tools/build/src/types.ts`](../../build/src/types.ts) |
 | TypeScript call analysis for used Pumpkin/WASI methods | [`tools/build/src/wit-method-usage.ts`](../../build/src/wit-method-usage.ts) |
-| WIT parsing, facade generation, type conversion, resource ownership, feature selection, and JSI adapter generation | [`tools/static-hermes-runtime/bin/wit-api.mjs`](../bin/wit-api.mjs) |
-| WASI C binding, feature flags, Hermes bytecode, and final component link | [`tools/static-hermes-runtime/bin/build-static-hermes.mjs`](../bin/build-static-hermes.mjs) |
+| Pinned `wasm-tools` JSON input and plugin import/declaration order | [`tools/static-hermes-runtime/src/wit/parser.ts`](../src/wit/parser.ts) |
+| Dependency aliases and resolved WIT types | [`tools/static-hermes-runtime/src/wit/resolver.ts`](../src/wit/resolver.ts) |
+| Used methods, feature closure, event fields, and WASI adapter plans | [`tools/static-hermes-runtime/src/wit/analysis.ts`](../src/wit/analysis.ts) |
+| Pumpkin/WASI JavaScript facades and native adapter emission | [`tools/static-hermes-runtime/src/wit/emitters.ts`](../src/wit/emitters.ts) |
+| Runtime shim and API enum generation | [`tools/static-hermes-runtime/src/wit/generation.ts`](../src/wit/generation.ts) |
+| Hermes source checkout, ordered patches, build profiles, cache and artifacts | [`tools/static-hermes-runtime/src/hermes/prepare.ts`](../src/hermes/prepare.ts) |
+| Component analysis, C binding, bytecode compilation, native compile and link | [`tools/static-hermes-runtime/src/component/build.ts`](../src/component/build.ts) |
+| Commander CLI source and package binary | [`tools/static-hermes-runtime/src/cli.ts`](../src/cli.ts), compiled to `dist/cli.js` and registered in [`package.json`](../package.json) |
 
 When adding or upgrading an interface:
 

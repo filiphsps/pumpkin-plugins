@@ -31,6 +31,10 @@ means. If you write a `@param`, its name must match a real parameter, and tags d
 Tests (including the `testing/` folders of shared packages), config files and generator templates are exempt, as are private helpers. A good description
 says what the thing is for, not what its name says.
 
+The rule checks `.ts` source across the repository and also checks `.mts` and `.mjs` source in
+`tools/static-hermes-runtime`. Declaration files are maintained with their source API but are not
+linted by this rule.
+
 ## Console log colors
 
 Use `ansi.named` from [`@pumpkin-plugins/minecraft-colors`](../tools/minecraft-colors/README.md)

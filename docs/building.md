@@ -90,14 +90,14 @@ Tasks are defined in `turbo.json` and run with the root scripts (`pnpm build`, `
 | Task | Notes |
 | --- | --- |
 | `transit` | Does nothing; it carries a package's dependencies' hashes (see below) |
-| `build` | Caches `build/**` except `build/types/**` |
+| `build` | Caches `build/**` except `build/types/**`, plus package `dist/**` output |
 | `typecheck` | Caches the generated `build/types/**`, so a cache hit restores them |
-| `test` | Cached on inputs only |
+| `test` | Caches `dist/**` for the `static-hermes-runtime` package's test build |
 | `test:integration` | Depends on `build`, never cached (it starts a real server) |
 | `readme`, `readme:check` | Never cached, they write or inspect files |
 
-Run `pnpm clean` to remove workspace `node_modules`, root and workspace `build/` output, root
-`dist/`, and `.turbo/cache/`. It preserves `.cache/`.
+Run `pnpm clean` to remove workspace `node_modules`, root and workspace `build/` and `dist/` output,
+and `.turbo/cache/`. It preserves `.cache/`.
 
 Run one plugin with `pnpm build --filter=@pumpkin-plugins/<folder>`.
 `pnpm build` checks the selected Turbo task graph and prepares Static Hermes once before plugin
