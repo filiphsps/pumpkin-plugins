@@ -56,11 +56,20 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
         target: path.join(buildDir, 'wit')
     });
     console.log(`Bundling ${entry}...`);
+    const engine = config.engine;
+    const staticHermesRuntime =
+        engine === 'static-hermes'
+            ? process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE === '0'
+                ? 'full'
+                : (config.staticHermesRuntime ?? 'lean')
+            : undefined;
     const size = await bundlePlugin({
         entry: path.resolve(pluginDir, entry),
         output: path.resolve(pluginDir, output),
         witDir,
         version: config.version,
+        engine,
+        ...(staticHermesRuntime === undefined ? {} : { staticHermesRuntime }),
         developmentMode: process.env.PUMPKIN_DEV_MODE === '1'
     });
     console.log(`Built ${output} (${(size / 1024).toFixed(0)} KiB)`);

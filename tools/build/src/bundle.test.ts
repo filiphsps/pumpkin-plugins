@@ -66,6 +66,67 @@ describe('bundlePlugin', () => {
         );
     });
 
+    it('builds Static Hermes plugins as a bundled IIFE and bypasses QuickJS componentization', async () => {
+        const { output } = buildAt();
+        esbuild.mockImplementationOnce((options) => {
+            if (!options.outfile) throw new Error('missing JavaScript bundle output');
+            fs.writeFileSync(options.outfile, 'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();');
+            return {} as never;
+        });
+        componentize.mockImplementationOnce((_file, args) => {
+            const bundleIndex = args?.indexOf('--bundle') ?? -1;
+            const bundlePath = args?.[bundleIndex + 1];
+            if (!bundlePath) throw new Error('missing Static Hermes bundle argument');
+            expect(fs.readFileSync(bundlePath, 'utf8')).toBe(
+                'var __pumpkinPlugin=(()=>{var exports={};return exports;})();'
+            );
+            const outputIndex = args?.indexOf('--output') ?? -1;
+            const staged = args?.[outputIndex + 1];
+            if (!staged) throw new Error('missing Static Hermes output argument');
+            fs.writeFileSync(staged, 'component');
+            return Buffer.alloc(0);
+        });
+
+        await bundlePlugin({
+            entry: 'src/plugin.ts',
+            output,
+            witDir: 'wit',
+            version: '1.0.0',
+            engine: 'static-hermes',
+            staticHermesRuntime: 'lean'
+        });
+
+        expect(esbuild).toHaveBeenCalledWith(
+            expect.objectContaining({ format: 'iife', globalName: '__pumpkinPlugin', bundle: true })
+        );
+        expect(componentize.mock.calls[0]?.[1]).toContainEqual(expect.stringContaining('build-static-hermes.mjs'));
+        expect(componentize.mock.calls[0]?.[1]).toContain('--runtime-variant');
+        expect(componentize.mock.calls[0]?.[1]).toContain('lean');
+        expect(componentize.mock.calls[0]?.[1]).not.toContainEqual(expect.stringContaining('componentize-qjs.cjs'));
+    });
+
+    it('rejects Static Hermes bundles with unimplemented WASI imports before compiling', async () => {
+        const { output } = buildAt();
+        esbuild.mockImplementationOnce((options) => {
+            if (!options.outfile) throw new Error('missing JavaScript bundle output');
+            fs.writeFileSync(options.outfile, 'var plugin = require("wasi:http/types@0.2.3");');
+            return {} as never;
+        });
+
+        await expect(
+            bundlePlugin({
+                entry: 'src/plugin.ts',
+                output,
+                witDir: 'wit',
+                version: '1.0.0',
+                engine: 'static-hermes'
+            })
+        ).rejects.toThrow('Static Hermes JavaScript bundle imports unsupported WASI interface wasi:http/types@0.2.3');
+
+        expect(componentize).not.toHaveBeenCalled();
+        expect(fs.existsSync(output)).toBe(false);
+    });
+
     it('publishes a completed component and returns its size', async () => {
         const { output } = buildAt();
         fs.writeFileSync(output, 'old artifact');
@@ -137,6 +198,30 @@ describe('bundlePlugin', () => {
 
         await expect(
             bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0', developmentMode: true })
+        ).resolves.toBe(size);
+
+        expect(fs.statSync(output).size).toBe(size);
+    });
+
+    it('does not block Static Hermes experiments on component size', async () => {
+        const { output } = buildAt();
+        const size = MAX_PRODUCTION_COMPONENT_BYTES + 1;
+        esbuild.mockImplementationOnce((options) => {
+            if (!options.outfile) throw new Error('missing JavaScript bundle output');
+            fs.writeFileSync(options.outfile, 'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();');
+            return {} as never;
+        });
+        componentize.mockImplementationOnce((_file, args) => {
+            const outputIndex = args?.indexOf('--output') ?? -1;
+            const staged = args?.[outputIndex + 1];
+            if (!staged) throw new Error('missing Static Hermes output argument');
+            fs.writeFileSync(staged, '');
+            fs.truncateSync(staged, size);
+            return Buffer.alloc(0);
+        });
+
+        await expect(
+            bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0', engine: 'static-hermes' })
         ).resolves.toBe(size);
 
         expect(fs.statSync(output).size).toBe(size);
