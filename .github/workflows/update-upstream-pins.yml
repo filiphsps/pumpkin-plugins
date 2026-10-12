@@ -1,0 +1,105 @@
+name: Update upstream pins
+
+on:
+    schedule:
+        - cron: '17 3 * * *'
+    workflow_dispatch:
+
+concurrency:
+    group: upstream-pins-${{ github.ref }}
+    cancel-in-progress: false
+
+permissions:
+    contents: write
+    issues: write
+    pull-requests: write
+
+jobs:
+    discover:
+        name: 🔎 Check upstream pins
+        runs-on: ubuntu-26.04
+        outputs:
+            matrix: ${{ steps.pins.outputs.matrix }}
+        steps:
+            - name: 🕶️ Checkout default branch
+              uses: actions/checkout@v7.0.1
+              with:
+                  ref: ${{ github.event.repository.default_branch }}
+
+            - name: 🔎 Discover upstream updates
+              id: pins
+              run: echo "matrix=$(node scripts/upstream-pins.mjs discover)" >> "$GITHUB_OUTPUT"
+
+    update:
+        name: ${{ matrix.source.name }}
+        needs: [discover]
+        if: needs.discover.outputs.matrix != ''
+        strategy:
+            fail-fast: false
+            matrix:
+                source: ${{ fromJSON(needs.discover.outputs.matrix).include }}
+        concurrency:
+            group: upstream-pin-${{ matrix.source.id }}
+            cancel-in-progress: false
+        timeout-minutes: 90
+        runs-on: ubuntu-26.04
+        env:
+            GH_REPO: ${{ github.repository }}
+            BASE_BRANCH: ${{ github.event.repository.default_branch }}
+            SOURCE_ID: ${{ matrix.source.id }}
+            SOURCE_NAME: ${{ matrix.source.name }}
+            PIN_FILE: ${{ matrix.source.pinFile }}
+            CURRENT_COMMIT: ${{ matrix.source.current }}
+            LATEST_COMMIT: ${{ matrix.source.latest }}
+            NEEDS_UPDATE: ${{ matrix.source.needsUpdate }}
+            COMPARE_URL: ${{ matrix.source.compareUrl }}
+            LABELS_JSON: ${{ toJSON(matrix.source.labels) }}
+        steps:
+            - name: 🔑 Create upstream pin update token
+              id: app-token
+              uses: actions/create-github-app-token@v3.2.0
+              with:
+                  client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+                  permission-contents: write
+                  permission-issues: write
+                  permission-pull-requests: write
+
+            - name: 🕶️ Checkout default branch
+              uses: actions/checkout@v7.0.1
+              with:
+                  ref: ${{ github.event.repository.default_branch }}
+                  token: ${{ steps.app-token.outputs.token }}
+
+            - name: 📦 Setup pnpm
+              if: env.NEEDS_UPDATE == 'true'
+              uses: pnpm/action-setup@v6.1.0
+
+            - name: 🟢 Setup Node
+              if: env.NEEDS_UPDATE == 'true'
+              uses: actions/setup-node@v7.0.0
+              with:
+                  node-version-file: .node-version
+                  cache: pnpm
+
+            - name: 📥 Install dependencies
+              if: env.NEEDS_UPDATE == 'true'
+              run: pnpm install --frozen-lockfile
+
+            - name: 📝 Update pinned source
+              if: env.NEEDS_UPDATE == 'true'
+              run: node scripts/upstream-pins.mjs apply "$SOURCE_ID" "$LATEST_COMMIT"
+
+            - name: 🧪 Validate updated source
+              id: validate
+              if: env.NEEDS_UPDATE == 'true'
+              continue-on-error: true
+              run: node scripts/upstream-pins.mjs validate "$SOURCE_ID"
+
+            - name: 🔄 Reconcile upstream update PR or issue
+              if: always()
+              env:
+                  VALIDATION_RESULT: ${{ steps.validate.outcome }}
+                  GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+              run: node scripts/upstream-pins.mjs reconcile

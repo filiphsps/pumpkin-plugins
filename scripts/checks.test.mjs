@@ -38,6 +38,64 @@ function run(script, dir, ...args) {
     return { ok: result.status === 0, out: `${result.stdout}${result.stderr}` };
 }
 
+describe('setup-static-hermes action', () => {
+    const action = parse(
+        fs.readFileSync(path.join(scripts, '../.github/common/setup-static-hermes/action.yml'), 'utf8')
+    );
+    const steps = action.runs.steps;
+    const step = (id) => steps.find((candidate) => candidate.id === id);
+
+    it('reads configured toolchain versions and uses them in cache keys', () => {
+        const versionScript = step('versions').run;
+        assert.match(versionScript, /wasi-sdk\.json/);
+        assert.match(versionScript, /toolchain-versions\.json/);
+        assert.match(versionScript, /\.tools\["wit-bindgen"\]/);
+        assert.match(versionScript, /\.tools\.rust/);
+
+        const witBindgenCache = step('wit-bindgen-cache').with;
+        assert.match(witBindgenCache.path, /wit-bindgen-\$\{\{ steps\.versions\.outputs\.wit-bindgen-version \}\}/);
+        assert.match(witBindgenCache.key, /steps\.versions\.outputs\.wit-bindgen-version/);
+        assert.match(witBindgenCache.key, /steps\.versions\.outputs\.rust-toolchain-version/);
+
+        const hermesCache = step('hermes-workspace-cache').with;
+        assert.match(hermesCache.path, /\.cache\/hermes/);
+        assert.match(hermesCache.key, /steps\.versions\.outputs\.wasi-sdk-version/);
+        assert.match(hermesCache.key, /steps\.versions\.outputs\.wit-bindgen-version/);
+        assert.match(hermesCache.key, /steps\.versions\.outputs\.rust-toolchain-version/);
+        assert.doesNotMatch(`${witBindgenCache.key} ${hermesCache.key}`, /wasi-sdk-34|wit-bindgen-0\.62|rust-1\.99/);
+    });
+});
+
+describe('upstream pin workflow', () => {
+    const workflow = parse(
+        fs.readFileSync(path.join(scripts, '../.github/workflows/update-upstream-pins.yml'), 'utf8')
+    );
+    const releaseWorkflow = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/release.yml'), 'utf8'));
+
+    it('uses the release GitHub App token so created pull requests trigger CI', () => {
+        const update = workflow.jobs.update;
+        const token = update.steps.find((step) => step.id === 'app-token');
+        const checkout = update.steps.find((step) => step.uses === 'actions/checkout@v7.0.1');
+        const reconcile = update.steps.find((step) => step.name === '🔄 Reconcile upstream update PR or issue');
+        const release = releaseWorkflow.jobs.release.steps;
+        const releaseToken = release.find((step) => step.id === 'app-token');
+        const releasePlease = release.find((step) => step.id === 'release');
+
+        assert.ok(token, 'updater must create a GitHub App token');
+        assert.equal(token.uses, 'actions/create-github-app-token@v3.2.0');
+        assert.equal(token.with['client-id'], releaseToken.with['client-id']);
+        assert.equal(token.with['private-key'], releaseToken.with['private-key']);
+        assert.equal(token.with['permission-contents'], 'write');
+        assert.equal(token.with['permission-issues'], 'write');
+        assert.equal(token.with['permission-pull-requests'], 'write');
+        const appTokenExpression = ['$', '{{ steps.app-token.outputs.token }}'].join('');
+        assert.equal(checkout.with.token, appTokenExpression);
+        assert.equal(reconcile.env.GH_TOKEN, appTokenExpression);
+        assert.equal(releasePlease.env.GITHUB_TOKEN, appTokenExpression);
+        assert.equal(reconcile.run, 'node scripts/upstream-pins.mjs reconcile');
+    });
+});
+
 const AUTHOR = 'Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)';
 const REPO = 'https://github.com/filiphsps/pumpkin-plugins';
 const metadata = (dir) => ({
@@ -458,12 +516,52 @@ describe('action release prerequisites', () => {
     const evaluate = (expression, context) =>
         runInNewContext(expression.trim().replace(/^\$\{\{|\}\}$/g, ''), { always: () => true, ...context });
 
+    it('starts Static Hermes preparation as soon as changes are classified', () => {
+        assert.deepEqual(ci.jobs.build.needs, ['changes']);
+        assert.equal(ci.jobs.build.steps.find((step) => step.name === '🏗️ Prepare Static Hermes')?.id, 'prepare-hermes');
+        assert.deepEqual(ci.jobs.lint.needs, ['changes']);
+        assert.deepEqual(ci.jobs.typecheck.needs, ['changes']);
+        assert.deepEqual(ci.jobs.release.needs, [
+            'changes',
+            'lint',
+            'typecheck',
+            'build',
+            'engine-comparison',
+            'test',
+            'docs',
+            'integration',
+            'action-gate'
+        ]);
+        assert.match(ci.jobs.release.if, /needs\.lint\.result == 'success'/);
+        assert.match(ci.jobs.release.if, /needs\.typecheck\.result == 'success'/);
+    });
+
     it('awaits action verification alongside every existing plugin prerequisite', () => {
-        for (const job of ['changes', 'build', 'test', 'docs', 'integration', 'action-gate']) {
-            assert.ok(ci.jobs.release.needs.includes(job), `Release does not await ${job}`);
-        }
+        assert.deepEqual(ci.jobs.release.needs, [
+            'changes',
+            'lint',
+            'typecheck',
+            'build',
+            'engine-comparison',
+            'test',
+            'docs',
+            'integration',
+            'action-gate'
+        ]);
         assert.deepEqual(ci.jobs['action-gate'].needs, ['changes', 'action-tests']);
         assert.equal(evaluate(ci.jobs['action-gate'].if, {}), true);
+    });
+
+    it('runs engine comparison through its own reusable workflow', () => {
+        const comparison = parse(
+            fs.readFileSync(path.join(scripts, '../.github/workflows/engine-comparison.yml'), 'utf8')
+        );
+        const job = ci.jobs['engine-comparison'];
+        assert.ok(Object.hasOwn(comparison.on, 'workflow_call'));
+        assert.equal(job.uses, './.github/workflows/engine-comparison.yml');
+        assert.deepEqual(job.needs, ['changes', 'build']);
+        assert.equal(job.if, "needs.changes.outputs.code == 'true'");
+        assert.ok(comparison.jobs.compare.steps.some((step) => step.run?.includes('compare-engines')));
     });
 
     it('passes the expanded matrix into the reusable action test workflow', () => {
@@ -498,11 +596,13 @@ describe('action release prerequisites', () => {
             it(`allows ${code === 'true' ? 'mixed' : 'action-only'} release only after a successful action gate (${result})`, () => {
                 const needs = {
                     changes: { result: 'success', outputs: { code, actions: '["sign-pumpkin-plugin"]' } },
+                    lint: { result: code === 'true' ? 'success' : 'skipped' },
+                    typecheck: { result: code === 'true' ? 'success' : 'skipped' },
                     docs: { result: 'success' },
                     build: { result: code === 'true' ? 'success' : 'skipped' },
+                    'engine-comparison': { result: code === 'true' ? 'success' : 'skipped' },
                     test: { result: code === 'true' ? 'success' : 'skipped' },
                     integration: { result: code === 'true' ? 'success' : 'skipped' },
-                    'runtime-provenance': { result: code === 'true' ? 'success' : 'skipped' },
                     'action-gate': { result }
                 };
                 assert.equal(
@@ -535,16 +635,27 @@ describe('action release prerequisites', () => {
         ]) {
             const needs = {
                 changes: { result: 'success', outputs: { code, actions: selected } },
+                lint: { result: code === 'true' ? 'success' : 'skipped' },
+                typecheck: { result: code === 'true' ? 'success' : 'skipped' },
                 docs: { result: docs },
                 build: { result: 'success' },
+                'engine-comparison': { result: code === 'true' ? 'success' : 'skipped' },
                 test: { result: 'success' },
                 integration: { result: 'success' },
-                'runtime-provenance': { result: code === 'true' ? 'success' : 'skipped' },
                 'action-gate': { result: 'success' }
             };
             assert.equal(evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }), expected);
             if (code === 'true') {
-                for (const required of ['changes', 'build', 'test', 'docs', 'integration']) {
+                for (const required of [
+                    'changes',
+                    'lint',
+                    'typecheck',
+                    'build',
+                    'engine-comparison',
+                    'test',
+                    'docs',
+                    'integration'
+                ]) {
                     const failing = { ...needs, [required]: { ...needs[required], result: 'failure' } };
                     assert.equal(
                         evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs: failing }),
