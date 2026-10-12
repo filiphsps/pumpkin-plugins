@@ -1,3 +1,4 @@
 {
-    "packages/bedrock-addon-manager": "Not ready for its first release"
+    "packages/bedrock-addon-manager": "Not ready for its first release",
+    "packages/tab-display": "Internal demo plugin"
 }
