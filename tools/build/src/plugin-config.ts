@@ -1,7 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { StaticHermesRuntimeVariant } from '@pumpkin-plugins/static-hermes-runtime';
 import { CAPABILITIES, type Capability, isCapability } from './capabilities.ts';
 import { BuildError } from './errors.ts';
+
+/** JavaScript runtime used to build a plugin component. */
+export type PluginEngine = 'quickjs' | 'static-hermes';
+/** Static Hermes runtime profile linked into the plugin component. */
+export type StaticHermesRuntime = StaticHermesRuntimeVariant;
 
 /** What a package declares under `pumpkinPlugin` in its `package.json`. */
 export interface PluginBuildConfig {
@@ -11,6 +17,10 @@ export interface PluginBuildConfig {
     output?: string;
     /** WASI capabilities the code uses. */
     wasi: Capability[];
+    /** JavaScript runtime used for the component. Defaults to QuickJS. */
+    engine: PluginEngine;
+    /** Optional Static Hermes VM profile. Lean omits runtime bytecode generation. */
+    staticHermesRuntime?: StaticHermesRuntime;
     /** The package's version, injected as `__PLUGIN_VERSION__`. */
     version: string;
 }
@@ -49,6 +59,20 @@ export function readPluginConfig(pluginDir: string): PluginBuildConfig {
     const entry = optionalRelativePath(config.entry, 'entry');
     const output = optionalRelativePath(config.output, 'output');
 
+    const engine = config.engine === undefined ? 'quickjs' : config.engine;
+    if (engine !== 'quickjs' && engine !== 'static-hermes') {
+        throw new BuildError('"pumpkinPlugin.engine" must be "quickjs" or "static-hermes"');
+    }
+
+    const staticHermesRuntime = config.staticHermesRuntime;
+    if (staticHermesRuntime !== undefined) {
+        if (engine !== 'static-hermes')
+            throw new BuildError('"pumpkinPlugin.staticHermesRuntime" requires "engine": "static-hermes"');
+        if (staticHermesRuntime !== 'full' && staticHermesRuntime !== 'lean') {
+            throw new BuildError('"pumpkinPlugin.staticHermesRuntime" must be "full" or "lean"');
+        }
+    }
+
     const wasiValue = config.wasi === undefined ? [] : config.wasi;
     if (!Array.isArray(wasiValue)) throw new BuildError('"pumpkinPlugin.wasi" must be an array of capability names');
     const wasi: Capability[] = [];
@@ -64,6 +88,8 @@ export function readPluginConfig(pluginDir: string): PluginBuildConfig {
     return {
         entry,
         output,
+        engine,
+        ...(staticHermesRuntime === undefined ? {} : { staticHermesRuntime }),
         wasi,
         version: pkg.version
     };
