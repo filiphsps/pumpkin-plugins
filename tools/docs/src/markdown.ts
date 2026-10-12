@@ -5,7 +5,7 @@ export interface TableOptions {
 
 /** Escape pipes and normalize line breaks in a Markdown table cell. */
 export function cell(text: string, options: TableOptions = {}): string {
-    const escaped = text.replace(/\|/g, '\\|');
+    const escaped = text.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
     return options.multiline === 'break' ? escaped.replace(/\r?\n/g, '<br>') : escaped.replace(/\s*\n\s*/g, ' ').trim();
 }
 
