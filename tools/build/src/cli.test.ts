@@ -65,7 +65,13 @@ describe('run arguments', () => {
             path.join(pluginDir, 'package.json'),
             JSON.stringify({
                 version: '1.2.3',
-                pumpkinPlugin: { entry: 'src/plugin.ts', output: 'build/plugin.wasm', wasi: [] }
+                pumpkinPlugin: {
+                    entry: 'src/plugin.ts',
+                    output: 'build/plugin.wasm',
+                    wasi: [],
+                    engine: 'static-hermes',
+                    staticHermesRuntime: 'lean'
+                }
             })
         );
         process.env.PUMPKIN_API_DIR = apiDir;
@@ -80,6 +86,8 @@ describe('run arguments', () => {
                 output: path.join(pluginDir, 'build/plugin.wasm'),
                 witDir: path.join(apiDir, 'wit', 'v0.1'),
                 version: '1.2.3',
+                engine: 'static-hermes',
+                staticHermesRuntime: 'lean',
                 developmentMode: false
             });
             expect(consoleLog.mock.calls.map(([message]) => message)).toEqual([
@@ -95,20 +103,111 @@ describe('run arguments', () => {
         }
     });
 
-    it('marks bundles created for pnpm dev as development builds', async () => {
-        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-dev-build-'));
+    it('links the lean Hermes archive by default', async () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-lean-default-'));
         const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
-        const realApiDir = process.env.PUMPKIN_API_DIR;
-        const realDevMode = process.env.PUMPKIN_DEV_MODE;
+        const previous = {
+            api: process.env.PUMPKIN_API_DIR,
+            lean: process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE
+        };
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
             JSON.stringify({
                 version: '1.2.3',
-                pumpkinPlugin: { entry: 'src/plugin.ts', output: 'build/plugin.wasm', wasi: [] }
+                pumpkinPlugin: {
+                    entry: 'src/plugin.ts',
+                    output: 'build/plugin.wasm',
+                    wasi: [],
+                    engine: 'static-hermes'
+                }
+            })
+        );
+        process.env.PUMPKIN_API_DIR = apiDir;
+        delete process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE;
+        vi.mocked(bundlePlugin).mockClear().mockResolvedValue(1);
+        const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        try {
+            await run([], pluginDir);
+
+            expect(bundlePlugin).toHaveBeenCalledWith(
+                expect.objectContaining({ engine: 'static-hermes', staticHermesRuntime: 'lean' })
+            );
+        } finally {
+            consoleLog.mockRestore();
+            if (previous.api === undefined) delete process.env.PUMPKIN_API_DIR;
+            else process.env.PUMPKIN_API_DIR = previous.api;
+            if (previous.lean === undefined) delete process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE;
+            else process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE = previous.lean;
+            fs.rmSync(pluginDir, { recursive: true, force: true });
+            fs.rmSync(apiDir, { recursive: true, force: true });
+        }
+    });
+
+    it('uses the full Hermes archive when the lean profile is disabled', async () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-full-'));
+        const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
+        const previous = {
+            api: process.env.PUMPKIN_API_DIR,
+            lean: process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE
+        };
+        fs.writeFileSync(
+            path.join(pluginDir, 'package.json'),
+            JSON.stringify({
+                version: '1.2.3',
+                pumpkinPlugin: {
+                    entry: 'src/plugin.ts',
+                    output: 'build/plugin.wasm',
+                    wasi: [],
+                    engine: 'static-hermes'
+                }
+            })
+        );
+        process.env.PUMPKIN_API_DIR = apiDir;
+        process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE = '0';
+        vi.mocked(bundlePlugin).mockClear().mockResolvedValue(1);
+        const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        try {
+            await run([], pluginDir);
+
+            expect(bundlePlugin).toHaveBeenCalledWith(
+                expect.objectContaining({ engine: 'static-hermes', staticHermesRuntime: 'full' })
+            );
+        } finally {
+            consoleLog.mockRestore();
+            if (previous.api === undefined) delete process.env.PUMPKIN_API_DIR;
+            else process.env.PUMPKIN_API_DIR = previous.api;
+            if (previous.lean === undefined) delete process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE;
+            else process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE = previous.lean;
+            fs.rmSync(pluginDir, { recursive: true, force: true });
+            fs.rmSync(apiDir, { recursive: true, force: true });
+        }
+    });
+
+    it('marks bundles created for pnpm dev as development builds', async () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-dev-build-'));
+        const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
+        const previous = {
+            api: process.env.PUMPKIN_API_DIR,
+            dev: process.env.PUMPKIN_DEV_MODE,
+            lean: process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE
+        };
+        fs.writeFileSync(
+            path.join(pluginDir, 'package.json'),
+            JSON.stringify({
+                version: '1.2.3',
+                pumpkinPlugin: {
+                    entry: 'src/plugin.ts',
+                    output: 'build/plugin.wasm',
+                    wasi: [],
+                    engine: 'static-hermes'
+                }
             })
         );
         process.env.PUMPKIN_API_DIR = apiDir;
         process.env.PUMPKIN_DEV_MODE = '1';
+        delete process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE;
         vi.mocked(bundlePlugin).mockClear().mockResolvedValue(2048);
         const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -120,14 +219,18 @@ describe('run arguments', () => {
                 output: path.join(pluginDir, 'build/plugin.wasm'),
                 witDir: path.join(apiDir, 'wit', 'v0.1'),
                 version: '1.2.3',
+                engine: 'static-hermes',
+                staticHermesRuntime: 'lean',
                 developmentMode: true
             });
         } finally {
             consoleLog.mockRestore();
-            if (realApiDir === undefined) delete process.env.PUMPKIN_API_DIR;
-            else process.env.PUMPKIN_API_DIR = realApiDir;
-            if (realDevMode === undefined) delete process.env.PUMPKIN_DEV_MODE;
-            else process.env.PUMPKIN_DEV_MODE = realDevMode;
+            if (previous.api === undefined) delete process.env.PUMPKIN_API_DIR;
+            else process.env.PUMPKIN_API_DIR = previous.api;
+            if (previous.dev === undefined) delete process.env.PUMPKIN_DEV_MODE;
+            else process.env.PUMPKIN_DEV_MODE = previous.dev;
+            if (previous.lean === undefined) delete process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE;
+            else process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE = previous.lean;
             fs.rmSync(pluginDir, { recursive: true, force: true });
             fs.rmSync(apiDir, { recursive: true, force: true });
         }

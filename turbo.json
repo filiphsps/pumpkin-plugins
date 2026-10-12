@@ -15,7 +15,22 @@
         },
         "build": {
             "dependsOn": ["transit"],
-            "env": ["PUMPKIN_API_DIR", "PUMPKIN_DEV_MODE"],
+            "env": [
+                "PUMPKIN_API_DIR",
+                "PUMPKIN_DEV_MODE",
+                "STATIC_HERMES_CACHE_DIR",
+                "STATIC_HERMES_SOURCE_DIR",
+                "STATIC_HERMES_HOST_BUILD_DIR",
+                "STATIC_HERMES_WASI_BUILD_DIR",
+                "STATIC_HERMES_WASI_SDK_PATH",
+                "STATIC_HERMES_STACK_SIZE",
+                "STATIC_HERMES_ENABLE_JSI_EXTENSIONS",
+                "STATIC_HERMES_ENABLE_LEAN_ARCHIVE",
+                "STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES",
+                "WASI_SDK_PATH",
+                "WASI_SDK",
+                "WIT_BINDGEN"
+            ],
             "outputs": ["build/**", "!build/types/**"]
         },
         "typecheck": {

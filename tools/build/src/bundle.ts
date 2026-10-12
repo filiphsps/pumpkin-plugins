@@ -2,7 +2,9 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
+import { buildStaticHermesComponent, staticHermesImportsPlugin } from '@pumpkin-plugins/static-hermes-runtime';
 import * as esbuild from 'esbuild';
+import type { PluginEngine, StaticHermesRuntime } from './plugin-config.ts';
 
 const require = createRequire(import.meta.url);
 const MAX_PRODUCTION_COMPONENT_BYTES = 5 * 1024 * 1024;
@@ -17,6 +19,10 @@ export interface BundleOptions {
     witDir: string;
     /** Injected as `__PLUGIN_VERSION__`. */
     version: string;
+    /** Runtime used for the component. Defaults to QuickJS. */
+    engine?: PluginEngine;
+    /** Static Hermes VM profile. Defaults to lean, which omits runtime `eval`. */
+    staticHermesRuntime?: StaticHermesRuntime;
     /** Whether this is a development build. */
     developmentMode?: boolean;
 }
@@ -34,13 +40,24 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
     const temporaryDir = fs.mkdtempSync(path.join(outputDir, '.pumpkin-build-'));
     const bundle = path.join(temporaryDir, 'bundle.js');
     const component = path.join(temporaryDir, 'plugin.wasm');
+    const engine = options.engine ?? 'quickjs';
     let preserveTemporaryDir = false;
     try {
         await esbuild.build({
             entryPoints: [options.entry],
             bundle: true,
             outfile: bundle,
-            format: 'esm',
+            format: engine === 'quickjs' ? 'esm' : 'iife',
+            ...(engine === 'static-hermes'
+                ? {
+                      globalName: '__pumpkinPlugin',
+                      plugins: [
+                          staticHermesImportsPlugin({
+                              resolveDir: path.dirname(path.resolve(options.entry))
+                          })
+                      ]
+                  }
+                : {}),
             target: 'es2022',
             minify: !options.developmentMode,
             treeShaking: true,
@@ -51,26 +68,44 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                 'process.env.NODE_ENV': JSON.stringify(options.developmentMode ? 'development' : 'production')
             }
         });
-        const componentizerPackage = path.dirname(require.resolve('@di-framework/componentize-qjs/package.json'));
-        execFileSync(
-            process.execPath,
-            [
-                path.join(componentizerPackage, 'bin/componentize-qjs.cjs'),
-                '--world',
-                'plugin',
-                '--wit',
-                options.witDir,
-                '--js',
+        if (engine === 'static-hermes') {
+            const source = fs.readFileSync(bundle, 'utf8');
+            const unsupportedWasiImports = staticHermesWasiImports(source);
+            if (unsupportedWasiImports.length > 0) {
+                throw new Error(
+                    `Static Hermes JavaScript bundle imports unsupported WASI interface${unsupportedWasiImports.length === 1 ? '' : 's'} ${unsupportedWasiImports.join(', ')}`
+                );
+            }
+            fs.writeFileSync(bundle, unwrapStaticHermesExports(source));
+            buildStaticHermesComponent({
                 bundle,
-                '--runtime',
-                path.join(import.meta.dirname, '../runtime/quickjs-runtime-bigint.wasm'),
-                '--output',
-                component
-            ],
-            { stdio: 'inherit' }
-        );
+                witDir: options.witDir,
+                output: component,
+                developmentMode: options.developmentMode ?? false,
+                ...(options.staticHermesRuntime === undefined ? {} : { runtimeVariant: options.staticHermesRuntime })
+            });
+        } else {
+            const componentizerPackage = path.dirname(require.resolve('@di-framework/componentize-qjs/package.json'));
+            execFileSync(
+                process.execPath,
+                [
+                    path.join(componentizerPackage, 'bin/componentize-qjs.cjs'),
+                    '--world',
+                    'plugin',
+                    '--wit',
+                    options.witDir,
+                    '--js',
+                    bundle,
+                    '--runtime',
+                    path.join(import.meta.dirname, '../runtime/quickjs-runtime-bigint.wasm'),
+                    '--output',
+                    component
+                ],
+                { stdio: 'inherit' }
+            );
+        }
         const size = fs.statSync(component).size;
-        if (!options.developmentMode && size > MAX_PRODUCTION_COMPONENT_BYTES) {
+        if (engine === 'quickjs' && !options.developmentMode && size > MAX_PRODUCTION_COMPONENT_BYTES) {
             throw new Error(
                 `Production WebAssembly component is ${size} bytes; maximum is ${MAX_PRODUCTION_COMPONENT_BYTES} bytes (5 MiB)`
             );
@@ -82,6 +117,17 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
     } finally {
         if (!preserveTemporaryDir) fs.rmSync(temporaryDir, { recursive: true, force: true });
     }
+}
+
+function staticHermesWasiImports(source: string): string[] {
+    return [...new Set([...source.matchAll(/["'](wasi:[^"']+)["']/g)].map((match) => match[1] as string))];
+}
+
+function unwrapStaticHermesExports(source: string): string {
+    const iifeReturn = /return\s+[$\w]+\(([$\w]+)\);(\s*}\)\(\);\s*)$/;
+    const match = iifeReturn.exec(source);
+    if (!match) throw new Error('Static Hermes bundle has an unsupported esbuild IIFE export wrapper');
+    return source.replace(iifeReturn, `return ${match[1]};$2`);
 }
 
 function publishComponent(
