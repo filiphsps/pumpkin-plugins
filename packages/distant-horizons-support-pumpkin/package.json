@@ -57,6 +57,7 @@
     },
     "pumpkinPlugin": {
         "entry": "src/plugin.ts",
+        "engine": "static-hermes",
         "output": "build/distant-horizons-support-pumpkin.wasm",
         "wasi": [
             "filesystem",

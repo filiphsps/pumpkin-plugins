@@ -56,6 +56,7 @@
     },
     "pumpkinPlugin": {
         "entry": "src/plugin.ts",
+        "engine": "static-hermes",
         "output": "build/dynamic-lights-pumpkin.wasm",
         "wasi": [
             "filesystem",
