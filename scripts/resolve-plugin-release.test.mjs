@@ -34,7 +34,7 @@ it('resolves a plugin tag to the registered plugin, version and collected WASM p
             path: 'packages/upnpumpkin',
             component: 'upnpumpkin',
             version: '0.0.8',
-            engine: 'quickjs',
+            engine: 'static-hermes',
             pluginName: 'UPnPumpkin',
             wasmFile: 'dist/upnpumpkin.wasm'
         });
@@ -44,9 +44,9 @@ it('resolves a plugin tag to the registered plugin, version and collected WASM p
 });
 
 it('preserves the selected engine so release recovery can prepare its toolchain', async () => {
-    const root = fixture({ engine: 'static-hermes' });
+    const root = fixture({ engine: 'quickjs' });
     try {
-        assert.equal((await resolvePluginRelease(root, 'upnpumpkin-v0.0.8')).engine, 'static-hermes');
+        assert.equal((await resolvePluginRelease(root, 'upnpumpkin-v0.0.8')).engine, 'quickjs');
     } finally {
         rmSync(root, { recursive: true, force: true });
     }

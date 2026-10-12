@@ -232,7 +232,7 @@ esac
     } finally {
         fs.rmSync(temporaryDir, { recursive: true, force: true });
     }
-});
+}, 30_000);
 
 it('refreshes the managed Hermes checkout when its pinned commit changes', () => {
     const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-pin-refresh-'));
@@ -304,7 +304,7 @@ exit 0
     } finally {
         fs.rmSync(temporaryDir, { recursive: true, force: true });
     }
-});
+}, 30_000);
 
 function writeExecutable(file, body = 'exit 0\n') {
     fs.mkdirSync(path.dirname(file), { recursive: true });

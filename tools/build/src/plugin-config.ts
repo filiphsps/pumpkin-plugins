@@ -17,7 +17,7 @@ export interface PluginBuildConfig {
     output?: string;
     /** WASI capabilities the code uses. */
     wasi: Capability[];
-    /** JavaScript runtime used for the component. Defaults to QuickJS. */
+    /** JavaScript runtime used for the component. Defaults to Static Hermes. */
     engine: PluginEngine;
     /** Optional Static Hermes VM profile. Lean omits runtime bytecode generation. */
     staticHermesRuntime?: StaticHermesRuntime;
@@ -59,7 +59,7 @@ export function readPluginConfig(pluginDir: string): PluginBuildConfig {
     const entry = optionalRelativePath(config.entry, 'entry');
     const output = optionalRelativePath(config.output, 'output');
 
-    const engine = config.engine === undefined ? 'quickjs' : config.engine;
+    const engine = config.engine === undefined ? 'static-hermes' : config.engine;
     if (engine !== 'quickjs' && engine !== 'static-hermes') {
         throw new BuildError('"pumpkinPlugin.engine" must be "quickjs" or "static-hermes"');
     }

@@ -77,6 +77,24 @@ describe('prepareWit', () => {
         expect(fs.readFileSync(path.join(apiWit, 'plugin.wit'), 'utf8')).toBe(PLUGIN_WIT);
     });
 
+    it('preserves package metadata from the pinned WIT files', () => {
+        const { apiWit, wasiWit, target } = layout();
+        const packageWit = 'package wasi:http@0.2.3;\n// pinned package metadata\n';
+        fs.mkdirSync(path.join(wasiWit, 'http'));
+        fs.writeFileSync(path.join(wasiWit, 'http/package.wit'), packageWit);
+        fs.writeFileSync(path.join(wasiWit, 'http/types.wit'), 'interface types {}');
+
+        prepareWit({
+            apiWit,
+            target,
+            wasiWit,
+            wasiFiles: ['http/package.wit', 'http/types.wit'],
+            interfaces: ['http/outgoing-handler']
+        });
+
+        expect(fs.readFileSync(path.join(target, 'deps/http/package.wit'), 'utf8')).toBe(packageWit);
+    });
+
     it('starts from a clean target every time', () => {
         const { apiWit, wasiWit, target } = layout();
         fs.mkdirSync(target, { recursive: true });

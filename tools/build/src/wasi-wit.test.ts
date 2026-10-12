@@ -51,6 +51,29 @@ describe('ensureWasiWit', () => {
         ]);
     });
 
+    it('writes generated WIT files from the lock without downloading them', async () => {
+        const cache = tmp();
+        const packageWit = 'package wasi:http@0.2.3;\n';
+        const generatedLock = {
+            version: '9.9.9',
+            files: { 'http/package.wit': sha(packageWit) },
+            generatedFiles: { 'http/package.wit': packageWit }
+        } satisfies WasiWitLock;
+        let fetchCount = 0;
+
+        const dir = await ensureWasiWit({
+            cacheDir: cache,
+            lock: generatedLock,
+            fetchFile: async () => {
+                fetchCount += 1;
+                return new TextEncoder().encode('unexpected download');
+            }
+        });
+
+        expect(fetchCount).toBe(0);
+        expect(fs.readFileSync(path.join(dir, 'http/package.wit'), 'utf8')).toBe(packageWit);
+    });
+
     it('downloads nothing when the cache is complete', async () => {
         const cache = tmp();
         await ensureWasiWit({ cacheDir: cache, lock, fetchFile: server().fetchFile });
@@ -129,5 +152,8 @@ describe('readLock', () => {
         expect(real.version).toMatch(/^\d+\.\d+\.\d+$/);
         expect(Object.keys(real.files).length).toBeGreaterThan(0);
         for (const hash of Object.values(real.files)) expect(hash).toMatch(/^[0-9a-f]{64}$/);
+        for (const [file, content] of Object.entries(real.generatedFiles ?? {})) {
+            expect(real.files[file]).toBe(sha(content));
+        }
     });
 });

@@ -75,6 +75,7 @@ export async function prepareStaticHermesBuild({
     await prepare();
 }
 
+/** Reuse the cached WASI SDK or install and validate the configured version. */
 async function resolveCachedWasiSdk({ toolchainRoot, platform, arch, wasiSdkConfig, env, fetchImpl, installWasiSdk }) {
     const { repository, version } = wasiSdkConfig;
     const destination = path.join(toolchainRoot, `wasi-sdk-${version}`);
@@ -91,6 +92,7 @@ async function resolveCachedWasiSdk({ toolchainRoot, platform, arch, wasiSdkConf
     return validateWasiSdk(path.resolve(installed), 'automatically installed WASI SDK');
 }
 
+/** Reuse a cached or user-installed wit-bindgen, otherwise install its pinned version. */
 async function resolveWitBindgen({ toolchainRoot, homeDirectory, toolchainConfig, installWitBindgen }) {
     const witBindgenVersion = toolchainConfig.tools['wit-bindgen'];
     const rustToolchainVersion = toolchainConfig.tools.rust;
@@ -109,6 +111,7 @@ async function resolveWitBindgen({ toolchainRoot, homeDirectory, toolchainConfig
     return validateWitBindgen(path.resolve(installed), 'automatically installed wit-bindgen');
 }
 
+/** Download, verify, and install the configured WASI SDK release. */
 async function installPinnedWasiSdk({ destination, platform, arch, repository, version, env, fetchImpl }) {
     const parent = path.dirname(destination);
     fs.mkdirSync(parent, { recursive: true });
@@ -190,6 +193,7 @@ export function selectWasiSdkAsset(release, { version, platform, arch }) {
     return asset;
 }
 
+/** Validate the WASI SDK version and release repository configuration. */
 function validateWasiSdkConfig(config) {
     if (
         !config ||
@@ -201,6 +205,7 @@ function validateWasiSdkConfig(config) {
     }
 }
 
+/** Validate the pinned wit-bindgen and Rust tool versions. */
 function validateToolchainConfig(config) {
     if (
         !config?.tools ||
@@ -213,10 +218,12 @@ function validateToolchainConfig(config) {
     }
 }
 
+/** Escape regular expression metacharacters in a literal value. */
 function escapeRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Install the pinned wit-bindgen CLI using the configured Rust toolchain. */
 async function installPinnedWitBindgen({ destination, version, rustToolchainVersion, homeDirectory }) {
     const installRoot = path.dirname(path.dirname(destination));
     fs.mkdirSync(installRoot, { recursive: true });
@@ -256,6 +263,7 @@ async function installPinnedWitBindgen({ destination, version, rustToolchainVers
     return destination;
 }
 
+/** Find an executable by searching the current PATH. */
 function findExecutable(name) {
     for (const directory of (process.env.PATH ?? '').split(path.delimiter)) {
         if (!directory) continue;
@@ -265,10 +273,12 @@ function findExecutable(name) {
     return undefined;
 }
 
+/** Check whether a directory contains the WASI SDK's target C compiler. */
 function isWasiSdk(directory) {
     return fs.existsSync(path.join(directory, 'bin', 'wasm32-wasip2-clang'));
 }
 
+/** Validate a WASI SDK directory and return its path. */
 function validateWasiSdk(directory, description) {
     if (!isWasiSdk(directory)) {
         throw new Error(`${description} is missing bin/wasm32-wasip2-clang: ${directory}`);
@@ -276,11 +286,13 @@ function validateWasiSdk(directory, description) {
     return directory;
 }
 
+/** Validate a wit-bindgen executable path and return it. */
 function validateWitBindgen(executable, description) {
     if (!fs.existsSync(executable)) throw new Error(`${description} executable not found: ${executable}`);
     return executable;
 }
 
+/** Compute a file's SHA-256 digest by streaming its contents. */
 async function sha256File(filename) {
     const hash = createHash('sha256');
     for await (const chunk of createReadStream(filename)) hash.update(chunk);

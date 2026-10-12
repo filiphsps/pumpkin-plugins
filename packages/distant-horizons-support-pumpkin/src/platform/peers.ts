@@ -87,7 +87,7 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                                 return acquireChunk(
                                     { x, z },
                                     () => {
-                                        // Generated types say undefined for WIT option-none; QuickJS lifts it as null.
+                                        // Generated types say undefined for WIT option-none; Static Hermes lifts it as null.
                                         const chunk = terrainWorld.getChunk(x, z);
                                         return chunk ?? undefined;
                                     },

@@ -14,6 +14,9 @@ export interface StaticHermesBuildOptions {
     output: string;
     developmentMode: boolean;
     runtimeVariant?: StaticHermesRuntimeVariant;
+    wasiImports?: string[];
+    wasiMethods?: string[];
+    apiMethods?: string[];
 }
 
 /** Builds the component using the runtime package's pinned shim and external Hermes toolchain. */
@@ -31,6 +34,10 @@ export function buildStaticHermesComponent(options: StaticHermesBuildOptions): v
             options.output,
             '--development-mode',
             options.developmentMode ? 'true' : 'false',
+            '--wasi-imports',
+            JSON.stringify(options.wasiImports ?? []),
+            ...(options.wasiMethods === undefined ? [] : ['--wasi-methods', JSON.stringify(options.wasiMethods)]),
+            ...(options.apiMethods === undefined ? [] : ['--api-methods', JSON.stringify(options.apiMethods)]),
             ...(options.runtimeVariant === undefined ? [] : ['--runtime-variant', options.runtimeVariant])
         ],
         { stdio: 'inherit' }

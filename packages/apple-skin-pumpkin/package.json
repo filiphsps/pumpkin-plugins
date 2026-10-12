@@ -55,7 +55,6 @@
     "pumpkinPlugin": {
         "entry": "src/plugin.ts",
         "output": "build/apple-skin-pumpkin.wasm",
-        "engine": "static-hermes",
         "wasi": [
             "http"
         ]

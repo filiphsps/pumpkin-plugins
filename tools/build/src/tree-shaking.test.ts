@@ -44,7 +44,7 @@ describe('production tree shaking', () => {
             return Buffer.alloc(0);
         });
 
-        await bundlePlugin({ entry, output, witDir: 'wit', version: '1.0.0' });
+        await bundlePlugin({ entry, output, witDir: 'wit', version: '1.0.0', engine: 'quickjs' });
 
         expect(bundledSource).toContain('PUMPKIN_USED_SENTINEL');
         expect(bundledSource).not.toContain('PUMPKIN_UNUSED_SENTINEL');

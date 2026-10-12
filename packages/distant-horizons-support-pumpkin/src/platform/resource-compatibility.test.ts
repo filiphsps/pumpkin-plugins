@@ -9,7 +9,7 @@ vi.mock('pumpkin:plugin/world@0.1.0', () => ({
 }));
 vi.mock('pumpkin:plugin/text@0.1.0', () => ({ TextComponent: { text: (value: string) => ({ value }) } }));
 
-describe('QuickJS resource compatibility', () => {
+describe('host resource compatibility', () => {
     it('serves terrain when host resources expose no Symbol.dispose method', () => {
         const values = defaultValues(schema);
         const java = { sendCustomPayload: vi.fn() };

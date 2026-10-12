@@ -5,6 +5,8 @@ import * as path from 'node:path';
 import { buildStaticHermesComponent, staticHermesImportsPlugin } from '@pumpkin-plugins/static-hermes-runtime';
 import * as esbuild from 'esbuild';
 import type { PluginEngine, StaticHermesRuntime } from './plugin-config.ts';
+import { generateTypes } from './types.ts';
+import { findUsedWitMethods } from './wit-method-usage.ts';
 
 const require = createRequire(import.meta.url);
 const MAX_PRODUCTION_COMPONENT_BYTES = 5 * 1024 * 1024;
@@ -19,7 +21,7 @@ export interface BundleOptions {
     witDir: string;
     /** Injected as `__PLUGIN_VERSION__`. */
     version: string;
-    /** Runtime used for the component. Defaults to QuickJS. */
+    /** Runtime used for the component. Defaults to Static Hermes. */
     engine?: PluginEngine;
     /** Static Hermes VM profile. Defaults to lean, which omits runtime `eval`. */
     staticHermesRuntime?: StaticHermesRuntime;
@@ -40,7 +42,8 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
     const temporaryDir = fs.mkdtempSync(path.join(outputDir, '.pumpkin-build-'));
     const bundle = path.join(temporaryDir, 'bundle.js');
     const component = path.join(temporaryDir, 'plugin.wasm');
-    const engine = options.engine ?? 'quickjs';
+    const engine = options.engine ?? 'static-hermes';
+    const resolvedWasiImports = new Set<string>();
     let preserveTemporaryDir = false;
     try {
         await esbuild.build({
@@ -53,7 +56,10 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                       globalName: '__pumpkinPlugin',
                       plugins: [
                           staticHermesImportsPlugin({
-                              resolveDir: path.dirname(path.resolve(options.entry))
+                              resolveDir: path.dirname(path.resolve(options.entry)),
+                              witDir: options.witDir,
+                              developmentMode: options.developmentMode ?? false,
+                              onWasiImport: (specifier) => resolvedWasiImports.add(specifier)
                           })
                       ]
                   }
@@ -70,19 +76,31 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
         });
         if (engine === 'static-hermes') {
             const source = fs.readFileSync(bundle, 'utf8');
-            const unsupportedWasiImports = staticHermesWasiImports(source);
+            const unsupportedWasiImports = staticHermesWasiImports(source).filter(
+                (specifier) => !resolvedWasiImports.has(specifier)
+            );
             if (unsupportedWasiImports.length > 0) {
                 throw new Error(
-                    `Static Hermes JavaScript bundle imports unsupported WASI interface${unsupportedWasiImports.length === 1 ? '' : 's'} ${unsupportedWasiImports.join(', ')}`
+                    `Static Hermes JavaScript bundle imports WASI interface${unsupportedWasiImports.length === 1 ? '' : 's'} without a JSI adapter: ${unsupportedWasiImports.join(', ')}`
                 );
             }
             fs.writeFileSync(bundle, unwrapStaticHermesExports(source));
+            const generatedTypes = path.join(temporaryDir, 'wit-types');
+            generateTypes(options.witDir, generatedTypes);
+            const usedWitMethods = findUsedWitMethods(options.entry, generatedTypes);
             buildStaticHermesComponent({
                 bundle,
                 witDir: options.witDir,
                 output: component,
                 developmentMode: options.developmentMode ?? false,
-                ...(options.staticHermesRuntime === undefined ? {} : { runtimeVariant: options.staticHermesRuntime })
+                wasiImports: [...resolvedWasiImports],
+                ...(options.staticHermesRuntime === undefined ? {} : { runtimeVariant: options.staticHermesRuntime }),
+                ...(usedWitMethods === undefined
+                    ? {}
+                    : {
+                          apiMethods: usedWitMethods.pumpkinMethods,
+                          wasiMethods: usedWitMethods.wasiMethods
+                      })
             });
         } else {
             const componentizerPackage = path.dirname(require.resolve('@di-framework/componentize-qjs/package.json'));
@@ -105,7 +123,7 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
             );
         }
         const size = fs.statSync(component).size;
-        if (engine === 'quickjs' && !options.developmentMode && size > MAX_PRODUCTION_COMPONENT_BYTES) {
+        if (!options.developmentMode && size > MAX_PRODUCTION_COMPONENT_BYTES) {
             throw new Error(
                 `Production WebAssembly component is ${size} bytes; maximum is ${MAX_PRODUCTION_COMPONENT_BYTES} bytes (5 MiB)`
             );
@@ -124,10 +142,26 @@ function staticHermesWasiImports(source: string): string[] {
 }
 
 function unwrapStaticHermesExports(source: string): string {
-    const iifeReturn = /return\s+[$\w]+\(([$\w]+)\);(\s*}\)\(\);\s*)$/;
-    const match = iifeReturn.exec(source);
-    if (!match) throw new Error('Static Hermes bundle has an unsupported esbuild IIFE export wrapper');
-    return source.replace(iifeReturn, `return ${match[1]};$2`);
+    const matches = [...source.matchAll(/return\s+[$\w]+\(([$\w]+)\);(\s*}\)\(\);)/g)];
+    const match = matches.at(-1);
+    if (!match?.index) throw new Error('Static Hermes bundle has an unsupported esbuild IIFE export wrapper');
+    const end = match.index + match[0].length;
+    const suffix = source.slice(end);
+    if (!isTrailingLicenseComment(suffix)) {
+        throw new Error('Static Hermes bundle has unsupported code after its esbuild IIFE export wrapper');
+    }
+    return `${source.slice(0, match.index)}return ${match[1]};${match[2]}${suffix}`;
+}
+
+function isTrailingLicenseComment(source: string): boolean {
+    let remaining = source.trim();
+    while (remaining) {
+        if (!remaining.startsWith('/*!')) return false;
+        const end = remaining.indexOf('*/', 3);
+        if (end < 0) return false;
+        remaining = remaining.slice(end + 2).trim();
+    }
+    return true;
 }
 
 function publishComponent(

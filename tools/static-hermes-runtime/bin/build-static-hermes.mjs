@@ -3,7 +3,11 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { wrapBundleForDiagnostics } from './bundle-diagnostics.mjs';
+import { parseJsonStringArray } from './cli-arguments.mjs';
+import { renderEmbeddedBytecode } from './embed-bytecode.mjs';
 import { prepareStaticHermesBuild } from './toolchain-environment.mjs';
+import { wasiFeaturesForMethods } from './wit-api.mjs';
 
 const runtimeRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const args = new Map();
@@ -18,6 +22,10 @@ const bundle = required('bundle');
 const witDir = required('wit');
 const output = required('output');
 const developmentMode = args.get('development-mode') === 'true';
+const wasiImports = parseJsonStringArray(args.get('wasi-imports') ?? '[]', 'wasi-imports', 'module specifiers');
+const wasiMethods = parseJsonStringArray(args.get('wasi-methods'), 'wasi-methods', 'WASI method identifiers');
+const wasiFeatures = wasiFeaturesForMethods(witDir, wasiMethods);
+const apiMethods = parseJsonStringArray(args.get('api-methods'), 'api-methods', 'method identifiers');
 const runtimeVariant =
     args.get('runtime-variant') ?? (process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE === '0' ? 'full' : 'lean');
 if (runtimeVariant !== 'full' && runtimeVariant !== 'lean') {
@@ -43,19 +51,22 @@ const hermesRuntimeArchive = path.join(
 );
 const compiler = path.join(wasiSdk, 'bin', 'wasm32-wasip2-clang');
 const cxx = `${compiler}++`;
-const hermesc = path.join(hermesHostBuild, 'bin', 'shermes');
+const hermesc = path.join(hermesHostBuild, 'bin', 'hermesc');
 const tempDir = fs.mkdtempSync(path.join(path.dirname(output), '.static-hermes-'));
 
+/** Read a required command-line path and resolve it against the current directory. */
 function required(name) {
     const value = args.get(name);
     if (!value) throw new Error(`Missing --${name}`);
     return path.resolve(value);
 }
 
+/** Resolve a configured environment path or its fallback. */
 function configuredPath(name, fallback) {
     return path.resolve(process.env[name] ?? fallback);
 }
 
+/** Ensure a required build input exists and provide setup guidance when it does not. */
 function requirePath(description, location) {
     if (!fs.existsSync(location)) {
         throw new Error(
@@ -64,6 +75,7 @@ function requirePath(description, location) {
     }
 }
 
+/** Run a build command while forwarding its standard streams to the terminal. */
 function run(command, commandArgs) {
     execFileSync(command, commandArgs, { stdio: 'inherit' });
 }
@@ -76,10 +88,11 @@ try {
     requirePath('wit-bindgen', bindgen);
 
     const generated = path.join(tempDir, 'wit');
-    const unitC = path.join(tempDir, 'plugin_bundle.c');
-    const unitObject = path.join(tempDir, 'plugin_bundle.o');
+    const unitBytecode = path.join(tempDir, 'plugin_bundle.hbc');
+    const bytecodeHeader = path.join(tempDir, 'plugin-bytecode.generated.h');
     const bindingsObject = path.join(tempDir, 'plugin.o');
     const shimObject = path.join(tempDir, 'runtime.o');
+    const runtimeCpp = path.join(tempDir, 'runtime.cpp');
     const componentType = path.join(generated, 'plugin_component_type.o');
     const hermesIncludes = [
         path.join(hermesSource, 'include'),
@@ -91,47 +104,58 @@ try {
         path.join(hermesWasiBuild, 'include'),
         path.join(hermesWasiBuild, 'lib/config')
     ];
-    const generatedApiDir = path.join(runtimeRoot, 'generated');
+    // Each plugin build has a distinct WIT world, so keep its generated enum header beside its
+    // other temporary bindings instead of sharing a package-level header across parallel builds.
+    const generatedApiDir = path.join(tempDir, 'generated');
 
     fs.mkdirSync(generated, { recursive: true });
-    run(bindgen, ['c', witDir, '--world', 'plugin', '--out-dir', generated]);
+    run(bindgen, [
+        'c',
+        witDir,
+        '--world',
+        'plugin',
+        ...(wasiFeatures.length === 0 ? [] : ['--features', wasiFeatures.join(',')]),
+        '--out-dir',
+        generated
+    ]);
     run(process.execPath, [
         path.join(runtimeRoot, 'bin/generate-api-enums.mjs'),
         '--wit',
         witDir,
+        '--bundle',
+        bundle,
         '--header',
         path.join(generated, 'plugin.h'),
         '--output',
         path.join(generatedApiDir, 'api-enums.generated.h')
     ]);
-    // shermes emits C for the bundled JS. Production uses -Os and compact output, then drops
-    // function names and debug data. Development uses -Og/-g2 to keep generated code inspectable.
-    const hermesOptimization = developmentMode ? ['-Og', '-g2'] : ['-Os', '-Xsmall-c', '-fstrip-function-names', '-g0'];
-    // Native production code uses -Oz, disables assertions, and splits sections for linker GC.
-    // Development uses -O0/-g but keeps NDEBUG so generated bindings behave like production.
+    run(process.execPath, [
+        path.join(runtimeRoot, 'bin/generate-runtime.mjs'),
+        '--wit',
+        witDir,
+        '--bundle',
+        bundle,
+        '--template',
+        path.join(runtimeRoot, 'bin/templates/runtime-shim.template'),
+        '--wasi-imports',
+        JSON.stringify(wasiImports),
+        ...(wasiMethods === undefined ? [] : ['--wasi-methods', JSON.stringify(wasiMethods)]),
+        ...(apiMethods === undefined ? [] : ['--api-methods', JSON.stringify(apiMethods)]),
+        '--output',
+        runtimeCpp
+    ]);
+    // Hermes bytecode keeps source locations for JavaScript backtraces in development builds.
+    const hermesOptimization = developmentMode ? ['-Og', '-g1'] : ['-O4', '-fstrip-function-names', '-g0'];
+    // Keep development line tables and function names while minimizing native code and allowing linker GC.
     const nativeOptimization = developmentMode
-        ? ['-O0', '-g', '-DNDEBUG']
+        ? ['-Oz', '-gline-tables-only', '-DNDEBUG', '-ffunction-sections', '-fdata-sections']
         : ['-Oz', '-DNDEBUG', '-ffunction-sections', '-fdata-sections'];
     // Always request compiler colors so captured build logs retain readable diagnostics.
-    run(hermesc, ['-color', ...hermesOptimization, '-emit-c', '-exported-unit=plugin_bundle', `-o=${unitC}`, bundle]);
+    fs.writeFileSync(bundle, wrapBundleForDiagnostics(fs.readFileSync(bundle, 'utf8')));
+    run(hermesc, ['-color', ...hermesOptimization, '-emit-binary', `-out=${unitBytecode}`, bundle]);
+    fs.writeFileSync(bytecodeHeader, renderEmbeddedBytecode(fs.readFileSync(unitBytecode)));
 
     const includeFlags = hermesIncludes.map((include) => `-I${include}`);
-    run(compiler, [
-        '-c',
-        ...nativeOptimization,
-        // Select the C implementation of the shim and Hermes's setjmp/longjmp lowering.
-        '-DSTATIC_HERMES',
-        '-mllvm',
-        '-wasm-enable-sjlj',
-        '-mllvm',
-        // Retain: omitting this option produced an invalid component for Wasmtime.
-        '-wasm-use-legacy-eh=false',
-        ...includeFlags,
-        `-I${generated}`,
-        '-o',
-        unitObject,
-        unitC
-    ]);
     run(compiler, [
         '-c',
         ...nativeOptimization,
@@ -161,7 +185,7 @@ try {
         `-I${generatedApiDir}`,
         '-o',
         shimObject,
-        path.join(runtimeRoot, 'native/runtime.cpp')
+        runtimeCpp
     ]);
     run(cxx, [
         ...nativeOptimization,
@@ -179,7 +203,6 @@ try {
         '-o',
         output,
         componentType,
-        unitObject,
         bindingsObject,
         shimObject,
         path.join(hermesWasiBuild, 'jsi/libjsi.a'),

@@ -12,7 +12,7 @@
 | [Checking for plugin updates](plugin-updates.md) | Checking plugin versions against Pumpkin Market |
 | [Pumpkin Market API](pumpkin-market-api.md) | Market listing lookup, metadata updates, current publisher behavior and API findings |
 | [Code style](code-style.md) | Biome, the JSDoc rule, and how code is organized and tested |
-| [Building](building.md) | The shared build tool, Turborepo setup, and the QuickJS runtime caveats |
+| [Building](building.md) | The shared build tool, Turborepo setup, and runtime caveats |
 | [Testing](testing.md) | Unit tests and integration tests against a real Pumpkin server |
 | [Port forwarding](port-forwarding.md) | UPnP and NAT-PMP for plugins: the engine, UPnPumpkin, its API and how to test them |
 | [CI and releases](ci-and-releases.md) | The CI workflow, release-please, rebase-only merging and the market stub |

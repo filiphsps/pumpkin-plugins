@@ -52,8 +52,8 @@ and typechecks, builds and integration-tests it, so the templates can't silently
   under the `COMMAND_PERMISSION` constant. See [Plugin info and READMEs](plugin-info-and-readmes.md).
 - Add plugin-specific behavior in `src/plugin.ts`'s `onPluginLoad` hook. The generated plugin extends
   `PluginBase` and calls `registerPlugin`, which provide shared metadata, lifecycle logging and the
-  automatic update check. Read [Building](building.md) first: plugins run on QuickJS and a few API
-  calls need workarounds. Follow [Code style](code-style.md): public code needs JSDoc descriptions
+  automatic update check. Read [Building](building.md) first: Static Hermes is the default runtime
+  and has runtime-specific API limits. Follow [Code style](code-style.md): public code needs JSDoc descriptions
   and `pnpm lint` checks it.
 - If the plugin needs settings, declare them as a schema with `@pumpkin-plugins/config` and add it
   as a dev dependency. See [Plugin config](plugin-config.md).

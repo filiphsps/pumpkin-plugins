@@ -1,8 +1,9 @@
 # AGENTS.md
 
 This pnpm and Turborepo monorepo builds TypeScript plugins for
-[Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) as WebAssembly components. Plugins run in
-Pumpkin's QuickJS/WASI runtime. Plugins live in `packages/`; shared libraries and tooling live in
+[Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) as WebAssembly components. Plugins use Pumpkin's
+Static Hermes/WASI runtime by default. QuickJS remains supported.
+Plugins live in `packages/`; shared libraries and tooling live in
 `tools/`. User instructions take precedence over this file.
 
 ## Before you work
