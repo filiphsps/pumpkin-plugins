@@ -10,7 +10,7 @@ catalog:
   "@pumpkinmc/pumpkin-api-ts": https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz
   # Shared dev tooling versions.
   c8: 12.0.0
-  "@vitest/coverage-v8": 5.0.3
+  "@vitest/coverage-v8": 5.0.4
   fflate: 0.8.3
   vitest: 5.0.3
   typescript: 6.0.3
