@@ -8,7 +8,7 @@ import { measureSyntheticWorkloads, measureWorkload } from './benchmark-workload
 
 export * from '@pumpkinmc/pumpkin-api-ts';
 
-const PLAYER_QUERIES_PER_SAMPLE = 100;
+const PLAYER_QUERIES_PER_SAMPLE = 10_000;
 const EVENT_LISTENER_COUNT = 3;
 const COMMAND_PERMISSION = 'RuntimeBenchmark:command.runtime-benchmark';
 
@@ -79,7 +79,7 @@ class RuntimeBenchmarkPlugin extends Plugin {
         let playersObserved = 0;
         const workloads = [
             ...measureSyntheticWorkloads(),
-            measureWorkload('pumpkin-api', 'Pumpkin server API', PLAYER_QUERIES_PER_SAMPLE, () => {
+            measureWorkload('pumpkin-api', 'Pumpkin server API', 'real Pumpkin API', PLAYER_QUERIES_PER_SAMPLE, () => {
                 let total = 0;
                 for (let index = 0; index < PLAYER_QUERIES_PER_SAMPLE; index++) {
                     const players = server.getAllPlayers();

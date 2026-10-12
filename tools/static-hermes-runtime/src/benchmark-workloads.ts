@@ -1,7 +1,10 @@
-/** Timings and deterministic output for one plugin-style workload. */
+type WorkloadProvenance = 'synthetic guest fixture' | 'real Pumpkin API';
+
+/** Timings and deterministic output for one measured workload. */
 interface BenchmarkWorkload {
     name: string;
     area: string;
+    provenance: WorkloadProvenance;
     /** Input items or requests processed by each timed sample. */
     operationsPerSample: number;
     samplesMs: number[];
@@ -14,6 +17,8 @@ type WorkloadScenario = Pick<BenchmarkWorkload, 'name' | 'area' | 'operationsPer
 
 /** Number of timed runs for each workload, after one un-timed warm-up. */
 const SAMPLE_COUNT = 5;
+const STRING_PART_COUNT = 25_000;
+const COMMAND_OPERATION_COUNT = 4_000;
 
 const CONFIG_SOURCE = JSON.stringify({
     enabled: true,
@@ -22,74 +27,126 @@ const CONFIG_SOURCE = JSON.stringify({
     aliases: { hp: 'health', inv: 'inventory', st: 'status' }
 });
 
+const STRING_PARTS = buildStringParts();
+
 const WORKLOADS: readonly WorkloadScenario[] = [
-    { name: 'numeric', area: 'Runtime baseline', operationsPerSample: 1_000_000, run: runNumeric },
+    { name: 'numeric', area: 'Numeric arithmetic baseline', operationsPerSample: 1_000_000, run: runNumeric },
     { name: 'objects', area: 'Object allocation and traversal', operationsPerSample: 50_000, run: runObjects },
     { name: 'strings', area: 'String construction and joining', operationsPerSample: 25_000, run: runStrings },
-    { name: 'config-validation', area: 'Plugin configuration', operationsPerSample: 1_000, run: runConfigValidation },
-    { name: 'command-routing', area: 'EssentialsX commands', operationsPerSample: 4_000, run: runCommandRouting },
+    {
+        name: 'string-construction',
+        area: 'String part construction',
+        operationsPerSample: STRING_PART_COUNT,
+        run: runStringConstruction
+    },
+    {
+        name: 'string-join',
+        area: 'Dense-array string joining',
+        operationsPerSample: STRING_PART_COUNT,
+        run: runStringJoin
+    },
+    {
+        name: 'config-validation',
+        area: 'Configuration parsing and validation',
+        operationsPerSample: 1_000,
+        run: runConfigValidation
+    },
+    {
+        name: 'command-routing',
+        area: 'Command tokenization, alias resolution and route-map lookup',
+        operationsPerSample: COMMAND_OPERATION_COUNT,
+        run: runCommandRouting
+    },
+    {
+        name: 'command-tokenization',
+        area: 'Command tokenization',
+        operationsPerSample: COMMAND_OPERATION_COUNT,
+        run: runCommandTokenization
+    },
+    {
+        name: 'command-route-lookup',
+        area: 'Command alias and route-map lookup',
+        operationsPerSample: COMMAND_OPERATION_COUNT,
+        run: runCommandRouteLookup
+    },
     {
         name: 'permission-resolution',
-        area: 'LuckPerms permissions',
+        area: 'Permission inheritance and context lookup',
         operationsPerSample: 12_000,
         run: runPermissionResolution
     },
-    { name: 'player-directory', area: 'Player lookup and homes', operationsPerSample: 18_000, run: runPlayerDirectory },
-    { name: 'event-cache', area: 'Player lifecycle events', operationsPerSample: 20_000, run: runEventCache },
+    { name: 'player-directory', area: 'Player and home lookups', operationsPerSample: 18_000, run: runPlayerDirectory },
+    { name: 'event-cache', area: 'Lifecycle cache updates', operationsPerSample: 20_000, run: runEventCache },
     {
         name: 'chat-formatting',
-        area: 'EssentialsX Chat and placeholders',
+        area: 'Chat template formatting and filtering',
         operationsPerSample: 3_000,
         run: runChatFormatting
     },
-    { name: 'scoreboard-rendering', area: 'Scoreboards', operationsPerSample: 12_000, run: runScoreboardRendering },
+    {
+        name: 'scoreboard-rendering',
+        area: 'Scoreboard text rendering',
+        operationsPerSample: 12_000,
+        run: runScoreboardRendering
+    },
     {
         name: 'region-protection',
-        area: 'WorldGuard region checks',
+        area: 'Region containment and access checks',
         operationsPerSample: 20_000,
         run: runRegionProtection
     },
     {
         name: 'world-edit-plan',
-        area: 'WorldEdit selection preview',
+        area: 'Block-edit plan generation',
         operationsPerSample: 55_296,
         run: runWorldEditPlan
     },
-    { name: 'economy-transfers', area: 'Vault economy', operationsPerSample: 12_000, run: runEconomyTransfers },
-    { name: 'inventory-stacking', area: 'Kits and inventory', operationsPerSample: 2_500, run: runInventoryStacking },
+    {
+        name: 'economy-transfers',
+        area: 'Balance transfer processing',
+        operationsPerSample: 12_000,
+        run: runEconomyTransfers
+    },
+    {
+        name: 'inventory-stacking',
+        area: 'Inventory stack allocation',
+        operationsPerSample: 2_500,
+        run: runInventoryStacking
+    },
     {
         name: 'cooldown-rate-limit',
-        area: 'Command cooldowns and anti-spam',
+        area: 'Cooldown and rate-limit checks',
         operationsPerSample: 20_000,
         run: runCooldownRateLimit
     },
-    { name: 'tick-scheduler', area: 'Delayed and repeating tasks', operationsPerSample: 6_000, run: runTickScheduler },
+    { name: 'tick-scheduler', area: 'Scheduled task processing', operationsPerSample: 6_000, run: runTickScheduler },
     {
         name: 'audit-history',
-        area: 'CoreProtect-style history queries',
+        area: 'Audit history filtering',
         operationsPerSample: 13_000,
         run: runAuditHistory
     },
     {
         name: 'player-state-json',
-        area: 'Player-state JSON serialization',
+        area: 'Player-state JSON round trip',
         operationsPerSample: 1_200,
         run: runPlayerStatePersistence
     },
-    { name: 'custom-payload', area: 'Custom packet encoding', operationsPerSample: 16_384, run: runPacketEncoding }
+    { name: 'custom-payload', area: 'Custom payload encoding', operationsPerSample: 16_384, run: runPacketEncoding }
 ];
 
 /** Runs and measures every deterministic plugin-style workload. */
 export function measureSyntheticWorkloads(): BenchmarkWorkload[] {
     return WORKLOADS.map(({ name, area, operationsPerSample, run }) =>
-        measureWorkload(name, area, operationsPerSample, run)
+        measureWorkload(name, area, 'synthetic guest fixture', operationsPerSample, run)
     );
 }
 
 /**
  * Measures one workload after a warm-up run.
  * @param name - Stable workload identifier.
- * @param area - Plugin feature represented by the workload.
+ * @param area - Algorithm represented by the workload.
+ * @param provenance - Whether this measures a synthetic fixture or real Pumpkin API behavior.
  * @param operationsPerSample - Number of inputs processed in each timed run.
  * @param run - Runs the workload and returns a deterministic checksum.
  * @returns The timed samples and final checksum.
@@ -97,6 +154,7 @@ export function measureSyntheticWorkloads(): BenchmarkWorkload[] {
 export function measureWorkload(
     name: string,
     area: string,
+    provenance: WorkloadProvenance,
     operationsPerSample: number,
     run: () => number
 ): BenchmarkWorkload {
@@ -108,7 +166,7 @@ export function measureWorkload(
         checksum = run();
         samplesMs.push(Date.now() - startedAt);
     }
-    return { name, area, operationsPerSample, samplesMs, checksum };
+    return { name, area, provenance, operationsPerSample, samplesMs, checksum };
 }
 
 function runNumeric(): number {
@@ -133,13 +191,30 @@ function runObjects(): number {
 }
 
 function runStrings(): number {
-    const parts = new Array<string>(25_000);
+    const parts = buildStringParts();
+    const joined = parts.join('|');
+    return joined.length + joined.charCodeAt(joined.length - 1);
+}
+
+function runStringConstruction(): number {
+    const parts = buildStringParts();
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+    if (first === undefined || last === undefined) return -1;
+    return parts.length + first.length + last.length + first.charCodeAt(0) + last.charCodeAt(last.length - 1);
+}
+
+function runStringJoin(): number {
+    const joined = STRING_PARTS.join('|');
+    return joined.length + joined.charCodeAt(joined.length - 1);
+}
+
+function buildStringParts(): string[] {
+    const parts = new Array<string>(STRING_PART_COUNT);
     for (let index = 0; index < parts.length; index++) {
         parts[index] = `${index.toString(36)}:${String.fromCharCode(65 + (index % 26))}`;
     }
-
-    const joined = parts.join('|');
-    return joined.length + joined.charCodeAt(joined.length - 1);
+    return parts;
 }
 
 function runConfigValidation(): number {
@@ -196,15 +271,21 @@ const COMMAND_ALIASES = new Map([
 
 const COMMAND_NAMES = ['home', 'h', 'warp', 'w', 'tp', 'bal', 'msg', 'tell', 'gm', 'unknown'];
 
+const COMMAND_INPUTS = Array.from({ length: COMMAND_OPERATION_COUNT }, (_, index) => createCommandInput(index));
+
+const COMMAND_LOOKUPS = COMMAND_INPUTS.map((input) => {
+    const [requestedName = '', ...arguments_] = tokenizeCommand(input);
+    return {
+        requestedName: requestedName.toLowerCase(),
+        argumentCount: arguments_.length,
+        argumentLength: arguments_.join('').length
+    };
+});
+
 function runCommandRouting(): number {
     let checksum = 0;
-    for (let index = 0; index < 4_000; index++) {
-        const commandName = COMMAND_NAMES[index % COMMAND_NAMES.length];
-        const playerName = `Player${index % 1_800}`;
-        const input =
-            commandName === 'msg' || commandName === 'tell'
-                ? `${commandName} ${playerName} "Shop purchase ${index}"`
-                : `${commandName} ${playerName}`;
+    for (let index = 0; index < COMMAND_OPERATION_COUNT; index++) {
+        const input = createCommandInput(index);
         const [requestedName = '', ...arguments_] = tokenizeCommand(input);
         const name = COMMAND_ALIASES.get(requestedName.toLowerCase()) ?? requestedName.toLowerCase();
         const route = COMMAND_ROUTES.get(name);
@@ -218,6 +299,42 @@ function runCommandRouting(): number {
         }
     }
     return checksum;
+}
+
+function runCommandTokenization(): number {
+    let checksum = 0;
+    for (const input of COMMAND_INPUTS) {
+        const arguments_ = tokenizeCommand(input);
+        const first = arguments_[0];
+        const last = arguments_[arguments_.length - 1];
+        checksum = (checksum + arguments_.length + (first?.length ?? 0) + (last?.length ?? 0)) >>> 0;
+    }
+    return checksum;
+}
+
+function runCommandRouteLookup(): number {
+    let checksum = 0;
+    for (const command of COMMAND_LOOKUPS) {
+        const name = COMMAND_ALIASES.get(command.requestedName) ?? command.requestedName;
+        const route = COMMAND_ROUTES.get(name);
+        if (route === undefined) {
+            checksum = (checksum + command.argumentCount + 1) >>> 0;
+            continue;
+        }
+
+        if (command.argumentCount >= route.minimumArguments && command.argumentCount <= route.maximumArguments) {
+            checksum = (checksum + route.permission.length + command.argumentLength) >>> 0;
+        }
+    }
+    return checksum;
+}
+
+function createCommandInput(index: number): string {
+    const commandName = COMMAND_NAMES[index % COMMAND_NAMES.length];
+    const playerName = `Player${index % 1_800}`;
+    return commandName === 'msg' || commandName === 'tell'
+        ? `${commandName} ${playerName} "Shop purchase ${index}"`
+        : `${commandName} ${playerName}`;
 }
 
 function tokenizeCommand(input: string): string[] {

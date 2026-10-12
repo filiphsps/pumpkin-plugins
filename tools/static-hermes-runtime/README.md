@@ -148,17 +148,27 @@ With the Hermes toolchain prepared, run the shared-engine comparison against a r
 pnpm --filter @pumpkin-plugins/static-hermes-runtime compare-engines
 ```
 
-The test builds one plugin for each engine and compares matching workloads for command routing,
-permission inheritance, player and home lookup, lifecycle caches, chat formatting, scoreboards,
-region protection, block-edit planning, economy transfers, inventory stacking, cooldowns, scheduled
-tasks, audit history, player-state JSON, packet encoding, configuration validation, numeric
-arithmetic, object allocation and traversal, and string construction and joining. It also registers
-three real server-tick listeners, schedules a task, registers a permission and command, dispatches the
-command, and calls the server's player-list API.
-Player-oriented guest workloads use deterministic fixtures because the comparison server has no
-connected players. Each workload has one warm-up and five measured samples; the report includes its
-input count, component sizes, and median execution times. Timings are informational and have no pass
-thresholds. In GitHub Actions, the report is added to the job summary.
+The test builds one plugin for each engine and compares matching workloads for command tokenization,
+alias and route-map lookup, permission inheritance, player and home lookup, lifecycle caches, chat
+formatting, scoreboards, region protection, block-edit planning, economy transfers, inventory
+stacking, cooldowns, scheduled tasks, audit history, player-state JSON, packet encoding, configuration
+validation, numeric arithmetic, object allocation and traversal, and string handling. The `strings`
+row retains the combined 25,000-part construction and join workload. `string-construction` measures
+building those parts, while `string-join` joins the same prebuilt dense array. The combined
+`command-routing` row remains available alongside separate tokenization and alias/route-map lookup
+workloads.
+
+The report labels these guest rows **synthetic guest fixture**. They are deterministic representative
+algorithms implemented by the benchmark, not runs of the named Minecraft plugins or Pumpkin's host
+command router. The `command-routing` fixture times guest-side tokenization, alias resolution and a
+private route map. The test separately registers and dispatches one real command through Pumpkin; that
+single `server.command()` dispatch is API behavior coverage, not a timed routing sample. The
+**real Pumpkin API** workload times 10,000 `server.getAllPlayers()` calls per sample. Player-oriented
+guest workloads use deterministic fixtures because the comparison server has no connected players.
+
+Each workload has one warm-up and five measured samples. The report includes input counts, component
+sizes, medians and each engine's minimum-to-maximum sample range. Timings are informational and have
+no pass thresholds. In GitHub Actions, the report is added to the job summary.
 
 ## API and platform coverage
 
