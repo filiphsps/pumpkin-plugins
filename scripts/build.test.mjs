@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
-import { hasStaticHermesBuild, normalizeTurboArgs } from './build.mjs';
+import { hasStaticHermesBuild, normalizeTurboArgs, prepareHermesInIsolatedEnvironment } from './build.mjs';
 
 const temporaryRoots = [];
 
@@ -73,5 +73,26 @@ describe('normalizeTurboArgs', () => {
 
     it('keeps Turbo arguments when pnpm did not add a separator', () => {
         assert.deepEqual(normalizeTurboArgs(['--filter=example']), ['--filter=example']);
+    });
+});
+
+describe('prepareHermesInIsolatedEnvironment', () => {
+    it('keeps toolchain defaults out of the caller environment', async () => {
+        const env = { USER_SETTING: 'kept', PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED: '1' };
+        let prepareEnvironment;
+        const preparedEnvironment = await prepareHermesInIsolatedEnvironment({
+            workspaceRoot: '/workspace',
+            env,
+            setupEnvironment: async () => ({ STATIC_HERMES_CACHE_DIR: '/cache/hermes' }),
+            runPrepare: async (environment) => {
+                prepareEnvironment = environment;
+            }
+        });
+
+        assert.deepEqual(env, { USER_SETTING: 'kept', PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED: '1' });
+        assert.notEqual(preparedEnvironment, env);
+        assert.equal(preparedEnvironment.STATIC_HERMES_CACHE_DIR, '/cache/hermes');
+        assert.equal(preparedEnvironment.PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED, undefined);
+        assert.equal(prepareEnvironment, preparedEnvironment);
     });
 });

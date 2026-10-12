@@ -444,7 +444,9 @@ jobs:
               run: node --test actions/ci-sample-action/src/*.test.mjs
 
             - name: 🎃 Typecheck, build and load it on a real Pumpkin
-              run: pnpm exec turbo run typecheck build test:integration --filter=@pumpkin-plugins/ci-sample
+              run: |
+                  pnpm build --filter=@pumpkin-plugins/ci-sample
+                  pnpm exec turbo run typecheck test:integration --filter=@pumpkin-plugins/ci-sample
               env:
                   PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/pumpkin-logs
 

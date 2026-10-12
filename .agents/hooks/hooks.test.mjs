@@ -105,8 +105,8 @@ describe('quietTurbo', () => {
         assert.equal(quietTurbo('pnpm test'), 'pnpm test --output-logs=errors-only');
         assert.equal(quietTurbo('pnpm run typecheck'), 'pnpm run typecheck --output-logs=errors-only');
         assert.equal(
-            quietTurbo('pnpm exec turbo run build --filter=...@pumpkin-plugins/upnpumpkin'),
-            'pnpm exec turbo run build --filter=...@pumpkin-plugins/upnpumpkin --output-logs=errors-only'
+            quietTurbo('pnpm exec turbo run test:integration --filter=...@pumpkin-plugins/upnpumpkin'),
+            'pnpm exec turbo run test:integration --filter=...@pumpkin-plugins/upnpumpkin --output-logs=errors-only'
         );
     });
 

@@ -390,11 +390,11 @@ function pnpmCommand() {
     return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 }
 
-/** Starts Turbo's one-shot build for all workspace plugins. */
+/** Starts the root build wrapper for all workspace plugins. */
 export function startInitialBuild(root, spawnImpl = spawn, env = process.env) {
     return spawnChild(
         pnpmCommand(),
-        ['exec', 'turbo', 'run', 'build', '--ui=stream', '--log-order=stream'],
+        ['run', 'build', '--', '--ui=stream', '--log-order=stream'],
         {
             cwd: root,
             stdio: 'inherit',
