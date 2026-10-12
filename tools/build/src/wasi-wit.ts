@@ -7,10 +7,12 @@ import { BuildError } from './errors.ts';
 export interface WasiWitLock {
     /** WASI release the files come from. */
     version: string;
-    /** SHA-256 of each file, by path below `wasip2/`. */
+    /** SHA-256 of each WIT file, by path below the cache directory. */
     files: Record<string, string>;
     /** Alternate pinned source URLs for WIT files outside the wasi repository. */
     sources?: Record<string, string>;
+    /** Contents for pinned WIT files that have no upstream source file. */
+    generatedFiles?: Record<string, string>;
 }
 
 /** Downloads a URL. */
@@ -47,9 +49,10 @@ function isCached(file: string, expected: string): boolean {
 }
 
 /**
- * Makes the WASI WIT files available locally. Files already cached with the right hash are kept,
- * missing or damaged ones are downloaded from the WASI repository and checked against the lock
- * before they are written. Nothing is downloaded when the cache is complete.
+ * Makes the WASI WIT files available locally. Files already cached with the right hash are kept;
+ * missing or damaged upstream files are downloaded and generated files are materialized from the
+ * lock. Every file is checked against its hash before it is written. Nothing is downloaded when the
+ * cache is complete.
  * @param options - Where to cache and, for tests, what to download with.
  * @returns The folder holding `<package>/<interface>.wit`.
  * @throws {BuildError} When a file can't be downloaded or doesn't match its pinned hash.
@@ -58,23 +61,38 @@ export async function ensureWasiWit(options: WasiWitOptions): Promise<string> {
     const lock = options.lock ?? readLock();
     const fetchFile = options.fetchFile ?? defaultFetch;
     const dir = path.join(options.cacheDir, 'wasi-wit', lock.version);
+    const generatedFiles = lock.generatedFiles ?? {};
+
+    for (const rel of Object.keys(generatedFiles)) {
+        if (!Object.hasOwn(lock.files, rel)) {
+            throw new BuildError(`generated WIT file ${rel} is missing from the files lock`);
+        }
+    }
 
     const missing = Object.entries(lock.files).filter(([rel, hash]) => !isCached(path.join(dir, rel), hash));
     await Promise.all(
         missing.map(async ([rel, hash]) => {
-            const url =
-                lock.sources?.[rel] ??
-                `https://raw.githubusercontent.com/WebAssembly/WASI/v${lock.version}/wasip2/${rel}`;
             let bytes: Uint8Array;
-            try {
-                bytes = await fetchFile(url);
-            } catch (err) {
-                throw new BuildError(
-                    `could not download ${url} (${err instanceof Error ? err.message : err}). The first build needs network access; the files are cached in ${dir} afterwards.`
-                );
+            const generated = generatedFiles[rel];
+            if (generated !== undefined) {
+                bytes = new TextEncoder().encode(generated);
+            } else {
+                const url =
+                    lock.sources?.[rel] ??
+                    `https://raw.githubusercontent.com/WebAssembly/WASI/v${lock.version}/wasip2/${rel}`;
+                try {
+                    bytes = await fetchFile(url);
+                } catch (err) {
+                    throw new BuildError(
+                        `could not download ${url} (${err instanceof Error ? err.message : err}). The first build needs network access; the files are cached in ${dir} afterwards.`
+                    );
+                }
             }
             const actual = sha256(bytes);
-            if (actual !== hash) throw new BuildError(`${rel} from ${url} has hash ${actual}, expected ${hash}`);
+            if (actual !== hash) {
+                const source = generated === undefined ? (lock.sources?.[rel] ?? `WASI v${lock.version}`) : 'the lock';
+                throw new BuildError(`${rel} from ${source} has hash ${actual}, expected ${hash}`);
+            }
             writeAtomically(path.join(dir, rel), bytes, options.cacheDir);
         })
     );

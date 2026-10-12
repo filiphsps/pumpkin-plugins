@@ -32,7 +32,7 @@ export async function resolvePluginRelease(root, tag) {
         throw new Error(`${packagePath} manifest version is ${manifest[packagePath]}, but tag version is ${version}`);
     }
 
-    const engine = packageJson.pumpkinPlugin?.engine ?? 'quickjs';
+    const engine = packageJson.pumpkinPlugin?.engine ?? 'static-hermes';
     if (engine !== 'quickjs' && engine !== 'static-hermes') {
         throw new Error(`${packagePath} declares an unsupported plugin engine: ${JSON.stringify(engine)}`);
     }

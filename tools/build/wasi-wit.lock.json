@@ -21,10 +21,14 @@
         "sockets/udp.wit": "63ea1696a3c9dd500ba8d0f518c526ff0e04e5cbeca4f56950756b0b217487c2",
         "sockets/world.wit": "6e2bd764df0037ebcec03c63f92bd47f4e69679cf608f6b3d2073cf10fb3672f",
         "http/handler.wit": "1f66174b4058b102367e69ce8aa657b3e9dbc767f6ade960108faaa1731f0945",
+        "http/package.wit": "03af060b69ccf1d6ac5cbe1ff626b3ed734214cf2829a3d6d23d5c6223633119",
         "http/types.wit": "a5501f024e9ced633153b5247d67d5d50a621c3cc09abc348d997040fd7355b3"
     },
     "sources": {
         "http/handler.wit": "https://raw.githubusercontent.com/WebAssembly/wasi-http/v0.2.3/wit/handler.wit",
         "http/types.wit": "https://raw.githubusercontent.com/WebAssembly/wasi-http/v0.2.3/wit/types.wit"
+    },
+    "generatedFiles": {
+        "http/package.wit": "package wasi:http@0.2.3;\n"
     }
 }

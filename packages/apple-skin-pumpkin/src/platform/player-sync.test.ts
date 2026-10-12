@@ -210,7 +210,7 @@ describe('PlayerSync', () => {
         expect(player.floats(SATURATION)).toEqual([4.5]);
     });
 
-    it('syncs players when QuickJS handles have no explicit disposal method', () => {
+    it('syncs players when host handles have no explicit disposal method', () => {
         const { player, server, sync } = setup();
         Object.defineProperty(player, Symbol.dispose, { value: undefined });
         const world = player.getWorld();

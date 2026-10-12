@@ -27,7 +27,7 @@ describe('readPluginConfig', () => {
             entry: 'src/plugin.ts',
             output: 'build/p.wasm',
             wasi: ['sockets'],
-            engine: 'quickjs',
+            engine: 'static-hermes',
             version: '1.2.3'
         });
     });
@@ -38,11 +38,26 @@ describe('readPluginConfig', () => {
         expect(config.engine).toBe('static-hermes');
     });
 
+    it('supports QuickJS plugins', () => {
+        const config = readPluginConfig(packageWith({ version: '1.2.3', pumpkinPlugin: { engine: 'quickjs' } }));
+
+        expect(config.engine).toBe('quickjs');
+    });
+
     it('supports selecting the lean Static Hermes runtime', () => {
         const config = readPluginConfig(
             packageWith({ version: '1.2.3', pumpkinPlugin: { engine: 'static-hermes', staticHermesRuntime: 'lean' } })
         );
 
+        expect(config.staticHermesRuntime).toBe('lean');
+    });
+
+    it('uses the default engine when selecting a Static Hermes runtime profile', () => {
+        const config = readPluginConfig(
+            packageWith({ version: '1.2.3', pumpkinPlugin: { staticHermesRuntime: 'lean' } })
+        );
+
+        expect(config.engine).toBe('static-hermes');
         expect(config.staticHermesRuntime).toBe('lean');
     });
 
@@ -80,7 +95,9 @@ describe('readPluginConfig', () => {
             )
         ).toThrow('"pumpkinPlugin.staticHermesRuntime" must be "full" or "lean"');
         expect(() =>
-            readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { staticHermesRuntime: 'lean' } }))
+            readPluginConfig(
+                packageWith({ version: '0.0.0', pumpkinPlugin: { engine: 'quickjs', staticHermesRuntime: 'lean' } })
+            )
         ).toThrow('"pumpkinPlugin.staticHermesRuntime" requires "engine": "static-hermes"');
         expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { wasi: [null] } }))).toThrow(
             '"pumpkinPlugin.wasi" must contain only capability names'

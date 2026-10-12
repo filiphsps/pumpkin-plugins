@@ -11,28 +11,34 @@ for (let index = 2; index < process.argv.length; index += 2) {
 }
 
 const witDir = required('wit');
+const bundle = fs.readFileSync(required('bundle'), 'utf8');
 const headerPath = required('header');
 const outputPath = required('output');
 const header = fs.readFileSync(headerPath, 'utf8');
 const entries = [
     ['eventTypes', 'event.wit', 'event-type', 'PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_'],
     ['eventPriorities', 'event.wit', 'event-priority', 'PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_'],
-    ['gameRules', 'game-rules.wit', 'game-rule', 'PUMPKIN_PLUGIN_GAME_RULES_GAME_RULE_']
-].map(([name, file, witEnum, cPrefix]) => ({
-    name,
-    values: enumVariants(path.join(witDir, file), witEnum).map((variant) => {
-        const cName = `${cPrefix}${variant.toUpperCase().replaceAll('-', '_')}`;
-        if (!new RegExp(`^#define ${cName} \\d+$`, 'm').test(header)) {
-            throw new Error(`Generated Pumpkin C bindings are missing ${cName}`);
-        }
-        return { variant, cName };
-    })
-}));
-
-const source = `// Generated from pumpkin-api-ts WIT and wit-bindgen C bindings. Do not edit.
+    ['gameRules', 'game-rules.wit', 'game-rule', 'PUMPKIN_PLUGIN_GAME_RULES_GAME_RULE_'],
+    ['namedColors', 'common.wit', 'named-color', 'PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_']
+].map(([name, file, witEnum, cPrefix]) => {
+    const requiresBundleMatch = name === 'eventTypes' || name === 'eventPriorities';
+    const values = enumVariants(path.join(witDir, file), witEnum)
+        .filter((variant) => !requiresBundleMatch || bundleUsesString(bundle, variant))
+        .map((variant) => {
+            const cName = `${cPrefix}${variant.toUpperCase().replaceAll('-', '_')}`;
+            if (!new RegExp(`^#define ${cName} \\d+$`, 'm').test(header)) {
+                throw new Error(`Generated Pumpkin C bindings are missing ${cName}`);
+            }
+            return { variant, cName };
+        });
+    return { name, values };
+});
+const source = /* cpp */ `// Generated from pumpkin-api-ts WIT and wit-bindgen C bindings. Do not edit.
 #pragma once
+#include <array>
 #include <cstdint>
 #include <string_view>
+#include "plugin.h"
 
 namespace pumpkin_static_api {
 struct EnumEntry {
@@ -41,9 +47,9 @@ struct EnumEntry {
 };
 ${entries
     .map(
-        ({ name, values }) => `inline constexpr EnumEntry ${name}[] = {
+        ({ name, values }) => /* cpp */ `inline constexpr std::array<EnumEntry, ${values.length}> ${name}{{
 ${values.map(({ variant, cName }) => `  {"${variant}", ${cName}},`).join('\n')}
-};`
+}};`
     )
     .join('\n\n')}
 } // namespace pumpkin_static_api
@@ -58,12 +64,19 @@ try {
     fs.rmSync(temporaryPath, { force: true });
 }
 
+/** Read a required command-line path and resolve it against the current directory. */
 function required(name) {
     const value = args.get(name);
     if (!value) throw new Error(`Missing --${name}`);
     return path.resolve(value);
 }
 
+/** Check whether the bundle contains a WIT enum value as a quoted string. */
+function bundleUsesString(bundle, value) {
+    return bundle.includes(JSON.stringify(value)) || bundle.includes(`'${value}'`);
+}
+
+/** Parse the supported case names from a WIT enum declaration. */
 function enumVariants(witPath, enumName) {
     const source = fs.readFileSync(witPath, 'utf8');
     const marker = new RegExp(`\\benum\\s+${enumName}\\s*\\{`, 'g');

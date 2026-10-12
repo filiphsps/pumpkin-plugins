@@ -73,12 +73,6 @@ export function prepareWit(options: PrepareWitOptions): string {
                 () => fs.rmSync(deps, { recursive: true, force: true })
             );
         }
-        if (options.interfaces.includes('http/outgoing-handler')) {
-            fs.copyFileSync(
-                path.join(import.meta.dirname, '../wit/http-package.wit'),
-                path.join(temporary, 'deps/http/package.wit')
-            );
-        }
         const pluginWit = path.join(temporary, 'plugin.wit');
         fs.writeFileSync(pluginWit, injectWasiImports(fs.readFileSync(pluginWit, 'utf8'), options.interfaces));
         fs.rmSync(options.target, { recursive: true, force: true });

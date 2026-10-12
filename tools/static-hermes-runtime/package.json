@@ -50,7 +50,7 @@
     },
     "scripts": {
         "prepare-hermes": "node bin/prepare-hermes.mjs",
-        "test": "vitest run test/prepare-hermes.test.mjs test/toolchain-environment.test.mjs",
+        "test": "vitest run test/bundle-diagnostics.test.mjs test/embed-bytecode.test.mjs test/generate-api-enums.test.mjs test/generate-runtime.test.mjs test/prepare-hermes.test.mjs test/toolchain-environment.test.mjs test/wasi-wit.test.mjs test/wit-api.test.mjs test/wit-api-coverage.test.mjs",
         "compare-engines": "vitest run test/engine-comparison.test.ts"
     },
     "devDependencies": {

@@ -1,46 +1,74 @@
 import type { Plugin } from 'esbuild';
+import type { WitApiInterface, WitWasiInterface } from '../bin/wit-api.mjs';
+import { generateEsmFacade, generateWasiEsmFacade, readWasiWitImports, readWitPackage } from '../bin/wit-api.mjs';
 
 /** Options for resolving Pumpkin package imports while bundling a plugin for Static Hermes. */
 export interface StaticHermesImportsOptions {
     resolveDir: string;
+    /** WIT world used by the component build. Pumpkin interfaces are generated from this source. */
+    witDir: string;
+    /** Excludes automatic update checks from development bundles. */
+    developmentMode?: boolean;
+    /** Called for each WASI module backed by generated JSI runtime code. */
+    onWasiImport?: (specifier: string) => void;
 }
 
-/** Replaces Pumpkin imports used by the shared plugin kit with Static Hermes host functions. */
+/** Replaces imported Pumpkin interfaces with facades generated from the plugin's WIT world. */
 export function staticHermesImportsPlugin(options: StaticHermesImportsOptions): Plugin {
+    const pumpkinWit = readWitPackage(options.witDir);
+    const pumpkinModules = new Map<string, string>(
+        pumpkinWit.interfaces.map((apiInterface: WitApiInterface) => [
+            apiInterface.specifier,
+            generateEsmFacade(apiInterface, pumpkinWit.interfaces)
+        ])
+    );
+    const wasiModules = new Map<string, string>(
+        readWasiWitImports(options.witDir).interfaces.map((apiInterface: WitWasiInterface) => [
+            apiInterface.specifier,
+            generateWasiEsmFacade(apiInterface)
+        ])
+    );
+
     return {
         name: 'pumpkin-static-hermes-imports',
         setup(build) {
-            build.onResolve({ filter: /^pumpkin:plugin\/(?:logging|scheduler)@0\.1\.0$/ }, ({ path }) => ({
-                path,
-                namespace: 'pumpkin-static-hermes'
-            }));
-            build.onLoad({ filter: /.*/, namespace: 'pumpkin-static-hermes' }, ({ path }) => ({
+            build.onResolve({ filter: /^pumpkin:/ }, ({ path }) => {
+                if (!pumpkinModules.has(path)) {
+                    throw new Error(`${path} is not imported by the plugin's WIT world`);
+                }
+                return { path, namespace: 'pumpkin-static-hermes-api' };
+            });
+            build.onLoad({ filter: /.*/, namespace: 'pumpkin-static-hermes-api' }, ({ path }) => ({
                 loader: 'js',
-                contents:
-                    path === 'pumpkin:plugin/logging@0.1.0'
-                        ? 'export const log = (level, message) => globalThis.__pumpkinHost.log(level, message);'
-                        : `
-                            export const scheduleDelayedTask = (handlerId, delayTicks) => globalThis.__pumpkinHost.scheduleDelayedTask(handlerId, delayTicks);
-                            export const scheduleRepeatingTask = (handlerId, delayTicks, periodTicks) => globalThis.__pumpkinHost.scheduleRepeatingTask(handlerId, delayTicks, periodTicks);
-                            export const cancelTask = (taskId) => globalThis.__pumpkinHost.cancelTask(taskId);
-                        `
+                contents: pumpkinModules.get(path)
             }));
 
-            build.onResolve({ filter: /^@pumpkin-plugins\/update-check$/ }, ({ path }) => ({
-                path,
-                namespace: 'pumpkin-static-hermes-update-check'
-            }));
-            build.onLoad({ filter: /.*/, namespace: 'pumpkin-static-hermes-update-check' }, () => ({
+            build.onResolve({ filter: /^wasi:/ }, ({ path }) => {
+                if (!wasiModules.has(path)) {
+                    throw new Error(`${path} is not imported or referenced by the plugin's WIT world`);
+                }
+                options.onWasiImport?.(path);
+                return { path, namespace: 'pumpkin-static-hermes-wasi-adapter' };
+            });
+            build.onLoad({ filter: /.*/, namespace: 'pumpkin-static-hermes-wasi-adapter' }, ({ path }) => ({
                 loader: 'js',
-                resolveDir: options.resolveDir,
-                contents: `
-                    import { registerPlugin } from '@pumpkinmc/pumpkin-api-ts';
-                    // Static Hermes does not yet expose WASI HTTP to JavaScript.
-                    export function registerPluginWithUpdates(plugin) {
-                        registerPlugin(plugin);
-                    }
-                `
+                contents: wasiModules.get(path)
             }));
+
+            if (options.developmentMode) {
+                build.onResolve({ filter: /^@pumpkin-plugins\/update-check$/ }, ({ path }) => ({
+                    path,
+                    namespace: 'pumpkin-static-hermes-dev-update-check'
+                }));
+                build.onLoad({ filter: /.*/, namespace: 'pumpkin-static-hermes-dev-update-check' }, () => ({
+                    loader: 'js',
+                    resolveDir: options.resolveDir,
+                    contents: `
+                        import { registerPlugin } from '@pumpkinmc/pumpkin-api-ts';
+                        export function registerPluginWithUpdates(plugin) { registerPlugin(plugin); }
+                    `
+                }));
+            }
         }
     };
 }

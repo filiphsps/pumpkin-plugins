@@ -25,7 +25,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or common plus all four public consumers for shared helper changes, then uploads c8 coverage to Codecov |
 | 🛡️ Action test gate | every CI run, after classification and action tests | Requires every selected action suite to pass; accepts skipped tests only for an empty matrix |
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
-| 🔨 Build | code changes, after change classification | Starts Static Hermes preparation while lint and typecheck run, then builds each plugin with its configured `engine`, runs integration checks, and rebuilds release artifacts with the same engine before signing and verification |
+| 🔨 Build | code changes, after change classification | Starts Static Hermes preparation while lint and typecheck run, then builds every production plugin with its configured engine (Static Hermes by default), runs integration checks, and rebuilds release artifacts with the same runtime before signing and verification |
 | 📊 Engine comparison | code changes, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`; restores the prepared Hermes toolchain and compares QuickJS and Hermes size, behavior and benchmark workloads on real Pumpkin |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin and action, checks release registration and READMEs, tests the action, then typechecks, builds and integration-tests the plugin |
@@ -205,8 +205,9 @@ Pumpkin can check a plugin's integrity: a signed `.wasm` carries two custom sect
 signature over the code plus the metadata, and the public key). Pumpkin loads unsigned plugins with
 a warning unless `allow_unsigned = false` is set in its config. Signing is optional here.
 
-`pnpm package` builds with each plugin's configured `engine`, then copies built plugins into `dist/` and
-writes checksums; it does not sign files or warn when they are unsigned. CI always prepares a key and uses
+`pnpm package` builds each production plugin with its configured engine (Static Hermes by default),
+then copies built plugins into `dist/` and writes checksums; it does not sign files or warn when they
+are unsigned. CI always prepares a key and uses
 the reusable [`sign-pumpkin-plugin` action](../actions/sign-pumpkin-plugin/README.md) to sign every
 collected plugin from a metadata manifest. It then runs the
 [`verify-pumpkin-plugin` action](../actions/verify-pumpkin-plugin/README.md) against the same

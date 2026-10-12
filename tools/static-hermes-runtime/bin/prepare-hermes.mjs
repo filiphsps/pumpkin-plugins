@@ -42,18 +42,22 @@ const patches = fs
     .map((file) => path.join(patchesDir, file));
 if (patches.length === 0) throw new Error(`No Hermes patches found in ${patchesDir}`);
 
+/** Run a command while forwarding its standard streams to the terminal. */
 function run(command, args, options = {}) {
     execFileSync(command, args, { stdio: 'inherit', ...options });
 }
 
+/** Run a command and return its standard output without a trailing newline. */
 function output(command, args, options = {}) {
     return execFileSync(command, args, { encoding: 'utf8', ...options }).replace(/\r?\n$/, '');
 }
 
+/** Resolve a configured environment path or its fallback. */
 function configuredPath(name, fallback) {
     return path.resolve(process.env[name] ?? fallback);
 }
 
+/** Check whether a directory is a Git checkout. */
 function hasGitDirectory(directory) {
     try {
         output('git', ['-C', directory, 'rev-parse', '--git-dir']);
@@ -63,6 +67,7 @@ function hasGitDirectory(directory) {
     }
 }
 
+/** Ensure the Hermes checkout matches the pinned commit and managed patch set. */
 function ensureSource() {
     if (!fs.existsSync(source)) {
         clonePinnedSource(source);
@@ -102,10 +107,12 @@ function ensureSource() {
     }
 }
 
+/** Return the Hermes checkout's working-tree status, including untracked files. */
 function verifyManagedSourceChanges() {
     return output('git', ['-C', source, 'status', '--porcelain', '--untracked-files=all']);
 }
 
+/** Reject Hermes source changes that are outside the files managed by patches. */
 function verifyChangesAreManaged(changes) {
     const changedPaths = new Set(changes.split('\n').map((line) => line.slice(3).replace(/ -> .*/, '')));
     const patchedPaths = new Set(
@@ -121,6 +128,7 @@ function verifyChangesAreManaged(changes) {
     }
 }
 
+/** Clone and check out the configured Hermes commit into a destination directory. */
 function clonePinnedSource(destination) {
     fs.mkdirSync(path.dirname(destination), { recursive: true });
     run('git', ['clone', '--filter=blob:none', '--no-checkout', pin.repository, destination]);
@@ -128,6 +136,7 @@ function clonePinnedSource(destination) {
     run('git', ['-C', destination, 'checkout', '--detach', pin.commit]);
 }
 
+/** Replace a stale Hermes cache with a fresh pinned checkout and the current patches. */
 function rebuildStaleSource() {
     const rebuilding = `${source}.rebuild-${process.pid}-${Date.now()}`;
     const previous = `${source}.stale-${process.pid}-${Date.now()}`;
@@ -162,6 +171,7 @@ function rebuildStaleSource() {
     console.log('Rebuilt stale Hermes source cache from the pinned commit and current patch set.');
 }
 
+/** Check whether a patch applies, or is already applied when reverse is true. */
 function checkPatch(repository, patch, reverse) {
     try {
         run('git', ['-C', repository, 'apply', '--check', ...(reverse ? ['--reverse'] : []), patch], {
@@ -173,6 +183,7 @@ function checkPatch(repository, patch, reverse) {
     }
 }
 
+/** Configure and build the host tools and WASI Hermes static libraries. */
 function configureAndBuild() {
     // wasi-sdk 34 stores WASI libc++ headers under target-specific paths. Its
     // Clang driver enables those paths only when this otherwise-empty marker exists.
@@ -243,10 +254,12 @@ function configureAndBuild() {
     run('cmake', ['--build', wasiBuild, '--target', 'hermesvm_a', 'hermesvmlean_a', 'jsi', '--parallel']);
 }
 
+/** Return the SHA-256 digest of a file. */
 function fileDigest(filename) {
     return createHash('sha256').update(fs.readFileSync(filename)).digest('hex');
 }
 
+/** Resolve a configured compiler and return its command and version. */
 function compilerIdentity(buildDirectory, cacheKey, fallback) {
     const cache = path.join(buildDirectory, 'CMakeCache.txt');
     const cacheText = fs.existsSync(cache) ? fs.readFileSync(cache, 'utf8') : '';
@@ -255,6 +268,7 @@ function compilerIdentity(buildDirectory, cacheKey, fallback) {
     return { command, version: output(command, ['--version']) };
 }
 
+/** Return metadata for a non-empty build artifact, or null if it is missing. */
 function artifactState(filename) {
     if (!fs.existsSync(filename)) return null;
     const stat = fs.statSync(filename);
@@ -262,6 +276,7 @@ function artifactState(filename) {
     return { size: stat.size, mtimeMs: stat.mtimeMs };
 }
 
+/** Hash the source, toolchain, options, caches, and artifacts that define this build. */
 function buildFingerprint() {
     const status = output('git', ['-C', source, 'status', '--porcelain', '--untracked-files=all']);
     const untrackedFiles = output('git', ['-C', source, 'ls-files', '--others', '--exclude-standard', '-z'])
@@ -331,6 +346,7 @@ function buildFingerprint() {
     return createHash('sha256').update(JSON.stringify(inputs)).digest('hex');
 }
 
+/** Check that every required artifact exists and the saved fingerprint matches. */
 function isBuildCacheCurrent(fingerprint) {
     if (requiredArtifacts.some((filename) => artifactState(filename) === null) || !fs.existsSync(buildStatePath)) {
         return false;
@@ -342,6 +358,7 @@ function isBuildCacheCurrent(fingerprint) {
     }
 }
 
+/** Persist the current build fingerprint using an atomic file replacement. */
 function saveBuildCache(fingerprint) {
     fs.mkdirSync(cacheRoot, { recursive: true });
     const temporary = `${buildStatePath}.${process.pid}.tmp`;
@@ -349,6 +366,7 @@ function saveBuildCache(fingerprint) {
     fs.renameSync(temporary, buildStatePath);
 }
 
+/** Check whether a process ID still belongs to a running process. */
 function processIsAlive(pid) {
     try {
         process.kill(pid, 0);
@@ -358,6 +376,7 @@ function processIsAlive(pid) {
     }
 }
 
+/** Determine whether the Hermes build lock is stale or has no live owner. */
 function staleBuildLock() {
     let stat;
     try {
@@ -378,6 +397,7 @@ function staleBuildLock() {
     return Date.now() - stat.mtimeMs > 60_000;
 }
 
+/** Acquire the exclusive build lock, removing stale locks and waiting for active builds. */
 async function acquireBuildLock() {
     fs.mkdirSync(cacheRoot, { recursive: true });
     const deadline = Date.now() + 30 * 60_000;

@@ -1,8 +1,8 @@
 # Static Hermes runtime
 
-Experimental Static Hermes backend for Pumpkin plugin components. It compiles a bundled JavaScript
-plugin to C with `shermes`, then links that unit with Hermes and the generated Pumpkin WASI 2
-bindings.
+Static Hermes is the default runtime for Pumpkin plugin components. The build compiles bundled
+JavaScript to Hermes bytecode with `hermesc`, embeds that bytecode, and links it with Hermes, the JSI
+shim and generated Pumpkin/WASI bindings.
 
 ## Prepare the toolchain
 
@@ -24,31 +24,31 @@ pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
 
 Preparation checks out the exact upstream commit in `hermes-source.json`, refreshes the managed
 checkout when that pin changes, and applies the ordered patches in `hermes-patches/`. It then builds
-host `shermes` and both full and lean WASI 2 Hermes/JSI static libraries under `.cache/hermes/`. It
+host `hermesc` and both full and lean WASI 2 Hermes/JSI static libraries under `.cache/hermes/`. It
 reuses that build while the pinned source, patches, toolchain, and build settings match; changes
 invalidate the cache and trigger a rebuild. Concurrent plugin builds share one preparation lock. It
 rejects local source changes outside the managed patch set. Plugin builds prepare Hermes automatically
-when `engine` is `"static-hermes"`; run this command to prewarm the toolchain. Optional toolchain
-paths and build settings are listed under [Build flags](#build-flags).
+when `engine` is omitted (the default) or set to `"static-hermes"`; run this command to prewarm the
+toolchain. Optional toolchain paths and build settings are listed under [Build flags](#build-flags).
 
-## Select Static Hermes for a plugin
+## Static Hermes configuration
 
-Set the plugin's build configuration in `package.json`:
+Static Hermes is the default engine. Omit `engine` to use it; set `"engine": "quickjs"` in
+`package.json` to select the supported QuickJS engine. Current plugin packages use the default:
 
 ```json
 "pumpkinPlugin": {
   "entry": "src/plugin.ts",
   "output": "build/plugin.wasm",
-  "engine": "static-hermes",
   "wasi": []
 }
 ```
 
 The lean archive is the default. It removes runtime source compilation, including `eval` and the
 `Function` constructor. Set `"staticHermesRuntime": "full"` to retain those features; the full
-archive remains available even when the lean archive is the default. Both profiles run precompiled
-plugin code; `shermes` still compiles the bundle during the build. The selected `engine` applies to
-development, integration and release builds.
+archive remains available even when the lean archive is the default. Both profiles execute
+precompiled Hermes bytecode. Builds use Static Hermes for development, integration and release when
+it is the configured engine.
 
 Then run the package build normally. It prepares the Hermes toolchain automatically when needed:
 
@@ -56,11 +56,11 @@ Then run the package build normally. It prepares the Hermes toolchain automatica
 pnpm --filter <plugin-package-name> build
 ```
 
-Production builds minify the JavaScript bundle and use Hermes `-Os`, small-C output, stripped function
-names, WASI `-Oz`, section-level dead-code elimination, and linker stripping. In the current engine
-comparison, the lean profile was 1,513,144 bytes (41.43%) smaller than full Hermes: 2,139,412 bytes
-versus 3,652,556 bytes. Development builds keep debug information and skip those size optimizations.
-The backend currently has no component-size limit.
+Production builds minify the JavaScript bundle, emit Hermes bytecode with stripped function names,
+compile native WASI code with `-Oz`, and use section-level dead-code elimination and linker stripping.
+Every production component must be at most 5 MiB (5,242,880 bytes). Development builds keep
+JavaScript source locations and native line tables for backtraces; native code is size optimized,
+and the JavaScript bundle stays non-minified.
 
 ## Build flags
 
@@ -101,31 +101,34 @@ component linking.
 
 ### JavaScript-to-C compiler
 
-Production runs `shermes -color -Os -Xsmall-c -fstrip-function-names -g0 -emit-c`:
+Production runs `hermesc -color -O4 -fstrip-function-names -g0 -emit-binary`:
 
 | Flag | Effect |
 | --- | --- |
 | `-color` | Prints colored compiler diagnostics in build logs. The build always passes this flag, including development builds. |
-| `-Os` | Optimizes generated code for size. |
-| `-Xsmall-c` | Prefers smaller generated C output. |
+| `-Og` | Applies Hermes optimizations intended to remain suitable for debugging; used in development. |
+| `-O4` | Optimizes Hermes bytecode. |
 | `-fstrip-function-names` | Removes function names from the generated string table. |
 | `-g0` | Omits compiler debug information. |
-| `-emit-c` | Emits C source for the generated JavaScript unit. |
-| `-exported-unit=plugin_bundle` | Names the generated unit entry point that the native runtime calls. |
+| `-g1` | Keeps Hermes source locations for JavaScript backtraces without per-instruction debug data. |
+| `-emit-binary` | Emits Hermes bytecode embedded in the component. |
 
-Development uses `-Og -g2` to keep generated code debuggable. Its native C/C++ compilation uses
-`-O0 -g -DNDEBUG`: no optimization, debug symbols, and assertions disabled.
+Development uses `hermesc -Og -g1 -emit-binary`: the bundle stays non-minified, function names remain,
+and Hermes keeps source locations for JavaScript backtraces. Native C/C++ compilation uses
+`-Oz -gline-tables-only -DNDEBUG -ffunction-sections -fdata-sections`; this keeps native line tables
+and function names while minimizing code and allowing unused sections to be removed. Development
+components retain those line tables; the linker does not use `--strip-debug` or `--strip-all`.
 
 ### WASI C/C++ compilation and linking
 
 | Flag | Effect |
 | --- | --- |
 | `-Oz` | Optimizes native WebAssembly for minimum size. |
+| `-gline-tables-only` | Keeps native source-line mappings for backtraces without full variable/type debug data. |
 | `-DNDEBUG` | Removes C/C++ assertions. |
 | `-ffunction-sections -fdata-sections` | Separates code and data so unused sections can be removed. |
 | `-DSTATIC_HERMES` | Selects the Static Hermes implementation in the native JSI shim. |
 | `-mllvm -wasm-enable-sjlj` with `-lsetjmp` | Provides the setjmp/longjmp lowering Hermes uses for JavaScript exceptions. |
-| `-mllvm -wasm-use-legacy-eh=false` | Keeps WASI SDK 34 output valid for Wasmtime. Removing it made the component fail validation (`function[76]: expected null not to be null`). |
 | `-D_WASI_EMULATED_MMAN`, `-D_WASI_EMULATED_PROCESS_CLOCKS` | Enables wasi-libc emulation for the POSIX calls Hermes needs. |
 | `-lwasi-emulated-mman`, `-lwasi-emulated-process-clocks` | Links those wasi-libc emulation implementations. |
 | `-fwasm-exceptions` | Keeps C++ exceptions for error handling in the JSI shim. |
@@ -137,11 +140,6 @@ Development uses `-Og -g2` to keep generated code debuggable. Its native C/C++ c
 | `-Wl,-z,stack-size=262144` | Reserves the default 256 KiB WASI stack; `STATIC_HERMES_STACK_SIZE` changes it (a multiple of 16 bytes, at least 131072). |
 | `-lc++abi -lunwind` | Links C++ ABI and unwinding support used by the JSI shim. |
 
-WASI SDK 34 reports `-wasm-use-legacy-eh=false` as an unused command-line argument. Removing it
-produced a component Wasmtime could not validate (`function[76]: expected null not to be null`), so it
-stays enabled. No size gain from removing the flag was measured. The warning cannot safely be fixed by
-deleting it; a replacement needs to pass component validation, the runtime comparison, and stack checks.
-
 ## Compare runtime size and speed
 
 With the Hermes toolchain prepared, run the shared-engine comparison against a real Pumpkin server:
@@ -150,26 +148,40 @@ With the Hermes toolchain prepared, run the shared-engine comparison against a r
 pnpm --filter @pumpkin-plugins/static-hermes-runtime compare-engines
 ```
 
-The test builds one plugin for each engine, checks matching numeric, configuration, cache, packet,
-string, object, and Pumpkin API workloads, records production component sizes, and reports median
-execution times. It also registers a real server-tick event, schedules a task, and calls the server's
-player-list API. Each workload has one warm-up and five measured samples. Timings are informational;
-the comparison reports size and speed without enforcing thresholds. In GitHub Actions, the report is
-added to the job summary.
+The test builds one plugin for each engine and compares matching workloads for command routing,
+permission inheritance, player and home lookup, lifecycle caches, chat formatting, scoreboards,
+region protection, block-edit planning, economy transfers, inventory stacking, cooldowns, scheduled
+tasks, audit history, player-state JSON, packet encoding, configuration validation, numeric
+arithmetic, object allocation and traversal, and string construction and joining. It also registers
+three real server-tick listeners, schedules a task, registers a permission and command, dispatches the
+command, and calls the server's player-list API.
+Player-oriented guest workloads use deterministic fixtures because the comparison server has no
+connected players. Each workload has one warm-up and five measured samples; the report includes its
+input count, component sizes, and median execution times. Timings are informational and have no pass
+thresholds. In GitHub Actions, the report is added to the job summary.
 
 ## API and platform coverage
 
-Each build generates the component ABI and ignored `generated/api-enums.generated.h` from the
-plugin's pinned `pumpkin-api-ts` WIT. The generator runs on every build and owns that file. The
-current native JSI shim only implements a subset of the Pumpkin API, including plugin lifecycle and
-metadata, event registration and dispatch for join/leave/tick, selected server/player/world methods,
-logging, scheduling, and Java custom payloads. Calls outside that subset are not yet supported.
-Expanding the shim from the API definitions remains required for full API compatibility.
+Each build generates the component ABI and ignored `generated/api-enums.generated.h` from the WIT
+directory prepared by `@pumpkin-plugins/build`, which owns the pinned API and WASI definitions. The
+generator runs on every build and owns that file. It emits event payload converters only for event
+variants and fields used by the bundled plugin. The current native JSI shim implements part of the
+Pumpkin API, including plugin lifecycle and metadata, command and task dispatch, event registration
+and dispatch, selected server/player/world methods, logging, scheduling, and Java custom payloads.
+Calls outside that subset are not yet supported.
+The generated Pumpkin API facades reject host calls while `on_unload` runs, except
+`scheduler.cancel-task`, which plugins need to stop scheduled callbacks. Consumers should cancel
+their tasks and perform local cleanup there; other host calls remain unavailable. This runtime guard
+is a fallback against re-entering the WASM store during shutdown.
 
-WASI HTTP, filesystem, TCP, UDP, and socket APIs are not yet exposed to JavaScript. Static Hermes
-builds therefore bypass the shared automatic Market update check and reject unresolved `wasi:*`
-JavaScript imports at build time. The WIT imports can be declared in a plugin world, but that alone
-does not create the JS-to-WIT resource and stream adapters those APIs require. WASI 3 support is deferred.
+Static Hermes reads the prepared WIT directory passed by `@pumpkin-plugins/build`; that package owns
+the WASI version and WIT files. It validates every operation in imported WASI interfaces, including
+currently unused operations, and emits adapters only for operations used by the plugin. The current
+imported WASI 0.2.3 surface covers filesystem, HTTP, streams, clocks, TCP, UDP and sockets. The build
+enables a feature-gated WIT operation when the plugin uses it. It also generates event converters for
+WIT variants and fields used by the bundled plugin. The native JSI shim implements only part of the
+Pumpkin API. Development builds still bypass the shared automatic Market update check. WASI 3 support
+is deferred.
 
 <!-- docs:begin reference -->
 <!-- Generated by pumpkin-plugins-docs from package, action, and component docs metadata. Run `pnpm readme`. -->
