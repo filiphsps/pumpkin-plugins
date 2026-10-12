@@ -33,6 +33,38 @@ export function normalizeTurboArgs(args) {
     return separator === -1 ? args : [...args.slice(0, separator), ...args.slice(separator + 1)];
 }
 
+/** Prepare Hermes in a private environment so toolchain defaults do not change Turbo cache keys. */
+export async function prepareHermesInIsolatedEnvironment({
+    workspaceRoot: root = workspaceRoot,
+    env = process.env,
+    setupEnvironment,
+    runPrepare = (prepareEnvironment) => {
+        const prepareScript = path.join(root, 'tools/static-hermes-runtime/bin/prepare-hermes.mjs');
+        const result = spawnSync(process.execPath, [prepareScript], {
+            cwd: root,
+            env: prepareEnvironment,
+            stdio: 'inherit'
+        });
+        if (result.error) throw result.error;
+        if (result.status !== 0) {
+            throw new Error(
+                `Static Hermes preparation exited with ${result.signal ?? result.status ?? 'unknown status'}`
+            );
+        }
+    }
+}) {
+    const prepareEnvironment = Object.fromEntries(
+        Object.entries(env).filter(([name]) => name !== alreadyPreparedVariable)
+    );
+    await prepareStaticHermesBuild({
+        workspaceRoot: root,
+        env: prepareEnvironment,
+        setupEnvironment,
+        prepare: () => runPrepare(prepareEnvironment)
+    });
+    return prepareEnvironment;
+}
+
 /** Run the root Turbo build and prepare its shared Hermes inputs once when needed. */
 async function build() {
     const args = normalizeTurboArgs(process.argv.slice(2));
@@ -52,7 +84,7 @@ async function build() {
 
     let env = process.env;
     if (hasStaticHermesBuild(graph)) {
-        await prepareStaticHermesBuild({ workspaceRoot });
+        await prepareHermesInIsolatedEnvironment({ workspaceRoot });
         env = { ...process.env, [alreadyPreparedVariable]: '1' };
     }
 

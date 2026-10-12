@@ -57,8 +57,9 @@ and typechecks, builds and integration-tests it, so the templates can't silently
   and `pnpm lint` checks it.
 - If the plugin needs settings, declare them as a schema with `@pumpkin-plugins/config` and add it
   as a dev dependency. See [Plugin config](plugin-config.md).
-- Run `pnpm exec turbo run build test:integration --filter=@pumpkin-plugins/<folder>` to build the
-  plugin and load it on a real server.
+- Run `pnpm build --filter=@pumpkin-plugins/<folder>` to build the plugin, then
+  `pnpm exec turbo run test:integration --filter=@pumpkin-plugins/<folder>` to load it on a real
+  server.
 
 ### Files and network access
 

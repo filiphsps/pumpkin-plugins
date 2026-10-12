@@ -151,8 +151,8 @@ Things to know when changing `turbo.json`:
   temp directories in `/tmp`. Static Hermes toolchain paths pass through to the uncached
   `test:integration` task because integration fixtures can build plugins and should reuse the prepared
   CI toolchain.
-- **`^` dependencies need a task the root doesn't have.** The root scripts share names with tasks
-  (`"build": "turbo run build"`), so `dependsOn: ["^build"]` would make the root package a
+- **`^` dependencies need a task the root doesn't have.** The root package also defines a `build`
+  script (`"build": "node scripts/build.mjs"`), so `dependsOn: ["^build"]` would make the root package a
   dependency of itself and fail or loop. `transit` is not a root script, which is why it can use
   `^transit`. Don't add a root script of that name. See the Turborepo docs page "Missing root task
   in turbo.json".
