@@ -14,15 +14,23 @@ by the `pumpkinPlugin` key in each plugin's `package.json`:
 "pumpkinPlugin": { "entry": "src/plugin.ts", "output": "build/my-plugin.wasm", "wasi": [] }
 ```
 
+`engine` is optional and defaults to `quickjs`. Experimental plugins can select `"engine":
+"static-hermes"`; see the [Static Hermes runtime guide](../tools/static-hermes-runtime/README.md) for
+toolchain setup and supported API calls.
+The selected `engine` is used for development, integration and release builds.
+When the selected engine is Static Hermes, the build tool provisions its pinned WASI SDK and
+`wit-bindgen` under `.cache/hermes/` when needed, then prepares Hermes automatically.
+
 It uses the WIT from the pinned `@pumpkinmc/pumpkin-api-ts` (the version is the `catalog:` entry in
 `pnpm-workspace.yaml`, and it must match the Pumpkin server's plugin ABI), esbuild and the
 Wasmtime 48 CLI fork of `componentize-qjs`. The fork is needed because the upstream Wasmtime 47 CLI
 fails to link the WASI HTTP types used by plugins. The pinned release's own build script uses a
 componentizer that produces 55 MB plugins and can't run the WASI socket code.
 
-Production bundles are minified and must be at most 5 MiB (5,242,880 bytes) after componentization.
-An oversized build fails before replacing the existing `.wasm` output. Development builds are not
-minified and are exempt from this limit.
+Production QuickJS bundles are minified and must be at most 5 MiB (5,242,880 bytes) after
+componentization. An oversized build fails before replacing the existing `.wasm` output. Development
+builds are not minified and are exempt from this limit. The experimental Static Hermes backend is
+not subject to the size limit while it is being evaluated.
 
 | Command | Result |
 | --- | --- |
@@ -45,7 +53,7 @@ makes the generated declarations win and preserves WIT `u64`/`s64` values as `bi
 
 ## Runtime caveats
 
-Plugins run on QuickJS inside the server's WebAssembly runtime:
+QuickJS plugins run inside the server's WebAssembly runtime:
 
 - There is no global `TextEncoder`, `TextDecoder` or `fetch`. `fflate` provides `strToU8` and `strFromU8`. Plugins that need HTTP can import `wasi:http` by declaring the `http` capability; the update-check tool already does this.
 - WIT `u64`/`s64` values are JavaScript `bigint` in both directions. Keep generated `bigint` types;
@@ -56,6 +64,12 @@ Plugins run on QuickJS inside the server's WebAssembly runtime:
   load. Hot reload can't prompt and denies them, so the first load needs a restart.
 - Two builds of identical source produce different bytes. Anything that signs or uploads a build
   must use the artifact from the build job, never a rebuild.
+
+Static Hermes plugins use the WASI 2 C API path in `tools/static-hermes-runtime`. Its native JSI shim
+currently implements only part of the Pumpkin API. WASI HTTP, filesystem, TCP, UDP, and socket APIs
+are not yet exposed to JavaScript. Static Hermes builds disable the shared automatic update check and
+reject unresolved `wasi:*` JavaScript imports. Declaring those WIT imports is not enough: the backend
+still needs JS adapters for imported resources and streams. WASI 3 support is deferred.
 
 ## Turborepo
 

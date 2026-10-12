@@ -10,8 +10,8 @@ reusable `.github/workflows/release.yml`, called after the CI gates pass. Action
 the reusable `.github/workflows/actions.yml`, scoped to action code. The documentation site has its own
 `.github/workflows/docs.yml`, which checks and publishes the VitePress site and mirrors it to
 `gh-pages`. The shared setup (pnpm, Node,
-install, Turborepo cache) is the composite action in `.github/common/bootstrap`. Most CI jobs use
-`ubuntu-26.04`; runtime provenance uses `macos-15` to match the verified macOS arm64 build procedure.
+install, Turborepo cache) is the composite action in `.github/common/bootstrap`. CI jobs use
+`ubuntu-26.04`.
 
 ## Jobs
 
@@ -21,12 +21,12 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 💬 Commit messages | code, action, or generated README changes on PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
-| 🔐 Runtime provenance | runtime inputs, provenance tests or CI workflow changes | Checks the vendored manifest and rebuilds twice with pinned Rust 1.99.0 and checksum-verified wasi-sdk 34 on macOS arm64; both candidates must match the shipped hash |
 | 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
 | 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or common plus all four public consumers for shared helper changes, then uploads c8 coverage to Codecov |
 | 🛡️ Action test gate | every CI run, after classification and action tests | Requires every selected action suite to pass; accepts skipped tests only for an empty matrix |
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
-| 🔨 Build | code changes, after lint and typecheck | Builds and collects every plugin, then signs with `sign-pumpkin-plugin` and verifies with `verify-pumpkin-plugin` before upload |
+| 🔨 Build | code changes, after change classification | Starts Static Hermes preparation while lint and typecheck run, then builds each plugin with its configured `engine`, runs integration checks, and rebuilds release artifacts with the same engine before signing and verification |
+| 📊 Engine comparison | code changes, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`; restores the prepared Hermes toolchain and compares QuickJS and Hermes size, behavior and benchmark workloads on real Pumpkin |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin and action, checks release registration and READMEs, tests the action, then typechecks, builds and integration-tests the plugin |
 | 🚢 Release | plugin or action release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; action releases create a versioned tag and GitHub release without a plugin artifact |
@@ -69,15 +69,25 @@ commit and reruns the repository checks that validate the generated README. Ordi
 skip the main CI workflow entirely.
 
 On a push, the release job waits for the action test gate and docs/config checks. Plugin/repository
-changes also require runtime provenance, build, unit test and integration jobs. The provenance job
-returns success without rebuilding when the change does not touch runtime inputs. Empty action matrices
-pass the gate without running action tests, including version-only release changes. Release Please
-only releases a component with
+changes also require build, engine comparison, unit test and integration jobs.
+Empty action matrices pass the gate without running action tests, including version-only release changes.
+Release Please only releases a component with
 releasable changes, so running it for changed action code does not create an empty release.
 
 Know this before narrowing a job further: a skipped job takes every job that needs it with it, so no
 job can be gated on less than the jobs below it. Gating `📋 Lint` without `🔨 Build` would leave a
 release with no artifact to attach, and nothing would say so.
+
+## Updating upstream runtime pins
+
+`Update upstream pins` runs daily and can be started manually. Add sources to
+`.github/upstream-pins.json`; pin files follow the schemas in `schemas/`, while each source provides
+its repository, branch and pinned field in that file and the catalog supplies labels and a validation
+command. The workflow compares each pin with its branch
+tip, validates updates, and refreshes a dedicated PR. If validation fails, it closes that PR and
+creates or updates an issue. When validation later succeeds, it closes the issue and reopens or
+creates the PR. Both use the configured labels and a compare link. Static Hermes validation prepares
+the pinned runtime, checking out the source and applying its ordered patch series.
 
 ## Merging
 
@@ -181,8 +191,10 @@ To finish a plugin release whose GitHub release exists but has no plugin assets,
 `Recover plugin release` workflow from `master` and pass its existing tag (for example,
 `upnpumpkin-v0.0.8`). It builds the source at that tag, signs and verifies the plugin with
 `PLUGIN_SIGNING_KEY`, uploads the `.wasm` and `.sha256` assets, then publishes the verified plugin
-and listing metadata to Pumpkin Market using `MARKET_API_TOKEN`. It reuses and verifies a complete
-existing asset pair; a partial pair fails so it cannot silently replace release files.
+and listing metadata to Pumpkin Market using `MARKET_API_TOKEN`. When the tagged plugin's release
+engine is Static Hermes, it also prepares that source's pinned Hermes toolchain before rebuilding. It
+reuses and verifies a complete existing asset pair; a partial pair fails so it cannot silently replace
+release files.
 If the workflow reports a partial pair, remove the lone asset from the release and rerun it.
 A release marked immutable without its asset pair cannot be recovered through this workflow.
 
@@ -193,8 +205,8 @@ Pumpkin can check a plugin's integrity: a signed `.wasm` carries two custom sect
 signature over the code plus the metadata, and the public key). Pumpkin loads unsigned plugins with
 a warning unless `allow_unsigned = false` is set in its config. Signing is optional here.
 
-`pnpm package` (`scripts/collect-plugins.mjs`) only copies built plugins into `dist/` and writes
-checksums; it does not sign files or warn when they are unsigned. CI always prepares a key and uses
+`pnpm package` builds with each plugin's configured `engine`, then copies built plugins into `dist/` and
+writes checksums; it does not sign files or warn when they are unsigned. CI always prepares a key and uses
 the reusable [`sign-pumpkin-plugin` action](../actions/sign-pumpkin-plugin/README.md) to sign every
 collected plugin from a metadata manifest. It then runs the
 [`verify-pumpkin-plugin` action](../actions/verify-pumpkin-plugin/README.md) against the same
