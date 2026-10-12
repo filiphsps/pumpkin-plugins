@@ -42,15 +42,18 @@ const tests = new Set(actionCodePaths.map((file) => file.split('/')[1]));
 if (tests.has('common')) for (const consumer of COMMON_CONSUMERS) tests.add(consumer);
 const actionsToTest = [...tests].sort();
 const code = changed.filter((file) => !isDocs(file) && !/^actions\/[^/]+\//.test(file));
-const integrationScope =
-    code.length > 0 &&
-    code.every((file) =>
-        /^(packages\/[^/]+|tools\/(build|config|plugin-kit|port-mapping|test-harness|upnpumpkin-api))(?:\/|$)/.test(
-            file
+/** Keep the benchmark comparison scoped to its dedicated real-server workflow. */
+const benchmarkOnly = code.length > 0 && code.every((file) => file.startsWith('benchmarks/engine-comparison/'));
+const integrationScope = benchmarkOnly
+    ? 'benchmark'
+    : code.length > 0 &&
+        code.every((file) =>
+            /^(packages\/[^/]+|tools\/(build|config|plugin-kit|port-mapping|test-harness|upnpumpkin-api))(?:\/|$)/.test(
+                file
+            )
         )
-    )
-        ? 'affected'
-        : 'all';
+      ? 'affected'
+      : 'all';
 const integrationExtra = code.some((file) => file.startsWith('packages/upnpumpkin/'))
     ? '@pumpkin-plugins/bedrock-addon-manager'
     : '';

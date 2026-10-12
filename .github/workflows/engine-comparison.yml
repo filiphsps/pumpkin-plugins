@@ -27,7 +27,7 @@ jobs:
             - name: 📊 Compare QuickJS and Static Hermes
               env:
                   PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/engine-comparison-logs
-              run: pnpm --filter @pumpkin-plugins/static-hermes-runtime compare-engines
+              run: pnpm --filter @pumpkin-plugins/engine-comparison compare-engines
 
             - name: 📤 Upload engine comparison server logs
               if: failure()

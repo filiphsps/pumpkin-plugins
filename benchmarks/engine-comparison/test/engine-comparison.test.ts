@@ -43,14 +43,16 @@ const engineVariants: EngineVariant[] = [
 ];
 const sizeBaselineEngineId = 'quickjs';
 
-const runtimeDir = path.resolve(import.meta.dirname, '..');
-const repositoryDir = path.resolve(runtimeDir, '../..');
+const benchmarkDir = path.resolve(import.meta.dirname, '..');
+const repositoryDir = path.resolve(benchmarkDir, '../..');
 const buildCli = path.join(repositoryDir, 'tools/build/bin/pumpkin-plugins-build.mjs');
-const benchmarkEntry = path.join(runtimeDir, 'src/benchmark-plugin.ts');
-const benchmarkWorkloads = path.join(runtimeDir, 'src/benchmark-workloads.ts');
+const benchmarkEntry = path.join(benchmarkDir, 'src/benchmark-plugin.ts');
+const benchmarkWorkloads = path.join(benchmarkDir, 'src/benchmark-workloads.ts');
 const apiRoot = path.dirname(createRequire(import.meta.url).resolve('@pumpkinmc/pumpkin-api-ts/package.json'));
 it('compares configured engines across component sizes, behavior, and matching workloads', async () => {
     const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-engine-comparison-'));
+    // Prefer CI's prepared toolchain; a fresh temp cache fetches WASI SDK release metadata again.
+    const hermesCacheDir = process.env.STATIC_HERMES_CACHE_DIR ?? path.join(temporaryDir, '.cache/hermes');
     const results: EngineResult[] = [];
 
     try {
@@ -103,7 +105,12 @@ it('compares configured engines across component sizes, behavior, and matching w
             const buildOutput = execFileSync(process.execPath, [buildCli], {
                 cwd: packageDir,
                 encoding: 'utf8',
-                env: { ...process.env, PUMPKIN_API_DIR: apiRoot, PUMPKIN_DEV_MODE: '0' },
+                env: {
+                    ...process.env,
+                    PUMPKIN_API_DIR: apiRoot,
+                    PUMPKIN_DEV_MODE: '0',
+                    STATIC_HERMES_CACHE_DIR: hermesCacheDir
+                },
                 maxBuffer: 16 * 1024 * 1024
             });
             console.log(`${label} build:\n${buildOutput.trim()}`);
@@ -326,7 +333,12 @@ registerPlugin(new StackGuardPlugin());
     execFileSync(process.execPath, [buildCli], {
         cwd: packageDir,
         encoding: 'utf8',
-        env: { ...process.env, PUMPKIN_API_DIR: apiRoot, PUMPKIN_DEV_MODE: '0' },
+        env: {
+            ...process.env,
+            // This fixture checks runtime stack handling; production size limits have separate coverage.
+            PUMPKIN_DEV_MODE: '1',
+            STATIC_HERMES_CACHE_DIR: path.join(temporaryDir, '.cache/hermes')
+        },
         maxBuffer: 16 * 1024 * 1024
     });
 

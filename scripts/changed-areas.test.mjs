@@ -123,6 +123,18 @@ describe('changed-areas', () => {
         assert.match(result.log, /Code: packages\/plug\/src\/index\.ts/);
     });
 
+    it('selects the engine comparison without unrelated integration suites for benchmark-only changes', () => {
+        const dir = repo({ 'benchmarks/engine-comparison/src/workload.ts': 'export const value = 1;\n' });
+        const base = change(dir, { 'benchmarks/engine-comparison/src/workload.ts': 'export const value = 2;\n' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=benchmark\nintegration_extra=\n'
+        );
+        assert.match(result.log, /Code: benchmarks\/engine-comparison\/src\/workload.ts/);
+    });
+
     it('runs all integration suites for changes outside plugin runtime packages', () => {
         const dir = repo({ 'scripts/check.mjs': 'export {};\n' });
         const base = change(dir, { 'scripts/check.mjs': 'export const changed = true;\n' });

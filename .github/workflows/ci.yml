@@ -359,7 +359,7 @@ jobs:
     integration:
         name: 🎃 Integration (real Pumpkin)
         needs: [changes, build]
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.code == 'true' && needs.changes.outputs.integration_scope != 'benchmark'
         timeout-minutes: 60
         runs-on: ubuntu-26.04
         steps:
@@ -477,7 +477,13 @@ jobs:
                   needs.build.result == 'success' &&
                   needs['engine-comparison'].result == 'success' &&
                   needs.test.result == 'success' &&
-                  needs.integration.result == 'success'
+                  (
+                    needs.integration.result == 'success' ||
+                    (
+                      needs.changes.outputs.integration_scope == 'benchmark' &&
+                      needs.integration.result == 'skipped'
+                    )
+                  )
                 ) ||
                 (
                   needs.changes.outputs.code != 'true' &&

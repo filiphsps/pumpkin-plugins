@@ -34,6 +34,7 @@ const rewrites: Record<string, string> = {
     'docs/README.md': 'guides/index.md',
     'docs/team.md': 'team.md'
 };
+const sourcePathsByRoute = new Map(Object.entries(rewrites).map(([source, route]) => [route, source]));
 const navigationAssets = new Map<string, string>();
 
 for (const file of walkMarkdown(path.join(repoRoot, 'docs'))) {
@@ -660,6 +661,7 @@ const themeConfig = {
 
 export default defineConfig({
     srcDir: '..',
+    additionalConfig: {},
     markdown: {
         config(md) {
             // The standalone Team page lives in docs, but its public route is outside /guides/.
@@ -672,27 +674,21 @@ export default defineConfig({
                 }
             });
             md.core.ruler.push('repository-doc-links', (state) => {
-                const relativePath = state.env.relativePath;
-                if (!relativePath) return;
-
+                const routePath = state.env.relativePath;
+                const sourcePath = sourcePathsByRoute.get(routePath) ?? routePath;
                 for (const token of state.tokens.flatMap((block) => block.children ?? [])) {
                     if (token.type !== 'link_open') continue;
-                    const href = token.attrGet('href');
-                    if (!href) continue;
-
-                    const suffixIndex = href.search(/[?#]/);
-                    const sourceLink = suffixIndex === -1 ? href : href.slice(0, suffixIndex);
-                    if (!sourceLink.endsWith('.md')) continue;
-
-                    const sourceTarget = path.posix.normalize(
-                        path.posix.join(path.posix.dirname(relativePath), sourceLink)
-                    );
-                    const siteTarget = rewrites[sourceTarget];
-                    if (!siteTarget) continue;
-
-                    const route = siteTarget.replace(/\.md$/, '').replace(/(^|\/)index$/, '$1');
-                    const suffix = suffixIndex === -1 ? '' : href.slice(suffixIndex);
-                    token.attrSet('href', `/${route}${suffix}`);
+                    const href = token.attrGet('href') ?? '';
+                    const match = /^([^?#]*)([?#].*)?$/.exec(href);
+                    if (!match?.[1] || /^[a-z][a-z\d+.-]*:/i.test(match[1]) || match[1].startsWith('/')) {
+                        continue;
+                    }
+                    const target = path.posix.normalize(path.posix.join(path.posix.dirname(sourcePath), match[1]));
+                    const sourceTarget = path.posix.extname(target) ? target : `${target}.md`;
+                    const route = rewrites[sourceTarget];
+                    if (route) {
+                        token.attrSet('href', `/${route.replace(/\.md$/, '')}${match[2] ?? ''}`);
+                    }
                 }
             });
             md.core.ruler.push('component-title-metadata', (state) => {
@@ -757,7 +753,7 @@ export default defineConfig({
         }
     },
     srcExclude: [
-        'README.md',
+        '**/README.md',
         '**/CHANGELOG.md',
         '**/AGENTS.md',
         'plans/**',

@@ -59,6 +59,10 @@ describe('setup-static-hermes action', () => {
 
         const hermesCache = step('hermes-workspace-cache').with;
         assert.match(hermesCache.path, /\.cache\/hermes/);
+        assert.match(hermesCache.key, /static-hermes-workspace-cache-v5/);
+        assert.match(hermesCache.key, /src\/hermes/);
+        assert.match(hermesCache.key, /src\/cli\.ts/);
+        assert.doesNotMatch(hermesCache.key, /bin\/toolchain-environment\.mjs/);
         assert.match(hermesCache.key, /steps\.versions\.outputs\.wasi-sdk-version/);
         assert.match(hermesCache.key, /steps\.versions\.outputs\.wit-bindgen-version/);
         assert.match(hermesCache.key, /steps\.versions\.outputs\.rust-toolchain-version/);
@@ -188,6 +192,28 @@ describe('check-docs', () => {
         assert.ok(result.ok, result.out);
     });
 
+    it('validates private benchmark Markdown and repository paths without treating it as a public component', () => {
+        const result = run(
+            'check-docs.mjs',
+            repo({
+                ...good,
+                'benchmarks/engine-comparison/README.md':
+                    '# Engine comparison\n\nSee [the guide](../../docs/guide.md) and `benchmarks/engine-comparison/src/workload.ts`.\n',
+                'benchmarks/engine-comparison/src/workload.ts': 'export {};\n'
+            })
+        );
+        assert.ok(result.ok, result.out);
+        const broken = run(
+            'check-docs.mjs',
+            repo({
+                ...good,
+                'benchmarks/engine-comparison/README.md':
+                    '# Engine comparison\n\n`benchmarks/engine-comparison/src/missing.ts`\n'
+            })
+        );
+        assert.match(broken.out, /mentions benchmarks\/engine-comparison\/src\/missing\.ts, which does not exist/);
+    });
+
     it('fails for a pnpm command that is not a script, but allows pnpm built-ins', () => {
         const bad = run('check-docs.mjs', repo({ ...good, 'docs/guide.md': '# Guide\n\n```sh\npnpm nonsense\n```\n' }));
         assert.match(bad.out, /runs `pnpm nonsense`/);
@@ -272,6 +298,42 @@ describe('package-metadata', () => {
     it('passes when everything is there', () => {
         const result = run('package-metadata.mjs', repo(files()));
         assert.ok(result.ok, result.out);
+    });
+
+    it('keeps benchmark workspace packages private and outside Release Please', () => {
+        const privatePackage = repo(
+            files({
+                'benchmarks/engine-comparison/package.json': {
+                    name: '@pumpkin-plugins/engine-comparison',
+                    private: true
+                }
+            })
+        );
+        assert.ok(run('package-metadata.mjs', privatePackage).ok);
+
+        const publicPackage = repo(
+            files({ 'benchmarks/engine-comparison/package.json': { name: '@pumpkin-plugins/engine-comparison' } })
+        );
+        assert.match(
+            run('package-metadata.mjs', publicPackage).out,
+            /benchmark workspace packages must set "private": true/
+        );
+
+        const registered = repo({
+            ...files({
+                'benchmarks/engine-comparison/package.json': {
+                    name: '@pumpkin-plugins/engine-comparison',
+                    private: true
+                }
+            }),
+            'release-please-config.json': {
+                packages: { 'benchmarks/engine-comparison': { component: 'engine-comparison' } }
+            },
+            '.release-please-manifest.json': { 'benchmarks/engine-comparison': '0.0.0' }
+        });
+        const result = run('package-metadata.mjs', registered);
+        assert.match(result.out, /private benchmark packages cannot be in release-please-config\.json/);
+        assert.match(result.out, /private benchmark packages cannot be in \.release-please-manifest\.json/);
     });
 
     it('names the missing or wrong fields', () => {
@@ -586,6 +648,26 @@ describe('action release prerequisites', () => {
         assert.deepEqual(job.needs, ['changes', 'build']);
         assert.equal(job.if, "needs.changes.outputs.code == 'true'");
         assert.ok(comparison.jobs.compare.steps.some((step) => step.run?.includes('compare-engines')));
+    });
+
+    it('skips general integration suites only for benchmark-only code changes', () => {
+        const integration = ci.jobs.integration;
+        assert.match(integration.if, /outputs\.integration_scope != 'benchmark'/);
+        assert.match(ci.jobs.release.if, /outputs\.integration_scope == 'benchmark'/);
+        const changes = { outputs: { code: 'true', integration_scope: 'benchmark' }, result: 'success' };
+        assert.equal(evaluate(integration.if, { needs: { changes } }), false);
+        const needs = {
+            changes,
+            lint: { result: 'success' },
+            typecheck: { result: 'success' },
+            build: { result: 'success' },
+            'engine-comparison': { result: 'success' },
+            test: { result: 'success' },
+            docs: { result: 'success' },
+            integration: { result: 'skipped' },
+            'action-gate': { result: 'success' }
+        };
+        assert.equal(evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }), true);
     });
 
     it('passes the expanded matrix into the reusable action test workflow', () => {

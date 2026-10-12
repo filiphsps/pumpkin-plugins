@@ -3,12 +3,17 @@ export type WorkloadProvenance = 'synthetic guest fixture' | 'real Pumpkin API';
 
 /** Timings and deterministic output for one measured workload. */
 export interface BenchmarkWorkload {
+    /** Stable identifier used to compare the same workload across runtimes. */
     name: string;
+    /** Human-readable description of the algorithm being measured. */
     area: string;
+    /** Whether the workload is a guest fixture or uses a real Pumpkin API call. */
     provenance: WorkloadProvenance;
     /** Input items or requests processed by each timed sample. */
     operationsPerSample: number;
+    /** Elapsed time in milliseconds for each measured run, after warm-up. */
     samplesMs: number[];
+    /** Deterministic result used to confirm equivalent work across runtimes. */
     checksum: number;
 }
 

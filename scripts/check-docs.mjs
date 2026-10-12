@@ -27,6 +27,10 @@ const generatedPackageOutputs = new Set(
     })
 );
 const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
+/** Include the private engine-comparison package when checking documentation links and paths. */
+const benchmarkDocs = exists('benchmarks/engine-comparison/README.md')
+    ? ['benchmarks/engine-comparison/README.md', ...markdownFiles('benchmarks/engine-comparison')]
+    : [];
 const docs = [
     ...(exists('README.md') ? ['README.md'] : []),
     ...markdownFiles('docs'),
@@ -34,6 +38,7 @@ const docs = [
     ...packages.flatMap((p) => markdownFiles(`${p}/docs`)),
     ...actions.map((p) => `${p}/README.md`).filter((p) => exists(p)),
     ...actions.flatMap((p) => markdownFiles(`${p}/docs`)),
+    ...benchmarkDocs,
     ...markdownFiles('.github'),
     ...(exists('AGENTS.md') ? ['AGENTS.md'] : []),
     ...markdownFiles('.agents')
@@ -92,7 +97,7 @@ const code = (text) => [...text.matchAll(/```[\s\S]*?```|`[^`\n]*`/g)].map((m) =
 const PLACEHOLDERS = ['my-plugin', 'my-action'];
 
 // 3. Repo paths in code spans exist.
-const PATH_IN_CODE = /`((?:packages|tools|actions|scripts|docs|\.github|\.agents)\/[\w./@-]+)`/g;
+const PATH_IN_CODE = /`((?:packages|tools|actions|benchmarks|scripts|docs|\.github|\.agents)\/[\w./@-]+)`/g;
 for (const file of docs) {
     for (const match of read(file).matchAll(PATH_IN_CODE)) {
         const target = (match[1] ?? '').replace(/[.,;:]+$/, '');

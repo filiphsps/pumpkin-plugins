@@ -1,0 +1,20 @@
+{
+    "name": "@pumpkin-plugins/engine-comparison",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Compares plugin engines on a real Pumpkin server",
+    "type": "module",
+    "scripts": {
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run test/engine-comparison-report.test.ts",
+        "compare-engines": "vitest run test/engine-comparison.test.ts"
+    },
+    "devDependencies": {
+        "@pumpkin-plugins/build": "workspace:*",
+        "@pumpkin-plugins/static-hermes-runtime": "workspace:*",
+        "@pumpkin-plugins/test-harness": "workspace:*",
+        "@pumpkinmc/pumpkin-api-ts": "catalog:",
+        "@types/node": "catalog:",
+        "vitest": "catalog:"
+    }
+}
