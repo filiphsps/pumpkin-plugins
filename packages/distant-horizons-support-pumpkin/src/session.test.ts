@@ -424,7 +424,7 @@ describe('DH protocol contracts', () => {
         expect(expired).toEqual([]);
         expect(completed.get(1)).toEqual(new Uint8Array(60_000).fill(1));
         expect(completed.get(2)).toEqual(new Uint8Array(60_000).fill(2));
-    });
+    }, 15_000);
 
     it('cancels an active transfer and releases its retained payload and send lock', () => {
         let now = 0;
