@@ -35,7 +35,19 @@ if (
 ) {
     throw new Error('--component requires --dry-run or --pull-requests-only');
 }
-const load = () => Manifest.fromManifest(github, branch, 'release-please-config.json', '.release-please-manifest.json');
+const load = async () => {
+    const manifest = await Manifest.fromManifest(
+        github,
+        branch,
+        'release-please-config.json',
+        '.release-please-manifest.json'
+    );
+    for (const config of Object.values(manifest.repositoryConfig)) {
+        config.bumpMinorPreMajor = true;
+        config.bumpPatchForMinorPreMajor = true;
+    }
+    return manifest;
+};
 const outputs = {
     paths_released: '[]',
     action_paths_released: '[]',

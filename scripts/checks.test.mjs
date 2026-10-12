@@ -366,6 +366,8 @@ describe('check-release-config', () => {
             'separate-pull-requests': true,
             'always-update': true,
             'force-tag-creation': true,
+            'bump-minor-pre-major': true,
+            'bump-patch-for-minor-pre-major': true,
             packages: { 'packages/plug': { component: 'plug', ...(releaseAs ? { 'release-as': releaseAs } : {}) } }
         }
     });
@@ -506,6 +508,28 @@ describe('check-release-config', () => {
         const withoutTag = files();
         withoutTag['release-please-config.json']['force-tag-creation'] = false;
         assert.match(run('check-release-config.mjs', repo(withoutTag)).out, /"force-tag-creation": true/);
+    });
+
+    it('requires both pre-major versioning options', () => {
+        const withoutMinor = files();
+        withoutMinor['release-please-config.json']['bump-minor-pre-major'] = undefined;
+        assert.match(run('check-release-config.mjs', repo(withoutMinor)).out, /needs "bump-minor-pre-major": true/);
+
+        const withoutPatch = files();
+        withoutPatch['release-please-config.json']['bump-patch-for-minor-pre-major'] = undefined;
+        assert.match(
+            run('check-release-config.mjs', repo(withoutPatch)).out,
+            /needs "bump-patch-for-minor-pre-major": true/
+        );
+    });
+
+    it('rejects component overrides that disable pre-major versioning', () => {
+        const disabled = files();
+        disabled['release-please-config.json'].packages['packages/plug']['bump-minor-pre-major'] = false;
+        assert.match(
+            run('check-release-config.mjs', repo(disabled)).out,
+            /packages\/plug cannot set "bump-minor-pre-major": false/
+        );
     });
 });
 

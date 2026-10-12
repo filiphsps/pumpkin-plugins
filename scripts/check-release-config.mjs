@@ -67,6 +67,19 @@ if (config['force-tag-creation'] !== true) {
         'release-please-config.json needs "force-tag-creation": true so the next run finds the previous release'
     );
 }
+for (const [option, behavior] of [
+    ['bump-minor-pre-major', 'breaking changes bump the minor version below 1.0.0'],
+    ['bump-patch-for-minor-pre-major', 'features bump the patch version below 1.0.0']
+]) {
+    if (config[option] !== true) {
+        problems.push(`release-please-config.json needs "${option}": true so ${behavior}`);
+    }
+    for (const [dir, entry] of Object.entries(config.packages ?? {})) {
+        if (entry?.[option] === false) {
+            problems.push(`${dir} cannot set "${option}": false; ${behavior}`);
+        }
+    }
+}
 for (const [dir, { type, version }] of components) {
     const name = path.basename(dir);
 

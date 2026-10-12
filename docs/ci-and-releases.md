@@ -164,11 +164,20 @@ and its private key in the `RELEASE_APP_PRIVATE_KEY` repository secret. Each job
 repository-scoped token; the release-PR job uses its token to push prepared README and pin updates,
 which trigger the normal pull-request CI checks.
 
-`scripts/release.mjs` runs the pinned Release Please runtime through `pnpm dlx`.
+`scripts/release.mjs` runs the pinned Release Please runtime through `pnpm dlx` and applies the
+pre-1.0.0 versioning policy to every configured component. For a current version below `1.0.0`,
+breaking changes bump the minor (`0.0.8` to `0.1.0`), features bump the patch, and fixes and
+performance improvements bump the patch. At `1.0.0` and later, normal SemVer applies: breaking
+changes bump major, features bump minor, and fixes and performance improvements bump patch. The
+release config checker requires the corresponding `bump-minor-pre-major` and
+`bump-patch-for-minor-pre-major` options and rejects package overrides that disable them.
+
 `scripts/release-commits.mjs` supplies shared commits through its plugin hook before versions and
-changelogs are calculated. Features, fixes and performance improvements appear in the notes. After
-publishing, the runner reloads the manifest before generating PRs. Each plugin's commits stop at its
-own latest release, and first-release notes start at the commit that added the plugin's `package.json`.
+changelogs are calculated. A shipped change is included for every plugin that bundles the affected
+package, and each plugin's version bump is calculated from its own current version. Features, fixes
+and performance improvements appear in the notes. After publishing, the runner reloads the manifest
+before generating PRs. Each plugin's commits stop at its own latest release, and first-release notes
+start at the commit that added the plugin's `package.json`.
 Action commits are trimmed to their latest release boundary, so first-release notes do not repeat in
 the next release. If a manifest version has no matching GitHub release or tag, the helper uses the
 latest published release for that component with a lower version as the history boundary. It fails
@@ -279,9 +288,10 @@ If you ever create a plugin by hand, do these three things:
    "packages/my-plugin": "0.0.0"
    ```
 
-3. Start the plugin at version `0.0.0` in its `package.json`. The release config also uses
-   `bump-patch-for-minor-pre-major`, so after the first release a `feat` or `fix` bumps the patch
-   while a plugin is below 1.0.0, and only a breaking change bumps the minor.
+3. Start the plugin at version `0.0.0` in its `package.json`. After the pinned `0.0.1` first
+   release, a `feat!:` breaking change bumps `0.0.X` to `0.X.0`; a regular `feat:` or `fix:` bumps
+   the patch while the current version is below `1.0.0`. Once `1.0.0` has been released, normal
+   SemVer applies: `feat:` bumps minor and a breaking change bumps major.
 
 ## Registering an action for releases
 

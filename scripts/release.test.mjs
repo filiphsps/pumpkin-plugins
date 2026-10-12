@@ -15,6 +15,7 @@ function run(args, overrides = {}) {
             `
             const { appendFileSync } = require('node:fs');
             const record = (call) => appendFileSync(process.env.CALLS_FILE, call + '\\n');
+            const recordVersioning = (config) => appendFileSync(process.env.VERSIONING_FILE, JSON.stringify(config) + '\\n');
             let published = false;
             module.exports = {
                 VERSION: '17.11.2',
@@ -32,6 +33,10 @@ function run(args, overrides = {}) {
                 }) },
                 Manifest: { fromManifest: async () => {
                     const latestReleasePublished = published;
+                    const repositoryConfig = {
+                        'packages/plugin': { bumpMinorPreMajor: false, bumpPatchForMinorPreMajor: false },
+                        'actions/publish-action': { bumpMinorPreMajor: false, bumpPatchForMinorPreMajor: false }
+                    };
                     const candidate = (path, tagName, notes, version) => ({
                         path, sha: 'release-sha', notes,
                         tag: {
@@ -53,9 +58,10 @@ function run(args, overrides = {}) {
                           ? [{ error: 'immutable', releases: [plugin] }, { releases: [action] }]
                           : [{ error: process.env.RELEASE_ERROR, releases: releaseItems }];
                     return {
-                    plugins: [], releasedVersions: {}, commitSearchDepth: 500,
+                    plugins: [], releasedVersions: {}, commitSearchDepth: 500, repositoryConfig,
                     labels: ['autorelease: pending'], releaseLabels: ['autorelease: tagged'],
                     createReleases: async function () {
+                        recordVersioning(this.repositoryConfig);
                         record('release');
                         const releases = [];
                         for (const group of releaseGroups) {
@@ -100,23 +106,28 @@ function run(args, overrides = {}) {
                                 version: release.tag.version.toString()
                             }));
                     },
-                    createPullRequests: async () => {
+                    createPullRequests: async function () {
+                        recordVersioning(this.repositoryConfig);
                         record('update-pr');
                         const prs = [{ headBranchName: 'release-branch' }];
                         if (published && !latestReleasePublished) prs.push({ headBranchName: 'empty-follow-up' });
                         return prs;
                     },
-                    buildPullRequests: async () => { record('preview'); return [{
-                        title: 'Release', body: 'Update checks', headRefName: 'release-branch'
-                    }]; }
+                    buildPullRequests: async function () {
+                        recordVersioning(this.repositoryConfig);
+                        record('preview');
+                        return [{ title: 'Release', body: 'Update checks', headRefName: 'release-branch' }];
+                    }
                 }; } }
             };
         `
         );
         const calls = join(root, 'calls');
         const output = join(root, 'output');
+        const versioning = join(root, 'versioning');
         writeFileSync(calls, '');
         writeFileSync(output, '');
+        writeFileSync(versioning, '');
         const result = spawnSync(
             process.execPath,
             [join(import.meta.dirname, 'release.mjs'), ...args, join(root, 'cli.js')],
@@ -129,6 +140,7 @@ function run(args, overrides = {}) {
                     GITHUB_SHA: 'release-sha',
                     GITHUB_OUTPUT: output,
                     CALLS_FILE: calls,
+                    VERSIONING_FILE: versioning,
                     RELEASE_ERROR: '',
                     ...overrides
                 }
@@ -137,7 +149,12 @@ function run(args, overrides = {}) {
         return {
             ...result,
             calls: readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean),
-            output: readFileSync(output, 'utf8')
+            output: readFileSync(output, 'utf8'),
+            versioning: readFileSync(versioning, 'utf8')
+                .trim()
+                .split('\n')
+                .filter(Boolean)
+                .map((entry) => JSON.parse(entry))
         };
     } finally {
         rmSync(root, { recursive: true, force: true });
@@ -150,6 +167,16 @@ it('previews without publishing releases, modifying PRs or setting workflow outp
     assert.deepEqual(result.calls, ['preview']);
     assert.equal(JSON.parse(result.stdout)[0].body, 'Update checks');
     assert.equal(result.output, '');
+});
+
+it('uses pre-major versioning for every component when creating releases and PRs', () => {
+    const result = run([]);
+    assert.equal(result.status, 0, result.stderr);
+    const policy = {
+        'packages/plugin': { bumpMinorPreMajor: true, bumpPatchForMinorPreMajor: true },
+        'actions/publish-action': { bumpMinorPreMajor: true, bumpPatchForMinorPreMajor: true }
+    };
+    assert.deepEqual(result.versioning, [policy, policy]);
 });
 
 it('updates PRs without publishing when pull-requests-only is requested', () => {
