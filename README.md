@@ -48,6 +48,7 @@ Browse the [public documentation site](https://filiphsps.github.io/pumpkin-plugi
 | [@pumpkin-plugins/port-mapping](tools/port-mapping) | UPnP and NAT-PMP port mapping | MIT |
 | [@pumpkin-plugins/pumpkin-pie-api](tools/pumpkin-pie-api) | Validated PumpkinPIE client, expansions and provider lifecycle | MIT |
 | [@pumpkin-plugins/signing](tools/signing) | Ed25519 signing for plugin builds | MIT |
+| [@pumpkin-plugins/static-hermes-runtime](tools/static-hermes-runtime) | Static Hermes runtime shim for Pumpkin plugin components | MIT |
 | [@pumpkin-plugins/terrain](tools/terrain) | Shared terrain capture and access contracts | MIT |
 | [@pumpkin-plugins/test-harness](tools/test-harness) | Runs plugins on a real Pumpkin in vitest | MIT |
 | [@pumpkin-plugins/update-check](tools/update-check) | Check plugin versions against Pumpkin Market | MIT |
