@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/filiphsps/pumpkin-plugins/schemas/upstream-release-pin.schema.json",
+    "title": "Upstream release pin",
+    "description": "A package pinned to a release published by its upstream repository.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["repository", "version"],
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "format": "uri-reference",
+            "minLength": 1
+        },
+        "repository": {
+            "type": "string",
+            "format": "uri",
+            "minLength": 1
+        },
+        "version": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The release tag or version, including any project-specific prefix."
+        }
+    }
+}
