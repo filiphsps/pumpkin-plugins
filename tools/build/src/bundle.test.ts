@@ -95,10 +95,11 @@ describe('bundlePlugin', () => {
         });
 
         const generatedTypesDir = vi.mocked(generateTypes).mock.calls[0]?.[1];
+        if (!generatedTypesDir) throw new Error('missing generated WIT declarations directory');
         expect(generateTypes).toHaveBeenCalledWith(apiWitDir, generatedTypesDir);
         expect(generatedTypesDir).toMatch(/\.pumpkin-build-[^/\\]+[\\/]wit-types$/);
         expect(findUsedWitMethods).toHaveBeenCalledWith('src/plugin.ts', generatedTypesDir);
-        expect(fs.existsSync(path.dirname(generatedTypesDir!))).toBe(false);
+        expect(fs.existsSync(path.dirname(generatedTypesDir))).toBe(false);
     });
 
     it('defines development mode in plugin bundles', async () => {
@@ -244,6 +245,40 @@ describe('bundlePlugin', () => {
                 define: expect.objectContaining({ 'process.env.NODE_ENV': JSON.stringify('production') })
             })
         );
+    });
+
+    it('removes abandoned staging directories from earlier builds', async () => {
+        const { dir, output } = buildAt();
+        const abandoned = path.join(dir, '.pumpkin-build-2147483647-abandoned');
+        fs.mkdirSync(abandoned);
+        fs.writeFileSync(path.join(abandoned, 'bundle.js'), 'leftover bundle');
+
+        await bundlePlugin({
+            entry: 'src/plugin.ts',
+            output,
+            witDir: 'wit',
+            version: '1.0.0',
+            engine: 'quickjs'
+        });
+
+        expect(fs.existsSync(abandoned)).toBe(false);
+    });
+
+    it('removes old staging directories created before owner tracking', async () => {
+        const { dir, output } = buildAt();
+        const abandoned = fs.mkdtempSync(path.join(dir, '.pumpkin-build-'));
+        const old = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        fs.utimesSync(abandoned, old, old);
+
+        await bundlePlugin({
+            entry: 'src/plugin.ts',
+            output,
+            witDir: 'wit',
+            version: '1.0.0',
+            engine: 'quickjs'
+        });
+
+        expect(fs.existsSync(abandoned)).toBe(false);
     });
 
     it.each(engineProfiles)('allows a $name production component exactly at the 5 MiB limit', async ({ options }) => {
@@ -445,6 +480,16 @@ describe('bundlePlugin', () => {
         const recoveryPath = message.split('previous artifact preserved at ')[1];
         expect(recoveryPath).toBeDefined();
         expect(fs.readFileSync(recoveryPath ?? '', 'utf8')).toBe('known-good artifact');
+
+        await bundlePlugin({
+            entry: 'src/plugin.ts',
+            output: path.join(path.dirname(output), 'next-plugin.wasm'),
+            witDir: 'wit',
+            version: '1.0.0',
+            engine: 'quickjs'
+        });
+
+        expect(fs.readFileSync(recoveryPath ?? '', 'utf8')).toBe('known-good artifact');
     });
 
     it('uses separate temporary bundles for concurrent builds', async () => {
@@ -458,6 +503,16 @@ describe('bundlePlugin', () => {
             await Promise.resolve();
             fs.writeFileSync(outfile as string, 'bundle');
             return {} as never;
+        });
+        componentize.mockImplementation((_file, args) => {
+            const bundleIndex = args?.indexOf('--js') ?? -1;
+            const bundle = args?.[bundleIndex + 1];
+            const outputIndex = args?.indexOf('--output') ?? -1;
+            const staged = args?.[outputIndex + 1];
+            if (!bundle || !staged) throw new Error('missing QuickJS componentizer paths');
+            if (!fs.existsSync(bundle)) throw new Error('concurrent build staging was removed');
+            fs.writeFileSync(staged, 'component');
+            return Buffer.alloc(0);
         });
 
         await Promise.all([
@@ -480,5 +535,6 @@ describe('bundlePlugin', () => {
         expect(new Set(bundles).size).toBe(2);
         expect(fs.readFileSync(first.output, 'utf8')).toBe('component');
         expect(fs.readFileSync(second.output, 'utf8')).toBe('component');
+        expect(fs.readdirSync(dir).sort()).toEqual(['first.wasm', 'second.wasm']);
     });
 });
