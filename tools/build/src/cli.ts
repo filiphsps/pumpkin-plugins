@@ -1,4 +1,6 @@
+import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { bundlePlugin } from './bundle.ts';
 import { wasiInterfaces } from './capabilities.ts';
@@ -34,16 +36,26 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
     const wasiFiles = Object.keys(wasiLock.files);
     const apiWit = path.join(apiRoot, 'wit/v0.1');
 
-    // Types go to build/types so `types` and `build` can run in parallel (turbo) without sharing files.
+    // Keep types and builds isolated; only generated declarations stay under build/types.
     if (!buildFields) {
-        const witDir = prepareWit({
-            apiWit,
-            interfaces,
-            wasiWit,
-            wasiFiles,
-            target: path.join(buildDir, 'types', 'wit')
-        });
-        generateTypes(witDir, path.join(buildDir, 'types', 'bindings'));
+        let witDir = apiWit;
+        let temporaryWitRoot: string | undefined;
+        try {
+            if (interfaces.length > 0) {
+                temporaryWitRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-plugin-types-'));
+                witDir = prepareWit({
+                    apiWit,
+                    interfaces,
+                    wasiWit,
+                    wasiFiles,
+                    target: path.join(temporaryWitRoot, 'wit')
+                });
+            }
+            generateTypes(witDir, path.join(buildDir, 'types', 'bindings'));
+            fs.rmSync(path.join(buildDir, 'types', 'wit'), { recursive: true, force: true });
+        } finally {
+            if (temporaryWitRoot !== undefined) fs.rmSync(temporaryWitRoot, { recursive: true, force: true });
+        }
         return;
     }
 

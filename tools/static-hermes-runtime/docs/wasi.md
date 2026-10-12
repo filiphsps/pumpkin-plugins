@@ -63,8 +63,10 @@ last step leaves those imports for the Pumpkin runtime to resolve.
    directory, copies only the locked WASI files, then adds the selected `wasi:*` imports to the
    `plugin` world. The build records this prepared copy under the plugin's `build/wit/` directory.
 4. **TypeScript declarations come from that world.** The build uses `jco guest-types` to generate
-   declarations under `build/types/`. Those declarations let the editor and TypeScript check
-   imported WASI modules and resource methods against the same WIT used for the component.
+   declarations under `build/types/`. When type generation runs separately, it prepares the WIT in a
+   temporary directory and removes the copy afterward. Those declarations let the editor and
+   TypeScript check imported WASI modules and resource methods against the same WIT used for the
+   component.
 5. **esbuild replaces the external imports with facades.** Imports such as
    `wasi:http/outgoing-handler@0.2.3` remain external to the ordinary JavaScript bundle. For
    Static Hermes, an esbuild plugin checks that each imported interface is present in the prepared

@@ -9,6 +9,10 @@ import { generateTypes } from './types.ts';
 
 vi.mock('./bundle.ts', () => ({ bundlePlugin: vi.fn() }));
 vi.mock('./types.ts', () => ({ generateTypes: vi.fn() }));
+vi.mock('./wasi-wit.ts', () => ({
+    ensureWasiWit: vi.fn(async () => '/unused-wasi-wit'),
+    readLock: vi.fn(() => ({ version: '0.2.3', files: {} }))
+}));
 
 describe('run arguments', () => {
     it('rejects unsupported arguments before reading package configuration', async () => {
@@ -50,6 +54,51 @@ describe('run arguments', () => {
                 path.join(pluginDir, 'build', 'types', 'bindings')
             );
         } finally {
+            if (realApiDir === undefined) delete process.env.PUMPKIN_API_DIR;
+            else process.env.PUMPKIN_API_DIR = realApiDir;
+            fs.rmSync(pluginDir, { recursive: true, force: true });
+            fs.rmSync(apiDir, { recursive: true, force: true });
+        }
+    });
+
+    it('does not keep a second WIT copy under build/types after generating WASI declarations', async () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-types-wasi-'));
+        const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
+        const apiWit = path.join(apiDir, 'wit', 'v0.1');
+        const legacyTypesWit = path.join(pluginDir, 'build', 'types', 'wit');
+        const realApiDir = process.env.PUMPKIN_API_DIR;
+        let generatedFrom = '';
+        fs.mkdirSync(apiWit, { recursive: true });
+        fs.writeFileSync(
+            path.join(apiWit, 'plugin.wit'),
+            'package pumpkin:plugin; world plugin {\n    export run: func();\n}\n'
+        );
+        fs.mkdirSync(legacyTypesWit, { recursive: true });
+        fs.writeFileSync(path.join(legacyTypesWit, 'old.wit'), 'stale generated copy');
+        fs.writeFileSync(
+            path.join(pluginDir, 'package.json'),
+            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: ['http'] } })
+        );
+        process.env.PUMPKIN_API_DIR = apiDir;
+        vi.mocked(generateTypes)
+            .mockReset()
+            .mockImplementation((witDir) => {
+                generatedFrom = witDir;
+                expect(fs.readFileSync(path.join(witDir, 'plugin.wit'), 'utf8')).toContain(
+                    'import wasi:http/types@0.2.3;'
+                );
+            });
+
+        try {
+            await run(['--types-only'], pluginDir);
+
+            expect(generateTypes).toHaveBeenCalledTimes(1);
+            expect(generatedFrom).not.toBe('');
+            expect(generatedFrom).not.toContain(path.join(pluginDir, 'build'));
+            expect(fs.existsSync(generatedFrom)).toBe(false);
+            expect(fs.existsSync(legacyTypesWit)).toBe(false);
+        } finally {
+            vi.mocked(generateTypes).mockReset();
             if (realApiDir === undefined) delete process.env.PUMPKIN_API_DIR;
             else process.env.PUMPKIN_API_DIR = realApiDir;
             fs.rmSync(pluginDir, { recursive: true, force: true });

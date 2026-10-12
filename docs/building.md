@@ -36,10 +36,12 @@ native code for size while keeping Hermes source locations and native line table
 | Command | Result |
 | --- | --- |
 | `pumpkin-plugins-build` | `build/<plugin>.wasm`, with the WIT it was built from in `build/wit/` (a copy, since the WASI imports are added) |
-| `pumpkin-plugins-build --types-only` | Guest types in `build/types/` for `tsc` and your editor |
+| `pumpkin-plugins-build --types-only` | Guest declarations in `build/types/bindings/` for `tsc` and your editor |
 
-Types go to a separate directory so `build` and `typecheck` can run in parallel without touching the
-same files. Run `pnpm typecheck` once after a fresh checkout so your editor finds the types.
+Only declarations persist under `build/types/`, so `build` and `typecheck` can run in parallel
+without touching the same files or keeping a second WIT tree. When a plugin requests WASI imports,
+type generation prepares its WIT in a temporary directory and removes it afterward. Run
+`pnpm typecheck` once after a fresh checkout so your editor finds the types.
 The shared `plugin-kit` package does the same for its own source, generating declarations for its
 filesystem imports in its ignored `build/types/` directory.
 
