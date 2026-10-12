@@ -59,6 +59,7 @@
     },
     "pumpkinPlugin": {
         "entry": "src/plugin.ts",
+        "engine": "static-hermes",
         "output": "build/upnpumpkin.wasm",
         "wasi": [
             "filesystem",
