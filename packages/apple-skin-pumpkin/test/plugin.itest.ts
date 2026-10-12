@@ -12,8 +12,9 @@ describe(info.name, () => {
         await server?.stop();
     });
 
-    it('loads on a real server', async () => {
+    it('loads and handles server ticks without runtime errors', async () => {
         await server.waitForLog(new RegExp(`Loaded ${info.name}`));
+        await new Promise((resolve) => setTimeout(resolve, 1_000));
         expect(server.errors()).toEqual([]);
     });
 });
