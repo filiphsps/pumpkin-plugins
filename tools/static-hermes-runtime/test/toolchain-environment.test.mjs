@@ -2,12 +2,10 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import {
-    fetchWasiSdkRelease,
-    prepareStaticHermesBuild,
-    selectWasiSdkAsset,
-    setupHermesToolchainEnvironment
-} from '../bin/toolchain-environment.mjs';
+import * as toolchainEnvironment from '../bin/toolchain-environment.mjs';
+
+const { fetchWasiSdkRelease, prepareStaticHermesBuild, selectWasiSdkAsset, setupHermesToolchainEnvironment } =
+    toolchainEnvironment;
 
 const temporaryDirs = [];
 
@@ -87,6 +85,26 @@ it('installs missing pinned toolchain dependencies under .cache/hermes', async (
     expect(environment.WIT_BINDGEN).toBe(
         path.join(workspaceRoot, '.cache', 'hermes', 'toolchain', 'wit-bindgen-0.62.0', 'bin', 'wit-bindgen')
     );
+});
+
+it('keeps an installed SDK when a later installer publishes to the same cache path', () => {
+    const workspaceRoot = temporaryDirectory('static-hermes-sdk-publish-');
+    const destination = path.join(workspaceRoot, '.cache', 'hermes', 'toolchain', 'wasi-sdk-34');
+    const firstExtraction = path.join(workspaceRoot, 'first-install');
+    const laterExtraction = path.join(workspaceRoot, 'later-install');
+    const compilerPath = path.join(destination, 'bin', 'wasm32-wasip2-clang');
+
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    writeExecutable(path.join(firstExtraction, 'bin', 'wasm32-wasip2-clang'), '#!/bin/sh\n# first SDK\nexit 0\n');
+    writeExecutable(path.join(laterExtraction, 'bin', 'wasm32-wasip2-clang'), '#!/bin/sh\n# later SDK\nexit 0\n');
+
+    const publish = toolchainEnvironment.publishWasiSdkDirectory;
+    const firstResult = publish?.(firstExtraction, destination);
+    const laterResult = publish?.(laterExtraction, destination);
+
+    expect(firstResult).toBe(destination);
+    expect(laterResult).toBe(destination);
+    expect(fs.readFileSync(compilerPath, 'utf8')).toBe('#!/bin/sh\n# first SDK\nexit 0\n');
 });
 
 it('uses the configured WASI SDK version for the cache path and release lookup', async () => {
@@ -231,8 +249,8 @@ function temporaryDirectory(prefix) {
     return directory;
 }
 
-function writeExecutable(file) {
+function writeExecutable(file, contents = '#!/bin/sh\nexit 0\n') {
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, '#!/bin/sh\nexit 0\n');
+    fs.writeFileSync(file, contents);
     fs.chmodSync(file, 0o755);
 }

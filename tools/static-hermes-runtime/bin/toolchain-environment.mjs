@@ -115,8 +115,9 @@ async function resolveWitBindgen({ toolchainRoot, homeDirectory, toolchainConfig
 async function installPinnedWasiSdk({ destination, platform, arch, repository, version, env, fetchImpl }) {
     const parent = path.dirname(destination);
     fs.mkdirSync(parent, { recursive: true });
-    const archive = `${destination}.${process.pid}.tar.gz`;
-    const extraction = `${destination}.partial-${process.pid}`;
+    const installationDirectory = fs.mkdtempSync(path.join(parent, `${path.basename(destination)}.install-`));
+    const archive = path.join(installationDirectory, 'sdk.tar.gz');
+    const extraction = path.join(installationDirectory, 'sdk');
     try {
         const release = await fetchWasiSdkRelease({
             repository,
@@ -136,17 +137,31 @@ async function installPinnedWasiSdk({ destination, platform, arch, repository, v
             throw new Error(`WASI SDK checksum mismatch: expected ${expectedSha256}, received ${actualSha256}`);
         }
 
-        fs.rmSync(extraction, { recursive: true, force: true });
         fs.mkdirSync(extraction, { recursive: true });
         execFileSync('tar', ['-xzf', archive, '--strip-components=1', '-C', extraction], { stdio: 'inherit' });
         validateWasiSdk(extraction, 'downloaded WASI SDK');
-        fs.rmSync(destination, { recursive: true, force: true });
-        fs.renameSync(extraction, destination);
-        return destination;
+        return publishWasiSdkDirectory(extraction, destination);
     } finally {
-        fs.rmSync(archive, { force: true });
-        fs.rmSync(extraction, { recursive: true, force: true });
+        fs.rmSync(installationDirectory, { recursive: true, force: true });
     }
+}
+
+/** Publish a complete SDK only if another build has not already installed one.
+ * @param {string} extraction - Directory containing the validated SDK.
+ * @param {string} destination - Shared cache directory for this SDK version.
+ * @returns {string} The shared SDK directory.
+ */
+export function publishWasiSdkDirectory(extraction, destination) {
+    try {
+        fs.renameSync(extraction, destination);
+    } catch (error) {
+        if (isWasiSdk(destination)) return destination;
+        if (fs.existsSync(destination)) {
+            throw new Error(`WASI SDK cache is incomplete at ${destination}; remove it and retry`, { cause: error });
+        }
+        throw error;
+    }
+    return destination;
 }
 
 /** Fetches release metadata used to discover platform archives and their published digests. */
