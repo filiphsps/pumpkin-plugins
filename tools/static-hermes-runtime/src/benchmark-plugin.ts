@@ -79,16 +79,22 @@ class RuntimeBenchmarkPlugin extends Plugin {
         let playersObserved = 0;
         const workloads = [
             ...measureSyntheticWorkloads(),
-            measureWorkload('pumpkin-api', 'Pumpkin server API', 'real Pumpkin API', PLAYER_QUERIES_PER_SAMPLE, () => {
-                let total = 0;
-                for (let index = 0; index < PLAYER_QUERIES_PER_SAMPLE; index++) {
-                    const players = server.getAllPlayers();
-                    serverQueries++;
-                    playersObserved += players.length;
-                    total += players.length;
+            measureWorkload(
+                'pumpkin-api',
+                'Pumpkin server.getAllPlayers()',
+                'real Pumpkin API',
+                PLAYER_QUERIES_PER_SAMPLE,
+                () => {
+                    let total = 0;
+                    for (let index = 0; index < PLAYER_QUERIES_PER_SAMPLE; index++) {
+                        const players = server.getAllPlayers();
+                        serverQueries++;
+                        playersObserved += players.length;
+                        total += players.length;
+                    }
+                    return total;
                 }
-                return total;
-            })
+            )
         ];
 
         logging.log(

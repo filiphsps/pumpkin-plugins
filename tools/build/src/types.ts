@@ -17,7 +17,7 @@ export function generateTypes(witDir: string, outDir: string): void {
     let preserveTemporary = false;
     try {
         fs.mkdirSync(generated);
-        execFileSync(jco, ['guest-types', witDir, '-n', 'plugin', '-o', generated, '--name', 'index'], {
+        execFileSync(jco, ['guest-types', witDir, '-n', 'plugin', '-o', generated, '--name', 'index', '--quiet'], {
             stdio: 'inherit'
         });
         publishTypes(generated, output, temporary, () => {
