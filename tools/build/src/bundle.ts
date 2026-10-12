@@ -10,6 +10,9 @@ import { findUsedWitMethods } from './wit-method-usage.ts';
 
 const require = createRequire(import.meta.url);
 const MAX_PRODUCTION_COMPONENT_BYTES = 5 * 1024 * 1024;
+const TEMPORARY_DIRECTORY_PREFIX = '.pumpkin-build-';
+const LEGACY_TEMPORARY_DIRECTORY_MAX_AGE_MS = 60 * 60 * 1000;
+const activeTemporaryDirectories = new Set<string>();
 
 /** Inputs to `bundlePlugin`. */
 export interface BundleOptions {
@@ -39,7 +42,9 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
     const output = path.resolve(options.output);
     const outputDir = path.dirname(output);
     fs.mkdirSync(outputDir, { recursive: true });
-    const temporaryDir = fs.mkdtempSync(path.join(outputDir, '.pumpkin-build-'));
+    removeAbandonedTemporaryDirectories(outputDir);
+    const temporaryDir = fs.mkdtempSync(path.join(outputDir, `${TEMPORARY_DIRECTORY_PREFIX}${process.pid}-`));
+    activeTemporaryDirectories.add(temporaryDir);
     const bundle = path.join(temporaryDir, 'bundle.js');
     const component = path.join(temporaryDir, 'plugin.wasm');
     const engine = options.engine ?? 'static-hermes';
@@ -133,7 +138,39 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
         });
         return size;
     } finally {
+        activeTemporaryDirectories.delete(temporaryDir);
         if (!preserveTemporaryDir) fs.rmSync(temporaryDir, { recursive: true, force: true });
+    }
+}
+
+function removeAbandonedTemporaryDirectories(outputDir: string): void {
+    for (const entry of fs.readdirSync(outputDir, { withFileTypes: true })) {
+        if (!entry.isDirectory() || !entry.name.startsWith(TEMPORARY_DIRECTORY_PREFIX)) continue;
+        const temporaryDir = path.join(outputDir, entry.name);
+        if (activeTemporaryDirectories.has(temporaryDir) || fs.existsSync(path.join(temporaryDir, 'previous.wasm'))) {
+            continue;
+        }
+
+        const owner = /^\.pumpkin-build-(\d+)-/.exec(entry.name);
+        if (owner) {
+            const pid = Number(owner[1]);
+            if (pid !== process.pid && isProcessRunning(pid)) continue;
+            fs.rmSync(temporaryDir, { recursive: true, force: true });
+            continue;
+        }
+
+        if (Date.now() - fs.statSync(temporaryDir).mtimeMs >= LEGACY_TEMPORARY_DIRECTORY_MAX_AGE_MS) {
+            fs.rmSync(temporaryDir, { recursive: true, force: true });
+        }
+    }
+}
+
+function isProcessRunning(pid: number): boolean {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (error) {
+        return typeof error === 'object' && error !== null && 'code' in error && error.code === 'EPERM';
     }
 }
 
