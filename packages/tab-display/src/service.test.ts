@@ -183,6 +183,25 @@ describe('TabDisplayService', () => {
         expect(service.status().lastFailure).toMatch(/batch/i);
     });
 
+    it('reports the actual display update error instead of labeling it as an output limit', () => {
+        const host = new FakeHost(viewers);
+        vi.spyOn(host, 'setHeaderFooter').mockImplementationOnce(() => {
+            throw new Error('Cannot use a disposed or transferred resource');
+        });
+        const warnings: string[] = [];
+        const service = new TabDisplayService({
+            host,
+            resolver: { resolveBatch: (requests) => requests.map(({ text }) => ({ text, unresolved: [] })) },
+            now: () => 0,
+            config: validConfig(baseConfig()),
+            log: (message) => warnings.push(message)
+        });
+
+        service.tick();
+
+        expect(warnings).toEqual(['Display update failed: Error: Cannot use a disposed or transferred resource']);
+    });
+
     it('keeps the last valid generation for 30 seconds during provider outages', () => {
         const host = new FakeHost(viewers);
         let available = true;

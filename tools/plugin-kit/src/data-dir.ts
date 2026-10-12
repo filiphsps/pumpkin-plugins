@@ -53,7 +53,8 @@ export class WasiDataDir implements DataFiles {
                     : 0
             };
         } catch (err) {
-            if (wasiErrorCode(err) === 'no-entry') return undefined;
+            const code = wasiErrorCode(err);
+            if (code === 'no-entry') return undefined;
             throw err;
         }
     }
