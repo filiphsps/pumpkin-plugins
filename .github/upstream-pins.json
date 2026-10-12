@@ -1,0 +1,12 @@
+{
+    "sources": [
+        {
+            "id": "static-hermes",
+            "name": "Static Hermes",
+            "pinFile": "tools/static-hermes-runtime/hermes-source.json",
+            "pinField": "commit",
+            "labels": ["dependencies", "area: runtime", "runtime: static-hermes"],
+            "validation": ["pnpm", "--filter", "@pumpkin-plugins/static-hermes-runtime", "prepare-hermes"]
+        }
+    ]
+}
