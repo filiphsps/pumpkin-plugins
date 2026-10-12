@@ -6,6 +6,7 @@
     "pumpkinPlugin": {
         "entry": "src/plugin.ts",
         "output": "tab-display-pie-expansion-fixture.wasm",
+        "engine": "quickjs",
         "wasi": []
     }
 }
