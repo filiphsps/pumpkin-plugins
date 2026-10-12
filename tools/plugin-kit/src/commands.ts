@@ -1,3 +1,4 @@
+import type { Command, CommandNode } from 'pumpkin:plugin/command@0.1.0';
 import {
     type CommandArgumentSpec,
     type CommandArgumentValue,
@@ -10,19 +11,11 @@ import {
     type SubcommandTree
 } from '@pumpkin-plugins/docs';
 
-/** A node of a command tree being built. The host's own command classes satisfy it. */
-export interface CommandNodeLike {
-    /** Adds a child node and transfers ownership of that child to this node. */
-    then(child: CommandNodeLike): unknown;
-    /** Makes the node runnable: the host calls the handler registered under this id. */
-    executeWithHandlerId(id: number): unknown;
-}
+/** Command resources from the pinned WIT API used while building a tree. */
+export type CommandNodeLike = Command | CommandNode;
 
 /** An argument node that can request dynamic completions. */
-export interface CommandArgumentNodeLike extends CommandNodeLike {
-    /** Uses a registered callback to suggest values for this argument node. */
-    suggestWithHandlerId(id: number): unknown;
-}
+export type CommandArgumentNodeLike = CommandNode;
 
 /** The input context Pumpkin provides when a client requests argument suggestions. */
 export interface CommandSuggestionRequest {
@@ -38,9 +31,9 @@ export type CommandSuggestionHandler<Sender> = (sender: Sender, request: Command
 /** What building commands needs from the host. `registerCommands` implements it with Pumpkin's command classes. */
 export interface CommandHost<Sender> {
     /** Creates the root of a command: the word typed after `/`. */
-    root(name: string, description: string): CommandNodeLike;
+    root(name: string, description: string): Command;
     /** Creates a fixed word below a node. */
-    literal(name: string): CommandNodeLike;
+    literal(name: string): CommandNode;
     /** Creates a typed argument below a node. */
     argument(spec: CommandArgumentSpec): CommandArgumentNodeLike;
     /** Registers a dynamic suggestion callback and returns its host handler ID. */
@@ -65,7 +58,7 @@ export interface BuiltCommand {
     /** The permission node needed to run it. */
     permission: string;
     /** Its root node. */
-    node: CommandNodeLike;
+    node: Command;
 }
 
 /**
@@ -98,7 +91,7 @@ export function buildCommands<Sender, T extends CommandTree>(
         return handler;
     };
     const suggestionIds = new Map<string, number>();
-    const argument = (spec: CommandArgumentSpec): CommandNodeLike => {
+    const argument = (spec: CommandArgumentSpec): CommandNode => {
         const node = host.argument(spec);
         const suggestion = suggestions[spec.name];
         if (suggestion !== undefined) {
@@ -199,9 +192,12 @@ export function buildCommands<Sender, T extends CommandTree>(
         if (!lastNode) throw new Error(`command /${handlerPath(path, arguments_)} has no argument node`);
         register(lastNode, path, permission, checkPermission, arguments_);
         for (let index = argumentNodes.length - 2; index >= 0; index--) {
-            argumentNodes[index]?.then(argumentNodes[index + 1] as CommandNodeLike);
+            const parent = argumentNodes[index];
+            const child = argumentNodes[index + 1];
+            if (parent && child) parent.then(child);
         }
-        node.then(argumentNodes[0] as CommandNodeLike);
+        const firstArgumentNode = argumentNodes[0];
+        if (firstArgumentNode) node.then(firstArgumentNode);
     };
 
     return Object.entries(tree).map(([name, spec]) => {

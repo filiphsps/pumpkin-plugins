@@ -1,10 +1,11 @@
+import type { CommandSender, ConsumedArgs } from 'pumpkin:plugin/command@0.1.0';
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { PluginMetadata } from 'pumpkin:plugin/metadata@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { type PluginInfo, pluginMetadata } from '@pumpkin-plugins/docs';
 import { registerPluginWithUpdates } from '@pumpkin-plugins/update-check';
-import { handleTask as apiHandleTask, Plugin } from '@pumpkinmc/pumpkin-api-ts';
-import { runTask, scheduleDelayed } from './host.ts';
+import { handleCommand as apiHandleCommand, handleTask as apiHandleTask, Plugin } from '@pumpkinmc/pumpkin-api-ts';
+import { runCommand, runTask, scheduleDelayed } from './host.ts';
 
 /** Base class for plugins, keeping metadata, lifecycle hooks, logging and update checks consistent. */
 export abstract class PluginBase extends Plugin {
@@ -49,6 +50,11 @@ export function registerPlugin(plugin: PluginBase): void {
     registerPluginWithUpdates(plugin, plugin.info, {
         schedule: (callback) => scheduleDelayed(1, () => callback())
     });
+}
+
+/** Dispatches shared command handlers before falling back to Pumpkin's API handlers. */
+export function handleCommand(id: number, sender: CommandSender, server: Server, args: ConsumedArgs): number {
+    return runCommand(id, sender, args) ?? apiHandleCommand(id, sender, server, args);
 }
 
 /** Dispatches shared scheduled tasks before falling back to the Pumpkin API's handlers.

@@ -1,8 +1,9 @@
+import type { Command, CommandNode } from 'pumpkin:plugin/command@0.1.0';
 import type { CommandArgumentSpec, CommandArgumentValue } from '@pumpkin-plugins/docs';
-import type { CommandHost, CommandNodeLike, CommandSuggestionHandler, CommandSuggestionRequest } from '../commands.ts';
+import type { CommandHost, CommandSuggestionHandler, CommandSuggestionRequest } from '../commands.ts';
 
 /** A node of a fake command tree, with what was attached to it. */
-export class FakeNode implements CommandNodeLike {
+export class FakeNode implements Command, CommandNode {
     readonly children: FakeNode[] = [];
     handlerId: number | undefined;
     suggestionHandlerId: number | undefined;
@@ -15,7 +16,7 @@ export class FakeNode implements CommandNodeLike {
     ) {}
 
     // biome-ignore lint/suspicious/noThenProperty: mirrors the host's command classes, which have `then`.
-    then(child: CommandNodeLike): void {
+    then(child: CommandNode): void {
         this.assertAvailable();
         const fakeChild = child as FakeNode;
         fakeChild.consume();
@@ -30,6 +31,14 @@ export class FakeNode implements CommandNodeLike {
     suggestWithHandlerId(id: number): void {
         this.assertAvailable();
         this.suggestionHandlerId = id;
+    }
+
+    requireWithHandlerId(_id: number): void {
+        this.assertAvailable();
+    }
+
+    [Symbol.dispose](): void {
+        this.consume();
     }
 
     private consume(): void {
