@@ -71,6 +71,10 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [PumpkinPIE API README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-pie-api/README.md): Additional component overview and usage details.
 - [Pumpkin plugin signing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/docs/index.md): Ed25519 signing for plugin builds
 - [Pumpkin plugin signing README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/README.md): Additional component overview and usage details.
+- [Static Hermes runtime](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/index.md): Static Hermes runtime shim for Pumpkin plugin components
+- [Static Hermes runtime README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/README.md): Additional component overview and usage details.
+- [Static Hermes runtime: Benchmarking QuickJS and Static Hermes](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/benchmarking.md): This guide explains what the engine comparison measures, how to read its report, and what conclusions its results support.
+- [Static Hermes runtime: WASI in Static Hermes](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/wasi.md): Static Hermes plugins run as WebAssembly components.
 - [Terrain capture](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/docs/index.md): Shared terrain capture and access contracts
 - [Terrain capture README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/README.md): Additional component overview and usage details.
 - [Pumpkin test harness](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/test-harness/docs/index.md): Runs plugins on a real Pumpkin in vitest
@@ -113,6 +117,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Port mapping library API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/port-mapping/): UPnP and NAT-PMP port mapping
 - [PumpkinPIE API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/pumpkin-pie-api/): Validated PumpkinPIE client, expansions and provider lifecycle
 - [Pumpkin plugin signing API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/signing/): Ed25519 signing for plugin builds
+- [Static Hermes runtime API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/static-hermes-runtime/): Static Hermes runtime shim for Pumpkin plugin components
 - [Terrain capture API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/terrain/): Shared terrain capture and access contracts
 - [Pumpkin test harness API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/test-harness/): Runs plugins on a real Pumpkin in vitest
 - [Pumpkin Market update checks API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/update-check/): Check plugin versions against Pumpkin Market
