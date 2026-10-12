@@ -7,6 +7,7 @@ import { PLUGIN_NAME, pluginServers, portConfig } from './running.ts';
 const start = pluginServers();
 
 const bigPack = makeMcpack(manifestJson(), { files: { 'textures/big.bin': noise(2 * 1024 * 1024, 3) } });
+const concurrentPack = makeMcpack(manifestJson(), { files: { 'textures/concurrent.bin': noise(256 * 1024, 7) } });
 
 describe('web server', () => {
     it('serves a pack with the right bytes and headers, and supports HEAD and ranges', async () => {
@@ -62,7 +63,7 @@ describe('web server', () => {
         const r = await start({
             name: 'parallel',
             config: (port) => portConfig(port),
-            files: { 'packs/a.mcpack': bigPack }
+            files: { 'packs/a.mcpack': concurrentPack }
         });
         await r.server.waitForLog(/Serving packs on/);
 
@@ -72,7 +73,7 @@ describe('web server', () => {
                 async () => new Uint8Array(await (await fetch(r.url('/packs/a.mcpack'))).arrayBuffer())
             )
         );
-        for (const body of results) expect(body).toEqual(bigPack);
+        for (const body of results) expect(body).toEqual(concurrentPack);
         expect(r.server.errors()).toEqual([]);
     });
 
