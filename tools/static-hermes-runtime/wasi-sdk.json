@@ -1,0 +1,5 @@
+{
+    "$schema": "../../schemas/upstream-release-pin.schema.json",
+    "repository": "https://github.com/WebAssembly/wasi-sdk",
+    "version": "34"
+}
