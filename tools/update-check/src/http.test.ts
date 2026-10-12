@@ -65,14 +65,16 @@ function resource(name: string) {
     host.created.push(result);
     return result;
 }
-function transport(chunks: Array<Uint8Array | object> = [strToU8('{"message":"héllo"}'), closed]) {
+function transport(chunks: Array<Uint8Array | object | null> = [strToU8('{"message":"héllo"}'), closed]) {
     const headers = { ...resource('headers-pollable'), ready: vi.fn(() => true), block: vi.fn() };
     const bytes = { ...resource('stream-pollable'), ready: vi.fn(() => true), block: vi.fn() };
     const stream = {
         ...resource('stream'),
         subscribe: vi.fn(() => bytes),
         read: vi.fn(() => {
-            const chunk = chunks.shift() ?? closed;
+            const chunk = chunks.shift();
+            if (chunk === null) return null;
+            if (chunk === undefined) throw closed;
             if (!(chunk instanceof Uint8Array)) throw chunk;
             return chunk;
         })
@@ -195,6 +197,56 @@ describe('WASI HTTP requests', () => {
             error: expect.objectContaining({ message: expect.stringContaining(message) })
         });
         expect(host.dropped).toEqual(['headers-pollable', 'stream-pollable', 'stream', 'body', 'response', 'future']);
+    });
+
+    it('treats a closed input-stream error as end-of-body', () => {
+        const t = transport([strToU8('{"message":"héllo"}'), new Error('WASI HTTP input stream read failed: closed')]);
+        const request = asyncRequest();
+
+        request.drain();
+
+        expect(request.complete).toHaveBeenCalledWith({ ok: true, value: { message: 'héllo' } });
+        expect(host.dropped).toEqual(['headers-pollable', 'stream-pollable', 'stream', 'body', 'response', 'future']);
+        expect(t.stream.read).toHaveBeenCalledTimes(2);
+    });
+
+    it('treats a thrown host error value as end-of-body', () => {
+        const t = transport([
+            strToU8('{"message":"héllo"}'),
+            { message: 'WASI HTTP input stream read failed: closed' }
+        ]);
+        const request = asyncRequest();
+
+        request.drain();
+
+        expect(request.complete).toHaveBeenCalledWith({ ok: true, value: { message: 'héllo' } });
+        expect(host.dropped).toEqual(['headers-pollable', 'stream-pollable', 'stream', 'body', 'response', 'future']);
+        expect(t.stream.read).toHaveBeenCalledTimes(2);
+    });
+
+    it('treats a host exception string as end-of-body', () => {
+        const t = transport([
+            strToU8('{"message":"héllo"}'),
+            { toString: () => 'Error: WASI HTTP input stream read failed: closed' }
+        ]);
+        const request = asyncRequest();
+
+        request.drain();
+
+        expect(request.complete).toHaveBeenCalledWith({ ok: true, value: { message: 'héllo' } });
+        expect(host.dropped).toEqual(['headers-pollable', 'stream-pollable', 'stream', 'body', 'response', 'future']);
+        expect(t.stream.read).toHaveBeenCalledTimes(2);
+    });
+
+    it('treats a end-of-stream value as end-of-body', () => {
+        const t = transport([strToU8('{"message":"héllo"}'), null]);
+        const request = asyncRequest();
+
+        request.drain();
+
+        expect(request.complete).toHaveBeenCalledWith({ ok: true, value: { message: 'héllo' } });
+        expect(host.dropped).toEqual(['headers-pollable', 'stream-pollable', 'stream', 'body', 'response', 'future']);
+        expect(t.stream.read).toHaveBeenCalledTimes(2);
     });
 
     it('bounds requests that remain pending and ignores stale scheduled polls', () => {

@@ -72,7 +72,9 @@ export function* marketJsonRequest(url: string): Generator<Pollable, unknown, vo
             stage = 'read response stream';
             let chunk: Uint8Array;
             try {
-                chunk = stream.read(READ_CHUNK_BYTES);
+                const nextChunk = stream.read(READ_CHUNK_BYTES) as Uint8Array | null;
+                if (nextChunk === null) break;
+                chunk = nextChunk;
             } catch (error) {
                 if (isClosed(error)) break;
                 throw error;
@@ -115,7 +117,16 @@ function parseUrl(url: string): { scheme: string; authority: string; path: strin
 }
 
 function isClosed(error: unknown): boolean {
-    if (typeof error !== 'object' || error === null || !('payload' in error)) return false;
+    const closedMessage = 'WASI HTTP input stream read failed: closed';
+    if (error instanceof Error && error.message === closedMessage) return true;
+    try {
+        if (String(error) === `Error: ${closedMessage}`) return true;
+    } catch {
+        // Fall through to the structured payload check.
+    }
+    if (typeof error !== 'object' || error === null) return false;
+    if ('message' in error && error.message === closedMessage) return true;
+    if (!('payload' in error)) return false;
     const payload = error.payload;
     return typeof payload === 'object' && payload !== null && 'tag' in payload && payload.tag === 'closed';
 }
