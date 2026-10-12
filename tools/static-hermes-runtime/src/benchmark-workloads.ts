@@ -1,0 +1,783 @@
+/** Timings and deterministic output for one plugin-style workload. */
+interface BenchmarkWorkload {
+    name: string;
+    area: string;
+    /** Input items or requests processed by each timed sample. */
+    operationsPerSample: number;
+    samplesMs: number[];
+    checksum: number;
+}
+
+type WorkloadScenario = Pick<BenchmarkWorkload, 'name' | 'area' | 'operationsPerSample'> & {
+    run: () => number;
+};
+
+/** Number of timed runs for each workload, after one un-timed warm-up. */
+const SAMPLE_COUNT = 5;
+
+const CONFIG_SOURCE = JSON.stringify({
+    enabled: true,
+    cache: { maxEntries: 512, ttlTicks: 1200 },
+    channels: ['status', 'inventory', 'health'],
+    aliases: { hp: 'health', inv: 'inventory', st: 'status' }
+});
+
+const WORKLOADS: readonly WorkloadScenario[] = [
+    { name: 'numeric', area: 'Runtime baseline', operationsPerSample: 1_000_000, run: runNumeric },
+    { name: 'objects', area: 'Object allocation and traversal', operationsPerSample: 50_000, run: runObjects },
+    { name: 'strings', area: 'String construction and joining', operationsPerSample: 25_000, run: runStrings },
+    { name: 'config-validation', area: 'Plugin configuration', operationsPerSample: 1_000, run: runConfigValidation },
+    { name: 'command-routing', area: 'EssentialsX commands', operationsPerSample: 4_000, run: runCommandRouting },
+    {
+        name: 'permission-resolution',
+        area: 'LuckPerms permissions',
+        operationsPerSample: 12_000,
+        run: runPermissionResolution
+    },
+    { name: 'player-directory', area: 'Player lookup and homes', operationsPerSample: 18_000, run: runPlayerDirectory },
+    { name: 'event-cache', area: 'Player lifecycle events', operationsPerSample: 20_000, run: runEventCache },
+    {
+        name: 'chat-formatting',
+        area: 'EssentialsX Chat and placeholders',
+        operationsPerSample: 3_000,
+        run: runChatFormatting
+    },
+    { name: 'scoreboard-rendering', area: 'Scoreboards', operationsPerSample: 12_000, run: runScoreboardRendering },
+    {
+        name: 'region-protection',
+        area: 'WorldGuard region checks',
+        operationsPerSample: 20_000,
+        run: runRegionProtection
+    },
+    {
+        name: 'world-edit-plan',
+        area: 'WorldEdit selection preview',
+        operationsPerSample: 55_296,
+        run: runWorldEditPlan
+    },
+    { name: 'economy-transfers', area: 'Vault economy', operationsPerSample: 12_000, run: runEconomyTransfers },
+    { name: 'inventory-stacking', area: 'Kits and inventory', operationsPerSample: 2_500, run: runInventoryStacking },
+    {
+        name: 'cooldown-rate-limit',
+        area: 'Command cooldowns and anti-spam',
+        operationsPerSample: 20_000,
+        run: runCooldownRateLimit
+    },
+    { name: 'tick-scheduler', area: 'Delayed and repeating tasks', operationsPerSample: 6_000, run: runTickScheduler },
+    {
+        name: 'audit-history',
+        area: 'CoreProtect-style history queries',
+        operationsPerSample: 13_000,
+        run: runAuditHistory
+    },
+    {
+        name: 'player-state-json',
+        area: 'Player-state JSON serialization',
+        operationsPerSample: 1_200,
+        run: runPlayerStatePersistence
+    },
+    { name: 'custom-payload', area: 'Custom packet encoding', operationsPerSample: 16_384, run: runPacketEncoding }
+];
+
+/** Runs and measures every deterministic plugin-style workload. */
+export function measureSyntheticWorkloads(): BenchmarkWorkload[] {
+    return WORKLOADS.map(({ name, area, operationsPerSample, run }) =>
+        measureWorkload(name, area, operationsPerSample, run)
+    );
+}
+
+/**
+ * Measures one workload after a warm-up run.
+ * @param name - Stable workload identifier.
+ * @param area - Plugin feature represented by the workload.
+ * @param operationsPerSample - Number of inputs processed in each timed run.
+ * @param run - Runs the workload and returns a deterministic checksum.
+ * @returns The timed samples and final checksum.
+ */
+export function measureWorkload(
+    name: string,
+    area: string,
+    operationsPerSample: number,
+    run: () => number
+): BenchmarkWorkload {
+    run();
+    let checksum = 0;
+    const samplesMs: number[] = [];
+    for (let sample = 0; sample < SAMPLE_COUNT; sample++) {
+        const startedAt = Date.now();
+        checksum = run();
+        samplesMs.push(Date.now() - startedAt);
+    }
+    return { name, area, operationsPerSample, samplesMs, checksum };
+}
+
+function runNumeric(): number {
+    let value = 1;
+    for (let index = 0; index < 1_000_000; index++) {
+        value = (value * 48_271 + index + 1) % 2_147_483_647;
+    }
+    return value + (Math.imul(0x811c9dc5, 16_777_619) >>> 0);
+}
+
+function runObjects(): number {
+    const records: { id: number; value: number }[] = [];
+    for (let id = 0; id < 50_000; id++) {
+        records.push({ id, value: (id * 17) % 97 });
+    }
+
+    let total = 0;
+    for (const record of records) {
+        total = (total + record.id * record.value) >>> 0;
+    }
+    return total;
+}
+
+function runStrings(): number {
+    const parts = new Array<string>(25_000);
+    for (let index = 0; index < parts.length; index++) {
+        parts[index] = `${index.toString(36)}:${String.fromCharCode(65 + (index % 26))}`;
+    }
+
+    const joined = parts.join('|');
+    return joined.length + joined.charCodeAt(joined.length - 1);
+}
+
+function runConfigValidation(): number {
+    let checksum = 0;
+    for (let index = 0; index < 1_000; index++) {
+        const parsed: unknown = JSON.parse(CONFIG_SOURCE);
+        if (
+            !isRecord(parsed) ||
+            !isRecord(parsed.cache) ||
+            !Array.isArray(parsed.channels) ||
+            !isRecord(parsed.aliases)
+        ) {
+            return -1;
+        }
+
+        const { cache, channels, aliases } = parsed;
+        if (
+            parsed.enabled !== true ||
+            typeof cache.maxEntries !== 'number' ||
+            cache.maxEntries < 1 ||
+            typeof cache.ttlTicks !== 'number' ||
+            cache.ttlTicks < 1 ||
+            channels.some((channel) => typeof channel !== 'string')
+        ) {
+            return -1;
+        }
+
+        const channelNames = new Set(channels as string[]);
+        const aliasEntries = Object.entries(aliases);
+        if (aliasEntries.some(([, channel]) => typeof channel !== 'string' || !channelNames.has(channel))) return -1;
+        checksum += channelNames.size + aliasEntries.length + cache.maxEntries + cache.ttlTicks;
+    }
+    return checksum;
+}
+
+const COMMAND_ROUTES = new Map([
+    ['home', { permission: 'essentials.home', minimumArguments: 0, maximumArguments: 1 }],
+    ['warp', { permission: 'essentials.warp', minimumArguments: 1, maximumArguments: 1 }],
+    ['teleport', { permission: 'essentials.teleport', minimumArguments: 1, maximumArguments: 2 }],
+    ['balance', { permission: 'essentials.balance', minimumArguments: 0, maximumArguments: 1 }],
+    ['message', { permission: 'essentials.message', minimumArguments: 2, maximumArguments: 24 }],
+    ['gamemode', { permission: 'minecraft.command.gamemode', minimumArguments: 1, maximumArguments: 2 }]
+]);
+
+const COMMAND_ALIASES = new Map([
+    ['h', 'home'],
+    ['w', 'warp'],
+    ['tp', 'teleport'],
+    ['bal', 'balance'],
+    ['msg', 'message'],
+    ['tell', 'message'],
+    ['gm', 'gamemode']
+]);
+
+const COMMAND_NAMES = ['home', 'h', 'warp', 'w', 'tp', 'bal', 'msg', 'tell', 'gm', 'unknown'];
+
+function runCommandRouting(): number {
+    let checksum = 0;
+    for (let index = 0; index < 4_000; index++) {
+        const commandName = COMMAND_NAMES[index % COMMAND_NAMES.length];
+        const playerName = `Player${index % 1_800}`;
+        const input =
+            commandName === 'msg' || commandName === 'tell'
+                ? `${commandName} ${playerName} "Shop purchase ${index}"`
+                : `${commandName} ${playerName}`;
+        const [requestedName = '', ...arguments_] = tokenizeCommand(input);
+        const name = COMMAND_ALIASES.get(requestedName.toLowerCase()) ?? requestedName.toLowerCase();
+        const route = COMMAND_ROUTES.get(name);
+        if (route === undefined) {
+            checksum = (checksum + arguments_.length + 1) >>> 0;
+            continue;
+        }
+
+        if (arguments_.length >= route.minimumArguments && arguments_.length <= route.maximumArguments) {
+            checksum = (checksum + route.permission.length + arguments_.join('').length) >>> 0;
+        }
+    }
+    return checksum;
+}
+
+function tokenizeCommand(input: string): string[] {
+    const arguments_: string[] = [];
+    let value = '';
+    let quote = '';
+    let escaped = false;
+    let hasValue = false;
+
+    for (const character of input) {
+        if (escaped) {
+            value += character;
+            escaped = false;
+            hasValue = true;
+        } else if (character === '\\') {
+            escaped = true;
+        } else if (quote !== '') {
+            if (character === quote) quote = '';
+            else value += character;
+            hasValue = true;
+        } else if (character === '"' || character === "'") {
+            quote = character;
+            hasValue = true;
+        } else if (/\s/.test(character)) {
+            if (hasValue) {
+                arguments_.push(value);
+                value = '';
+                hasValue = false;
+            }
+        } else {
+            value += character;
+            hasValue = true;
+        }
+    }
+
+    if (escaped) value += '\\';
+    if (hasValue) arguments_.push(value);
+    return arguments_;
+}
+
+interface PermissionGroup {
+    parent?: string;
+    permissions: ReadonlyMap<string, boolean>;
+    contexts: ReadonlyMap<string, boolean>;
+}
+
+const PERMISSION_GROUPS = new Map<string, PermissionGroup>([
+    [
+        'default',
+        {
+            permissions: new Map([
+                ['essentials.home', true],
+                ['essentials.balance', true],
+                ['worldguard.build', false]
+            ]),
+            contexts: new Map()
+        }
+    ],
+    [
+        'member',
+        {
+            parent: 'default',
+            permissions: new Map([
+                ['essentials.warp', true],
+                ['economy.pay', true]
+            ]),
+            contexts: new Map([['spawn:worldguard.build', true]])
+        }
+    ],
+    [
+        'moderator',
+        {
+            parent: 'member',
+            permissions: new Map([
+                ['essentials.teleport', true],
+                ['coreprotect.*', true]
+            ]),
+            contexts: new Map()
+        }
+    ],
+    [
+        'admin',
+        {
+            parent: 'moderator',
+            permissions: new Map([['*', true]]),
+            contexts: new Map()
+        }
+    ]
+]);
+
+const PERMISSION_NODES = [
+    'essentials.home',
+    'essentials.warp',
+    'essentials.teleport',
+    'essentials.balance',
+    'essentials.message',
+    'economy.pay',
+    'worldguard.build',
+    'worldguard.interact',
+    'coreprotect.inspect',
+    'minecraft.command.gamemode'
+];
+
+const PERMISSION_GROUP_NAMES = ['default', 'member', 'moderator', 'admin'];
+const PERMISSION_WORLDS = ['survival', 'spawn', 'creative'];
+
+function runPermissionResolution(): number {
+    let checksum = 0;
+    for (let index = 0; index < 12_000; index++) {
+        const group = PERMISSION_GROUP_NAMES[index % PERMISSION_GROUP_NAMES.length];
+        const permission = PERMISSION_NODES[index % PERMISSION_NODES.length];
+        const world = PERMISSION_WORLDS[index % PERMISSION_WORLDS.length];
+        if (hasPermission(group, permission, world)) checksum += permission.length + (index % 17);
+    }
+    return checksum;
+}
+
+function hasPermission(groupName: string, permission: string, world: string): boolean {
+    let group = PERMISSION_GROUPS.get(groupName);
+    while (group !== undefined) {
+        const contextualPermission = group.contexts.get(`${world}:${permission}`);
+        if (contextualPermission !== undefined) return contextualPermission;
+
+        const exactPermission = group.permissions.get(permission);
+        if (exactPermission !== undefined) return exactPermission;
+
+        for (
+            let separator = permission.lastIndexOf('.');
+            separator >= 0;
+            separator = permission.lastIndexOf('.', separator - 1)
+        ) {
+            const wildcardPermission = group.permissions.get(`${permission.slice(0, separator)}.*`);
+            if (wildcardPermission !== undefined) return wildcardPermission;
+        }
+
+        const globalPermission = group.permissions.get('*');
+        if (globalPermission !== undefined) return globalPermission;
+        group = group.parent === undefined ? undefined : PERMISSION_GROUPS.get(group.parent);
+    }
+    return false;
+}
+
+interface PlayerProfile {
+    uuid: string;
+    name: string;
+    world: string;
+    balance: number;
+    homes: readonly string[];
+}
+
+function runPlayerDirectory(): number {
+    const byUuid = new Map<string, PlayerProfile>();
+    const byName = new Map<string, PlayerProfile>();
+    for (let id = 0; id < 6_000; id++) {
+        const hexadecimalId = id.toString(16);
+        const profile: PlayerProfile = {
+            uuid: `00000000-0000-4000-8000-${'000000000000'.slice(hexadecimalId.length)}${hexadecimalId}`,
+            name: `Player${id}`,
+            world: PERMISSION_WORLDS[id % PERMISSION_WORLDS.length],
+            balance: 1_000 + ((id * 97) % 90_000),
+            homes: id % 3 === 0 ? ['home', 'farm'] : ['home']
+        };
+        byUuid.set(profile.uuid, profile);
+        byName.set(profile.name.toLowerCase(), profile);
+    }
+
+    let checksum = 0;
+    for (let lookup = 0; lookup < 12_000; lookup++) {
+        const id = lookup % 6_000;
+        const profile =
+            lookup % 2 === 0
+                ? byName.get(`player${id}`)
+                : byUuid.get(
+                      `00000000-0000-4000-8000-${'000000000000'.slice(id.toString(16).length)}${id.toString(16)}`
+                  );
+        if (profile !== undefined) checksum += profile.balance + profile.name.length + profile.homes.length;
+    }
+    return checksum;
+}
+
+function runEventCache(): number {
+    const cache = new Map<string, { food: number; lastTick: number }>();
+    for (let tick = 0; tick < 20_000; tick++) {
+        const playerId = `player-${tick % 2_000}`;
+        const current = cache.get(playerId);
+        cache.set(playerId, { food: current ? (current.food + 1) % 21 : tick % 21, lastTick: tick });
+        if (tick % 1_000 === 999) {
+            for (const [id, entry] of cache) {
+                if (tick - entry.lastTick > 1_000) cache.delete(id);
+            }
+        }
+    }
+    let checksum = 0;
+    for (const [id, entry] of cache) checksum += id.length + entry.food + entry.lastTick;
+    return checksum;
+}
+
+const CHAT_TEMPLATES = [
+    '&a%player%&7: Hello from %world%',
+    '&b%player%&7 paid %balance% coins for a shop item',
+    '&c%player%&7 shared a fake scamlink in %world%'
+];
+const CHAT_FILTERS = ['badword', 'scamlink', 'discord.gg/fake'];
+
+function runChatFormatting(): number {
+    let checksum = 0;
+    for (let index = 0; index < 3_000; index++) {
+        const player = `Player${index % 1_500}`;
+        const world = PERMISSION_WORLDS[index % PERMISSION_WORLDS.length];
+        const balance = (index * 83) % 100_000;
+        const rawMessage = CHAT_TEMPLATES[index % CHAT_TEMPLATES.length]
+            .replace(/%player%/g, player)
+            .replace(/%world%/g, world)
+            .replace(/%balance%/g, balance.toString());
+        const normalizedMessage = rawMessage.toLowerCase();
+        const blocked = CHAT_FILTERS.some((term) => normalizedMessage.includes(term));
+        const formattedMessage = rawMessage.replace(/&([0-9a-fk-or])/gi, '§$1');
+        checksum += formattedMessage.length + (blocked ? 1 : 0);
+    }
+    return checksum;
+}
+
+function runScoreboardRendering(): number {
+    const lines = ['&6%player%', '&7World: &f%world%', '&7Balance: &a$%balance%', '&7Online: &f%online%'];
+    let checksum = 0;
+    for (let playerId = 0; playerId < 3_000; playerId++) {
+        const playerName = `Player${playerId}`;
+        const world = PERMISSION_WORLDS[playerId % PERMISSION_WORLDS.length];
+        const balance = ((playerId * 97) % 100_000).toString();
+        for (const line of lines) {
+            const rendered = line
+                .replace(/%player%/g, playerName)
+                .replace(/%world%/g, world)
+                .replace(/%balance%/g, balance)
+                .replace(/%online%/g, '3000')
+                .replace(/&([0-9a-fk-or])/gi, '§$1');
+            checksum += rendered.length;
+        }
+    }
+    return checksum;
+}
+
+interface ProtectedRegion {
+    world: string;
+    minimumX: number;
+    maximumX: number;
+    minimumZ: number;
+    maximumZ: number;
+    ownerId: number;
+    trustedPlayers: ReadonlySet<number>;
+    allowPublicPlace: boolean;
+}
+
+function runRegionProtection(): number {
+    const regionsByChunk = new Map<string, ProtectedRegion[]>();
+    for (let worldIndex = 0; worldIndex < PERMISSION_WORLDS.length; worldIndex++) {
+        const world = PERMISSION_WORLDS[worldIndex];
+        for (let column = 0; column < 8; column++) {
+            for (let row = 0; row < 4; row++) {
+                const region: ProtectedRegion = {
+                    world,
+                    minimumX: -512 + column * 128,
+                    maximumX: -449 + column * 128,
+                    minimumZ: -256 + row * 128,
+                    maximumZ: -193 + row * 128,
+                    ownerId: (column * 11 + row * 7 + worldIndex) % 4_096,
+                    trustedPlayers: new Set([(column * 17 + row * 13) % 4_096]),
+                    allowPublicPlace: (column + row) % 5 === 0
+                };
+                addRegionToChunkIndex(regionsByChunk, region);
+            }
+        }
+    }
+
+    let checksum = 0;
+    for (let event = 0; event < 20_000; event++) {
+        const world = PERMISSION_WORLDS[event % PERMISSION_WORLDS.length];
+        const x = ((event * 73) % 1_024) - 512;
+        const z = ((event * 43) % 1_024) - 512;
+        const playerId = (event * 19) % 4_096;
+        const action = event % 2 === 0 ? 'break' : 'place';
+        const candidates = regionsByChunk.get(`${world}:${x >> 4}:${z >> 4}`) ?? [];
+        let allowed = true;
+
+        for (const region of candidates) {
+            if (x < region.minimumX || x > region.maximumX || z < region.minimumZ || z > region.maximumZ) continue;
+            allowed =
+                playerId === region.ownerId ||
+                region.trustedPlayers.has(playerId) ||
+                (action === 'place' && region.allowPublicPlace);
+            break;
+        }
+        checksum = (checksum + (allowed ? 1 : 0) + candidates.length) >>> 0;
+    }
+    return checksum;
+}
+
+function addRegionToChunkIndex(index: Map<string, ProtectedRegion[]>, region: ProtectedRegion): void {
+    for (let chunkX = region.minimumX >> 4; chunkX <= region.maximumX >> 4; chunkX++) {
+        for (let chunkZ = region.minimumZ >> 4; chunkZ <= region.maximumZ >> 4; chunkZ++) {
+            const key = `${region.world}:${chunkX}:${chunkZ}`;
+            const regions = index.get(key) ?? [];
+            regions.push(region);
+            index.set(key, regions);
+        }
+    }
+}
+
+interface BlockChange {
+    x: number;
+    y: number;
+    z: number;
+    before: number;
+    after: number;
+}
+
+function runWorldEditPlan(): number {
+    const changes: BlockChange[] = [];
+    const palette = [1, 2, 3, 4, 5, 6, 7, 8];
+    for (let x = 0; x < 48; x++) {
+        for (let y = 0; y < 24; y++) {
+            for (let z = 0; z < 48; z++) {
+                const offsetX = x - 24;
+                const offsetY = y - 12;
+                const offsetZ = z - 24;
+                if (offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ > 24 * 24) continue;
+
+                const before = (x * 31 + y * 17 + z * 13) % 9;
+                if (before === 0 || (x + z) % 5 === 0) continue;
+                const after = palette[(x + y + z) % palette.length];
+                if (before !== after) changes.push({ x, y, z, before, after });
+            }
+        }
+    }
+
+    let checksum = changes.length;
+    for (const change of changes) {
+        checksum = (checksum + change.x * 3 + change.y * 5 + change.z * 7 + change.before + change.after) >>> 0;
+    }
+    return checksum;
+}
+
+function runEconomyTransfers(): number {
+    const balances = new Map<number, number>();
+    for (let playerId = 0; playerId < 4_000; playerId++) balances.set(playerId, 50_000 + playerId * 5);
+
+    const transactions: [number, number, number][] = [];
+    for (let transactionId = 0; transactionId < 12_000; transactionId++) {
+        const senderId = transactionId % 4_000;
+        const recipientId = (transactionId * 17 + 29) % 4_000;
+        const amount = ((transactionId * 97) % 350) + 1;
+        const senderBalance = balances.get(senderId) ?? 0;
+        if (senderBalance < amount || senderId === recipientId) continue;
+
+        balances.set(senderId, senderBalance - amount);
+        balances.set(recipientId, (balances.get(recipientId) ?? 0) + amount);
+        transactions.push([senderId, recipientId, amount]);
+    }
+
+    let checksum = transactions.length;
+    for (const [senderId, recipientId, amount] of transactions) {
+        checksum += senderId + recipientId + amount;
+    }
+    for (const [playerId, balance] of balances) checksum += (playerId + 1) * balance;
+    return checksum;
+}
+
+interface ItemStack {
+    itemId: string;
+    count: number;
+}
+
+function runInventoryStacking(): number {
+    const inventory = new Array<ItemStack | undefined>(36).fill(undefined);
+    for (let slot = 0; slot < 24; slot++)
+        inventory[slot] = { itemId: `minecraft:item${slot % 48}`, count: 32 + (slot % 32) };
+
+    let itemsAdded = 0;
+    for (let grant = 0; grant < 2_500; grant++) {
+        const itemId = `minecraft:item${grant % 48}`;
+        const count = ((grant * 13) % 96) + 1;
+        itemsAdded += addToInventory(inventory, itemId, count);
+    }
+
+    let checksum = itemsAdded;
+    for (let slot = 0; slot < inventory.length; slot++) {
+        const stack = inventory[slot];
+        if (stack !== undefined) checksum += (slot + 1) * stack.count + stack.itemId.length;
+    }
+    return checksum;
+}
+
+function addToInventory(inventory: Array<ItemStack | undefined>, itemId: string, count: number): number {
+    let remaining = count;
+    for (const stack of inventory) {
+        if (stack?.itemId !== itemId || stack.count === 64) continue;
+        const moved = Math.min(64 - stack.count, remaining);
+        stack.count += moved;
+        remaining -= moved;
+        if (remaining === 0) return count;
+    }
+
+    while (remaining > 0) {
+        const emptySlot = inventory.indexOf(undefined);
+        if (emptySlot === -1) break;
+        const moved = Math.min(64, remaining);
+        inventory[emptySlot] = { itemId, count: moved };
+        remaining -= moved;
+    }
+    return count - remaining;
+}
+
+function runCooldownRateLimit(): number {
+    const lastAllowedTick = new Map<string, number>();
+    const commandNames = ['home', 'warp', 'message', 'pay'];
+    let allowed = 0;
+    let blocked = 0;
+
+    for (let attempt = 0; attempt < 20_000; attempt++) {
+        const playerId = attempt % 64;
+        const command = commandNames[Math.floor(attempt / 64) % commandNames.length];
+        const tick = Math.floor(attempt / 4);
+        const key = `${playerId}:${command}`;
+        const previousTick = lastAllowedTick.get(key);
+        if (previousTick === undefined || tick - previousTick >= 100) {
+            lastAllowedTick.set(key, tick);
+            allowed++;
+        } else {
+            blocked++;
+        }
+    }
+    return allowed * 31 + blocked;
+}
+
+interface ScheduledTask {
+    id: number;
+    repeatEveryTicks: number;
+}
+
+function runTickScheduler(): number {
+    const tasksByTick: ScheduledTask[][] = Array.from({ length: 1_200 }, () => []);
+    for (let taskId = 0; taskId < 6_000; taskId++) {
+        const dueTick = (taskId * 37) % 600;
+        tasksByTick[dueTick].push({ id: taskId, repeatEveryTicks: taskId % 4 === 0 ? 20 + (taskId % 60) : 0 });
+    }
+
+    let callbacks = 0;
+    let checksum = 0;
+    for (let tick = 0; tick < tasksByTick.length; tick++) {
+        for (const task of tasksByTick[tick]) {
+            callbacks++;
+            checksum = (checksum + task.id * (tick + 1)) >>> 0;
+            const nextTick = tick + task.repeatEveryTicks;
+            if (task.repeatEveryTicks > 0 && nextTick < tasksByTick.length) tasksByTick[nextTick].push(task);
+        }
+    }
+    return checksum + callbacks;
+}
+
+interface AuditRecord {
+    tick: number;
+    world: string;
+    x: number;
+    z: number;
+    action: string;
+}
+
+function runAuditHistory(): number {
+    const eventsByPlayer = new Map<number, AuditRecord[]>();
+    for (let eventId = 0; eventId < 12_000; eventId++) {
+        const playerId = eventId % 2_048;
+        const records = eventsByPlayer.get(playerId) ?? [];
+        records.push({
+            tick: eventId * 2,
+            world: PERMISSION_WORLDS[eventId % PERMISSION_WORLDS.length],
+            x: ((eventId * 31) % 2_000) - 1_000,
+            z: ((eventId * 47) % 2_000) - 1_000,
+            action: eventId % 2 === 0 ? 'block-break' : 'block-place'
+        });
+        eventsByPlayer.set(playerId, records);
+    }
+
+    let checksum = 0;
+    for (let query = 0; query < 1_000; query++) {
+        const playerId = query % 2_048;
+        const minimumTick = query * 8;
+        const maximumTick = minimumTick + 4_000;
+        const world = PERMISSION_WORLDS[query % PERMISSION_WORLDS.length];
+        for (const event of eventsByPlayer.get(playerId) ?? []) {
+            if (
+                event.tick >= minimumTick &&
+                event.tick <= maximumTick &&
+                event.world === world &&
+                Math.abs(event.x) < 800 &&
+                Math.abs(event.z) < 800
+            ) {
+                checksum += event.tick + event.action.length + event.x + event.z;
+            }
+        }
+    }
+    return checksum;
+}
+
+interface StoredPlayerState {
+    uuid: string;
+    name: string;
+    balanceCents: number;
+    homes: { name: string; world: string; x: number; y: number; z: number }[];
+    preferences: { chat: boolean; privateMessages: boolean; scoreboard: boolean };
+}
+
+function runPlayerStatePersistence(): number {
+    const players: StoredPlayerState[] = [];
+    for (let playerId = 0; playerId < 1_200; playerId++) {
+        players.push({
+            uuid: `player-${playerId.toString(16)}`,
+            name: `Player${playerId}`,
+            balanceCents: playerId * 193,
+            homes: [
+                {
+                    name: 'home',
+                    world: PERMISSION_WORLDS[playerId % PERMISSION_WORLDS.length],
+                    x: playerId,
+                    y: 64,
+                    z: -playerId
+                },
+                { name: 'farm', world: 'survival', x: playerId * 2, y: 70, z: playerId * 3 }
+            ],
+            preferences: {
+                chat: playerId % 5 !== 0,
+                privateMessages: playerId % 7 !== 0,
+                scoreboard: playerId % 3 !== 0
+            }
+        });
+    }
+
+    const serialized = JSON.stringify({ schemaVersion: 2, players });
+    const restored: unknown = JSON.parse(serialized);
+    if (!isRecord(restored) || restored.schemaVersion !== 2 || !Array.isArray(restored.players)) return -1;
+
+    let checksum = serialized.length;
+    for (const player of restored.players as StoredPlayerState[]) {
+        checksum += player.balanceCents + player.homes.length + player.name.length;
+    }
+    return checksum;
+}
+
+function runPacketEncoding(): number {
+    const payload = new Uint8Array(256);
+    const view = new DataView(payload.buffer);
+    let checksum = 0;
+    for (let packet = 0; packet < 256; packet++) {
+        for (let field = 0; field < 64; field++) {
+            view.setUint32(field * 4, (packet * 0x9e3779b1 + field) >>> 0, false);
+        }
+        for (let field = 0; field < 64; field++) checksum = (checksum + view.getUint32(field * 4, false)) >>> 0;
+    }
+    return checksum;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}

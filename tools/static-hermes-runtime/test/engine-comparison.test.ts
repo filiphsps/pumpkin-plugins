@@ -8,6 +8,8 @@ import { expect, it } from 'vitest';
 
 interface BenchmarkWorkload {
     name: string;
+    area: string;
+    operationsPerSample: number;
     samplesMs: number[];
     checksum: number;
 }
@@ -19,6 +21,9 @@ interface EngineResult {
         eventDispatches: number;
         scheduledTasks: number;
         scheduledCallbacks: number;
+        permissionRegistrations: number;
+        commandRegistrations: number;
+        commandDispatches: number;
         serverQueries: number;
         playersObserved: number;
     };
@@ -31,8 +36,30 @@ const runtimeDir = path.resolve(import.meta.dirname, '..');
 const repositoryDir = path.resolve(runtimeDir, '../..');
 const buildCli = path.join(repositoryDir, 'tools/build/bin/pumpkin-plugins-build.mjs');
 const benchmarkEntry = path.join(runtimeDir, 'src/benchmark-plugin.ts');
+const benchmarkWorkloads = path.join(runtimeDir, 'src/benchmark-workloads.ts');
 const apiRoot = path.dirname(createRequire(import.meta.url).resolve('@pumpkinmc/pumpkin-api-ts/package.json'));
-const expectedWorkloads = ['numeric', 'config', 'event-cache', 'packet', 'objects', 'strings', 'pumpkin-api'];
+const expectedWorkloads = [
+    'numeric',
+    'objects',
+    'strings',
+    'config-validation',
+    'command-routing',
+    'permission-resolution',
+    'player-directory',
+    'event-cache',
+    'chat-formatting',
+    'scoreboard-rendering',
+    'region-protection',
+    'world-edit-plan',
+    'economy-transfers',
+    'inventory-stacking',
+    'cooldown-rate-limit',
+    'tick-scheduler',
+    'audit-history',
+    'player-state-json',
+    'custom-payload',
+    'pumpkin-api'
+];
 const samplesPerWorkload = 5;
 
 it('compares QuickJS, full Hermes, and lean Hermes sizes, behavior, and guest workloads', async () => {
@@ -49,6 +76,7 @@ it('compares QuickJS, full Hermes, and lean Hermes sizes, behavior, and guest wo
             fs.mkdirSync(sourceDir, { recursive: true });
             fs.mkdirSync(path.dirname(apiLink), { recursive: true });
             fs.copyFileSync(benchmarkEntry, path.join(sourceDir, 'plugin.ts'));
+            fs.copyFileSync(benchmarkWorkloads, path.join(sourceDir, 'benchmark-workloads.ts'));
             fs.symlinkSync(apiRoot, apiLink, 'dir');
             fs.writeFileSync(
                 path.join(packageDir, 'package.json'),
@@ -63,6 +91,23 @@ it('compares QuickJS, full Hermes, and lean Hermes sizes, behavior, and guest wo
                             wasi: [],
                             ...(pluginEngine === 'static-hermes' ? { staticHermesRuntime } : {})
                         }
+                    },
+                    null,
+                    2
+                )}\n`
+            );
+            fs.writeFileSync(
+                path.join(packageDir, 'tsconfig.json'),
+                `${JSON.stringify(
+                    {
+                        compilerOptions: {
+                            target: 'ES2022',
+                            module: 'ESNext',
+                            moduleResolution: 'Bundler',
+                            strict: true,
+                            types: []
+                        },
+                        include: ['src/**/*.ts']
                     },
                     null,
                     2
@@ -86,7 +131,20 @@ it('compares QuickJS, full Hermes, and lean Hermes sizes, behavior, and guest wo
                 plugins: [wasmPath]
             });
             try {
-                const line = await server.waitForLog(/RUNTIME_BENCHMARK:|Failed to load plugin/, 60_000);
+                const readyLine = await server.waitForLog(
+                    /RUNTIME_BENCHMARK_READY|Failed to (?:load|initialize) plugin/,
+                    60_000
+                );
+                expect(readyLine, `${engine} did not register its benchmark command: ${readyLine}`).toContain(
+                    'RUNTIME_BENCHMARK_READY'
+                );
+                const commandOutputStart = server.lines.length;
+                server.command('runtime-benchmark');
+                const line = await server.waitForLog(
+                    /RUNTIME_BENCHMARK:|Failed to (?:load|initialize) plugin/,
+                    60_000,
+                    commandOutputStart
+                );
                 const payload = line.match(/RUNTIME_BENCHMARK:(\{.*\})/);
                 expect(payload, `${engine} did not emit benchmark results: ${line}`).not.toBeNull();
                 results[engine] = { binarySizeBytes, ...JSON.parse(payload?.[1] ?? '') };
@@ -110,10 +168,13 @@ it('compares QuickJS, full Hermes, and lean Hermes sizes, behavior, and guest wo
         expect(leanHermes.runtimeSourceCompilation).toBe(false);
         for (const result of [quickjs, hermes, leanHermes]) {
             expect(result.workloads.map(({ name }) => name)).toEqual(expectedWorkloads);
-            expect(result.apiBehavior.eventRegistrations).toBe(1);
-            expect(result.apiBehavior.eventDispatches).toBeGreaterThan(0);
+            expect(result.apiBehavior.eventRegistrations).toBe(3);
+            expect(result.apiBehavior.eventDispatches).toBeGreaterThanOrEqual(3);
             expect(result.apiBehavior.scheduledTasks).toBe(1);
             expect(result.apiBehavior.scheduledCallbacks).toBe(1);
+            expect(result.apiBehavior.permissionRegistrations).toBe(1);
+            expect(result.apiBehavior.commandRegistrations).toBe(1);
+            expect(result.apiBehavior.commandDispatches).toBe(1);
             expect(result.apiBehavior.serverQueries).toBe(600);
             expect(result.apiBehavior.playersObserved).toBe(0);
         }
@@ -122,6 +183,11 @@ it('compares QuickJS, full Hermes, and lean Hermes sizes, behavior, and guest wo
             const quickjsWorkload = quickjs.workloads[index];
             const hermesWorkload = hermes.workloads[index];
             const leanWorkload = leanHermes.workloads[index];
+            expect(quickjsWorkload.area).toBe(hermesWorkload.area);
+            expect(quickjsWorkload.area).toBe(leanWorkload.area);
+            expect(quickjsWorkload.operationsPerSample).toBeGreaterThan(0);
+            expect(quickjsWorkload.operationsPerSample).toBe(hermesWorkload.operationsPerSample);
+            expect(quickjsWorkload.operationsPerSample).toBe(leanWorkload.operationsPerSample);
             expect(Number.isFinite(quickjsWorkload.checksum)).toBe(true);
             expect(Number.isFinite(hermesWorkload.checksum)).toBe(true);
             expect(Number.isFinite(leanWorkload.checksum)).toBe(true);
@@ -160,25 +226,26 @@ function formatReport(quickjs: EngineResult, hermes: EngineResult, leanHermes: E
         `| Static Hermes full | ${hermes.binarySizeBytes.toLocaleString()} bytes | baseline |`,
         `| Static Hermes lean | ${leanHermes.binarySizeBytes.toLocaleString()} bytes | -${savedBytes.toLocaleString()} bytes (${savedPercent.toFixed(2)}% smaller) |`,
         '',
-        '| Workload | QuickJS median | Hermes full median | Hermes lean median | QuickJS/full | QuickJS/lean |',
-        '| --- | ---: | ---: | ---: | ---: | ---: |'
+        '| Plugin area / workload | Inputs per sample | QuickJS median | Hermes full median | Hermes lean median | QuickJS/full | QuickJS/lean |',
+        '| --- | ---: | ---: | ---: | ---: | ---: | ---: |'
     ];
 
     for (let index = 0; index < expectedWorkloads.length; index++) {
+        const workload = quickjs.workloads[index];
         const quickjsMedian = median(quickjs.workloads[index].samplesMs);
         const hermesMedian = median(hermes.workloads[index].samplesMs);
         const leanMedian = median(leanHermes.workloads[index].samplesMs);
         const fullRatio = hermesMedian === 0 ? 'n/a' : `${(quickjsMedian / hermesMedian).toFixed(2)}x`;
         const leanRatio = leanMedian === 0 ? 'n/a' : `${(quickjsMedian / leanMedian).toFixed(2)}x`;
         lines.push(
-            `| ${expectedWorkloads[index]} | ${quickjsMedian.toFixed(2)} ms | ${hermesMedian.toFixed(2)} ms | ${leanMedian.toFixed(2)} ms | ${fullRatio} | ${leanRatio} |`
+            `| ${workload.area} / ${workload.name} | ${workload.operationsPerSample.toLocaleString()} | ${quickjsMedian.toFixed(2)} ms | ${hermesMedian.toFixed(2)} ms | ${leanMedian.toFixed(2)} ms | ${fullRatio} | ${leanRatio} |`
         );
     }
 
     lines.push(
         '',
-        'Each workload uses five timed samples after one warm-up; size and timing have no pass thresholds.',
-        `Real Pumpkin calls per engine: 1 event registration, tick dispatch, 1 delayed task and callback, ${quickjs.apiBehavior.serverQueries} getAllPlayers calls; no players connected.`,
+        'Each workload uses five timed samples after one warm-up. Inputs per sample describe the guest-side fixture or requests; size and timing have no pass thresholds.',
+        `Real Pumpkin calls per engine: ${quickjs.apiBehavior.eventRegistrations} tick-event listener registrations and ${quickjs.apiBehavior.eventDispatches} handler dispatches, 1 delayed task and callback, 1 permission registration, 1 command registration and dispatch, and ${quickjs.apiBehavior.serverQueries} getAllPlayers calls. The comparison server has no connected players; player workflows use deterministic guest-side fixtures.`,
         'Lean Hermes omits runtime source compilation, so `eval` and `Function(string)` are unavailable.'
     );
     return lines.join('\n');
