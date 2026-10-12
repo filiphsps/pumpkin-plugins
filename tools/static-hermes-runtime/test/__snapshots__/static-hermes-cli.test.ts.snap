@@ -1,0 +1,127 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`documents [ '--help' ] command 1`] = `
+"Usage: static-hermes-runtime [options] [command]
+
+Prepare and build Pumpkin Static Hermes components
+
+Options:
+  -h, --help      display help for command
+
+Commands:
+  hermes          Manage the pinned Hermes source and build
+  codegen         Analyze WIT and generate Static Hermes adapters
+  component       Compile and link a Static Hermes component
+  help [command]  display help for command
+"
+`;
+
+exports[`documents [ 'codegen', '--help' ] command 1`] = `
+"Usage: static-hermes-runtime codegen [options] [command]
+
+Analyze WIT and generate Static Hermes adapters
+
+Options:
+  -h, --help          display help for command
+
+Commands:
+  analyze [options]   Print deterministic WIT usage and adapter analysis
+  generate [options]  Generate runtime.cpp and api-enums.generated.h
+  help [command]      display help for command
+"
+`;
+
+exports[`documents [ 'codegen', 'analyze', '--help' ] command 1`] = `
+"Usage: static-hermes-runtime codegen analyze [options]
+
+Print deterministic WIT usage and adapter analysis
+
+Options:
+  --wit <dir>                  Prepared WIT directory
+  --bundle <file>              Bundled JavaScript source
+  --wasi-imports <json-array>  WASI interface specifiers (default: "[]")
+  --wasi-methods <json-array>  Used WASI operation identifiers
+  --api-methods <json-array>   Used Pumpkin operation identifiers
+  -h, --help                   display help for command
+"
+`;
+
+exports[`documents [ 'codegen', 'generate', '--help' ] command 1`] = `
+"Usage: static-hermes-runtime codegen generate [options]
+
+Generate runtime.cpp and api-enums.generated.h
+
+Options:
+  --wit <dir>                  Prepared WIT directory
+  --bundle <file>              Bundled JavaScript source
+  --wasi-imports <json-array>  WASI interface specifiers (default: "[]")
+  --wasi-methods <json-array>  Used WASI operation identifiers
+  --api-methods <json-array>   Used Pumpkin operation identifiers
+  --template <file>            Runtime C++ template
+  --header <file>              Generated plugin.h
+  --out-dir <dir>              Generated output directory
+  -h, --help                   display help for command
+"
+`;
+
+exports[`documents [ 'component', '--help' ] command 1`] = `
+"Usage: static-hermes-runtime component [options] [command]
+
+Compile and link a Static Hermes component
+
+Options:
+  -h, --help       display help for command
+
+Commands:
+  build [options]  Build one plugin component
+  help [command]   display help for command
+"
+`;
+
+exports[`documents [ 'component', 'build', '--help' ] command 1`] = `
+"Usage: static-hermes-runtime component build [options]
+
+Build one plugin component
+
+Options:
+  --bundle <file>              Bundled JavaScript source
+  --wit <dir>                  Prepared WIT directory
+  --output <file>              Output component file
+  --development-mode           Keep development symbols and line tables
+  --wasi-imports <json-array>  WASI interface specifiers (default: "[]")
+  --wasi-methods <json-array>  Used WASI operation identifiers
+  --api-methods <json-array>   Used Pumpkin operation identifiers
+  --runtime-variant <variant>  Hermes archive profile (choices: "full", "lean")
+  -h, --help                   display help for command
+"
+`;
+
+exports[`documents [ 'hermes', '--help' ] command 1`] = `
+"Usage: static-hermes-runtime hermes [options] [command]
+
+Manage the pinned Hermes source and build
+
+Options:
+  -h, --help      display help for command
+
+Commands:
+  source          Create or validate the pinned Hermes source checkout
+  patch           Apply the ordered Hermes patch series
+  build           Build the host compiler and WASI archives
+  prepare         Run source, patch, and build stages
+  help [command]  display help for command
+"
+`;
+
+exports[`documents [ 'hermes', 'source', '--help' ] command 1`] = `
+"Usage: static-hermes-runtime hermes source [options]
+
+Create or validate the pinned Hermes source checkout
+
+Options:
+  -h, --help  display help for command
+
+Uses STATIC_HERMES_SOURCE_DIR or the configured cache source directory.
+
+"
+`;

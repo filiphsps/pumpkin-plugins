@@ -57,7 +57,7 @@ runs:
           uses: actions/cache/restore@v6.1.0
           with:
               path: ${{ github.workspace }}/.cache/hermes
-              key: static-hermes-workspace-cache-v4-wasi-sdk-${{ steps.versions.outputs.wasi-sdk-version }}-wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}-rust-${{ steps.versions.outputs.rust-toolchain-version }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(format('{0}/wasi-sdk.json', inputs['toolchain-config-root']), format('{0}/toolchain-versions.json', inputs['toolchain-config-root'])) }}-${{ hashFiles(format('{0}/hermes-source.json', inputs['toolchain-config-root']), format('{0}/hermes-patches/*.patch', inputs['toolchain-config-root']), format('{0}/cmake/**', inputs['toolchain-config-root']), format('{0}/bin/prepare-hermes.mjs', inputs['toolchain-config-root']), format('{0}/bin/toolchain-environment.mjs', inputs['toolchain-config-root'])) }}
+              key: static-hermes-workspace-cache-v5-wasi-sdk-${{ steps.versions.outputs.wasi-sdk-version }}-wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}-rust-${{ steps.versions.outputs.rust-toolchain-version }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(format('{0}/wasi-sdk.json', inputs['toolchain-config-root']), format('{0}/toolchain-versions.json', inputs['toolchain-config-root'])) }}-${{ hashFiles(format('{0}/hermes-source.json', inputs['toolchain-config-root']), format('{0}/hermes-patches/*.patch', inputs['toolchain-config-root']), format('{0}/cmake/**', inputs['toolchain-config-root']), format('{0}/src/hermes/**', inputs['toolchain-config-root']), format('{0}/src/cli.ts', inputs['toolchain-config-root'])) }}
 
         - name: 🔧 Export Static Hermes toolchain paths
           shell: bash

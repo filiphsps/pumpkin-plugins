@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderEmbeddedBytecode } from '../bin/embed-bytecode.mjs';
+import { renderEmbeddedBytecode } from '../src/component/embed-bytecode.ts';
 
 describe('embedded Hermes bytecode', () => {
     it('renders bytecode bytes and their size as a C++ header', () => {

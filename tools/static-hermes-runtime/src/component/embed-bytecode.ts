@@ -1,7 +1,7 @@
-/** Render Hermes bytecode as a C++ byte array embedded in the plugin component. */
-export function renderEmbeddedBytecode(bytecode) {
+/** Render bytecode as a C++ header containing the embedded Hermes program. */
+export function renderEmbeddedBytecode(bytecode: Uint8Array): string {
     if (bytecode.length === 0) throw new Error('Hermes bytecode is empty');
-    const lines = [];
+    const lines: string[] = [];
     for (let index = 0; index < bytecode.length; index += 12) {
         lines.push(
             `    ${[...bytecode.subarray(index, index + 12)]

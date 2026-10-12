@@ -1,37 +1,57 @@
 import type { Plugin } from 'esbuild';
-import type { WitApiInterface, WitWasiInterface } from '../bin/wit-api.mjs';
-import { generateEsmFacade, generateWasiEsmFacade, readWasiWitImports, readWitPackage } from '../bin/wit-api.mjs';
+import { setupHermesToolchainEnvironment } from './hermes/toolchain-environment.ts';
+import { emitPumpkinFacade, emitWasiFacade } from './wit/emitters.ts';
+import { readInterfaceDeclarationOrder, readPluginImportOrder, readWitToolsDocument } from './wit/parser.ts';
+import { resolvePluginApi, resolveWasiImports, resolveWitDocument } from './wit/resolver.ts';
 
-/** Options for resolving Pumpkin package imports while bundling a plugin for Static Hermes. */
+/** Options for resolving Pumpkin and WASI package imports while bundling for Static Hermes. */
 export interface StaticHermesImportsOptions {
+    /** Directory used to resolve the development update-check module. */
     resolveDir: string;
-    /** WIT world used by the component build. Pumpkin interfaces are generated from this source. */
+    /** Prepared WIT world used to resolve and generate Pumpkin and WASI interfaces. */
     witDir: string;
     /** Excludes automatic update checks from development bundles. */
     developmentMode?: boolean;
-    /** Called for each WASI module backed by generated JSI runtime code. */
+    /** Called for each resolved WASI import so the component build can select its adapters. */
     onWasiImport?: (specifier: string) => void;
 }
 
-/** Replaces imported Pumpkin interfaces with facades generated from the plugin's WIT world. */
+/**
+ * Resolves imported Pumpkin and WASI interfaces from the plugin's WIT world and provides generated facades.
+ *
+ * @remarks
+ * The setup hook resolves the pinned `wasm-tools` binary before registering module handlers. Imports that are
+ * absent from the WIT world fail the esbuild build. In development mode, the update-check import is replaced with
+ * a wrapper that registers the plugin without running automatic update checks.
+ *
+ * @param options - WIT inputs and callbacks used to resolve the bundle's imports.
+ * @returns An esbuild plugin that loads generated Pumpkin and WASI facade modules.
+ */
 export function staticHermesImportsPlugin(options: StaticHermesImportsOptions): Plugin {
-    const pumpkinWit = readWitPackage(options.witDir);
-    const pumpkinModules = new Map<string, string>(
-        pumpkinWit.interfaces.map((apiInterface: WitApiInterface) => [
-            apiInterface.specifier,
-            generateEsmFacade(apiInterface, pumpkinWit.interfaces)
-        ])
-    );
-    const wasiModules = new Map<string, string>(
-        readWasiWitImports(options.witDir).interfaces.map((apiInterface: WitWasiInterface) => [
-            apiInterface.specifier,
-            generateWasiEsmFacade(apiInterface)
-        ])
-    );
-
     return {
         name: 'pumpkin-static-hermes-imports',
-        setup(build) {
+        async setup(build) {
+            const toolchain = await setupHermesToolchainEnvironment({
+                workspaceRoot: process.cwd(),
+                includeWasiSdk: false,
+                includeWitBindgen: false,
+                includeWasmTools: true
+            });
+            Object.assign(process.env, toolchain);
+            const importOrder = readPluginImportOrder(options.witDir);
+            const document = readWitToolsDocument(options.witDir);
+            const resolved = resolveWitDocument(document, readInterfaceDeclarationOrder(options.witDir));
+            const pumpkinWit = resolvePluginApi(resolved, importOrder);
+            const wasiWit = resolveWasiImports(resolved, undefined, importOrder);
+            const pumpkinModules = new Map<string, string>(
+                pumpkinWit.interfaces.map((apiInterface) => [
+                    apiInterface.specifier,
+                    emitPumpkinFacade(apiInterface, pumpkinWit.interfaces)
+                ])
+            );
+            const wasiModules = new Map<string, string>(
+                wasiWit.interfaces.map((apiInterface) => [apiInterface.specifier, emitWasiFacade(apiInterface)])
+            );
             build.onResolve({ filter: /^pumpkin:/ }, ({ path }) => {
                 if (!pumpkinModules.has(path)) {
                     throw new Error(`${path} is not imported by the plugin's WIT world`);
@@ -63,8 +83,9 @@ export function staticHermesImportsPlugin(options: StaticHermesImportsOptions): 
                 build.onLoad({ filter: /.*/, namespace: 'pumpkin-static-hermes-dev-update-check' }, () => ({
                     loader: 'js',
                     resolveDir: options.resolveDir,
-                    contents: `
+                    contents: /* JavaScript */ `
                         import { registerPlugin } from '@pumpkinmc/pumpkin-api-ts';
+                        /** Register a plugin without running automatic update checks. */
                         export function registerPluginWithUpdates(plugin) { registerPlugin(plugin); }
                     `
                 }));

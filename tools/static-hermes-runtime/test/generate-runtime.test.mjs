@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const generator = path.join(packageRoot, 'bin/generate-runtime.mjs');
+const generator = path.join(packageRoot, 'test/oracles/generate-runtime.mjs');
 const directories = [];
 
 function fixture() {
@@ -65,7 +65,7 @@ function fixture() {
         fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file, source);
     }
-    const template = path.join(packageRoot, 'bin/templates/runtime-shim.template');
+    const template = path.join(packageRoot, 'src/component/templates/runtime-shim.template');
     return { root, wit, template, output: path.join(root, 'runtime.cpp'), bundle: path.join(root, 'bundle.js') };
 }
 

@@ -152,7 +152,7 @@ it('keeps upstream pin schemas reusable across repositories and release tag form
     assert.equal(releasePin.properties.version.minLength, 1);
 
     assert.equal(toolchainVersions.$schema, '../../schemas/toolchain-versions.schema.json');
-    assert.deepEqual(toolchainVersions.tools, { 'wit-bindgen': '0.62.0', rust: '1.99.0' });
+    assert.deepEqual(toolchainVersions.tools, { 'wasm-tools': '1.261.0', 'wit-bindgen': '0.62.0', rust: '1.99.0' });
     assert.equal(toolchainSchema.properties.tools.additionalProperties.type, 'string');
     assert.equal(toolchainSchema.properties.tools.propertyNames.pattern, '^[a-z0-9]+(?:-[a-z0-9]+)*$');
 });

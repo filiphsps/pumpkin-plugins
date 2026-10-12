@@ -1,6 +1,7 @@
 packages:
   - "packages/*"
   - "tools/*"
+  - "benchmarks/*"
 saveExact: true
 allowBuilds:
   esbuild: true
@@ -9,6 +10,8 @@ catalog:
   # Must match the Pumpkin server's plugin ABI (v0.1.1 = Pumpkin 0.2.0+26.3-26.51).
   "@pumpkinmc/pumpkin-api-ts": https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz
   # Shared dev tooling versions.
+  commander: 15.0.0
+  "@commander-js/extra-typings": 15.0.0
   c8: 12.0.0
   "@vitest/coverage-v8": 5.0.4
   fflate: 0.8.3

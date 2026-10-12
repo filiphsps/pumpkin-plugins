@@ -380,14 +380,23 @@ function isWitOperationUsed(usedMethods, operationId, bundleUsesOperation) {
 }
 
 /** Generate native resource-method adapters for WIT operations used by the plugin bundle. */
-export function generateWitSimpleMethodDispatch(apiPackage, bundleSource = '', apiMethods) {
+export function generateWitSimpleMethodDispatch(apiPackage, bundleSource = '', apiMethods, apiAdapters) {
     const namespace = cIdentifier(apiPackage.packageName);
     const cases = [];
     const resourceDrops = new Map();
     const apiFunctions = new Map();
     const resourceApiFunctions = new Map();
     const usedMethods = apiMethods === undefined ? undefined : new Set(apiMethods);
-    for (const apiInterface of apiPackage.interfaces) {
+    const resolvedAdapters = new Map((apiAdapters ?? []).map((adapter) => [adapter.operationId, adapter]));
+    const operationTypes = (apiInterface, operation, resource, resultSource) => {
+        const operationId = `${apiInterface.name}.${resource ? `${resource.name}.` : ''}${operation.name}`;
+        const adapter = resolvedAdapters.get(operationId);
+        return adapter ?? resolveWitOperationTypes(apiPackage, apiInterface, operation, resultSource);
+    };
+    const interfaces = apiAdapters
+        ? orderApiPackageByMethods(apiPackage.interfaces, apiMethods)
+        : apiPackage.interfaces;
+    for (const apiInterface of interfaces) {
         for (const operation of apiInterface.functions) {
             const functionId = `${apiInterface.name}.${operation.name}`;
             if (
@@ -399,7 +408,7 @@ export function generateWitSimpleMethodDispatch(apiPackage, bundleSource = '', a
             )
                 continue;
 
-            const { parameters, resultType } = resolveWitOperationTypes(apiPackage, apiInterface, operation);
+            const { parameters, resultType } = operationTypes(apiInterface, operation);
             if (
                 !isSupportedMethod(
                     resultType,
@@ -436,12 +445,7 @@ export function generateWitSimpleMethodDispatch(apiPackage, bundleSource = '', a
                     )
                         continue;
 
-                    const { parameters, resultType } = resolveWitOperationTypes(
-                        apiPackage,
-                        apiInterface,
-                        operation,
-                        resource.name
-                    );
+                    const { parameters, resultType } = operationTypes(apiInterface, operation, resource, resource.name);
                     if (
                         !isSupportedMethod(
                             resultType,
@@ -495,7 +499,7 @@ export function generateWitSimpleMethodDispatch(apiPackage, bundleSource = '', a
                     )
                         continue;
 
-                    const { parameters, resultType } = resolveWitOperationTypes(apiPackage, apiInterface, operation);
+                    const { parameters, resultType } = operationTypes(apiInterface, operation, resource);
                     if (
                         !isSupportedMethod(
                             resultType,
@@ -548,7 +552,7 @@ export function generateWitSimpleMethodDispatch(apiPackage, bundleSource = '', a
                     )
                 )
                     continue;
-                const { parameters, resultType } = resolveWitOperationTypes(apiPackage, apiInterface, operation);
+                const { parameters, resultType } = operationTypes(apiInterface, operation, resource);
                 if (
                     !isSupportedMethod(
                         resultType,
@@ -654,6 +658,41 @@ void installGeneratedWitApiFunctions(Runtime &runtime, Object &host) {
 }`;
 }
 
+/** Preserve the requested operation order when resolved plans come from a separately parsed WIT graph. */
+function orderApiPackageByMethods(interfaces, apiMethods) {
+    if (apiMethods === undefined) return interfaces;
+    const rank = new Map(apiMethods.map((operationId, index) => [operationId, index]));
+    const operationRank = (apiInterface, operation, resource) =>
+        rank.get(`${apiInterface.name}.${resource ? `${resource.name}.` : ''}${operation.name}`) ??
+        Number.MAX_SAFE_INTEGER;
+    const sorted = (items, getRank) =>
+        items
+            .map((item, index) => ({ item, index, rank: getRank(item) }))
+            .sort((left, right) => left.rank - right.rank || left.index - right.index)
+            .map(({ item }) => item);
+    const rankedInterfaces = interfaces.map((apiInterface, index) => {
+        const functions = sorted(apiInterface.functions, (operation) => operationRank(apiInterface, operation));
+        const resources = sorted(
+            apiInterface.resources.map((resource) => ({
+                ...resource,
+                functions: sorted(resource.functions, (operation) => operationRank(apiInterface, operation, resource))
+            })),
+            (resource) =>
+                Math.min(...resource.functions.map((operation) => operationRank(apiInterface, operation, resource)))
+        );
+        const firstOperation = Math.min(
+            ...functions.map((operation) => operationRank(apiInterface, operation)),
+            ...resources.flatMap((resource) =>
+                resource.functions.map((operation) => operationRank(apiInterface, operation, resource))
+            )
+        );
+        return { apiInterface: { ...apiInterface, functions, resources }, index, rank: firstOperation };
+    });
+    return sorted(rankedInterfaces, ({ rank: operationOrder }) => operationOrder).map(
+        ({ apiInterface }) => apiInterface
+    );
+}
+
 /** Select used WASI operations and verify that their WIT types have native conversions. */
 export function planWasiAdapterDispatch(selectedInterfaces, allInterfaces = selectedInterfaces, usedMethods) {
     const selected = usedMethods === undefined ? undefined : new Set(usedMethods);
@@ -711,6 +750,51 @@ function wasiOperationCFunctionName(apiPackage, apiInterface, operation, resourc
     }
     const kind = operation.isStatic ? 'static' : 'method';
     return `${namespace}_${interfaceName}_${kind}_${cIdentifier(resource.name)}_${cIdentifier(operation.name)}`;
+}
+
+/** Emit the host-function branch for one resolved WASI resource method plan. */
+export function generateWitResourceMethodForResolvedPlan(apiPackage, plan) {
+    const { apiInterface, operation, parameters, resultType, resource } = plan;
+    if (!resource || plan.kind !== 'resource-method') {
+        throw new Error(`WASI resource method plan is incomplete: ${plan.operationId}`);
+    }
+    const namespace = cIdentifier(apiPackage.packageName);
+    const functionName = wasiOperationCFunctionName(apiPackage, apiInterface, operation, resource);
+    const borrowType = `${namespace}_${cIdentifier(apiInterface.name)}_borrow_${cIdentifier(resource.name)}_t`;
+    const inputs = [];
+    const beforeCall = [];
+    const cleanup = [];
+    const callArguments = [`${borrowType}{state->handle}`];
+    for (const [index, parameter] of parameters.entries()) {
+        const input = generateWitInput(apiPackage, apiInterface, parameter, index);
+        if (!input) return undefined;
+        inputs.push(...input.setup);
+        beforeCall.push(...(input.beforeCall ?? []));
+        cleanup.push(...input.cleanup);
+        callArguments.push(input.argument);
+    }
+    const result = generateWitResult(apiPackage, apiInterface, resultType, functionName, callArguments, new Map());
+    if (!result) return undefined;
+
+    const methodName = jsName(operation.name);
+    const argumentCheck = parameters.length
+        ? `if (count < ${parameters.length}) throw JSError(rt, ${JSON.stringify(`${resource.name}.${methodName} expects ${parameters.length} argument${parameters.length === 1 ? '' : 's'}`)});`
+        : '';
+    const body = [
+        argumentCheck,
+        ...inputs,
+        ...result.setup,
+        ...beforeCall,
+        result.call,
+        ...cleanup,
+        ...result.cleanup,
+        result.return
+    ].filter(Boolean);
+    return `  if (packageName == ${JSON.stringify(apiPackage.packageName)} && interfaceName == ${JSON.stringify(apiInterface.name)} && resourceName == ${JSON.stringify(resource.name)} && methodName == ${JSON.stringify(methodName)}) {
+    return hostFunction(runtime, ${JSON.stringify(methodName)}, ${parameters.length}, [state = std::move(state)](Runtime &rt, const Value &, const Value *args, std::size_t count) -> Value {
+      ${body.join('\n      ')}
+    });
+  }`;
 }
 
 /** Generate WASI resource methods, resource drops, and interface host objects from imported WIT. */
@@ -951,6 +1035,18 @@ function generateWitApiFunction(
             [](Runtime &rt, const Value &, const Value *args, std::size_t count) -> Value {
                 ${body.join('\n                ')}
             }));`;
+}
+
+/** Emit one freestanding, constructor, or static operation from a resolved adapter plan. */
+export function generateWitApiFunctionForResolvedOperation({
+    apiPackage,
+    apiInterface,
+    operation,
+    parameters,
+    resultType,
+    options
+}) {
+    return generateWitApiFunction(apiPackage, apiInterface, operation, parameters, resultType, options);
 }
 
 /** Check whether the bundle calls a method using dot notation. */
@@ -1954,13 +2050,17 @@ function witCType(apiPackage, apiInterface, type) {
     if (type.kind === 'resource') {
         const packageName = type.packageName ?? apiPackage.packageName;
         const interfaceName = type.interfaceName ?? apiInterface.name;
-        const resourceName = type.aliasName ?? type.name;
+        const resourceName =
+            type.interfaceSpecifier === apiInterface.specifier ? (type.aliasName ?? type.name) : type.name;
         return `${cIdentifier(packageName)}_${cIdentifier(interfaceName)}_own_${cIdentifier(resourceName)}_t`;
     }
     if (type.kind === 'borrow' && type.item.kind === 'resource') {
         const packageName = type.item.packageName ?? apiPackage.packageName;
         const interfaceName = type.item.interfaceName ?? apiInterface.name;
-        const resourceName = type.item.aliasName ?? type.item.name;
+        const resourceName =
+            type.item.interfaceSpecifier === apiInterface.specifier
+                ? (type.item.aliasName ?? type.item.name)
+                : type.item.name;
         return `${cIdentifier(packageName)}_${cIdentifier(interfaceName)}_borrow_${cIdentifier(resourceName)}_t`;
     }
     if (type.kind === 'tuple' && !type.aliasName) {
@@ -1982,7 +2082,8 @@ function witCType(apiPackage, apiInterface, type) {
         const namespace = witTypeNamespace(apiPackage, apiInterface, type);
         return `${namespace}_${name}_t`;
     }
-    const name = type.aliasName ?? type.name;
+    const name =
+        type.name && type.interfaceSpecifier !== apiInterface.specifier ? type.name : (type.aliasName ?? type.name);
     const packageName = type.packageName ?? apiPackage.packageName;
     const interfaceName = type.declaredInterface ?? type.interfaceName ?? apiInterface.name;
     return `${cIdentifier(packageName)}_${cIdentifier(interfaceName)}_${cIdentifier(name)}_t`;

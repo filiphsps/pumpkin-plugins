@@ -13,7 +13,7 @@ import {
     readWasiWitImports,
     readWitPackage,
     wasiFeaturesForMethods
-} from '../bin/wit-api.mjs';
+} from './oracles/wit-api.mjs';
 
 const directories = [];
 
@@ -1141,6 +1141,7 @@ describe('WIT-derived Pumpkin API facades', () => {
         const dispatch = generateWitSimpleMethodDispatch(api, '', ['player.java-player.send-packet']);
 
         expect(dispatch).toContain('pumpkin_plugin_player_method_java_player_send_packet');
+        expect(dispatch).toContain('pumpkin_plugin_java_packets_clientbound_packet_t argument0{};');
         expect(dispatch).toContain('argument0Tag == "c-spawn-entity"');
         expect(dispatch).not.toContain('argument0Tag == "cSpawnEntity"');
         expect(dispatch).toContain('argument0CSpawnEntity');

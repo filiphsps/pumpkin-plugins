@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const generator = path.join(packageRoot, 'bin/generate-api-enums.mjs');
+const generator = path.join(packageRoot, 'test/oracles/generate-api-enums.mjs');
 const directories = [];
 
 function fixture(imports = '') {

@@ -1,6 +1,7 @@
 {
     "$schema": "../../schemas/toolchain-versions.schema.json",
     "tools": {
+        "wasm-tools": "1.261.0",
         "wit-bindgen": "0.62.0",
         "rust": "1.99.0"
     }

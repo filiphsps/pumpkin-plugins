@@ -2,10 +2,11 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
-import * as toolchainEnvironment from '../bin/toolchain-environment.mjs';
+import * as toolchainEnvironment from '../src/hermes/toolchain-environment.ts';
 
 const { fetchWasiSdkRelease, prepareStaticHermesBuild, selectWasiSdkAsset, setupHermesToolchainEnvironment } =
     toolchainEnvironment;
+const { selectWasmToolsAsset } = toolchainEnvironment;
 
 const temporaryDirs = [];
 
@@ -221,6 +222,130 @@ it('requires a checksum and a matching archive for the pinned WASI SDK release',
     );
 });
 
+it.each([
+    [
+        'darwin',
+        'arm64',
+        'wasm-tools-1.261.0-aarch64-macos.tar.gz',
+        '94c4fc9baeada6e793f0d4adeca537633b5d93e9dc6bf718be2f478f4afe0296'
+    ],
+    [
+        'darwin',
+        'x64',
+        'wasm-tools-1.261.0-x86_64-macos.tar.gz',
+        '354a84ffeede30ba11f29bc72de76875a977cf43bf1c5bdc3e91e2313e8a854b'
+    ],
+    [
+        'linux',
+        'arm64',
+        'wasm-tools-1.261.0-aarch64-linux.tar.gz',
+        '6f19389a69e21c7dbd2a4e7ae72f807dc999988b48782c706c4102bad3e44487'
+    ],
+    [
+        'linux',
+        'x64',
+        'wasm-tools-1.261.0-x86_64-linux.tar.gz',
+        'ad62b2176037e93e1348cb65d6212d128ca9f097b63d155569f25215818ff7b1'
+    ],
+    [
+        'win32',
+        'arm64',
+        'wasm-tools-1.261.0-aarch64-windows.zip',
+        '284a9010b7d8bf35270c7814f853c4d0e87b0c9a697d696b3273e5bf07565d23'
+    ],
+    [
+        'win32',
+        'x64',
+        'wasm-tools-1.261.0-x86_64-windows.zip',
+        '250c6ee7d8073865a5cb42e1077f4246c72516af9b09d41d8a2734985ae673fd'
+    ]
+])('pins the wasm-tools archive and checksum for %s/%s', (platform, arch, name, digest) => {
+    expect(selectWasmToolsAsset({ version: '1.261.0', platform, arch })).toEqual({
+        name,
+        url: `https://github.com/bytecodealliance/wasm-tools/releases/download/v1.261.0/${name}`,
+        digest
+    });
+});
+
+it('fails clearly for a platform without a pinned wasm-tools binary', () => {
+    expect(() => selectWasmToolsAsset({ version: '1.261.0', platform: 'freebsd', arch: 'x64' })).toThrow(
+        'no pinned wasm-tools 1.261.0 binary for freebsd/x64'
+    );
+});
+
+it('rejects a configured wasm-tools executable with the wrong pinned version', async () => {
+    const workspaceRoot = temporaryDirectory('static-hermes-wasm-tools-version-');
+    const executable = path.join(workspaceRoot, 'wasm-tools');
+    writeExecutable(executable, '#!/bin/sh\necho "wasm-tools 1.260.0 (fixture)"\n');
+
+    await expect(
+        setupHermesToolchainEnvironment({
+            workspaceRoot,
+            env: { WASM_TOOLS: executable },
+            includeWasiSdk: false,
+            includeWitBindgen: false,
+            includeWasmTools: true
+        })
+    ).rejects.toThrow('configured wasm-tools must be wasm-tools 1.261.0: wasm-tools 1.260.0 (fixture)');
+});
+
+it('does not install a wasm-tools archive whose digest differs from the pinned release', async () => {
+    const workspaceRoot = temporaryDirectory('static-hermes-wasm-tools-checksum-');
+    const fetchImpl = vi.fn(async () => ({
+        ok: true,
+        arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer
+    }));
+
+    await expect(
+        setupHermesToolchainEnvironment({
+            workspaceRoot,
+            env: {},
+            platform: 'linux',
+            arch: 'x64',
+            includeWasiSdk: false,
+            includeWitBindgen: false,
+            includeWasmTools: true,
+            fetchImpl
+        })
+    ).rejects.toThrow(/wasm-tools checksum mismatch/);
+
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(fs.readdirSync(path.join(workspaceRoot, '.cache', 'hermes', 'toolchain'))).toEqual([]);
+});
+
+it('installs and exposes the pinned wasm-tools binary in the shared cache', async () => {
+    const workspaceRoot = temporaryDirectory('static-hermes-wasm-tools-');
+    const destination = path.join(
+        workspaceRoot,
+        '.cache',
+        'hermes',
+        'toolchain',
+        'wasm-tools-1.261.0',
+        'bin',
+        'wasm-tools'
+    );
+    const installWasmTools = vi.fn(({ destination: executable }) => {
+        writeExecutable(executable, '#!/bin/sh\necho "wasm-tools 1.261.0 (fixture)"\n');
+        return executable;
+    });
+
+    const environment = await setupHermesToolchainEnvironment({
+        workspaceRoot,
+        env: {},
+        platform: 'darwin',
+        arch: 'arm64',
+        includeWasiSdk: false,
+        includeWitBindgen: false,
+        includeWasmTools: true,
+        installWasmTools
+    });
+
+    expect(installWasmTools).toHaveBeenCalledWith(
+        expect.objectContaining({ version: '1.261.0', platform: 'darwin', arch: 'arm64', destination })
+    );
+    expect(environment.WASM_TOOLS).toBe(destination);
+});
+
 it('prepares the selected Hermes toolchain before compiling a component', async () => {
     const env = {};
     const setupEnvironment = vi.fn(async () => ({
@@ -239,7 +364,7 @@ it('prepares the selected Hermes toolchain before compiling a component', async 
         prepare
     });
 
-    expect(setupEnvironment).toHaveBeenCalledWith({ workspaceRoot: '/workspace', env });
+    expect(setupEnvironment).toHaveBeenCalledWith({ workspaceRoot: '/workspace', env, includeWasmTools: true });
     expect(prepare).toHaveBeenCalledOnce();
 });
 
@@ -255,7 +380,7 @@ it('skips repeated Hermes preparation when the workspace build already prepared 
         prepare
     });
 
-    expect(setupEnvironment).toHaveBeenCalledWith({ workspaceRoot: '/workspace', env });
+    expect(setupEnvironment).toHaveBeenCalledWith({ workspaceRoot: '/workspace', env, includeWasmTools: true });
     expect(prepare).not.toHaveBeenCalled();
 });
 

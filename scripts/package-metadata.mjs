@@ -51,7 +51,7 @@ const KEY_ORDER = [
 const EXTRA_FILES = {
     'tools/build': ['runtime', 'wasi-wit.lock.json'],
     'tools/static-hermes-runtime': [
-        'bin',
+        'dist',
         'cmake',
         'hermes-patches',
         'hermes-source.json',
@@ -77,6 +77,15 @@ const packageDirs = () => [
     '.',
     ...['packages', 'tools'].flatMap((group) => discoverComponents(root, group).map(({ slug }) => `${group}/${slug}`))
 ];
+/** Find private benchmark workspaces that need release-registration checks. */
+const benchmarkPackageDirs = () => {
+    const directory = path.join(root, 'benchmarks');
+    if (!fs.existsSync(directory)) return [];
+    return fs
+        .readdirSync(directory, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(directory, entry.name, 'package.json')))
+        .map((entry) => `benchmarks/${entry.name}`);
+};
 
 /** What the package.json of `dir` should say, apart from the description. */
 function expected(dir, pkg) {
@@ -90,18 +99,20 @@ function expected(dir, pkg) {
         bugs: { url: `${REPO}/issues` },
         funding: FUNDING
     };
+    const binTargets = typeof pkg.bin === 'string' ? [pkg.bin] : Object.values(pkg.bin ?? {});
+    const binSourceFiles = binTargets.some((target) => target.replace(/^\.\//, '').startsWith('bin/')) ? ['bin'] : [];
     // A library is a tool that others import: it has a root export, as opposed to a plugin or a CLI.
     const root = pkg.exports?.['.'];
     if (dir.startsWith('tools/') && pkg.exports) {
         want.sideEffects = false;
-        want.files = ['src', ...(pkg.bin ? ['bin'] : []), ...(EXTRA_FILES[dir] ?? [])];
+        want.files = ['src', ...binSourceFiles, ...(EXTRA_FILES[dir] ?? [])];
         want.publishConfig = { access: 'public' };
         if (typeof root === 'string') {
             want.module = root;
             want.types = root;
         }
     } else if (dir.startsWith('tools/')) {
-        want.files = ['src', ...(pkg.bin ? ['bin'] : []), ...(EXTRA_FILES[dir] ?? [])];
+        want.files = ['src', ...binSourceFiles, ...(EXTRA_FILES[dir] ?? [])];
     }
     return want;
 }
@@ -138,6 +149,24 @@ for (const dir of packageDirs()) {
     } else {
         for (const issue of issues) problems.push(`${file}: ${issue}`);
         if (issues.length === 0) problems.push(`${file}: keys are not in the standard order`);
+    }
+}
+
+for (const dir of benchmarkPackageDirs()) {
+    const file = path.join(dir, 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
+    if (pkg.private !== true) problems.push(`${file}: benchmark workspace packages must set "private": true`);
+    const releaseConfigPath = path.join(root, 'release-please-config.json');
+    if (fs.existsSync(releaseConfigPath)) {
+        const packages = JSON.parse(fs.readFileSync(releaseConfigPath, 'utf8')).packages ?? {};
+        if (Object.hasOwn(packages, dir))
+            problems.push(`${file}: private benchmark packages cannot be in release-please-config.json`);
+    }
+    const manifestPath = path.join(root, '.release-please-manifest.json');
+    if (fs.existsSync(manifestPath)) {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        if (Object.hasOwn(manifest, dir))
+            problems.push(`${file}: private benchmark packages cannot be in .release-please-manifest.json`);
     }
 }
 

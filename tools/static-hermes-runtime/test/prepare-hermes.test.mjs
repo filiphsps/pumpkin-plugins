@@ -7,7 +7,13 @@ import { expect, it } from 'vitest';
 
 const runtimeDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workspaceRoot = path.resolve(runtimeDir, '../..');
-const prepareScript = path.join(runtimeDir, 'bin/prepare-hermes.mjs');
+const runtimeCli = path.join(runtimeDir, 'dist/cli.js');
+
+it('routes the prepare-hermes package script through the compiled CLI', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'package.json'), 'utf8'));
+    expect(manifest.scripts['prepare-hermes']).toBe('pnpm build && node dist/cli.js hermes prepare');
+    expect(fs.existsSync(runtimeCli)).toBe(true);
+});
 
 it('extends Hermes OS compatibility sources without replacing existing platforms', () => {
     const patch = fs.readFileSync(
@@ -64,9 +70,12 @@ case " $* " in
   *" rev-parse --git-dir "*) printf '.git\\n' ;;
   *" rev-parse HEAD "*) printf '820aa0d4b5fe5d3ed7900e1274211ef561081b3f\\n' ;;
   *" status --porcelain "*) printf ' M cmake/modules/Hermes.cmake\\n' ;;
-  *" apply --check --reverse "*0004-wasi-p2-runtime-compatibility.patch*) exit 1 ;;
+  *" apply --check --reverse "*0004-wasi-p2-runtime-compatibility.patch*)
+    if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 0; else exit 1; fi
+    ;;
   *" apply --check --reverse "*) exit 0 ;;
   *" apply --check "*) exit 0 ;;
+  *" apply "*0004-wasi-p2-runtime-compatibility.patch*) touch "$STATIC_HERMES_TEST_PATCHED_0004"; exit 0 ;;
   *" apply "*) exit 0 ;;
   *) exit 0 ;;
 esac
@@ -106,11 +115,12 @@ exit 0
             STATIC_HERMES_HOST_BUILD_DIR: path.join(temporaryDir, 'build-host'),
             STATIC_HERMES_WASI_BUILD_DIR: path.join(temporaryDir, 'build-wasip2'),
             STATIC_HERMES_WASI_SDK_PATH: wasiSdk,
+            STATIC_HERMES_TEST_PATCHED_0004: path.join(temporaryDir, 'patch-0004-applied'),
             STATIC_HERMES_FAKE_CMAKE_LOG: cmakeLog
         };
         const [result, concurrent] = await Promise.all([runPrepare(environment), runPrepare(environment)]);
 
-        expect(result.status, result.stderr).toBe(0);
+        expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
         expect(concurrent.status, concurrent.stderr).toBe(0);
         expect(result.stdout).toContain('Static Hermes is ready.');
         expect(concurrent.stdout).toContain('Static Hermes is ready.');
@@ -179,6 +189,7 @@ case "$args" in
     target=
     for arg do target=$arg; done
     mkdir -p "$target/.git"
+    case "$target" in *source.rebuild-*) touch "$STATIC_HERMES_TEST_FRESH_SOURCE" ;; esac
     ;;
   *" rev-parse --git-dir "*) printf '.git\\n' ;;
   *" rev-parse HEAD "*) printf '820aa0d4b5fe5d3ed7900e1274211ef561081b3f\\n' ;;
@@ -187,6 +198,7 @@ case "$args" in
     printf ' M cmake/modules/Hermes.cmake\\n'
     ;;
   *" apply --check --reverse "*0004-wasi-p2-runtime-compatibility.patch*)
+    if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 0; fi
     case "$repo" in *source.rebuild-*) exit 1 ;; esac
     exit 1
     ;;
@@ -195,9 +207,11 @@ case "$args" in
     exit 0
     ;;
   *" apply --check "*0004-wasi-p2-runtime-compatibility.patch*)
-    case "$repo" in *source.rebuild-*) exit 0 ;; esac
+    if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 1; fi
+    if [ -f "$STATIC_HERMES_TEST_FRESH_SOURCE" ]; then exit 0; fi
     exit 1
     ;;
+  *" apply "*0004-wasi-p2-runtime-compatibility.patch*) touch "$STATIC_HERMES_TEST_PATCHED_0004"; exit 0 ;;
   *" apply --check "*) exit 0 ;;
   *) exit 0 ;;
 esac
@@ -209,7 +223,7 @@ esac
         fs.writeFileSync(fakeCmake, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$STATIC_HERMES_FAKE_CMAKE_LOG"\nexit 0\n');
         fs.chmodSync(fakeCmake, 0o755);
 
-        const result = spawnSync(process.execPath, [prepareScript], {
+        const result = spawnSync(process.execPath, [runtimeCli, 'hermes', 'prepare'], {
             cwd: workspaceRoot,
             encoding: 'utf8',
             env: {
@@ -220,11 +234,13 @@ esac
                 STATIC_HERMES_HOST_BUILD_DIR: path.join(temporaryDir, 'build-host'),
                 STATIC_HERMES_WASI_BUILD_DIR: path.join(temporaryDir, 'build-wasip2'),
                 STATIC_HERMES_WASI_SDK_PATH: wasiSdk,
+                STATIC_HERMES_TEST_PATCHED_0004: path.join(temporaryDir, 'patch-0004-applied'),
+                STATIC_HERMES_TEST_FRESH_SOURCE: path.join(temporaryDir, 'fresh-source'),
                 STATIC_HERMES_FAKE_CMAKE_LOG: cmakeLog
             }
         });
 
-        expect(result.status, result.stderr).toBe(0);
+        expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
         expect(result.stdout).toContain('Rebuilt stale Hermes source cache');
         expect(fs.existsSync(source)).toBe(true);
         expect(fs.readdirSync(temporaryDir).some((name) => name.startsWith('source.rebuild-'))).toBe(false);
@@ -284,7 +300,7 @@ exit 0
         );
         fs.chmodSync(fakeCmake, 0o755);
 
-        const result = spawnSync(process.execPath, [prepareScript], {
+        const result = spawnSync(process.execPath, [runtimeCli, 'hermes', 'prepare'], {
             cwd: workspaceRoot,
             encoding: 'utf8',
             env: {
@@ -296,9 +312,7 @@ exit 0
         });
 
         expect(result.status, result.stderr).toBe(0);
-        expect(result.stdout).toContain(
-            'Rebuilt stale Hermes source cache from the pinned commit and current patch set.'
-        );
+        expect(result.stdout).toContain('Rebuilt stale Hermes source cache from the pinned commit.');
         expect(fs.existsSync(path.join(source, '.hermes-pinned'))).toBe(true);
         expect(fs.readdirSync(cache).some((name) => name.startsWith('source.rebuild-'))).toBe(false);
     } finally {
@@ -314,7 +328,7 @@ function writeExecutable(file, body = 'exit 0\n') {
 
 function runPrepare(env) {
     return new Promise((resolve, reject) => {
-        const child = spawn(process.execPath, [prepareScript], { cwd: workspaceRoot, env });
+        const child = spawn(process.execPath, [runtimeCli, 'hermes', 'prepare'], { cwd: workspaceRoot, env });
         let stdout = '';
         let stderr = '';
         child.stdout.setEncoding('utf8').on('data', (chunk) => {

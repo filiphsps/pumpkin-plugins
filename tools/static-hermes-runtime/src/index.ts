@@ -3,37 +3,53 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export { staticHermesImportsPlugin } from './esbuild-plugin.ts';
+export { buildHermesArtifacts, patchHermesSource, prepareHermes, prepareHermesSource } from './hermes/prepare.ts';
+export { prepareStaticHermesBuild, setupHermesToolchainEnvironment } from './hermes/toolchain-environment.ts';
 
 /** Hermes archive profile linked into a Static Hermes plugin component. */
 export type StaticHermesRuntimeVariant = 'full' | 'lean';
 
 /** Inputs for compiling a bundled plugin as a Static Hermes WASI component. */
 export interface StaticHermesBuildOptions {
+    /** Path to the bundled JavaScript source. */
     bundle: string;
+    /** Path to the prepared WIT directory containing the plugin world. */
     witDir: string;
+    /** Destination path for the compiled component. */
     output: string;
+    /** Whether to retain development symbols and Hermes source line information. */
     developmentMode: boolean;
+    /** Hermes archive profile; defaults to the configured profile, usually `lean`. */
     runtimeVariant?: StaticHermesRuntimeVariant;
+    /** WASI interface specifiers requested by the plugin; defaults to no additional imports. */
     wasiImports?: string[];
+    /** WASI operation identifiers selected for native adapter generation. */
     wasiMethods?: string[];
+    /** Pumpkin API operation identifiers selected for native dispatch generation. */
     apiMethods?: string[];
 }
 
-/** Builds the component using the runtime package's pinned shim and external Hermes toolchain. */
+/**
+ * Builds a plugin component using the runtime package's pinned shim and external Hermes toolchain.
+ *
+ * @param options - Bundle, WIT, output, development, and operation-selection inputs.
+ * @throws {Error} If the Static Hermes CLI cannot prepare or build the requested component.
+ */
 export function buildStaticHermesComponent(options: StaticHermesBuildOptions): void {
     const packageDir = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
     execFileSync(
         process.execPath,
         [
-            path.join(packageDir, 'bin/build-static-hermes.mjs'),
+            path.join(packageDir, 'dist/cli.js'),
+            'component',
+            'build',
             '--bundle',
             options.bundle,
             '--wit',
             options.witDir,
             '--output',
             options.output,
-            '--development-mode',
-            options.developmentMode ? 'true' : 'false',
+            ...(options.developmentMode ? ['--development-mode'] : []),
             '--wasi-imports',
             JSON.stringify(options.wasiImports ?? []),
             ...(options.wasiMethods === undefined ? [] : ['--wasi-methods', JSON.stringify(options.wasiMethods)]),

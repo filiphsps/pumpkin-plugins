@@ -6,7 +6,7 @@ generated Pumpkin/WASI bindings into a WebAssembly component. Static Hermes is t
 QuickJS remains available as an alternative.
 
 Start with the [runtime documentation](docs/index.md). It links to the
-[benchmarking guide](docs/benchmarking.md); this README covers toolchain setup, build profiles,
+[benchmarking guide](../../docs/benchmarking.md); this README covers toolchain setup, build profiles,
 compiler and linker flags, and API coverage.
 
 ## Prepare the toolchain
@@ -37,6 +37,20 @@ versions are pinned in `toolchain-versions.json`; the files follow the
 [toolchain versions schema](../../schemas/toolchain-versions.schema.json). The package also carries
 the WASI 2 CMake toolchain adjustment required by Hermes. Optional paths and build settings are
 listed under [Build flags](#build-flags).
+
+## CLI and package API
+
+The package CLI is compiled from `src/cli.ts` to `dist/cli.js` and registered as
+`static-hermes-runtime`. Run it from this monorepo with:
+
+```sh
+pnpm --filter @pumpkin-plugins/static-hermes-runtime build
+pnpm --filter @pumpkin-plugins/static-hermes-runtime exec static-hermes-runtime --help
+```
+
+Package consumers can import `buildStaticHermesComponent`, `prepareHermes`, and the other public
+runtime functions directly from `@pumpkin-plugins/static-hermes-runtime`. Use the CLI for WIT
+analysis and code generation.
 
 ## Engine and runtime profiles
 
@@ -154,7 +168,7 @@ components retain those line tables; the linker does not use `--strip-debug` or 
 | `-Wl,-z,stack-size=262144` | Reserves the default 256 KiB WASI stack; `STATIC_HERMES_STACK_SIZE` changes it (a multiple of 16 bytes, at least 131072). |
 | `-lc++abi -lunwind` | Links C++ ABI and unwinding support used by the JSI shim. |
 
-See [Benchmarking](docs/benchmarking.md) for the comparison command, workload coverage, and report interpretation.
+See [Benchmarking](../../docs/benchmarking.md) for the comparison command, workload coverage, and report interpretation.
 
 ## API and platform coverage
 

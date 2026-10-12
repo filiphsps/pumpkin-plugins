@@ -61,6 +61,7 @@
     "devDependencies": {
         "@biomejs/biome": "2.5.15",
         "@commitlint/config-conventional": "21.2.3",
+        "@pumpkin-plugins/static-hermes-runtime": "workspace:*",
         "c8": "catalog:",
         "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/signing": "workspace:*",

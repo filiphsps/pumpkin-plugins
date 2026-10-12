@@ -72,7 +72,21 @@ describe('bundlePlugin', () => {
         });
 
         expect(esbuild).toHaveBeenCalledWith(expect.objectContaining({ format: 'iife' }));
-        expect(componentize.mock.calls[0]?.[1]).toContainEqual(expect.stringContaining('build-static-hermes.mjs'));
+        expect(componentize.mock.calls[0]?.[1]).toEqual(
+            expect.arrayContaining([
+                expect.stringContaining('dist/cli.js'),
+                'component',
+                'build',
+                '--bundle',
+                expect.any(String),
+                '--wit',
+                apiWitDir,
+                '--output',
+                expect.any(String),
+                '--wasi-imports',
+                '[]'
+            ])
+        );
     });
 
     it('generates isolated WIT declarations before selecting Static Hermes adapters', async () => {
@@ -160,7 +174,9 @@ describe('bundlePlugin', () => {
         expect(esbuild).toHaveBeenCalledWith(
             expect.objectContaining({ format: 'iife', globalName: '__pumpkinPlugin', bundle: true })
         );
-        expect(componentize.mock.calls[0]?.[1]).toContainEqual(expect.stringContaining('build-static-hermes.mjs'));
+        expect(componentize.mock.calls[0]?.[1]).toContainEqual(expect.stringContaining('dist/cli.js'));
+        expect(componentize.mock.calls[0]?.[1]).toContain('component');
+        expect(componentize.mock.calls[0]?.[1]).toContain('build');
         expect(componentize.mock.calls[0]?.[1]).toContain('--runtime-variant');
         expect(componentize.mock.calls[0]?.[1]).toContain('lean');
         expect(componentize.mock.calls[0]?.[1]).not.toContainEqual(expect.stringContaining('componentize-qjs.cjs'));

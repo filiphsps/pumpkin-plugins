@@ -1,3 +1,4 @@
+/** Runtime source that gives generated component resources stable receivers and idempotent disposal. */
 export const resourceProxySource = /* JavaScript */ `
 globalThis.__staticHermesWrapResource = (resource) => {
     let disposed = false;

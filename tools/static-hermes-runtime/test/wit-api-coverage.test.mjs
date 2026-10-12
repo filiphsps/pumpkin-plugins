@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
@@ -8,6 +9,12 @@ import { CAPABILITIES, wasiInterfaces } from '../../build/src/capabilities.ts';
 import { cacheDir } from '../../build/src/repo.ts';
 import { ensureWasiWit, readLock } from '../../build/src/wasi-wit.ts';
 import { prepareWit } from '../../build/src/wit.ts';
+import { setupHermesToolchainEnvironment } from '../src/hermes/toolchain-environment.ts';
+import { analyzeWitUsage } from '../src/wit/analysis.ts';
+import { emitPumpkinMethodDispatch, emitWasiAdapterDispatch } from '../src/wit/emitters.ts';
+import { generateWitOutputs } from '../src/wit/generation.ts';
+import { readInterfaceDeclarationOrder, readPluginImportOrder, readWitToolsDocument } from '../src/wit/parser.ts';
+import { resolvePluginApi, resolveWasiImports, resolveWitDocument } from '../src/wit/resolver.ts';
 import {
     generateEsmFacade,
     generateWasiAdapterDispatch,
@@ -17,9 +24,10 @@ import {
     planWasiAdapterDispatch,
     readWasiWitImports,
     readWitPackage
-} from '../bin/wit-api.mjs';
+} from './oracles/wit-api.mjs';
 
 const directories = [];
+const runtimeRoot = path.resolve(import.meta.dirname, '..');
 const apiWitDir = path.join(
     path.dirname(createRequire(import.meta.url).resolve('@pumpkinmc/pumpkin-api-ts/package.json')),
     'wit/v0.1'
@@ -93,6 +101,177 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
     expect(count(eventDispatch, /case PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_/g)).toBe(eventVariant.cases.length);
     expect(count(eventDispatch, /data\.setProperty\(runtime,/g)).toBeGreaterThanOrEqual(eventFieldCount);
     expect(eventDispatch).toContain('switch (event->tag)');
+
+    const workspaceRoot = path.resolve(import.meta.dirname, '../../..');
+    const toolchain = await setupHermesToolchainEnvironment({
+        workspaceRoot,
+        includeWasiSdk: false,
+        includeWitBindgen: false,
+        includeWasmTools: true
+    });
+    const wasmTools = process.env.WASM_TOOLS ?? toolchain.WASM_TOOLS;
+    const declarationOrder = readInterfaceDeclarationOrder(witDir);
+    const document = readWitToolsDocument(witDir, { executable: wasmTools });
+    const resolved = resolveWitDocument(document, declarationOrder);
+    const importsInOrder = readPluginImportOrder(witDir);
+    const typedApi = resolvePluginApi(resolved, importsInOrder);
+    const typedWasi = resolveWasiImports(resolved, undefined, importsInOrder);
+    const typedAnalysis = analyzeWitUsage(resolved, {
+        bundleSource: eventSource,
+        pluginImportOrder: importsInOrder,
+        wasiImports: typedWasi.imports,
+        apiMethods
+    });
+    const typedApiOperationCount = typedApi.interfaces.reduce(
+        (total, apiInterface) =>
+            total +
+            apiInterface.functions.length +
+            apiInterface.resources.reduce((resources, resource) => resources + resource.functions.length, 0),
+        0
+    );
+    expect(document.packages).toHaveLength(6);
+    expect(document.interfaces).toHaveLength(63);
+    expect(document.types).toHaveLength(1998);
+    expect(typedApi.interfaces).toHaveLength(44);
+    expect(typedApiOperationCount).toBe(957);
+    expect(typedAnalysis.apiMethods).toEqual(apiMethods);
+    expect(typedWasi.interfaces).toHaveLength(15);
+    expect(typedAnalysis.wasiMethods).toHaveLength(157);
+    expect(typedAnalysis.wasiAdapters).toHaveLength(157);
+    expect(typedAnalysis.eventFields).toHaveLength(eventVariant.cases.length);
+
+    const selectedAdapter = typedAnalysis.wasiAdapters.find(({ parameters }) => parameters.length > 0);
+    expect(selectedAdapter).toBeDefined();
+    const unresolvedSourceInterfaces = typedWasi.interfaces.map((apiInterface) => {
+        const replaceSourceType = (operation, resource) => {
+            const operationId = `${apiInterface.specifier}#${resource ? `${resource.name}.` : ''}${operation.name}`;
+            return operationId === selectedAdapter.operationId
+                ? {
+                      ...operation,
+                      parameters: operation.parameters.map((parameter) => ({
+                          ...parameter,
+                          type: 'unresolved-source-type'
+                      }))
+                  }
+                : operation;
+        };
+        return {
+            ...apiInterface,
+            functions: apiInterface.functions.map((operation) => replaceSourceType(operation)),
+            resources: apiInterface.resources.map((resource) => ({
+                ...resource,
+                functions: resource.functions.map((operation) => replaceSourceType(operation, resource))
+            }))
+        };
+    });
+    expect(emitWasiAdapterDispatch(unresolvedSourceInterfaces, typedAnalysis)).toBe(wasiDispatch);
+
+    const selectedApiOperation = typedApi.interfaces
+        .flatMap((apiInterface) => [
+            ...apiInterface.functions.map((operation) => ({ apiInterface, operation })),
+            ...apiInterface.resources.flatMap((resource) =>
+                resource.functions.map((operation) => ({ apiInterface, operation, resource }))
+            )
+        ])
+        .find(({ apiInterface, operation, resource }) => {
+            const operationId = `${apiInterface.name}.${resource ? `${resource.name}.` : ''}${operation.name}`;
+            return typedAnalysis.apiMethods.includes(operationId) && operation.parameters.length > 0;
+        });
+    expect(selectedApiOperation).toBeDefined();
+    const unresolvedApiTypes = {
+        ...typedApi,
+        interfaces: typedApi.interfaces.map((apiInterface) => {
+            const replaceSourceType = (operation, resource) => {
+                const operationId = `${apiInterface.name}.${resource ? `${resource.name}.` : ''}${operation.name}`;
+                return operationId ===
+                    `${selectedApiOperation.apiInterface.name}.${selectedApiOperation.resource ? `${selectedApiOperation.resource.name}.` : ''}${selectedApiOperation.operation.name}`
+                    ? {
+                          ...operation,
+                          parameters: operation.parameters.map((parameter) => ({
+                              ...parameter,
+                              type: 'unresolved-source-type'
+                          }))
+                      }
+                    : operation;
+            };
+            return {
+                ...apiInterface,
+                functions: apiInterface.functions.map((operation) => replaceSourceType(operation)),
+                resources: apiInterface.resources.map((resource) => ({
+                    ...resource,
+                    functions: resource.functions.map((operation) => replaceSourceType(operation, resource))
+                }))
+            };
+        })
+    };
+    const typedPumpkinDispatch = emitPumpkinMethodDispatch(unresolvedApiTypes, eventSource, typedAnalysis);
+    expect(typedPumpkinDispatch).toBe(pumpkinDispatch);
+
+    expect(typedApi.interfaces.map((apiInterface) => generateEsmFacade(apiInterface, typedApi.interfaces))).toEqual(
+        apiPackage.interfaces.map((apiInterface) => generateEsmFacade(apiInterface, apiPackage.interfaces))
+    );
+    expect(typedWasi.interfaces.map((apiInterface) => generateWasiEsmFacade(apiInterface))).toEqual(
+        wasiPackage.interfaces.map((apiInterface) => generateWasiEsmFacade(apiInterface))
+    );
+    const runtimeTemplate = fs.readFileSync(
+        new URL('../src/component/templates/runtime-shim.template', import.meta.url),
+        'utf8'
+    );
+    const apiEnumSpecs = [
+        ['event', 'event-type', 'PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_'],
+        ['event', 'event-priority', 'PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_'],
+        ['game-rules', 'game-rule', 'PUMPKIN_PLUGIN_GAME_RULES_GAME_RULE_'],
+        ['common', 'named-color', 'PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_']
+    ];
+    const pluginHeader = apiEnumSpecs
+        .flatMap(([interfaceName, enumName, prefix]) => {
+            const declaration = apiPackage.interfaces
+                .find((apiInterface) => apiInterface.name === interfaceName)
+                .enums.find((apiEnum) => apiEnum.name === enumName);
+            return declaration.values.map((value) => `#define ${prefix}${value.toUpperCase().replaceAll('-', '_')} 0`);
+        })
+        .join('\n');
+    const pluginHeaderPath = path.join(directory, 'plugin.h');
+    const legacyApiEnumPath = path.join(directory, 'legacy-api-enums.generated.h');
+    const eventUsagePath = path.join(directory, 'event-usage.js');
+    fs.writeFileSync(pluginHeaderPath, pluginHeader);
+    fs.writeFileSync(eventUsagePath, eventSource);
+    const typedOutput = generateWitOutputs({
+        analysis: typedAnalysis,
+        apiPackage: typedApi,
+        wasiInterfaces: typedWasi.interfaces,
+        bundleSource: eventSource,
+        pluginHeader,
+        runtimeTemplate
+    });
+    execFileSync(
+        process.execPath,
+        [
+            path.join(runtimeRoot, 'test/oracles/generate-api-enums.mjs'),
+            '--wit',
+            witDir,
+            '--bundle',
+            eventUsagePath,
+            '--header',
+            pluginHeaderPath,
+            '--output',
+            legacyApiEnumPath
+        ],
+        { stdio: 'pipe' }
+    );
+    expect(typedOutput.apiEnumHeader).toBe(fs.readFileSync(legacyApiEnumPath, 'utf8'));
+    const expectedRuntime = runtimeTemplate
+        .replace(
+            '/* <PUMPKIN_WASI_RUNTIME> */',
+            generateWasiAdapterDispatch(wasiPackage.interfaces, wasiPackage.interfaces, wasiMethods)
+        )
+        .replace('/* <PUMPKIN_WASI_INITIALIZATION> */', 'installGeneratedWasiApiFunctions(*jsRuntime);')
+        .replace(
+            '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
+            generateWitSimpleMethodDispatch(apiPackage, eventSource, apiMethods)
+        )
+        .replace('/* <PUMPKIN_WIT_EVENT_DISPATCH> */', generateWitEventDispatch(apiPackage, eventSource));
+    expect(typedOutput.runtimeSource).toBe(expectedRuntime);
 }, 30_000);
 
 function count(source, expression) {

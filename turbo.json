@@ -32,7 +32,7 @@
                 "WIT_BINDGEN"
             ],
             "passThroughEnv": ["PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED"],
-            "outputs": ["build/**", "!build/types/**"]
+            "outputs": ["build/**", "!build/types/**", "dist/**"]
         },
         "typecheck": {
             "dependsOn": ["transit"],
@@ -41,6 +41,10 @@
         },
         "test": {
             "dependsOn": ["transit"]
+        },
+        "@pumpkin-plugins/static-hermes-runtime#test": {
+            "dependsOn": ["transit"],
+            "outputs": ["dist/**"]
         },
         "test:coverage": {
             "dependsOn": ["transit"],

@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { generateWasiEsmFacade, readWasiWitImports } from '../bin/wit-api.mjs';
+import { generateWasiEsmFacade, readWasiWitImports } from './oracles/wit-api.mjs';
 
 const directories = [];
 

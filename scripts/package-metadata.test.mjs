@@ -20,7 +20,7 @@ function fixture(t) {
             encoding: 'utf8'
         });
     assert.equal(run('--fix').status, 0);
-    return { file, run };
+    return { root, file, run };
 }
 test('rejects escaped author and contributor names and fixes them to literal UTF-8', (t) => {
     const { file, run } = fixture(t);
@@ -41,4 +41,35 @@ test('permits literal backslash sequences and necessary JSON control escapes', (
     pkg.example = 'literal \\u00f6\n\t';
     fs.writeFileSync(file, `${JSON.stringify(pkg, null, 4)}\n`);
     assert.equal(run().status, 0);
+});
+
+test('does not package a source bin directory when the CLI is compiled under dist', (t) => {
+    const { root, run } = fixture(t);
+    const runtime = path.join(root, 'tools/static-hermes-runtime');
+    fs.mkdirSync(runtime, { recursive: true });
+    const manifest = path.join(runtime, 'package.json');
+    fs.writeFileSync(
+        manifest,
+        JSON.stringify({
+            name: '@pumpkin-plugins/static-hermes-runtime',
+            description: 'Static Hermes runtime',
+            exports: { '.': './src/index.ts' },
+            bin: { 'static-hermes-runtime': 'dist/cli.js' }
+        })
+    );
+
+    assert.equal(run('--fix').status, 0);
+
+    const files = JSON.parse(fs.readFileSync(manifest, 'utf8')).files;
+    assert.deepEqual(files, [
+        'src',
+        'dist',
+        'cmake',
+        'hermes-patches',
+        'hermes-source.json',
+        'toolchain-versions.json',
+        'wasi-sdk.json',
+        'native',
+        'README.md'
+    ]);
 });

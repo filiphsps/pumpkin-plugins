@@ -20,6 +20,36 @@ const REQUIRED = [
     `${EXPORT} > ClassDeclaration > ClassBody > MethodDefinition[accessibility!='private'][accessibility!='protected'][kind!='constructor']`
 ];
 
+const JSDOC_RULES = {
+    // Only the selectors above apply, so the plugin's own defaults (every function) are turned off.
+    'jsdoc/require-jsdoc': [
+        'error',
+        {
+            publicOnly: false,
+            require: {
+                FunctionDeclaration: false,
+                ClassDeclaration: false,
+                MethodDefinition: false,
+                ArrowFunctionExpression: false,
+                FunctionExpression: false
+            },
+            contexts: REQUIRED
+        }
+    ],
+    // A block with only tags is as bad as no block. Types come from TypeScript, so tags need no `{type}`.
+    'jsdoc/require-description': ['error', { contexts: ['any'], exemptedBy: ['inheritdoc'] }],
+    'jsdoc/no-types': 'error',
+    'jsdoc/check-tag-names': 'error',
+    // Parameters don't have to be documented, but a documented one has to exist.
+    'jsdoc/check-param-names': ['error', { disableMissingParamChecks: true, checkDestructured: false }]
+};
+
+const jsdocConfig = {
+    plugins: { jsdoc },
+    settings: { jsdoc: { mode: 'typescript' } },
+    rules: JSDOC_RULES
+};
+
 export default [
     {
         ignores: [
@@ -39,30 +69,17 @@ export default [
         files: ['**/*.ts'],
         ignores: ['**/*.test.ts', '**/*.itest.ts', '**/test/**', '**/testing/**', '**/*.config.ts', '**/*.d.ts'],
         languageOptions: { parser: tseslint.parser },
-        plugins: { jsdoc },
-        settings: { jsdoc: { mode: 'typescript' } },
-        rules: {
-            // Only the selectors above apply, so the plugin's own defaults (every function) are turned off.
-            'jsdoc/require-jsdoc': [
-                'error',
-                {
-                    publicOnly: false,
-                    require: {
-                        FunctionDeclaration: false,
-                        ClassDeclaration: false,
-                        MethodDefinition: false,
-                        ArrowFunctionExpression: false,
-                        FunctionExpression: false
-                    },
-                    contexts: REQUIRED
-                }
-            ],
-            // A block with only tags is as bad as no block. Types come from TypeScript, so tags need no `{type}`.
-            'jsdoc/require-description': ['error', { contexts: ['any'], exemptedBy: ['inheritdoc'] }],
-            'jsdoc/no-types': 'error',
-            'jsdoc/check-tag-names': 'error',
-            // Parameters don't have to be documented, but a documented one has to exist.
-            'jsdoc/check-param-names': ['error', { disableMissingParamChecks: true, checkDestructured: false }]
-        }
+        ...jsdocConfig
+    },
+    {
+        files: ['tools/static-hermes-runtime/**/*.mts'],
+        ignores: ['**/*.test.mts', '**/*.itest.mts', '**/test/**', '**/testing/**', '**/*.config.mts', '**/*.d.mts'],
+        languageOptions: { parser: tseslint.parser },
+        ...jsdocConfig
+    },
+    {
+        files: ['tools/static-hermes-runtime/**/*.mjs'],
+        ignores: ['**/*.test.mjs', '**/*.itest.mjs', '**/test/**', '**/testing/**', '**/*.config.mjs'],
+        ...jsdocConfig
     }
 ];

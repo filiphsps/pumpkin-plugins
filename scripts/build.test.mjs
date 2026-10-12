@@ -3,7 +3,13 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
-import { hasStaticHermesBuild, normalizeTurboArgs, prepareHermesInIsolatedEnvironment } from './build.mjs';
+import {
+    buildTaskEnvironment,
+    hasStaticHermesBuild,
+    normalizeTurboArgs,
+    prepareHermesInIsolatedEnvironment,
+    runStaticHermesPreparation
+} from './build.mjs';
 
 const temporaryRoots = [];
 
@@ -94,5 +100,57 @@ describe('prepareHermesInIsolatedEnvironment', () => {
         assert.equal(preparedEnvironment.STATIC_HERMES_CACHE_DIR, '/cache/hermes');
         assert.equal(preparedEnvironment.PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED, undefined);
         assert.equal(prepareEnvironment, preparedEnvironment);
+    });
+});
+
+describe('runStaticHermesPreparation', () => {
+    it('builds the runtime package and invokes Hermes preparation through dist/cli.js', () => {
+        const calls = [];
+        const env = { STATIC_HERMES_CACHE_DIR: '/cache/hermes' };
+
+        runStaticHermesPreparation('/workspace', env, (command, args, options) => {
+            calls.push({ command, args, options });
+            return { status: 0 };
+        });
+
+        assert.deepEqual(
+            calls.map(({ command, args, options }) => ({
+                command,
+                args,
+                options: { cwd: options.cwd, env: options.env }
+            })),
+            [
+                {
+                    command: 'pnpm',
+                    args: ['--filter', '@pumpkin-plugins/static-hermes-runtime', 'build'],
+                    options: { cwd: '/workspace', env }
+                },
+                {
+                    command: process.execPath,
+                    args: ['/workspace/tools/static-hermes-runtime/dist/cli.js', 'hermes', 'prepare'],
+                    options: { cwd: '/workspace', env }
+                }
+            ]
+        );
+    });
+});
+
+describe('buildTaskEnvironment', () => {
+    it('passes the shared cache path and prepared marker without leaking toolchain defaults', () => {
+        const environment = buildTaskEnvironment(
+            { USER_SETTING: 'kept', STATIC_HERMES_SOURCE_DIR: '/custom/source' },
+            {
+                STATIC_HERMES_CACHE_DIR: '/workspace/.cache/hermes',
+                STATIC_HERMES_WASI_SDK_PATH: '/toolchain/wasi-sdk',
+                WIT_BINDGEN: '/toolchain/wit-bindgen'
+            }
+        );
+
+        assert.deepEqual(environment, {
+            USER_SETTING: 'kept',
+            STATIC_HERMES_SOURCE_DIR: '/custom/source',
+            STATIC_HERMES_CACHE_DIR: '/workspace/.cache/hermes',
+            PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED: '1'
+        });
     });
 });
