@@ -1,0 +1,502 @@
+diff --git a/external/llvh/include/llvh/Demangle/ItaniumDemangle.h b/external/llvh/include/llvh/Demangle/ItaniumDemangle.h
+index 4b56f9d5e..5b346b9ef 100644
+--- a/external/llvh/include/llvh/Demangle/ItaniumDemangle.h
++++ b/external/llvh/include/llvh/Demangle/ItaniumDemangle.h
+@@ -23,6 +23,8 @@
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cstring>
++#include <exception>
++#include <type_traits>
+ #include <numeric>
+ #include <utility>
+ 
+diff --git a/external/llvh/include/llvh/Demangle/Utility.h b/external/llvh/include/llvh/Demangle/Utility.h
+index da4a0c050..664f5f581 100644
+--- a/external/llvh/include/llvh/Demangle/Utility.h
++++ b/external/llvh/include/llvh/Demangle/Utility.h
+@@ -16,6 +16,7 @@
+ 
+ #include <cstdint>
+ #include <cstdlib>
++#include <exception>
+ #include <cstring>
+ #include <iterator>
+ #include <limits>
+diff --git a/external/llvh/lib/Support/Program.cpp b/external/llvh/lib/Support/Program.cpp
+index b5bf65883..522f6e0b0 100644
+--- a/external/llvh/lib/Support/Program.cpp
++++ b/external/llvh/lib/Support/Program.cpp
+@@ -75,9 +75,13 @@ bool sys::commandLineFitsWithinSystemLimits(StringRef Program,
+ }
+ 
+ // Include the platform-specific parts of this class.
++#ifdef __wasi__
++#include "Wasi/Program.inc"
++#else
+ #ifdef LLVM_ON_UNIX
+ #include "Unix/Program.inc"
+ #endif
+ #ifdef _WIN32
+ #include "Windows/Program.inc"
+ #endif
++#endif
+diff --git a/external/llvh/lib/Support/Signals.cpp b/external/llvh/lib/Support/Signals.cpp
+index 483d0c95c..3ab76c0eb 100644
+--- a/external/llvh/lib/Support/Signals.cpp
++++ b/external/llvh/lib/Support/Signals.cpp
+@@ -240,9 +240,13 @@ static bool printSymbolizedStackTrace(StringRef Argv0, void **StackTrace,
+ }
+ 
+ // Include the platform-specific parts of this class.
++#ifdef __wasi__
++#include "Wasi/Signals.inc"
++#else
+ #ifdef LLVM_ON_UNIX
+ #include "Unix/Signals.inc"
+ #endif
+ #ifdef _WIN32
+ #include "Windows/Signals.inc"
+ #endif
++#endif
+diff --git a/external/llvh/lib/Support/Unix/Memory.inc b/external/llvh/lib/Support/Unix/Memory.inc
+index e1e514712..7351aa896 100644
+--- a/external/llvh/lib/Support/Unix/Memory.inc
++++ b/external/llvh/lib/Support/Unix/Memory.inc
+@@ -43,6 +43,43 @@ extern "C" void sys_icache_invalidate(const void *Addr, size_t len);
+ extern "C" void __clear_cache(void *, void*);
+ #endif
+ 
++#if defined(__wasi__)
++namespace llvh {
++namespace sys {
++
++MemoryBlock Memory::allocateMappedMemory(size_t NumBytes,
++                                         const MemoryBlock *const NearBlock,
++                                         unsigned PFlags,
++                                         std::error_code &EC) {
++  (void)NumBytes;
++  (void)NearBlock;
++  (void)PFlags;
++  EC = std::make_error_code(std::errc::operation_not_supported);
++  return MemoryBlock();
++}
++
++std::error_code Memory::releaseMappedMemory(MemoryBlock &M) {
++  if (M.base() == nullptr || M.size() == 0)
++    return std::error_code();
++  return std::make_error_code(std::errc::operation_not_supported);
++}
++
++std::error_code Memory::protectMappedMemory(const MemoryBlock &M,
++                                            unsigned Flags) {
++  (void)M;
++  (void)Flags;
++  return std::make_error_code(std::errc::operation_not_supported);
++}
++
++void Memory::InvalidateInstructionCache(const void *Addr, size_t Len) {
++  (void)Addr;
++  (void)Len;
++}
++
++} // namespace sys
++} // namespace llvh
++#else
++
+ namespace {
+ 
+ int getPosixProtectionFlags(unsigned Flags) {
+@@ -247,3 +284,5 @@ void Memory::InvalidateInstructionCache(const void *Addr,
+ 
+ } // namespace sys
+ } // namespace llvh
++
++#endif // defined(__wasi__)
+diff --git a/external/llvh/lib/Support/Unix/Path.inc b/external/llvh/lib/Support/Unix/Path.inc
+index dd5560522..5c242300b 100644
+--- a/external/llvh/lib/Support/Unix/Path.inc
++++ b/external/llvh/lib/Support/Unix/Path.inc
+@@ -33,7 +33,9 @@
+ #endif
+ 
+ #include <dirent.h>
++#if !defined(__wasi__)
+ #include <pwd.h>
++#endif
+ 
+ #ifdef __APPLE__
+ #include <mach-o/dyld.h>
+@@ -199,6 +201,9 @@ std::string getMainExecutable(const char *argv0, void *MainAddr) {
+   char link_path[MAXPATHLEN];
+   if (realpath(DLInfo.dli_fname, link_path))
+     return link_path;
++#elif defined(__wasi__)
++  (void)argv0;
++  (void)MainAddr;
+ #else
+ #error GetMainExecutable is not implemented on this host yet.
+ #endif
+@@ -379,7 +384,7 @@ static bool is_local_impl(struct STATVFS &Vfs) {
+   StringRef fstype(Vfs.f_basetype);
+   // NFS is the only non-local fstype??
+   return !fstype.equals("nfs");
+-#elif defined(__EMSCRIPTEN__)
++#elif defined(__EMSCRIPTEN__) || defined(__wasi__)
+   return false;
+ #else
+   return !!(STATVFS_F_FLAG(Vfs) & MNT_LOCAL);
+@@ -510,6 +515,10 @@ static void expandTildeExpr(SmallVectorImpl<char> &Path) {
+ 
+   // This is a string of the form ~username/, look up this user's entry in the
+   // password database.
++#if defined(__wasi__)
++  // WASI has no password database; leave ~username unchanged.
++  return;
++#else
+   struct passwd *Entry = nullptr;
+   std::string User = Expr.str();
+   Entry = ::getpwnam(User.c_str());
+@@ -523,6 +532,7 @@ static void expandTildeExpr(SmallVectorImpl<char> &Path) {
+   Path.clear();
+   Path.append(Entry->pw_dir, Entry->pw_dir + strlen(Entry->pw_dir));
+   llvh::sys::path::append(Path, Storage);
++#endif
+ }
+ 
+ static file_type typeForMode(mode_t Mode) {
+@@ -616,6 +626,12 @@ std::error_code mapped_file_region::init(int FD, uint64_t Offset,
+                                          mapmode Mode) {
+   assert(Size != 0);
+ 
++#if defined(__wasi__)
++  (void)FD;
++  (void)Offset;
++  (void)Mode;
++  return make_error_code(errc::function_not_supported);
++#else
+   int flags = (Mode == readwrite) ? MAP_SHARED : MAP_PRIVATE;
+   int prot = (Mode == readonly) ? PROT_READ : (PROT_READ | PROT_WRITE);
+ #if defined(__APPLE__)
+@@ -642,6 +658,7 @@ std::error_code mapped_file_region::init(int FD, uint64_t Offset,
+   if (Mapping == MAP_FAILED)
+     return std::error_code(errno, std::generic_category());
+   return std::error_code();
++#endif
+ }
+ 
+ mapped_file_region::mapped_file_region(int fd, mapmode mode, size_t length,
+@@ -654,8 +671,10 @@ mapped_file_region::mapped_file_region(int fd, mapmode mode, size_t length,
+ }
+ 
+ mapped_file_region::~mapped_file_region() {
++#if !defined(__wasi__)
+   if (Mapping)
+     ::munmap(Mapping, Size);
++#endif
+ }
+ 
+ size_t mapped_file_region::size() const {
+@@ -934,11 +953,13 @@ namespace path {
+ 
+ bool home_directory(SmallVectorImpl<char> &result) {
+   char *RequestedDir = getenv("HOME");
++#if !defined(__wasi__)
+   if (!RequestedDir) {
+     struct passwd *pw = getpwuid(getuid());
+     if (pw && pw->pw_dir)
+       RequestedDir = pw->pw_dir;
+   }
++#endif
+   if (!RequestedDir)
+     return false;
+ 
+diff --git a/external/llvh/lib/Support/Unix/Process.inc b/external/llvh/lib/Support/Unix/Process.inc
+index 90981b52e..0a1a1ff27 100644
+--- a/external/llvh/lib/Support/Unix/Process.inc
++++ b/external/llvh/lib/Support/Unix/Process.inc
+@@ -30,7 +30,7 @@
+ #ifdef HAVE_SYS_STAT_H
+ #include <sys/stat.h>
+ #endif
+-#if HAVE_SIGNAL_H
++#if HAVE_SIGNAL_H && !defined(__wasi__)
+ #include <signal.h>
+ #endif
+ // DragonFlyBSD, and OpenBSD have deprecated <malloc.h> for
+@@ -196,6 +196,9 @@ private:
+ }
+ 
+ std::error_code Process::FixupStandardFileDescriptors() {
++#if defined(__wasi__)
++  return std::error_code();
++#else
+   int NullFD = -1;
+   FDCloser FDC(NullFD);
+   const int StandardFDs[] = {STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO};
+@@ -227,9 +230,14 @@ std::error_code Process::FixupStandardFileDescriptors() {
+       return std::error_code(errno, std::generic_category());
+   }
+   return std::error_code();
++#endif
+ }
+-
+ std::error_code Process::SafelyCloseFileDescriptor(int FD) {
++#if defined(__wasi__)
++  if (::close(FD) < 0)
++    return std::error_code(errno, std::generic_category());
++  return std::error_code();
++#else
+   // Create a signal set filled with *all* signals.
+   sigset_t FullSet;
+   if (sigfillset(&FullSet) < 0)
+@@ -262,6 +270,7 @@ std::error_code Process::SafelyCloseFileDescriptor(int FD) {
+   if (ErrnoFromClose)
+     return std::error_code(ErrnoFromClose, std::generic_category());
+   return std::error_code(EC, std::generic_category());
++#endif
+ }
+ 
+ bool Process::StandardInIsUserInput() {
+diff --git a/external/llvh/lib/Support/Unix/Unix.h b/external/llvh/lib/Support/Unix/Unix.h
+index b1735fd73..61450ec09 100644
+--- a/external/llvh/lib/Support/Unix/Unix.h
++++ b/external/llvh/lib/Support/Unix/Unix.h
+@@ -30,7 +30,9 @@
+ #include <cstring>
+ #include <string>
+ #include <sys/types.h>
++#if !defined(__wasi__)
+ #include <sys/wait.h>
++#endif
+ 
+ #ifdef HAVE_UNISTD_H
+ #include <unistd.h>
+diff --git a/external/llvh/lib/Support/Watchdog.cpp b/external/llvh/lib/Support/Watchdog.cpp
+index 06f585f17..73491aae1 100644
+--- a/external/llvh/lib/Support/Watchdog.cpp
++++ b/external/llvh/lib/Support/Watchdog.cpp
+@@ -15,9 +15,13 @@
+ #include "llvh/Config/llvm-config.h"
+ 
+ // Include the platform-specific parts of this class.
++#ifdef __wasi__
++#include "Wasi/Watchdog.inc"
++#else
+ #ifdef LLVM_ON_UNIX
+ #include "Unix/Watchdog.inc"
+ #endif
+ #ifdef _WIN32
+ #include "Windows/Watchdog.inc"
+ #endif
++#endif
+
+diff --git a/external/llvh/lib/Support/Wasi/Program.inc b/external/llvh/lib/Support/Wasi/Program.inc
+new file mode 100644
+index 000000000..8b6e9cf42
+--- /dev/null
++++ b/external/llvh/lib/Support/Wasi/Program.inc
+@@ -0,0 +1,203 @@
++//===- llvm/Support/Unix/Program.cpp -----------------------------*- C++ -*-===//
++//
++//                     The LLVM Compiler Infrastructure
++//
++// This file is distributed under the University of Illinois Open Source
++// License. See LICENSE.TXT for details.
++//
++//===----------------------------------------------------------------------===//
++//
++// This file implements the Unix specific portion of the Program class.
++//
++//===----------------------------------------------------------------------===//
++
++//===----------------------------------------------------------------------===//
++//=== WARNING: Implementation here must contain only generic UNIX code that
++//===          is guaranteed to work on *all* UNIX variants.
++//===----------------------------------------------------------------------===//
++
++#include "../Unix/Unix.h"
++#include "llvh/ADT/StringExtras.h"
++#include "llvh/Config/config.h"
++#include "llvh/Support/Compiler.h"
++#include "llvh/Support/Errc.h"
++#include "llvh/Support/FileSystem.h"
++#include "llvh/Support/Path.h"
++#include "llvh/Support/StringSaver.h"
++#include "llvh/Support/raw_ostream.h"
++#if HAVE_SYS_STAT_H
++#include <sys/stat.h>
++#endif
++#if HAVE_SYS_RESOURCE_H
++#include <sys/resource.h>
++#endif
++#if HAVE_SIGNAL_H
++#include <signal.h>
++#endif
++#if HAVE_FCNTL_H
++#include <fcntl.h>
++#endif
++#if HAVE_UNISTD_H
++#include <unistd.h>
++#endif
++#if defined(__APPLE__)
++#include <TargetConditionals.h>
++#endif
++#ifdef HAVE_POSIX_SPAWN
++#include <spawn.h>
++
++#if defined(__APPLE__) && !(defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE)
++#define USE_NSGETENVIRON 1
++#else
++#define USE_NSGETENVIRON 0
++#endif
++
++#if !USE_NSGETENVIRON
++  extern char **environ;
++#else
++#include <crt_externs.h> // _NSGetEnviron
++#endif
++#endif
++
++namespace llvh {
++
++using namespace sys;
++
++ProcessInfo::ProcessInfo() : Pid(0), ReturnCode(0) {}
++
++ErrorOr<std::string> sys::findProgramByName(StringRef Name,
++                                            ArrayRef<StringRef> Paths) {
++  assert(!Name.empty() && "Must have a name!");
++  // Use the given path verbatim if it contains any slashes; this matches
++  // the behavior of sh(1) and friends.
++  if (Name.find('/') != StringRef::npos)
++    return std::string(Name);
++
++  SmallVector<StringRef, 16> EnvironmentPaths;
++  if (Paths.empty())
++    if (const char *PathEnv = std::getenv("PATH")) {
++      SplitString(PathEnv, EnvironmentPaths, ":");
++      Paths = EnvironmentPaths;
++    }
++
++  for (auto Path : Paths) {
++    if (Path.empty())
++      continue;
++
++    // Check to see if this first directory contains the executable...
++    SmallString<128> FilePath(Path);
++    sys::path::append(FilePath, Name);
++    if (sys::fs::can_execute(FilePath.c_str()))
++      return std::string(FilePath.str()); // Found the executable!
++  }
++  return errc::no_such_file_or_directory;
++}
++
++#ifdef HAVE_POSIX_SPAWN
++static bool RedirectIO_PS(const std::string *Path, int FD, std::string *ErrMsg,
++                          posix_spawn_file_actions_t *FileActions) {
++  if (!Path) // Noop
++    return false;
++  const char *File;
++  if (Path->empty())
++    // Redirect empty paths to /dev/null
++    File = "/dev/null";
++  else
++    File = Path->c_str();
++
++  if (int Err = posix_spawn_file_actions_addopen(
++          FileActions, FD, File,
++          FD == 0 ? O_RDONLY : O_WRONLY | O_CREAT, 0666))
++    return MakeErrMsg(ErrMsg, "Cannot dup2", Err);
++  return false;
++}
++#endif
++
++}
++
++static bool Execute(ProcessInfo &PI, StringRef Program,
++                    ArrayRef<StringRef> Args, Optional<ArrayRef<StringRef>> Env,
++                    ArrayRef<Optional<StringRef>> Redirects,
++                    unsigned MemoryLimit, std::string *ErrMsg) {
++  if (ErrMsg)
++    *ErrMsg = std::string("Execute() is not supported on Wasi");
++  return false;
++}
++
++namespace llvh {
++
++ProcessInfo sys::Wait(const ProcessInfo &PI, unsigned SecondsToWait,
++                      bool WaitUntilTerminates, std::string *ErrMsg) {
++  if (ErrMsg)
++    *ErrMsg = std::string("Wait() is not supported on Wasi");
++  return {};
++}
++
++std::error_code sys::ChangeStdinToBinary() {
++  // Do nothing, as Unix doesn't differentiate between text and binary.
++  return std::error_code();
++}
++
++std::error_code sys::ChangeStdoutToBinary() {
++  // Do nothing, as Unix doesn't differentiate between text and binary.
++  return std::error_code();
++}
++
++std::error_code
++llvh::sys::writeFileWithEncoding(StringRef FileName, StringRef Contents,
++                                 WindowsEncodingMethod Encoding /*unused*/) {
++  std::error_code EC;
++  llvh::raw_fd_ostream OS(FileName, EC, llvh::sys::fs::OpenFlags::F_Text);
++
++  if (EC)
++    return EC;
++
++  OS << Contents;
++
++  if (OS.has_error())
++    return make_error_code(errc::io_error);
++
++  return EC;
++}
++
++bool llvh::sys::commandLineFitsWithinSystemLimits(StringRef Program,
++                                                  ArrayRef<StringRef> Args) {
++  static long ArgMax = sysconf(_SC_ARG_MAX);
++  // POSIX requires that _POSIX_ARG_MAX is 4096, which is the lowest possible
++  // value for ARG_MAX on a POSIX compliant system.
++  static long ArgMin = _POSIX_ARG_MAX;
++
++  // This the same baseline used by xargs.
++  long EffectiveArgMax = 128 * 1024;
++
++  if (EffectiveArgMax > ArgMax)
++    EffectiveArgMax = ArgMax;
++  else if (EffectiveArgMax < ArgMin)
++    EffectiveArgMax = ArgMin;
++
++  // System says no practical limit.
++  if (ArgMax == -1)
++    return true;
++
++  // Conservatively account for space required by environment variables.
++  long HalfArgMax = EffectiveArgMax / 2;
++
++  size_t ArgLength = Program.size() + 1;
++  for (StringRef Arg : Args) {
++    // Ensure that we do not exceed the MAX_ARG_STRLEN constant on Linux, which
++    // does not have a constant unlike what the man pages would have you
++    // believe. Since this limit is pretty high, perform the check
++    // unconditionally rather than trying to be aggressive and limiting it to
++    // Linux only.
++    if (Arg.size() >= (32 * 4096))
++      return false;
++
++    ArgLength += Arg.size() + 1;
++    if (ArgLength > size_t(HalfArgMax)) {
++      return false;
++    }
++  }
++
++  return true;
++}
++}

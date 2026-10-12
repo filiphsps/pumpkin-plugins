@@ -1,0 +1,60 @@
+diff --git a/cmake/modules/Hermes.cmake b/cmake/modules/Hermes.cmake
+index 466b01d98..d210a1618 100644
+--- a/cmake/modules/Hermes.cmake
++++ b/cmake/modules/Hermes.cmake
+@@ -49,7 +49,13 @@ if (WIN32)
+     set(LLVM_ON_UNIX 0)
+   endif (CYGWIN)
+ else (WIN32)
+-  if (FUCHSIA OR UNIX)
++  if (CMAKE_SYSTEM_NAME STREQUAL "WASI")
++    set(LLVM_ON_WIN32 0)
++    # WASI exposes Unix file-status structures but lacks some APIs used by
++    # process, signal, and path helpers.
++    set(LLVM_ON_UNIX 1)
++    set(LLVM_HAVE_LINK_VERSION_SCRIPT 0)
++  elseif (FUCHSIA OR UNIX)
+     set(LLVM_ON_WIN32 0)
+     set(LLVM_ON_UNIX 1)
+     if (APPLE OR ${CMAKE_SYSTEM_NAME} MATCHES "AIX")
+@@ -57,9 +63,9 @@ else (WIN32)
+     else ()
+       set(LLVM_HAVE_LINK_VERSION_SCRIPT 1)
+     endif ()
+-  else (FUCHSIA OR UNIX)
++  else ()
+     MESSAGE(SEND_ERROR "Unable to determine platform")
+-  endif (FUCHSIA OR UNIX)
++  endif ()
+ endif (WIN32)
+ 
+ # Set C++ exception handling and RTTI flags for a target.
+diff --git a/external/llvh/CMakeLists.txt b/external/llvh/CMakeLists.txt
+index 5944b9c0e..6e4fc052f 100644
+--- a/external/llvh/CMakeLists.txt
++++ b/external/llvh/CMakeLists.txt
+@@ -11,7 +11,11 @@ set(PACKAGE_NAME "LLVH")
+ set(PACKAGE_STRING "LLVH 8.0.0svn")
+ set(PACKAGE_VERSION "8.0.0svn")
+ 
+-set(LLVM_ENABLE_THREADS 1)
++if (CMAKE_SYSTEM_NAME STREQUAL "WASI")
++  set(LLVM_ENABLE_THREADS 0)
++else()
++  set(LLVM_ENABLE_THREADS 1)
++endif()
+ if (LLVH_REVERSE_ITERATION)
+   set(LLVM_ENABLE_REVERSE_ITERATION 1)
+ endif ()
+diff --git a/lib/Support/CMakeLists.txt b/lib/Support/CMakeLists.txt
+index ea2f227bf..a6421d633 100644
+--- a/lib/Support/CMakeLists.txt
++++ b/lib/Support/CMakeLists.txt
+@@ -35,6 +35,7 @@ add_hermes_library(hermesSupport
+         OSCompatEmscripten.cpp
+         OSCompatPosix.cpp
+         OSCompatWindows.cpp
++        OSCompatWASI.cpp
+         PageAccessTrackerPosix.cpp
+         PerfSection.cpp
+         SemaphorePosix.cpp
