@@ -5,9 +5,21 @@ import { join } from 'node:path';
 import { it } from 'node:test';
 import { resolvePluginRelease } from './resolve-plugin-release.mjs';
 
-function fixture({ packageVersion = '0.0.8', manifestVersion = '0.0.8', engine } = {}) {
+function fixture({
+    packageVersion = '0.0.8',
+    manifestVersion = '0.0.8',
+    engine,
+    includeStaticHermesRuntime = true
+} = {}) {
     const root = mkdtempSync(join(tmpdir(), 'resolve-plugin-release-'));
     mkdirSync(join(root, 'packages/upnpumpkin/src'), { recursive: true });
+    if (includeStaticHermesRuntime) {
+        mkdirSync(join(root, 'tools/static-hermes-runtime'), { recursive: true });
+        writeFileSync(
+            join(root, 'tools/static-hermes-runtime/package.json'),
+            JSON.stringify({ name: '@pumpkin-plugins/static-hermes-runtime' })
+        );
+    }
     writeFileSync(
         join(root, 'release-please-config.json'),
         JSON.stringify({ packages: { 'packages/upnpumpkin': { component: 'upnpumpkin', 'release-type': 'node' } } })
@@ -45,6 +57,15 @@ it('resolves a plugin tag to the registered plugin, version and collected WASM p
 
 it('preserves the selected engine so release recovery can prepare its toolchain', async () => {
     const root = fixture({ engine: 'quickjs' });
+    try {
+        assert.equal((await resolvePluginRelease(root, 'upnpumpkin-v0.0.8')).engine, 'quickjs');
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
+
+it('uses QuickJS for legacy release sources without the Static Hermes runtime', async () => {
+    const root = fixture({ includeStaticHermesRuntime: false });
     try {
         assert.equal((await resolvePluginRelease(root, 'upnpumpkin-v0.0.8')).engine, 'quickjs');
     } finally {
