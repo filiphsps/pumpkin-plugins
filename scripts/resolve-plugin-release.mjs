@@ -32,6 +32,11 @@ export async function resolvePluginRelease(root, tag) {
         throw new Error(`${packagePath} manifest version is ${manifest[packagePath]}, but tag version is ${version}`);
     }
 
+    const engine = packageJson.pumpkinPlugin?.engine ?? 'quickjs';
+    if (engine !== 'quickjs' && engine !== 'static-hermes') {
+        throw new Error(`${packagePath} declares an unsupported plugin engine: ${JSON.stringify(engine)}`);
+    }
+
     const infoPath = resolve(packageDirectory, packageJson.pumpkinPlugin?.info ?? 'src/info.ts');
     if (!isInside(packageDirectory, infoPath)) throw new Error(`${packagePath} plugin info path escapes the package`);
     const infoModule = await import(pathToFileURL(infoPath).href);
@@ -52,6 +57,7 @@ export async function resolvePluginRelease(root, tag) {
         path: packagePath,
         component: releaseConfig.component,
         version,
+        engine,
         pluginName,
         wasmFile: `dist/${basename(packagePath)}.wasm`
     };
