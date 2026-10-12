@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { it } from 'node:test';
 import { resolvePluginRelease } from './resolve-plugin-release.mjs';
 
-function fixture({ packageVersion = '0.0.8', manifestVersion = '0.0.8' } = {}) {
+function fixture({ packageVersion = '0.0.8', manifestVersion = '0.0.8', engine } = {}) {
     const root = mkdtempSync(join(tmpdir(), 'resolve-plugin-release-'));
     mkdirSync(join(root, 'packages/upnpumpkin/src'), { recursive: true });
     writeFileSync(
@@ -20,7 +20,7 @@ function fixture({ packageVersion = '0.0.8', manifestVersion = '0.0.8' } = {}) {
         join(root, 'packages/upnpumpkin/package.json'),
         JSON.stringify({
             version: packageVersion,
-            pumpkinPlugin: { info: 'src/info.mjs', output: 'build/upnpumpkin.wasm' }
+            pumpkinPlugin: { info: 'src/info.mjs', output: 'build/upnpumpkin.wasm', engine }
         })
     );
     writeFileSync(join(root, 'packages/upnpumpkin/src/info.mjs'), 'export const info = { name: "UPnPumpkin" };\n');
@@ -34,9 +34,31 @@ it('resolves a plugin tag to the registered plugin, version and collected WASM p
             path: 'packages/upnpumpkin',
             component: 'upnpumpkin',
             version: '0.0.8',
+            engine: 'quickjs',
             pluginName: 'UPnPumpkin',
             wasmFile: 'dist/upnpumpkin.wasm'
         });
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
+
+it('preserves the selected engine so release recovery can prepare its toolchain', async () => {
+    const root = fixture({ engine: 'static-hermes' });
+    try {
+        assert.equal((await resolvePluginRelease(root, 'upnpumpkin-v0.0.8')).engine, 'static-hermes');
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
+
+it('rejects release metadata with an unsupported plugin engine', async () => {
+    const root = fixture({ engine: 'hermes' });
+    try {
+        await assert.rejects(
+            resolvePluginRelease(root, 'upnpumpkin-v0.0.8'),
+            /declares an unsupported plugin engine: "hermes"/
+        );
     } finally {
         rmSync(root, { recursive: true, force: true });
     }

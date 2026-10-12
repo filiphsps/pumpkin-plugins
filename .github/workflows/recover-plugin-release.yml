@@ -18,7 +18,7 @@ permissions:
 jobs:
     recover:
         name: Recover ${{ inputs.tag }}
-        timeout-minutes: 60
+        timeout-minutes: 90
         runs-on: ubuntu-26.04
         permissions:
             contents: write
@@ -110,6 +110,30 @@ jobs:
                       echo "$marker"
                   } >> "$GITHUB_OUTPUT"
                   echo "Verified $TAG at $tag_commit; matching release assets present: $has_wasm."
+
+            - name: 🔧 Setup Static Hermes toolchain
+              id: setup-hermes
+              if: >-
+                  steps.release.outputs.assets_present == 'false' &&
+                  steps.plugin.outputs.engine == 'static-hermes'
+              uses: ./.github/common/setup-static-hermes
+              with:
+                  toolchain-config-root: release-source/tools/static-hermes-runtime
+
+            - name: 🏗️ Prepare Static Hermes
+              id: prepare-hermes
+              if: >-
+                  steps.release.outputs.assets_present == 'false' &&
+                  steps.plugin.outputs.engine == 'static-hermes'
+              working-directory: release-source
+              run: pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
+
+            - name: 💾 Save Static Hermes build cache
+              if: steps.prepare-hermes.outcome == 'success'
+              uses: actions/cache/save@v6.1.0
+              with:
+                  path: ${{ github.workspace }}/.cache/hermes
+                  key: ${{ steps.setup-hermes.outputs.hermes-cache-key }}
 
             - name: 🔨 Build and collect the released plugin
               if: steps.release.outputs.assets_present == 'false'
