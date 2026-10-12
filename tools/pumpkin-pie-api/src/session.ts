@@ -105,13 +105,13 @@ export class PieSession {
         }
         this.transition(state);
     }
-    /** Stop permanently, unregistering once if the provider was reachable. */
-    stop(): void {
+    /** Stop permanently; set unregister to false when the host is shutting down. */
+    stop(options: { readonly unregister?: boolean } = {}): void {
         this.guard.assertOutside();
         if (this.stopped) return;
         this.stopped = true;
         try {
-            if (this.reachable) this.client.unregisterExpansions();
+            if (options.unregister !== false && this.reachable) this.client.unregisterExpansions();
         } catch {
             /* Reachability can change between the last ping and stop. */
         } finally {

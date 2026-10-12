@@ -29,6 +29,7 @@ describe('TabDisplay PumpkinPIE integration', () => {
 
     afterAll(async () => {
         await server?.stop();
+        if (server) expect(server.errors()).toEqual([]);
     });
 
     it('uses the checksum-pinned provider artifact and verifies a real IPC batch and expansion', async () => {
