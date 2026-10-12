@@ -1,0 +1,63 @@
+{
+    "name": "@pumpkin-plugins/static-hermes-runtime",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Static Hermes runtime shim for Pumpkin plugin components",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/static-hermes-runtime#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
+        "directory": "tools/static-hermes-runtime"
+    },
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/filiphsps"
+        },
+        {
+            "type": "custom",
+            "url": "https://paypal.me/filiph"
+        }
+    ],
+    "type": "module",
+    "sideEffects": false,
+    "module": "./src/index.ts",
+    "types": "./src/index.ts",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "files": [
+        "src",
+        "bin",
+        "cmake",
+        "hermes-patches",
+        "hermes-source.json",
+        "toolchain-versions.json",
+        "wasi-sdk.json",
+        "native",
+        "README.md"
+    ],
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "prepare-hermes": "node bin/prepare-hermes.mjs",
+        "test": "vitest run test/prepare-hermes.test.mjs test/toolchain-environment.test.mjs",
+        "compare-engines": "vitest run test/engine-comparison.test.ts"
+    },
+    "devDependencies": {
+        "@pumpkin-plugins/test-harness": "workspace:*",
+        "@pumpkinmc/pumpkin-api-ts": "catalog:",
+        "@types/node": "catalog:",
+        "esbuild": "catalog:",
+        "vitest": "catalog:"
+    }
+}
