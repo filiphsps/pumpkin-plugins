@@ -96,6 +96,9 @@ Tasks are defined in `turbo.json` and run with the root scripts (`pnpm build`, `
 | `test:integration` | Depends on `build`, never cached (it starts a real server) |
 | `readme`, `readme:check` | Never cached, they write or inspect files |
 
+Run `pnpm clean` to remove workspace `node_modules`, root and workspace `build/` output, root
+`dist/`, and `.turbo/cache/`. It preserves `.cache/`.
+
 Run one plugin with `pnpm build --filter=@pumpkin-plugins/<folder>`.
 `pnpm build` checks the selected Turbo task graph and prepares Static Hermes once before plugin
 builds start. QuickJS-only filters skip that setup. Direct package builds still prepare Hermes when

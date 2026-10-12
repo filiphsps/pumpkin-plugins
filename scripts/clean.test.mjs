@@ -21,6 +21,8 @@ function createWorkspace() {
         'packages/example/build/plugin.wasm',
         'tools/example/build/types/bindings/index.d.ts',
         'dist/plugin.wasm',
+        'coverage/report.html',
+        'packages/example/coverage/report.html',
         '.turbo/cache/task.json',
         '.turbo/metadata.json',
         '.cache/pumpkin/world/level.dat',
@@ -44,6 +46,8 @@ describe('cleanWorkspace', () => {
             assert.equal(fs.existsSync(path.join(root, directory)), false, `${directory} should be removed`);
         }
         for (const file of [
+            'coverage/report.html',
+            'packages/example/coverage/report.html',
             '.turbo/metadata.json',
             '.cache/pumpkin/world/level.dat',
             'packages/example/src/plugin.ts'
@@ -88,6 +92,9 @@ describe('cleanWorkspace', () => {
         }
         for (const directory of ['build', 'packages/example/build', 'tools/example/build', 'dist', '.turbo/cache']) {
             assert.equal(fs.existsSync(path.join(root, directory)), false, `${directory} should be removed`);
+        }
+        for (const file of ['coverage/report.html', 'packages/example/coverage/report.html']) {
+            assert.equal(fs.existsSync(path.join(root, file)), true, `${file} should be preserved`);
         }
         assert.equal(fs.existsSync(path.join(root, '.cache/pumpkin/world/level.dat')), true);
         assert.equal(fs.existsSync(path.join(root, '.turbo/metadata.json')), true);

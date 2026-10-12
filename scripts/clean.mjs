@@ -8,7 +8,7 @@ const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PROJECT_FOLDERS = ['packages', 'tools'];
 const BASE_DIRS = [
     // Gets matched in root and the folders defined in `PROJECT_FOLDERS`
-    '.turbo',
+    '.turbo/cache',
     'build',
     'coverage',
     'dist'

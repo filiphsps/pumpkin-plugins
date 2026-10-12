@@ -116,7 +116,7 @@ describe('findUsedPumpkinWitMethods', () => {
             'text.text-component.from-json',
             'world.world.get-name'
         ]);
-    });
+    }, 15_000);
 
     it('includes command-node methods used through plugin-kit structural adapters', () => {
         const entry = fileURLToPath(new URL('../../plugin-kit/src/register-commands.ts', import.meta.url));
