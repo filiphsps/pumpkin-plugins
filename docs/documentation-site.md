@@ -16,7 +16,8 @@ On phones, the same sections open as compact accordions in the navigation screen
 Create Markdown files under the component's `docs/` folder. For example, a plugin can have an
 `index.md` plus additional pages such as `configuration.md`; tools and actions use the same layout.
 The site discovers each file and adds it to that component's sidebar and reference links. Relative
-links are checked by `pnpm check`.
+links are checked by `pnpm check`. Links from component docs to files under repository `docs/` are
+rewritten to their site routes during the build, so keep those links relative in the source Markdown.
 
 For component-specific documentation settings, add a `docs.yml` file at the component root, next to
 its `docs/` folder. Put navigation settings under `navigation`:

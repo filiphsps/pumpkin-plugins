@@ -435,7 +435,7 @@ function groupMenuItems(items: MenuCard[], defaultCategory: string): MenuSection
         .map(([text, groupedItems]) => ({ text, items: groupedItems }));
 }
 
-function referenceItems(items: Component[]): DefaultTheme.NavItemWithLink[] {
+function referenceItems(items: Component[]): DefaultTheme.SidebarItem[] {
     return items.flatMap((item) => (item.apiReference ? [{ text: item.title, link: item.apiReference }] : []));
 }
 
@@ -498,13 +498,13 @@ const apiSidebar = [
     { text: 'Scripts', link: '/api/scripts/', items: typedocSidebar(path.join(repoRoot, 'docs/api/scripts')) }
 ];
 
-const apiNav: DefaultTheme.NavItemWithLink[] = [
+const apiNav = [
     { text: 'Overview', link: '/api/' },
     { text: 'Plugins', link: '/api/plugins/' },
     { text: 'Tools', link: '/api/tools/' },
     { text: 'Actions', link: '/api/actions/' },
     { text: 'Scripts', link: '/api/scripts/' }
-];
+] satisfies DefaultTheme.SidebarItem[];
 
 const apiSidebars: Record<string, SidebarItem[]> = {
     '/api/': [{ text: 'Reference', link: '/api/', items: apiSidebar }],
@@ -669,6 +669,30 @@ export default defineConfig({
                     if (token.type === 'link_open' && /^(?:\.\/)?team\.md(?:#.*)?$/.test(token.attrGet('href') ?? '')) {
                         token.attrSet('href', (token.attrGet('href') ?? '').replace(/^(?:\.\/)?team\.md/, '/team'));
                     }
+                }
+            });
+            md.core.ruler.push('repository-doc-links', (state) => {
+                const relativePath = state.env.relativePath;
+                if (!relativePath) return;
+
+                for (const token of state.tokens.flatMap((block) => block.children ?? [])) {
+                    if (token.type !== 'link_open') continue;
+                    const href = token.attrGet('href');
+                    if (!href) continue;
+
+                    const suffixIndex = href.search(/[?#]/);
+                    const sourceLink = suffixIndex === -1 ? href : href.slice(0, suffixIndex);
+                    if (!sourceLink.endsWith('.md')) continue;
+
+                    const sourceTarget = path.posix.normalize(
+                        path.posix.join(path.posix.dirname(relativePath), sourceLink)
+                    );
+                    const siteTarget = rewrites[sourceTarget];
+                    if (!siteTarget) continue;
+
+                    const route = siteTarget.replace(/\.md$/, '').replace(/(^|\/)index$/, '$1');
+                    const suffix = suffixIndex === -1 ? '' : href.slice(suffixIndex);
+                    token.attrSet('href', `/${route}${suffix}`);
                 }
             });
             md.core.ruler.push('component-title-metadata', (state) => {
