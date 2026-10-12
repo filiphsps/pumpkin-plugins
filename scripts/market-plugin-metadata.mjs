@@ -54,7 +54,12 @@ function marketDescription(pluginDir, summary) {
 }
 
 function describeReadme(readme) {
-    const markdown = stripGeneratedBlocks(readme).replace(/<!--[\s\S]*?-->/g, '');
+    let markdown = stripGeneratedBlocks(readme);
+    let previous;
+    do {
+        previous = markdown;
+        markdown = markdown.replace(/<!--[\s\S]*?-->/g, '');
+    } while (markdown !== previous);
     const sections = [];
     let section = { depth: 0, heading: undefined, lines: [] };
     let fence;
