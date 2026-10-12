@@ -138,6 +138,23 @@ it('unregisters all owned namespaces once on reachable stop and stays stopped', 
     offline.session.stop();
     expect(offline.ops).toEqual(['ping']);
 });
+it('clears local callbacks without IPC during host teardown', () => {
+    const f = setup();
+    f.online(true);
+    f.session.registerExpansion('ranks', { prefix: () => 'Admin' });
+    f.session.tick();
+    expect(f.ops).toEqual(['ping', 'register_expansion']);
+
+    f.session.stop({ unregister: false });
+
+    expect(f.ops).toEqual(['ping', 'register_expansion']);
+    expect(() => f.session.registerExpansion('extra', {})).toThrow(api.InputError);
+    const reply = f.session.router.handle(
+        'PumpkinPIE',
+        strToU8('{"op":"on_request","namespace":"ranks","id":"ranks_prefix","name":"prefix"}')
+    );
+    expect(JSON.parse(strFromU8(reply))).toEqual({ ok: true, on_request: {} });
+});
 it('shares the callback guard with session client and restores it after stop re-entry', () => {
     const f = setup();
     f.online(true);

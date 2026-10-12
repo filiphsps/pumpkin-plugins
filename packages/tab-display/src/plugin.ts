@@ -88,7 +88,8 @@ class TabDisplay extends PluginBase {
     protected override onPluginUnload(ctx: Context): void {
         if (this.taskId !== undefined) cancelTask(this.taskId);
         this.taskId = undefined;
-        this.session?.stop();
+        // Pumpkin may already be stopping the WASM store, so teardown must not re-enter it over IPC.
+        this.session?.stop({ unregister: false });
 
         if (this.host !== undefined && this.service !== undefined) {
             const server = ctx.getServer();

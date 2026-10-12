@@ -12,6 +12,7 @@ describe(info.name, () => {
     });
     afterAll(async () => {
         await server?.stop();
+        if (server) expect(server.errors()).toEqual([]);
     });
 
     it('loads on a real server', async () => {
