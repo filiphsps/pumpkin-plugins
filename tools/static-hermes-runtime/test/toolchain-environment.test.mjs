@@ -243,6 +243,22 @@ it('prepares the selected Hermes toolchain before compiling a component', async 
     expect(prepare).toHaveBeenCalledOnce();
 });
 
+it('skips repeated Hermes preparation when the workspace build already prepared it', async () => {
+    const env = { PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED: '1' };
+    const setupEnvironment = vi.fn(async () => ({ STATIC_HERMES_WASI_SDK_PATH: '/sdk' }));
+    const prepare = vi.fn();
+
+    await prepareStaticHermesBuild({
+        workspaceRoot: '/workspace',
+        env,
+        setupEnvironment,
+        prepare
+    });
+
+    expect(setupEnvironment).toHaveBeenCalledWith({ workspaceRoot: '/workspace', env });
+    expect(prepare).not.toHaveBeenCalled();
+});
+
 function temporaryDirectory(prefix) {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
     temporaryDirs.push(directory);

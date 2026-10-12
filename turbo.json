@@ -31,6 +31,7 @@
                 "WASI_SDK",
                 "WIT_BINDGEN"
             ],
+            "passThroughEnv": ["PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED"],
             "outputs": ["build/**", "!build/types/**"]
         },
         "typecheck": {

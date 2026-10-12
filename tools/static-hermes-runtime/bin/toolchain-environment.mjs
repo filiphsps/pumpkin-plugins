@@ -72,7 +72,7 @@ export async function prepareStaticHermesBuild({
     prepare = () => import('./prepare-hermes.mjs')
 }) {
     Object.assign(env, await setupEnvironment({ workspaceRoot, env }));
-    await prepare();
+    if (env.PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED !== '1') await prepare();
 }
 
 /** Reuse the cached WASI SDK or install and validate the configured version. */
