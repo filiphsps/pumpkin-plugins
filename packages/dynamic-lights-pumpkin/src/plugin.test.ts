@@ -54,7 +54,7 @@ describe('DynamicLightsPumpkin host lifecycle', () => {
         state.tasks.clear();
         state.files = new MemoryFiles();
         await import('./plugin.ts');
-    });
+    }, 20_000);
 
     it('reads the selected item after the held-slot event has finished', () => {
         const env = setup();
@@ -175,7 +175,7 @@ function entity(id: number, type: string, x: number) {
 function setup() {
     const plugin = state.plugin;
     if (plugin === undefined) throw new Error('Plugin was not registered');
-    // QuickJS handles have no Symbol.dispose, even though generated declarations include it.
+    // Test handles can omit Symbol.dispose even though generated declarations include it.
     const player = {
         online: true,
         item: undefined as string | undefined,

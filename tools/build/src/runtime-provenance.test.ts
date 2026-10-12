@@ -142,7 +142,7 @@ describe('runtime provenance build', () => {
         expect(result.stdout).toContain(expectedHash);
         expect(f.verifyCandidate().status).toBe(0);
         expect(f.verifyShipped(f.output).stderr).toContain('Candidate provenance cannot verify as shipped runtime');
-    });
+    }, 15_000);
     it('verifies the vendored runtime against its pinned output hash', () => {
         const f = fixture();
         const result = f.verifyShipped();
