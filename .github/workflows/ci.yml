@@ -140,106 +140,6 @@ jobs:
             - name: ✅ Typecheck
               run: pnpm run typecheck
 
-    runtime-provenance:
-        name: 🔐 Runtime provenance
-        needs: [changes]
-        if: needs.changes.outputs.code == 'true'
-        timeout-minutes: 45
-        runs-on: macos-15
-        permissions:
-            contents: read
-        steps:
-            - name: 🕶️ Checkout repository
-              uses: actions/checkout@v7.0.1
-              with:
-                  fetch-depth: 0
-
-            - name: 🔍 Select runtime inputs
-              id: scope
-              env:
-                  BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-                  HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-              run: |
-                  changed=$(git diff --name-only "$BASE" "$HEAD" -- \
-                    tools/build/runtime tools/build/src/runtime-provenance.test.ts \
-                    tools/build/src/runtime-ci.test.ts .github/workflows/ci.yml)
-                  if [ -n "$changed" ]; then
-                    echo 'required=true' >> "$GITHUB_OUTPUT"
-                  else
-                    echo 'required=false' >> "$GITHUB_OUTPUT"
-                  fi
-
-            - name: 🚀 Bootstrap
-              if: steps.scope.outputs.required == 'true'
-              uses: ./.github/common/bootstrap
-
-            - name: 🔐 Rebuild and verify pinned runtime twice
-              id: verify
-              if: steps.scope.outputs.required == 'true'
-              env:
-                  RUNTIME_PROBE_ROOT: ${{ runner.temp }}/runtime-provenance
-              run: |
-                  set -eu
-                  mkdir -p "$RUNTIME_PROBE_ROOT/sdk"
-                  rustup toolchain install 1.99.0 --profile minimal --target wasm32-wasip2
-                  export PATH="$(dirname "$(rustup which --toolchain 1.99.0 rustc)"):$PATH"
-                  curl --fail --location --retry 3 \
-                    https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-arm64-macos.tar.gz \
-                    --output "$RUNTIME_PROBE_ROOT/sdk.tar.gz"
-                  printf '%s  %s\n' \
-                    9c59398106b417f8f14913380fdf0097a8cc0ff4af9eb3ce0065a859e88d49e9 \
-                    "$RUNTIME_PROBE_ROOT/sdk.tar.gz" | shasum -a 256 -c
-                  tar -xzf "$RUNTIME_PROBE_ROOT/sdk.tar.gz" -C "$RUNTIME_PROBE_ROOT/sdk" --strip-components=1
-                  node tools/build/runtime/provenance.mjs verify tools/build/runtime
-                  for attempt in a b; do
-                    source_dir="$RUNTIME_PROBE_ROOT/source-$attempt"
-                    git init -q "$source_dir"
-                    git -C "$source_dir" remote add origin https://github.com/andreiltd/componentize-qjs.git
-                    git -C "$source_dir" fetch --depth=1 origin e563c6d6ae50b087980414015663ca9c948c09bb
-                    git -C "$source_dir" checkout --detach FETCH_HEAD
-                    QJS_SOURCE_DIR="$source_dir" \
-                    WASI_SDK_PATH="$RUNTIME_PROBE_ROOT/sdk" \
-                    CARGO_TARGET_DIR="$RUNTIME_PROBE_ROOT/target-$attempt" \
-                    RUNTIME_OUTPUT_DIR="$RUNTIME_PROBE_ROOT/candidate-$attempt" \
-                      sh tools/build/runtime/build.sh
-                    node tools/build/runtime/provenance.mjs verify-candidate "$RUNTIME_PROBE_ROOT/candidate-$attempt"
-                  done
-                  candidate_a="$RUNTIME_PROBE_ROOT/candidate-a/quickjs-runtime-bigint.wasm"
-                  candidate_b="$RUNTIME_PROBE_ROOT/candidate-b/quickjs-runtime-bigint.wasm"
-                  hash_a=$(shasum -a 256 "$candidate_a" | cut -d ' ' -f 1)
-                  hash_b=$(shasum -a 256 "$candidate_b" | cut -d ' ' -f 1)
-                  printf 'Runtime build A SHA-256: %s\nRuntime build B SHA-256: %s\n' "$hash_a" "$hash_b"
-                  if ! cmp -s "$candidate_a" "$candidate_b"; then
-                    echo 'Isolated runtime builds differ on this runner' >&2
-                    exit 1
-                  fi
-
-            - name: 🎃 Test candidate runtime on real Pumpkin
-              id: integration
-              if: steps.scope.outputs.required == 'true'
-              env:
-                  RUNTIME_PROBE_ROOT: ${{ runner.temp }}/runtime-provenance
-                  PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/pumpkin-logs
-              run: |
-                  cp "$RUNTIME_PROBE_ROOT/candidate-a/quickjs-runtime-bigint.wasm" \
-                    tools/build/runtime/quickjs-runtime-bigint.wasm
-                  pnpm exec turbo run test:integration --concurrency=4 --force \
-                    --filter=...@pumpkin-plugins/apple-skin-pumpkin \
-                    --filter=...@pumpkin-plugins/bedrock-addon-manager \
-                    --filter=...@pumpkin-plugins/distant-horizons-support-pumpkin \
-                    --filter=...@pumpkin-plugins/dynamic-lights-pumpkin \
-                    --filter=...@pumpkin-plugins/upnpumpkin \
-                    --filter=...@pumpkin-plugins/waypoints
-
-            - name: 📤 Upload server logs
-              if: failure() && steps.scope.outputs.required == 'true'
-              uses: actions/upload-artifact@v7.0.2
-              with:
-                  retention-days: 1
-                  name: runtime-pumpkin-logs
-                  path: ${{ runner.temp }}/pumpkin-logs
-                  if-no-files-found: ignore
-
     test:
         name: 🧪 Test
         needs: [changes]
@@ -330,9 +230,9 @@ jobs:
 
     build:
         name: 🔨 Build
-        needs: [changes, lint, typecheck]
+        needs: [changes]
         if: needs.changes.outputs.code == 'true'
-        timeout-minutes: 25
+        timeout-minutes: 60
         runs-on: ubuntu-26.04
         steps:
             - name: 🕶️ Checkout repository
@@ -341,7 +241,28 @@ jobs:
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
+            - name: 🔧 Setup Static Hermes toolchain
+              id: setup-hermes
+              uses: ./.github/common/setup-static-hermes
+
+            - name: 🏗️ Prepare Static Hermes
+              id: prepare-hermes
+              run: pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
+
+            - name: 💾 Save Static Hermes build cache
+              if: steps.prepare-hermes.outcome == 'success'
+              uses: actions/cache/save@v6.1.0
+              with:
+                  path: ${{ github.workspace }}/.cache/hermes
+                  key: ${{ steps.setup-hermes.outputs.hermes-cache-key }}
+
             - name: 🔨 Build All
+              run: pnpm run build
+
+            - name: 🔬 Run Static Hermes integration test
+              run: pnpm exec turbo run test:integration --filter=@pumpkin-plugins/apple-skin-pumpkin
+
+            - name: 📦 Build release artifacts
               run: pnpm run build
 
             # Fork PRs cannot access repository secrets. Sign their CI artifacts with a run-only
@@ -429,6 +350,12 @@ jobs:
                   name: update-check-fixture
                   path: tools/update-check/build/update-check-fixture.wasm
 
+    engine-comparison:
+        name: 📊 Engine comparison
+        needs: [changes, build]
+        if: needs.changes.outputs.code == 'true'
+        uses: ./.github/workflows/engine-comparison.yml
+
     integration:
         name: 🎃 Integration (real Pumpkin)
         needs: [changes, build]
@@ -443,6 +370,12 @@ jobs:
 
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
+
+            - name: 🔧 Restore Static Hermes toolchain
+              uses: ./.github/common/setup-static-hermes
+
+            - name: 🏗️ Verify Static Hermes is prepared
+              run: pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
 
             - name: 📥 Download plugin builds
               uses: actions/download-artifact@v8.0.2
@@ -526,7 +459,7 @@ jobs:
 
     release:
         name: 🚢 Release
-        needs: [changes, build, test, docs, integration, action-gate, runtime-provenance]
+        needs: [changes, lint, typecheck, build, engine-comparison, test, docs, integration, action-gate]
         if: >-
             ${{
               always() &&
@@ -537,8 +470,10 @@ jobs:
               (
                 (
                   needs.changes.outputs.code == 'true' &&
-                  needs['runtime-provenance'].result == 'success' &&
+                  needs.lint.result == 'success' &&
+                  needs.typecheck.result == 'success' &&
                   needs.build.result == 'success' &&
+                  needs['engine-comparison'].result == 'success' &&
                   needs.test.result == 'success' &&
                   needs.integration.result == 'success'
                 ) ||
@@ -555,11 +490,12 @@ jobs:
 
     cleanup:
         name: 🧹 Cleanup artifacts
-        needs: [build, integration, release]
+        needs: [build, engine-comparison, integration, release]
         if: >-
             ${{
               always() &&
               needs.build.result == 'success' &&
+              (needs['engine-comparison'].result == 'success' || needs['engine-comparison'].result == 'skipped') &&
               (needs.integration.result == 'success' || needs.integration.result == 'skipped') &&
               (needs.release.result == 'success' || needs.release.result == 'skipped') &&
               (
