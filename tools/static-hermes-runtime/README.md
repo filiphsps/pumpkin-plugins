@@ -26,8 +26,10 @@ Preparation checks out the exact upstream commit in `hermes-source.json`, refres
 checkout when that pin changes, and applies the ordered patches in `hermes-patches/`. It then builds
 host `hermesc` and both full and lean WASI 2 Hermes/JSI static libraries under `.cache/hermes/`. It
 reuses that build while the pinned source, patches, toolchain, and build settings match; changes
-invalidate the cache and trigger a rebuild. Concurrent plugin builds share one preparation lock. It
-rejects local source changes outside the managed patch set. Plugin builds prepare Hermes automatically
+invalidate the cache and trigger a rebuild. Concurrent plugin builds install the SDK into separate
+temporary directories and publish the first valid cache entry without replacing it. Hermes preparation
+uses one shared lock. The tool rejects local source changes outside the managed patch set. Plugin builds
+prepare Hermes automatically
 when `engine` is omitted (the default) or set to `"static-hermes"`; run this command to prewarm the
 toolchain. Optional toolchain paths and build settings are listed under [Build flags](#build-flags).
 
