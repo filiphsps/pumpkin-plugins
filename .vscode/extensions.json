@@ -1,0 +1,11 @@
+{
+    "recommendations": [
+        "bierner.comment-tagged-templates",
+        "biomejs.biome",
+        "redhat.vscode-yaml",
+        "tamasfe.even-better-toml",
+        "chdsbd.github-code-owners",
+        "wix.vscode-import-cost",
+        "yoavbls.pretty-ts-errors"
+    ]
+}
