@@ -145,7 +145,9 @@ Things to know when changing `turbo.json`:
   cache key. The `PUMPKIN_*` variables the test harness and the build's download cache read are in
   `globalPassThroughEnv`; they don't affect cache keys, which is fine because they only say where
   things are or what to run in uncached tasks. `TMPDIR` isn't passed through, so tests run under Turborepo create their
-  temp directories in `/tmp`.
+  temp directories in `/tmp`. Static Hermes toolchain paths pass through to the uncached
+  `test:integration` task because integration fixtures can build plugins and should reuse the prepared
+  CI toolchain.
 - **`^` dependencies need a task the root doesn't have.** The root scripts share names with tasks
   (`"build": "turbo run build"`), so `dependsOn: ["^build"]` would make the root package a
   dependency of itself and fail or loop. `transit` is not a root script, which is why it can use
