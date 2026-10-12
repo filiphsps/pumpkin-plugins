@@ -1,0 +1,71 @@
+name: Setup Static Hermes
+description: Cache the configured WASI SDK, wit-bindgen and Static Hermes toolchain
+
+inputs:
+    toolchain-config-root:
+        description: Directory containing the WASI SDK and toolchain version configuration
+        required: false
+        default: tools/static-hermes-runtime
+
+outputs:
+    hermes-cache-key:
+        description: Cache key to use when saving the prepared Static Hermes build
+        value: ${{ steps.hermes-workspace-cache.outputs.cache-primary-key }}
+
+runs:
+    using: composite
+    steps:
+        - name: 🔎 Read configured toolchain versions
+          id: versions
+          shell: bash
+          env:
+              TOOLCHAIN_CONFIG_ROOT: ${{ inputs['toolchain-config-root'] }}
+          run: |
+              config="$GITHUB_WORKSPACE/$TOOLCHAIN_CONFIG_ROOT"
+              wasi_sdk_version="$(jq -er '.version' "$config/wasi-sdk.json")"
+              wit_bindgen_version="$(jq -er '.tools["wit-bindgen"]' "$config/toolchain-versions.json")"
+              rust_toolchain_version="$(jq -er '.tools.rust' "$config/toolchain-versions.json")"
+              {
+                  echo "wasi-sdk-version=$wasi_sdk_version"
+                  echo "wit-bindgen-version=$wit_bindgen_version"
+                  echo "rust-toolchain-version=$rust_toolchain_version"
+              } >> "$GITHUB_OUTPUT"
+
+        - name: 💾 Cache wit-bindgen ${{ steps.versions.outputs.wit-bindgen-version }}
+          id: wit-bindgen-cache
+          uses: actions/cache@v6.1.0
+          with:
+              path: ${{ runner.temp }}/wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}
+              key: static-hermes-wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}-${{ runner.os }}-${{ runner.arch }}-rust-${{ steps.versions.outputs.rust-toolchain-version }}
+
+        - name: 🦀 Install Rust ${{ steps.versions.outputs.rust-toolchain-version }} and wit-bindgen ${{ steps.versions.outputs.wit-bindgen-version }}
+          shell: bash
+          env:
+              RUST_TOOLCHAIN_VERSION: ${{ steps.versions.outputs.rust-toolchain-version }}
+              WIT_BINDGEN_VERSION: ${{ steps.versions.outputs.wit-bindgen-version }}
+          run: |
+              set -euo pipefail
+              install_root="$RUNNER_TEMP/wit-bindgen-$WIT_BINDGEN_VERSION"
+              rustup toolchain install "$RUST_TOOLCHAIN_VERSION" --profile minimal
+              if [[ ! -x "$install_root/bin/wit-bindgen" ]]; then
+                  cargo "+$RUST_TOOLCHAIN_VERSION" install wit-bindgen-cli --version "$WIT_BINDGEN_VERSION" --locked \
+                      --root "$install_root"
+              fi
+
+        - name: 💾 Cache Static Hermes build
+          id: hermes-workspace-cache
+          uses: actions/cache/restore@v6.1.0
+          with:
+              path: ${{ github.workspace }}/.cache/hermes
+              key: static-hermes-workspace-cache-v4-wasi-sdk-${{ steps.versions.outputs.wasi-sdk-version }}-wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}-rust-${{ steps.versions.outputs.rust-toolchain-version }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(format('{0}/wasi-sdk.json', inputs['toolchain-config-root']), format('{0}/toolchain-versions.json', inputs['toolchain-config-root'])) }}-${{ hashFiles(format('{0}/hermes-source.json', inputs['toolchain-config-root']), format('{0}/hermes-patches/*.patch', inputs['toolchain-config-root']), format('{0}/cmake/**', inputs['toolchain-config-root']), format('{0}/bin/prepare-hermes.mjs', inputs['toolchain-config-root']), format('{0}/bin/toolchain-environment.mjs', inputs['toolchain-config-root'])) }}
+
+        - name: 🔧 Export Static Hermes toolchain paths
+          shell: bash
+          run: |
+              {
+                  echo "STATIC_HERMES_CACHE_DIR=$GITHUB_WORKSPACE/.cache/hermes"
+                  echo "STATIC_HERMES_SOURCE_DIR=$GITHUB_WORKSPACE/.cache/hermes/source"
+                  echo "STATIC_HERMES_HOST_BUILD_DIR=$GITHUB_WORKSPACE/.cache/hermes/build-host"
+                  echo "STATIC_HERMES_WASI_BUILD_DIR=$GITHUB_WORKSPACE/.cache/hermes/build-wasip2"
+                  echo "WIT_BINDGEN=$RUNNER_TEMP/wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}/bin/wit-bindgen"
+              } >> "$GITHUB_ENV"
