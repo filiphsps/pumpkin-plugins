@@ -1,13 +1,27 @@
-/** Explicitly releases a WASI resource when the host runtime exposes disposal. */
-export function disposeWasiResource(
-    resource: { [Symbol.dispose]?: () => void; drop?: () => void } | null | undefined
-): void {
+interface WasiResourceLike {
+    readonly __isValid?: boolean;
+    readonly __staticHermesDisposed?: boolean;
+    readonly __staticHermesResource?: { readonly __isValid?: boolean };
+    [Symbol.dispose]?: () => void;
+    drop?: () => void;
+}
+
+/** Explicitly releases a WASI resource still owned by this plugin. */
+export function disposeWasiResource(resource: WasiResourceLike | null | undefined): void {
     if (resource == null) return;
+    if (
+        resource.__isValid === false ||
+        resource.__staticHermesDisposed === true ||
+        resource.__staticHermesResource?.__isValid === false
+    )
+        return;
+    const drop = resource.drop;
+    if (typeof drop === 'function') {
+        drop.call(resource);
+        return;
+    }
     const dispose = resource[Symbol.dispose];
     if (typeof dispose === 'function') {
         dispose.call(resource);
-        return;
     }
-    const drop = resource.drop;
-    if (typeof drop === 'function') drop.call(resource);
 }

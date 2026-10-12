@@ -6,7 +6,7 @@ import { startPumpkin } from '@pumpkin-plugins/test-harness';
 import { expect, it } from 'vitest';
 import { bundlePlugin } from '../../../tools/build/src/bundle.ts';
 
-it('releases repeated world acquisitions in the bundled QuickJS runtime', async () => {
+it('releases repeated world acquisitions in the bundled Static Hermes runtime', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-resource-lifetime-'));
     const require = createRequire(import.meta.url);
     const api = require.resolve('@pumpkinmc/pumpkin-api-ts');
@@ -15,7 +15,7 @@ it('releases repeated world acquisitions in the bundled QuickJS runtime', async 
     const disposer = path.resolve('../../tools/plugin-kit/src/wasi-resource.ts');
     fs.writeFileSync(
         entry,
-        `import { Plugin, registerPlugin } from ${JSON.stringify(api)};
+        /* JavaScript */ `import { Plugin, registerPlugin } from ${JSON.stringify(api)};
 import { disposeWasiResource } from ${JSON.stringify(disposer)};
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
 class ResourceLifetimeProbe extends Plugin {

@@ -293,6 +293,7 @@ export class TabDisplayService {
 
         if (generation.cursor < generation.jobs.length) return;
         const providerAvailable = this.providerAvailable() && generation.jobs.length > 0;
+        let phase: 'rendering' | 'updating' = 'rendering';
         try {
             const unresolved = new Set<string>();
             const rendered = generation.players.map((player) => {
@@ -318,11 +319,15 @@ export class TabDisplayService {
             });
             if (providerAvailable) this.lastSuccessfulAt = now;
             this.unresolved = unresolved;
+            phase = 'updating';
             this.applyGeneration(generation.players, rendered);
             this.pending = undefined;
             this.lastFailure = undefined;
-        } catch {
-            this.failGeneration(generation, now, 'Rendered display exceeded the configured output limits');
+        } catch (error) {
+            const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+            const reason =
+                phase === 'updating' ? `Display update failed: ${detail}` : `Rendered display failed: ${detail}`;
+            this.failGeneration(generation, now, reason);
         }
     }
 
