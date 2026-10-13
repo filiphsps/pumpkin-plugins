@@ -16,7 +16,7 @@ export function renderDocs({ release, protocol, limits, license, timing }: Metad
     const upstream = 'https://github.com/Rennex07/PumpkinPIE';
     return {
         overview: `Host-independent TypeScript client, expansion router and recovery session for
-[PumpkinPIE](${upstream}) protocol ${protocol}.`,
+[PumpkinPIE (EXTERNAL)](${upstream}) protocol ${protocol}.`,
         scheduling: `The session starts unavailable. Call \`tick()\` explicitly with a monotonic millisecond clock; there
 are no global timers. Failed attempts use exponential backoff (${timing.initialRetryMs}–${timing.maxRetryMs} ms).
 Successful sessions ping and renew desired registrations every
@@ -48,7 +48,7 @@ ${table(
         ['Provider license', release.license],
         ['Target Pumpkin release', code(release.pumpkinRelease)],
         ['Target Pumpkin source commit', code(release.pumpkinCommit)],
-        ['Target API artifact', `${code('@pumpkinmc/pumpkin-api-ts')} ${release.apiArtifact}`],
+        ['Target API artifact', `${code('@pumpkin-plugins/pumpkin-api')} ${release.apiArtifact}`],
         ['Workspace tool license', license]
     ]
 )}

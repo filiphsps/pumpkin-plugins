@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 
 /** Repository component kinds with package or GitHub Action metadata. */
 export type ComponentGroup = 'packages' | 'tools' | 'actions';
@@ -11,17 +11,28 @@ export interface SourceComponent {
     metadataFile: string;
 }
 
-/** Discover sorted component folders by metadata, skipping underscore-prefixed scratch folders. */
+/** Discover sorted component folders by metadata, including grouped tool packages. */
 export function discoverComponents(root: string, group: ComponentGroup): SourceComponent[] {
     const base = resolve(root, group);
     if (!existsSync(base)) return [];
     const names = group === 'actions' ? ['action.yml', 'action.yaml'] : ['package.json'];
-    return readdirSync(base, { withFileTypes: true })
+    const componentIn = (directory: string): SourceComponent | undefined => {
+        const metadataFile = names.map((name) => join(directory, name)).find((file) => existsSync(file));
+        return metadataFile
+            ? { slug: relative(base, directory).split(sep).join('/'), directory, metadataFile }
+            : undefined;
+    };
+    const folders = readdirSync(base, { withFileTypes: true })
         .filter((entry) => entry.isDirectory() && !entry.name.startsWith('_'))
-        .flatMap((entry) => {
-            const directory = join(base, entry.name);
-            const metadataFile = names.map((name) => join(directory, name)).find((file) => existsSync(file));
-            return metadataFile ? [{ slug: entry.name, directory, metadataFile }] : [];
+        .map((entry) => join(base, entry.name));
+    return folders
+        .flatMap((directory) => {
+            const component = componentIn(directory);
+            if (component || group !== 'tools') return component ? [component] : [];
+            return readdirSync(directory, { withFileTypes: true })
+                .filter((entry) => entry.isDirectory() && !entry.name.startsWith('_'))
+                .map((entry) => componentIn(join(directory, entry.name)))
+                .filter((nested): nested is SourceComponent => nested !== undefined);
         })
         .sort((left, right) => left.slug.localeCompare(right.slug));
 }

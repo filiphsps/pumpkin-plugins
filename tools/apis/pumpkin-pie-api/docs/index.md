@@ -4,13 +4,16 @@
 <!-- Generated from protocol/session constants, test/provider.ts and package.json. Run `pnpm readme`. -->
 
 Host-independent TypeScript client, expansion router and recovery session for
-[PumpkinPIE](https://github.com/Rennex07/PumpkinPIE) protocol 0.
+[PumpkinPIE (EXTERNAL)](https://github.com/Rennex07/PumpkinPIE) protocol 0.
 <!-- docs:end overview -->
 
-Private workspace package. Its production dependency tree contains only `fflate`;
-the host transport is injected by each consumer. See the upstream
-[repository](https://github.com/Rennex07/PumpkinPIE) and
-[releases](https://github.com/Rennex07/PumpkinPIE/releases).
+PumpkinPIE is an external plugin whose implementation and separate build tooling live in the
+upstream [repository](https://github.com/Rennex07/PumpkinPIE); that project publishes the provider
+through its [releases](https://github.com/Rennex07/PumpkinPIE/releases). This workspace package
+provides the TypeScript client API and does not build or bundle the provider.
+
+This is a private workspace package. Its production dependency tree contains only `fflate`; the host
+transport is injected by each consumer.
 
 ## Resolve a line
 
@@ -305,7 +308,7 @@ A checksum mismatch fails the run rather than silently selecting another release
 | Provider license | GPL-3.0-only |
 | Target Pumpkin release | `0.2.0+26.3-26.51` |
 | Target Pumpkin source commit | `204a94ed895f041a845630d5a23c094705a0704e` |
-| Target API artifact | `@pumpkinmc/pumpkin-api-ts` v0.1.1 |
+| Target API artifact | `@pumpkin-plugins/pumpkin-api` v0.1.1 |
 | Workspace tool license | MIT |
 
 The pinned provider's [protocol contract](https://github.com/Rennex07/PumpkinPIE/blob/b7cbb14417b397bca71a36b62efa8caa1ba72354/docs/protocol.md)

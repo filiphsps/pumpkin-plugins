@@ -8,11 +8,11 @@
     "contributors": [
         "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
     ],
-    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/upnpumpkin-api#readme",
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/apis/upnpumpkin-api#readme",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
-        "directory": "tools/upnpumpkin-api"
+        "directory": "tools/apis/upnpumpkin-api"
     },
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

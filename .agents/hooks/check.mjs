@@ -29,9 +29,21 @@ const LINT_CONFIG = /^(biome\.json|eslint\.config\.mjs)$/;
 
 /** Paths that contain generated output, without confusing tools/build with an output folder. */
 export function isGeneratedPath(file) {
-    return /^(dist|build|\.cache|\.turbo)\/|^(packages|tools)\/[^/]+\/(build|dist)\/|(^|\/)(node_modules|\.cache|\.turbo|coverage)\//.test(
+    return /^(dist|build|\.cache|\.turbo)\/|^(?:packages\/[^/]+|tools\/(?:[^/]+\/)?[^/]+)\/(build|dist)\/|(^|\/)(node_modules|\.cache|\.turbo|coverage)\//.test(
         file
     );
+}
+
+function packageDirectory(file, packageName) {
+    const parts = file.split('/');
+    if (parts[0] !== 'packages' && parts[0] !== 'tools') return undefined;
+    if (packageName(file)) return file;
+
+    for (let length = 2; length < parts.length; length++) {
+        const candidate = parts.slice(0, length).join('/');
+        if (packageName(candidate)) return candidate;
+    }
+    return parts.length > 1 ? parts.slice(0, 2).join('/') : undefined;
 }
 
 /**
@@ -67,9 +79,9 @@ export function planChecks(files, exists = defaultExists, packageName = defaultP
     let everything = false;
     for (const file of relevant) {
         if (SHARED.some((p) => p.test(file))) everything = true;
-        const match = /^(packages|tools)\/([^/]+)\//.exec(file);
-        if (!match) continue;
-        const name = packageName(`${match[1]}/${match[2]}`);
+        const directory = packageDirectory(file, packageName);
+        if (!directory) continue;
+        const name = packageName(directory);
         if (!name) {
             everything = true; // A removed package can leave broken imports in its dependents.
             continue;

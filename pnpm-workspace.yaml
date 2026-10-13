@@ -1,6 +1,7 @@
 packages:
   - "packages/*"
   - "tools/*"
+  - "tools/apis/*"
   - "benchmarks/*"
 saveExact: true
 allowBuilds:

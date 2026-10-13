@@ -17,6 +17,11 @@ const FUNDING = [
     { type: 'custom', url: 'https://paypal.me/filiph' }
 ];
 const MAX_DESCRIPTION = 70;
+/** Canonical package names for tools that are published under public names. */
+const EXPECTED_PUBLIC_TOOL_NAMES = {
+    'tools/pumpkin-api': '@pumpkin-plugins/pumpkin-api',
+    'tools/create-pumpkin-plugin': 'create-pumpkin-plugin'
+};
 
 /** Order of keys in a package.json, so every one reads the same. Unknown keys go after these. */
 const KEY_ORDER = [
@@ -49,7 +54,9 @@ const KEY_ORDER = [
 
 /** Files a tool ships besides `src`, where it has them. */
 const EXTRA_FILES = {
-    'tools/build': ['runtime', 'wasi-wit.lock.json'],
+    'tools/build': ['dist', 'runtime', 'wasi-wit.lock.json'],
+    'tools/pumpkin-api': ['wit.lock.json', 'compatibility', 'docs', 'README.md', 'LICENSE'],
+    'tools/create-pumpkin-plugin': ['bin', 'dist', 'templates', 'README.md'],
     'tools/static-hermes-runtime': [
         'dist',
         'cmake',
@@ -102,18 +109,27 @@ function expected(dir, pkg) {
     const binTargets = typeof pkg.bin === 'string' ? [pkg.bin] : Object.values(pkg.bin ?? {});
     const binSourceFiles = binTargets.some((target) => target.replace(/^\.\//, '').startsWith('bin/')) ? ['bin'] : [];
     // A library is a tool that others import: it has a root export, as opposed to a plugin or a CLI.
-    const root = pkg.exports?.['.'];
+    const rootExport = pkg.exports?.['.'];
     if (dir.startsWith('tools/') && pkg.exports) {
         want.sideEffects = false;
-        want.files = ['src', ...binSourceFiles, ...(EXTRA_FILES[dir] ?? [])];
+        want.files = [
+            ...(fs.existsSync(path.join(root, dir, 'src')) ? ['src'] : []),
+            ...binSourceFiles,
+            ...(EXTRA_FILES[dir] ?? [])
+        ];
         want.publishConfig = { access: 'public' };
-        if (typeof root === 'string') {
-            want.module = root;
-            want.types = root;
+        if (typeof rootExport === 'string') {
+            want.module = rootExport;
+            want.types = rootExport;
         }
     } else if (dir.startsWith('tools/')) {
-        want.files = ['src', ...binSourceFiles, ...(EXTRA_FILES[dir] ?? [])];
+        want.files = [
+            ...(fs.existsSync(path.join(root, dir, 'src')) ? ['src'] : []),
+            ...binSourceFiles,
+            ...(EXTRA_FILES[dir] ?? [])
+        ];
     }
+    if (Object.hasOwn(EXPECTED_PUBLIC_TOOL_NAMES, dir)) want.publishConfig = { access: 'public' };
     return want;
 }
 
@@ -129,6 +145,8 @@ for (const dir of packageDirs()) {
     const pkg = JSON.parse(source);
     const want = expected(dir, pkg);
     const issues = [];
+    const expectedName = EXPECTED_PUBLIC_TOOL_NAMES[dir];
+    if (expectedName && pkg.name !== expectedName) issues.push(`"name" must remain ${JSON.stringify(expectedName)}`);
     if (hasEscapedUnicode(source)) issues.push('non-ASCII characters must use literal UTF-8, not Unicode escapes');
 
     for (const [key, value] of Object.entries(want)) {

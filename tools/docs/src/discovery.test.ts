@@ -15,6 +15,9 @@ it('discovers sorted components by metadata and walks Markdown with explicit exc
         put('tools/z/package.json');
         put('tools/a/package.json');
         put('tools/a/LICENSE.md');
+        put('tools/a/test/fixtures/nested/package.json');
+        put('tools/pumpkin-api/package.json');
+        put('tools/apis/upnpumpkin-api/package.json');
         put('tools/_scratch/package.json');
         put('tools/other/README.md');
         put('actions/y/action.yaml');
@@ -23,7 +26,12 @@ it('discovers sorted components by metadata and walks Markdown with explicit exc
         put('docs/nested/guide.md');
         put('docs/api/generated.md');
         put('docs/node_modules/hidden.md');
-        expect(discoverComponents(root, 'tools').map((item) => item.slug)).toEqual(['a', 'z']);
+        expect(discoverComponents(root, 'tools').map((item) => item.slug)).toEqual([
+            'a',
+            'apis/upnpumpkin-api',
+            'pumpkin-api',
+            'z'
+        ]);
         expect(discoverComponents(root, 'actions').map((item) => item.slug)).toEqual(['x', 'y']);
         expect(discoverComponents(root, 'packages')).toEqual([]);
         expect(localLicenseFile(join(root, 'tools/a'))).toBe(join(root, 'tools/a/LICENSE.md'));

@@ -127,7 +127,11 @@ function fallbackSourcePath(relativePage) {
         return `${pluginDirectory}/README.md`;
     }
     if (parts[0] === 'tools' && parts[1] === '@pumpkin-plugins' && parts[2]) {
-        const toolDirectory = `tools/${parts[2]}`;
+        const toolName = `${parts[1]}/${parts[2]}`;
+        const tool = toolPackages.find(({ manifest }) => manifest.name === toolName);
+        const toolDirectory = tool
+            ? path.relative(repoRoot, tool.directory).split(path.sep).join('/')
+            : `tools/${parts[2]}`;
         const moduleParts = parts.slice(3, -1);
         const moduleSource = moduleSourcePath(path.join(repoRoot, toolDirectory, 'src'), moduleParts, ['.ts', '.tsx']);
         return moduleSource

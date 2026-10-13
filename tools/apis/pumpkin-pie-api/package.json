@@ -8,11 +8,11 @@
     "contributors": [
         "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
     ],
-    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/pumpkin-pie-api#readme",
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/apis/pumpkin-pie-api#readme",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
-        "directory": "tools/pumpkin-pie-api"
+        "directory": "tools/apis/pumpkin-pie-api"
     },
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

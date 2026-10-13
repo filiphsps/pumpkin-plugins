@@ -57,7 +57,7 @@ export default [
             '**/coverage/**',
             'build/**',
             'packages/*/build/**',
-            'tools/*/build/**',
+            'tools/**/build/**',
             '**/dist/**',
             '**/.turbo/**',
             '**/.cache/**',

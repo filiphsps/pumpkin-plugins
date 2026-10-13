@@ -48,7 +48,7 @@ const integrationScope = benchmarkOnly
     ? 'benchmark'
     : code.length > 0 &&
         code.every((file) =>
-            /^(packages\/[^/]+|tools\/(build|config|plugin-kit|port-mapping|test-harness|upnpumpkin-api))(?:\/|$)/.test(
+            /^(packages\/[^/]+|tools\/(build|config|plugin-kit|port-mapping|test-harness|apis\/upnpumpkin-api))(?:\/|$)/.test(
                 file
             )
         )

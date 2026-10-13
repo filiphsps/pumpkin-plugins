@@ -130,7 +130,8 @@ describe('planChecks', () => {
     const names = {
         'packages/upnpumpkin': '@pumpkin-plugins/upnpumpkin',
         'tools/config': '@pumpkin-plugins/config',
-        'tools/build': '@pumpkin-plugins/build'
+        'tools/build': '@pumpkin-plugins/build',
+        'tools/apis/upnpumpkin-api': '@pumpkin-plugins/upnpumpkin-api'
     };
     const plan = (files, exists = () => true) => planChecks(files, exists, (dir) => names[dir]);
     const turbo = (steps) => steps.find((s) => s.name === 'Typecheck and unit tests')?.args;
@@ -155,6 +156,15 @@ describe('planChecks', () => {
 
     it('checks the dependents of a changed tool', () => {
         assert.ok(turbo(plan(['tools/config/src/load.ts']))?.includes('--filter=...@pumpkin-plugins/config'));
+    });
+
+    it('checks grouped tools and ignores their build output', () => {
+        assert.ok(
+            turbo(plan(['tools/apis/upnpumpkin-api/src/index.ts']))?.includes(
+                '--filter=...@pumpkin-plugins/upnpumpkin-api'
+            )
+        );
+        assert.deepEqual(plan(['tools/apis/upnpumpkin-api/build/generated.d.ts']), []);
     });
 
     it('checks every package when a shared file changes', () => {
