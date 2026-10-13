@@ -1,7 +1,69 @@
 import { expect, it } from 'vitest';
 import type { WitAnalysis } from './analysis.ts';
-import type { WitFunction, WitWasiAdapterPlan, WitWasiInterface } from './types.ts';
+import { generateWitApiFunctionForResolvedOperation } from './native-adapters.ts';
+import type { ResolvedWitType, WitApiInterface, WitApiPackage, WitFunction, WitWasiAdapterPlan, WitWasiInterface } from './types.ts';
 import { generateWasiAdapterDispatch } from './wasi-dispatch.ts';
+
+it('guards owned input and output WIT values before conversion can throw', () => {
+    const interfaceSpecifier = 'wasi:test/api@0.2.3';
+    const apiInterface: WitWasiInterface = {
+        packageName: 'wasi:test',
+        version: '0.2.3',
+        name: 'api',
+        specifier: interfaceSpecifier,
+        functions: [],
+        resources: [],
+        records: [],
+        variants: [],
+        enums: [],
+        flags: [],
+        types: [],
+        dependencies: [],
+        dependencyTypes: {}
+    };
+    const apiPackage: WitApiPackage = {
+        packageName: 'wasi:test',
+        version: '0.2.3',
+        interfaces: [apiInterface]
+    };
+    const listOfStrings: ResolvedWitType = {
+        kind: 'list',
+        item: { kind: 'primitive', name: 'string' },
+        packageName: 'wasi:test',
+        interfaceSpecifier
+    };
+    const operation: WitFunction = {
+        name: 'echo',
+        isStatic: false,
+        parameters: [{ name: 'names', type: 'list<string>' }],
+        result: 'string'
+    };
+
+    const generated = generateWitApiFunctionForResolvedOperation({
+        apiPackage,
+        apiInterface,
+        operation,
+        parameters: [{ name: 'names', type: 'list<string>', resolvedType: listOfStrings }],
+        resultType: { kind: 'primitive', name: 'string' }
+    });
+
+    expect(generated).toBeDefined();
+    const inputDeclaration = generated!.indexOf('plugin_list_string_t argument0{argument0Data, argument0Size};');
+    const inputGuard = generated!.indexOf('WitScopeGuard argument0Cleanup');
+    const inputLoop = generated!.indexOf('for (std::size_t argument0Index');
+    expect(inputGuard).toBeGreaterThan(inputDeclaration);
+    expect(inputGuard).toBeLessThan(inputLoop);
+    expect(generated).toContain('plugin_list_string_free(&argument0);');
+
+    const outputDeclaration = generated!.indexOf('plugin_string_t result{};');
+    const outputGuard = generated!.indexOf('WitScopeGuard resultCleanup');
+    const outputCall = generated!.indexOf('wasi_test_api_echo(&argument0, &result);');
+    const outputConversion = generated!.indexOf('wasiStringValue(result)');
+    expect(outputGuard).toBeGreaterThan(outputDeclaration);
+    expect(outputGuard).toBeLessThan(outputCall);
+    expect(outputGuard).toBeLessThan(outputConversion);
+    expect(generated).toContain('plugin_string_free(&result);');
+});
 
 it('uses the owning interface name for imported named WIT types', () => {
     const interfaceSpecifier = 'wasi:filesystem/types@0.2.3';
