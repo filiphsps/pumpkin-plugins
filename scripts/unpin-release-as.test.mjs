@@ -105,11 +105,17 @@ describe('unpin-release-as', () => {
         fs.writeFileSync(manifestPath, `${JSON.stringify({ 'tools/build': '0.0.0' }, null, 4)}\n`);
 
         assert.ok(run(dir).ok);
-        assert.equal(fs.readFileSync(path.join(dir, 'release-please-config.json'), 'utf8').includes('release-as'), true);
+        assert.equal(
+            fs.readFileSync(path.join(dir, 'release-please-config.json'), 'utf8').includes('release-as'),
+            true
+        );
 
         fs.writeFileSync(manifestPath, `${JSON.stringify({ 'tools/build': '0.1.0' }, null, 4)}\n`);
         assert.ok(run(dir).ok);
-        assert.equal(fs.readFileSync(path.join(dir, 'release-please-config.json'), 'utf8').includes('release-as'), false);
+        assert.equal(
+            fs.readFileSync(path.join(dir, 'release-please-config.json'), 'utf8').includes('release-as'),
+            false
+        );
     });
 
     it('changes nothing when there is nothing to retire', () => {
