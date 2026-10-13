@@ -10,6 +10,7 @@ import {
     assertPublicToolPackage,
     assertPublicToolPackageContents,
     assertStarterToolDependencies,
+    parseTarEntries,
     syncStarterToolDependencies
 } from './tool-packages.mjs';
 
@@ -69,6 +70,13 @@ describe('public tool package metadata', () => {
 });
 
 describe('packed public tool contents', () => {
+    it('parses tar listings with Windows line endings', () => {
+        assert.deepEqual(parseTarEntries('package/package.json\r\npackage/src/index.ts\r\n'), [
+            'package/package.json',
+            'package/src/index.ts'
+        ]);
+    });
+
     it('requires each packed lockfile schema to resolve to a packed package-local file', () => {
         const entries = ['package/wit.lock.json', 'package/schemas/upstream-git-pin.schema.json'];
         const lockFiles = {

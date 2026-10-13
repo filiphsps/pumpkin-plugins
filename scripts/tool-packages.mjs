@@ -56,6 +56,16 @@ const TEMPLATE_LANGUAGES = ['typescript', 'javascript'];
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 /**
+ * Parses a `tar -t` listing from any supported host platform.
+ *
+ * @param {string} listing - Newline-delimited tar entries.
+ * @returns {string[]} Non-empty entry paths without platform line endings.
+ */
+export function parseTarEntries(listing) {
+    return listing.split(/\r?\n/).filter(Boolean);
+}
+
+/**
  * Checks that a public tool's packed package metadata permits public npm publication.
  *
  * @param {Record<string, unknown>} packageJson - The packed package metadata to validate.

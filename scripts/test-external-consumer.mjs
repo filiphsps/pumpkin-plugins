@@ -12,7 +12,8 @@ import {
     assertPublicToolPackageContents,
     assertStarterToolDependencies,
     PACKED_TOOL_SCHEMA_LOCK_FILES,
-    PUBLIC_TOOL_PACKAGE_PATHS
+    PUBLIC_TOOL_PACKAGE_PATHS,
+    parseTarEntries
 } from './tool-packages.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -88,9 +89,7 @@ try {
         const expectedPublicName = PUBLIC_TOOL_PACKAGE_PATHS[packagePath];
         if (expectedPublicName) {
             assertPublicToolPackage(packedPackageJson, expectedPublicName);
-            const entries = execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' })
-                .split('\n')
-                .filter(Boolean);
+            const entries = parseTarEntries(execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' }));
             assertPublicToolPackageContents(entries, packagePath);
             const schemaLockFiles = Object.fromEntries(
                 (PACKED_TOOL_SCHEMA_LOCK_FILES[packagePath] ?? []).map((entry) => [
