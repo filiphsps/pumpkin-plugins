@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { BuildError } from './errors.ts';
+import { withWasiWitFileLock } from './wasi-wit-lock.ts';
 
 /** The WASI WIT files a build needs, pinned by content hash. */
 export interface WasiWitLock {
@@ -14,7 +15,6 @@ export interface WasiWitLock {
     /** Contents for pinned WIT files that have no upstream source file. */
     generatedFiles?: Record<string, string>;
 }
-
 /** Downloads a URL. */
 export type Fetcher = (url: string) => Promise<Uint8Array>;
 
@@ -22,13 +22,82 @@ export type Fetcher = (url: string) => Promise<Uint8Array>;
 export interface WasiWitOptions {
     /** Folder to cache under. The files go in `<cacheDir>/wasi-wit/<version>`. */
     cacheDir: string;
-    /** The pinned files. Defaults to `wasi-wit.lock.json` next to the sources. */
+    /** Validated WASI version and pinned relative file paths. Defaults to `wasi-wit.lock.json` next to the sources. */
     lock?: WasiWitLock;
     /** Downloads a URL. Defaults to `fetch`. */
     fetchFile?: Fetcher;
 }
 
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isSafeWitPath(file: string): boolean {
+    if (
+        !file.endsWith('.wit') ||
+        file.includes('\\') ||
+        file.includes(':') ||
+        file.includes('\0') ||
+        path.posix.isAbsolute(file) ||
+        path.win32.isAbsolute(file)
+    ) {
+        return false;
+    }
+
+    return file.split('/').every((segment) => segment !== '' && segment !== '.' && segment !== '..');
+}
+
+function assertWitLockEntries(
+    kind: 'file' | 'source' | 'generated-file',
+    entries: unknown
+): asserts entries is Record<string, string> {
+    if (!isRecord(entries)) throw new BuildError(`WASI WIT lock ${kind} entries must be an object`);
+
+    for (const [file, entry] of Object.entries(entries)) {
+        if (!isSafeWitPath(file)) throw new BuildError(`unsafe WASI WIT ${kind} path: ${file}`);
+        if (typeof entry !== 'string') throw new BuildError(`WASI WIT ${kind} entry ${file} must be a string`);
+    }
+}
+
+function validateWasiWitLock(lock: WasiWitLock): void {
+    if (!isRecord(lock)) throw new BuildError('WASI WIT lock must be an object');
+
+    const version = lock.version;
+    if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) {
+        throw new BuildError('unsafe WASI WIT lock version; expected a numeric x.y.z release');
+    }
+
+    const files = lock.files;
+    assertWitLockEntries('file', files);
+    for (const [file, hash] of Object.entries(files)) {
+        if (!/^[0-9a-f]{64}$/.test(hash)) throw new BuildError(`WASI WIT file ${file} has an invalid SHA-256 hash`);
+    }
+
+    const sources = lock.sources;
+    if (sources !== undefined) {
+        assertWitLockEntries('source', sources);
+        for (const file of Object.keys(sources)) {
+            if (!Object.hasOwn(files, file))
+                throw new BuildError(`WASI WIT source ${file} is missing from the files lock`);
+        }
+    }
+
+    const generatedFiles = lock.generatedFiles;
+    if (generatedFiles !== undefined) {
+        assertWitLockEntries('generated-file', generatedFiles);
+        for (const [file, contents] of Object.entries(generatedFiles)) {
+            const expectedHash = files[file];
+            if (!Object.hasOwn(files, file)) {
+                throw new BuildError(`generated WIT file ${file} is missing from the files lock`);
+            }
+            if (sha256(new TextEncoder().encode(contents)) !== expectedHash) {
+                throw new BuildError(`generated WIT file ${file} does not match its pinned SHA-256 hash`);
+            }
+        }
+    }
+}
 
 const defaultFetch: Fetcher = async (url) => {
     const res = await fetch(url);
@@ -45,29 +114,30 @@ export function readLock(): WasiWitLock {
 }
 
 function isCached(file: string, expected: string): boolean {
-    return fs.existsSync(file) && sha256(fs.readFileSync(file)) === expected;
+    try {
+        if (!fs.lstatSync(file).isFile()) return false;
+        return sha256(fs.readFileSync(file)) === expected;
+    } catch {
+        return false;
+    }
 }
 
 /**
  * Makes the WASI WIT files available locally. Files already cached with the right hash are kept;
  * missing or damaged upstream files are downloaded and generated files are materialized from the
- * lock. Every file is checked against its hash before it is written. Nothing is downloaded when the
- * cache is complete.
- * @param options - Where to cache and, for tests, what to download with.
+ * lock. Every file is checked against its hash before it is written. Concurrent cache fills serialize
+ * publication per file, so a valid cached file is never replaced by another build. Nothing is
+ * downloaded when the cache is complete.
+ * @param options - Cache location and optional lock contents or downloader.
  * @returns The folder holding `<package>/<interface>.wit`.
- * @throws {BuildError} When a file can't be downloaded or doesn't match its pinned hash.
+ * @throws {BuildError} When the lock is invalid, a file can't be downloaded, or content doesn't match its pinned hash.
  */
 export async function ensureWasiWit(options: WasiWitOptions): Promise<string> {
     const lock = options.lock ?? readLock();
+    validateWasiWitLock(lock);
     const fetchFile = options.fetchFile ?? defaultFetch;
     const dir = path.join(options.cacheDir, 'wasi-wit', lock.version);
     const generatedFiles = lock.generatedFiles ?? {};
-
-    for (const rel of Object.keys(generatedFiles)) {
-        if (!Object.hasOwn(lock.files, rel)) {
-            throw new BuildError(`generated WIT file ${rel} is missing from the files lock`);
-        }
-    }
 
     const missing = Object.entries(lock.files).filter(([rel, hash]) => !isCached(path.join(dir, rel), hash));
     await Promise.all(
@@ -93,13 +163,18 @@ export async function ensureWasiWit(options: WasiWitOptions): Promise<string> {
                 const source = generated === undefined ? (lock.sources?.[rel] ?? `WASI v${lock.version}`) : 'the lock';
                 throw new BuildError(`${rel} from ${source} has hash ${actual}, expected ${hash}`);
             }
-            writeAtomically(path.join(dir, rel), bytes, options.cacheDir);
+            await writeAtomically(path.join(dir, rel), bytes, hash, options.cacheDir);
         })
     );
     return dir;
 }
 
-function writeAtomically(file: string, bytes: Uint8Array, stagingDirectory: string): void {
+async function writeAtomically(
+    file: string,
+    bytes: Uint8Array,
+    expectedHash: string,
+    stagingDirectory: string
+): Promise<void> {
     const parent = path.dirname(file);
     fs.mkdirSync(parent, { recursive: true });
     // Keep staging outside the shared WIT tree: concurrent builds copy that tree into jco's
@@ -109,7 +184,12 @@ function writeAtomically(file: string, bytes: Uint8Array, stagingDirectory: stri
     const temporary = path.join(temporaryDirectory, path.basename(file));
     try {
         fs.writeFileSync(temporary, bytes);
-        fs.renameSync(temporary, file);
+        const lockName = createHash('sha256').update(path.resolve(file)).digest('hex');
+        await withWasiWitFileLock(path.join(stagingDirectory, `.wasi-wit-${lockName}.lock`), () => {
+            if (isCached(file, expectedHash)) return;
+            fs.rmSync(file, { recursive: true, force: true });
+            fs.renameSync(temporary, file);
+        });
     } finally {
         fs.rmSync(temporaryDirectory, { recursive: true, force: true });
     }
