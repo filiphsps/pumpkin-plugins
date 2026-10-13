@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildHermes } from './build.ts';
+import { buildHermes, buildHermesWithLockHeld, withHermesBuildLock } from './build.ts';
 import { affectedHermesPaths, applyHermesPatchSeries, readHermesPatchSeries } from './patch.ts';
 import { ensureHermesSource, readHermesSourcePin, refreshHermesSource } from './source.ts';
 import { setupHermesToolchainEnvironment } from './toolchain-environment.ts';
@@ -54,28 +54,32 @@ export async function prepareHermes(options: HermesPreparationOptions = {}): Pro
     const paths = configuredHermesPaths(context.packageRoot, context.workspaceRoot, context.environment);
     const pin = readHermesSourcePin(paths.pinFile);
     const patches = readHermesPatchSeries(paths.patchesDirectory);
-    await runHermesPreparationStages({
-        source: () => {
-            ensurePinnedSource(paths, pin, patches);
-        },
-        patch: () => {
-            try {
-                applyCurrentPatches(paths.source, pin.commit, patches);
-            } catch (error) {
-                if (!(error instanceof Error) || !error.message.includes('conflict or partial application')) {
-                    throw error;
+    await withHermesBuildLock(paths.cacheRoot, async () => {
+        await runHermesPreparationStages({
+            source: () => {
+                ensurePinnedSource(paths, pin, patches);
+            },
+            patch: () => {
+                try {
+                    applyCurrentPatches(paths.source, pin.commit, patches);
+                } catch (error) {
+                    if (!(error instanceof Error) || !error.message.includes('conflict or partial application')) {
+                        throw error;
+                    }
+                    refreshHermesSource({
+                        pin,
+                        source: paths.source,
+                        managedSource: paths.managedSource,
+                        managedPaths: affectedHermesPaths(patches)
+                    });
+                    console.log(
+                        'Rebuilt stale Hermes source cache from the pinned commit; applying current patch series.'
+                    );
+                    applyCurrentPatches(paths.source, pin.commit, patches);
                 }
-                refreshHermesSource({
-                    pin,
-                    source: paths.source,
-                    managedSource: paths.managedSource,
-                    managedPaths: affectedHermesPaths(patches)
-                });
-                console.log('Rebuilt stale Hermes source cache from the pinned commit; applying current patch series.');
-                applyCurrentPatches(paths.source, pin.commit, patches);
-            }
-        },
-        build: () => buildCurrentHermes(context, paths, pin, patches)
+            },
+            build: () => buildCurrentHermes(context, paths, pin, patches, buildHermesWithLockHeld)
+        });
     });
 }
 
@@ -90,7 +94,7 @@ export async function prepareHermesSource(options: HermesPreparationOptions = {}
     const paths = configuredHermesPaths(context.packageRoot, context.workspaceRoot, context.environment);
     const pin = readHermesSourcePin(paths.pinFile);
     const patches = readHermesPatchSeries(paths.patchesDirectory);
-    return ensurePinnedSource(paths, pin, patches);
+    return withHermesBuildLock(paths.cacheRoot, () => ensurePinnedSource(paths, pin, patches));
 }
 
 /**
@@ -104,10 +108,12 @@ export async function patchHermesSource(options: HermesPreparationOptions = {}):
     const paths = configuredHermesPaths(context.packageRoot, context.workspaceRoot, context.environment);
     const pin = readHermesSourcePin(paths.pinFile);
     const patches = readHermesPatchSeries(paths.patchesDirectory);
-    if (!fs.existsSync(paths.source)) {
-        throw new Error(`Hermes source not found at ${paths.source}; run hermes source first`);
-    }
-    applyCurrentPatches(paths.source, pin.commit, patches);
+    await withHermesBuildLock(paths.cacheRoot, () => {
+        if (!fs.existsSync(paths.source)) {
+            throw new Error(`Hermes source not found at ${paths.source}; run hermes source first`);
+        }
+        applyCurrentPatches(paths.source, pin.commit, patches);
+    });
 }
 
 /**
@@ -211,12 +217,13 @@ async function buildCurrentHermes(
     context: HermesContext,
     paths: HermesPaths,
     pin: ReturnType<typeof readHermesSourcePin>,
-    patches: ReturnType<typeof readHermesPatchSeries>
+    patches: ReturnType<typeof readHermesPatchSeries>,
+    build: typeof buildHermes = buildHermes
 ): Promise<void> {
     if (!context.environment.STATIC_HERMES_WASI_SDK_PATH) {
         throw new Error('Static Hermes WASI SDK path is not configured; run the Hermes build setup first');
     }
-    await buildHermes({
+    await build({
         packageRoot: context.packageRoot,
         cacheRoot: paths.cacheRoot,
         source: paths.source,

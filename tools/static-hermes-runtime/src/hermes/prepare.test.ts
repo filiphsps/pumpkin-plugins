@@ -4,6 +4,8 @@ import { prepareHermes, runHermesPreparationStages } from './prepare.ts';
 const mocks = vi.hoisted(() => ({
     setupToolchain: vi.fn(),
     buildHermes: vi.fn(),
+    buildHermesWithLockHeld: vi.fn(),
+    withBuildLock: vi.fn(),
     affectedPaths: vi.fn(),
     applyPatches: vi.fn(),
     readPatches: vi.fn(),
@@ -13,7 +15,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('./toolchain-environment.ts', () => ({ setupHermesToolchainEnvironment: mocks.setupToolchain }));
-vi.mock('./build.ts', () => ({ buildHermes: mocks.buildHermes }));
+vi.mock('./build.ts', () => ({
+    buildHermes: mocks.buildHermes,
+    buildHermesWithLockHeld: mocks.buildHermesWithLockHeld,
+    withHermesBuildLock: mocks.withBuildLock
+}));
 vi.mock('./patch.ts', () => ({
     affectedHermesPaths: mocks.affectedPaths,
     applyHermesPatchSeries: mocks.applyPatches,
@@ -38,6 +44,8 @@ beforeEach(() => {
         STATIC_HERMES_WASI_SDK_PATH: '/toolchain/wasi-sdk'
     });
     mocks.buildHermes.mockReset().mockResolvedValue(undefined);
+    mocks.buildHermesWithLockHeld.mockReset().mockResolvedValue(undefined);
+    mocks.withBuildLock.mockReset().mockImplementation(async (_cacheRoot, operation) => operation());
     mocks.affectedPaths.mockReset().mockReturnValue(['lib/Runtime.cpp']);
     mocks.applyPatches.mockReset();
     mocks.readPatches.mockReset().mockReturnValue(patches);
@@ -106,7 +114,8 @@ it('prepares the pinned source, applies patches, and builds with resolved cache 
         expectedCommit: pin.commit,
         patches
     });
-    expect(mocks.buildHermes).toHaveBeenCalledWith(
+    expect(mocks.withBuildLock).toHaveBeenCalledWith('/cache/hermes', expect.any(Function));
+    expect(mocks.buildHermesWithLockHeld).toHaveBeenCalledWith(
         expect.objectContaining({
             packageRoot: '/package',
             cacheRoot: '/cache/hermes',
@@ -120,6 +129,36 @@ it('prepares the pinned source, applies patches, and builds with resolved cache 
             environment
         })
     );
+});
+
+it('waits for the preparation lock before touching source, patches, or build artifacts', async () => {
+    let markLockEntered = (): void => undefined;
+    let releaseLock = (): void => undefined;
+    const lockEntered = new Promise<void>((resolve) => {
+        markLockEntered = resolve;
+    });
+    const lockGate = new Promise<void>((resolve) => {
+        releaseLock = resolve;
+    });
+    mocks.withBuildLock.mockImplementation(async (_cacheRoot, operation) => {
+        markLockEntered();
+        await lockGate;
+        return operation();
+    });
+
+    const preparation = prepareHermes({ workspaceRoot: '/workspace', packageRoot: '/package', environment: {} });
+    await lockEntered;
+
+    expect(mocks.ensureSource).not.toHaveBeenCalled();
+    expect(mocks.applyPatches).not.toHaveBeenCalled();
+    expect(mocks.buildHermesWithLockHeld).not.toHaveBeenCalled();
+
+    releaseLock();
+    await preparation;
+
+    expect(mocks.ensureSource).toHaveBeenCalledOnce();
+    expect(mocks.applyPatches).toHaveBeenCalledOnce();
+    expect(mocks.buildHermesWithLockHeld).toHaveBeenCalledOnce();
 });
 
 it('rejects build preparation when setup did not provide a WASI SDK', async () => {
