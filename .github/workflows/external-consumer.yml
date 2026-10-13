@@ -37,6 +37,23 @@ jobs:
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
+            - name: 📂 Prepare external consumer caches
+              shell: bash
+              run: mkdir -p .cache/external-consumer/pnpm-store .cache/hermes
+
+            - name: 💾 Restore external consumer pnpm store
+              id: external-consumer-pnpm-cache
+              uses: actions/cache/restore@v6.1.0
+              with:
+                  path: .cache/external-consumer/pnpm-store
+                  key: external-consumer-pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}-${{ github.sha }}
+                  restore-keys: |
+                      external-consumer-pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}-
+
+            - name: 🔧 Setup Static Hermes cache
+              id: setup-static-hermes
+              uses: ./.github/common/setup-static-hermes
+
             - name: 🪟 Setup MSVC 2022 toolset 14.44
               if: runner.os == 'Windows'
               uses: ilammy/msvc-dev-cmd@v1.13.0
@@ -97,7 +114,23 @@ jobs:
                   fi
 
             - name: 📦 Pack, install, create, typecheck and build outside the monorepo
+              id: external-consumer
               run: pnpm run test:external-consumer
               env:
                   GITHUB_TOKEN: ${{ github.token }}
+                  PUMPKIN_EXTERNAL_CONSUMER_PNPM_STORE_DIR: ${{ github.workspace }}/.cache/external-consumer/pnpm-store
                   PUMPKIN_PLUGINS_VERBOSE_BUILD: ${{ matrix.platform == 'Windows x64' && '1' || '0' }}
+
+            - name: 💾 Save external consumer pnpm store
+              if: steps.external-consumer.outcome == 'success' && steps.external-consumer-pnpm-cache.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v6.1.0
+              with:
+                  path: .cache/external-consumer/pnpm-store
+                  key: external-consumer-pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}-${{ github.sha }}
+
+            - name: 💾 Save Static Hermes cache
+              if: steps.external-consumer.outcome == 'success'
+              uses: actions/cache/save@v6.1.0
+              with:
+                  path: ${{ github.workspace }}/.cache/hermes
+                  key: ${{ steps.setup-static-hermes.outputs.hermes-cache-key }}

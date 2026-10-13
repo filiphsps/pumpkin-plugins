@@ -70,9 +70,11 @@ plugin build in the integration job.
 Run `pnpm run test:external-consumer` with Node `24.21.0` and pnpm `12.11.2` to pack the internal
 production dependencies, install them from a temporary local registry, invoke the packed creator
 binary and both real `pnpm create pumpkin-plugin` language flows, then typecheck and build both
-starters. The check uses a temporary pnpm store and Static Hermes cache outside the consumer and
-removes its temporary project when it finishes. CI runs this cold-cache build on Linux x64, macOS
-arm64 and Windows x64; host-tool versions are pinned in the [Static Hermes Runtime guide](../tools/static-hermes-runtime/README.md).
+starters. By default, the check uses a temporary pnpm store and Static Hermes cache outside the
+consumer and removes its temporary project when it finishes. Set
+`PUMPKIN_EXTERNAL_CONSUMER_PNPM_STORE_DIR` and `STATIC_HERMES_CACHE_DIR` to use persistent caches;
+the workflow saves and restores both per platform. CI runs on Linux x64, macOS arm64 and Windows x64;
+host-tool versions are pinned in the [Static Hermes Runtime guide](../tools/static-hermes-runtime/README.md).
 
 The check also installs only the packed builder's production dependencies with pnpm hoisting disabled
 and runs its CLI without an ambient TypeScript installation. Run

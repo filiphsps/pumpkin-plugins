@@ -55,11 +55,17 @@ try {
 
     const tarballDirectory = path.join(temporaryRoot, 'tarballs');
     const consumerDirectory = path.join(temporaryRoot, 'consumer');
-    const storeDirectory = path.join(temporaryRoot, 'pnpm-store');
-    const cacheDirectory = path.join(temporaryRoot, 'cache', 'hermes');
+    const storeDirectory = path.resolve(
+        process.env.PUMPKIN_EXTERNAL_CONSUMER_PNPM_STORE_DIR ?? path.join(temporaryRoot, 'pnpm-store')
+    );
+    const cacheDirectory = path.resolve(
+        process.env.STATIC_HERMES_CACHE_DIR ?? path.join(temporaryRoot, 'cache', 'hermes')
+    );
     const pnpmConfigDirectory = path.join(temporaryRoot, 'pnpm-config');
     fs.mkdirSync(tarballDirectory, { recursive: true });
     fs.mkdirSync(consumerDirectory, { recursive: true });
+    fs.mkdirSync(storeDirectory, { recursive: true });
+    fs.mkdirSync(cacheDirectory, { recursive: true });
 
     const packedPackages = new Map();
     for (const packagePath of packagePaths) {
