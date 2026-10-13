@@ -23,6 +23,17 @@ interface CreatorOptions {
     skipInstall?: boolean;
 }
 
+/** Filesystem entries created while publishing a generated project. */
+interface CreatedEntry {
+    /** Path created by this invocation. */
+    path: string;
+    /** Filesystem identity used to avoid removing an entry that replaced ours. */
+    device: number;
+    inode: number;
+    /** Entry type, which determines the safe rollback operation. */
+    kind: 'file' | 'directory';
+}
+
 /** Select a requested language or prompt on an interactive terminal.
  *
  * @param options - Language flags supplied on the command line.
@@ -126,10 +137,10 @@ async function createProject(directory: string, options: CreatorOptions): Promis
     const packageManager = detectPackageManager();
     const templateName = language === 'typescript' ? 'typescript' : 'javascript';
     const templateRoot = path.resolve(import.meta.dirname, '../templates', templateName);
-    fs.mkdirSync(path.dirname(destination), { recursive: true });
-    fs.mkdirSync(destination);
-    copyTemplate(templateRoot, destination, projectName);
-    pinPnpmVersion(destination, packageManager, process.env);
+    createProjectFiles(destination, (stagingDirectory) => {
+        copyTemplate(templateRoot, stagingDirectory, projectName);
+        pinPnpmVersion(stagingDirectory, packageManager, process.env);
+    });
 
     console.log(`Created ${projectName} (${language}).`);
     if (options.skipInstall || packageManager === undefined) {
@@ -155,6 +166,138 @@ async function createProject(directory: string, options: CreatorOptions): Promis
     }
     console.log(`Project directory: ${destination}`);
     console.log(`Next: from the project directory, run ${packageManager} run build.`);
+}
+
+/** Generate a project in a sibling staging directory and publish it after generation succeeds.
+ *
+ * @param destination - Final absolute path where the project should be published.
+ * @param generate - Copies and finalizes project files inside the staging directory.
+ * @throws {Error} If generation fails or another entry claims the destination before publication.
+ */
+function createProjectFiles(destination: string, generate: (stagingDirectory: string) => void): void {
+    const parentDirectory = path.dirname(destination);
+    fs.mkdirSync(parentDirectory, { recursive: true });
+    const stagingDirectory = fs.mkdtempSync(path.join(parentDirectory, `.${path.basename(destination)}-`));
+
+    try {
+        generate(stagingDirectory);
+        publishStagedProject(stagingDirectory, destination);
+    } catch (error) {
+        fs.rmSync(stagingDirectory, { recursive: true, force: true });
+        throw error;
+    }
+    fs.rmSync(stagingDirectory, { recursive: true, force: true });
+}
+
+/** Claim the destination atomically and copy the complete staged project into it.
+ *
+ * @param stagingDirectory - Complete generated project tree in a sibling directory.
+ * @param destination - Final absolute path that must not already exist.
+ * @throws {Error} If another process claims the destination or publishing its contents fails.
+ */
+function publishStagedProject(stagingDirectory: string, destination: string): void {
+    try {
+        fs.mkdirSync(destination);
+    } catch (error) {
+        if (error instanceof Error && 'code' in error && error.code === 'EEXIST') {
+            throw new Error(`destination already exists: ${destination}`, { cause: error });
+        }
+        throw error;
+    }
+
+    const createdEntries: CreatedEntry[] = [];
+    createdEntries.push(createdDirectory(destination));
+    try {
+        copyStagedProject(stagingDirectory, destination, createdEntries);
+    } catch (error) {
+        try {
+            removeCreatedEntries(createdEntries);
+        } catch (cleanupError) {
+            throw new AggregateError(
+                [error, cleanupError],
+                `project publication failed and its owned files could not be fully removed: ${destination}`
+            );
+        }
+        throw error;
+    }
+}
+
+/** Copy staged files without replacing entries another process created.
+ *
+ * @param source - Staged directory to copy.
+ * @param destination - Directory receiving the staged entries.
+ * @param createdEntries - Entries created during publication, used for rollback.
+ * @throws {Error} If a destination entry already exists or cannot be copied.
+ */
+function copyStagedProject(source: string, destination: string, createdEntries: CreatedEntry[]): void {
+    for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+        const sourcePath = path.join(source, entry.name);
+        const destinationPath = path.join(destination, entry.name);
+        if (entry.isDirectory()) {
+            fs.mkdirSync(destinationPath);
+            createdEntries.push(createdDirectory(destinationPath));
+            copyStagedProject(sourcePath, destinationPath, createdEntries);
+        } else if (entry.isFile()) {
+            copyStagedFile(sourcePath, destinationPath, createdEntries);
+        } else {
+            throw new Error(`unsupported staged entry: ${sourcePath}`);
+        }
+    }
+}
+
+/** Create an exclusive file from staged content and remember its filesystem identity.
+ *
+ * @param source - Staged source file.
+ * @param destination - File path to create without replacing an existing entry.
+ * @param createdEntries - Entries created during publication, used for rollback.
+ */
+function copyStagedFile(source: string, destination: string, createdEntries: CreatedEntry[]): void {
+    const contents = fs.readFileSync(source);
+    const descriptor = fs.openSync(destination, 'wx');
+    try {
+        createdEntries.push(createdEntry(destination, fs.fstatSync(descriptor), 'file'));
+        fs.writeFileSync(descriptor, contents);
+    } finally {
+        fs.closeSync(descriptor);
+    }
+}
+
+/** Capture the identity of a newly created directory. */
+function createdDirectory(destination: string): CreatedEntry {
+    return createdEntry(destination, fs.lstatSync(destination), 'directory');
+}
+
+/** Build rollback metadata from an open file or a freshly created directory. */
+function createdEntry(entryPath: string, stats: fs.Stats, kind: CreatedEntry['kind']): CreatedEntry {
+    return { path: entryPath, device: stats.dev, inode: stats.ino, kind };
+}
+
+/** Remove only entries that still have the identity recorded during publication. */
+function removeCreatedEntries(createdEntries: CreatedEntry[]): void {
+    for (const created of createdEntries.slice().reverse()) {
+        let current: fs.Stats;
+        try {
+            current = fs.lstatSync(created.path);
+        } catch (error) {
+            if (error instanceof Error && 'code' in error && error.code === 'ENOENT') continue;
+            throw error;
+        }
+        if (current.dev !== created.device || current.ino !== created.inode) continue;
+
+        try {
+            if (created.kind === 'file' && current.isFile()) fs.unlinkSync(created.path);
+            else if (created.kind === 'directory' && current.isDirectory()) fs.rmdirSync(created.path);
+        } catch (error) {
+            if (
+                error instanceof Error &&
+                'code' in error &&
+                (error.code === 'ENOENT' || error.code === 'ENOTEMPTY' || error.code === 'EEXIST')
+            ) {
+                continue;
+            }
+            throw error;
+        }
+    }
 }
 
 /** Record the launching pnpm version in the generated package manifest when known.
