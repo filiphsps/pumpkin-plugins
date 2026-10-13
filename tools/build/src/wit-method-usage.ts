@@ -2,12 +2,32 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
 
-/** Select referenced Pumpkin operations, or retain full adapters when analysis is incomplete. */
+/**
+ * Finds the Pumpkin host operations referenced by a plugin's TypeScript or JavaScript sources.
+ *
+ * The returned identifiers can be used to retain only the required Pumpkin native adapters.
+ * An `undefined` result means static analysis could not establish the complete set, so callers
+ * should retain all Pumpkin adapters.
+ *
+ * @param entry - Path to the plugin entry file.
+ * @param additionalTypesDir - Optional directory of generated declaration files for dependency types.
+ * @returns Sorted Pumpkin WIT operation identifiers, or `undefined` when analysis is incomplete.
+ */
 export function findUsedPumpkinWitMethods(entry: string, additionalTypesDir?: string): string[] | undefined {
     return findUsedWitMethods(entry, additionalTypesDir)?.pumpkinMethods;
 }
 
-/** Select referenced WASI operations, or retain full adapters when analysis is incomplete. */
+/**
+ * Finds the WASI host operations referenced by a plugin's TypeScript or JavaScript sources.
+ *
+ * The returned identifiers can be used to retain only the required WASI native adapters.
+ * An `undefined` result means static analysis could not establish the complete set, so callers
+ * should retain all WASI adapters.
+ *
+ * @param entry - Path to the plugin entry file.
+ * @param additionalTypesDir - Optional directory of generated declaration files for dependency types.
+ * @returns Sorted WASI WIT operation identifiers, or `undefined` when analysis is incomplete.
+ */
 export function findUsedWasiWitMethods(entry: string, additionalTypesDir?: string): string[] | undefined {
     return findUsedWitMethods(entry, additionalTypesDir)?.wasiMethods;
 }
@@ -68,6 +88,9 @@ export function findUsedWitMethods(
     const pumpkinMethods = new Set<string>();
     const wasiMethods = new Set<string>();
     const witDeclarations = new Map<string, ts.Declaration[]>();
+    const calledValues = new Set<ts.Symbol>();
+    const constructedValues = new Set<ts.Symbol>();
+    let valueUsagesIndexed = false;
     for (const source of program.getSourceFiles()) {
         if (!pumpkinInterfaceName(source.fileName) && !wasiModuleSpecifier(source)) continue;
         indexDeclarations(source);
@@ -176,6 +199,7 @@ export function findUsedWitMethods(
             }
         } else if (ts.isIdentifier(node)) collectMethod(node);
         if (ts.isNewExpression(node)) collectConstructor(node.expression);
+        if (ts.isIdentifier(node) || ts.isPropertyAccessExpression(node)) collectReferencedWitConstructor(node);
         if (ts.isVariableDeclaration(node) && ts.isObjectBindingPattern(node.name) && node.initializer) {
             for (const binding of node.name.elements) {
                 if (binding.dotDotDotToken) {
@@ -226,7 +250,7 @@ export function findUsedWitMethods(
 
     function collectAllMembers(type: ts.Type, name: ts.Node, receiver: ts.Expression): void {
         if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
-            incomplete = true;
+            if (!ts.isElementAccessExpression(name.parent) || isUnknownDynamicHostCall(name.parent)) incomplete = true;
             return;
         }
         if (type.isUnionOrIntersection()) {
@@ -234,6 +258,109 @@ export function findUsedWitMethods(
             return;
         }
         for (const member of checker.getPropertiesOfType(type)) collectMethod(name, receiver, member.name);
+    }
+
+    /**
+     * Checks whether an untyped computed property is invoked as a method or constructor.
+     * Ordinary data indexing in JavaScript dependencies cannot name a WIT operation.
+     */
+    function isUnknownDynamicHostCall(access: ts.ElementAccessExpression): boolean {
+        let expression: ts.Expression = access;
+        while (
+            ts.isParenthesizedExpression(expression.parent) ||
+            ts.isAsExpression(expression.parent) ||
+            ts.isTypeAssertionExpression(expression.parent) ||
+            ts.isNonNullExpression(expression.parent) ||
+            ts.isSatisfiesExpression(expression.parent)
+        ) {
+            expression = expression.parent;
+        }
+
+        const parent = expression.parent;
+        if (ts.isCallExpression(parent) && parent.expression === expression) return true;
+        if (ts.isNewExpression(parent) && parent.expression === expression)
+            return !isRuntimeDependencySource(access.getSourceFile());
+        if (
+            ts.isPropertyAccessExpression(parent) &&
+            parent.expression === expression &&
+            ['apply', 'bind', 'call'].includes(parent.name.text) &&
+            ts.isCallExpression(parent.parent) &&
+            parent.parent.expression === parent
+        )
+            return true;
+        if (!ts.isVariableDeclaration(parent) || parent.initializer !== expression || !ts.isIdentifier(parent.name))
+            return false;
+
+        const symbol = checker.getSymbolAtLocation(parent.name);
+        if (!symbol) return false;
+        indexValueUsages();
+        if (calledValues.has(symbol)) return true;
+        return constructedValues.has(symbol) && !isRuntimeDependencySource(access.getSourceFile());
+    }
+
+    /**
+     * Indexes identifiers used as call or constructor targets so computed members can be followed through a local alias.
+     */
+    function indexValueUsages(): void {
+        if (valueUsagesIndexed) return;
+        valueUsagesIndexed = true;
+        for (const source of program.getSourceFiles()) {
+            if (!isPluginSource(source)) continue;
+            findUses(source);
+        }
+
+        function findUses(node: ts.Node): void {
+            if (ts.isCallExpression(node)) {
+                const expression = node.expression;
+                const target = ts.isPropertyAccessExpression(expression)
+                    ? ['apply', 'bind', 'call'].includes(expression.name.text)
+                        ? expression.expression
+                        : expression
+                    : expression;
+                if (ts.isIdentifier(target)) {
+                    const symbol = checker.getSymbolAtLocation(target);
+                    if (symbol) calledValues.add(symbol);
+                }
+            } else if (ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
+                const symbol = checker.getSymbolAtLocation(node.expression);
+                if (symbol) constructedValues.add(symbol);
+            }
+            ts.forEachChild(node, findUses);
+        }
+    }
+
+    /**
+     * Retains a host constructor when plugin code passes its class value to a dynamically typed dependency.
+     */
+    function collectReferencedWitConstructor(expression: ts.Expression): void {
+        if (isTypeOnlyReference(expression)) return;
+        if (
+            ts.isIdentifier(expression) &&
+            ts.isPropertyAccessExpression(expression.parent) &&
+            expression.parent.expression === expression
+        )
+            return;
+        const symbol =
+            ts.isIdentifier(expression) && ts.isShorthandPropertyAssignment(expression.parent)
+                ? checker.getShorthandAssignmentValueSymbol(expression.parent)
+                : checker.getSymbolAtLocation(expression);
+        if (!symbol) return;
+        const resolvedSymbol = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+        for (const declaration of resolvedSymbol.declarations ?? []) {
+            if (ts.isClassDeclaration(declaration) || ts.isClassExpression(declaration))
+                collectWitConstructor(declaration);
+        }
+    }
+
+    /**
+     * Distinguishes runtime values from type-only references and import/export declarations.
+     */
+    function isTypeOnlyReference(expression: ts.Expression): boolean {
+        for (let parent = expression.parent; parent; parent = parent.parent) {
+            if (ts.isTypeNode(parent) || ts.isImportDeclaration(parent) || ts.isExportDeclaration(parent)) return true;
+            if (ts.isExpression(parent)) return false;
+        }
+        return false;
     }
 
     function collectMethod(name: ts.Node, receiver?: ts.Expression, memberName?: string): void {
@@ -305,20 +432,101 @@ export function findUsedWitMethods(
 
     function collectConstructor(expression: ts.Expression): void {
         const name = ts.isPropertyAccessExpression(expression) ? expression.name : expression;
-        const symbol = checker.getSymbolAtLocation(name) ?? checker.getTypeAtLocation(expression).getSymbol();
-        const resolvedSymbol =
-            symbol && symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
-        for (const declaration of resolvedSymbol?.declarations ?? []) {
-            if (!ts.isClassDeclaration(declaration) && !ts.isClassExpression(declaration)) continue;
-            const wasiSpecifier = wasiModuleSpecifier(declaration.getSourceFile());
-            if (!declaration.name) continue;
-            if (wasiSpecifier) {
-                wasiMethods.add(`${wasiSpecifier}#${toWitName(declaration.name.text)}.constructor`);
-                continue;
-            }
-            const interfaceName = pumpkinInterfaceName(declaration.getSourceFile().fileName);
-            if (interfaceName) pumpkinMethods.add(`${interfaceName}.${toWitName(declaration.name.text)}.constructor`);
+        const type = checker.getTypeAtLocation(expression);
+        const symbol = checker.getSymbolAtLocation(name);
+        const symbols = new Set<ts.Symbol>();
+        for (const candidate of [symbol, type.getSymbol()]) {
+            if (!candidate) continue;
+            symbols.add(candidate.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(candidate) : candidate);
         }
+
+        let resolved = false;
+        for (const candidate of symbols) {
+            for (const declaration of candidate.declarations ?? []) {
+                if (!ts.isClassDeclaration(declaration) && !ts.isClassExpression(declaration)) continue;
+                collectWitConstructor(declaration);
+                resolved = true;
+            }
+        }
+
+        if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+            if (!isRuntimeDependencySource(expression.getSourceFile())) incomplete = true;
+            return;
+        }
+        if (type.isUnionOrIntersection()) {
+            for (const member of type.types)
+                resolved = collectConstructorType(member, expression.getSourceFile()) || resolved;
+        } else {
+            resolved = collectConstructorType(type, expression.getSourceFile()) || resolved;
+        }
+        if (!resolved) {
+            if (!isRuntimeDependencySource(expression.getSourceFile())) incomplete = true;
+        }
+    }
+
+    function collectConstructorType(type: ts.Type, source: ts.SourceFile, visited = new Set<ts.Type>()): boolean {
+        if (visited.has(type)) return true;
+        visited.add(type);
+        if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) {
+            if (!isRuntimeDependencySource(source)) incomplete = true;
+            return false;
+        }
+        if (type.isUnionOrIntersection()) {
+            let resolved = true;
+            for (const member of type.types) resolved = collectConstructorType(member, source, visited) && resolved;
+            return resolved;
+        }
+
+        let resolved = false;
+        let classResolved = false;
+        const symbol = type.getSymbol();
+        if (symbol) {
+            const candidate = symbol.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(symbol) : symbol;
+            for (const declaration of candidate.declarations ?? []) {
+                if (!ts.isClassDeclaration(declaration) && !ts.isClassExpression(declaration)) continue;
+                collectWitConstructor(declaration);
+                resolved = true;
+                classResolved = true;
+            }
+        }
+
+        const signatures = checker.getSignaturesOfType(type, ts.SignatureKind.Construct);
+        if (signatures.length > 0) {
+            let signaturesResolved = true;
+            for (const signature of signatures) {
+                const declaration = signature.getDeclaration();
+                const parent = declaration?.parent;
+                if (parent && (ts.isClassDeclaration(parent) || ts.isClassExpression(parent))) {
+                    collectWitConstructor(parent);
+                    continue;
+                }
+                if (classResolved) continue;
+                if (declaration && isKnownNonHostConstructor(declaration)) continue;
+                signaturesResolved = false;
+            }
+            if (!signaturesResolved) incomplete = true;
+            resolved = signaturesResolved || resolved;
+        }
+        return resolved;
+    }
+
+    function collectWitConstructor(declaration: ts.ClassDeclaration | ts.ClassExpression): void {
+        if (!declaration.name) return;
+        const wasiSpecifier = wasiModuleSpecifier(declaration.getSourceFile());
+        if (wasiSpecifier) {
+            wasiMethods.add(`${wasiSpecifier}#${toWitName(declaration.name.text)}.constructor`);
+            return;
+        }
+        const interfaceName = pumpkinInterfaceName(declaration.getSourceFile().fileName);
+        if (interfaceName) pumpkinMethods.add(`${interfaceName}.${toWitName(declaration.name.text)}.constructor`);
+    }
+
+    function isKnownNonHostConstructor(declaration: ts.SignatureDeclaration): boolean {
+        const source = declaration.getSourceFile();
+        if (/[/\\]lib\.[^/\\]+\.d\.ts$/.test(source.fileName)) return true;
+        return (
+            !source.isDeclarationFile && (ts.isFunctionDeclaration(declaration) || ts.isFunctionExpression(declaration))
+        );
     }
 
     function collectWasiMethod(specifier: string, declaration: ts.Declaration): void {
@@ -339,6 +547,13 @@ export function findUsedWitMethods(
 
 function isPluginSource(source: ts.SourceFile): boolean {
     return !source.isDeclarationFile && !/\.(?:test|spec)\.[cm]?tsx?$/.test(source.fileName);
+}
+
+/**
+ * Identifies installed dependency implementations whose generic JavaScript constructs are not statically typed.
+ */
+function isRuntimeDependencySource(source: ts.SourceFile): boolean {
+    return /(?:^|[/\\])node_modules[/\\]/.test(source.fileName);
 }
 
 function pumpkinInterfaceName(fileName: string): string | undefined {

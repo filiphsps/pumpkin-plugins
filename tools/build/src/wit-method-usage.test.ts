@@ -224,6 +224,58 @@ describe('findUsedPumpkinWitMethods', () => {
         expect(findUsedPumpkinWitMethods(entry)).toContain('command.command.constructor');
     });
 
+    it.each([
+        'import { Command } from "./build/types/bindings/interfaces/pumpkin-plugin-command"; const Create = Command; new Create(["say"], "Send");',
+        'import * as commands from "./build/types/bindings/interfaces/pumpkin-plugin-command"; const Create = commands.Command; new Create(["say"], "Send");'
+    ])('retains constructors referenced through local aliases: %s', (usage) => {
+        const entry = fixture();
+        fs.writeFileSync(entry, usage);
+
+        expect(findUsedPumpkinWitMethods(entry)).toContain('command.command.constructor');
+    });
+
+    it('falls back to full adapters when a constructor alias has an unknown type', () => {
+        const entry = fixture();
+        fs.writeFileSync(entry, 'declare const Create: any; new Create();');
+
+        expect(findUsedWitMethods(entry)).toBeUndefined();
+    });
+
+    it('ignores generic dynamic indexing and constructors in runtime dependencies', () => {
+        const entry = fixture();
+        const dependency = path.join(path.dirname(entry), 'node_modules/generic-library');
+        fs.mkdirSync(dependency, { recursive: true });
+        fs.writeFileSync(
+            path.join(dependency, 'index.js'),
+            'export function clone(values) { for (const value of values) { if (value.buffer) new value.constructor(value); } } export function create(registry, name) { const Constructor = registry[name]; return new Constructor(); }\n'
+        );
+        fs.writeFileSync(
+            entry,
+            'import { clone, create } from "./node_modules/generic-library/index.js"; import { Command } from "./build/types/bindings/interfaces/pumpkin-plugin-command"; clone([]); create({}, "codec"); create({ Command }, "Command");'
+        );
+
+        expect(findUsedWitMethods(entry)).toEqual({
+            pumpkinMethods: ['command.command.constructor'],
+            wasiMethods: []
+        });
+    });
+
+    it.each([
+        'export function invoke(value, key) { return value[key](); }',
+        'export function invoke(value, key) { const method = value[key]; return method(); }'
+    ])('falls back when a runtime dependency dynamically invokes an unknown member: %s', (implementation) => {
+        const entry = fixture();
+        const dependency = path.join(path.dirname(entry), 'node_modules/generic-library');
+        fs.mkdirSync(dependency, { recursive: true });
+        fs.writeFileSync(path.join(dependency, 'index.js'), `${implementation}\n`);
+        fs.writeFileSync(
+            entry,
+            'import { invoke } from "./node_modules/generic-library/index.js"; declare const resource: any; invoke(resource, "unknown");'
+        );
+
+        expect(findUsedWitMethods(entry)).toBeUndefined();
+    });
+
     it('analyzes the requested entry even when its tsconfig excludes it', () => {
         const entry = fixture();
         const excludedEntry = path.join(path.dirname(entry), 'excluded.ts');

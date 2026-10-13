@@ -1,5 +1,4 @@
 import * as fs from 'node:fs';
-import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -14,19 +13,13 @@ vi.mock('node:fs', async (importOriginal) => {
 });
 
 import { execFileSync } from 'node:child_process';
-import { ensurePumpkinWit } from '@pumpkin-plugins/pumpkin-api/wit';
 import { build } from 'esbuild';
 import { bundlePlugin } from './bundle.ts';
-import { cacheDir } from './repo.ts';
 import { generateTypes } from './types.ts';
 import { findUsedWitMethods } from './wit-method-usage.ts';
 
 const dirs: string[] = [];
-const apiRoot = path.dirname(createRequire(import.meta.url).resolve('@pumpkin-plugins/pumpkin-api/package.json'));
-const apiWitDir = ensurePumpkinWit({
-    lockFile: path.join(apiRoot, 'wit.lock.json'),
-    cacheRoot: cacheDir(import.meta.dirname)
-});
+const apiWitDir = path.join(os.tmpdir(), 'pumpkin-api-wit-fixture');
 const MAX_PRODUCTION_COMPONENT_BYTES = 5 * 1024 * 1024;
 const engineProfiles = [
     { name: 'QuickJS', options: { engine: 'quickjs' } },
