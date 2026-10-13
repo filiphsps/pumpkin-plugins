@@ -31,7 +31,7 @@ export interface StaticHermesBuildOptions {
     wasiImports?: string[];
     /** WASI operation identifiers selected for native adapter generation. */
     wasiMethods?: string[];
-    /** Pumpkin API operation identifiers selected for native dispatch generation. */
+    /** Pumpkin API operation identifiers for native dispatch; omission includes every declared operation. */
     apiMethods?: string[];
 }
 

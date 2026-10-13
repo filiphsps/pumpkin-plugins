@@ -38,10 +38,10 @@ Print deterministic WIT usage and adapter analysis
 
 Options:
   --wit <dir>                  Prepared WIT directory
-  --bundle <file>              Bundled JavaScript source
   --wasi-imports <json-array>  WASI interface specifiers (default: "[]")
-  --wasi-methods <json-array>  Used WASI operation identifiers
-  --api-methods <json-array>   Used Pumpkin operation identifiers
+  --wasi-methods <json-array>  WASI operation identifiers; omit to include all
+  --api-methods <json-array>   Pumpkin operation identifiers; omit to include
+                               all
   -h, --help                   display help for command
 "
 `;
@@ -53,10 +53,10 @@ Generate runtime.cpp and api-enums.generated.h
 
 Options:
   --wit <dir>                  Prepared WIT directory
-  --bundle <file>              Bundled JavaScript source
   --wasi-imports <json-array>  WASI interface specifiers (default: "[]")
-  --wasi-methods <json-array>  Used WASI operation identifiers
-  --api-methods <json-array>   Used Pumpkin operation identifiers
+  --wasi-methods <json-array>  WASI operation identifiers; omit to include all
+  --api-methods <json-array>   Pumpkin operation identifiers; omit to include
+                               all
   --template <file>            Runtime C++ template
   --header <file>              Generated plugin.h
   --out-dir <dir>              Generated output directory
@@ -87,11 +87,13 @@ Options:
   --bundle <file>              Bundled JavaScript source
   --wit <dir>                  Prepared WIT directory
   --output <file>              Output component file
-  --workspace-root <dir>       Consumer project root used for caches
+  --workspace-root <dir>       Consumer project directory used to find the
+                               nearest workspace cache
   --development-mode           Keep development symbols and line tables
   --wasi-imports <json-array>  WASI interface specifiers (default: "[]")
-  --wasi-methods <json-array>  Used WASI operation identifiers
-  --api-methods <json-array>   Used Pumpkin operation identifiers
+  --wasi-methods <json-array>  WASI operation identifiers; omit to include all
+  --api-methods <json-array>   Pumpkin operation identifiers; omit to include
+                               all
   --runtime-variant <variant>  Hermes archive profile (choices: "full", "lean")
   -h, --help                   display help for command
 "

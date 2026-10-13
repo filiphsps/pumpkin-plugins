@@ -1,7 +1,15 @@
 import { expect, it } from 'vitest';
 import type { WitAnalysis } from './analysis.ts';
+import { generateWitOutputs } from './generation.ts';
 import { generateWitApiFunctionForResolvedOperation } from './native-adapters.ts';
-import type { ResolvedWitType, WitApiPackage, WitFunction, WitWasiAdapterPlan, WitWasiInterface } from './types.ts';
+import type {
+    ResolvedWitType,
+    WitApiInterface,
+    WitApiPackage,
+    WitFunction,
+    WitWasiAdapterPlan,
+    WitWasiInterface
+} from './types.ts';
 import { generateWasiAdapterDispatch } from './wasi-dispatch.ts';
 
 it('guards owned input and output WIT values before conversion can throw', () => {
@@ -156,4 +164,157 @@ it('uses the owning interface name for imported named WIT types', () => {
     expect(generated).toContain('wasi_clocks_wall_clock_datetime_t argument0{};');
     expect(generated).toContain('wasi_io_error_borrow_error_t argument1{argument1State->handle};');
     expect(generated).not.toContain('wasi_clocks_types_datetime_t');
+});
+
+it('recursively frees variant payload records without standalone wit-bindgen cleanup functions', () => {
+    const interfaceSpecifier = 'wasi:http/types@0.2.3';
+    const payloadRecord = (name: string, fields: Array<{ name: string; type: ResolvedWitType }>): ResolvedWitType => ({
+        kind: 'record',
+        name,
+        interfaceName: 'types',
+        packageName: 'wasi:http',
+        interfaceSpecifier,
+        interfaceDependencies: [],
+        declaredInterface: 'types',
+        fields: fields.map(({ name: fieldName, type }) => ({
+            name: fieldName,
+            type: 'option',
+            resolvedType: type
+        }))
+    });
+    const errorCode: ResolvedWitType = {
+        kind: 'variant',
+        name: 'error-code',
+        interfaceName: 'types',
+        packageName: 'wasi:http',
+        interfaceSpecifier,
+        interfaceDependencies: [],
+        declaredInterface: 'types',
+        cases: [
+            {
+                name: 'DNS-error',
+                type: 'dns-error-payload',
+                resolvedType: payloadRecord('dns-error-payload', [
+                    { name: 'rcode', type: { kind: 'option', item: { kind: 'primitive', name: 'string' } } }
+                ])
+            },
+            {
+                name: 'TLS-alert-received',
+                type: 'tls-alert-received-payload',
+                resolvedType: payloadRecord('tls-alert-received-payload', [
+                    { name: 'alert-message', type: { kind: 'option', item: { kind: 'primitive', name: 'string' } } }
+                ])
+            },
+            {
+                name: 'HTTP-request-header-size',
+                type: 'option<field-size-payload>',
+                resolvedType: {
+                    kind: 'option',
+                    item: payloadRecord('field-size-payload', [
+                        { name: 'field-name', type: { kind: 'option', item: { kind: 'primitive', name: 'string' } } }
+                    ])
+                }
+            }
+        ]
+    };
+    const apiInterface: WitWasiInterface = {
+        packageName: 'wasi:http',
+        version: '0.2.3',
+        name: 'types',
+        specifier: interfaceSpecifier,
+        functions: [],
+        resources: [],
+        records: [],
+        variants: [],
+        enums: [],
+        flags: [],
+        types: [],
+        dependencies: [],
+        dependencyTypes: {}
+    };
+    const operation: WitFunction = {
+        name: 'accept-error',
+        isStatic: false,
+        parameters: [{ name: 'error', type: 'error-code' }],
+        result: '',
+        resolvedResult: { kind: 'unit' }
+    };
+    apiInterface.functions = [operation];
+    const plan: WitWasiAdapterPlan = {
+        operationId: `${interfaceSpecifier}#accept-error`,
+        kind: 'function',
+        apiInterface,
+        operation,
+        parameters: [{ name: 'error', type: 'error-code', resolvedType: errorCode }],
+        resultType: { kind: 'unit' }
+    };
+    const analysis: WitAnalysis = {
+        apiInterfaces: [],
+        apiMethods: [],
+        apiAdapters: [],
+        wasiImports: [interfaceSpecifier],
+        wasiInterfaces: [interfaceSpecifier],
+        resolvedWasiInterfaces: [apiInterface],
+        wasiMethods: [plan.operationId],
+        wasiFeatures: [],
+        wasiAdapters: [plan],
+        eventFields: []
+    };
+    const apiInterfaceFixture = (name: string, enums: WitApiInterface['enums']): WitApiInterface => ({
+        packageName: 'pumpkin:api',
+        version: '1.0.0',
+        name,
+        specifier: `pumpkin:api/${name}@1.0.0`,
+        functions: [],
+        resources: [],
+        records: [],
+        variants: [],
+        enums,
+        flags: [],
+        types: [],
+        dependencies: [],
+        dependencyTypes: {}
+    });
+    const apiPackage: WitApiPackage = {
+        packageName: 'pumpkin:api',
+        version: '1.0.0',
+        interfaces: [
+            apiInterfaceFixture('event', [
+                { name: 'event-type', values: ['join'] },
+                { name: 'event-priority', values: ['normal'] }
+            ]),
+            apiInterfaceFixture('game-rules', [{ name: 'game-rule', values: ['keep-inventory'] }]),
+            apiInterfaceFixture('common', [{ name: 'named-color', values: ['white'] }])
+        ]
+    };
+    const pluginHeader = [
+        '#define PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_JOIN 1',
+        '#define PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_NORMAL 2',
+        '#define PUMPKIN_PLUGIN_GAME_RULES_GAME_RULE_KEEP_INVENTORY 3',
+        '#define PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_WHITE 4',
+        'void plugin_option_string_free(plugin_option_string_t *value);',
+        'void wasi_http_types_error_code_free(wasi_http_types_error_code_t *value);',
+        'void wasi_http_types_option_field_size_payload_free(wasi_http_types_option_field_size_payload_t *value);'
+    ].join('\n');
+    const generated = generateWitOutputs({
+        analysis,
+        apiPackage,
+        wasiInterfaces: [apiInterface],
+        pluginHeader,
+        runtimeTemplate: [
+            '/* <PUMPKIN_WASI_RUNTIME> */',
+            '/* <PUMPKIN_WASI_INITIALIZATION> */',
+            '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
+            '/* <PUMPKIN_WIT_EVENT_DISPATCH> */'
+        ].join('\n')
+    }).runtimeSource;
+
+    expect(generated).toContain('wasi_http_types_error_code_free(&argument0);');
+    expect(generated).toContain('plugin_option_string_free(&argument0DNSErrorRcode);');
+    expect(generated).toContain('plugin_option_string_free(&argument0TLSAlertReceivedAlertMessage);');
+    expect(generated).toContain('wasi_http_types_option_field_size_payload_free(&argument0HTTPRequestHeaderSize);');
+    expect(generated).toContain('plugin_option_string_free(&argument0HTTPRequestHeaderSizeValueFieldName);');
+    expect(generated).not.toContain('wasi_http_types_dns_error_payload_free');
+    expect(generated).not.toContain('wasi_http_types_tls_alert_received_payload_free');
+    expect(generated).not.toContain('wasi_http_types_field_size_payload_free');
 });

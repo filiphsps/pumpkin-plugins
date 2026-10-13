@@ -39,9 +39,8 @@ beforeEach(() => {
 
 afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
-it('resolves the bundle WIT inputs and preserves inferred method selection', () => {
+it('resolves WIT inputs without reading the component bundle for operation selection', () => {
     const bundle = path.join(root, 'bundle.js');
-    fs.writeFileSync(bundle, 'import { log } from "pumpkin:plugin/logging@0.1.0"; log("hello");');
     const options: ComponentBuildOptions = {
         bundle,
         wit: path.join(root, 'wit'),
@@ -60,7 +59,6 @@ it('resolves the bundle WIT inputs and preserves inferred method selection', () 
     expect(mocks.resolveDocument).toHaveBeenCalledWith(document, expect.any(Map));
     expect(mocks.resolveApi).toHaveBeenCalledWith(resolved, imports);
     expect(mocks.analyzeUsage).toHaveBeenCalledWith(resolved, {
-        bundleSource: fs.readFileSync(bundle, 'utf8'),
         pluginImportOrder: imports,
         wasiImports: []
     });
@@ -72,7 +70,6 @@ it('resolves the bundle WIT inputs and preserves inferred method selection', () 
 
 it('forwards explicit operation selections without collapsing empty lists to inferred selection', () => {
     const bundle = path.join(root, 'bundle.js');
-    fs.writeFileSync(bundle, '');
     const options: ComponentBuildOptions = {
         bundle,
         wit: path.join(root, 'wit'),

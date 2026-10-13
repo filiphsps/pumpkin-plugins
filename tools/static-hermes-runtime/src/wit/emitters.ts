@@ -16,20 +16,20 @@ export function emitWasiFacade(apiInterface: WitWasiInterface): string {
 }
 
 /** Generate native Pumpkin method dispatch from the analyzed API method selection. */
-export function emitPumpkinMethodDispatch(
-    apiPackage: WitApiPackage,
-    _bundleSource: string,
-    analysis: WitAnalysis
-): string {
+export function emitPumpkinMethodDispatch(apiPackage: WitApiPackage, analysis: WitAnalysis): string {
     return generatePumpkinMethodDispatch(apiPackage, analysis);
 }
 
 /** Generate native WASI dispatch from the resolved import closure and adapter plan. */
-export function emitWasiAdapterDispatch(interfaces: readonly WitWasiInterface[], analysis: WitAnalysis): string {
-    return generateWasiAdapterDispatch(interfaces, analysis);
+export function emitWasiAdapterDispatch(
+    interfaces: readonly WitWasiInterface[],
+    analysis: WitAnalysis,
+    availableFreeFunctions?: ReadonlySet<string>
+): string {
+    return generateWasiAdapterDispatch(interfaces, analysis, availableFreeFunctions);
 }
 
-/** Generate native event conversion using the selected event-field plan. */
-export function emitEventDispatch(apiPackage: WitApiPackage, bundleSource: string, analysis: WitAnalysis): string {
-    return generateWitEventDispatch(apiPackage, bundleSource, analysis.eventFields);
+/** Generate native event conversion using the complete event-field plan. */
+export function emitEventDispatch(apiPackage: WitApiPackage, analysis: WitAnalysis): string {
+    return generateWitEventDispatch(apiPackage, analysis.eventFields);
 }

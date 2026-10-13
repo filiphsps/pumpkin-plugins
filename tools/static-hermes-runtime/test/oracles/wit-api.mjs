@@ -1697,7 +1697,10 @@ function generateWitResult(apiPackage, apiInterface, type, functionName, argumen
     if (type.kind === 'unit') return { setup: [], call: `${call};`, cleanup: [], return: 'return Value::undefined();' };
     if (type.kind === 'primitive' && type.name === 'string') {
         return {
-            setup: ['plugin_string_t result{};', ...witCleanupGuard(apiPackage, apiInterface, type, 'result', 'resultCleanup')],
+            setup: [
+                'plugin_string_t result{};',
+                ...witCleanupGuard(apiPackage, apiInterface, type, 'result', 'resultCleanup')
+            ],
             call: `${functionName}(${[...callArguments, '&result'].join(', ')});`,
             cleanup: [],
             return: 'const auto text = wasiStringValue(result); return jsString(rt, text);'

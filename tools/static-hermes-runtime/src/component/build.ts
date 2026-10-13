@@ -4,12 +4,15 @@ import { fileURLToPath } from 'node:url';
 import { prepareHermes } from '../hermes/prepare.ts';
 import { setupHermesToolchainEnvironment } from '../hermes/toolchain-environment.ts';
 import { hermesHostCompilerPath } from '../hermes/toolchain-paths.ts';
+import { readInterfaceDeclarationOrder, readPluginImportOrder } from '../wit/parser.ts';
+import { resolveConsumerWorkspaceRoot } from '../workspace-root.ts';
 import { analyzeComponentWit } from './analyze.ts';
 import { compileAndLinkComponent } from './compile.ts';
 import { generateComponentFiles } from './generate.ts';
 import type { ComponentBuildOptions } from './types.ts';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const maximumStackSizeBytes = 0xffff_fff0;
 
 /**
  * Analyze WIT, generate adapters, compile Hermes bytecode, and link one component.
@@ -19,8 +22,17 @@ const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
  * @throws {Error} If required toolchain setup, WIT analysis, compilation, or linking fails.
  */
 export async function buildStaticHermesComponent(options: ComponentBuildOptions): Promise<void> {
-    const workspaceRoot = path.resolve(options.workspaceRoot ?? path.dirname(options.output));
     const environment = process.env;
+    const runtimeVariant =
+        options.runtimeVariant ?? (environment.STATIC_HERMES_ENABLE_LEAN_ARCHIVE === '0' ? 'full' : 'lean');
+    const stackSizeBytes = environment.STATIC_HERMES_STACK_SIZE ?? '262144';
+    validateRuntimeVariant(runtimeVariant);
+    validateStackSize(stackSizeBytes);
+    preflightComponentInputs(options);
+    const outputDirectory = path.dirname(options.output);
+    fs.mkdirSync(outputDirectory, { recursive: true });
+
+    const workspaceRoot = resolveConsumerWorkspaceRoot(options.workspaceRoot);
     const toolchain = await setupHermesToolchainEnvironment({
         workspaceRoot,
         env: environment,
@@ -29,16 +41,10 @@ export async function buildStaticHermesComponent(options: ComponentBuildOptions)
         includeWasmTools: true
     });
     Object.assign(environment, toolchain);
+    const analysis = analyzeComponentWit(options);
     if (environment.PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED !== '1') {
         await prepareHermes({ workspaceRoot, environment });
     }
-
-    const analysis = analyzeComponentWit(options);
-    const runtimeVariant =
-        options.runtimeVariant ?? (environment.STATIC_HERMES_ENABLE_LEAN_ARCHIVE === '0' ? 'full' : 'lean');
-    const stackSizeBytes = environment.STATIC_HERMES_STACK_SIZE ?? '262144';
-    validateRuntimeVariant(runtimeVariant);
-    validateStackSize(stackSizeBytes);
 
     const cacheRoot = configuredPath(environment, 'STATIC_HERMES_CACHE_DIR', path.join(workspaceRoot, '.cache/hermes'));
     const hermesSource = configuredPath(environment, 'STATIC_HERMES_SOURCE_DIR', path.join(cacheRoot, 'source'));
@@ -65,26 +71,36 @@ export async function buildStaticHermesComponent(options: ComponentBuildOptions)
     requirePath('WASI Hermes JSI archive', path.join(hermesWasiBuild, 'jsi/libjsi.a'));
     requirePath('wit-bindgen', bindgen);
 
-    const temporaryDirectory = fs.mkdtempSync(path.join(path.dirname(options.output), '.static-hermes-'));
+    const temporaryDirectory = fs.mkdtempSync(path.join(outputDirectory, '.static-hermes-'));
+    let preserveTemporaryDirectory = false;
     try {
         const generated = generateComponentFiles({
             witDirectory: options.wit,
-            bundlePath: options.bundle,
             templatePath: path.join(runtimeRoot, 'src/component/templates/runtime-shim.template'),
             outputDirectory: temporaryDirectory,
             bindgenPath: bindgen,
             analysis
         });
+        const componentOutput = path.join(temporaryDirectory, 'component.wasm');
         compileAndLinkComponent({
-            options,
+            options: { ...options, output: componentOutput },
             generated,
             temporaryDirectory,
             stackSizeBytes,
             toolchain: { hermesSource, hermesWasiBuild, hermesRuntimeArchive, hermesc, wasiSdk }
         });
+        publishComponent(componentOutput, options.output, temporaryDirectory, () => {
+            preserveTemporaryDirectory = true;
+        });
     } finally {
-        fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+        if (!preserveTemporaryDirectory) fs.rmSync(temporaryDirectory, { recursive: true, force: true });
     }
+}
+
+function preflightComponentInputs(options: ComponentBuildOptions): void {
+    readPluginImportOrder(options.wit);
+    readInterfaceDeclarationOrder(options.wit);
+    fs.readFileSync(options.bundle, 'utf8');
 }
 
 function configuredPath(environment: NodeJS.ProcessEnv, name: string, fallback: string): string {
@@ -110,7 +126,57 @@ function validateRuntimeVariant(value: string): asserts value is 'full' | 'lean'
 }
 
 function validateStackSize(value: string): void {
-    if (!/^\d+$/.test(value) || Number(value) < 131072 || Number(value) % 16 !== 0) {
-        throw new Error('STATIC_HERMES_STACK_SIZE must be a multiple of 16 and at least 131072 bytes');
+    const stackSizeBytes = Number(value);
+    if (
+        !/^\d+$/.test(value) ||
+        !Number.isSafeInteger(stackSizeBytes) ||
+        stackSizeBytes < 131072 ||
+        stackSizeBytes > maximumStackSizeBytes ||
+        stackSizeBytes % 16 !== 0
+    ) {
+        throw new Error(
+            `STATIC_HERMES_STACK_SIZE must be a multiple of 16 and between 131072 and ${maximumStackSizeBytes} bytes`
+        );
     }
+}
+
+function publishComponent(
+    component: string,
+    output: string,
+    temporaryDirectory: string,
+    preserveForRecovery: () => void
+): void {
+    try {
+        fs.renameSync(component, output);
+    } catch (error) {
+        if (!isReplaceError(error) || !fs.existsSync(output)) throw error;
+        const existing = fs.lstatSync(output);
+        if (!existing.isFile() && !existing.isSymbolicLink()) throw error;
+
+        const previous = path.join(temporaryDirectory, 'previous.wasm');
+        fs.renameSync(output, previous);
+        try {
+            fs.renameSync(component, output);
+        } catch (publishError) {
+            try {
+                fs.renameSync(previous, output);
+            } catch (restoreError) {
+                preserveForRecovery();
+                throw new AggregateError(
+                    [publishError, restoreError],
+                    `could not publish or restore ${output}; previous artifact preserved at ${previous}`
+                );
+            }
+            throw publishError;
+        }
+    }
+}
+
+function isReplaceError(error: unknown): boolean {
+    return (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error.code === 'EEXIST' || error.code === 'EPERM' || error.code === 'EACCES')
+    );
 }

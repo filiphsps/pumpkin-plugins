@@ -13,8 +13,6 @@ export interface WitGenerationInput {
     apiPackage: WitApiPackage;
     /** Resolved WASI interfaces to pass to native adapter generation. */
     wasiInterfaces: readonly WitWasiInterface[];
-    /** Bundled JavaScript scanned for operation usage. */
-    bundleSource: string;
     /** Generated `plugin.h` used to validate native enum constants. */
     pluginHeader: string;
     /** Runtime C++ template containing the generator marker comments. */
@@ -32,12 +30,13 @@ export interface WitGenerationOutput {
 /**
  * Generate deterministic runtime and API enum outputs from one resolved analysis plan.
  *
- * @param input - WIT analysis, resolved interfaces, bundle source, and generated source fragments.
+ * @param input - WIT analysis, resolved interfaces, and generated source fragments.
  * @returns C++ runtime source and the generated API enum header.
  * @throws {Error} If required template markers, WIT enums, or native enum constants are missing.
  */
 export function generateWitOutputs(input: WitGenerationInput): WitGenerationOutput {
-    const wasiRuntime = emitWasiAdapterDispatch(input.wasiInterfaces, input.analysis);
+    const availableFreeFunctions = readGeneratedFreeFunctions(input.pluginHeader);
+    const wasiRuntime = emitWasiAdapterDispatch(input.wasiInterfaces, input.analysis, availableFreeFunctions);
     let runtimeSource = input.runtimeTemplate;
     runtimeSource = replaceMarker(runtimeSource, '/* <PUMPKIN_WASI_RUNTIME> */', wasiRuntime);
     runtimeSource = replaceMarker(
@@ -48,12 +47,12 @@ export function generateWitOutputs(input: WitGenerationInput): WitGenerationOutp
     runtimeSource = replaceMarker(
         runtimeSource,
         '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
-        emitPumpkinMethodDispatch(input.apiPackage, input.bundleSource, input.analysis)
+        emitPumpkinMethodDispatch(input.apiPackage, input.analysis)
     );
     runtimeSource = replaceMarker(
         runtimeSource,
         '/* <PUMPKIN_WIT_EVENT_DISPATCH> */',
-        emitEventDispatch(input.apiPackage, input.bundleSource, input.analysis)
+        emitEventDispatch(input.apiPackage, input.analysis)
     );
     if (runtimeSource.includes('/* <PUMPKIN_WIT_EVENT_RESULT> */')) {
         runtimeSource = replaceMarker(
@@ -66,6 +65,16 @@ export function generateWitOutputs(input: WitGenerationInput): WitGenerationOutp
         runtimeSource,
         apiEnumHeader: generateApiEnumHeader(input.apiPackage, input.pluginHeader)
     };
+}
+
+/**
+ * Read the standalone cleanup functions declared by wit-bindgen in a generated C header.
+ *
+ * @param pluginHeader - Generated C header containing wit-bindgen declarations.
+ * @returns The names of declared cleanup functions.
+ */
+export function readGeneratedFreeFunctions(pluginHeader: string): ReadonlySet<string> {
+    return new Set([...pluginHeader.matchAll(/^\s*void\s+([A-Za-z_]\w*_free)\s*\(/gm)].map(([, name]) => name));
 }
 
 /**
@@ -100,7 +109,7 @@ function generateApiEnumHeader(apiPackage: WitApiPackage, pluginHeader: string):
         });
         return { name, values };
     });
-    return `// Generated from pumpkin-api-ts WIT and wit-bindgen C bindings. Do not edit.
+    return `// Generated from @pumpkin-plugins/pumpkin-api WIT and wit-bindgen C bindings. Do not edit.
 #pragma once
 #include <array>
 #include <cstdint>

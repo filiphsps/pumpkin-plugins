@@ -16,10 +16,8 @@ afterEach(() => {
 it('runs wit-bindgen with selected features and writes generated runtime outputs', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-generate-'));
     directories.push(root);
-    const bundlePath = path.join(root, 'bundle.js');
     const templatePath = path.join(root, 'runtime.template.cpp');
     const outputDirectory = path.join(root, 'generated');
-    fs.writeFileSync(bundlePath, 'registerPlugin({});');
     fs.writeFileSync(
         templatePath,
         [
@@ -33,7 +31,6 @@ it('runs wit-bindgen with selected features and writes generated runtime outputs
 
     const generated = generateComponentFiles({
         witDirectory: path.join(root, 'wit'),
-        bundlePath,
         templatePath,
         outputDirectory,
         bindgenPath: '/toolchain/wit-bindgen',
@@ -72,17 +69,16 @@ it('runs wit-bindgen with selected features and writes generated runtime outputs
     });
     expect(fs.readFileSync(generated.runtimeSource, 'utf8')).toContain('installGeneratedWasiApiFunctions(*jsRuntime);');
     expect(fs.readFileSync(generated.runtimeSource, 'utf8')).not.toContain('<PUMPKIN_');
-    expect(fs.readFileSync(path.join(outputDirectory, 'api-enums.generated.h'), 'utf8')).toContain(
-        'namespace pumpkin_static_api'
-    );
+    const apiEnumHeader = fs.readFileSync(path.join(outputDirectory, 'api-enums.generated.h'), 'utf8');
+    expect(apiEnumHeader).toContain('// Generated from @pumpkin-plugins/pumpkin-api WIT');
+    expect(apiEnumHeader).not.toContain('pumpkin-api-ts');
+    expect(apiEnumHeader).toContain('namespace pumpkin_static_api');
 });
 
 it('omits the feature option when no WASI features are selected', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-generate-no-features-'));
     directories.push(root);
-    const bundlePath = path.join(root, 'bundle.js');
     const templatePath = path.join(root, 'runtime.template.cpp');
-    fs.writeFileSync(bundlePath, 'registerPlugin({});');
     fs.writeFileSync(
         templatePath,
         '/* <PUMPKIN_WASI_RUNTIME> */\n/* <PUMPKIN_WASI_INITIALIZATION> */\n/* <PUMPKIN_WIT_SIMPLE_METHODS> */\n/* <PUMPKIN_WIT_EVENT_DISPATCH> */'
@@ -98,7 +94,6 @@ it('omits the feature option when no WASI features are selected', () => {
 
     generateComponentFiles({
         witDirectory: path.join(root, 'wit'),
-        bundlePath,
         templatePath,
         outputDirectory: path.join(root, 'generated'),
         bindgenPath: '/toolchain/wit-bindgen',
@@ -112,16 +107,13 @@ it('omits the feature option when no WASI features are selected', () => {
 it('does not write runtime outputs if wit-bindgen fails', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-generate-failure-'));
     directories.push(root);
-    const bundlePath = path.join(root, 'bundle.js');
     const templatePath = path.join(root, 'runtime.template.cpp');
     const outputDirectory = path.join(root, 'generated');
-    fs.writeFileSync(bundlePath, '');
     fs.writeFileSync(templatePath, '');
 
     expect(() =>
         generateComponentFiles({
             witDirectory: path.join(root, 'wit'),
-            bundlePath,
             templatePath,
             outputDirectory,
             bindgenPath: '/toolchain/wit-bindgen',
@@ -189,7 +181,6 @@ it('keeps enum lookup entries for computed event tags and priorities', () => {
     const output = generateWitOutputs({
         ...input,
         wasiInterfaces: [],
-        bundleSource: 'registerEvent(["jo", "in"].join(""), ["nor", "mal"].join(""), callback);',
         pluginHeader:
             '#define PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_JOIN 7\n#define PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_NORMAL 3',
         runtimeTemplate: [

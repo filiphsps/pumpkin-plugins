@@ -28,6 +28,8 @@ export interface WitOwnedType {
     declaredInterface?: string;
     /** Original alias name when this type is referenced through an alias. */
     aliasName?: string;
+    /** Whether wit-bindgen emitted a standalone C cleanup function for this value. */
+    hasGeneratedFreeFunction?: boolean;
 }
 
 /** Alias and owner metadata retained while resolving WIT types. */
@@ -40,6 +42,8 @@ export interface WitTypeAliasMetadata {
     packageName?: string;
     /** Fully qualified interface that owns the alias or anonymous container. */
     interfaceSpecifier?: string;
+    /** Whether wit-bindgen emitted a standalone C cleanup function for this value. */
+    hasGeneratedFreeFunction?: boolean;
 }
 
 /** Named parameter or field with its source and optional resolved type. */

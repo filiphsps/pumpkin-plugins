@@ -49,6 +49,107 @@ interface WitResourceMethodOptions {
     resourceDrops?: Map<string, [string, string]>;
 }
 
+/** Annotate selected adapter types with the standalone cleanup functions declared by wit-bindgen. */
+export function annotateWitCleanupAvailability(
+    plans: readonly WitWasiAdapterPlan[],
+    availableFreeFunctions: ReadonlySet<string>
+): WitWasiAdapterPlan[] {
+    return plans.map((plan) => {
+        const apiPackage: WitApiPackage = {
+            packageName: plan.apiInterface.packageName,
+            version: plan.apiInterface.version,
+            interfaces: [plan.apiInterface]
+        };
+        return {
+            ...plan,
+            parameters: plan.parameters.map((parameter) => ({
+                ...parameter,
+                resolvedType: annotateWitTypeCleanupAvailability(
+                    apiPackage,
+                    plan.apiInterface,
+                    parameter.resolvedType,
+                    availableFreeFunctions
+                )
+            })),
+            resultType: annotateWitTypeCleanupAvailability(
+                apiPackage,
+                plan.apiInterface,
+                plan.resultType,
+                availableFreeFunctions
+            )
+        };
+    });
+}
+
+function annotateWitTypeCleanupAvailability(
+    apiPackage: WitApiPackage,
+    apiInterface: WitApiInterface,
+    type: ResolvedWitType,
+    availableFreeFunctions: ReadonlySet<string>
+): ResolvedWitType {
+    let annotated: ResolvedWitType;
+    if (type.kind === 'borrow' || type.kind === 'list' || type.kind === 'option') {
+        annotated = {
+            ...type,
+            item: annotateWitTypeCleanupAvailability(apiPackage, apiInterface, type.item, availableFreeFunctions)
+        };
+    } else if (type.kind === 'tuple') {
+        annotated = {
+            ...type,
+            items: type.items.map((item) =>
+                annotateWitTypeCleanupAvailability(apiPackage, apiInterface, item, availableFreeFunctions)
+            )
+        };
+    } else if (type.kind === 'result') {
+        annotated = {
+            ...type,
+            ok: annotateWitTypeCleanupAvailability(apiPackage, apiInterface, type.ok, availableFreeFunctions),
+            error: annotateWitTypeCleanupAvailability(apiPackage, apiInterface, type.error, availableFreeFunctions)
+        };
+    } else if (type.kind === 'record') {
+        annotated = {
+            ...type,
+            fields: type.fields.map((field) => ({
+                ...field,
+                ...(field.resolvedType
+                    ? {
+                          resolvedType: annotateWitTypeCleanupAvailability(
+                              apiPackage,
+                              apiInterface,
+                              field.resolvedType,
+                              availableFreeFunctions
+                          )
+                      }
+                    : {})
+            }))
+        };
+    } else if (type.kind === 'variant') {
+        annotated = {
+            ...type,
+            cases: type.cases.map((variant) => ({
+                ...variant,
+                ...(variant.resolvedType
+                    ? {
+                          resolvedType: annotateWitTypeCleanupAvailability(
+                              apiPackage,
+                              apiInterface,
+                              variant.resolvedType,
+                              availableFreeFunctions
+                          )
+                      }
+                    : {})
+            }))
+        };
+    } else {
+        annotated = type;
+    }
+
+    const freeFunction = witFreeFunctionCandidate(apiPackage, apiInterface, annotated);
+    if (!freeFunction || !['borrow', 'list', 'option', 'record', 'result', 'tuple', 'variant'].includes(annotated.kind))
+        return annotated;
+    return { ...annotated, hasGeneratedFreeFunction: availableFreeFunctions.has(freeFunction) } as ResolvedWitType;
+}
+
 /** Return the generated C function name for a WASI function or resource operation. */
 function wasiOperationCFunctionName(
     apiPackage: WitApiPackage,
@@ -941,6 +1042,15 @@ function witFreeFunction(
     apiInterface: WitApiInterface,
     type: ResolvedWitType
 ): string | undefined {
+    if ('hasGeneratedFreeFunction' in type && type.hasGeneratedFreeFunction === false) return undefined;
+    return witFreeFunctionCandidate(apiPackage, apiInterface, type);
+}
+
+function witFreeFunctionCandidate(
+    apiPackage: WitApiPackage,
+    apiInterface: WitApiInterface,
+    type: ResolvedWitType
+): string | undefined {
     if (type.kind === 'enum' || type.kind === 'flags') return undefined;
     if (type.kind === 'resource' || type.kind === 'borrow') return undefined;
     if (
@@ -1002,6 +1112,20 @@ function witFreeCode(
             )
             .filter(Boolean)
             .join(' ');
+    }
+    if (type.kind === 'variant') {
+        const cases = type.cases.map((variant) => {
+            const cleanup = variant.resolvedType
+                ? witFreeCode(
+                      apiPackage,
+                      apiInterface,
+                      requireResolvedFieldType(variant),
+                      `${expression}.val.${cFieldIdentifier(variant.name)}`
+                  )
+                : '';
+            return `case ${enumValue(apiPackage, type, variant.name)}: ${cleanup} break;`;
+        });
+        return `switch (${expression}.tag) { ${cases.join(' ')} default: break; }`;
     }
     return '';
 }
@@ -1367,7 +1491,7 @@ function witTypeOwner(
     };
 }
 
-/** Emit an owned export result without transferring resources until conversion succeeds. */
+/** Emit an owned export result and return guards to release after transferring its WIT allocations. */
 export function generateWitExportValue(
     apiPackage: WitApiPackage,
     apiInterface: WitApiInterface,
@@ -1375,7 +1499,7 @@ export function generateWitExportValue(
     input: string,
     name: string,
     ownership: string
-): { setup: string[]; expression: string } {
+): { setup: string[]; expression: string; cleanupGuards?: string[] } {
     const result = generateWitInputValue(apiPackage, apiInterface, type, input, name, ownership, true);
     if (!result) throw new Error(`Cannot convert WIT export result ${name}`);
     return result;

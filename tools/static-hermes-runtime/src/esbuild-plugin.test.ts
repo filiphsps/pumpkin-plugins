@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { build } from 'esbuild';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -77,7 +79,7 @@ it('bundles declared Pumpkin and WASI imports through generated facades', async 
     });
 
     expect(mocks.setupToolchain).toHaveBeenCalledWith({
-        workspaceRoot: process.cwd(),
+        workspaceRoot: path.resolve(process.cwd(), '../..'),
         includeWasiSdk: false,
         includeWitBindgen: false,
         includeWasmTools: true
@@ -86,6 +88,68 @@ it('bundles declared Pumpkin and WASI imports through generated facades', async 
     expect(onWasiImport).toHaveBeenCalledWith(wasiInterface.specifier);
     expect(result.outputFiles[0]?.text).toContain('api-facade');
     expect(result.outputFiles[0]?.text).toContain('wasi-facade');
+});
+
+it('uses the nearest pnpm workspace root when the cache workspace is omitted', async () => {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-plugin-workspace-'));
+    const nestedPackage = path.join(workspaceRoot, 'packages/plugin/src');
+    const expectedWorkspaceRoot = fs.realpathSync(workspaceRoot);
+    fs.mkdirSync(nestedPackage, { recursive: true });
+    fs.writeFileSync(path.join(workspaceRoot, 'pnpm-workspace.yaml'), 'packages:\n  - packages/*\n');
+    const originalWorkingDirectory = process.cwd();
+
+    try {
+        process.chdir(nestedPackage);
+        const plugin = staticHermesImportsPlugin({ resolveDir: nestedPackage, witDir: witDirectory });
+        await build({
+            stdin: { contents: 'export {}', resolveDir: nestedPackage, sourcefile: 'plugin-entry.js' },
+            bundle: true,
+            write: false,
+            plugins: [plugin],
+            logLevel: 'silent'
+        });
+
+        expect(mocks.setupToolchain).toHaveBeenCalledWith({
+            workspaceRoot: expectedWorkspaceRoot,
+            includeWasiSdk: false,
+            includeWitBindgen: false,
+            includeWasmTools: true
+        });
+    } finally {
+        process.chdir(originalWorkingDirectory);
+        fs.rmSync(workspaceRoot, { recursive: true, force: true });
+    }
+});
+
+it('resolves the nearest pnpm workspace from a nested consumer cache directory', async () => {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-plugin-workspace-root-'));
+    const nestedPackage = path.join(workspaceRoot, 'packages/plugin/src');
+    fs.mkdirSync(nestedPackage, { recursive: true });
+    fs.writeFileSync(path.join(workspaceRoot, 'pnpm-workspace.yaml'), 'packages:\n  - packages/*\n');
+
+    try {
+        const plugin = staticHermesImportsPlugin({
+            resolveDir: nestedPackage,
+            workspaceRoot: path.join(workspaceRoot, 'packages/plugin'),
+            witDir: witDirectory
+        });
+        await build({
+            stdin: { contents: 'export {}', resolveDir: nestedPackage, sourcefile: 'plugin-entry.js' },
+            bundle: true,
+            write: false,
+            plugins: [plugin],
+            logLevel: 'silent'
+        });
+
+        expect(mocks.setupToolchain).toHaveBeenCalledWith({
+            workspaceRoot,
+            includeWasiSdk: false,
+            includeWitBindgen: false,
+            includeWasmTools: true
+        });
+    } finally {
+        fs.rmSync(workspaceRoot, { recursive: true, force: true });
+    }
 });
 
 it('replaces update checks in development bundles and rejects undeclared imports', async () => {

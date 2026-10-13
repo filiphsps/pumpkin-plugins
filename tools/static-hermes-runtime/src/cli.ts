@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { Command, Option } from '@commander-js/extra-typings';
 import { buildStaticHermesComponent } from './component/build.ts';
 import type { ComponentBuildOptions } from './component/types.ts';
@@ -11,21 +11,17 @@ import { analyzeWitUsage } from './wit/analysis.ts';
 import { generateWitOutputs, writeWitGeneration } from './wit/generation.ts';
 import { readInterfaceDeclarationOrder, readPluginImportOrder, readWitToolsDocument } from './wit/parser.ts';
 import { resolvePluginApi, resolveWitDocument } from './wit/resolver.ts';
-
-const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const workspaceRoot = path.resolve(runtimeRoot, '../..');
+import { resolveConsumerWorkspaceRoot } from './workspace-root.ts';
 
 /** WIT inputs and selections shared by the analyze and generate commands. */
 export interface CodegenSelectionOptions {
     /** Directory containing the prepared plugin WIT world. */
     wit: string;
-    /** Bundled JavaScript source scanned for used operations and event fields. */
-    bundle: string;
     /** WASI interface specifiers explicitly selected for adapter generation. */
     wasiImports: string[];
     /** Optional fully qualified WASI operation identifiers to include. */
     wasiMethods?: string[];
-    /** Optional fully qualified Pumpkin API operation identifiers to include. */
+    /** Optional Pumpkin API operation identifiers; omission includes every declared operation. */
     apiMethods?: string[];
 }
 
@@ -84,19 +80,17 @@ export function createStaticHermesProgram(dependencies: StaticHermesCliDependenc
         .command('analyze')
         .description('Print deterministic WIT usage and adapter analysis')
         .requiredOption('--wit <dir>', 'Prepared WIT directory')
-        .requiredOption('--bundle <file>', 'Bundled JavaScript source')
         .option('--wasi-imports <json-array>', 'WASI interface specifiers', '[]')
-        .option('--wasi-methods <json-array>', 'Used WASI operation identifiers')
-        .option('--api-methods <json-array>', 'Used Pumpkin operation identifiers')
+        .option('--wasi-methods <json-array>', 'WASI operation identifiers; omit to include all')
+        .option('--api-methods <json-array>', 'Pumpkin operation identifiers; omit to include all')
         .action(async (options) => dependencies.analyze(parseCodegenSelection(options)));
     codegen
         .command('generate')
         .description('Generate runtime.cpp and api-enums.generated.h')
         .requiredOption('--wit <dir>', 'Prepared WIT directory')
-        .requiredOption('--bundle <file>', 'Bundled JavaScript source')
         .option('--wasi-imports <json-array>', 'WASI interface specifiers', '[]')
-        .option('--wasi-methods <json-array>', 'Used WASI operation identifiers')
-        .option('--api-methods <json-array>', 'Used Pumpkin operation identifiers')
+        .option('--wasi-methods <json-array>', 'WASI operation identifiers; omit to include all')
+        .option('--api-methods <json-array>', 'Pumpkin operation identifiers; omit to include all')
         .requiredOption('--template <file>', 'Runtime C++ template')
         .requiredOption('--header <file>', 'Generated plugin.h')
         .requiredOption('--out-dir <dir>', 'Generated output directory')
@@ -109,11 +103,11 @@ export function createStaticHermesProgram(dependencies: StaticHermesCliDependenc
         .requiredOption('--bundle <file>', 'Bundled JavaScript source')
         .requiredOption('--wit <dir>', 'Prepared WIT directory')
         .requiredOption('--output <file>', 'Output component file')
-        .option('--workspace-root <dir>', 'Consumer project root used for caches')
+        .option('--workspace-root <dir>', 'Consumer project directory used to find the nearest workspace cache')
         .option('--development-mode', 'Keep development symbols and line tables')
         .option('--wasi-imports <json-array>', 'WASI interface specifiers', '[]')
-        .option('--wasi-methods <json-array>', 'Used WASI operation identifiers')
-        .option('--api-methods <json-array>', 'Used Pumpkin operation identifiers')
+        .option('--wasi-methods <json-array>', 'WASI operation identifiers; omit to include all')
+        .option('--api-methods <json-array>', 'Pumpkin operation identifiers; omit to include all')
         .addOption(new Option('--runtime-variant <variant>', 'Hermes archive profile').choices(['full', 'lean']))
         .action(async (options) => dependencies.componentBuild(parseComponentBuild(options)));
 
@@ -151,7 +145,6 @@ export function parseJsonStringArray(
 
 function parseCodegenSelection(options: {
     wit: string;
-    bundle: string;
     wasiImports: string;
     wasiMethods?: string;
     apiMethods?: string;
@@ -160,7 +153,6 @@ function parseCodegenSelection(options: {
     const apiMethods = parseJsonStringArray(options.apiMethods, 'api-methods', 'method identifiers');
     return {
         wit: path.resolve(options.wit),
-        bundle: path.resolve(options.bundle),
         wasiImports: parseJsonStringArray(options.wasiImports, 'wasi-imports', 'module specifiers') ?? [],
         ...(wasiMethods === undefined ? {} : { wasiMethods }),
         ...(apiMethods === undefined ? {} : { apiMethods })
@@ -169,7 +161,6 @@ function parseCodegenSelection(options: {
 
 function parseCodegenGenerate(options: {
     wit: string;
-    bundle: string;
     wasiImports: string;
     wasiMethods?: string;
     apiMethods?: string;
@@ -190,7 +181,7 @@ function parseComponentBuild(options: {
     bundle: string;
     wit: string;
     output: string;
-    /** Consumer project root used to place shared runtime caches. */
+    /** Consumer project directory used to find the nearest workspace for shared runtime caches. */
     workspaceRoot?: string;
     developmentMode?: boolean;
     wasiImports: string;
@@ -234,26 +225,24 @@ async function runAnalysis(options: CodegenSelectionOptions): Promise<void> {
 }
 
 async function analyzeCodegen(options: CodegenSelectionOptions) {
+    const imports = readPluginImportOrder(options.wit);
+    const declarationOrder = readInterfaceDeclarationOrder(options.wit);
     await ensureWasmTools();
     const document = readWitToolsDocument(options.wit);
-    const imports = readPluginImportOrder(options.wit);
-    const resolved = resolveWitDocument(document, readInterfaceDeclarationOrder(options.wit));
-    const bundleSource = fs.readFileSync(options.bundle, 'utf8');
+    const resolved = resolveWitDocument(document, declarationOrder);
     const apiPackage = resolvePluginApi(resolved, imports);
     const analysis = analyzeWitUsage(resolved, {
-        bundleSource,
         pluginImportOrder: imports,
         wasiImports: options.wasiImports,
         ...(options.wasiMethods === undefined ? {} : { wasiMethods: options.wasiMethods }),
         ...(options.apiMethods === undefined ? {} : { apiMethods: options.apiMethods })
     });
-    return { analysis, apiPackage, bundleSource };
+    return { analysis, apiPackage };
 }
 
 async function runGeneration(options: CodegenGenerateOptions): Promise<void> {
-    const { analysis, apiPackage, bundleSource } = await analyzeCodegen({
+    const { analysis, apiPackage } = await analyzeCodegen({
         wit: options.wit,
-        bundle: options.bundle,
         wasiImports: options.wasiImports,
         ...(options.wasiMethods === undefined ? {} : { wasiMethods: options.wasiMethods }),
         ...(options.apiMethods === undefined ? {} : { apiMethods: options.apiMethods })
@@ -262,7 +251,6 @@ async function runGeneration(options: CodegenGenerateOptions): Promise<void> {
         analysis,
         apiPackage,
         wasiInterfaces: analysis.resolvedWasiInterfaces,
-        bundleSource,
         pluginHeader: fs.readFileSync(options.header, 'utf8'),
         runtimeTemplate: fs.readFileSync(options.template, 'utf8')
     });
@@ -275,17 +263,18 @@ async function runComponentBuild(options: ComponentBuildOptions): Promise<void> 
 
 let setupWasmTools: Promise<void> | undefined;
 async function ensureWasmTools(): Promise<void> {
-    if (process.env.WASM_TOOLS) return;
+    const setupOptions = {
+        workspaceRoot: resolveConsumerWorkspaceRoot(),
+        includeWasiSdk: false,
+        includeWitBindgen: false,
+        includeWasmTools: true
+    };
+    if (process.env.WASM_TOOLS) {
+        Object.assign(process.env, await setupHermesToolchainEnvironment(setupOptions));
+        return;
+    }
     setupWasmTools ??= (async () => {
-        Object.assign(
-            process.env,
-            await setupHermesToolchainEnvironment({
-                workspaceRoot,
-                includeWasiSdk: false,
-                includeWitBindgen: false,
-                includeWasmTools: true
-            })
-        );
+        Object.assign(process.env, await setupHermesToolchainEnvironment(setupOptions));
     })();
     await setupWasmTools;
 }
@@ -315,7 +304,19 @@ export async function runStaticHermesCli(args: readonly string[] = process.argv)
     else await program.parseAsync([...args], { from: 'user' });
 }
 
-if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
+/** Match package-manager bin symlinks to this module's resolved entry file. */
+function isCliEntryPoint(): boolean {
+    const entryPath = process.argv[1];
+    if (entryPath === undefined) return false;
+
+    try {
+        return fs.realpathSync(entryPath) === fs.realpathSync(fileURLToPath(import.meta.url));
+    } catch {
+        return false;
+    }
+}
+
+if (isCliEntryPoint()) {
     runStaticHermesCli().catch((error: unknown) => {
         console.error(error);
         process.exitCode = 1;

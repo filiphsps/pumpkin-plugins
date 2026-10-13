@@ -22,8 +22,6 @@ export interface ComponentGeneratedFiles {
 export interface ComponentGenerationInput {
     /** Prepared WIT directory passed to wit-bindgen. */
     witDirectory: string;
-    /** Bundled plugin JavaScript scanned for used API methods and event fields. */
-    bundlePath: string;
     /** C++ runtime template populated with generated adapters and dispatch. */
     templatePath: string;
     /** Temporary output directory for generated bindings and runtime source. */
@@ -66,7 +64,6 @@ export function generateComponentFiles(input: ComponentGenerationInput): Compone
         analysis: input.analysis.analysis,
         apiPackage: input.analysis.apiPackage,
         wasiInterfaces: input.analysis.analysis.resolvedWasiInterfaces,
-        bundleSource: fs.readFileSync(input.bundlePath, 'utf8'),
         pluginHeader: fs.readFileSync(pluginHeader, 'utf8'),
         runtimeTemplate: fs.readFileSync(input.templatePath, 'utf8')
     });

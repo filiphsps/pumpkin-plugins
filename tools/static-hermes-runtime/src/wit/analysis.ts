@@ -11,17 +11,15 @@ import type {
     WitWasiInterface
 } from './types.ts';
 
-/** Bundle contents and explicit API/WASI selections used to construct a WIT usage plan. */
+/** Explicit API/WASI selections used to construct a WIT usage plan. */
 export interface WitAnalysisOptions {
-    /** Bundled JavaScript used to infer Pumpkin methods when no explicit selection is available. */
-    bundleSource: string;
     /** Plugin WIT import order, used to keep generated interface ordering stable. */
     pluginImportOrder?: readonly string[];
     /** WASI interface specifiers explicitly requested by the component build. */
     wasiImports?: readonly string[];
     /** Optional fully qualified WASI operation identifiers selected for adapter generation. */
     wasiMethods?: readonly string[];
-    /** Optional fully qualified Pumpkin API operation identifiers selected for dispatch generation. */
+    /** Optional Pumpkin API operation identifiers; omission includes every declared operation. */
     apiMethods?: readonly string[];
 }
 
@@ -68,10 +66,10 @@ interface WitOperation {
 }
 
 /**
- * Analyze explicit method selections and bundle scans into a deterministic WIT usage plan.
+ * Build a deterministic WIT usage plan from explicit selections, defaulting to all declared Pumpkin operations.
  *
  * @param resolved - Parsed and resolved WIT package graph.
- * @param options - Bundle source, import ordering, and optional operation selections.
+ * @param options - Import ordering and optional API/WASI operation selections.
  * @returns API/WASI methods, required WASI features, adapters, and event payload fields.
  */
 export function analyzeWitUsage(resolved: ResolvedWitDocument, options: WitAnalysisOptions): WitAnalysis {
@@ -82,7 +80,7 @@ export function analyzeWitUsage(resolved: ResolvedWitDocument, options: WitAnaly
     ];
     const wasi = resolveWasiImports(resolved, wasiImports, options.pluginImportOrder);
     const apiOperations = allApiOperations(apiPackage);
-    const apiMethods = selectApiMethods(apiOperations, options.bundleSource, options.apiMethods);
+    const apiMethods = selectApiMethods(apiOperations, options.apiMethods);
     const wasiOperations = allWasiOperations(wasi.interfaces);
     const wasiMethods = selectWasiMethods(wasiOperations, requestedWasiMethods);
 
@@ -96,7 +94,7 @@ export function analyzeWitUsage(resolved: ResolvedWitDocument, options: WitAnaly
         wasiMethods,
         wasiFeatures: selectWasiFeatures({ interfaces: wasi.interfaces }, wasiMethods),
         wasiAdapters: planWasiAdapterOperations(wasi.interfaces, requestedWasiMethods),
-        eventFields: selectWitEventFields(apiPackage, options.bundleSource)
+        eventFields: selectWitEventFields(apiPackage)
     };
 }
 
@@ -211,10 +209,9 @@ export function planWasiAdapterOperations(
  * Retain complete event payloads because JavaScript tags and field access can be dynamic.
  *
  * @param apiPackage - Resolved Pumpkin API package containing the event variant and records.
- * @param _bundleSource - Bundle source retained for compatibility; never used to prune payloads.
  * @returns Every declared event case and all fields from its payload record.
  */
-export function selectWitEventFields(apiPackage: WitApiPackage, _bundleSource: string): WitEventFieldSelection[] {
+export function selectWitEventFields(apiPackage: WitApiPackage): WitEventFieldSelection[] {
     const eventInterface = apiPackage.interfaces.find(({ name }) => name === 'event');
     const eventVariant = eventInterface?.variants.find(({ name }) => name === 'event');
     if (!eventVariant) return [];
@@ -283,11 +280,7 @@ function allWasiOperations(interfaces: readonly WitWasiInterface[]): WitOperatio
     ]);
 }
 
-function selectApiMethods(
-    operations: WitOperation[],
-    bundleSource: string,
-    requestedMethods?: readonly string[]
-): string[] {
+function selectApiMethods(operations: WitOperation[], requestedMethods?: readonly string[]): string[] {
     const byId = new Map(operations.map((entry) => [entry.operationId, entry]));
     if (requestedMethods !== undefined) {
         const selected = [...new Set(requestedMethods)];
@@ -297,14 +290,7 @@ function selectApiMethods(
         }
         return selected;
     }
-    if (isEsbuildIifeBundle(bundleSource)) return operations.map(({ operationId }) => operationId);
-    return operations
-        .filter((entry) => bundleUsesApiOperation(bundleSource, entry))
-        .map(({ operationId }) => operationId);
-}
-
-function isEsbuildIifeBundle(bundleSource: string): boolean {
-    return /^\s*var\s+[$\w]+\s*=\s*\(\(\)\s*=>\s*\{/.test(bundleSource);
+    return operations.map(({ operationId }) => operationId);
 }
 
 function selectWasiMethods(operations: WitOperation[], requestedMethods?: readonly string[]): string[] {
@@ -316,28 +302,6 @@ function selectWasiMethods(operations: WitOperation[], requestedMethods?: readon
             throw new Error(`WASI operation used by the plugin is not declared in WIT: ${method}`);
     }
     return selected;
-}
-
-function bundleUsesApiOperation(bundleSource: string, entry: WitOperation): boolean {
-    const { operation, resource, apiInterface } = entry;
-    if (!resource) {
-        const imports = /import\s*\{([^}]+)\}\s*from\s*(["'])([^"']+)\2/g;
-        for (const match of bundleSource.matchAll(imports)) {
-            if (match[3] !== apiInterface.specifier) continue;
-            const importedBindings = match[1];
-            if (importedBindings === undefined) continue;
-            for (const binding of importedBindings.split(',')) {
-                const names = /^\s*([\w$]+)(?:\s+as\s+([\w$]+))?\s*$/.exec(binding);
-                if (!names || names[1] !== jsName(operation.name)) continue;
-                const localName = names[2] ?? names[1];
-                return new RegExp(`\\b${escapeRegExp(localName)}\\s*\\(`).test(bundleSource);
-            }
-        }
-        return false;
-    }
-    if (operation.name === 'constructor')
-        return new RegExp(`\\bnew\\s+${escapeRegExp(jsClassName(resource.name))}\\s*\\(`).test(bundleSource);
-    return new RegExp(`\\.${escapeRegExp(jsName(operation.name))}\\s*\\(`).test(bundleSource);
 }
 
 function importsFromMethodIds(methods: readonly string[]): string[] {
@@ -404,18 +368,4 @@ function isSupportedWitResult(type: ResolvedWitType): boolean {
     if (type.kind === 'tuple') return type.items.every(isSupportedWitResult);
     if (type.kind === 'result') return isSupportedWitResult(type.ok) && isSupportedWitResult(type.error);
     return false;
-}
-
-function jsName(name: string): string {
-    return name.replace(/^%/, '').replace(/-([a-zA-Z0-9])/g, (_match, character: string) => character.toUpperCase());
-}
-
-function jsClassName(name: string): string {
-    return name
-        .replace(/^%/, '')
-        .replace(/(^|[-_])([a-zA-Z0-9])/g, (_match, _separator: string, character: string) => character.toUpperCase());
-}
-
-function escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

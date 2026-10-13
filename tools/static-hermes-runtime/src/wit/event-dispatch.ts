@@ -28,14 +28,12 @@ const C_RESERVED_FIELD_NAMES = new Set(
  * Generate native event payload conversion without pruning nested JavaScript record fields.
  *
  * @param apiPackage - Resolved Pumpkin API package containing event variants and payload records.
- * @param _bundleSource - Bundle source retained for compatibility; payload conversion is source independent.
  * @param selections - Event cases and payload fields selected during WIT analysis.
  * @returns C++ event dispatch code, or an empty string when there are no selected events.
  * @throws {Error} If a selected event or payload record is missing from the WIT package.
  */
 export function generateWitEventDispatch(
     apiPackage: WitApiPackage,
-    _bundleSource: string,
     selections: readonly WitEventFieldSelection[]
 ): string {
     const eventInterface = apiPackage.interfaces.find((apiInterface) => apiInterface.name === 'event');
@@ -375,6 +373,7 @@ export function generateWitEventResultDispatch(
         'for (const auto &resource : returnedResources) resource->transfer();',
         'plugin_event_free(event);',
         `*ret = ${result.expression};`,
+        ...(result.cleanupGuards ?? []).map((guardName) => `${guardName}.release();`),
         'for (const auto &resource : *eventResources) resource->drop();'
     ].join('\n');
 }

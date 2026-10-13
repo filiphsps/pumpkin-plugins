@@ -3,10 +3,11 @@ import { setupHermesToolchainEnvironment } from './hermes/toolchain-environment.
 import { emitPumpkinFacade, emitWasiFacade } from './wit/emitters.ts';
 import { readInterfaceDeclarationOrder, readPluginImportOrder, readWitToolsDocument } from './wit/parser.ts';
 import { resolvePluginApi, resolveWasiImports, resolveWitDocument } from './wit/resolver.ts';
+import { resolveConsumerWorkspaceRoot } from './workspace-root.ts';
 
 /** Options for resolving Pumpkin and WASI package imports while bundling for Static Hermes. */
 export interface StaticHermesImportsOptions {
-    /** Consumer project root used for runtime toolchain caches. */
+    /** Consumer project directory used to find the nearest pnpm workspace root for runtime toolchain caches. */
     workspaceRoot?: string;
     /** Directory used to resolve the development update-check module. */
     resolveDir: string;
@@ -34,7 +35,7 @@ export function staticHermesImportsPlugin(options: StaticHermesImportsOptions): 
         name: 'pumpkin-static-hermes-imports',
         async setup(build) {
             const toolchain = await setupHermesToolchainEnvironment({
-                workspaceRoot: options.workspaceRoot ?? process.cwd(),
+                workspaceRoot: resolveConsumerWorkspaceRoot(options.workspaceRoot),
                 includeWasiSdk: false,
                 includeWitBindgen: false,
                 includeWasmTools: true

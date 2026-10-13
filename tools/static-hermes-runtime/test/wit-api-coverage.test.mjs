@@ -15,7 +15,7 @@ import { PUMPKIN_RELEASE } from '../../test-harness/src/pumpkin-version.ts';
 import { setupHermesToolchainEnvironment } from '../src/hermes/toolchain-environment.ts';
 import { analyzeWitUsage } from '../src/wit/analysis.ts';
 import { emitPumpkinMethodDispatch, emitWasiAdapterDispatch } from '../src/wit/emitters.ts';
-import { generateWitOutputs } from '../src/wit/generation.ts';
+import { generateWitOutputs, readGeneratedFreeFunctions } from '../src/wit/generation.ts';
 import { readInterfaceDeclarationOrder, readPluginImportOrder, readWitToolsDocument } from '../src/wit/parser.ts';
 import { resolvePluginApi, resolveWasiImports, resolveWitDocument } from '../src/wit/resolver.ts';
 import {
@@ -139,7 +139,6 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
     const typedApi = resolvePluginApi(resolved, importsInOrder);
     const typedWasi = resolveWasiImports(resolved, undefined, importsInOrder);
     const typedAnalysis = analyzeWitUsage(resolved, {
-        bundleSource: eventSource,
         pluginImportOrder: importsInOrder,
         wasiImports: typedWasi.imports,
         apiMethods
@@ -227,7 +226,7 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
             };
         })
     };
-    const typedPumpkinDispatch = emitPumpkinMethodDispatch(unresolvedApiTypes, eventSource, typedAnalysis);
+    const typedPumpkinDispatch = emitPumpkinMethodDispatch(unresolvedApiTypes, typedAnalysis);
     expect(typedPumpkinDispatch).toBe(pumpkinDispatch);
 
     expect(typedApi.interfaces.map((apiInterface) => generateEsmFacade(apiInterface, typedApi.interfaces))).toEqual(
@@ -267,7 +266,6 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
         analysis: typedAnalysis,
         apiPackage: typedApi,
         wasiInterfaces: typedWasi.interfaces,
-        bundleSource: eventSource,
         pluginHeader,
         runtimeTemplate
     });
@@ -289,8 +287,9 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
     expect(typedOutput.apiEnumHeader).toBe(fs.readFileSync(legacyApiEnumPath, 'utf8'));
     // Keep compatibility checks for unaffected adapter sections. Event conversion intentionally
     // diverges from the frozen oracle: callbacks receive and return complete payloads.
+    const generatedFreeFunctions = readGeneratedFreeFunctions(fs.readFileSync(pluginHeaderPath, 'utf8'));
     expect(typedOutput.runtimeSource).toContain(
-        generateWasiAdapterDispatch(wasiPackage.interfaces, wasiPackage.interfaces, wasiMethods)
+        emitWasiAdapterDispatch(wasiPackage.interfaces, typedAnalysis, generatedFreeFunctions)
     );
     expect(typedOutput.runtimeSource).toContain('installGeneratedWasiApiFunctions(*jsRuntime);');
     expect(typedOutput.runtimeSource).toContain(generateWitSimpleMethodDispatch(apiPackage, eventSource, apiMethods));

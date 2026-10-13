@@ -20,7 +20,8 @@ it('compiles bytecode and links the generated component with the selected optimi
     fs.mkdirSync(generatedDirectory, { recursive: true });
     const bundle = path.join(root, 'bundle.js');
     const output = path.join(root, 'plugin.wasm');
-    fs.writeFileSync(bundle, 'registerPlugin({});');
+    const bundleBytes = Buffer.from('registerPlugin({});\r\n');
+    fs.writeFileSync(bundle, bundleBytes);
     const generated: ComponentGeneratedFiles = {
         directory: generatedDirectory,
         pluginC: path.join(generatedDirectory, 'plugin.c'),
@@ -73,8 +74,12 @@ it('compiles bytecode and links the generated component with the selected optimi
     expect(calls[3]?.args).toContain('-Wl,--strip-all');
     expect(calls[3]?.args).toContain('-Wl,-z,stack-size=262144');
     expect(fs.existsSync(output)).toBe(true);
+    const compiledBundlePath = calls[0]?.args.at(-1) ?? '';
+    expect(compiledBundlePath).not.toBe(bundle);
+    expect(path.dirname(compiledBundlePath)).toBe(temporaryDirectory);
+    expect(fs.readFileSync(compiledBundlePath, 'utf8')).toContain('__pumpkinPluginInitError');
+    expect(fs.readFileSync(bundle)).toEqual(bundleBytes);
     expect(fs.readFileSync(path.join(temporaryDirectory, 'plugin-bytecode.generated.h'), 'utf8')).toContain(
         '0x00, 0x01, 0x02'
     );
-    expect(fs.readFileSync(bundle, 'utf8')).toContain('__pumpkinPluginInitError');
 });

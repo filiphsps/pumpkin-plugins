@@ -46,6 +46,7 @@ export function compileAndLinkComponent(input: ComponentCompilationInput): void 
     const { options, generated, temporaryDirectory, stackSizeBytes, toolchain } = input;
     const run = input.run ?? ((command, args) => execFileSync(command, args, { stdio: 'inherit' }));
     const unitBytecode = path.join(temporaryDirectory, 'plugin_bundle.hbc');
+    const diagnosticBundle = path.join(temporaryDirectory, 'plugin_bundle.js');
     const bytecodeHeader = path.join(temporaryDirectory, 'plugin-bytecode.generated.h');
     const bindingsObject = path.join(temporaryDirectory, 'plugin.o');
     const shimObject = path.join(temporaryDirectory, 'runtime.o');
@@ -66,8 +67,8 @@ export function compileAndLinkComponent(input: ComponentCompilationInput): void 
         ? ['-Oz', '-gline-tables-only', '-DNDEBUG', '-ffunction-sections', '-fdata-sections']
         : ['-Oz', '-DNDEBUG', '-ffunction-sections', '-fdata-sections'];
 
-    fs.writeFileSync(options.bundle, wrapBundleForDiagnostics(fs.readFileSync(options.bundle, 'utf8')));
-    run(toolchain.hermesc, ['-color', ...hermesOptimization, '-emit-binary', `-out=${unitBytecode}`, options.bundle]);
+    fs.writeFileSync(diagnosticBundle, wrapBundleForDiagnostics(fs.readFileSync(options.bundle, 'utf8')));
+    run(toolchain.hermesc, ['-color', ...hermesOptimization, '-emit-binary', `-out=${unitBytecode}`, diagnosticBundle]);
     fs.writeFileSync(bytecodeHeader, renderEmbeddedBytecode(fs.readFileSync(unitBytecode)));
 
     const includeFlags = hermesIncludes.map((include) => `-I${include}`);

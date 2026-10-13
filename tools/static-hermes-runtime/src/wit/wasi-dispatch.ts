@@ -1,5 +1,6 @@
 import type { WitAnalysis } from './analysis.ts';
 import {
+    annotateWitCleanupAvailability,
     generateWitApiFunctionForResolvedOperation,
     generateWitResourceMethodForResolvedPlan
 } from './native-adapters.ts';
@@ -13,8 +14,15 @@ import type { ResolvedWitType, WitApiPackage, WitFunction, WitResource, WitWasiI
  * @returns Deterministic C++ adapters for the selected WASI operations.
  * @throws {Error} If a selected operation cannot be generated from its resolved WIT types.
  */
-export function generateWasiAdapterDispatch(interfaces: readonly WitWasiInterface[], analysis: WitAnalysis): string {
-    const plansByOperation = new Map(analysis.wasiAdapters.map((plan) => [plan.operationId, plan]));
+export function generateWasiAdapterDispatch(
+    interfaces: readonly WitWasiInterface[],
+    analysis: WitAnalysis,
+    availableFreeFunctions?: ReadonlySet<string>
+): string {
+    const adapterPlans = availableFreeFunctions
+        ? annotateWitCleanupAvailability(analysis.wasiAdapters, availableFreeFunctions)
+        : analysis.wasiAdapters;
+    const plansByOperation = new Map(adapterPlans.map((plan) => [plan.operationId, plan]));
     const usedResources = new Set<string>();
     for (const plan of analysis.wasiAdapters) {
         if (plan.resource) usedResources.add(`${plan.apiInterface.specifier}#${plan.resource.name}`);

@@ -33,7 +33,7 @@ const entries = [
         });
     return { name, values };
 });
-const source = /* cpp */ `// Generated from pumpkin-api-ts WIT and wit-bindgen C bindings. Do not edit.
+const source = /* cpp */ `// Generated from @pumpkin-plugins/pumpkin-api WIT and wit-bindgen C bindings. Do not edit.
 #pragma once
 #include <array>
 #include <cstdint>
