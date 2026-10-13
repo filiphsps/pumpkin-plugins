@@ -20,10 +20,18 @@ const markdownFiles = (dir) =>
 const packages = [...packageDirs('packages'), ...packageDirs('tools')];
 const generatedPackageOutputs = new Set(
     packages.flatMap((dir) => {
-        const output = JSON.parse(read(dir, 'package.json')).pumpkinPlugin?.output;
-        if (typeof output !== 'string' || path.posix.isAbsolute(output)) return [];
-        const target = path.posix.normalize(path.posix.join(dir, output));
-        return target.startsWith(`${dir}/`) ? [target] : [];
+        const manifest = JSON.parse(read(dir, 'package.json'));
+        const binOutputs =
+            typeof manifest.bin === 'string'
+                ? [manifest.bin]
+                : manifest.bin && typeof manifest.bin === 'object'
+                  ? Object.values(manifest.bin)
+                  : [];
+        return [manifest.pumpkinPlugin?.output, ...binOutputs].flatMap((output) => {
+            if (typeof output !== 'string' || path.posix.isAbsolute(output)) return [];
+            const target = path.posix.normalize(path.posix.join(dir, output));
+            return target.startsWith(`${dir}/`) ? [target] : [];
+        });
     })
 );
 const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
@@ -105,7 +113,10 @@ for (const file of docs) {
                 : path.posix.normalize(path.posix.join(path.posix.dirname(file), href))
             : file;
         if (!exists(resolved)) {
-            problems.push(`${file} links to ${target}, which does not exist`);
+            // API pages are generated during the docs build and intentionally ignored by Git.
+            if (!(href.startsWith('/api/') && !exists('docs/api'))) {
+                problems.push(`${file} links to ${target}, which does not exist`);
+            }
         } else if (anchor && resolved.endsWith('.md') && !anchors(resolved).has(anchor)) {
             problems.push(`${file} links to ${target}, but ${resolved} has no such heading`);
         }
