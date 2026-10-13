@@ -6,5 +6,5 @@
             "@pumpkin-plugins/pumpkin-api": ["./src/index.ts"]
         }
     },
-    "include": ["src", "test", "vitest.config.ts", "build/types"]
+    "include": ["src", "test", "docs.ts", "vitest.config.ts", "build/types"]
 }
