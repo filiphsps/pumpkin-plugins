@@ -2,8 +2,10 @@
 export interface ComponentBuildOptions {
     /** Consumer project directory used to find the nearest pnpm workspace root for runtime caches. */
     workspaceRoot?: string;
-    /** Path to the bundled JavaScript source. */
+    /** Path to the bundled JavaScript source or an opt-in TypeScript bundle. */
     bundle: string;
+    /** Parse the bundle as TypeScript with Hermes's unstable TypeScript parser. */
+    parseTypeScript?: boolean;
     /** Path to the prepared WIT directory containing the plugin world. */
     wit: string;
     /** Destination path for the compiled component. */

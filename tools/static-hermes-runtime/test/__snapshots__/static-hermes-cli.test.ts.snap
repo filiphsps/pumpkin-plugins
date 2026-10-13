@@ -84,12 +84,14 @@ exports[`documents [ 'component', 'build', '--help' ] command 1`] = `
 Build one plugin component
 
 Options:
-  --bundle <file>              Bundled JavaScript source
+  --bundle <file>              Bundled JavaScript source, or TypeScript with
+                               --parse-ts
   --wit <dir>                  Prepared WIT directory
   --output <file>              Output component file
   --workspace-root <dir>       Consumer project directory used to find the
                                nearest workspace cache
   --development-mode           Keep development symbols and line tables
+  --parse-ts                   Parse a TypeScript bundle with Hermes
   --wasi-imports <json-array>  WASI interface specifiers (default: "[]")
   --wasi-methods <json-array>  WASI operation identifiers; omit to include all
   --api-methods <json-array>   Pumpkin operation identifiers; omit to include

@@ -107,6 +107,7 @@ it.each([
             '--output <file>',
             '--workspace-root <dir>',
             '--development-mode',
+            '--parse-ts',
             '--event-types <json-array>',
             '--runtime-variant'
         ]
@@ -219,13 +220,14 @@ it('forwards the consumer project root to the component build action', async () 
             'component',
             'build',
             '--bundle',
-            'bundle.js',
+            'bundle.ts',
             '--wit',
             'wit',
             '--output',
             'plugin.wasm',
             '--workspace-root',
             'consumer',
+            '--parse-ts',
             '--event-types',
             '["server-tick-end-event"]'
         ],
@@ -234,11 +236,12 @@ it('forwards the consumer project root to the component build action', async () 
 
     expect(calls).toEqual([
         {
-            bundle: path.resolve('bundle.js'),
+            bundle: path.resolve('bundle.ts'),
             wit: path.resolve('wit'),
             output: path.resolve('plugin.wasm'),
             workspaceRoot: path.resolve('consumer'),
             developmentMode: false,
+            parseTypeScript: true,
             wasiImports: [],
             eventTypes: ['server-tick-end-event']
         }

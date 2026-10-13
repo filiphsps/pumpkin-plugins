@@ -15,8 +15,10 @@ export type StaticHermesRuntimeVariant = 'full' | 'lean';
 export interface StaticHermesBuildOptions {
     /** Consumer project root used for runtime toolchain caches. */
     workspaceRoot?: string;
-    /** Path to the bundled JavaScript source. */
+    /** Path to the bundled JavaScript source or an opt-in TypeScript bundle. */
     bundle: string;
+    /** Parse the bundle as TypeScript with Hermes's unstable TypeScript parser. */
+    parseTypeScript?: boolean;
     /** Path to the prepared WIT directory containing the plugin world. */
     witDir: string;
     /** Destination path for the compiled component. */
@@ -53,6 +55,7 @@ export function buildStaticHermesComponent(options: StaticHermesBuildOptions): v
             'build',
             '--bundle',
             options.bundle,
+            ...(options.parseTypeScript ? ['--parse-ts'] : []),
             '--wit',
             options.witDir,
             '--output',

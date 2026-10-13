@@ -12,15 +12,20 @@ afterEach(() => {
     for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 
-it('compiles bytecode and links the generated component with the selected optimization profile', () => {
+it.each([
+    { name: 'JavaScript bundle', parseTypeScript: false },
+    { name: 'TypeScript bundle', parseTypeScript: true }
+])('compiles a $name with the selected optimization profile', ({ parseTypeScript }) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-component-compile-'));
     directories.push(root);
     const temporaryDirectory = path.join(root, 'temporary');
     const generatedDirectory = path.join(temporaryDirectory, 'wit');
     fs.mkdirSync(generatedDirectory, { recursive: true });
-    const bundle = path.join(root, 'bundle.js');
+    const bundle = path.join(root, parseTypeScript ? 'bundle.ts' : 'bundle.js');
     const output = path.join(root, 'plugin.wasm');
-    const bundleBytes = Buffer.from('registerPlugin({});\r\n');
+    const bundleBytes = Buffer.from(
+        parseTypeScript ? 'const pluginName: string = "compile-test";\r\n' : 'registerPlugin({});\r\n'
+    );
     fs.writeFileSync(bundle, bundleBytes);
     const generated: ComponentGeneratedFiles = {
         directory: generatedDirectory,
@@ -35,7 +40,8 @@ it('compiles bytecode and links the generated component with the selected optimi
         output,
         developmentMode: false,
         wasiImports: [],
-        runtimeVariant: 'full'
+        runtimeVariant: 'full',
+        ...(parseTypeScript ? { parseTypeScript: true } : {})
     };
     const calls: Array<{ command: string; args: string[] }> = [];
 
@@ -68,6 +74,7 @@ it('compiles bytecode and links the generated component with the selected optimi
         'wasm32-wasip2-clang++'
     ]);
     expect(calls[0]?.args).toContain('-O4');
+    expect(calls[0]?.args.includes('-parse-ts')).toBe(parseTypeScript);
     expect(calls[0]?.args).toContain('-fstrip-function-names');
     expect(calls[1]?.args).toContain('-wasm-enable-sjlj');
     expect(calls[2]?.args).toContain('-fwasm-exceptions');
@@ -77,7 +84,9 @@ it('compiles bytecode and links the generated component with the selected optimi
     const compiledBundlePath = calls[0]?.args.at(-1) ?? '';
     expect(compiledBundlePath).not.toBe(bundle);
     expect(path.dirname(compiledBundlePath)).toBe(temporaryDirectory);
-    expect(fs.readFileSync(compiledBundlePath, 'utf8')).toContain('__pumpkinPluginInitError');
+    expect(fs.readFileSync(compiledBundlePath, 'utf8')).toContain(
+        parseTypeScript ? 'pluginName: string' : '__pumpkinPluginInitError'
+    );
     expect(fs.readFileSync(bundle)).toEqual(bundleBytes);
     expect(fs.readFileSync(path.join(temporaryDirectory, 'plugin-bytecode.generated.h'), 'utf8')).toContain(
         '0x00, 0x01, 0x02'

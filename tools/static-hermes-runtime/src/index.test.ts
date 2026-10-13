@@ -13,10 +13,11 @@ beforeEach(() => mocks.execFileSync.mockReset());
 it('forwards selected build options to the packaged CLI', () => {
     const options = {
         workspaceRoot: '/plugin',
-        bundle: '/plugin/build/plugin.js',
+        bundle: '/plugin/build/plugin.ts',
         witDir: '/plugin/build/wit',
         output: '/plugin/build/plugin.wasm',
         developmentMode: true,
+        parseTypeScript: true,
         runtimeVariant: 'full' as const,
         quietOutput: true,
         wasiImports: ['wasi:filesystem/types@0.2.3'],
@@ -36,6 +37,7 @@ it('forwards selected build options to the packaged CLI', () => {
             'build',
             '--bundle',
             options.bundle,
+            '--parse-ts',
             '--wit',
             options.witDir,
             '--output',
@@ -85,4 +87,5 @@ it('uses empty WASI imports and omits optional selections by default', () => {
     expect(args).not.toContain('--api-methods');
     expect(args).not.toContain('--event-types');
     expect(args).not.toContain('--runtime-variant');
+    expect(args).not.toContain('--parse-ts');
 });

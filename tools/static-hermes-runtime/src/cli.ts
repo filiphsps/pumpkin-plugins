@@ -100,11 +100,12 @@ export function createStaticHermesProgram(dependencies: StaticHermesCliDependenc
     component
         .command('build')
         .description('Build one plugin component')
-        .requiredOption('--bundle <file>', 'Bundled JavaScript source')
+        .requiredOption('--bundle <file>', 'Bundled JavaScript source, or TypeScript with --parse-ts')
         .requiredOption('--wit <dir>', 'Prepared WIT directory')
         .requiredOption('--output <file>', 'Output component file')
         .option('--workspace-root <dir>', 'Consumer project directory used to find the nearest workspace cache')
         .option('--development-mode', 'Keep development symbols and line tables')
+        .option('--parse-ts', 'Parse a TypeScript bundle with Hermes')
         .option('--wasi-imports <json-array>', 'WASI interface specifiers', '[]')
         .option('--wasi-methods <json-array>', 'WASI operation identifiers; omit to include all')
         .option('--api-methods <json-array>', 'Pumpkin operation identifiers; omit to include all')
@@ -185,6 +186,7 @@ function parseComponentBuild(options: {
     /** Consumer project directory used to find the nearest workspace for shared runtime caches. */
     workspaceRoot?: string;
     developmentMode?: boolean;
+    parseTs?: boolean;
     wasiImports: string;
     wasiMethods?: string;
     apiMethods?: string;
@@ -200,6 +202,7 @@ function parseComponentBuild(options: {
         output: path.resolve(options.output),
         ...(options.workspaceRoot === undefined ? {} : { workspaceRoot: path.resolve(options.workspaceRoot) }),
         developmentMode: options.developmentMode ?? false,
+        ...(options.parseTs ? { parseTypeScript: true } : {}),
         wasiImports: parseJsonStringArray(options.wasiImports, 'wasi-imports', 'module specifiers') ?? [],
         ...(wasiMethods === undefined ? {} : { wasiMethods }),
         ...(apiMethods === undefined ? {} : { apiMethods }),

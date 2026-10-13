@@ -68,7 +68,14 @@ export function compileAndLinkComponent(input: ComponentCompilationInput): void 
         : ['-Oz', '-DNDEBUG', '-ffunction-sections', '-fdata-sections'];
 
     fs.writeFileSync(diagnosticBundle, wrapBundleForDiagnostics(fs.readFileSync(options.bundle, 'utf8')));
-    run(toolchain.hermesc, ['-color', ...hermesOptimization, '-emit-binary', `-out=${unitBytecode}`, diagnosticBundle]);
+    run(toolchain.hermesc, [
+        '-color',
+        ...(options.parseTypeScript ? ['-parse-ts'] : []),
+        ...hermesOptimization,
+        '-emit-binary',
+        `-out=${unitBytecode}`,
+        diagnosticBundle
+    ]);
     fs.writeFileSync(bytecodeHeader, renderEmbeddedBytecode(fs.readFileSync(unitBytecode)));
 
     const includeFlags = hermesIncludes.map((include) => `-I${include}`);

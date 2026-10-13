@@ -1,8 +1,8 @@
 # Static Hermes Runtime
 
 This package supplies the Static Hermes backend for Pumpkin plugin components. It compiles bundled
-JavaScript to Hermes bytecode with `hermesc`, then links the bytecode, Hermes, the JSI shim, and
-generated Pumpkin/WASI bindings into a WebAssembly component. Static Hermes is the default engine;
+JavaScript to Hermes bytecode by default, with optional TypeScript parsing through `-parse-ts`, then
+links the bytecode, Hermes, the JSI shim, and generated Pumpkin/WASI bindings into a WebAssembly component. Static Hermes is the default engine;
 QuickJS remains available as an alternative.
 
 Start with the [runtime documentation](docs/index.md). It links to the
@@ -71,10 +71,11 @@ Package consumers can import `buildStaticHermesComponent`, `prepareHermes`, and 
 runtime functions directly from `@pumpkin-plugins/static-hermes-runtime`. The `codegen analyze` and
 `codegen generate` commands take prepared WIT inputs and do not read a JavaScript bundle. Use
 `--api-methods` and `--wasi-methods` to select operation identifiers; when omitted, codegen includes
-all operations in the selected interfaces. `component build` still requires the bundled JavaScript
-file for Hermes bytecode compilation. Set `quietOutput: true` on `buildStaticHermesComponent` when a
-caller owns the console format; runtime stdout is suppressed, while command failures retain stderr
-diagnostics.
+all operations in the selected interfaces. `component build` accepts a JavaScript bundle by default;
+pass `--parse-ts` with a TypeScript bundle, or set `parseTypeScript: true` in
+`buildStaticHermesComponent`. Hermes marks TypeScript parser support partial and unstable. Set
+`quietOutput: true` on `buildStaticHermesComponent` when a caller owns the console format; runtime
+stdout is suppressed, while command failures retain stderr diagnostics.
 
 ## Engine and runtime profiles
 
@@ -159,6 +160,7 @@ Production runs `hermesc -color -O4 -fstrip-function-names -g0 -emit-binary`:
 | Flag | Effect |
 | --- | --- |
 | `-color` | Prints colored compiler diagnostics in build logs. The build always passes this flag, including development builds. |
+| `-parse-ts` | Optional. Parses supported TypeScript syntax in a TypeScript bundle by converting it to Flow; upstream support is partial and unstable. |
 | `-Og` | Applies Hermes optimizations intended to remain suitable for debugging; used in development. |
 | `-O4` | Optimizes Hermes bytecode. |
 | `-fstrip-function-names` | Removes function names from the generated string table. |
@@ -166,8 +168,8 @@ Production runs `hermesc -color -O4 -fstrip-function-names -g0 -emit-binary`:
 | `-g1` | Keeps Hermes source locations for JavaScript backtraces without per-instruction debug data. |
 | `-emit-binary` | Emits Hermes bytecode embedded in the component. |
 
-Development uses `hermesc -Og -g1 -emit-binary`: the bundle stays non-minified, function names remain,
-and Hermes keeps source locations for JavaScript backtraces. Native C/C++ compilation uses
+Development uses `hermesc -color -Og -g1 -emit-binary`: the bundle stays non-minified, function
+names remain, and Hermes keeps source locations for JavaScript backtraces. Native C/C++ compilation uses
 `-Oz -gline-tables-only -DNDEBUG -ffunction-sections -fdata-sections`; this keeps native line tables
 and function names while minimizing code and allowing unused sections to be removed. Development
 components retain those line tables; the linker does not use `--strip-debug` or `--strip-all`.
