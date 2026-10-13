@@ -32,6 +32,18 @@ describe('readPluginConfig', () => {
         });
     });
 
+    it('normalizes Windows separators in package-relative build paths', () => {
+        const config = readPluginConfig(
+            packageWith({
+                version: '1.2.3',
+                pumpkinPlugin: { entry: 'src\\plugin.ts', output: 'build\\plugin.wasm' }
+            })
+        );
+
+        expect(config.entry).toBe('src/plugin.ts');
+        expect(config.output).toBe('build/plugin.wasm');
+    });
+
     it('supports the Static Hermes engine', () => {
         const config = readPluginConfig(packageWith({ version: '1.2.3', pumpkinPlugin: { engine: 'static-hermes' } }));
 

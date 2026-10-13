@@ -135,7 +135,7 @@ function requiredRelativePath(value: unknown, name: string): string {
     if (name === 'output' && path.posix.extname(normalized).toLowerCase() !== '.wasm') {
         throw new BuildError('"pumpkinPlugin.output" must name a .wasm file');
     }
-    return value;
+    return normalized;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
