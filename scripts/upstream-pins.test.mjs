@@ -7,7 +7,7 @@ import { applyUpstreamPin, discoverUpstreamPins } from './upstream-pins.mjs';
 
 function fixture() {
     const root = mkdtempSync(join(tmpdir(), 'upstream-pins-'));
-    const pinFile = 'runtime/hermes-source.json';
+    const pinFile = 'runtime/hermes-source.lock.json';
     const catalogPath = join(root, 'upstream-pins.json');
     mkdirSync(dirname(join(root, pinFile)), { recursive: true });
     writeFileSync(
@@ -127,10 +127,10 @@ it('keeps upstream pin schemas reusable across repositories and release tag form
         readFileSync(new URL('../schemas/toolchain-versions.schema.json', import.meta.url), 'utf8')
     );
     const hermesSource = JSON.parse(
-        readFileSync(new URL('../tools/static-hermes-runtime/hermes-source.json', import.meta.url), 'utf8')
+        readFileSync(new URL('../tools/static-hermes-runtime/hermes-source.lock.json', import.meta.url), 'utf8')
     );
     const wasiSdk = JSON.parse(
-        readFileSync(new URL('../tools/static-hermes-runtime/wasi-sdk.json', import.meta.url), 'utf8')
+        readFileSync(new URL('../tools/static-hermes-runtime/wasi-sdk.lock.json', import.meta.url), 'utf8')
     );
     const toolchainVersions = JSON.parse(
         readFileSync(new URL('../tools/static-hermes-runtime/toolchain-versions.json', import.meta.url), 'utf8')

@@ -81,7 +81,7 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
     const wasiBuild = path.join(root, 'build-wasip2');
     const wasiSdk = path.join(root, 'wasi-sdk');
     const toolchainFile = path.join(packageRoot, 'cmake/wasi-sdk-hermes-p2.cmake');
-    const pinFile = path.join(packageRoot, 'hermes-source.json');
+    const pinFile = path.join(packageRoot, 'hermes-source.lock.json');
     const patchFile = path.join(packageRoot, 'hermes-patches/0001-fixture.patch');
 
     for (const directory of [
@@ -98,7 +98,7 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
     fs.writeFileSync(path.join(packageRoot, 'src/cli.ts'), '');
     fs.writeFileSync(path.join(packageRoot, 'src/hermes/toolchain-environment.ts'), '');
     fs.writeFileSync(path.join(packageRoot, 'toolchain-versions.json'), '{}\n');
-    fs.writeFileSync(path.join(packageRoot, 'wasi-sdk.json'), '{}\n');
+    fs.writeFileSync(path.join(packageRoot, 'wasi-sdk.lock.json'), '{}\n');
     fs.writeFileSync(toolchainFile, 'toolchain fixture');
     fs.writeFileSync(pinFile, '{}\n');
     fs.writeFileSync(patchFile, 'patch fixture');

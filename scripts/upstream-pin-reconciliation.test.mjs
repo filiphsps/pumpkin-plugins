@@ -4,7 +4,7 @@ import * as upstreamPins from './upstream-pins.mjs';
 
 const pinBranch = 'automation/update-upstream-static-hermes';
 const pinMarker = '<!-- upstream-pin:static-hermes -->';
-const pinPath = 'tools/static-hermes-runtime/hermes-source.json';
+const pinPath = 'tools/static-hermes-runtime/hermes-source.lock.json';
 
 function input(overrides = {}) {
     return {

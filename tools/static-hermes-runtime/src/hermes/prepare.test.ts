@@ -93,7 +93,7 @@ it('prepares the pinned source, applies patches, and builds with resolved cache 
         env: environment,
         includeWitBindgen: false
     });
-    expect(mocks.readPin).toHaveBeenCalledWith('/package/hermes-source.json');
+    expect(mocks.readPin).toHaveBeenCalledWith('/package/hermes-source.lock.json');
     expect(mocks.readPatches).toHaveBeenCalledWith('/package/hermes-patches');
     expect(mocks.ensureSource).toHaveBeenCalledWith({
         pin,

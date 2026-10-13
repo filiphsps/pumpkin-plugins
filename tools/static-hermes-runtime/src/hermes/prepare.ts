@@ -180,7 +180,7 @@ function configuredHermesPaths(
         hostBuild: path.resolve(environment.STATIC_HERMES_HOST_BUILD_DIR ?? path.join(cacheRoot, 'build-host')),
         wasiBuild: path.resolve(environment.STATIC_HERMES_WASI_BUILD_DIR ?? path.join(cacheRoot, 'build-wasip2')),
         wasiSdk: path.resolve(environment.STATIC_HERMES_WASI_SDK_PATH ?? ''),
-        pinFile: path.join(packageRoot, 'hermes-source.json'),
+        pinFile: path.join(packageRoot, 'hermes-source.lock.json'),
         patchesDirectory: path.join(packageRoot, 'hermes-patches'),
         toolchainFile: path.join(packageRoot, 'cmake/wasi-sdk-hermes-p2.cmake')
     };

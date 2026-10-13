@@ -54,9 +54,9 @@ const EXTRA_FILES = {
         'dist',
         'cmake',
         'hermes-patches',
-        'hermes-source.json',
+        'hermes-source.lock.json',
         'toolchain-versions.json',
-        'wasi-sdk.json',
+        'wasi-sdk.lock.json',
         'native',
         'README.md'
     ]

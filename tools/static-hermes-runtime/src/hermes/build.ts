@@ -132,7 +132,7 @@ export function hermesBuildFingerprint(
         toolchainFiles: [
             options.toolchainFile,
             path.join(options.packageRoot, 'toolchain-versions.json'),
-            path.join(options.packageRoot, 'wasi-sdk.json')
+            path.join(options.packageRoot, 'wasi-sdk.lock.json')
         ].map((filename) => [path.relative(options.packageRoot, filename), fileDigest(filename, filesystem)]),
         toolchain: {
             wasiSdk: options.wasiSdk,

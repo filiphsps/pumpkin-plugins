@@ -18,9 +18,9 @@ version is not already installed.
 pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
 ```
 
-Preparation uses the SDK release configured in `wasi-sdk.json`, verifies its published checksum,
+Preparation uses the SDK release configured in `wasi-sdk.lock.json`, verifies its published checksum,
 installs the configured `wit-bindgen` version if needed, and caches the toolchain under
-`.cache/hermes/` by default. It checks out the source commit in `hermes-source.json`, applies the ordered
+`.cache/hermes/` by default. It checks out the source commit in `hermes-source.lock.json`, applies the ordered
 patches in `hermes-patches/`, then builds host `hermesc` and the full and lean WASI 2 Hermes/JSI
 libraries.
 
@@ -99,7 +99,7 @@ compilation, and WASI C/C++ compilation and linking.
 
 | Setting | Effect |
 | --- | --- |
-| `STATIC_HERMES_WASI_SDK_PATH` | Optional WASI SDK path override. Otherwise setup reuses `WASI_SDK_PATH` or `WASI_SDK`, or discovers the matching archive and SHA-256 digest from the release configured in `wasi-sdk.json` and caches it under `.cache/hermes/toolchain/`. |
+| `STATIC_HERMES_WASI_SDK_PATH` | Optional WASI SDK path override. Otherwise setup reuses `WASI_SDK_PATH` or `WASI_SDK`, or discovers the matching archive and SHA-256 digest from the release configured in `wasi-sdk.lock.json` and caches it under `.cache/hermes/toolchain/`. |
 | `STATIC_HERMES_CACHE_DIR` | Cache root; defaults to `.cache/hermes/` at the workspace root. |
 | `STATIC_HERMES_SOURCE_DIR` | Hermes checkout; defaults to `source/` under the cache root. |
 | `STATIC_HERMES_HOST_BUILD_DIR` | Host build directory; defaults to `build-host/` under the cache root. |

@@ -96,7 +96,7 @@ export interface StaticHermesBuildPreparationOptions {
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const DEFAULT_WASI_SDK_CONFIG = JSON.parse(
-    fs.readFileSync(path.join(packageRoot, 'wasi-sdk.json'), 'utf8')
+    fs.readFileSync(path.join(packageRoot, 'wasi-sdk.lock.json'), 'utf8')
 ) as WasiSdkConfig;
 const DEFAULT_TOOLCHAIN_CONFIG = JSON.parse(
     fs.readFileSync(path.join(packageRoot, 'toolchain-versions.json'), 'utf8')
@@ -518,7 +518,7 @@ function validateWasiSdkConfig(config: WasiSdkConfig): void {
         !/^\d+(?:\.\d+)?$/.test(config.version) ||
         typeof config.repository !== 'string'
     ) {
-        throw new Error('wasi-sdk.json must provide a numeric version and GitHub repository URL');
+        throw new Error('wasi-sdk.lock.json must provide a numeric version and GitHub repository URL');
     }
 }
 

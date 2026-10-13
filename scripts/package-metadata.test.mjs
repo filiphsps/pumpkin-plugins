@@ -66,9 +66,9 @@ test('does not package a source bin directory when the CLI is compiled under dis
         'dist',
         'cmake',
         'hermes-patches',
-        'hermes-source.json',
+        'hermes-source.lock.json',
         'toolchain-versions.json',
-        'wasi-sdk.json',
+        'wasi-sdk.lock.json',
         'native',
         'README.md'
     ]);
