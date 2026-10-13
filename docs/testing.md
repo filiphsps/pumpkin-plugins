@@ -61,8 +61,9 @@ await server.stop();
 Servers are killed on exit, so a crashed test run doesn't leave processes holding ports.
 Each test file owns its server instances and temporary directories, so Vitest can run files in
 parallel. The root command runs up to four package suites at a time to reduce total server startup
-time without starting every package's servers simultaneously. CI also reuses the WASM files from its
-build job, avoiding a second plugin build in the integration job.
+time without starting every package's servers simultaneously. CI limits that to two package suites
+at a time on hosted runners. CI also reuses the WASM files from its build job, avoiding a second
+plugin build in the integration job.
 
 ## Packed standalone consumer
 

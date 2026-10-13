@@ -24,6 +24,9 @@ jobs:
             - name: 🏗️ Verify Static Hermes is prepared
               run: pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
 
+            - name: 🔨 Build the plugin builder CLI
+              run: pnpm --filter @pumpkin-plugins/build build
+
             - name: 📊 Compare QuickJS and Static Hermes
               env:
                   PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/engine-comparison-logs

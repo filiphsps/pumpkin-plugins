@@ -491,9 +491,9 @@ jobs:
                       if [ -n "$INTEGRATION_EXTRA" ]; then
                           filters+=(--filter="$INTEGRATION_EXTRA")
                       fi
-                      pnpm exec turbo run test:integration --concurrency=4 --only "${filters[@]}"
+                      pnpm exec turbo run test:integration --concurrency=2 --only "${filters[@]}"
                   else
-                      pnpm exec turbo run test:integration --concurrency=4 --only
+                      pnpm exec turbo run test:integration --concurrency=2 --only
                   fi
 
             - name: 📤 Upload server logs
