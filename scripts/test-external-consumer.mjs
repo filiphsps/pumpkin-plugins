@@ -7,8 +7,11 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
     assertPackedBuilderDependencies,
+    assertPackedToolSchemaReferences,
     assertPublicToolPackage,
+    assertPublicToolPackageContents,
     assertStarterToolDependencies,
+    PACKED_TOOL_SCHEMA_LOCK_FILES,
     PUBLIC_TOOL_PACKAGE_PATHS
 } from './tool-packages.mjs';
 
@@ -40,95 +43,114 @@ if (pnpmVersion.trim() !== requiredPnpmVersion) {
 }
 
 const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-external-consumer-'));
-if (isWithin(repositoryRoot, temporaryRoot))
-    throw new Error(`Temporary consumer is inside the repository: ${temporaryRoot}`);
-const resolvedTemporaryRoot = fs.realpathSync(temporaryRoot);
-
-const tarballDirectory = path.join(temporaryRoot, 'tarballs');
-const consumerDirectory = path.join(temporaryRoot, 'consumer');
-const storeDirectory = path.join(temporaryRoot, 'pnpm-store');
-const cacheDirectory = path.join(temporaryRoot, 'cache', 'hermes');
-const pnpmConfigDirectory = path.join(temporaryRoot, 'pnpm-config');
-fs.mkdirSync(tarballDirectory, { recursive: true });
-fs.mkdirSync(consumerDirectory, { recursive: true });
-
-const packedPackages = new Map();
-for (const packagePath of packagePaths) {
-    const packageDirectory = path.join(repositoryRoot, packagePath);
-    await run(
-        packageManager.command,
-        [...packageManager.args, 'pack', '--pack-destination', tarballDirectory],
-        packageDirectory,
-        process.env,
-        ['ignore', 'ignore', 'inherit']
-    );
-    const packageJson = JSON.parse(fs.readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'));
-    const tarball = fs
-        .readdirSync(tarballDirectory)
-        .find((filename) => filename.startsWith(tarballName(packageJson.name)));
-    if (!tarball) throw new Error(`pnpm pack did not create a tarball for ${packageJson.name}`);
-    const tarballPath = path.join(tarballDirectory, tarball);
-    const packedPackageJson = JSON.parse(
-        execFileSync('tar', ['-xOf', tarballPath, 'package/package.json'], { encoding: 'utf8' })
-    );
-    if (packedPackageJson.name !== packageJson.name) {
-        throw new Error(`Packed package name changed from ${packageJson.name} to ${packedPackageJson.name}`);
-    }
-    const expectedPublicName = PUBLIC_TOOL_PACKAGE_PATHS[packagePath];
-    if (expectedPublicName) assertPublicToolPackage(packedPackageJson, expectedPublicName);
-    if (packedPackageJson.name === '@pumpkin-plugins/pumpkin-api') {
-        assertPumpkinApiPackageContents(tarballPath);
-    }
-    packedPackages.set(packedPackageJson.name, {
-        packageJson: packedPackageJson,
-        filename: tarball,
-        bytes: fs.readFileSync(tarballPath)
-    });
-}
-
-const packedToolVersions = Object.fromEntries(
-    [...packedPackages].map(([name, { packageJson }]) => [name, packageJson.version])
-);
-assertPackedBuilderDependencies(packedPackages.get('@pumpkin-plugins/build').packageJson, packedToolVersions);
-if (!buildCliOnly) {
-    const creatorPackage = packedPackages.get('create-pumpkin-plugin');
-    for (const language of ['typescript', 'javascript']) {
-        const templatePackageJson = JSON.parse(
-            execFileSync(
-                'tar',
-                ['-xOf', path.join(tarballDirectory, creatorPackage.filename), `package/templates/${language}/package.json`],
-                { encoding: 'utf8' }
-            )
-        );
-        assertStarterToolDependencies(templatePackageJson, packedToolVersions);
-    }
-}
-
-const registry = createInternalRegistry(packedPackages);
-await new Promise((resolve, reject) => {
-    registry.once('error', reject);
-    registry.listen(0, '127.0.0.1', resolve);
-});
-const address = registry.address();
-if (!address || typeof address === 'string') throw new Error('Temporary registry did not bind to a TCP port');
-const registryUrl = `http://127.0.0.1:${address.port}/`;
-const authFilePath = path.join(temporaryRoot, 'auth.ini');
-fs.mkdirSync(path.join(pnpmConfigDirectory, 'pnpm'), { recursive: true });
-fs.writeFileSync(authFilePath, '');
-fs.writeFileSync(
-    path.join(pnpmConfigDirectory, 'pnpm', 'config.yaml'),
-    `storeDir: ${JSON.stringify(storeDirectory)}\nminimumReleaseAge: 0\nnpmrcAuthFile: ${JSON.stringify(authFilePath)}\n`
-);
-const environment = {
-    ...process.env,
-    PATH: `${path.dirname(process.execPath)}${path.delimiter}${process.env.PATH ?? ''}`,
-    XDG_CONFIG_HOME: pnpmConfigDirectory,
-    pnpm_config_registry: registryUrl,
-    STATIC_HERMES_CACHE_DIR: cacheDirectory,
-    CI: 'true'
-};
+let registry;
 
 try {
+    if (isWithin(repositoryRoot, temporaryRoot))
+        throw new Error(`Temporary consumer is inside the repository: ${temporaryRoot}`);
+    const resolvedTemporaryRoot = fs.realpathSync(temporaryRoot);
+
+    const tarballDirectory = path.join(temporaryRoot, 'tarballs');
+    const consumerDirectory = path.join(temporaryRoot, 'consumer');
+    const storeDirectory = path.join(temporaryRoot, 'pnpm-store');
+    const cacheDirectory = path.join(temporaryRoot, 'cache', 'hermes');
+    const pnpmConfigDirectory = path.join(temporaryRoot, 'pnpm-config');
+    fs.mkdirSync(tarballDirectory, { recursive: true });
+    fs.mkdirSync(consumerDirectory, { recursive: true });
+
+    const packedPackages = new Map();
+    for (const packagePath of packagePaths) {
+        const packageDirectory = path.join(repositoryRoot, packagePath);
+        await run(
+            packageManager.command,
+            [...packageManager.args, 'pack', '--pack-destination', tarballDirectory],
+            packageDirectory,
+            process.env,
+            ['ignore', 'ignore', 'inherit']
+        );
+        const packageJson = JSON.parse(fs.readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'));
+        const tarball = fs
+            .readdirSync(tarballDirectory)
+            .find((filename) => filename.startsWith(tarballName(packageJson.name)));
+        if (!tarball) throw new Error(`pnpm pack did not create a tarball for ${packageJson.name}`);
+        const tarballPath = path.join(tarballDirectory, tarball);
+        const packedPackageJson = JSON.parse(
+            execFileSync('tar', ['-xOf', tarballPath, 'package/package.json'], { encoding: 'utf8' })
+        );
+        if (packedPackageJson.name !== packageJson.name) {
+            throw new Error(`Packed package name changed from ${packageJson.name} to ${packedPackageJson.name}`);
+        }
+        const expectedPublicName = PUBLIC_TOOL_PACKAGE_PATHS[packagePath];
+        if (expectedPublicName) {
+            assertPublicToolPackage(packedPackageJson, expectedPublicName);
+            const entries = execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' })
+                .split('\n')
+                .filter(Boolean);
+            assertPublicToolPackageContents(entries, packagePath);
+            const schemaLockFiles = Object.fromEntries(
+                (PACKED_TOOL_SCHEMA_LOCK_FILES[packagePath] ?? []).map((entry) => [
+                    entry,
+                    execFileSync('tar', ['-xOf', tarballPath, entry], { encoding: 'utf8' })
+                ])
+            );
+            assertPackedToolSchemaReferences(entries, schemaLockFiles);
+        }
+        if (packedPackageJson.name === '@pumpkin-plugins/pumpkin-api') {
+            assertPumpkinApiPackageContents(tarballPath);
+        }
+        packedPackages.set(packedPackageJson.name, {
+            packageJson: packedPackageJson,
+            filename: tarball,
+            bytes: fs.readFileSync(tarballPath)
+        });
+    }
+
+    const packedToolVersions = Object.fromEntries(
+        [...packedPackages].map(([name, { packageJson }]) => [name, packageJson.version])
+    );
+    assertPackedBuilderDependencies(packedPackages.get('@pumpkin-plugins/build').packageJson, packedToolVersions);
+    if (!buildCliOnly) {
+        const creatorPackage = packedPackages.get('create-pumpkin-plugin');
+        for (const language of ['typescript', 'javascript']) {
+            const templatePackageJson = JSON.parse(
+                execFileSync(
+                    'tar',
+                    [
+                        '-xOf',
+                        path.join(tarballDirectory, creatorPackage.filename),
+                        `package/templates/${language}/package.json`
+                    ],
+                    { encoding: 'utf8' }
+                )
+            );
+            assertStarterToolDependencies(templatePackageJson, packedToolVersions);
+        }
+    }
+
+    registry = createInternalRegistry(packedPackages);
+    await new Promise((resolve, reject) => {
+        registry.once('error', reject);
+        registry.listen(0, '127.0.0.1', resolve);
+    });
+    const address = registry.address();
+    if (!address || typeof address === 'string') throw new Error('Temporary registry did not bind to a TCP port');
+    const registryUrl = `http://127.0.0.1:${address.port}/`;
+    const authFilePath = path.join(temporaryRoot, 'auth.ini');
+    fs.mkdirSync(path.join(pnpmConfigDirectory, 'pnpm'), { recursive: true });
+    fs.writeFileSync(authFilePath, '');
+    fs.writeFileSync(
+        path.join(pnpmConfigDirectory, 'pnpm', 'config.yaml'),
+        `storeDir: ${JSON.stringify(storeDirectory)}\nminimumReleaseAge: 0\nnpmrcAuthFile: ${JSON.stringify(authFilePath)}\n`
+    );
+    const environment = {
+        ...process.env,
+        PATH: `${path.dirname(process.execPath)}${path.delimiter}${process.env.PATH ?? ''}`,
+        XDG_CONFIG_HOME: pnpmConfigDirectory,
+        pnpm_config_registry: registryUrl,
+        STATIC_HERMES_CACHE_DIR: cacheDirectory,
+        CI: 'true'
+    };
+
     const builderConsumer = path.join(temporaryRoot, 'builder-consumer');
     fs.mkdirSync(builderConsumer);
     fs.writeFileSync(
@@ -254,8 +276,18 @@ try {
         console.log(`Packed consumer and pnpm create flows passed outside the repository: ${temporaryRoot}`);
     }
 } finally {
-    await new Promise((resolve) => registry.close(resolve));
-    fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    try {
+        if (registry) {
+            await new Promise((resolve, reject) => {
+                registry.close((error) => {
+                    if (error && error.code !== 'ERR_SERVER_NOT_RUNNING') reject(error);
+                    else resolve();
+                });
+            });
+        }
+    } finally {
+        fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    }
 }
 
 function createInternalRegistry(packages) {

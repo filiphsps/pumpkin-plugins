@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { partitionReleasePaths } from './release-fanout.mjs';
 import {
-    assertPublicToolPackage,
     assertPackedBuilderDependencies,
+    assertPackedToolSchemaReferences,
+    assertPublicToolPackage,
+    assertPublicToolPackageContents,
     assertStarterToolDependencies,
     syncStarterToolDependencies
 } from './tool-packages.mjs';
@@ -62,6 +64,145 @@ describe('public tool package metadata', () => {
         assert.throws(
             () => assertPublicToolPackage({ ...metadata, engines: undefined }, '@pumpkin-plugins/build'),
             /engines.node must be >=24\.21\.0/
+        );
+    });
+});
+
+describe('packed public tool contents', () => {
+    it('requires each packed lockfile schema to resolve to a packed package-local file', () => {
+        const entries = ['package/wit.lock.json', 'package/schemas/upstream-git-pin.schema.json'];
+        const lockFiles = {
+            'package/wit.lock.json': JSON.stringify({ $schema: 'schemas/upstream-git-pin.schema.json' })
+        };
+
+        assert.doesNotThrow(() => assertPackedToolSchemaReferences(entries, lockFiles));
+        assert.throws(
+            () =>
+                assertPackedToolSchemaReferences(entries, {
+                    ...lockFiles,
+                    'package/wit.lock.json': JSON.stringify({ $schema: '../../schemas/upstream-git-pin.schema.json' })
+                }),
+            /schema escapes its package/
+        );
+        assert.throws(
+            () => assertPackedToolSchemaReferences(['package/wit.lock.json'], lockFiles),
+            /references missing schema package\/schemas\/upstream-git-pin\.schema\.json/
+        );
+    });
+
+    it('requires the schemas referenced by packed Pumpkin API lockfiles', () => {
+        const entries = [
+            'package/src/index.ts',
+            'package/src/wit.mjs',
+            'package/src/wit.d.mts',
+            'package/wit.lock.json'
+        ];
+
+        assert.throws(
+            () => assertPublicToolPackageContents(entries, 'tools/pumpkin-api'),
+            /missing package\/schemas\/upstream-git-pin\.schema\.json/
+        );
+    });
+
+    it('requires the schemas referenced by packed Static Hermes lockfiles', () => {
+        const entries = [
+            'package/src/index.ts',
+            'package/dist/index.js',
+            'package/cmake/wasi-sdk-hermes-p2.cmake',
+            'package/hermes-patches/0001-wasi-p2-configure-platform.patch',
+            'package/hermes-source.lock.json',
+            'package/wasi-sdk.lock.json',
+            'package/toolchain-versions.json'
+        ];
+
+        assert.throws(
+            () => assertPublicToolPackageContents(entries, 'tools/static-hermes-runtime'),
+            /missing package\/schemas\/upstream-git-pin\.schema\.json/
+        );
+    });
+
+    it('keeps Pumpkin API type sources and excludes source tests', () => {
+        const entries = [
+            'package/src/index.ts',
+            'package/src/core.ts',
+            'package/src/wit.mjs',
+            'package/src/wit.d.mts',
+            'package/wit.lock.json',
+            'package/schemas/upstream-git-pin.schema.json',
+            'package/src/index.test.ts'
+        ];
+
+        assert.throws(() => assertPublicToolPackageContents(entries, 'tools/pumpkin-api'), /development test source/);
+        assert.doesNotThrow(() =>
+            assertPublicToolPackageContents(
+                entries.filter((entry) => !entry.endsWith('.test.ts')),
+                'tools/pumpkin-api'
+            )
+        );
+    });
+
+    it('keeps Static Hermes type sources and runtime assets while excluding source tests', () => {
+        const entries = [
+            'package/src/index.ts',
+            'package/dist/index.js',
+            'package/cmake/wasi-sdk-hermes-p2.cmake',
+            'package/hermes-patches/0001-wasi-p2-configure-platform.patch',
+            'package/schemas/upstream-git-pin.schema.json',
+            'package/schemas/wasi-sdk-release-pin.schema.json',
+            'package/schemas/toolchain-versions.schema.json',
+            'package/src/component/build.test.ts'
+        ];
+
+        assert.throws(
+            () => assertPublicToolPackageContents(entries, 'tools/static-hermes-runtime'),
+            /development test source/
+        );
+        assert.doesNotThrow(() =>
+            assertPublicToolPackageContents(
+                entries.filter((entry) => !entry.endsWith('.test.ts')),
+                'tools/static-hermes-runtime'
+            )
+        );
+    });
+
+    it('keeps only the build CLI bundle and runtime assets', () => {
+        const entries = [
+            'package/dist/cli.js',
+            'package/runtime/quickjs-runtime-bigint.wasm',
+            'package/wasi-wit.lock.json',
+            'package/src/cli.ts'
+        ];
+
+        assert.throws(
+            () => assertPublicToolPackageContents(entries, 'tools/build'),
+            /CLI-only package contains source/
+        );
+        assert.doesNotThrow(() =>
+            assertPublicToolPackageContents(
+                entries.filter((entry) => !entry.startsWith('package/src/')),
+                'tools/build'
+            )
+        );
+    });
+
+    it('keeps the generator CLI source while excluding its development test source', () => {
+        const entries = [
+            'package/bin/create-pumpkin-plugin.ts',
+            'package/dist/create-pumpkin-plugin.js',
+            'package/templates/typescript/package.json',
+            'package/templates/javascript/package.json',
+            'package/bin/create-pumpkin-plugin.test.ts'
+        ];
+
+        assert.throws(
+            () => assertPublicToolPackageContents(entries, 'tools/create-pumpkin-plugin'),
+            /development test source/
+        );
+        assert.doesNotThrow(() =>
+            assertPublicToolPackageContents(
+                entries.filter((entry) => !entry.endsWith('.test.ts')),
+                'tools/create-pumpkin-plugin'
+            )
         );
     });
 });

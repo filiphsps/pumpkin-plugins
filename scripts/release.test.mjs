@@ -202,7 +202,7 @@ it('preserves workflow tag and multiline release-note outputs for assets and Mar
     assert.match(result.output, /pr_count<<[^\n]+\n1\n/);
     assert.match(
         result.stdout,
-        /Release fan-out: plugin paths=\["packages\/plugin"\], action paths=\["actions\/publish-action"\], release PR count=1/
+        /Release fan-out: plugin paths=\["packages\/plugin"\], action paths=\["actions\/publish-action"\], tool paths=\[\], release PR count=1/
     );
 });
 
