@@ -50,19 +50,38 @@ const KEY_ORDER = [
     'pumpkinPlugin'
 ];
 
-/** Files a tool ships besides `src`, where it has them. */
-const EXTRA_FILES = {
+/**
+ * Intentional publication allowlists for the public toolchain packages.
+ * These packages use globs and exclusions to keep development sources out of their tarballs.
+ */
+const TOOL_FILE_ALLOWLISTS = {
     'tools/build': ['dist', 'runtime', 'wasi-wit.lock.json'],
-    'tools/pumpkin-api': ['wit.lock.json', 'compatibility', 'docs', 'README.md', 'LICENSE'],
-    'tools/create-pumpkin-plugin': ['bin', 'dist', 'templates', 'README.md'],
+    'tools/pumpkin-api': [
+        'src/**/*.ts',
+        'src/**/*.mts',
+        'src/**/*.mjs',
+        '!src/**/*.test.ts',
+        '!src/**/*.spec.ts',
+        'schemas',
+        'wit.lock.json',
+        'compatibility',
+        'docs',
+        'README.md',
+        'LICENSE'
+    ],
+    'tools/create-pumpkin-plugin': ['bin/create-pumpkin-plugin.ts', 'dist', 'templates', 'README.md'],
     'tools/static-hermes-runtime': [
+        'src/**/*.ts',
+        '!src/**/*.test.ts',
+        '!src/**/*.spec.ts',
+        'src/**/*.template',
         'dist',
         'cmake',
         'hermes-patches',
+        'schemas',
         'hermes-source.lock.json',
         'toolchain-versions.json',
         'wasi-sdk.lock.json',
-        'native',
         'README.md'
     ]
 };
@@ -110,10 +129,9 @@ function expected(dir, pkg) {
     const rootExport = pkg.exports?.['.'];
     if (dir.startsWith('tools/') && pkg.exports) {
         want.sideEffects = false;
-        want.files = [
+        want.files = TOOL_FILE_ALLOWLISTS[dir] ?? [
             ...(fs.existsSync(path.join(root, dir, 'src')) ? ['src'] : []),
-            ...binSourceFiles,
-            ...(EXTRA_FILES[dir] ?? [])
+            ...binSourceFiles
         ];
         want.publishConfig = { access: 'public' };
         if (typeof rootExport === 'string') {
@@ -121,10 +139,9 @@ function expected(dir, pkg) {
             want.types = rootExport;
         }
     } else if (dir.startsWith('tools/')) {
-        want.files = [
+        want.files = TOOL_FILE_ALLOWLISTS[dir] ?? [
             ...(fs.existsSync(path.join(root, dir, 'src')) ? ['src'] : []),
-            ...binSourceFiles,
-            ...(EXTRA_FILES[dir] ?? [])
+            ...binSourceFiles
         ];
     }
     if (Object.hasOwn(EXPECTED_PUBLIC_TOOL_NAMES, dir)) want.publishConfig = { access: 'public' };

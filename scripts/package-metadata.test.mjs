@@ -63,14 +63,86 @@ test('does not package a source bin directory when the CLI is compiled under dis
 
     const files = JSON.parse(fs.readFileSync(manifest, 'utf8')).files;
     assert.deepEqual(files, [
-        'src',
+        'src/**/*.ts',
+        '!src/**/*.test.ts',
+        '!src/**/*.spec.ts',
+        'src/**/*.template',
         'dist',
         'cmake',
         'hermes-patches',
+        'schemas',
         'hermes-source.lock.json',
         'toolchain-versions.json',
         'wasi-sdk.lock.json',
-        'native',
         'README.md'
     ]);
+});
+
+test('preserves each published tool package file allowlist when metadata is fixed', (t) => {
+    const { root, run } = fixture(t);
+    const packages = {
+        'tools/build': {
+            name: '@pumpkin-plugins/build',
+            description: 'Build Pumpkin plugins',
+            bin: { 'pumpkin-plugins-build': 'dist/cli.js' },
+            files: ['dist', 'runtime', 'wasi-wit.lock.json']
+        },
+        'tools/pumpkin-api': {
+            name: '@pumpkin-plugins/pumpkin-api',
+            description: 'Pumpkin plugin TypeScript API',
+            exports: { '.': './src/index.ts' },
+            files: [
+                'src/**/*.ts',
+                'src/**/*.mts',
+                'src/**/*.mjs',
+                '!src/**/*.test.ts',
+                '!src/**/*.spec.ts',
+                'schemas',
+                'wit.lock.json',
+                'compatibility',
+                'docs',
+                'README.md',
+                'LICENSE'
+            ]
+        },
+        'tools/create-pumpkin-plugin': {
+            name: 'create-pumpkin-plugin',
+            description: 'Create a minimal Pumpkin plugin project',
+            bin: { 'create-pumpkin-plugin': 'dist/create-pumpkin-plugin.js' },
+            files: ['bin/create-pumpkin-plugin.ts', 'dist', 'templates', 'README.md']
+        },
+        'tools/static-hermes-runtime': {
+            name: '@pumpkin-plugins/static-hermes-runtime',
+            description: 'Static Hermes Runtime shim for plugin components',
+            exports: { '.': './src/index.ts' },
+            bin: { 'static-hermes-runtime': 'dist/cli.js' },
+            files: [
+                'src/**/*.ts',
+                '!src/**/*.test.ts',
+                '!src/**/*.spec.ts',
+                'src/**/*.template',
+                'dist',
+                'cmake',
+                'hermes-patches',
+                'schemas',
+                'hermes-source.lock.json',
+                'toolchain-versions.json',
+                'wasi-sdk.lock.json',
+                'README.md'
+            ]
+        }
+    };
+
+    for (const [directory, manifest] of Object.entries(packages)) {
+        const packageDirectory = path.join(root, directory);
+        fs.mkdirSync(path.join(packageDirectory, 'src'), { recursive: true });
+        fs.writeFileSync(path.join(packageDirectory, 'package.json'), JSON.stringify(manifest));
+    }
+
+    assert.equal(run('--fix').status, 0);
+    for (const [directory, expectedFiles] of Object.entries(packages)) {
+        const manifest = JSON.parse(fs.readFileSync(path.join(root, directory, 'package.json'), 'utf8'));
+        assert.deepEqual(manifest.files, expectedFiles.files, `${directory} files allowlist`);
+    }
+    assert.equal(run().status, 0);
 });
