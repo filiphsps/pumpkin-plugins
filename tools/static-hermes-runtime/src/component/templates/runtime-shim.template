@@ -21,6 +21,24 @@ using namespace facebook::jsi;
 
 namespace {
 
+template <typename Callback> class WitScopeGuard final {
+  public:
+    explicit WitScopeGuard(Callback callback)
+        : callback_(std::move(callback)) {}
+    ~WitScopeGuard() noexcept {
+        if (active_)
+            callback_();
+    }
+    WitScopeGuard(const WitScopeGuard &) = delete;
+    WitScopeGuard &operator=(const WitScopeGuard &) = delete;
+
+    void release() noexcept { active_ = false; }
+
+  private:
+    Callback callback_;
+    bool active_ = true;
+};
+
 SHRuntime *staticRuntime = nullptr;
 HermesRuntime *jsRuntime = nullptr;
 

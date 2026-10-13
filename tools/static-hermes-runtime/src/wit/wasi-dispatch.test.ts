@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import type { WitAnalysis } from './analysis.ts';
 import { generateWitApiFunctionForResolvedOperation } from './native-adapters.ts';
-import type { ResolvedWitType, WitApiInterface, WitApiPackage, WitFunction, WitWasiAdapterPlan, WitWasiInterface } from './types.ts';
+import type { ResolvedWitType, WitApiPackage, WitFunction, WitWasiAdapterPlan, WitWasiInterface } from './types.ts';
 import { generateWasiAdapterDispatch } from './wasi-dispatch.ts';
 
 it('guards owned input and output WIT values before conversion can throw', () => {
@@ -47,18 +47,23 @@ it('guards owned input and output WIT values before conversion can throw', () =>
         resultType: { kind: 'primitive', name: 'string' }
     });
 
-    expect(generated).toBeDefined();
-    const inputDeclaration = generated!.indexOf('plugin_list_string_t argument0{argument0Data, argument0Size};');
-    const inputGuard = generated!.indexOf('WitScopeGuard argument0Cleanup');
-    const inputLoop = generated!.indexOf('for (std::size_t argument0Index');
+    if (generated === undefined) throw new Error('Expected an adapter for the supported WIT operation');
+    const inputDeclaration = generated.indexOf('plugin_list_string_t argument0{argument0Data, argument0Size};');
+    const inputGuard = generated.indexOf('WitScopeGuard argument0Cleanup');
+    const inputLoop = generated.indexOf('for (std::size_t argument0Index');
     expect(inputGuard).toBeGreaterThan(inputDeclaration);
     expect(inputGuard).toBeLessThan(inputLoop);
     expect(generated).toContain('plugin_list_string_free(&argument0);');
+    const itemGuard = generated.indexOf('WitScopeGuard argument0ItemCleanup');
+    const itemAssignment = generated.indexOf('argument0Data[argument0Index] = argument0Item;');
+    const itemGuardRelease = generated.indexOf('argument0ItemCleanup.release();');
+    expect(itemGuard).toBeGreaterThan(inputLoop);
+    expect(itemGuardRelease).toBeGreaterThan(itemAssignment);
 
-    const outputDeclaration = generated!.indexOf('plugin_string_t result{};');
-    const outputGuard = generated!.indexOf('WitScopeGuard resultCleanup');
-    const outputCall = generated!.indexOf('wasi_test_api_echo(&argument0, &result);');
-    const outputConversion = generated!.indexOf('wasiStringValue(result)');
+    const outputDeclaration = generated.indexOf('plugin_string_t result{};');
+    const outputGuard = generated.indexOf('WitScopeGuard resultCleanup');
+    const outputCall = generated.indexOf('wasi_test_api_echo(&argument0, &result);');
+    const outputConversion = generated.indexOf('wasiStringValue(result)');
     expect(outputGuard).toBeGreaterThan(outputDeclaration);
     expect(outputGuard).toBeLessThan(outputCall);
     expect(outputGuard).toBeLessThan(outputConversion);

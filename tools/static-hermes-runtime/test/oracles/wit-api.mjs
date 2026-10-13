@@ -769,14 +769,12 @@ export function generateWitResourceMethodForResolvedPlan(apiPackage, plan) {
     const borrowType = `${namespace}_${cIdentifier(apiInterface.name)}_borrow_${cIdentifier(resource.name)}_t`;
     const inputs = [];
     const beforeCall = [];
-    const cleanup = [];
     const callArguments = [`${borrowType}{state->handle}`];
     for (const [index, parameter] of parameters.entries()) {
         const input = generateWitInput(apiPackage, apiInterface, parameter, index);
         if (!input) return undefined;
         inputs.push(...input.setup);
         beforeCall.push(...(input.beforeCall ?? []));
-        cleanup.push(...input.cleanup);
         callArguments.push(input.argument);
     }
     const result = generateWitResult(apiPackage, apiInterface, resultType, functionName, callArguments, new Map());
@@ -792,7 +790,6 @@ export function generateWitResourceMethodForResolvedPlan(apiPackage, plan) {
         ...result.setup,
         ...beforeCall,
         result.call,
-        ...cleanup,
         ...result.cleanup,
         result.return
     ].filter(Boolean);
@@ -1001,14 +998,12 @@ function generateWitApiFunction(
     const nativeFunctionName = functionName ?? wasiOperationCFunctionName(apiPackage, apiInterface, operation);
     const inputs = [];
     const beforeCall = [];
-    const cleanup = [];
     const callArguments = [];
     for (const [index, parameter] of parameters.entries()) {
         const input = generateWitInput(apiPackage, apiInterface, parameter, index);
         if (!input) return undefined;
         inputs.push(...input.setup);
         beforeCall.push(...(input.beforeCall ?? []));
-        cleanup.push(...input.cleanup);
         callArguments.push(input.argument);
     }
 
@@ -1031,7 +1026,6 @@ function generateWitApiFunction(
         ...result.setup,
         ...beforeCall,
         result.call,
-        ...cleanup,
         ...result.cleanup,
         result.return
     ].filter(Boolean);
@@ -1304,10 +1298,12 @@ function generateWitInput(apiPackage, apiInterface, parameter, index) {
         const itemType = witCType(apiPackage, apiInterface, type.item);
         const setup = [
             `${itemType} ${name}Storage{};`,
+            ...witCleanupGuard(apiPackage, apiInterface, type.item, `${name}Storage`, `${name}StorageCleanup`),
             `${itemType} *${name} = nullptr;`,
             `if (!args[${index}].isNull() && !args[${index}].isUndefined()) {`,
             ...item.setup.map((line) => `  ${line}`),
             `  ${name}Storage = ${item.expression};`,
+            ...releaseInputGuards(item).map((line) => `  ${line}`),
             `  ${name} = &${name}Storage;`,
             '}'
         ];
@@ -1315,19 +1311,12 @@ function generateWitInput(apiPackage, apiInterface, parameter, index) {
             setup: [...(ownership ? [`std::vector<std::shared_ptr<ResourceState>> ${ownership};`] : []), ...setup],
             beforeCall: ownership ? [`for (const auto &resource : ${ownership}) resource->transfer();`] : [],
             argument: name,
-            cleanup: [witFreeCode(apiPackage, apiInterface, type.item, `${name}Storage`)].filter(Boolean)
+            cleanup: []
         };
     }
     const value = generateWitInputValue(apiPackage, apiInterface, type, `args[${index}]`, name, ownership, false);
     if (!value) return undefined;
 
-    const aggregate = ['record', 'variant', 'tuple', 'list', 'option', 'result'].includes(type.kind);
-    const cleanup =
-        type.kind === 'primitive' && type.name === 'string'
-            ? [`plugin_string_free(&${name});`]
-            : aggregate && !(type.kind === 'list' && type.item.kind === 'primitive' && type.item.name === 'u8')
-              ? [witFreeCode(apiPackage, apiInterface, type, name)].filter(Boolean)
-              : [];
     const setup = [...(ownership ? [`std::vector<std::shared_ptr<ResourceState>> ${ownership};`] : []), ...value.setup];
     return {
         setup,
@@ -1338,7 +1327,7 @@ function generateWitInput(apiPackage, apiInterface, parameter, index) {
                   ? [`for (const auto &resource : ${ownership}) resource->transfer();`]
                   : [],
         argument: value.passByPointer ? `&${name}` : value.expression,
-        cleanup
+        cleanup: []
     };
 }
 
@@ -1348,9 +1337,13 @@ function generateWitInputValue(apiPackage, apiInterface, type, input, name, owne
     if (type.kind === 'primitive') {
         if (type.name === 'string') {
             return {
-                setup: [`plugin_string_t ${name} = wasiInputString(rt, ${input});`],
+                setup: [
+                    `plugin_string_t ${name} = wasiInputString(rt, ${input});`,
+                    ...witCleanupGuard(apiPackage, apiInterface, type, name, `${name}Cleanup`)
+                ],
                 expression: name,
-                passByPointer: true
+                passByPointer: true,
+                cleanupGuards: [`${name}Cleanup`]
             };
         }
         return { setup: [], expression: primitiveInput(type, input, 'rt') };
@@ -1404,9 +1397,11 @@ function generateWitInputValue(apiPackage, apiInterface, type, input, name, owne
     }
     if (type.kind === 'record') {
         const object = `${name}Object`;
+        const cleanupGuard = witCleanupGuard(apiPackage, apiInterface, type, name, `${name}Cleanup`);
         const setup = [
             `const auto ${object} = ${input}.asObject(rt);`,
-            `${witCType(apiPackage, apiInterface, type)} ${name}{};`
+            `${witCType(apiPackage, apiInterface, type)} ${name}{};`,
+            ...cleanupGuard
         ];
         for (const field of type.fields) {
             const fieldType = field.resolvedType ?? resolveWitTypeFromField(field, type, apiPackage);
@@ -1421,15 +1416,26 @@ function generateWitInputValue(apiPackage, apiInterface, type, input, name, owne
                 true
             );
             if (!value) return undefined;
-            setup.push(...value.setup, `${name}.${cFieldIdentifier(field.name)} = ${value.expression};`);
+            setup.push(
+                ...value.setup,
+                `${name}.${cFieldIdentifier(field.name)} = ${value.expression};`,
+                ...releaseInputGuards(value)
+            );
         }
-        return { setup, expression: name, passByPointer: true };
+        return {
+            setup,
+            expression: name,
+            passByPointer: true,
+            cleanupGuards: cleanupGuard.length ? [`${name}Cleanup`] : []
+        };
     }
     if (type.kind === 'tuple') {
         const array = `${name}Array`;
+        const cleanupGuard = witCleanupGuard(apiPackage, apiInterface, type, name, `${name}Cleanup`);
         const setup = [
             `const auto ${array} = ${input}.asObject(rt).asArray(rt);`,
-            `${witCType(apiPackage, apiInterface, type)} ${name}{};`
+            `${witCType(apiPackage, apiInterface, type)} ${name}{};`,
+            ...cleanupGuard
         ];
         for (const [index, itemType] of type.items.entries()) {
             const itemName = `${name}Item${index}`;
@@ -1443,17 +1449,24 @@ function generateWitInputValue(apiPackage, apiInterface, type, input, name, owne
                 true
             );
             if (!item) return undefined;
-            setup.push(...item.setup, `${name}.f${index} = ${item.expression};`);
+            setup.push(...item.setup, `${name}.f${index} = ${item.expression};`, ...releaseInputGuards(item));
         }
-        return { setup, expression: name, passByPointer: true };
+        return {
+            setup,
+            expression: name,
+            passByPointer: true,
+            cleanupGuards: cleanupGuard.length ? [`${name}Cleanup`] : []
+        };
     }
     if (type.kind === 'variant') {
         const object = `${name}Object`;
         const tag = `${name}Tag`;
+        const cleanupGuard = witCleanupGuard(apiPackage, apiInterface, type, name, `${name}Cleanup`);
         const setup = [
             `const auto ${object} = ${input}.asObject(rt);`,
             `const auto ${tag} = utf8(rt, ${object}.getProperty(rt, "tag"));`,
-            `${witCType(apiPackage, apiInterface, type)} ${name}{};`
+            `${witCType(apiPackage, apiInterface, type)} ${name}{};`,
+            ...cleanupGuard
         ];
         const alternatives = [];
         for (const variant of type.cases) {
@@ -1471,14 +1484,23 @@ function generateWitInputValue(apiPackage, apiInterface, type, input, name, owne
                     true
                 );
                 if (!payload) return undefined;
-                branch.push(...payload.setup, `${name}.val.${cFieldIdentifier(variant.name)} = ${payload.expression};`);
+                branch.push(
+                    ...payload.setup,
+                    `${name}.val.${cFieldIdentifier(variant.name)} = ${payload.expression};`,
+                    ...releaseInputGuards(payload)
+                );
             }
             alternatives.push(`if (${tag} == ${tagValue}) { ${branch.join(' ')} }`);
         }
         setup.push(
             `${alternatives.join(' else ')} else { throw JSError(rt, ${JSON.stringify(`Unknown ${type.name} variant`)}); }`
         );
-        return { setup, expression: name, passByPointer: true };
+        return {
+            setup,
+            expression: name,
+            passByPointer: true,
+            cleanupGuards: cleanupGuard.length ? [`${name}Cleanup`] : []
+        };
     }
     if (type.kind === 'option') {
         const valueType = type.item;
@@ -1493,17 +1515,21 @@ function generateWitInputValue(apiPackage, apiInterface, type, input, name, owne
         );
         if (!value) return undefined;
         const cType = witCType(apiPackage, apiInterface, type);
+        const cleanupGuard = witCleanupGuard(apiPackage, apiInterface, type, name, `${name}Cleanup`);
         return {
             setup: [
                 `${cType} ${name}{};`,
+                ...cleanupGuard,
                 `if (!${input}.isNull() && !${input}.isUndefined()) {`,
                 ...value.setup.map((line) => `  ${line}`),
                 `  ${name}.is_some = true;`,
                 `  ${name}.val = ${value.expression};`,
+                ...releaseInputGuards(value).map((line) => `  ${line}`),
                 '}'
             ],
             expression: name,
-            passByPointer: true
+            passByPointer: true,
+            cleanupGuards: cleanupGuard.length ? [`${name}Cleanup`] : []
         };
     }
     if (type.kind === 'result') {
@@ -1513,7 +1539,8 @@ function generateWitInputValue(apiPackage, apiInterface, type, input, name, owne
         const setup = [
             `const auto ${object} = ${input}.asObject(rt);`,
             `const auto ${tag} = utf8(rt, ${object}.getProperty(rt, "tag"));`,
-            `${cType} ${name}{};`
+            `${cType} ${name}{};`,
+            ...witCleanupGuard(apiPackage, apiInterface, type, name, `${name}Cleanup`)
         ];
         for (const [tagName, itemType, branch] of [
             ['ok', type.ok, 'ok'],
@@ -1534,11 +1561,18 @@ function generateWitInputValue(apiPackage, apiInterface, type, input, name, owne
                 ...value.setup.map((line) => `  ${line}`),
                 `  ${name}.is_err = ${branch === 'err' ? 'true' : 'false'};`,
                 ...(itemType.kind === 'unit' ? [] : [`  ${name}.val.${branch} = ${value.expression};`]),
+                ...releaseInputGuards(value).map((line) => `  ${line}`),
                 '}'
             );
         }
         setup.push(`else { throw JSError(rt, ${JSON.stringify('WIT result tag must be "ok" or "err"')}); }`);
-        return { setup, expression: name, passByPointer: true };
+        const cleanupGuard = witCleanupGuard(apiPackage, apiInterface, type, name, `${name}Cleanup`);
+        return {
+            setup,
+            expression: name,
+            passByPointer: true,
+            cleanupGuards: cleanupGuard.length ? [`${name}Cleanup`] : []
+        };
     }
     if (type.kind === 'list') {
         const cType = witCType(apiPackage, apiInterface, type);
@@ -1558,6 +1592,7 @@ function generateWitInputValue(apiPackage, apiInterface, type, input, name, owne
             }
             const data = `${name}Data`;
             const size = `${name}Size`;
+            const cleanupGuard = witCleanupGuard(apiPackage, apiInterface, type, name, `${name}Cleanup`);
             return {
                 setup: [
                     `auto ${typed} = ${input}.asObject(rt).asUint8Array(rt);`,
@@ -1566,10 +1601,12 @@ function generateWitInputValue(apiPackage, apiInterface, type, input, name, owne
                     `auto *${data} = static_cast<uint8_t *>(${size} ? std::malloc(${size}) : nullptr);`,
                     `if (${size} && !${data}) throw JSError(rt, "WIT byte-list allocation failed");`,
                     `if (${size}) std::memcpy(${data}, ${buffer}.data(rt) + ${typed}.byteOffset(rt), ${size});`,
-                    `${cType} ${name}{${data}, ${size}};`
+                    `${cType} ${name}{${data}, ${size}};`,
+                    ...cleanupGuard
                 ],
                 expression: name,
-                passByPointer: true
+                passByPointer: true,
+                cleanupGuards: cleanupGuard.length ? [`${name}Cleanup`] : []
             };
         }
         const array = `${name}Array`;
@@ -1587,6 +1624,7 @@ function generateWitInputValue(apiPackage, apiInterface, type, input, name, owne
             true
         );
         if (!item) return undefined;
+        const cleanupGuard = witCleanupGuard(apiPackage, apiInterface, type, name, `${name}Cleanup`);
         return {
             setup: [
                 `const auto ${array} = ${input}.asObject(rt);`,
@@ -1594,14 +1632,17 @@ function generateWitInputValue(apiPackage, apiInterface, type, input, name, owne
                 `const std::size_t ${size} = static_cast<std::size_t>(${array}.getProperty(rt, "length").asNumber());`,
                 `auto *${data} = static_cast<${itemType} *>(${size} ? std::calloc(${size}, sizeof(${itemType})) : nullptr);`,
                 `if (${size} && !${data}) throw JSError(rt, "WIT list allocation failed");`,
+                `${cType} ${name}{${data}, ${size}};`,
+                ...cleanupGuard,
                 `for (std::size_t ${index} = 0; ${index} < ${size}; ++${index}) {`,
                 ...item.setup.map((line) => `  ${line}`),
                 `  ${data}[${index}] = ${item.expression};`,
-                '}',
-                `${cType} ${name}{${data}, ${size}};`
+                ...releaseInputGuards(item).map((line) => `  ${line}`),
+                '}'
             ],
             expression: name,
-            passByPointer: true
+            passByPointer: true,
+            cleanupGuards: cleanupGuard.length ? [`${name}Cleanup`] : []
         };
     }
     return undefined;
@@ -1625,12 +1666,19 @@ function generateWitResult(apiPackage, apiInterface, type, functionName, argumen
         if (error.kind !== 'unit' && !isSupportedWitError(error)) return undefined;
         const setup = [
             ...(output.kind === 'unit' ? [] : [`${witCType(apiPackage, apiInterface, output)} result{};`]),
-            ...(error.kind === 'unit' ? [] : [`${witCType(apiPackage, apiInterface, error)} error{};`])
+            ...(output.kind === 'unit'
+                ? []
+                : witCleanupGuard(apiPackage, apiInterface, output, 'result', 'resultCleanup')),
+            ...(error.kind === 'unit'
+                ? []
+                : [
+                      `${witCType(apiPackage, apiInterface, error)} error{};`,
+                      ...witCleanupGuard(apiPackage, apiInterface, error, 'error', 'errorCleanup')
+                  ])
         ];
         const outputArguments = output.kind === 'unit' ? callArguments : [...callArguments, '&result'];
         if (error.kind !== 'unit') outputArguments.push('&error');
         const callExpression = `const bool callSucceeded = ${functionName}(${outputArguments.join(', ')});`;
-        const free = output.kind === 'resource' ? '' : witFreeCode(apiPackage, apiInterface, output, 'result');
         const errorReturn =
             error.kind === 'unit'
                 ? `Object errorValue(rt); errorValue.setProperty(rt, "tag", "err"); return errorValue;`
@@ -1638,7 +1686,7 @@ function generateWitResult(apiPackage, apiInterface, type, functionName, argumen
         const successReturn =
             output.kind === 'resource'
                 ? generateWitResourceValue(apiPackage, output, 'result')
-                : `${value.setup.join(' ')} auto converted = ${value.expression}; ${free} return converted;`;
+                : `${value.setup.join(' ')} auto converted = ${value.expression}; return converted;`;
         return {
             setup,
             call: callExpression,
@@ -1649,10 +1697,10 @@ function generateWitResult(apiPackage, apiInterface, type, functionName, argumen
     if (type.kind === 'unit') return { setup: [], call: `${call};`, cleanup: [], return: 'return Value::undefined();' };
     if (type.kind === 'primitive' && type.name === 'string') {
         return {
-            setup: ['plugin_string_t result{};'],
+            setup: ['plugin_string_t result{};', ...witCleanupGuard(apiPackage, apiInterface, type, 'result', 'resultCleanup')],
             call: `${functionName}(${[...callArguments, '&result'].join(', ')});`,
             cleanup: [],
-            return: 'const auto text = wasiStringValue(result); plugin_string_free(&result); return jsString(rt, text);'
+            return: 'const auto text = wasiStringValue(result); return jsString(rt, text);'
         };
     }
     if (type.kind === 'primitive')
@@ -1677,12 +1725,12 @@ function generateWitResult(apiPackage, apiInterface, type, functionName, argumen
         const value = generateWitResultValue(apiPackage, apiInterface, type, 'result', 'resultValue');
         if (!value) return undefined;
         const setup = [`${witCType(apiPackage, apiInterface, type)} result{};`];
-        const free = witFreeCode(apiPackage, apiInterface, type, 'result');
+        setup.push(...witCleanupGuard(apiPackage, apiInterface, type, 'result', 'resultCleanup'));
         return {
             setup,
             call: `${functionName}(${[...callArguments, '&result'].join(', ')});`,
             cleanup: [],
-            return: `${value.setup.join(' ')} auto converted = ${value.expression}; ${free} return converted;`
+            return: `${value.setup.join(' ')} auto converted = ${value.expression}; return converted;`
         };
     }
     if (type.kind === 'resource')
@@ -1698,13 +1746,15 @@ function generateWitResult(apiPackage, apiInterface, type, functionName, argumen
     if (type.kind === 'option') {
         const value = generateWitResultValue(apiPackage, apiInterface, type.item, 'result', 'resultValue');
         if (!value) return undefined;
-        const setup = [`${witCType(apiPackage, apiInterface, type.item)} result{};`];
-        const free = witFreeCode(apiPackage, apiInterface, type.item, 'result');
+        const setup = [
+            `${witCType(apiPackage, apiInterface, type.item)} result{};`,
+            ...witCleanupGuard(apiPackage, apiInterface, type.item, 'result', 'resultCleanup')
+        ];
         return {
             setup,
             call: `const bool hasResult = ${functionName}(${[...callArguments, '&result'].join(', ')});`,
             cleanup: [],
-            return: `if (!hasResult) return Value::null(); ${value.setup.join(' ')} auto converted = ${value.expression}; ${free} return converted;`
+            return: `if (!hasResult) return Value::null(); ${value.setup.join(' ')} auto converted = ${value.expression}; return converted;`
         };
     }
     return undefined;
@@ -1715,8 +1765,7 @@ function generateWitErrorReturn(apiPackage, apiInterface, type, expression) {
     if (type.kind === 'enum') return generateWitEnumErrorReturn(apiPackage, type, expression);
     const value = generateWitResultValue(apiPackage, apiInterface, type, expression, 'wasiError');
     if (!value) return `throw JSError(rt, ${JSON.stringify(`WIT call ${type.name} failed`)});`;
-    const free = witFreeCode(apiPackage, apiInterface, type, expression);
-    return `${value.setup.join(' ')} auto errorPayload = ${value.expression}; ${free} Object errorValue(rt); errorValue.setProperty(rt, "__staticHermesWasiError", std::move(errorPayload)); return errorValue;`;
+    return `${value.setup.join(' ')} auto errorPayload = ${value.expression}; Object errorValue(rt); errorValue.setProperty(rt, "__staticHermesWasiError", std::move(errorPayload)); return errorValue;`;
 }
 
 function generateWitEnumErrorReturn(apiPackage, type, expression) {
@@ -1953,6 +2002,17 @@ function witFreeCode(apiPackage, apiInterface, type, expression) {
             .join(' ');
     }
     return '';
+}
+
+/** Emit a local C++ scope guard for one generated WIT value with owned storage. */
+function witCleanupGuard(apiPackage, apiInterface, type, expression, guardName) {
+    const cleanup = witFreeCode(apiPackage, apiInterface, type, expression);
+    return cleanup ? [`WitScopeGuard ${guardName}([&] { ${cleanup} });`] : [];
+}
+
+/** Release child guards after their owned values move into a guarded WIT aggregate. */
+function releaseInputGuards(value) {
+    return (value.cleanupGuards ?? []).map((guardName) => `${guardName}.release();`);
 }
 
 /** Check whether freeing a WIT value may release owned memory. */
