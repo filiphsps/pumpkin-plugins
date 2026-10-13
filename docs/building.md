@@ -41,6 +41,16 @@ native code for size while keeping Hermes source locations and native line table
 | `pumpkin-plugins-build` | `build/<plugin>.wasm`, plus the latest combined WIT snapshot in `build/wit/` when WASI imports are added |
 | `pumpkin-plugins-build --types-only` | Guest declarations in `build/types/bindings/` for `tsc` and your editor |
 
+Set `PUMPKIN_PLUGINS_VERBOSE_BUILD=1` to include Static Hermes tool output and the selected
+`--wasi-imports`, `--wasi-methods`, `--api-methods` and `--event-types` for each component. Root builds
+normally hide cached task logs, so add `--force` to print the selections for every plugin:
+
+```sh
+PUMPKIN_PLUGINS_VERBOSE_BUILD=1 pnpm build -- --force
+```
+
+An omitted method or event filter means all available operations or event variants are retained.
+
 Only declarations persist under `build/types/`, so `build` and `typecheck` can run in parallel
 without touching the same files or keeping a second WIT tree. When a plugin requests WASI imports,
 each build uses a private WIT snapshot while it runs, then publishes a copy to `build/wit/` for

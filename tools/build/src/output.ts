@@ -4,7 +4,17 @@ import type { PluginEngine, StaticHermesRuntime } from './plugin-config.ts';
 /** A message emitted by the shared plugin build output formatter. */
 export type BuildOutputMessage =
     | { type: 'bundle'; entry: string; engine: PluginEngine; runtimeVariant?: StaticHermesRuntime }
-    | { type: 'componentize'; engine: PluginEngine; runtimeVariant?: StaticHermesRuntime }
+    | {
+          type: 'componentize';
+          engine: PluginEngine;
+          runtimeVariant?: StaticHermesRuntime;
+          selections?: {
+              wasiImports: string[];
+              wasiMethods?: string[];
+              apiMethods?: string[];
+              eventTypes?: string[];
+          };
+      }
     | { type: 'built'; output: string; sizeBytes: number }
     | { type: 'error'; message: string };
 
@@ -25,9 +35,18 @@ export function formatBuildOutput(message: BuildOutputMessage): string {
     }
 
     const runtime = ansi.named.name(runtimeLabel(message.engine, message.runtimeVariant));
-    return message.type === 'bundle'
-        ? `[build] Bundling ${ansi.named.name(message.entry)} with ${runtime}...`
-        : `[build] Componentizing with ${runtime}...`;
+    if (message.type === 'bundle') return `[build] Bundling ${ansi.named.name(message.entry)} with ${runtime}...`;
+
+    const output = `[build] Componentizing with ${runtime}...`;
+    if (message.selections === undefined) return output;
+
+    return [
+        output,
+        formatSelectionOption('--wasi-imports', message.selections.wasiImports, 'no imports'),
+        formatSelectionOption('--wasi-methods', message.selections.wasiMethods, 'all imported WASI operations'),
+        formatSelectionOption('--api-methods', message.selections.apiMethods, 'all imported Pumpkin API operations'),
+        formatSelectionOption('--event-types', message.selections.eventTypes, 'all event variants')
+    ].join('\n');
 }
 
 /** Write one formatted build event to the appropriate console stream. */
@@ -40,4 +59,9 @@ export function printBuildOutput(message: BuildOutputMessage): void {
 function runtimeLabel(engine: PluginEngine, runtimeVariant?: StaticHermesRuntime): string {
     if (engine === 'quickjs') return 'QuickJS';
     return `Static Hermes${runtimeVariant === undefined ? '' : ` (${runtimeVariant})`}`;
+}
+
+function formatSelectionOption(option: string, selection: string[] | undefined, omittedValue: string): string {
+    const value = selection === undefined ? `(omitted; ${omittedValue})` : JSON.stringify(selection);
+    return `[build]   ${ansi.named.name(option)} ${ansi.named.value(value)}`;
 }

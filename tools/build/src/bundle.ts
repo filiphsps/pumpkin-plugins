@@ -108,7 +108,23 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
             options.onOutput?.({
                 type: 'componentize',
                 engine,
-                ...(options.staticHermesRuntime === undefined ? {} : { runtimeVariant: options.staticHermesRuntime })
+                ...(options.staticHermesRuntime === undefined ? {} : { runtimeVariant: options.staticHermesRuntime }),
+                ...(engine === 'static-hermes' && !quietRuntimeOutput
+                    ? {
+                          selections: {
+                              wasiImports: [...resolvedWasiImports],
+                              ...(usedWitMethods === undefined
+                                  ? {}
+                                  : {
+                                        wasiMethods: usedWitMethods.wasiMethods,
+                                        apiMethods: usedWitMethods.pumpkinMethods,
+                                        ...(usedWitMethods.eventTypes === undefined
+                                            ? {}
+                                            : { eventTypes: usedWitMethods.eventTypes })
+                                    })
+                          }
+                      }
+                    : {})
             });
             try {
                 buildStaticHermesComponent({

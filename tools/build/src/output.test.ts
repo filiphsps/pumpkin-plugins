@@ -13,6 +13,26 @@ it('formats both componentizers and results with the shared build prefix', () =>
     );
 });
 
+it('prints Static Hermes selections and explains omitted all-operation filters', () => {
+    expect(
+        formatBuildOutput({
+            type: 'componentize',
+            engine: 'static-hermes',
+            runtimeVariant: 'lean',
+            selections: {
+                wasiImports: ['wasi:clocks/monotonic-clock@0.2.3'],
+                apiMethods: ['player.player.get-position']
+            }
+        })
+    ).toBe(
+        '[build] Componentizing with \u001b[36mStatic Hermes (lean)\u001b[0m...\n' +
+            '[build]   \u001b[36m--wasi-imports\u001b[0m \u001b[33m["wasi:clocks/monotonic-clock@0.2.3"]\u001b[0m\n' +
+            '[build]   \u001b[36m--wasi-methods\u001b[0m \u001b[33m(omitted; all imported WASI operations)\u001b[0m\n' +
+            '[build]   \u001b[36m--api-methods\u001b[0m \u001b[33m["player.player.get-position"]\u001b[0m\n' +
+            '[build]   \u001b[36m--event-types\u001b[0m \u001b[33m(omitted; all event variants)\u001b[0m'
+    );
+});
+
 it('keeps captured runtime diagnostics in the shared error format', () => {
     expect(formatBuildOutput({ type: 'error', message: 'componentizer failed\nlink failed' })).toBe(
         '[build] Error: \u001b[1;31mcomponentizer failed\u001b[0m\n[build]   \u001b[1;31mlink failed\u001b[0m'

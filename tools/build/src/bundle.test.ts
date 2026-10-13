@@ -88,6 +88,45 @@ describe('bundlePlugin', () => {
         });
     });
 
+    it('reports selected Static Hermes methods and events when runtime output is enabled', async () => {
+        const { output } = buildAt();
+        const onOutput = vi.fn();
+        esbuild.mockImplementationOnce((buildOptions) => {
+            if (!buildOptions.outfile) throw new Error('missing JavaScript bundle output');
+            fs.writeFileSync(
+                buildOptions.outfile,
+                'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();'
+            );
+            return { metafile: { outputs: { [buildOptions.outfile]: { imports: [] } } } } as never;
+        });
+        vi.mocked(findUsedWitMethods).mockReturnValue({
+            pumpkinMethods: ['player.player.get-position'],
+            wasiMethods: ['wasi:filesystem/types@0.2.3#read-via-stream'],
+            eventTypes: ['server-tick-end-event']
+        });
+
+        await bundlePlugin({
+            entry: 'src/plugin.ts',
+            output,
+            witDir: apiWitDir,
+            version: '1.0.0',
+            engine: 'static-hermes',
+            quietRuntimeOutput: false,
+            onOutput
+        });
+
+        expect(onOutput).toHaveBeenCalledWith({
+            type: 'componentize',
+            engine: 'static-hermes',
+            selections: {
+                wasiImports: [],
+                wasiMethods: ['wasi:filesystem/types@0.2.3#read-via-stream'],
+                apiMethods: ['player.player.get-position'],
+                eventTypes: ['server-tick-end-event']
+            }
+        });
+    });
+
     it('preserves captured QuickJS diagnostics for the build output handler', async () => {
         const { output } = buildAt();
         componentize.mockImplementationOnce(() => {

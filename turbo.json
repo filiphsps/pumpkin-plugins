@@ -17,6 +17,7 @@
             "dependsOn": ["transit", "@pumpkin-plugins/build#build"],
             "env": [
                 "PUMPKIN_DEV_MODE",
+                "PUMPKIN_PLUGINS_VERBOSE_BUILD",
                 "STATIC_HERMES_CACHE_DIR",
                 "STATIC_HERMES_SOURCE_DIR",
                 "STATIC_HERMES_HOST_BUILD_DIR",
