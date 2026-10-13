@@ -142,6 +142,7 @@ function clonePinnedSource(
 ): void {
     filesystem.mkdirSync(path.dirname(destination), { recursive: true });
     process.run('git', ['clone', '--filter=blob:none', '--no-checkout', pin.repository, destination]);
+    process.run('git', ['-C', destination, 'config', 'core.autocrlf', 'false']);
     process.run('git', ['-C', destination, 'fetch', '--depth', '1', 'origin', pin.commit]);
     process.run('git', ['-C', destination, 'checkout', '--detach', pin.commit]);
 }

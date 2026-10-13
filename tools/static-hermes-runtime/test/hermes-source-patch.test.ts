@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -10,7 +11,7 @@ import {
     readHermesSourcePin,
     refreshHermesSource
 } from '../src/hermes/source.ts';
-import type { HermesProcessRunner } from '../src/hermes/system.ts';
+import { type HermesProcessRunner, hermesProcess } from '../src/hermes/system.ts';
 
 const directories: string[] = [];
 const pin = {
@@ -68,6 +69,53 @@ it('clones and validates the pinned checkout through an injectable Git runner', 
 
     expect(ensureHermesSource({ pin, source, managedSource: true, managedPaths: [], process: runner })).toBe(source);
     expect(fs.existsSync(path.join(source, '.git'))).toBe(true);
+});
+
+it('preserves LF source files when global Git config enables CRLF checkouts', () => {
+    const root = temporaryDirectory();
+    const working = path.join(root, 'working');
+    const repository = path.join(root, 'hermes.git');
+    const source = path.join(root, 'source');
+    const seedConfig = path.join(root, 'seed.gitconfig');
+    const checkoutConfig = path.join(root, 'checkout.gitconfig');
+    fs.writeFileSync(seedConfig, '[core]\n\tautocrlf = false\n[init]\n\tdefaultBranch = main\n');
+    const seedEnvironment = { ...process.env, GIT_CONFIG_GLOBAL: seedConfig, GIT_CONFIG_NOSYSTEM: '1' };
+    const runGit = (args: string[], env: NodeJS.ProcessEnv): string =>
+        execFileSync('git', args, { encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'ignore'] });
+
+    runGit(['init', working], seedEnvironment);
+    runGit(['-C', working, 'config', 'user.name', 'Hermes test'], seedEnvironment);
+    runGit(['-C', working, 'config', 'user.email', 'hermes-test@example.com'], seedEnvironment);
+    fs.mkdirSync(path.join(working, 'cmake'));
+    fs.writeFileSync(path.join(working, 'cmake', 'Hermes.cmake'), 'set(LLVM_ON_UNIX 1)\n');
+    runGit(['-C', working, 'add', '.'], seedEnvironment);
+    runGit(['-C', working, 'commit', '-m', 'pinned source fixture'], seedEnvironment);
+    const commit = runGit(['-C', working, 'rev-parse', 'HEAD'], seedEnvironment).trim();
+    runGit(['clone', '--bare', working, repository], seedEnvironment);
+
+    fs.writeFileSync(checkoutConfig, '[core]\n\tautocrlf = true\n');
+    const checkoutEnvironment = { ...process.env, GIT_CONFIG_GLOBAL: checkoutConfig, GIT_CONFIG_NOSYSTEM: '1' };
+    const runner: HermesProcessRunner = {
+        run(command, args) {
+            hermesProcess.run(command, args, { env: checkoutEnvironment, stdio: 'ignore' });
+        },
+        output(command, args) {
+            return hermesProcess.output(command, args, { env: checkoutEnvironment });
+        },
+        buffer(command, args) {
+            return hermesProcess.buffer(command, args, { env: checkoutEnvironment });
+        }
+    };
+
+    ensureHermesSource({
+        pin: { ...pin, repository, commit },
+        source,
+        managedSource: true,
+        managedPaths: [],
+        process: runner
+    });
+
+    expect(fs.readFileSync(path.join(source, 'cmake', 'Hermes.cmake'), 'utf8')).toBe('set(LLVM_ON_UNIX 1)\n');
 });
 
 it('retries an initial Hermes clone after a failed fetch', () => {
