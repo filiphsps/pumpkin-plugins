@@ -65,6 +65,52 @@ it('clones and validates the pinned checkout through an injectable Git runner', 
     expect(fs.existsSync(path.join(source, '.git'))).toBe(true);
 });
 
+it('retries an initial Hermes clone after a failed fetch', () => {
+    const root = temporaryDirectory();
+    const source = path.join(root, 'source');
+    let cloneAttempts = 0;
+    let failFirstFetch = true;
+    const runner: HermesProcessRunner = {
+        run(_command, args) {
+            if (args[0] === 'clone') {
+                const destination = args.at(-1);
+                if (destination === undefined) throw new Error('Git clone destination is missing');
+                cloneAttempts += 1;
+                fs.mkdirSync(path.join(destination, '.git'), { recursive: true });
+            } else if (args[0] === '-C' && args[2] === 'fetch' && failFirstFetch) {
+                failFirstFetch = false;
+                throw new Error('network interrupted');
+            } else if (args[0] === '-C' && args[2] === 'checkout') {
+                const directory = args[1];
+                if (directory === undefined) throw new Error('Git checkout directory is missing');
+                fs.writeFileSync(path.join(directory, '.git', 'resolved-commit'), pin.commit);
+            }
+        },
+        output(_command, args) {
+            const directory = args[1];
+            if (directory === undefined) throw new Error('Git source directory is missing');
+            if (args.includes('--git-dir')) {
+                if (!fs.existsSync(path.join(directory, '.git'))) throw new Error('not a Git checkout');
+                return '.git';
+            }
+            if (args.includes('HEAD')) {
+                return fs.readFileSync(path.join(directory, '.git', 'resolved-commit'), 'utf8');
+            }
+            if (args.includes('--porcelain')) return '';
+            throw new Error(`Unexpected Git command: ${args.join(' ')}`);
+        },
+        buffer() {
+            return Buffer.alloc(0);
+        }
+    };
+
+    expect(() => ensureHermesSource({ pin, source, managedSource: true, managedPaths: [], process: runner })).toThrow(
+        'network interrupted'
+    );
+    expect(ensureHermesSource({ pin, source, managedSource: true, managedPaths: [], process: runner })).toBe(source);
+    expect(cloneAttempts).toBe(2);
+});
+
 it('discovers patches by numeric order and rejects gaps before applying', () => {
     const directory = temporaryDirectory();
     writePatch(directory, '0001-first.patch', 'first.txt');
