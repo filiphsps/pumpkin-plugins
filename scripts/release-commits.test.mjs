@@ -18,7 +18,20 @@ const packages = new Map([
     ],
     ['kit', { path: 'tools/plugin-kit', manifest: { dependencies: { updates: 'workspace:*' } } }],
     ['updates', { path: 'tools/update-check', manifest: { dependencies: { kit: 'workspace:*' } } }],
-    ['@pumpkin-plugins/build', { path: 'tools/build', manifest: {} }],
+    [
+        '@pumpkin-plugins/build',
+        {
+            path: 'tools/build',
+            manifest: {
+                dependencies: {
+                    '@pumpkin-plugins/pumpkin-api': 'workspace:*',
+                    '@pumpkin-plugins/static-hermes-runtime': 'workspace:*'
+                }
+            }
+        }
+    ],
+    ['@pumpkin-plugins/pumpkin-api', { path: 'tools/pumpkin-api', manifest: {} }],
+    ['@pumpkin-plugins/static-hermes-runtime', { path: 'tools/static-hermes-runtime', manifest: {} }],
     ['harness', { path: 'tools/test-harness', manifest: {} }]
 ]);
 const commit = (sha, files, message = 'fix: ship a change') => ({ sha, files, message });
@@ -145,6 +158,32 @@ describe('bundled release commits', () => {
             strategies
         );
         assert.deepEqual(scoped['packages/plugin'], [history[0]]);
+    });
+
+    it('releases the public builder when its API or Static Hermes dependency changes', async () => {
+        const history = [
+            commit('builder-change', ['tools/build/src/cli.ts']),
+            commit('api-change', ['tools/pumpkin-api/src/core.ts']),
+            commit('runtime-change', ['tools/static-hermes-runtime/src/index.ts']),
+            commit('unrelated', ['tools/plugin-kit/src/host.ts']),
+            commit('boundary', ['tools/build/package.json'])
+        ];
+        const github = {
+            async *mergeCommitIterator() {
+                yield* history;
+            }
+        };
+        const plugin = bundledChangesPlugin(github, 'master', packages, { 'tools/build': '0.1.0' });
+        const strategies = { 'tools/build': {} };
+        const commits = { 'tools/build': [] };
+        const releases = { 'tools/build': { tag: new TestTagName('0.1.0', 'build'), sha: 'boundary' } };
+
+        await plugin.preconfigure(strategies, commits, releases);
+
+        assert.deepEqual(
+            commits['tools/build'].map((entry) => entry.sha),
+            ['builder-change', 'api-change', 'runtime-change']
+        );
     });
 
     it('falls back to the latest published release below a missing manifest release', async () => {

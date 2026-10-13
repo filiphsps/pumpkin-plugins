@@ -11,8 +11,8 @@
         "typecheck": "pumpkin-plugins-build --types-only && tsc --noEmit"
     },
     "dependencies": {
-        "@pumpkin-plugins/pumpkin-api": "0.1.0",
-        "@pumpkin-plugins/build": "0.1.0"
+        "@pumpkin-plugins/pumpkin-api": "^0.1.0",
+        "@pumpkin-plugins/build": "^0.1.0"
     },
     "devDependencies": {
         "typescript": "6.0.3"

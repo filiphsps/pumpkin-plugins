@@ -39,6 +39,22 @@
         },
         "packages/waypoints": {
             "component": "waypoints"
+        },
+        "tools/build": {
+            "component": "build",
+            "release-as": "0.1.0"
+        },
+        "tools/create-pumpkin-plugin": {
+            "component": "create-pumpkin-plugin",
+            "release-as": "0.1.0"
+        },
+        "tools/pumpkin-api": {
+            "component": "pumpkin-api",
+            "release-as": "0.1.0"
+        },
+        "tools/static-hermes-runtime": {
+            "component": "static-hermes-runtime",
+            "release-as": "0.1.0"
         }
     },
     "changelog-sections": [

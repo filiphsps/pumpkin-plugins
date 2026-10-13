@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
+import { PUBLIC_TOOL_PACKAGE_PATHS } from './tool-packages.mjs';
 
 /** Reads workspace package manifests for identifying code bundled into each plugin. */
 export function workspacePackages(root) {
@@ -123,7 +124,9 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
                 );
             }
             const pluginPaths = Object.keys(strategies).filter((path) => path.startsWith('packages/'));
-            const releasePaths = [...pluginPaths, ...actionPaths];
+            const toolPaths = Object.keys(strategies).filter((path) => Object.hasOwn(PUBLIC_TOOL_PACKAGE_PATHS, path));
+            const packagePaths = [...pluginPaths, ...toolPaths];
+            const releasePaths = [...packagePaths, ...actionPaths];
             if (releasePaths.length === 0) return strategies;
             const commits = [];
             const boundaries = new Set();
@@ -131,7 +134,7 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
                 const release = releasesByPath[path];
                 if (release?.sha) boundaries.add(release.sha);
                 else if (releasedVersions[path]?.toString() === '0.0.0') {
-                    if (path.startsWith('packages/')) boundaries.add(await firstPackageCommitSha(github, branch, path));
+                    if (packagePaths.includes(path)) boundaries.add(await firstPackageCommitSha(github, branch, path));
                 } else {
                     const previousRelease = await previousPublishedRelease(github, release?.tag);
                     if (!previousRelease?.sha) {
@@ -154,7 +157,7 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
                 boundaries.delete(commit.sha);
                 if (boundaries.size === 0) break;
             }
-            for (const path of pluginPaths) {
+            for (const path of packagePaths) {
                 commitsByPath[path] = releaseCommits(
                     commits,
                     bundledPaths(packages, path),

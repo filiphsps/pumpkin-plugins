@@ -422,16 +422,39 @@ describe('package-metadata', () => {
 });
 
 describe('check-release-config', () => {
+    const publicTools = {
+        'tools/build': '@pumpkin-plugins/build',
+        'tools/create-pumpkin-plugin': 'create-pumpkin-plugin',
+        'tools/pumpkin-api': '@pumpkin-plugins/pumpkin-api',
+        'tools/static-hermes-runtime': '@pumpkin-plugins/static-hermes-runtime'
+    };
     const files = ({ manifest = '0.0.0', releaseAs = '0.0.1', version = '0.0.0' } = {}) => ({
         'packages/plug/package.json': { name: 'plug', version },
-        '.release-please-manifest.json': { 'packages/plug': manifest },
+        ...Object.fromEntries(
+            Object.entries(publicTools).map(([directory, name]) => [
+                `${directory}/package.json`,
+                { name, version: '0.1.0' }
+            ])
+        ),
+        '.release-please-manifest.json': {
+            'packages/plug': manifest,
+            ...Object.fromEntries(Object.keys(publicTools).map((directory) => [directory, '0.0.0']))
+        },
         'release-please-config.json': {
             'separate-pull-requests': true,
             'always-update': true,
             'force-tag-creation': true,
             'bump-minor-pre-major': true,
             'bump-patch-for-minor-pre-major': true,
-            packages: { 'packages/plug': { component: 'plug', ...(releaseAs ? { 'release-as': releaseAs } : {}) } }
+            packages: {
+                'packages/plug': { component: 'plug', ...(releaseAs ? { 'release-as': releaseAs } : {}) },
+                ...Object.fromEntries(
+                    Object.keys(publicTools).map((directory) => [
+                        directory,
+                        { component: path.basename(directory), 'release-as': '0.1.0' }
+                    ])
+                )
+            }
         }
     });
     const withAction = (
@@ -463,6 +486,24 @@ describe('check-release-config', () => {
     it('passes for an unreleased plugin that is set to release 0.0.1', () => {
         const result = run('check-release-config.mjs', repo(files()));
         assert.ok(result.ok, result.out);
+        assert.match(result.out, /4 public tools/);
+    });
+
+    it('requires the public tool release pin and package version to match its first 0.1.0 release', () => {
+        const missingPin = files();
+        delete missingPin['release-please-config.json'].packages['tools/build']['release-as'];
+        assert.match(run('check-release-config.mjs', repo(missingPin)).out, /tools\/build.*release-as.*0\.1\.0/);
+
+        const mismatchedVersion = files();
+        mismatchedVersion['tools/build/package.json'].version = '0.1.1';
+        assert.match(run('check-release-config.mjs', repo(mismatchedVersion)).out, /tools\/build\/package\.json must be/);
+    });
+
+    it('retires a public tool pin only after the manifest records its first release', () => {
+        const released = files();
+        released['.release-please-manifest.json']['tools/build'] = '0.1.0';
+        delete released['release-please-config.json'].packages['tools/build']['release-as'];
+        assert.ok(run('check-release-config.mjs', repo(released)).ok);
     });
 
     it('allows a plugin to pause release tracking with a reason', () => {

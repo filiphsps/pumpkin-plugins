@@ -89,6 +89,29 @@ describe('unpin-release-as', () => {
         });
     });
 
+    it('keeps a public tool pin until Release Please advances its manifest baseline', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'unpin-tool-'));
+        dirs.push(dir);
+        fs.mkdirSync(path.join(dir, 'tools/build'), { recursive: true });
+        fs.writeFileSync(
+            path.join(dir, 'tools/build/package.json'),
+            `${JSON.stringify({ name: '@pumpkin-plugins/build', version: '0.1.0' }, null, 4)}\n`
+        );
+        fs.writeFileSync(
+            path.join(dir, 'release-please-config.json'),
+            `${JSON.stringify({ packages: { 'tools/build': { component: 'build', 'release-as': '0.1.0' } } }, null, 4)}\n`
+        );
+        const manifestPath = path.join(dir, '.release-please-manifest.json');
+        fs.writeFileSync(manifestPath, `${JSON.stringify({ 'tools/build': '0.0.0' }, null, 4)}\n`);
+
+        assert.ok(run(dir).ok);
+        assert.equal(fs.readFileSync(path.join(dir, 'release-please-config.json'), 'utf8').includes('release-as'), true);
+
+        fs.writeFileSync(manifestPath, `${JSON.stringify({ 'tools/build': '0.1.0' }, null, 4)}\n`);
+        assert.ok(run(dir).ok);
+        assert.equal(fs.readFileSync(path.join(dir, 'release-please-config.json'), 'utf8').includes('release-as'), false);
+    });
+
     it('changes nothing when there is nothing to retire', () => {
         const { dir, read } = repo({ waiting: '0.0.0' });
         const before = fs.readFileSync(path.join(dir, 'release-please-config.json'), 'utf8');

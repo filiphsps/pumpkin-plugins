@@ -1,5 +1,5 @@
-// Removes the "release-as" pin from release-please-config.json for every plugin or action that has a version
-// past its first release. Run it on a release PR branch: release-please only writes versions,
+// Removes the "release-as" pin from release-please-config.json after the manifest records the first release.
+// Run it on a release PR branch: release-please only writes versions,
 // changelogs and the manifest, so the pin would otherwise reach master, fail the release config
 // check, and take the release and attach jobs down with it, leaving the release untagged with no
 // .wasm attached. See "Registering a plugin for releases" in docs/ci-and-releases.md.
@@ -9,6 +9,8 @@ import * as path from 'node:path';
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
 const file = path.join(root, 'release-please-config.json');
 const config = JSON.parse(fs.readFileSync(file, 'utf8'));
+const manifestPath = path.join(root, '.release-please-manifest.json');
+const manifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, 'utf8')) : {};
 
 const retired = [];
 for (const [dir, entry] of Object.entries(config.packages ?? {})) {
@@ -17,10 +19,11 @@ for (const [dir, entry] of Object.entries(config.packages ?? {})) {
         ? path.join(root, dir, 'version.txt')
         : path.join(root, dir, 'package.json');
     if (!fs.existsSync(versionFile)) continue;
-    const version = dir.startsWith('actions/')
+    const fileVersion = dir.startsWith('actions/')
         ? fs.readFileSync(versionFile, 'utf8').trim()
         : JSON.parse(fs.readFileSync(versionFile, 'utf8')).version;
-    // Still on its starting version, so the pin is what makes its first release 0.0.1.
+    const version = manifest[dir] ?? fileVersion;
+    // Keep first-release pins until Release Please advances the authoritative manifest version.
     if (version === '0.0.0') continue;
     config.packages[dir] = Object.fromEntries(Object.entries(entry).filter(([key]) => key !== 'release-as'));
     retired.push(`${dir} (at ${version})`);

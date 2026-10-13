@@ -3,6 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
+import { PUBLIC_TOOL_PACKAGE_PATHS } from './tool-packages.mjs';
 
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
 const read = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
@@ -35,6 +36,7 @@ for (const [dir, reason] of pausedEntries) {
 }
 const plugins = discoveredPlugins.filter((dir) => !pausedPlugins.has(dir));
 const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
+const tools = Object.keys(PUBLIC_TOOL_PACKAGE_PATHS);
 for (const dir of actions) {
     for (const file of ['README.md', 'CHANGELOG.md', 'version.txt']) {
         if (!fs.existsSync(path.join(root, dir, file))) problems.push(`${dir}/${file} is missing`);
@@ -42,6 +44,7 @@ for (const dir of actions) {
 }
 const components = new Map([
     ...plugins.map((dir) => [dir, { type: 'plugin', version: read(`${dir}/package.json`).version }]),
+    ...tools.map((dir) => [dir, { type: 'tool', version: read(`${dir}/package.json`).version }]),
     ...actions.map((dir) => [
         dir,
         {
@@ -55,6 +58,7 @@ const components = new Map([
 
 const FIRST_VERSION_BASE = '0.0.0';
 const FIRST_RELEASE = '0.0.1';
+const FIRST_TOOL_RELEASE = '0.1.0';
 
 if (config['separate-pull-requests'] !== true) {
     problems.push('release-please-config.json needs "separate-pull-requests": true for independent component releases');
@@ -97,11 +101,14 @@ for (const [dir, { type, version }] of components) {
         problems.push(`${dir} needs "release-type": "simple" in release-please-config.json`);
     }
 
-    // The first release of every component is 0.0.1. `release-as` forces that whatever the first commits are
-    // (a breaking change would otherwise make it 0.1.0), but it also pins every later release, so it
-    // has to go as soon as the plugin has been released.
+    // Plugins and actions start at 0.0.0 and use 0.0.1 as their first release. Public tools retain
+    // their pre-release package version and use a 0.0.0 manifest baseline until their first 0.1.0 tag.
     const releaseAs = entry?.['release-as'];
-    if (entry && manifest[dir] === FIRST_VERSION_BASE && releaseAs !== FIRST_RELEASE) {
+    if (type === 'tool' && entry && manifest[dir] === FIRST_VERSION_BASE && releaseAs !== FIRST_TOOL_RELEASE) {
+        problems.push(
+            `${dir} has not been released yet, so it needs "release-as": "${FIRST_TOOL_RELEASE}" in release-please-config.json to make its first release ${FIRST_TOOL_RELEASE}`
+        );
+    } else if (entry && type !== 'tool' && manifest[dir] === FIRST_VERSION_BASE && releaseAs !== FIRST_RELEASE) {
         problems.push(
             `${dir} has not been released yet, so it needs "release-as": "${FIRST_RELEASE}" in release-please-config.json to make its first release ${FIRST_RELEASE}`
         );
@@ -113,6 +120,10 @@ for (const [dir, { type, version }] of components) {
 
     if (!(dir in manifest)) {
         problems.push(`${dir} is not in .release-please-manifest.json. Add "${dir}": "${version}"`);
+    } else if (type === 'tool' && manifest[dir] === FIRST_VERSION_BASE) {
+        if (version !== FIRST_TOOL_RELEASE) {
+            problems.push(`${dir}/package.json must be "${FIRST_TOOL_RELEASE}" before its first public release`);
+        }
     } else if (manifest[dir] !== version) {
         problems.push(
             `.release-please-manifest.json has "${dir}": "${manifest[dir]}" but ${type === 'action' ? `${dir}/version.txt` : `${dir}/package.json`} is "${version}". They must match: release-please updates both on every release`
@@ -133,5 +144,5 @@ if (problems.length) {
 }
 const pausedSummary = pausedPlugins.size ? `; ${pausedPlugins.size} paused: ${[...pausedPlugins].join(', ')}` : '';
 console.log(
-    `Release config covers ${plugins.length} plugin${plugins.length === 1 ? '' : 's'} and ${actions.length} action${actions.length === 1 ? '' : 's'}: ${[...components.keys()].join(', ')}${pausedSummary}`
+    `Release config covers ${plugins.length} plugin${plugins.length === 1 ? '' : 's'}, ${actions.length} action${actions.length === 1 ? '' : 's'}, and ${tools.length} public tool${tools.length === 1 ? '' : 's'}: ${[...components.keys()].join(', ')}${pausedSummary}`
 );

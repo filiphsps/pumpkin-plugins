@@ -6,6 +6,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { discoverComponents, localLicenseFile } from '@pumpkin-plugins/docs/node';
+import { PUBLIC_TOOL_PACKAGE_PATHS } from './tool-packages.mjs';
 
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
 const fix = process.argv.includes('--fix');
@@ -18,10 +19,7 @@ const FUNDING = [
 ];
 const MAX_DESCRIPTION = 70;
 /** Canonical package names for tools that are published under public names. */
-const EXPECTED_PUBLIC_TOOL_NAMES = {
-    'tools/pumpkin-api': '@pumpkin-plugins/pumpkin-api',
-    'tools/create-pumpkin-plugin': 'create-pumpkin-plugin'
-};
+const EXPECTED_PUBLIC_TOOL_NAMES = PUBLIC_TOOL_PACKAGE_PATHS;
 
 /** Order of keys in a package.json, so every one reads the same. Unknown keys go after these. */
 const KEY_ORDER = [
@@ -147,6 +145,7 @@ for (const dir of packageDirs()) {
     const issues = [];
     const expectedName = EXPECTED_PUBLIC_TOOL_NAMES[dir];
     if (expectedName && pkg.name !== expectedName) issues.push(`"name" must remain ${JSON.stringify(expectedName)}`);
+    if (expectedName && pkg.private === true) issues.push('public npm tools must not set "private": true');
     if (hasEscapedUnicode(source)) issues.push('non-ASCII characters must use literal UTF-8, not Unicode escapes');
 
     for (const [key, value] of Object.entries(want)) {
