@@ -37,6 +37,9 @@ export function assertPublicToolPackage(packageJson, expectedName) {
     if (packageJson.publishConfig?.access !== 'public') {
         throw new Error(`${expectedName} publishConfig.access must be public`);
     }
+    if (packageJson.engines?.node !== '>=24.21.0') {
+        throw new Error(`${expectedName} engines.node must be >=24.21.0`);
+    }
     assertVersion(packageJson.version, `${expectedName} version`);
 }
 

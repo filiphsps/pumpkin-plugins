@@ -46,6 +46,7 @@ describe('public tool package metadata', () => {
         const metadata = {
             name: '@pumpkin-plugins/build',
             version: '0.1.0',
+            engines: { node: '>=24.21.0' },
             publishConfig: { access: 'public' }
         };
 
@@ -57,6 +58,10 @@ describe('public tool package metadata', () => {
         assert.throws(
             () => assertPublicToolPackage({ ...metadata, publishConfig: undefined }, '@pumpkin-plugins/build'),
             /publishConfig.access must be public/
+        );
+        assert.throws(
+            () => assertPublicToolPackage({ ...metadata, engines: undefined }, '@pumpkin-plugins/build'),
+            /engines.node must be >=24\.21\.0/
         );
     });
 });
