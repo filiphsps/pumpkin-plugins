@@ -98,6 +98,22 @@ describe('upstream pin workflow', () => {
         assert.equal(releasePlease.env.GITHUB_TOKEN, appTokenExpression);
         assert.equal(reconcile.run, 'node scripts/upstream-pins.mjs reconcile');
     });
+
+    it('publishes registered tool releases through the caller workflow with OIDC', () => {
+        const ciWorkflow = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/ci.yml'), 'utf8'));
+        const callerPermissions = ciWorkflow.jobs.release.permissions;
+        const publish = releaseWorkflow.jobs['publish-tools'];
+        const callerExpression = ['$', '{{ needs.release.outputs.tool_paths_released }}'].join('');
+
+        assert.ok(releaseWorkflow.jobs.release.outputs.tool_paths_released);
+        assert.equal(callerPermissions['id-token'], 'write');
+        assert.ok(publish, 'release workflow needs a separate npm publish job for tools');
+        assert.equal(publish.permissions['id-token'], 'write');
+        assert.equal(publish.if.includes(callerExpression), true);
+        assert.equal(publish.strategy.matrix.path, ['$', '{{ fromJSON(needs.release.outputs.tool_paths_released) }}'].join(''));
+        assert.match(publish.steps.map((step) => step.run ?? '').join('\n'), /npm publish .*--access public/);
+        assert.match(publish.steps.map((step) => step.run ?? '').join('\n'), /pnpm pack/);
+    });
 });
 
 const AUTHOR = 'Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)';

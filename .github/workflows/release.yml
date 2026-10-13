@@ -20,6 +20,7 @@ jobs:
         outputs:
             paths_released: ${{ steps.release.outputs.paths_released }}
             action_paths_released: ${{ steps.release.outputs.action_paths_released }}
+            tool_paths_released: ${{ steps.release.outputs.tool_paths_released }}
             release_count: ${{ steps.release.outputs.release_count }}
             prepared_pr_count: ${{ steps.release.outputs.pr_count }}
             open_pr_count: ${{ steps.release-prs.outputs.open_pr_count }}
@@ -95,6 +96,7 @@ jobs:
             OPEN_PR_COUNT: ${{ needs.release.outputs.open_pr_count }}
             PLUGIN_PATHS: ${{ needs.release.outputs.paths_released }}
             ACTION_PATHS: ${{ needs.release.outputs.action_paths_released }}
+            TOOL_PATHS: ${{ needs.release.outputs.tool_paths_released }}
             RELEASE_METADATA: ${{ needs.release.outputs.all }}
         steps:
             - name: 🧮 Require complete release outputs
@@ -109,8 +111,9 @@ jobs:
                   done
                   plugin_count="$(jq -er 'if type == "array" then length else error("expected a JSON array") end' <<< "$PLUGIN_PATHS")"
                   action_count="$(jq -er 'if type == "array" then length else error("expected a JSON array") end' <<< "$ACTION_PATHS")"
-                  if (( plugin_count + action_count != RELEASE_COUNT )); then
-                      echo "::error::Release output mismatch: count=$RELEASE_COUNT, plugin paths=$plugin_count, action paths=$action_count."
+                  tool_count="$(jq -er 'if type == "array" then length else error("expected a JSON array") end' <<< "$TOOL_PATHS")"
+                  if (( plugin_count + action_count + tool_count != RELEASE_COUNT )); then
+                      echo "::error::Release output mismatch: count=$RELEASE_COUNT, plugin paths=$plugin_count, action paths=$action_count, tool paths=$tool_count."
                       exit 1
                   fi
                   if (( OPEN_PR_COUNT < PREPARED_PR_COUNT )); then
@@ -125,7 +128,7 @@ jobs:
                           echo "::error::Missing tag metadata for $release_path."
                           exit 1
                       }
-                  done < <(jq --raw-output '.[]' <<< "$PLUGIN_PATHS"; jq --raw-output '.[]' <<< "$ACTION_PATHS")
+                  done < <(jq --raw-output '.[]' <<< "$PLUGIN_PATHS"; jq --raw-output '.[]' <<< "$ACTION_PATHS"; jq --raw-output '.[]' <<< "$TOOL_PATHS")
                   echo "Validated $RELEASE_COUNT release(s), $PREPARED_PR_COUNT prepared PR(s), and $OPEN_PR_COUNT open release PR(s)."
 
     release-pr:
@@ -177,6 +180,21 @@ jobs:
                   git commit -m "chore: retire first-release pins"
                   git push
 
+            - name: 🔧 Sync starter API and builder ranges
+              run: node scripts/sync-tool-template-versions.mjs
+
+            - name: 💾 Commit starter dependency range updates
+              run: |
+                  if git diff --quiet -- tools/create-pumpkin-plugin/templates; then
+                      echo "Starter dependency ranges are already current"
+                      exit 0
+                  fi
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add -- tools/create-pumpkin-plugin/templates/typescript/package.json tools/create-pumpkin-plugin/templates/javascript/package.json
+                  git commit -m "fix(create-pumpkin-plugin): sync starter tool versions"
+                  git push
+
             - name: 🏷️ Update action README version examples
               run: pnpm exec pumpkin-plugins-docs action-versions
 
@@ -191,6 +209,89 @@ jobs:
                   git add -- README.md 'packages/*/README.md' 'actions/*/README.md'
                   git commit -m "docs: update generated READMEs"
                   git push
+
+    publish-tools:
+        name: 📦 Publish npm ${{ matrix.path }}
+        needs: [release, release-fanout-check]
+        if: ${{ needs.release.outputs.tool_paths_released != '[]' }}
+        timeout-minutes: 15
+        runs-on: ubuntu-26.04
+        permissions:
+            contents: read
+            id-token: write
+        strategy:
+            fail-fast: false
+            matrix:
+                path: ${{ fromJSON(needs.release.outputs.tool_paths_released) }}
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            GH_REPO: ${{ github.repository }}
+            TAG: ${{ fromJSON(needs.release.outputs.all)[format('{0}--tag_name', matrix.path)] }}
+            TOOL_DIRECTORY: ${{ matrix.path }}
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 🔒 Check the tag is the commit this run built
+              env:
+                  RELEASE_TAG: ${{ env.TAG }}
+              run: |
+                  ref="$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha')"
+                  sha="${ref##* }"
+                  if [ "${ref%% *}" = tag ]; then
+                      sha="$(gh api "repos/$GH_REPO/git/tags/$RELEASE_TAG" --jq '.object.sha')"
+                  fi
+                  if [ "$sha" != "$GITHUB_SHA" ]; then
+                      echo "::error::$RELEASE_TAG releases $sha, but this run checked out $GITHUB_SHA. Not publishing anything."
+                      exit 1
+                  fi
+
+            - name: 📦 Configure npm OIDC publishing
+              uses: actions/setup-node@v7.0.0
+              with:
+                  node-version: 24.21.0
+                  registry-url: https://registry.npmjs.org
+                  package-manager-cache: false
+
+            - name: 📤 Pack and publish public npm package
+              env:
+                  PACKAGE_DIRECTORY: ${{ matrix.path }}
+              run: |
+                  set -euo pipefail
+                  npm_version="$(npm --version)"
+                  node --input-type=module - "$npm_version" <<'NODE'
+                  const actual = process.argv[2].split('.').map(Number);
+                  const minimum = [11, 5, 1];
+                  for (let index = 0; index < minimum.length; index += 1) {
+                      if ((actual[index] ?? 0) > minimum[index]) break;
+                      if ((actual[index] ?? 0) < minimum[index]) {
+                          throw new Error(`Trusted npm publishing needs npm 11.5.1 or newer; found ${process.argv[2]}`);
+                      }
+                  }
+                  NODE
+                  package_name="$(node --input-type=module -e 'import { readFileSync } from "node:fs"; process.stdout.write(JSON.parse(readFileSync(`${process.env.PACKAGE_DIRECTORY}/package.json`, "utf8")).name)' )"
+                  package_version="$(node --input-type=module -e 'import { readFileSync } from "node:fs"; process.stdout.write(JSON.parse(readFileSync(`${process.env.PACKAGE_DIRECTORY}/package.json`, "utf8")).version)' )"
+                  mkdir -p "$RUNNER_TEMP/npm-packages"
+                  cd "$PACKAGE_DIRECTORY"
+                  pnpm pack --pack-destination "$RUNNER_TEMP/npm-packages"
+                  tarball="$(find "$RUNNER_TEMP/npm-packages" -maxdepth 1 -type f -name '*.tgz' -print -quit)"
+                  if [ -z "$tarball" ]; then
+                      echo "::error::pnpm pack did not produce a tarball for $package_name@$package_version."
+                      exit 1
+                  fi
+                  candidate_integrity="$(node --input-type=module -e 'import { createHash } from "node:crypto"; import { readFileSync } from "node:fs"; process.stdout.write(`sha512-${createHash("sha512").update(readFileSync(process.argv[1])).digest("base64")}`)' "$tarball")"
+                  if existing_integrity="$(npm view "$package_name@$package_version" dist.integrity 2>/dev/null)"; then
+                      if [ "$existing_integrity" = "$candidate_integrity" ]; then
+                          echo "$package_name@$package_version is already published with the same tarball."
+                          exit 0
+                      fi
+                      echo "::error::$package_name@$package_version is published with different contents."
+                      exit 1
+                  fi
+                  npm publish "$tarball" --access public --provenance
 
     assets:
         name: 📎 Attach ${{ matrix.path }}
