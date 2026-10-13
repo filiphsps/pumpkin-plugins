@@ -4,6 +4,8 @@ import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { buildStaticHermesComponent, staticHermesImportsPlugin } from '@pumpkin-plugins/static-hermes-runtime';
 import * as esbuild from 'esbuild';
+import { runtimeBuildError } from './errors.ts';
+import type { BuildOutputMessage } from './output.ts';
 import type { PluginEngine, StaticHermesRuntime } from './plugin-config.ts';
 import { generateTypes } from './types.ts';
 import { findUsedWitMethods } from './wit-method-usage.ts';
@@ -16,6 +18,8 @@ const activeTemporaryDirectories = new Set<string>();
 
 /** Inputs to `bundlePlugin`. */
 export interface BundleOptions {
+    /** Consumer project root used for runtime toolchain caches. */
+    projectRoot?: string;
     /** Source file to bundle. */
     entry: string;
     /** Where to write the `.wasm`. */
@@ -30,11 +34,15 @@ export interface BundleOptions {
     staticHermesRuntime?: StaticHermesRuntime;
     /** Whether this is a development build. */
     developmentMode?: boolean;
+    /** Suppress runtime stdout while preserving stderr for the build command's shared formatter. */
+    quietRuntimeOutput?: boolean;
+    /** Receives runtime progress messages for formatting by the build command. */
+    onOutput?: (message: BuildOutputMessage) => void;
 }
 
 /**
- * Bundles a plugin with esbuild and turns it into a WebAssembly component, the same two steps and
- * settings `pumpkin-api-ts`'s own build uses, with `pumpkin:plugin/*` and `wasi:*` left as imports.
+ * Bundles a plugin with esbuild and turns it into a WebAssembly component, leaving
+ * `pumpkin:plugin/*` and `wasi:*` as imports.
  * @param options - What to build.
  * @returns The size of the component in bytes.
  */
@@ -48,13 +56,16 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
     const bundle = path.join(temporaryDir, 'bundle.js');
     const component = path.join(temporaryDir, 'plugin.wasm');
     const engine = options.engine ?? 'static-hermes';
+    const quietRuntimeOutput = options.quietRuntimeOutput ?? false;
+    const projectRoot = path.resolve(options.projectRoot ?? process.cwd());
     const resolvedWasiImports = new Set<string>();
     let preserveTemporaryDir = false;
     try {
-        await esbuild.build({
+        const buildResult = await esbuild.build({
             entryPoints: [options.entry],
             bundle: true,
             outfile: bundle,
+            metafile: engine === 'static-hermes',
             format: engine === 'quickjs' ? 'esm' : 'iife',
             ...(engine === 'static-hermes'
                 ? {
@@ -62,6 +73,7 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                       plugins: [
                           staticHermesImportsPlugin({
                               resolveDir: path.dirname(path.resolve(options.entry)),
+                              workspaceRoot: projectRoot,
                               witDir: options.witDir,
                               developmentMode: options.developmentMode ?? false,
                               onWasiImport: (specifier) => resolvedWasiImports.add(specifier)
@@ -81,7 +93,7 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
         });
         if (engine === 'static-hermes') {
             const source = fs.readFileSync(bundle, 'utf8');
-            const unsupportedWasiImports = staticHermesWasiImports(source).filter(
+            const unsupportedWasiImports = staticHermesWasiImports(buildResult.metafile).filter(
                 (specifier) => !resolvedWasiImports.has(specifier)
             );
             if (unsupportedWasiImports.length > 0) {
@@ -93,39 +105,62 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
             const generatedTypes = path.join(temporaryDir, 'wit-types');
             generateTypes(options.witDir, generatedTypes);
             const usedWitMethods = findUsedWitMethods(options.entry, generatedTypes);
-            buildStaticHermesComponent({
-                bundle,
-                witDir: options.witDir,
-                output: component,
-                developmentMode: options.developmentMode ?? false,
-                wasiImports: [...resolvedWasiImports],
-                ...(options.staticHermesRuntime === undefined ? {} : { runtimeVariant: options.staticHermesRuntime }),
-                ...(usedWitMethods === undefined
-                    ? {}
-                    : {
-                          apiMethods: usedWitMethods.pumpkinMethods,
-                          wasiMethods: usedWitMethods.wasiMethods
-                      })
+            options.onOutput?.({
+                type: 'componentize',
+                engine,
+                ...(options.staticHermesRuntime === undefined ? {} : { runtimeVariant: options.staticHermesRuntime })
             });
+            try {
+                buildStaticHermesComponent({
+                    bundle,
+                    witDir: options.witDir,
+                    output: component,
+                    workspaceRoot: projectRoot,
+                    developmentMode: options.developmentMode ?? false,
+                    wasiImports: [...resolvedWasiImports],
+                    ...(quietRuntimeOutput ? { quietOutput: true } : {}),
+                    ...(options.staticHermesRuntime === undefined
+                        ? {}
+                        : { runtimeVariant: options.staticHermesRuntime }),
+                    ...(usedWitMethods === undefined
+                        ? {}
+                        : {
+                              apiMethods: usedWitMethods.pumpkinMethods,
+                              wasiMethods: usedWitMethods.wasiMethods
+                          })
+                });
+            } catch (error) {
+                if (!quietRuntimeOutput) throw error;
+                throw runtimeBuildError('Static Hermes', error);
+            }
         } else {
             const componentizerPackage = path.dirname(require.resolve('@di-framework/componentize-qjs/package.json'));
-            execFileSync(
-                process.execPath,
-                [
-                    path.join(componentizerPackage, 'bin/componentize-qjs.cjs'),
-                    '--world',
-                    'plugin',
-                    '--wit',
-                    options.witDir,
-                    '--js',
-                    bundle,
-                    '--runtime',
-                    path.join(import.meta.dirname, '../runtime/quickjs-runtime-bigint.wasm'),
-                    '--output',
-                    component
-                ],
-                { stdio: 'inherit' }
-            );
+            options.onOutput?.({ type: 'componentize', engine });
+            try {
+                execFileSync(
+                    process.execPath,
+                    [
+                        path.join(componentizerPackage, 'bin/componentize-qjs.cjs'),
+                        '--world',
+                        'plugin',
+                        '--wit',
+                        options.witDir,
+                        '--js',
+                        bundle,
+                        '--runtime',
+                        path.join(import.meta.dirname, '../runtime/quickjs-runtime-bigint.wasm'),
+                        '--output',
+                        component
+                    ],
+                    {
+                        stdio: quietRuntimeOutput ? ['inherit', 'ignore', 'pipe'] : 'inherit',
+                        ...(quietRuntimeOutput ? { maxBuffer: 16 * 1024 * 1024 } : {})
+                    }
+                );
+            } catch (error) {
+                if (!quietRuntimeOutput) throw error;
+                throw runtimeBuildError('QuickJS', error);
+            }
         }
         const size = fs.statSync(component).size;
         if (!options.developmentMode && size > MAX_PRODUCTION_COMPONENT_BYTES) {
@@ -174,8 +209,13 @@ function isProcessRunning(pid: number): boolean {
     }
 }
 
-function staticHermesWasiImports(source: string): string[] {
-    return [...new Set([...source.matchAll(/["'](wasi:[^"']+)["']/g)].map((match) => match[1] as string))];
+function staticHermesWasiImports(metafile: esbuild.Metafile | undefined): string[] {
+    const imports = Object.values(metafile?.outputs ?? {}).flatMap((output) => output.imports);
+    return [
+        ...new Set(
+            imports.filter((entry) => entry.external && entry.path.startsWith('wasi:')).map((entry) => entry.path)
+        )
+    ];
 }
 
 function unwrapStaticHermesExports(source: string): string {

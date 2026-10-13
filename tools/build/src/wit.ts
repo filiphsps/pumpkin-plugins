@@ -23,7 +23,7 @@ export function injectWasiImports(pluginWit: string, interfaces: readonly string
 
 /** Inputs to `prepareWit`. */
 export interface PrepareWitOptions {
-    /** The API package's `wit/v0.1` folder. */
+    /** The cached WIT directory selected by the API package's `wit.lock.json`. */
     apiWit: string;
     /** Where to write the combined WIT, when there is anything to add. */
     target: string;

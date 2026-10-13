@@ -1,15 +1,19 @@
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { runInNewContext } from 'node:vm';
+import { ensurePumpkinWit } from '@pumpkin-plugins/pumpkin-api/wit';
 import { staticHermesImportsPlugin } from '@pumpkin-plugins/static-hermes-runtime';
 import * as esbuild from 'esbuild';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cacheDir } from './repo.ts';
 
-const apiWitDir = path.resolve(
-    import.meta.dirname,
-    '../../static-hermes-runtime/node_modules/@pumpkinmc/pumpkin-api-ts/wit/v0.1'
-);
+const apiRoot = path.dirname(createRequire(import.meta.url).resolve('@pumpkin-plugins/pumpkin-api/package.json'));
+const apiWitDir = ensurePumpkinWit({
+    lockFile: path.join(apiRoot, 'wit.lock.json'),
+    cacheRoot: cacheDir(import.meta.dirname)
+});
 const temporaryDirectories: string[] = [];
 
 afterEach(() => {

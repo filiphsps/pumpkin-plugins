@@ -1,5 +1,4 @@
 node_modules/
-/packages/*/build/
 dist/
 *.wasm
 *.tgz

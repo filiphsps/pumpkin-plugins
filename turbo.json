@@ -14,9 +14,8 @@
             "dependsOn": ["^transit"]
         },
         "build": {
-            "dependsOn": ["transit"],
+            "dependsOn": ["transit", "@pumpkin-plugins/build#build"],
             "env": [
-                "PUMPKIN_API_DIR",
                 "PUMPKIN_DEV_MODE",
                 "STATIC_HERMES_CACHE_DIR",
                 "STATIC_HERMES_SOURCE_DIR",
@@ -34,9 +33,14 @@
             "passThroughEnv": ["PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED"],
             "outputs": ["build/**", "!build/types/**", "dist/**"]
         },
+        "@pumpkin-plugins/build#build": {
+            "dependsOn": ["transit", "@pumpkin-plugins/static-hermes-runtime#build"]
+        },
+        "@pumpkin-plugins/static-hermes-runtime#build": {
+            "dependsOn": ["transit"]
+        },
         "typecheck": {
-            "dependsOn": ["transit"],
-            "env": ["PUMPKIN_API_DIR"],
+            "dependsOn": ["transit", "@pumpkin-plugins/build#build"],
             "outputs": ["build/types/**"]
         },
         "test": {

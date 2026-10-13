@@ -1,6 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import * as path from 'node:path';
+
+const require = createRequire(import.meta.url);
 
 /**
  * Generates TypeScript declarations for the Pumpkin (and WASI) modules a plugin imports.
@@ -8,7 +11,7 @@ import * as path from 'node:path';
  * @param outDir - Where to write the declarations.
  */
 export function generateTypes(witDir: string, outDir: string): void {
-    const jco = path.join(import.meta.dirname, '../node_modules/.bin/jco');
+    const jco = resolveJcoCli();
     const output = path.resolve(outDir);
     const parent = path.dirname(output);
     fs.mkdirSync(parent, { recursive: true });
@@ -17,15 +20,54 @@ export function generateTypes(witDir: string, outDir: string): void {
     let preserveTemporary = false;
     try {
         fs.mkdirSync(generated);
-        execFileSync(jco, ['guest-types', witDir, '-n', 'plugin', '-o', generated, '--name', 'index', '--quiet'], {
-            stdio: 'inherit'
-        });
+        execFileSync(
+            process.execPath,
+            [jco, 'guest-types', witDir, '-n', 'plugin', '-o', generated, '--name', 'index', '--quiet'],
+            {
+                stdio: 'inherit'
+            }
+        );
         publishTypes(generated, output, temporary, () => {
             preserveTemporary = true;
         });
     } finally {
         if (!preserveTemporary) fs.rmSync(temporary, { recursive: true, force: true });
     }
+}
+
+/** Resolve the installed `jco` executable from its package metadata.
+ *
+ * @returns Absolute path to the installed `jco` executable.
+ * @throws {Error} If the package, binary declaration, or executable cannot be found.
+ */
+function resolveJcoCli(): string {
+    let entry: string;
+    try {
+        entry = require.resolve('@bytecodealliance/jco');
+    } catch {
+        throw new Error('@bytecodealliance/jco is missing from @pumpkin-plugins/build dependencies');
+    }
+
+    for (let directory = path.dirname(entry); ; directory = path.dirname(directory)) {
+        const packagePath = path.join(directory, 'package.json');
+        if (fs.existsSync(packagePath)) {
+            const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8')) as {
+                name?: string;
+                bin?: string | Record<string, string>;
+            };
+            if (packageJson.name === '@bytecodealliance/jco') {
+                const command = typeof packageJson.bin === 'string' ? packageJson.bin : packageJson.bin?.jco;
+                if (!command) throw new Error('@bytecodealliance/jco package metadata does not declare its jco binary');
+                const binaryPath = path.resolve(directory, command);
+                if (!fs.existsSync(binaryPath))
+                    throw new Error(`jco binary is missing from its package: ${binaryPath}`);
+                return binaryPath;
+            }
+        }
+        const parent = path.dirname(directory);
+        if (parent === directory) break;
+    }
+    throw new Error(`could not locate @bytecodealliance/jco package metadata from ${entry}`);
 }
 
 function publishTypes(generated: string, output: string, temporary: string, preserveForRecovery: () => void): void {

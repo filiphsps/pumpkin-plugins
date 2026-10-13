@@ -1,0 +1,43 @@
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
+import type { PluginEngine, StaticHermesRuntime } from './plugin-config.ts';
+
+/** A message emitted by the shared plugin build output formatter. */
+export type BuildOutputMessage =
+    | { type: 'bundle'; entry: string; engine: PluginEngine; runtimeVariant?: StaticHermesRuntime }
+    | { type: 'componentize'; engine: PluginEngine; runtimeVariant?: StaticHermesRuntime }
+    | { type: 'built'; output: string; sizeBytes: number }
+    | { type: 'error'; message: string };
+
+/** Render a build event in the common console format. */
+export function formatBuildOutput(message: BuildOutputMessage): string {
+    if (message.type === 'error') {
+        return message.message
+            .split(/\r?\n/)
+            .map((line, index) => {
+                const prefix = index === 0 ? 'Error: ' : '  ';
+                return `[build] ${prefix}${ansi.named.error(line)}`;
+            })
+            .join('\n');
+    }
+    if (message.type === 'built') {
+        const size = `${(message.sizeBytes / 1024).toFixed(0)} KiB`;
+        return `[build] Built ${ansi.named.name(message.output)} (${ansi.named.number(size)})`;
+    }
+
+    const runtime = ansi.named.name(runtimeLabel(message.engine, message.runtimeVariant));
+    return message.type === 'bundle'
+        ? `[build] Bundling ${ansi.named.name(message.entry)} with ${runtime}...`
+        : `[build] Componentizing with ${runtime}...`;
+}
+
+/** Write one formatted build event to the appropriate console stream. */
+export function printBuildOutput(message: BuildOutputMessage): void {
+    const formatted = formatBuildOutput(message);
+    if (message.type === 'error') console.error(formatted);
+    else console.log(formatted);
+}
+
+function runtimeLabel(engine: PluginEngine, runtimeVariant?: StaticHermesRuntime): string {
+    if (engine === 'quickjs') return 'QuickJS';
+    return `Static Hermes${runtimeVariant === undefined ? '' : ` (${runtimeVariant})`}`;
+}

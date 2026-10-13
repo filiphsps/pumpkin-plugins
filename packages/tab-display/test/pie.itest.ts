@@ -3,8 +3,8 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { builtPluginPath, type PumpkinInstance, startPumpkin } from '@pumpkin-plugins/test-harness';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { PIE_RELEASE, resolvePieProvider } from '../../../tools/apis/pumpkin-pie-api/test/provider.ts';
 import { run as buildPlugin } from '../../../tools/build/src/cli.ts';
-import { PIE_RELEASE, resolvePieProvider } from '../../../tools/pumpkin-pie-api/test/provider.ts';
 
 describe('TabDisplay PumpkinPIE integration', () => {
     let server: PumpkinInstance;

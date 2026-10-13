@@ -34,6 +34,18 @@ function outputAt(): string {
 }
 
 describe('generateTypes', () => {
+    it('runs the jco JavaScript entry through Node for Windows compatibility', () => {
+        const output = outputAt();
+
+        generateTypes('wit', output);
+
+        const [executable, args] = jco.mock.calls[0] ?? [];
+        expect(executable).toBe(process.execPath);
+        expect(args?.[0]).toMatch(/[\\/]jco\.js$/);
+        expect(args?.slice(1, 3)).toEqual(['guest-types', 'wit']);
+        expect(fs.readFileSync(path.join(output, 'index.d.ts'), 'utf8')).toBe('export type Size = bigint;');
+    });
+
     it('replaces stale generated files and preserves bigint declarations', () => {
         const output = outputAt();
         generateTypes('wit', output);

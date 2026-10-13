@@ -16,9 +16,20 @@ It uses the lean runtime archive by default. Set `staticHermesRuntime` to `"full
 source compilation, or set `STATIC_HERMES_ENABLE_LEAN_ARCHIVE=0` to disable the lean archive for
 builds.
 
+The executable is compiled from TypeScript to `dist/cli.js`. Repository-wide build and typecheck
+commands compile it before consumers run. For a direct workspace package command after a fresh
+checkout, first run `pnpm --filter @pumpkin-plugins/static-hermes-runtime build` and
+`pnpm --filter @pumpkin-plugins/build build` from the repository root.
+Use `pumpkin-plugins-build --help` to list options and `--version` to show the installed tool version.
+
 Run the build command with `--types-only` to generate guest types without producing the component.
 Those declarations are consumed by TypeScript and the editor. They are build output, so edit the
 plugin source and package configuration rather than generated files.
+
+The build tool owns console output for both engines. It reports the entry point, selected runtime,
+componentization stage and final artifact size with a shared `[build]` prefix. Routine output from
+the QuickJS and Static Hermes toolchains is suppressed; failures include captured stderr diagnostics
+in the same format.
 
 ## Build constraints
 

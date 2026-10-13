@@ -45,10 +45,10 @@ const sizeBaselineEngineId = 'quickjs';
 
 const benchmarkDir = path.resolve(import.meta.dirname, '..');
 const repositoryDir = path.resolve(benchmarkDir, '../..');
-const buildCli = path.join(repositoryDir, 'tools/build/bin/pumpkin-plugins-build.mjs');
+const buildCli = path.join(repositoryDir, 'tools/build/dist/cli.js');
 const benchmarkEntry = path.join(benchmarkDir, 'src/benchmark-plugin.ts');
 const benchmarkWorkloads = path.join(benchmarkDir, 'src/benchmark-workloads.ts');
-const apiRoot = path.dirname(createRequire(import.meta.url).resolve('@pumpkinmc/pumpkin-api-ts/package.json'));
+const apiRoot = path.dirname(createRequire(import.meta.url).resolve('@pumpkin-plugins/pumpkin-api/package.json'));
 it('compares configured engines across component sizes, behavior, and matching workloads', async () => {
     const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-engine-comparison-'));
     // Prefer CI's prepared toolchain; a fresh temp cache fetches WASI SDK release metadata again.
@@ -60,7 +60,7 @@ it('compares configured engines across component sizes, behavior, and matching w
             const { id, label, pluginEngine, staticHermesRuntime } = variant;
             const packageDir = path.join(temporaryDir, id);
             const sourceDir = path.join(packageDir, 'src');
-            const apiLink = path.join(packageDir, 'node_modules/@pumpkinmc/pumpkin-api-ts');
+            const apiLink = path.join(packageDir, 'node_modules/@pumpkin-plugins/pumpkin-api');
             fs.mkdirSync(sourceDir, { recursive: true });
             fs.mkdirSync(path.dirname(apiLink), { recursive: true });
             fs.copyFileSync(benchmarkEntry, path.join(sourceDir, 'plugin.ts'));
@@ -107,7 +107,6 @@ it('compares configured engines across component sizes, behavior, and matching w
                 encoding: 'utf8',
                 env: {
                     ...process.env,
-                    PUMPKIN_API_DIR: apiRoot,
                     PUMPKIN_DEV_MODE: '0',
                     STATIC_HERMES_CACHE_DIR: hermesCacheDir
                 },
@@ -288,7 +287,7 @@ async function verifyHermesStackGuard(
 ): Promise<void> {
     const packageDir = path.join(temporaryDir, `static-hermes-${runtimeVariant}-stack-guard`);
     const sourceDir = path.join(packageDir, 'src');
-    const apiLink = path.join(packageDir, 'node_modules/@pumpkinmc/pumpkin-api-ts');
+    const apiLink = path.join(packageDir, 'node_modules/@pumpkin-plugins/pumpkin-api');
     fs.mkdirSync(sourceDir, { recursive: true });
     fs.mkdirSync(path.dirname(apiLink), { recursive: true });
     fs.symlinkSync(apiRoot, apiLink, 'dir');
@@ -315,8 +314,8 @@ async function verifyHermesStackGuard(
         `import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import type { PluginMetadata } from 'pumpkin:plugin/metadata@0.1.0';
-import { Plugin, registerPlugin } from '@pumpkinmc/pumpkin-api-ts';
-export * from '@pumpkinmc/pumpkin-api-ts';
+import { Plugin, registerPlugin } from '@pumpkin-plugins/pumpkin-api';
+export * from '@pumpkin-plugins/pumpkin-api';
 class StackGuardPlugin extends Plugin {
   metadata(): PluginMetadata { return { name: 'StackGuard', version: '0.0.0', authors: [], description: '', dependencies: [], permissions: [] }; }
   onLoad(context: Context): void { super.onLoad(context); logging.log('info', \`STACK_GUARD:\${catchesStackOverflow()}\`); }

@@ -1,4 +1,5 @@
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,16 +14,19 @@ vi.mock('node:fs', async (importOriginal) => {
 });
 
 import { execFileSync } from 'node:child_process';
+import { ensurePumpkinWit } from '@pumpkin-plugins/pumpkin-api/wit';
 import { build } from 'esbuild';
 import { bundlePlugin } from './bundle.ts';
+import { cacheDir } from './repo.ts';
 import { generateTypes } from './types.ts';
 import { findUsedWitMethods } from './wit-method-usage.ts';
 
 const dirs: string[] = [];
-const apiWitDir = path.resolve(
-    import.meta.dirname,
-    '../../static-hermes-runtime/node_modules/@pumpkinmc/pumpkin-api-ts/wit/v0.1'
-);
+const apiRoot = path.dirname(createRequire(import.meta.url).resolve('@pumpkin-plugins/pumpkin-api/package.json'));
+const apiWitDir = ensurePumpkinWit({
+    lockFile: path.join(apiRoot, 'wit.lock.json'),
+    cacheRoot: cacheDir(import.meta.dirname)
+});
 const MAX_PRODUCTION_COMPONENT_BYTES = 5 * 1024 * 1024;
 const engineProfiles = [
     { name: 'QuickJS', options: { engine: 'quickjs' } },
@@ -56,8 +60,61 @@ function buildAt(name = 'plugin.wasm'): { dir: string; output: string } {
 }
 
 describe('bundlePlugin', () => {
-    it('defaults to Static Hermes componentization', async () => {
+    it.each(engineProfiles)('captures $name output and reports componentization centrally', async ({ options }) => {
         const { output } = buildAt();
+        const onOutput = vi.fn();
+        esbuild.mockImplementationOnce((buildOptions) => {
+            if (!buildOptions.outfile) throw new Error('missing JavaScript bundle output');
+            fs.writeFileSync(
+                buildOptions.outfile,
+                'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();'
+            );
+            return {} as never;
+        });
+
+        await bundlePlugin({
+            entry: 'src/plugin.ts',
+            output,
+            witDir: apiWitDir,
+            version: '1.0.0',
+            quietRuntimeOutput: true,
+            onOutput,
+            ...options
+        });
+
+        const engine = 'engine' in options ? options.engine : 'static-hermes';
+        const runtimeVariant = 'staticHermesRuntime' in options ? options.staticHermesRuntime : undefined;
+        expect(componentize.mock.calls[0]?.[2]).toEqual({
+            stdio: ['inherit', 'ignore', 'pipe'],
+            maxBuffer: 16 * 1024 * 1024
+        });
+        expect(onOutput).toHaveBeenCalledWith({
+            type: 'componentize',
+            engine,
+            ...(runtimeVariant === undefined ? {} : { runtimeVariant })
+        });
+    });
+
+    it('preserves captured QuickJS diagnostics for the build output handler', async () => {
+        const { output } = buildAt();
+        componentize.mockImplementationOnce(() => {
+            throw Object.assign(new Error('componentizer failed'), { stderr: Buffer.from('link failed') });
+        });
+
+        await expect(
+            bundlePlugin({
+                entry: 'src/plugin.ts',
+                output,
+                witDir: apiWitDir,
+                version: '1.0.0',
+                engine: 'quickjs',
+                quietRuntimeOutput: true
+            })
+        ).rejects.toThrow('QuickJS componentizer failed:\nlink failed');
+    });
+
+    it('defaults to Static Hermes componentization', async () => {
+        const { dir, output } = buildAt();
         esbuild.mockImplementationOnce((options) => {
             if (!options.outfile) throw new Error('missing JavaScript bundle output');
             fs.writeFileSync(options.outfile, 'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();');
@@ -65,6 +122,7 @@ describe('bundlePlugin', () => {
         });
 
         await bundlePlugin({
+            projectRoot: dir,
             entry: 'src/plugin.ts',
             output,
             witDir: apiWitDir,
@@ -83,6 +141,8 @@ describe('bundlePlugin', () => {
                 apiWitDir,
                 '--output',
                 expect.any(String),
+                '--workspace-root',
+                dir,
                 '--wasi-imports',
                 '[]'
             ])
@@ -182,6 +242,32 @@ describe('bundlePlugin', () => {
         expect(componentize.mock.calls[0]?.[1]).not.toContainEqual(expect.stringContaining('componentize-qjs.cjs'));
     });
 
+    it('allows WASI-looking string literals in Static Hermes bundles', async () => {
+        const { output } = buildAt();
+        esbuild.mockImplementationOnce((options) => {
+            if (!options.outfile) throw new Error('missing JavaScript bundle output');
+            fs.writeFileSync(
+                options.outfile,
+                'var __pumpkinPlugin=(()=>{var note="wasi:http/types@0.2.3";var exports={};return wrap(exports);})();'
+            );
+            return {
+                metafile: {
+                    outputs: { [options.outfile]: { imports: [] } }
+                }
+            } as never;
+        });
+
+        await bundlePlugin({
+            entry: 'src/plugin.ts',
+            output,
+            witDir: apiWitDir,
+            version: '1.0.0',
+            engine: 'static-hermes'
+        });
+
+        expect(componentize).toHaveBeenCalled();
+    });
+
     it('unwraps Static Hermes bundles with trailing esbuild license comments', async () => {
         const { output } = buildAt();
         esbuild.mockImplementationOnce((options) => {
@@ -220,7 +306,15 @@ describe('bundlePlugin', () => {
         esbuild.mockImplementationOnce((options) => {
             if (!options.outfile) throw new Error('missing JavaScript bundle output');
             fs.writeFileSync(options.outfile, 'var plugin = require("wasi:http/types@0.2.3");');
-            return {} as never;
+            return {
+                metafile: {
+                    outputs: {
+                        [options.outfile]: {
+                            imports: [{ path: 'wasi:http/types@0.2.3', external: true }]
+                        }
+                    }
+                }
+            } as never;
         });
 
         await expect(
@@ -235,6 +329,7 @@ describe('bundlePlugin', () => {
             'Static Hermes JavaScript bundle imports WASI interface without a JSI adapter: wasi:http/types@0.2.3'
         );
 
+        expect(esbuild).toHaveBeenCalledWith(expect.objectContaining({ metafile: true }));
         expect(componentize).not.toHaveBeenCalled();
         expect(fs.existsSync(output)).toBe(false);
     });

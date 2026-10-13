@@ -29,29 +29,35 @@
     ],
     "type": "module",
     "bin": {
-        "pumpkin-plugins-build": "bin/pumpkin-plugins-build.mjs"
+        "pumpkin-plugins-build": "dist/cli.js"
     },
     "files": [
         "src",
-        "bin",
+        "dist",
         "runtime",
         "wasi-wit.lock.json"
     ],
     "scripts": {
+        "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --target=node24 --packages=external --alias:@pumpkin-plugins/minecraft-colors=../minecraft-colors/src/index.ts --outfile=dist/cli.js",
+        "prepack": "pnpm build",
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage"
     },
     "dependencies": {
-        "@bytecodealliance/jco": "1.36.1",
+        "@bytecodealliance/jco": "catalog:",
+        "@commander-js/extra-typings": "catalog:",
         "@di-framework/componentize-qjs": "0.4.4-di.3",
+        "@pumpkin-plugins/pumpkin-api": "catalog:",
+        "@pumpkin-plugins/static-hermes-runtime": "workspace:*",
+        "commander": "catalog:",
         "esbuild": "catalog:",
-        "@pumpkin-plugins/static-hermes-runtime": "workspace:*"
+        "typescript": "catalog:"
     },
     "devDependencies": {
+        "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",
-        "typescript": "catalog:",
         "vitest": "catalog:"
     }
 }
