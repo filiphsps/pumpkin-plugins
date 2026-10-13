@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const upstreamGitPinSchema = '../../schemas/upstream-git-pin.schema.json';
+const upstreamGitPinSchema = 'schemas/upstream-git-pin.schema.json';
 const lockWait = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
 const staleLockAgeMs = 30_000;
 const maxLockWaitMs = 15 * 60_000;
@@ -13,7 +13,8 @@ const maxLockWaitMs = 15 * 60_000;
  *
  * The cache directory is keyed by the SHA-256 digest of the complete lockfile, so a change to
  * any lock field cannot reuse files from another pin. WIT is copied out of the temporary Git
- * checkout and the checkout is removed before the cache is published.
+ * checkout and the checkout is removed before the cache is published. Cached WIT files are
+ * verified against their SHA-256 manifest before reuse, so a modified cache cannot change API bindings.
  *
  * @param {{ lockFile: string, cacheRoot: string }} options Lockfile path and consumer-owned cache root.
  * @returns The cached WIT package directory selected by the lockfile.
@@ -68,7 +69,7 @@ export function ensurePumpkinWit({ lockFile, cacheRoot }) {
             fs.cpSync(sourceWit, stagedWit, { recursive: true });
             fs.writeFileSync(
                 path.join(stagingDirectory, 'pin.json'),
-                `${JSON.stringify({ lockDigest, ...pin }, null, 4)}\n`
+                `${JSON.stringify({ lockDigest, ...pin, witFiles: getWitFileManifest(stagedWit) }, null, 4)}\n`
             );
             fs.rmSync(checkout, { recursive: true, force: true });
 
@@ -180,21 +181,72 @@ function resolveThroughExistingPath(directory) {
 
 function isValidCache(cacheDirectory, witDirectory, lockDigest, commit, subdirectory) {
     const pinFile = path.join(cacheDirectory, 'pin.json');
-    if (!fs.existsSync(pinFile) || !hasWitFiles(witDirectory)) return false;
     try {
+        if (!fs.existsSync(pinFile) || !hasWitFiles(witDirectory)) return false;
         const cachedPin = JSON.parse(fs.readFileSync(pinFile, 'utf8'));
         return (
             cachedPin.lockDigest === lockDigest &&
             cachedPin.commit === commit &&
-            cachedPin.subdirectory === subdirectory
+            cachedPin.subdirectory === subdirectory &&
+            matchesWitFileManifest(cachedPin.witFiles, getWitFileManifest(witDirectory))
         );
     } catch {
         return false;
     }
 }
 
+function getWitFileManifest(directory) {
+    const witFiles = [];
+
+    function collect(currentDirectory) {
+        for (const entry of fs.readdirSync(currentDirectory, { withFileTypes: true })) {
+            const entryPath = path.join(currentDirectory, entry.name);
+            if (entry.isDirectory()) {
+                collect(entryPath);
+            } else if (entry.isFile() && entry.name.endsWith('.wit')) {
+                witFiles.push({
+                    path: path.relative(directory, entryPath).split(path.sep).join('/'),
+                    sha256: createHash('sha256').update(fs.readFileSync(entryPath)).digest('hex')
+                });
+            }
+        }
+    }
+
+    collect(directory);
+    return witFiles.sort(compareWitFilePaths);
+}
+
+function matchesWitFileManifest(manifest, actualWitFiles) {
+    if (!Array.isArray(manifest) || manifest.length !== actualWitFiles.length) return false;
+
+    const expectedWitFiles = [];
+    for (const entry of manifest) {
+        if (
+            typeof entry !== 'object' ||
+            entry === null ||
+            typeof entry.path !== 'string' ||
+            !isSafeSubdirectory(entry.path) ||
+            typeof entry.sha256 !== 'string' ||
+            !/^[a-f0-9]{64}$/.test(entry.sha256)
+        ) {
+            return false;
+        }
+        expectedWitFiles.push({ path: entry.path, sha256: entry.sha256 });
+    }
+
+    expectedWitFiles.sort(compareWitFilePaths);
+    return actualWitFiles.every(
+        (file, index) => file.path === expectedWitFiles[index].path && file.sha256 === expectedWitFiles[index].sha256
+    );
+}
+
+function compareWitFilePaths(left, right) {
+    return left.path < right.path ? -1 : left.path > right.path ? 1 : 0;
+}
+
 function acquireCacheLock(cacheParent, cacheDirectory, cachedWit, lockDigest, commit, subdirectory) {
     const lockDirectory = path.join(cacheParent, `.${lockDigest}.lock`);
+    const reclaimDirectory = `${lockDirectory}.reclaim`;
     const startedAt = Date.now();
 
     while (Date.now() - startedAt < maxLockWaitMs) {
@@ -202,19 +254,118 @@ function acquireCacheLock(cacheParent, cacheDirectory, cachedWit, lockDigest, co
 
         try {
             fs.mkdirSync(lockDirectory);
-            fs.writeFileSync(path.join(lockDirectory, 'owner.json'), JSON.stringify({ pid: process.pid }));
-            return () => fs.rmSync(lockDirectory, { recursive: true, force: true });
+            return createOwnedDirectoryLock(lockDirectory);
         } catch (error) {
             if (!isAlreadyExists(error)) throw error;
             if (isStaleLock(lockDirectory)) {
-                fs.rmSync(lockDirectory, { recursive: true, force: true });
-                continue;
+                const releaseReclaimClaim = tryCreateOwnedDirectoryLock(reclaimDirectory);
+                if (releaseReclaimClaim) {
+                    try {
+                        if (isValidCache(cacheDirectory, cachedWit, lockDigest, commit, subdirectory)) return undefined;
+                        if (!isStaleLock(lockDirectory)) continue;
+
+                        fs.rmSync(lockDirectory, { recursive: true, force: true });
+                        try {
+                            fs.mkdirSync(lockDirectory);
+                        } catch (createError) {
+                            if (isAlreadyExists(createError)) continue;
+                            throw createError;
+                        }
+                        return createOwnedDirectoryLock(lockDirectory);
+                    } finally {
+                        releaseReclaimClaim();
+                    }
+                }
             }
             Atomics.wait(lockWait, 0, 0, 100);
         }
     }
 
-    throw new Error(`timed out waiting for the Pumpkin WIT cache lock: ${lockDirectory}`);
+    throw new Error(
+        `timed out waiting for the Pumpkin WIT cache lock: ${lockDirectory}; stale-lock recovery claim: ${reclaimDirectory}`
+    );
+}
+
+function tryCreateOwnedDirectoryLock(lockDirectory) {
+    try {
+        fs.mkdirSync(lockDirectory);
+    } catch (error) {
+        if (!isAlreadyExists(error)) throw error;
+        if (!removeStaleOwnedDirectoryLock(lockDirectory)) return undefined;
+        try {
+            fs.mkdirSync(lockDirectory);
+        } catch (createError) {
+            if (isAlreadyExists(createError)) return undefined;
+            throw createError;
+        }
+    }
+    return createOwnedDirectoryLock(lockDirectory);
+}
+
+function removeStaleOwnedDirectoryLock(lockDirectory) {
+    const identity = readDirectoryIdentity(lockDirectory);
+    if (!identity) return true;
+
+    const ownerFile = path.join(lockDirectory, 'owner.json');
+    const ownerSource = readLockOwnerSource(ownerFile);
+    if (!isStaleLock(lockDirectory)) return false;
+    if (readDirectoryIdentity(lockDirectory) !== identity || readLockOwnerSource(ownerFile) !== ownerSource)
+        return false;
+    if (!isStaleLock(lockDirectory)) return false;
+
+    fs.rmSync(lockDirectory, { recursive: true, force: true });
+    return true;
+}
+
+function createOwnedDirectoryLock(lockDirectory) {
+    const ownerFile = path.join(lockDirectory, 'owner.json');
+    const token = randomUUID();
+    const identity = readDirectoryIdentity(lockDirectory);
+
+    try {
+        fs.writeFileSync(ownerFile, JSON.stringify({ pid: process.pid, token }));
+    } catch (error) {
+        removeDirectoryIfUnchanged(lockDirectory, identity);
+        throw error;
+    }
+
+    return () => {
+        if (readLockOwnerToken(ownerFile) === token) fs.rmSync(lockDirectory, { recursive: true, force: true });
+    };
+}
+
+function readDirectoryIdentity(directory) {
+    try {
+        const { dev, ino } = fs.statSync(directory);
+        return `${dev}:${ino}`;
+    } catch {
+        return undefined;
+    }
+}
+
+function removeDirectoryIfUnchanged(directory, identity) {
+    if (identity && readDirectoryIdentity(directory) === identity) {
+        fs.rmSync(directory, { recursive: true, force: true });
+    }
+}
+
+function readLockOwnerToken(ownerFile) {
+    const contents = readLockOwnerSource(ownerFile);
+    if (contents === undefined) return undefined;
+    try {
+        const owner = JSON.parse(contents);
+        return typeof owner.token === 'string' ? owner.token : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+function readLockOwnerSource(ownerFile) {
+    try {
+        return fs.readFileSync(ownerFile, 'utf8');
+    } catch {
+        return undefined;
+    }
 }
 
 function isStaleLock(lockDirectory) {
@@ -255,6 +406,7 @@ function hasWitFiles(directory) {
 }
 
 function isSafeSubdirectory(value) {
+    // Reject traversal so lockfile paths stay inside the pinned checkout and cache.
     if (!value || value.startsWith('/') || value.includes('\\')) return false;
     return value.split('/').every((segment) => segment.length > 0 && segment !== '.' && segment !== '..');
 }

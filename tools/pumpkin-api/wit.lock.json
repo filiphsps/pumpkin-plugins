@@ -1,5 +1,5 @@
 {
-    "$schema": "../../schemas/upstream-git-pin.schema.json",
+    "$schema": "schemas/upstream-git-pin.schema.json",
     "repository": "https://github.com/Pumpkin-MC/pumpkin-plugin-wit",
     "branch": "master",
     "commit": "4d7a501943bb99f0f02a339128833f58ed37d0cc",
