@@ -50,7 +50,8 @@ export function ensurePumpkinWit({ lockFile, cacheRoot }) {
 
         try {
             const checkout = path.join(stagingDirectory, 'checkout');
-            runGit(['clone', '--filter=blob:none', '--no-checkout', pin.repository, checkout]);
+            // End option parsing so a validated remote cannot be interpreted as a Git option.
+            runGit(['clone', '--filter=blob:none', '--no-checkout', '--', pin.repository, checkout]);
             runGit(['-C', checkout, 'fetch', '--depth', '1', 'origin', pin.commit]);
             runGit(['-C', checkout, 'checkout', '--quiet', '--detach', pin.commit]);
 
@@ -116,7 +117,8 @@ export function parsePumpkinWitPin(source, lockFile) {
     if (record.$schema !== upstreamGitPinSchema) {
         throw new Error(`WIT lockfile must use ${upstreamGitPinSchema} as its $schema: ${lockFile}`);
     }
-    if (typeof record.repository !== 'string' || !isGitRepositoryUri(record.repository)) {
+    const repository = typeof record.repository === 'string' ? parseGitRepositoryUri(record.repository) : undefined;
+    if (!repository) {
         throw new Error(`WIT lockfile must provide a valid HTTPS or file Git repository URI: ${lockFile}`);
     }
     if (typeof record.branch !== 'string' || !record.branch.trim()) {
@@ -130,7 +132,7 @@ export function parsePumpkinWitPin(source, lockFile) {
     }
 
     return {
-        repository: record.repository,
+        repository,
         branch: record.branch,
         commit: record.commit.toLowerCase(),
         subdirectory: record.subdirectory
@@ -142,12 +144,16 @@ function readLockSource(lockFile) {
     return fs.readFileSync(lockFile, 'utf8');
 }
 
-function isGitRepositoryUri(value) {
+function parseGitRepositoryUri(value) {
     try {
         const uri = new URL(value);
-        return (uri.protocol === 'https:' && !uri.username && !uri.password) || uri.protocol === 'file:';
+        if ((uri.protocol === 'https:' && !uri.username && !uri.password) || uri.protocol === 'file:') {
+            // HTTPS/file only blocks Git helper transports that could invoke unexpected programs; normalize for Git.
+            return uri.href;
+        }
+        return undefined;
     } catch {
-        return false;
+        return undefined;
     }
 }
 
