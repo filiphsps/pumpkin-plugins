@@ -435,10 +435,10 @@ function pnpmCommand() {
 }
 
 /** Starts the root build wrapper for all workspace plugins. */
-export function startInitialBuild(root, spawnImpl = spawn, env = process.env) {
+export function startInitialBuild(root, spawnImpl = spawn, env = process.env, parseTypeScript = false) {
     return spawnChild(
         pnpmCommand(),
-        ['run', 'build', '--', '--ui=stream'],
+        ['run', 'build', '--', '--ui=stream', ...(parseTypeScript ? ['--parse-ts'] : [])],
         {
             cwd: root,
             stdio: 'inherit',
@@ -456,6 +456,7 @@ export async function runDev({
     resolveBinary = resolvePumpkinBinary,
     hotReload = true,
     nightly = false,
+    parseTypeScript = false,
     shutdownTimeoutMs = CHILD_SHUTDOWN_TIMEOUT_MS,
     signalSource = process
 } = {}) {
@@ -498,7 +499,7 @@ export async function runDev({
         console.log(
             `Building every plugin, then launching the latest ${nightly ? 'nightly build' : 'stable release'}.`
         );
-        const initialBuild = startInitialBuild(root, spawnImpl, devEnv);
+        const initialBuild = startInitialBuild(root, spawnImpl, devEnv, parseTypeScript);
         children.push(initialBuild);
         const buildResult = initialBuild.done.then(({ code, signal }) => {
             if (!shuttingDown && (code !== 0 || signal)) {
@@ -516,7 +517,7 @@ export async function runDev({
             outputs = watchBuildOutputs(plugins, serverPluginsDir);
             const turbo = spawnChild(
                 pnpmCommand(),
-                ['exec', 'turbo', 'watch', 'build', '--ui=stream'],
+                ['exec', 'turbo', 'watch', parseTypeScript ? 'build:parse-ts' : 'build', '--ui=stream'],
                 {
                     cwd: root,
                     stdio: 'inherit',
@@ -558,9 +559,10 @@ export function parseDevArgs(args) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-    const { hotReload, nightly } = parseDevArgs(process.argv.slice(2));
+    const args = process.argv.slice(2);
+    const { hotReload, nightly } = parseDevArgs(args);
     const command = hotReload ? 'pnpm dev' : 'pnpm dev:no-hot-reload';
-    runDev({ hotReload, nightly }).catch((error) => {
+    runDev({ hotReload, nightly, parseTypeScript: args.includes('--parse-ts') }).catch((error) => {
         console.error(`${command}: ${error.message}`);
         process.exitCode = 1;
     });

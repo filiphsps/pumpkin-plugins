@@ -43,6 +43,7 @@ native code for size while keeping Hermes source locations and native line table
 | `pumpkin-plugins-build --parse-ts` | Opts Static Hermes into its partial, unstable TypeScript parser; unavailable with QuickJS |
 
 Run `pnpm build:parse-ts` to build the repository's plugin packages with that parser.
+For the dev server, run `pnpm dev -- --parse-ts` to use that task for the initial build and watch builds.
 
 Set `PUMPKIN_PLUGINS_VERBOSE_BUILD=1` to include Static Hermes tool output and the selected
 `--wasi-imports`, `--wasi-methods`, `--api-methods` and `--event-types` for each component. Root builds
