@@ -11,6 +11,7 @@ const NIGHTLY_API = `https://api.github.com/repos/${REPOSITORY}/releases/tags/ni
 const RELEASE_METADATA_TTL_MS = 24 * 60 * 60 * 1000;
 const RELEASE_METADATA_FILE = 'latest-release.json';
 const NIGHTLY_METADATA_FILE = 'latest-nightly.json';
+const CHILD_SHUTDOWN_TIMEOUT_MS = 10_000;
 
 /** Returns the Pumpkin release asset name for a platform. */
 export function assetName(platform, arch) {
@@ -379,11 +380,54 @@ function createServerDirectory(serverDir, hotReload) {
 
 function spawnChild(command, args, options, spawnImpl = spawn) {
     const child = spawnImpl(command, args, options);
+    let exited = false;
     const done = new Promise((resolve, reject) => {
-        child.once('error', reject);
-        child.once('exit', (code, signal) => resolve({ code, signal }));
+        child.on('error', (error) => {
+            if (child.pid === undefined && !exited) {
+                exited = true;
+                reject(error);
+            }
+        });
+        child.once('exit', (code, signal) => {
+            exited = true;
+            resolve({ code, signal });
+        });
     });
-    return { child, done };
+    return {
+        child,
+        done,
+        get exited() {
+            return exited;
+        }
+    };
+}
+
+function signalChild(task, signal) {
+    try {
+        task.child.kill(signal);
+    } catch (error) {
+        console.warn(`Could not send ${signal} to a dev child process: ${error}`);
+    }
+}
+
+async function stopChild(task, signal, timeoutMs) {
+    if (task.exited) return task.done.catch(() => {});
+
+    signalChild(task, signal);
+    let timeout;
+    const exited = await Promise.race([
+        task.done.then(
+            () => true,
+            () => true
+        ),
+        new Promise((resolve) => {
+            timeout = setTimeout(() => resolve(false), timeoutMs);
+        })
+    ]);
+    clearTimeout(timeout);
+
+    if (!exited && !task.exited) signalChild(task, 'SIGKILL');
+    await task.done.catch(() => {});
 }
 
 function pnpmCommand() {
@@ -411,7 +455,9 @@ export async function runDev({
     spawnImpl = spawn,
     resolveBinary = resolvePumpkinBinary,
     hotReload = true,
-    nightly = false
+    nightly = false,
+    shutdownTimeoutMs = CHILD_SHUTDOWN_TIMEOUT_MS,
+    signalSource = process
 } = {}) {
     const plugins = listPluginBuilds(root);
     if (plugins.length === 0) throw new Error('No plugin packages with pumpkinPlugin.output were found');
@@ -420,36 +466,40 @@ export async function runDev({
     const serverPluginsDir = createServerDirectory(serverDir, hotReload);
     const devEnv = { ...process.env, PUMPKIN_DEV_MODE: '1' };
     let outputs;
-    let turbo;
-    let server;
+    const children = [];
     let shuttingDown = false;
+    let shutdownSignal = 'SIGINT';
     let resolveShutdown;
     const shutdown = new Promise((resolve) => {
         resolveShutdown = resolve;
     });
 
-    const stopChildren = (signal = 'SIGTERM') => {
-        if (shuttingDown) return;
-        shuttingDown = true;
-        turbo?.child.kill(signal);
-        server?.child.kill(signal);
-    };
+    const stopChildren = (signal) => Promise.all(children.map((child) => stopChild(child, signal, shutdownTimeoutMs)));
+
     const handleSignal = (signal) => {
+        if (shuttingDown) {
+            for (const task of children) {
+                if (!task.exited) signalChild(task, 'SIGKILL');
+            }
+            return;
+        }
+
+        shuttingDown = true;
+        shutdownSignal = signal;
         process.exitCode = signal === 'SIGINT' ? 130 : 143;
-        stopChildren(signal);
         resolveShutdown();
     };
     const onInterrupt = () => handleSignal('SIGINT');
     const onTerminate = () => handleSignal('SIGTERM');
-    process.once('SIGINT', onInterrupt);
-    process.once('SIGTERM', onTerminate);
+    signalSource.on('SIGINT', onInterrupt);
+    signalSource.on('SIGTERM', onTerminate);
 
     try {
         console.log(
             `Building every plugin, then launching the latest ${nightly ? 'nightly build' : 'stable release'}.`
         );
         const initialBuild = startInitialBuild(root, spawnImpl, devEnv);
-        turbo = initialBuild;
+        children.push(initialBuild);
         const buildResult = initialBuild.done.then(({ code, signal }) => {
             if (!shuttingDown && (code !== 0 || signal)) {
                 throw new Error(`turbo run build exited (${signal ?? code ?? 'unknown status'})`);
@@ -464,7 +514,7 @@ export async function runDev({
         const backgroundTasks = [];
         if (hotReload) {
             outputs = watchBuildOutputs(plugins, serverPluginsDir);
-            turbo = spawnChild(
+            const turbo = spawnChild(
                 pnpmCommand(),
                 ['exec', 'turbo', 'watch', 'build', '--ui=stream'],
                 {
@@ -475,6 +525,7 @@ export async function runDev({
                 },
                 spawnImpl
             );
+            children.push(turbo);
             const turboExit = turbo.done.then(({ code, signal }) => {
                 if (!shuttingDown) throw new Error(`turbo watch build exited (${signal ?? code ?? 'unknown status'})`);
             });
@@ -486,14 +537,15 @@ export async function runDev({
 
         const { binary: serverBinary, release } = resolvedBinary;
         console.log(`Starting Pumpkin ${release} with ${plugins.length} plugins in ${serverDir}`);
-        server = spawnChild(serverBinary, [], { cwd: serverDir, stdio: 'inherit' }, spawnImpl);
-        const serverResult = await Promise.race([server.done, ...backgroundTasks]);
+        const server = spawnChild(serverBinary, [], { cwd: serverDir, stdio: 'inherit' }, spawnImpl);
+        children.push(server);
+        const serverResult = await Promise.race([server.done, ...backgroundTasks, shutdown]);
         if (serverResult && !shuttingDown) process.exitCode = serverResult.code ?? (serverResult.signal ? 1 : 0);
     } finally {
-        process.removeListener('SIGINT', onInterrupt);
-        process.removeListener('SIGTERM', onTerminate);
+        signalSource.removeListener('SIGINT', onInterrupt);
+        signalSource.removeListener('SIGTERM', onTerminate);
         outputs?.close();
-        stopChildren('SIGTERM');
+        await stopChildren(shutdownSignal);
     }
 }
 

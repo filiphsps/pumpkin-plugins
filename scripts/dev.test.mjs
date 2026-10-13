@@ -24,6 +24,17 @@ function tempDir() {
     return dir;
 }
 
+function addPluginFixture(root) {
+    const packageDir = path.join(root, 'packages', 'plugin');
+    const output = path.join(packageDir, 'build', 'plugin.wasm');
+    fs.mkdirSync(path.dirname(output), { recursive: true });
+    fs.writeFileSync(
+        path.join(packageDir, 'package.json'),
+        JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } })
+    );
+    fs.writeFileSync(output, 'built plugin');
+}
+
 afterEach(() => {
     for (const dir of tempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -468,6 +479,108 @@ describe('copyPluginBuild', () => {
 });
 
 describe('runDev', () => {
+    it('waits for build watchers to exit after asking them to shut down gracefully', async () => {
+        const root = tempDir();
+        addPluginFixture(root);
+        let watcherExited = false;
+        const watcherSignals = [];
+        const spawnImpl = (command, args) => {
+            const child = new EventEmitter();
+            child.kill = (signal) => {
+                if (!args.includes('watch')) return;
+                watcherSignals.push(signal);
+                if (signal === 'SIGINT') {
+                    setTimeout(() => {
+                        watcherExited = true;
+                        child.emit('exit', null, signal);
+                    }, 20);
+                }
+            };
+            if (args.includes('run') || command === '/fake/pumpkin') {
+                process.nextTick(() => child.emit('exit', 0, null));
+            }
+            return child;
+        };
+
+        await runDev({
+            root,
+            spawnImpl,
+            resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' })
+        });
+
+        assert.deepEqual(watcherSignals, ['SIGINT']);
+        assert.equal(watcherExited, true);
+    });
+
+    it('force-kills unresponsive children after graceful shutdown and waits for them to exit', async () => {
+        const root = tempDir();
+        addPluginFixture(root);
+        const signalSource = new EventEmitter();
+        const previousExitCode = process.exitCode;
+        const childSignals = new Map();
+        const exitedChildren = new Set();
+        const children = [];
+        let watcher;
+        let server;
+        const spawnImpl = (command, args) => {
+            const child = new EventEmitter();
+            child.once('exit', () => exitedChildren.add(child));
+            child.kill = (signal) => {
+                if (args.includes('watch') || command === '/fake/pumpkin') {
+                    const signals = childSignals.get(child) ?? [];
+                    signals.push(signal);
+                    childSignals.set(child, signals);
+                    if (signal === 'SIGKILL') {
+                        setTimeout(() => child.emit('exit', null, signal), 20);
+                    }
+                }
+            };
+            children.push(child);
+            if (args.includes('watch')) watcher = child;
+            if (command === '/fake/pumpkin') server = child;
+            if (args.includes('run')) process.nextTick(() => child.emit('exit', 0, null));
+            if (command === '/fake/pumpkin') {
+                process.nextTick(() => signalSource.emit('SIGINT'));
+            }
+            return child;
+        };
+
+        let completed;
+        const running = runDev({
+            root,
+            spawnImpl,
+            resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' }),
+            signalSource,
+            shutdownTimeoutMs: 5
+        }).then(() => {
+            completed = true;
+        });
+
+        try {
+            let timeout;
+            const finishedInTime = await Promise.race([
+                running.then(() => true),
+                new Promise((resolve) => {
+                    timeout = setTimeout(() => resolve(false), 1000);
+                })
+            ]);
+            clearTimeout(timeout);
+            if (!finishedInTime) {
+                for (const child of children) child.emit('exit', 0, null);
+                await running;
+            }
+
+            assert.equal(finishedInTime, true);
+            assert.deepEqual(childSignals.get(watcher), ['SIGINT', 'SIGKILL']);
+            assert.deepEqual(childSignals.get(server), ['SIGINT', 'SIGKILL']);
+            assert.equal(exitedChildren.has(watcher), true);
+            assert.equal(exitedChildren.has(server), true);
+            assert.equal(completed, true);
+        } finally {
+            process.exitCode = previousExitCode;
+        }
+    });
+
     it('starts the server when cached plugin outputs do not change during the initial build', async () => {
         const root = tempDir();
         const packageDir = path.join(root, 'packages', 'plugin');
@@ -488,7 +601,7 @@ describe('runDev', () => {
         const calls = [];
         const spawnImpl = (command, args, options) => {
             const child = new EventEmitter();
-            child.kill = () => {};
+            child.kill = (signal) => process.nextTick(() => child.emit('exit', null, signal));
             calls.push({ command, args, options });
             if (args.includes('run') || command === '/fake/pumpkin') {
                 process.nextTick(() => child.emit('exit', 0, null));
@@ -529,7 +642,7 @@ describe('runDev', () => {
         let resolvedOptions;
         const spawnImpl = (command, args, options) => {
             const child = new EventEmitter();
-            child.kill = () => {};
+            child.kill = (signal) => process.nextTick(() => child.emit('exit', null, signal));
             calls.push({ command, args, options });
             if (args.includes('run') || command === '/fake/pumpkin') {
                 process.nextTick(() => child.emit('exit', 0, null));
