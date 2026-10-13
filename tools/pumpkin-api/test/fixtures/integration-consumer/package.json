@@ -1,0 +1,14 @@
+{
+    "name": "pumpkin-api-integration-consumer",
+    "version": "0.1.0",
+    "type": "module",
+    "dependencies": {
+        "@pumpkin-plugins/pumpkin-api": "0.1.0"
+    },
+    "pumpkinPlugin": {
+        "entry": "src/plugin.ts",
+        "output": "build/pumpkin-api-integration-consumer.wasm",
+        "engine": "static-hermes",
+        "wasi": []
+    }
+}
