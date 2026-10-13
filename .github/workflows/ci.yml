@@ -518,6 +518,12 @@ jobs:
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
+            - name: 🔧 Setup Static Hermes toolchain
+              uses: ./.github/common/setup-static-hermes
+
+            - name: 🏗️ Prepare Static Hermes
+              run: pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
+
             # A throwaway plugin proves the templates still produce something that builds and loads.
             - name: 🧬 Generate a sample plugin
               run: pnpm gen --args ci-sample CiSample "Generator smoke test"
