@@ -97,6 +97,7 @@ it('preserves reviewed decisions for unchanged items and requires review for cha
             id: 'world.read',
             kind: 'function',
             signature: 'world.read() -> u64',
+            features: [],
             decision: 'review-required',
             migration: ''
         },
@@ -104,6 +105,7 @@ it('preserves reviewed decisions for unchanged items and requires review for cha
             id: 'world.create',
             kind: 'function',
             signature: 'world.create() -> unit',
+            features: [],
             decision: 'review-required',
             migration: ''
         }
@@ -188,11 +190,28 @@ it('archives each release and WIT revision without overwriting a different audit
     expect(path.relative(directory, archivePath)).toBe(
         'history/0.2.0+26.3-26.51/v0.1/4d7a501943bb99f0f02a339128833f58ed37d0cc-111dab16b0475551f23422d5bf734b7900f3030a0f8b33cefde70af10f3ea825.json'
     );
-    expect(fs.readFileSync(archivePath, 'utf8')).toBe(`${JSON.stringify(matrix, null, 4)}\n`);
+    const archiveContents = fs.readFileSync(archivePath, 'utf8');
+    const archivedMatrix = JSON.parse(archiveContents);
+    expect(archivedMatrix.$schema).toBe(
+        'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json'
+    );
+    expect(archivedMatrix.sourceWit.subdirectory).toBe('v0.1');
     expect(archiveCompatibilityMatrix(directory, matrix)).toBe(archivePath);
+    expect(fs.readFileSync(archivePath, 'utf8')).toBe(archiveContents);
 
     expect(() => archiveCompatibilityMatrix(directory, { ...matrix, defaultExport: true })).toThrow(
         /refusing to overwrite compatibility history/
+    );
+});
+
+it('refuses to archive a matrix that does not match the compatibility schema', () => {
+    const matrix = compatibilityMatrix([]);
+    const invalidMatrix = Object.fromEntries(Object.entries(matrix).filter(([key]) => key !== 'inventory'));
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-compatibility-history-'));
+    temporaryDirectories.push(directory);
+
+    expect(() => archiveCompatibilityMatrix(directory, invalidMatrix as unknown as CompatibilityMatrix)).toThrow(
+        /invalid Pumpkin API compatibility matrix/
     );
 });
 
@@ -246,7 +265,24 @@ it('refuses to archive a compatibility audit with an unsupported decision', () =
 
 function compatibilityMatrix(operations: Record<string, string>[]): CompatibilityMatrix {
     return {
-        baseline: { package: '@pumpkinmc/pumpkin-api-ts', version: '0.1.1', pumpkinRelease: '0.2.0+26.3-26.51' },
+        $schema:
+            'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json',
+        baseline: {
+            package: '@pumpkinmc/pumpkin-api-ts',
+            version: '0.1.1',
+            archive:
+                'https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz',
+            integrity:
+                'sha512-FpJjXx05AvLQGVguOnWN6wPfb0mZVfRNiWxYHgiaIYFRQoiRyhqsqemriWsBBmlUlpMqihhd4uJJLpye7rMlpQ==',
+            pumpkinRelease: '0.2.0+26.3-26.51',
+            license: 'MIT OR Apache-2.0'
+        },
+        replacement: {
+            package: '@pumpkin-plugins/pumpkin-api',
+            version: '0.1.0',
+            witPackage: 'pumpkin:plugin@0.1.0',
+            license: 'MIT'
+        },
         sourceWit: {
             repository: 'https://github.com/Pumpkin-MC/pumpkin-plugin-wit',
             branch: 'master',
@@ -254,19 +290,27 @@ function compatibilityMatrix(operations: Record<string, string>[]): Compatibilit
             subdirectory: 'v0.1'
         },
         sourceWitSha256: '111dab16b0475551f23422d5bf734b7900f3030a0f8b33cefde70af10f3ea825',
+        defaultExport: false,
+        runtimeExports: [],
+        publicTypes: [],
+        inventory: { interfaces: 1, types: 0, operations: operations.length },
         interfaces: [
             {
                 name: 'world',
                 specifier: 'pumpkin:plugin/world@0.1.0',
                 decision: 'retained',
                 migration: 'The interface is unchanged.',
+                types: [],
                 operations: operations.map((operation) => ({
                     decision: 'retained',
                     migration: 'The operation is unchanged.',
+                    features: [],
                     ...operation
                 }))
             }
-        ]
+        ],
+        deviations: [],
+        sourceChanges: []
     };
 }
 

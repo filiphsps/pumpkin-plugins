@@ -73,6 +73,12 @@
     "js/ts.suggestionActions.enabled": true,
     "js/ts.updateImportsOnFileMove.enabled": "always",
     "js/ts.updateImportsOnPaste.enabled": true,
+    "json.schemas": [
+        {
+            "fileMatch": ["tools/pumpkin-api/compatibility/**/*.json"],
+            "url": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json"
+        }
+    ],
     "notebook.defaultFormatter": "biomejs.biome",
     "notebook.output.wordWrap": true,
     "npm.packageManager": "pnpm",

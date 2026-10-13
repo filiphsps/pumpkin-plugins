@@ -1,4 +1,5 @@
 {
+    "$schema": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json",
     "baseline": {
         "package": "@pumpkinmc/pumpkin-api-ts",
         "version": "0.1.1",

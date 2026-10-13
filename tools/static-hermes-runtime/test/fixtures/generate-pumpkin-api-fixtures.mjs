@@ -9,6 +9,10 @@ import {
     hasSameWitRevision,
     reconcileCompatibilityMatrix
 } from '../../../pumpkin-api/src/compatibility-audit.ts';
+import {
+    COMPATIBILITY_SCHEMA_URL,
+    validateCompatibilityMatrix
+} from '../../../pumpkin-api/src/compatibility-schema.ts';
 import { PUMPKIN_RELEASE } from '../../../test-harness/src/pumpkin-version.ts';
 import { readWitPackage } from '../oracles/wit-api.mjs';
 
@@ -20,6 +24,7 @@ const compatibilityPath = path.join(compatibilityDirectory, 'v0.1.1.json');
 const previousMatrix = fs.existsSync(compatibilityPath)
     ? JSON.parse(fs.readFileSync(compatibilityPath, 'utf8'))
     : undefined;
+if (previousMatrix) validateCompatibilityMatrix(previousMatrix, compatibilityPath);
 const witLockFile = path.join(apiRoot, 'wit.lock.json');
 const sourceWit = parsePumpkinWitPin(fs.readFileSync(witLockFile, 'utf8'), witLockFile);
 const apiWitDir = ensurePumpkinWit({
@@ -141,6 +146,7 @@ const operationRows = api.interfaces.flatMap((apiInterface) =>
 );
 
 const candidateMatrix = {
+    $schema: COMPATIBILITY_SCHEMA_URL,
     baseline: {
         ...(previousMatrix?.baseline ?? {
             package: '@pumpkinmc/pumpkin-api-ts',
@@ -223,6 +229,7 @@ const sameRevision =
     hasSameWitRevision(previousMatrix, { sourceWit, sourceWitSha256: actualWitDigest });
 const sourceChanges = previousMatrix && !sameRevision ? diffCompatibilityMatrices(previousMatrix, candidateMatrix) : [];
 const compatibilityMatrix = reconcileCompatibilityMatrix(previousMatrix, candidateMatrix, sourceChanges, sameRevision);
+validateCompatibilityMatrix(compatibilityMatrix, compatibilityPath);
 
 if (previousMatrix && !sameRevision) archiveCompatibilityMatrix(compatibilityDirectory, previousMatrix);
 

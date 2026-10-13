@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/correctness/noUnusedFunctionParameters: the abstract class `Public`  shouldn't need to use the `_` prefix for parameters */
 import type {
     Command,
     CommandSender,
@@ -74,20 +75,20 @@ export abstract class Plugin {
     abstract metadata(): PluginMetadata;
 
     /** Register startup handlers and perform plugin initialization. */
-    onLoad(_context: Context): void {}
+    onLoad(context: Context): void {}
 
     /** Save plugin state and release resources before unload. */
-    onUnload(_context: Context): void {}
+    onUnload(context: Context): void {}
 
     /**
      * Handle a message sent by another plugin.
      *
-     * @param _sender - ID of the sending plugin.
-     * @param _message - Message payload.
+     * @param sender - ID of the sending plugin.
+     * @param message - Message payload.
      * @returns The reply sent to the caller.
      * @throws {Error} When the plugin does not implement IPC message handling.
      */
-    handleIpcMessage(_sender: PluginId, _message: IpcMessage): IpcMessage {
+    handleIpcMessage(sender: PluginId, message: IpcMessage): IpcMessage {
         throw new Error('This plugin does not handle IPC messages');
     }
 

@@ -2,9 +2,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
+import { validateCompatibilityMatrix } from '../src/compatibility-schema.ts';
 import { parsePumpkinWitPin } from '../src/wit.mjs';
 
 const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = path.resolve(apiRoot, '../..');
 const compatibilityDirectory = path.join(apiRoot, 'compatibility');
 const witLockFile = path.join(apiRoot, 'wit.lock.json');
 const witPin = parsePumpkinWitPin(fs.readFileSync(witLockFile, 'utf8'), witLockFile);
@@ -64,10 +66,43 @@ it('discovers at least one compatibility definition', () => {
     expect(matrixFiles.length).toBeGreaterThan(0);
 });
 
+it('uses the published schema URL in matrices and VS Code settings', () => {
+    const schemaUrl =
+        'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json';
+
+    const matrixPaths = [...matrixFiles.map((file) => path.join(compatibilityDirectory, file)), ...historyFiles];
+    for (const matrixPath of matrixPaths) {
+        const matrix = JSON.parse(fs.readFileSync(matrixPath, 'utf8'));
+        expect(matrix.$schema).toBe(schemaUrl);
+    }
+
+    const schema = JSON.parse(
+        fs.readFileSync(path.join(repoRoot, 'schemas/pumpkin-api-compatibility.schema.json'), 'utf8')
+    );
+    expect(schema.$id).toBe(schemaUrl);
+    expect(schema.properties.$schema.const).toBe(schemaUrl);
+
+    const settings = JSON.parse(fs.readFileSync(path.join(repoRoot, '.vscode/settings.json'), 'utf8'));
+    expect(settings['json.schemas']).toContainEqual({
+        fileMatch: ['tools/pumpkin-api/compatibility/**/*.json'],
+        url: schemaUrl
+    });
+});
+
+it('rejects compatibility matrices that omit schema-required fields', () => {
+    const matrixPath = path.join(compatibilityDirectory, matrixFiles[0]);
+    const matrix = Object.fromEntries(
+        Object.entries(JSON.parse(fs.readFileSync(matrixPath, 'utf8'))).filter(([key]) => key !== 'inventory')
+    );
+
+    expect(() => validateCompatibilityMatrix(matrix, matrixPath)).toThrow(/inventory/);
+});
+
 for (const file of matrixFiles) {
     it(`records compatibility decisions for every API item in ${file}`, () => {
         const matrixPath = path.join(compatibilityDirectory, file);
         const matrix = JSON.parse(fs.readFileSync(matrixPath, 'utf8')) as CompatibilityMatrix;
+        validateCompatibilityMatrix(matrix, matrixPath);
         const pumpkinReleases = Array.isArray(matrix.baseline.pumpkinRelease)
             ? matrix.baseline.pumpkinRelease
             : [matrix.baseline.pumpkinRelease];
@@ -123,6 +158,7 @@ for (const file of matrixFiles) {
 for (const file of historyFiles) {
     it(`preserves a reviewed historical compatibility audit in ${path.relative(compatibilityDirectory, file)}`, () => {
         const matrix = JSON.parse(fs.readFileSync(file, 'utf8')) as CompatibilityMatrix;
+        validateCompatibilityMatrix(matrix, file);
         const expectedFilename = `${matrix.sourceWit.commit}-${matrix.sourceWitSha256}.json`;
         const pumpkinRelease = Array.isArray(matrix.baseline.pumpkinRelease)
             ? matrix.baseline.pumpkinRelease.join(',')

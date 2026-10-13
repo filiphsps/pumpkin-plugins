@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { code, table } from '@pumpkin-plugins/docs/markdown';
 import type { DocumentSpec } from '@pumpkin-plugins/docs/node';
+import { validateCompatibilityMatrix } from './src/compatibility-schema.ts';
 
 interface CompatibilityDefinition {
     baseline: {
@@ -28,9 +29,9 @@ if (compatibilityFiles.length === 0) {
 }
 
 const compatibilityRows = compatibilityFiles.map((file) => {
-    const definition = JSON.parse(
-        readFileSync(new URL(`./compatibility/${file}`, import.meta.url), 'utf8')
-    ) as CompatibilityDefinition;
+    const compatibilityPath = new URL(`./compatibility/${file}`, import.meta.url);
+    const definition = JSON.parse(readFileSync(compatibilityPath, 'utf8')) as CompatibilityDefinition;
+    validateCompatibilityMatrix(definition, file);
     const pumpkinReleases = Array.isArray(definition.baseline.pumpkinRelease)
         ? definition.baseline.pumpkinRelease
         : [definition.baseline.pumpkinRelease];

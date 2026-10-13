@@ -68,6 +68,7 @@
         "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
+        "ajv": "8.20.0",
         "typescript": "catalog:",
         "vitest": "catalog:"
     },

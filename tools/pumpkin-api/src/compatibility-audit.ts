@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { COMPATIBILITY_SCHEMA_URL, validateCompatibilityMatrix } from './compatibility-schema.ts';
 
 const reviewedDecisions = new Set(['retained', 'improved', 'replaced', 'removed', 'added']);
 
@@ -16,13 +17,25 @@ export interface CompatibilityChange {
 
 /** The compatibility data needed to compare and preserve one WIT audit. */
 export interface CompatibilityMatrix {
-    baseline: { package: string; version: string; pumpkinRelease: string | string[] };
+    $schema: string;
+    baseline: {
+        package: string;
+        version: string;
+        archive: string;
+        integrity: string;
+        pumpkinRelease: string | string[];
+        license: string;
+    };
+    replacement: { package: string; version: string; witPackage: string; license: string };
     sourceWit: { repository: string; branch: string; commit: string; subdirectory?: string };
     sourceWitSha256: string;
-    runtimeExports?: CompatibilityItem[];
-    publicTypes?: CompatibilityItem[];
+    defaultExport: boolean;
+    runtimeExports: CompatibilityItem[];
+    publicTypes: CompatibilityItem[];
+    inventory: { interfaces: number; types: number; operations: number };
     interfaces: CompatibilityInterface[];
-    sourceChanges?: CompatibilityChange[];
+    deviations: Array<{ item: string; decision: string; rationale: string; migration: string }>;
+    sourceChanges: CompatibilityChange[];
     [key: string]: unknown;
 }
 
@@ -149,9 +162,6 @@ export function archiveCompatibilityMatrix(compatibilityDirectory: string, matri
     const commit = matrix.sourceWit.commit.toLowerCase();
     const digest = matrix.sourceWitSha256.toLowerCase();
     const subdirectory = matrix.sourceWit.subdirectory ?? 'v0.1';
-    const archivedMatrix = matrix.sourceWit.subdirectory
-        ? matrix
-        : { ...matrix, sourceWit: { ...matrix.sourceWit, subdirectory } };
     if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit)) {
         throw new Error(`cannot archive compatibility matrix with invalid WIT commit: ${matrix.sourceWit.commit}`);
     }
@@ -162,6 +172,12 @@ export function archiveCompatibilityMatrix(compatibilityDirectory: string, matri
     const historyDirectory = path.join(compatibilityDirectory, 'history', releaseDirectory);
     const sourceDirectory = subdirectory.split('/').map(safePathSegment);
     const archivePath = path.join(historyDirectory, ...sourceDirectory, `${commit}-${digest}.json`);
+    const archivedMatrix = {
+        ...matrix,
+        $schema: COMPATIBILITY_SCHEMA_URL,
+        sourceWit: { ...matrix.sourceWit, subdirectory }
+    };
+    validateCompatibilityMatrix(archivedMatrix, archivePath);
     const serialized = `${JSON.stringify(archivedMatrix, null, 4)}\n`;
     fs.mkdirSync(path.dirname(archivePath), { recursive: true });
 
