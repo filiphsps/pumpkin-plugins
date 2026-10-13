@@ -502,7 +502,7 @@ describe('runDev', () => {
             resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' })
         });
 
-        assert.deepEqual(calls[0].args, ['run', 'build', '--', '--ui=stream', '--log-order=stream']);
+        assert.deepEqual(calls[0].args, ['run', 'build', '--', '--ui=stream']);
         assert.equal(calls[0].options.env.PUMPKIN_DEV_MODE, '1');
         assert.equal(calls[1].options.env.PUMPKIN_DEV_MODE, '1');
         assert.equal(calls.at(-1).command, '/fake/pumpkin');

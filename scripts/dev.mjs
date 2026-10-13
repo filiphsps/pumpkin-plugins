@@ -394,7 +394,7 @@ function pnpmCommand() {
 export function startInitialBuild(root, spawnImpl = spawn, env = process.env) {
     return spawnChild(
         pnpmCommand(),
-        ['run', 'build', '--', '--ui=stream', '--log-order=stream'],
+        ['run', 'build', '--', '--ui=stream'],
         {
             cwd: root,
             stdio: 'inherit',
@@ -466,7 +466,7 @@ export async function runDev({
             outputs = watchBuildOutputs(plugins, serverPluginsDir);
             turbo = spawnChild(
                 pnpmCommand(),
-                ['exec', 'turbo', 'watch', 'build', '--ui=stream', '--log-order=stream'],
+                ['exec', 'turbo', 'watch', 'build', '--ui=stream'],
                 {
                     cwd: root,
                     stdio: 'inherit',
