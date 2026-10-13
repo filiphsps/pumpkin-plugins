@@ -123,6 +123,9 @@ it('keeps upstream pin schemas reusable across repositories and release tag form
     const releasePin = JSON.parse(
         readFileSync(new URL('../schemas/upstream-release-pin.schema.json', import.meta.url), 'utf8')
     );
+    const wasiSdkPin = JSON.parse(
+        readFileSync(new URL('../schemas/wasi-sdk-release-pin.schema.json', import.meta.url), 'utf8')
+    );
     const toolchainSchema = JSON.parse(
         readFileSync(new URL('../schemas/toolchain-versions.schema.json', import.meta.url), 'utf8')
     );
@@ -136,8 +139,8 @@ it('keeps upstream pin schemas reusable across repositories and release tag form
         readFileSync(new URL('../tools/static-hermes-runtime/toolchain-versions.json', import.meta.url), 'utf8')
     );
 
-    assert.equal(hermesSource.$schema, '../../schemas/upstream-git-pin.schema.json');
-    assert.equal(wasiSdk.$schema, '../../schemas/upstream-release-pin.schema.json');
+    assert.equal(hermesSource.$schema, 'schemas/upstream-git-pin.schema.json');
+    assert.equal(wasiSdk.$schema, 'schemas/wasi-sdk-release-pin.schema.json');
     assert.equal(gitPin.properties.repository.format, 'uri');
     assert.equal(gitPin.properties.$schema.format, 'uri-reference');
     assert.equal(gitPin.properties.repository.pattern, undefined);
@@ -151,8 +154,26 @@ it('keeps upstream pin schemas reusable across repositories and release tag form
     assert.equal(releasePin.properties.version.pattern, undefined);
     assert.equal(releasePin.properties.version.minLength, 1);
 
-    assert.equal(toolchainVersions.$schema, '../../schemas/toolchain-versions.schema.json');
+    assert.equal(wasiSdkPin.properties.checksums.required.length, 7);
+    assert.equal(wasiSdkPin.$defs.sha256.pattern, '^[0-9a-f]{64}$');
+
+    assert.equal(toolchainVersions.$schema, 'schemas/toolchain-versions.schema.json');
     assert.deepEqual(toolchainVersions.tools, { 'wasm-tools': '1.261.0', 'wit-bindgen': '0.62.0', rust: '1.99.0' });
     assert.equal(toolchainSchema.properties.tools.additionalProperties.type, 'string');
     assert.equal(toolchainSchema.properties.tools.propertyNames.pattern, '^[a-z0-9]+(?:-[a-z0-9]+)*$');
+});
+
+it('keeps shared upstream schemas synchronized with the repository schema sources', () => {
+    for (const [sourcePath, packagePath] of [
+        ['schemas/upstream-git-pin.schema.json', 'tools/static-hermes-runtime/schemas/upstream-git-pin.schema.json'],
+        [
+            'schemas/wasi-sdk-release-pin.schema.json',
+            'tools/static-hermes-runtime/schemas/wasi-sdk-release-pin.schema.json'
+        ],
+        ['schemas/toolchain-versions.schema.json', 'tools/static-hermes-runtime/schemas/toolchain-versions.schema.json']
+    ]) {
+        const source = JSON.parse(readFileSync(new URL(`../${sourcePath}`, import.meta.url), 'utf8'));
+        const packaged = JSON.parse(readFileSync(new URL(`../${packagePath}`, import.meta.url), 'utf8'));
+        assert.deepEqual(packaged, source, `${packagePath} must match ${sourcePath}`);
+    }
 });

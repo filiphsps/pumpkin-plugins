@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';

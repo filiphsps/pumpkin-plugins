@@ -5,11 +5,16 @@ import { createReadStream } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withHermesBuildLock } from './build.ts';
 import { configuredExecutablePath, executablePath, findExecutable, wasiSdkCompilerPath } from './toolchain-paths.ts';
 
 interface WasiSdkConfig {
+    /** Upstream WASI SDK release version. */
     version: string;
+    /** GitHub repository that publishes the release. */
     repository: string;
+    /** Trusted lowercase SHA-256 digests indexed by Node platform and architecture. */
+    checksums: Record<string, string>;
 }
 
 interface HermesToolchainConfig {
@@ -26,13 +31,23 @@ interface WasiSdkRelease {
     assets?: WasiSdkReleaseAsset[];
 }
 
+/** Inputs for downloading, verifying, and installing a pinned WASI SDK archive. */
 interface WasiSdkInstallOptions {
+    /** Cache directory where the SDK will be installed. */
     destination: string;
+    /** Host platform used to select the release asset. */
     platform: NodeJS.Platform;
+    /** Host architecture used to select the release asset. */
     arch: string;
+    /** Upstream GitHub repository. */
     repository: string;
+    /** Pinned release version. */
     version: string;
+    /** Trusted lowercase archive digest from the local lockfile. */
+    sha256: string;
+    /** Environment containing optional GitHub authentication. */
     env: NodeJS.ProcessEnv;
+    /** Fetch implementation used for release metadata. */
     fetchImpl: typeof fetch;
 }
 
@@ -78,7 +93,7 @@ export interface HermesToolchainSetupOptions {
     includeWitBindgen?: boolean;
     /** Whether to resolve and validate wasm-tools. */
     includeWasmTools?: boolean;
-    /** Version and GitHub repository used to resolve the WASI SDK release. */
+    /** WASI SDK version, GitHub repository, and trusted platform SHA-256 checksums. */
     wasiSdkConfig?: WasiSdkConfig;
     /** Pinned wit-bindgen, Rust, and wasm-tools versions. */
     toolchainConfig?: HermesToolchainConfig;
@@ -105,6 +120,8 @@ export interface StaticHermesBuildPreparationOptions {
 }
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+/** Compilers required from a WASI SDK by the Static Hermes C and C++ build paths. */
+const requiredWasiSdkCompilers = ['wasm32-wasip2-clang', 'wasm32-wasip2-clang++'] as const;
 const DEFAULT_WASI_SDK_CONFIG = JSON.parse(
     fs.readFileSync(path.join(packageRoot, 'wasi-sdk.lock.json'), 'utf8')
 ) as WasiSdkConfig;
@@ -118,6 +135,8 @@ const DEFAULT_TOOLCHAIN_CONFIG = JSON.parse(
  * @remarks
  * The WASI SDK and wit-bindgen are selected by default. `wasm-tools` is opt-in so callers that only need Hermes
  * preparation do not download it; component builds and WIT analysis enable it explicitly.
+ * Invalid cached `wasm-tools` binaries are removed and reinstalled while holding the shared toolchain lock. A
+ * configured `WASM_TOOLS` override is validated separately and is never removed by cache recovery.
  *
  * @param options - Workspace, environment, platform, cache, and tool-selection settings.
  * @returns Environment variables for the shared cache and each selected tool.
@@ -222,7 +241,7 @@ export async function prepareStaticHermesBuild({
     if (env.PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED !== '1') await prepare();
 }
 
-/** Reuse the cached WASI SDK or install and validate the configured version. */
+/** Reuse a valid cached WASI SDK or serialize cache repair and installation. */
 async function resolveCachedWasiSdk({
     toolchainRoot,
     platform,
@@ -241,18 +260,26 @@ async function resolveCachedWasiSdk({
     installWasiSdk: NonNullable<HermesToolchainSetupOptions['installWasiSdk']>;
 }): Promise<string> {
     const { repository, version } = wasiSdkConfig;
+    const sha256 = wasiSdkConfig.checksums[`${platform}/${arch}`];
+    if (!sha256) throw new Error(`no pinned WASI SDK ${version} SHA-256 checksum for ${platform}/${arch}`);
     const destination = path.join(toolchainRoot, `wasi-sdk-${version}`);
-    if (isWasiSdk(destination, platform)) return destination;
-    const installed = await installWasiSdk({
-        destination,
-        platform,
-        arch,
-        repository,
-        version,
-        env,
-        fetchImpl
+    return withHermesBuildLock(path.dirname(toolchainRoot), async () => {
+        if (isWasiSdk(destination, platform)) return destination;
+
+        // Repair only the managed cache path; user-configured SDK paths are validated separately.
+        fs.rmSync(destination, { recursive: true, force: true });
+        const installed = await installWasiSdk({
+            destination,
+            platform,
+            arch,
+            repository,
+            version,
+            sha256,
+            env,
+            fetchImpl
+        });
+        return validateWasiSdk(path.resolve(installed), 'automatically installed WASI SDK', platform);
     });
-    return validateWasiSdk(path.resolve(installed), 'automatically installed WASI SDK', platform);
 }
 
 /** Reuse a cached or user-installed wit-bindgen, otherwise install its pinned version for the selected platform. */
@@ -278,25 +305,45 @@ async function resolveWitBindgen({
         'wit-bindgen',
         platform
     );
-    if (fs.existsSync(destination)) return validateWitBindgen(destination, witBindgenVersion, 'cached wit-bindgen');
-
+    const installRoot = path.dirname(path.dirname(destination));
     const userInstall = executablePath(path.join(homeDirectory, '.cargo', 'bin'), 'wit-bindgen', platform);
-    if (fs.existsSync(userInstall)) {
-        return validateWitBindgen(userInstall, witBindgenVersion, 'user-installed wit-bindgen');
-    }
+    return withHermesBuildLock(path.dirname(toolchainRoot), async () => {
+        if (fs.existsSync(destination)) {
+            try {
+                return validateWitBindgen(destination, witBindgenVersion, 'cached wit-bindgen');
+            } catch {
+                fs.rmSync(installRoot, { recursive: true, force: true });
+            }
+        }
 
-    const installed = await installWitBindgen({
-        destination,
-        version: witBindgenVersion,
-        rustToolchainVersion,
-        homeDirectory,
-        environment,
-        platform
+        if (fs.existsSync(userInstall)) {
+            return validateWitBindgen(userInstall, witBindgenVersion, 'user-installed wit-bindgen');
+        }
+
+        // Remove an interrupted cargo install before starting a fresh installation.
+        fs.rmSync(installRoot, { recursive: true, force: true });
+        try {
+            const installed = await installWitBindgen({
+                destination,
+                version: witBindgenVersion,
+                rustToolchainVersion,
+                homeDirectory,
+                environment,
+                platform
+            });
+            return validateWitBindgen(
+                path.resolve(installed),
+                witBindgenVersion,
+                'automatically installed wit-bindgen'
+            );
+        } catch (error) {
+            fs.rmSync(installRoot, { recursive: true, force: true });
+            throw error;
+        }
     });
-    return validateWitBindgen(path.resolve(installed), witBindgenVersion, 'automatically installed wit-bindgen');
 }
 
-/** Reuse a cached wasm-tools binary or install the pinned release archive. */
+/** Reuse a valid cached wasm-tools binary, replace an invalid cache entry, or install the pinned release archive. */
 async function resolveWasmTools({
     toolchainRoot,
     version,
@@ -314,9 +361,31 @@ async function resolveWasmTools({
 }): Promise<string> {
     const binaryName = platform === 'win32' ? 'wasm-tools.exe' : 'wasm-tools';
     const executable = path.join(toolchainRoot, `wasm-tools-${version}`, 'bin', binaryName);
-    if (fs.existsSync(executable)) return validateWasmTools(executable, version, 'cached wasm-tools');
-    const installed = await installWasmTools({ destination: executable, version, platform, arch, fetchImpl });
-    return validateWasmTools(path.resolve(installed), version, 'automatically installed wasm-tools');
+    const installRoot = path.dirname(path.dirname(executable));
+
+    return withHermesBuildLock(path.dirname(toolchainRoot), async () => {
+        if (fs.existsSync(executable)) {
+            try {
+                return validateWasmTools(executable, version, 'cached wasm-tools');
+            } catch {
+                fs.rmSync(installRoot, { recursive: true, force: true });
+            }
+        } else {
+            fs.rmSync(installRoot, { recursive: true, force: true });
+        }
+
+        try {
+            const installed = await installWasmTools({ destination: executable, version, platform, arch, fetchImpl });
+            return validateWasmTools(path.resolve(installed), version, 'automatically installed wasm-tools');
+        } catch (error) {
+            try {
+                return validateWasmTools(executable, version, 'cached wasm-tools');
+            } catch {
+                fs.rmSync(installRoot, { recursive: true, force: true });
+                throw error;
+            }
+        }
+    });
 }
 
 /** Download, verify, extract, and cache the pinned wasm-tools release. */
@@ -375,6 +444,7 @@ async function installPinnedWasiSdk({
     arch,
     repository,
     version,
+    sha256,
     env,
     fetchImpl
 }: WasiSdkInstallOptions): Promise<string> {
@@ -390,17 +460,13 @@ async function installPinnedWasiSdk({
             token: env.GITHUB_TOKEN ?? env.GH_TOKEN,
             fetchImpl
         });
-        const asset = selectWasiSdkAsset(release, { version, platform, arch });
+        const asset = selectWasiSdkAsset(release, { version, platform, arch, expectedSha256: sha256 });
         execFileSync(
             'curl',
             ['--fail', '--location', '--retry', '3', asset.browser_download_url, '--output', archive],
             { stdio: 'inherit' }
         );
-        const actualSha256 = await sha256File(archive);
-        const expectedSha256 = asset.digest.slice('sha256:'.length);
-        if (actualSha256 !== expectedSha256) {
-            throw new Error(`WASI SDK checksum mismatch: expected ${expectedSha256}, received ${actualSha256}`);
-        }
+        await verifyWasiSdkArchiveChecksum(archive, sha256);
 
         fs.mkdirSync(extraction, { recursive: true });
         execFileSync('tar', ['-xzf', archive, '--strip-components=1', '-C', extraction], { stdio: 'inherit' });
@@ -482,12 +548,20 @@ export async function fetchWasiSdkRelease({
  * @param release - GitHub release metadata containing its published assets.
  * @param target - SDK version, platform, and architecture to match.
  * @returns The matching asset, including its HTTPS download URL and published SHA-256 digest.
- * @throws {Error} If the release has no matching archive or its digest or URL is invalid.
+ * @throws {Error} If the release has no matching archive, its digest differs from the trusted pin, or its URL is invalid.
  */
 export function selectWasiSdkAsset(
     release: WasiSdkRelease,
-    { version, platform, arch }: { version: string; platform: NodeJS.Platform; arch: string }
+    {
+        version,
+        platform,
+        arch,
+        expectedSha256
+    }: { version: string; platform: NodeJS.Platform; arch: string; expectedSha256: string }
 ): WasiSdkReleaseAsset & { digest: string; browser_download_url: string } {
+    if (!/^[0-9a-f]{64}$/.test(expectedSha256)) {
+        throw new Error(`WASI SDK ${version} has no valid pinned SHA-256 checksum for ${platform}/${arch}`);
+    }
     const wasiOsByPlatform: Partial<Record<NodeJS.Platform, string>> = { darwin: 'macos', win32: 'windows' };
     const wasiOs = wasiOsByPlatform[platform] ?? platform;
     const wasiArch = ({ x64: 'x86_64' } as Record<string, string>)[arch] ?? arch;
@@ -503,11 +577,30 @@ export function selectWasiSdkAsset(
     if (!digest || !/^sha256:[0-9a-f]{64}$/i.test(digest)) {
         throw new Error(`WASI SDK archive ${asset.name} has no SHA-256 digest in GitHub release metadata`);
     }
+    if (digest.toLowerCase() !== `sha256:${expectedSha256}`) {
+        throw new Error(
+            `WASI SDK archive ${asset.name} SHA-256 ${digest.slice('sha256:'.length)} does not match the pinned SHA-256 ${expectedSha256}`
+        );
+    }
     const browserDownloadUrl = asset.browser_download_url;
     if (typeof browserDownloadUrl !== 'string' || new URL(browserDownloadUrl).protocol !== 'https:') {
         throw new Error(`WASI SDK archive ${asset.name} has no valid HTTPS download URL`);
     }
     return { ...asset, digest, browser_download_url: browserDownloadUrl };
+}
+
+/**
+ * Verify a downloaded WASI SDK archive against its trusted lockfile checksum.
+ *
+ * @param archivePath - Path to the downloaded SDK archive.
+ * @param expectedSha256 - Trusted lowercase SHA-256 digest from the lockfile.
+ * @throws {Error} If the archive bytes do not match the lockfile digest.
+ */
+export async function verifyWasiSdkArchiveChecksum(archivePath: string, expectedSha256: string): Promise<void> {
+    const actualSha256 = await sha256File(archivePath);
+    if (actualSha256 !== expectedSha256) {
+        throw new Error(`WASI SDK checksum mismatch: expected ${expectedSha256}, received ${actualSha256}`);
+    }
 }
 
 const WASM_TOOLS_RELEASE_ASSETS = {
@@ -549,15 +642,27 @@ export function selectWasmToolsAsset({
     };
 }
 
-/** Validate the WASI SDK version and release repository configuration. */
+/** Validate the WASI SDK version, release repository, and per-target SHA-256 pins. */
 function validateWasiSdkConfig(config: WasiSdkConfig): void {
     if (
         !config ||
         typeof config.version !== 'string' ||
         !/^\d+(?:\.\d+)?$/.test(config.version) ||
-        typeof config.repository !== 'string'
+        typeof config.repository !== 'string' ||
+        !config.checksums ||
+        typeof config.checksums !== 'object' ||
+        Array.isArray(config.checksums) ||
+        Object.keys(config.checksums).length === 0 ||
+        Object.entries(config.checksums).some(
+            ([target, digest]) =>
+                !/^(?:darwin|linux|win32)\/(?:arm64|riscv64|x64)$/.test(target) ||
+                typeof digest !== 'string' ||
+                !/^[0-9a-f]{64}$/.test(digest)
+        )
     ) {
-        throw new Error('wasi-sdk.lock.json must provide a numeric version and GitHub repository URL');
+        throw new Error(
+            'wasi-sdk.lock.json must provide a numeric version, GitHub repository URL, and platform SHA-256 checksums'
+        );
     }
 }
 
@@ -579,7 +684,6 @@ function escapeRegExp(value: string): string {
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Install the pinned wit-bindgen CLI using the configured Rust toolchain. */
 /** Install the pinned wit-bindgen release using rustup or an available cargo toolchain. */
 async function installPinnedWitBindgen({
     destination,
@@ -631,14 +735,16 @@ async function installPinnedWitBindgen({
     return destination;
 }
 
-/** Check whether a WASI SDK directory contains its platform-specific target C compiler.
+/** Check whether a WASI SDK directory contains its platform-specific target C and C++ compilers.
  *
  * @param directory - WASI SDK directory to inspect.
  * @param platform - Host platform used to resolve the compiler executable suffix.
- * @returns `true` when the target compiler exists.
+ * @returns `true` when both target compilers exist.
  */
 function isWasiSdk(directory: string, platform: NodeJS.Platform): boolean {
-    return fs.existsSync(wasiSdkCompilerPath(directory, 'wasm32-wasip2-clang', platform));
+    return requiredWasiSdkCompilers.every((compiler) =>
+        fs.existsSync(wasiSdkCompilerPath(directory, compiler, platform))
+    );
 }
 
 /** Validate a WASI SDK directory and return its path.
@@ -647,12 +753,14 @@ function isWasiSdk(directory: string, platform: NodeJS.Platform): boolean {
  * @param description - Source label included in validation errors.
  * @param platform - Host platform that determines the expected compiler executable suffix.
  * @returns The validated SDK directory.
- * @throws {Error} If the SDK target compiler is missing.
+ * @throws {Error} If either SDK target compiler is missing.
  */
 function validateWasiSdk(directory: string, description: string, platform: NodeJS.Platform): string {
-    if (!isWasiSdk(directory, platform)) {
-        const compiler = path.basename(wasiSdkCompilerPath(directory, 'wasm32-wasip2-clang', platform));
-        throw new Error(`${description} is missing bin/${compiler}: ${directory}`);
+    const missingCompiler = requiredWasiSdkCompilers
+        .map((compiler) => wasiSdkCompilerPath(directory, compiler, platform))
+        .find((compilerPath) => !fs.existsSync(compilerPath));
+    if (missingCompiler) {
+        throw new Error(`${description} is missing bin/${path.basename(missingCompiler)}: ${directory}`);
     }
     return directory;
 }
