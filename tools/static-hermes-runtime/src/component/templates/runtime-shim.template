@@ -6,10 +6,12 @@
 #include "hermes/hermes.h"
 #include "jsi/jsi.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -171,6 +173,18 @@ plugin_string_t wasiInputString(Runtime &runtime, const Value &value) {
     plugin_string_t output{};
     plugin_string_dup_n(&output, text.data(), text.size());
     return output;
+}
+
+template <typename Integer>
+Integer wasiInputInteger(Runtime &runtime, const Value &value,
+                         const char *witType) {
+    const double number = value.asNumber();
+    if (!std::isfinite(number) || std::trunc(number) != number ||
+        number < static_cast<double>(std::numeric_limits<Integer>::lowest()) ||
+        number > static_cast<double>(std::numeric_limits<Integer>::max()))
+        throw JSError(runtime, "Expected an integral value in the WIT " +
+                                   std::string(witType) + " range");
+    return static_cast<Integer>(number);
 }
 
 uint32_t wasiInputChar(Runtime &runtime, const Value &value) {

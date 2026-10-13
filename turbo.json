@@ -30,7 +30,7 @@
                 "WASI_SDK",
                 "WIT_BINDGEN"
             ],
-            "passThroughEnv": ["PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED"],
+            "passThroughEnv": ["PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED", "WASM_TOOLS"],
             "outputs": ["build/**", "!build/types/**", "dist/**"]
         },
         "@pumpkin-plugins/build#build": {
@@ -77,6 +77,7 @@
                 "STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES",
                 "WASI_SDK_PATH",
                 "WASI_SDK",
+                "WASM_TOOLS",
                 "WIT_BINDGEN"
             ],
             "cache": false

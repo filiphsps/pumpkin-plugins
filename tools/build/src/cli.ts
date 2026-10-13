@@ -124,7 +124,8 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
 /**
  * Resolves the Pumpkin API package and fetches its pinned WIT into the consumer cache.
  *
- * @remarks A declared pnpm alias is used when the canonical package is not directly resolvable.
+ * @remarks A declared alias takes precedence over an undeclared canonical package hoisted from a tool dependency.
+ * A directly declared canonical dependency remains preferred.
  * @param pluginDir - Root directory of the consuming plugin project.
  * @param resolvePackageJson - Resolver for a requested API package manifest, injectable for isolated callers.
  * @returns The cached WIT directory selected by the API package's `wit.lock.json`.
@@ -137,10 +138,12 @@ export function resolveApiWit(
 ): string {
     let packageJson: string;
     try {
-        const packageSpecifiers = [
-            '@pumpkin-plugins/pumpkin-api/package.json',
-            ...apiAliasPackageSpecifiers(pluginDir)
-        ];
+        const canonicalSpecifier = '@pumpkin-plugins/pumpkin-api/package.json';
+        const { aliases, hasCanonicalDependency } = apiPackageSpecifiers(pluginDir);
+        const packageSpecifiers =
+            hasCanonicalDependency || aliases.length === 0
+                ? [canonicalSpecifier, ...aliases]
+                : [...aliases, canonicalSpecifier];
         let resolvedPackageJson: string | undefined;
         for (const packageSpecifier of packageSpecifiers) {
             try {
@@ -170,32 +173,39 @@ export function resolveApiWit(
 }
 
 /**
- * Finds package aliases that point at the Pumpkin API package.
+ * Finds declared canonical and alias dependencies on the Pumpkin API package.
  * @param pluginDir - Root directory of the consuming plugin project.
- * @returns Alias package JSON specifiers declared in its dependency fields.
+ * @returns The declared aliases and whether the canonical package is a direct dependency.
  */
-function apiAliasPackageSpecifiers(pluginDir: string): string[] {
+function apiPackageSpecifiers(pluginDir: string): { aliases: string[]; hasCanonicalDependency: boolean } {
     let packageManifest: unknown;
     try {
         packageManifest = JSON.parse(fs.readFileSync(path.join(pluginDir, 'package.json'), 'utf8'));
     } catch {
-        return [];
+        return { aliases: [], hasCanonicalDependency: false };
     }
-    if (typeof packageManifest !== 'object' || packageManifest === null || Array.isArray(packageManifest)) return [];
+    if (typeof packageManifest !== 'object' || packageManifest === null || Array.isArray(packageManifest)) {
+        return { aliases: [], hasCanonicalDependency: false };
+    }
 
     const dependencies = packageManifest as Record<string, unknown>;
     const aliases = new Set<string>();
+    let hasCanonicalDependency = false;
     for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
         const declarations = dependencies[field];
         if (typeof declarations !== 'object' || declarations === null || Array.isArray(declarations)) continue;
 
         for (const [packageName, specification] of Object.entries(declarations)) {
+            if (packageName === '@pumpkin-plugins/pumpkin-api') {
+                hasCanonicalDependency = true;
+                continue;
+            }
             if (typeof specification === 'string' && /^npm:@pumpkin-plugins\/pumpkin-api(?:@|$)/.test(specification)) {
                 aliases.add(`${packageName}/package.json`);
             }
         }
     }
-    return [...aliases];
+    return { aliases: [...aliases], hasCanonicalDependency };
 }
 
 /**

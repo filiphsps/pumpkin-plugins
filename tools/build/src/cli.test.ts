@@ -353,6 +353,51 @@ describe('run arguments', () => {
         }
     });
 
+    it('tries every declared scoped API alias before a hoisted undeclared canonical package', () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-hoisted-api-alias-'));
+        const canonicalApiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-canonical-transitive-'));
+        const aliasApiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-alias-'));
+        const repositoryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-wit-repo-'));
+        const canonicalPin = createWitRepository(repositoryDir, 'v0.1', '@0.1.0');
+        const aliasCommit = commitWitFile(
+            repositoryDir,
+            'package pumpkin:plugin@0.2.0;\nworld plugin {\n    export run: func();\n}\n'
+        );
+        writeApiPackageManifest(canonicalApiDir);
+        writeWitLock(canonicalApiDir, repositoryDir, canonicalPin.branch, canonicalPin.commit);
+        writeApiPackageManifest(aliasApiDir);
+        const aliasLock = writeWitLock(aliasApiDir, repositoryDir, canonicalPin.branch, aliasCommit);
+
+        const canonicalScopeDir = path.join(pluginDir, 'node_modules', '@pumpkin-plugins');
+        const aliasScopeDir = path.join(pluginDir, 'node_modules', '@pumpkinmc');
+        fs.mkdirSync(canonicalScopeDir, { recursive: true });
+        fs.mkdirSync(aliasScopeDir, { recursive: true });
+        fs.symlinkSync(canonicalApiDir, path.join(canonicalScopeDir, 'pumpkin-api'), 'dir');
+        fs.symlinkSync(aliasApiDir, path.join(aliasScopeDir, 'pumpkin-api-ts'), 'dir');
+        fs.writeFileSync(
+            path.join(pluginDir, 'package.json'),
+            JSON.stringify({
+                dependencies: {
+                    '@pumpkin-plugins/build': '0.1.0',
+                    '@missing/pumpkin-api': 'npm:@pumpkin-plugins/pumpkin-api@^0.1.0',
+                    '@pumpkinmc/pumpkin-api-ts': 'npm:@pumpkin-plugins/pumpkin-api@^0.1.0'
+                }
+            })
+        );
+
+        try {
+            const witDir = resolveApiWit(pluginDir);
+
+            expect(witDir).toBe(cachedWitDir(pluginDir, aliasLock));
+            expect(fs.readFileSync(path.join(witDir, 'plugin.wit'), 'utf8')).toContain('package pumpkin:plugin@0.2.0');
+        } finally {
+            fs.rmSync(pluginDir, { recursive: true, force: true });
+            fs.rmSync(canonicalApiDir, { recursive: true, force: true });
+            fs.rmSync(aliasApiDir, { recursive: true, force: true });
+            fs.rmSync(repositoryDir, { recursive: true, force: true });
+        }
+    });
+
     it('fetches a new WIT cache after the lock commit changes', async () => {
         const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-wit-refresh-'));
         const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));

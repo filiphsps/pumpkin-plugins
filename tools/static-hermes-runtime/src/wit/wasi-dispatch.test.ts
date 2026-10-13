@@ -1,4 +1,9 @@
-import { expect, it } from 'vitest';
+import * as childProcess from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterEach, expect, it } from 'vitest';
 import type { WitAnalysis } from './analysis.ts';
 import { generateWitOutputs } from './generation.ts';
 import { generateWitApiFunctionForResolvedOperation } from './native-adapters.ts';
@@ -11,6 +16,95 @@ import type {
     WitWasiInterface
 } from './types.ts';
 import { generateWasiAdapterDispatch } from './wasi-dispatch.ts';
+
+const temporaryDirectories: string[] = [];
+
+afterEach(() => {
+    for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
+});
+
+it('validates signed and unsigned WIT integer inputs without changing float conversions', () => {
+    const cases = [
+        { name: 's8', cType: 'int8_t' },
+        { name: 'u8', cType: 'uint8_t' },
+        { name: 's16', cType: 'int16_t' },
+        { name: 'u16', cType: 'uint16_t' },
+        { name: 's32', cType: 'int32_t' },
+        { name: 'u32', cType: 'uint32_t' }
+    ];
+
+    for (const { name, cType } of cases) {
+        const generated = generateIntegerInputAdapter(name);
+        expect(generated).toContain(`wasiInputInteger<${cType}>(rt, args[0], ${JSON.stringify(name)})`);
+    }
+
+    expect(generateIntegerInputAdapter('f32')).toContain('static_cast<float>(args[0].asNumber())');
+    expect(generateIntegerInputAdapter('f64')).toContain('static_cast<double>(args[0].asNumber())');
+});
+
+it('rejects out-of-range and fractional WIT integer inputs while accepting valid boundaries', () => {
+    const templatePath = path.resolve(
+        path.dirname(fileURLToPath(import.meta.url)),
+        '../../src/component/templates/runtime-shim.template'
+    );
+    const template = fs.readFileSync(templatePath, 'utf8');
+    const helper = extractCppFunction(template, 'template <typename Integer>\nInteger wasiInputInteger(');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-wit-integer-'));
+    temporaryDirectories.push(root);
+    const source = `
+#include <cassert>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
+#include <limits>
+#include <stdexcept>
+#include <string>
+
+class Runtime {};
+class Value {
+  public:
+    explicit Value(double number) : number_(number) {}
+    double asNumber() const { return number_; }
+  private:
+    double number_;
+};
+class JSError : public std::runtime_error {
+  public:
+    JSError(Runtime &, const std::string &message) : std::runtime_error(message) {}
+};
+
+${helper}
+
+template <typename Callback>
+void expectInvalid(Callback callback) {
+    try {
+        callback();
+    } catch (const JSError &) {
+        return;
+    }
+    std::abort();
+}
+
+int main() {
+    Runtime runtime;
+    assert(wasiInputInteger<int8_t>(runtime, Value(-128), "s8") == -128);
+    assert(wasiInputInteger<int8_t>(runtime, Value(127), "s8") == 127);
+    assert(wasiInputInteger<uint8_t>(runtime, Value(0), "u8") == 0);
+    assert(wasiInputInteger<uint8_t>(runtime, Value(255), "u8") == 255);
+    assert(wasiInputInteger<int32_t>(runtime, Value(-2147483648.0), "s32") == INT32_MIN);
+    assert(wasiInputInteger<int32_t>(runtime, Value(2147483647.0), "s32") == INT32_MAX);
+    assert(wasiInputInteger<uint32_t>(runtime, Value(0), "u32") == 0);
+    assert(wasiInputInteger<uint32_t>(runtime, Value(4294967295.0), "u32") == UINT32_MAX);
+    expectInvalid([&] { wasiInputInteger<uint32_t>(runtime, Value(-1), "u32"); });
+    expectInvalid([&] { wasiInputInteger<uint8_t>(runtime, Value(300), "u8"); });
+    expectInvalid([&] { wasiInputInteger<int32_t>(runtime, Value(1.5), "s32"); });
+    expectInvalid([&] { wasiInputInteger<int8_t>(runtime, Value(-128.5), "s8"); });
+    expectInvalid([&] { wasiInputInteger<uint16_t>(runtime, Value(65536), "u16"); });
+    expectInvalid([&] { wasiInputInteger<int16_t>(runtime, Value(std::numeric_limits<double>::infinity()), "s16"); });
+}
+`;
+    compileAndRunCpp(root, source);
+}, 20_000);
 
 it('guards owned input and output WIT values before conversion can throw', () => {
     const interfaceSpecifier = 'wasi:test/api@0.2.3';
@@ -77,6 +171,69 @@ it('guards owned input and output WIT values before conversion can throw', () =>
     expect(outputGuard).toBeLessThan(outputConversion);
     expect(generated).toContain('plugin_string_free(&result);');
 });
+
+function generateIntegerInputAdapter(typeName: string): string {
+    const interfaceSpecifier = 'wasi:test/types@0.2.3';
+    const operation: WitFunction = {
+        name: 'accept',
+        isStatic: false,
+        parameters: [{ name: 'value', type: typeName }],
+        result: ''
+    };
+    const apiInterface: WitWasiInterface = {
+        packageName: 'wasi:test',
+        version: '0.2.3',
+        name: 'types',
+        specifier: interfaceSpecifier,
+        functions: [operation],
+        resources: [],
+        records: [],
+        variants: [],
+        enums: [],
+        flags: [],
+        types: [],
+        dependencies: [],
+        dependencyTypes: {}
+    };
+    const apiPackage: WitApiPackage = {
+        packageName: 'wasi:test',
+        version: '0.2.3',
+        interfaces: [apiInterface]
+    };
+    const generated = generateWitApiFunctionForResolvedOperation({
+        apiPackage,
+        apiInterface,
+        operation,
+        parameters: [{ name: 'value', type: typeName, resolvedType: { kind: 'primitive', name: typeName } }],
+        resultType: { kind: 'unit' }
+    });
+    if (!generated) throw new Error(`Expected a generated adapter for WIT ${typeName}`);
+    return generated;
+}
+
+function extractCppFunction(source: string, signature: string): string {
+    const start = source.indexOf(signature);
+    if (start < 0) throw new Error(`Runtime template is missing ${signature}`);
+    const open = source.indexOf('{', start);
+    if (open < 0) throw new Error(`Runtime template has no function body for ${signature}`);
+    let depth = 0;
+    for (let index = open; index < source.length; index++) {
+        if (source[index] === '{') depth++;
+        else if (source[index] === '}') {
+            depth--;
+            if (depth === 0) return source.slice(start, index + 1);
+        }
+    }
+    throw new Error(`Runtime template has an unclosed function body for ${signature}`);
+}
+
+function compileAndRunCpp(root: string, source: string): void {
+    const input = path.join(root, 'integer-input-contract.cpp');
+    const executable = path.join(root, 'integer-input-contract');
+    fs.writeFileSync(input, source);
+    childProcess.execFileSync(process.env.CXX ?? 'c++', ['-std=c++17', input, '-o', executable], { stdio: 'pipe' });
+    childProcess.execFileSync(executable, [], { stdio: 'pipe' });
+}
 
 it('uses the owning interface name for imported named WIT types', () => {
     const interfaceSpecifier = 'wasi:filesystem/types@0.2.3';

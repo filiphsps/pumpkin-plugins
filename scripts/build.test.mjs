@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
     buildTaskEnvironment,
     hasStaticHermesBuild,
@@ -12,6 +14,29 @@ import {
 } from './build.mjs';
 
 const temporaryRoots = [];
+const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+function resolvedTurboTask(task, packageName) {
+    const output = execFileSync(
+        process.execPath,
+        [
+            path.join(workspaceRoot, 'node_modules/turbo/bin/turbo'),
+            'run',
+            task,
+            `--filter=${packageName}`,
+            '--dry=json'
+        ],
+        {
+            cwd: workspaceRoot,
+            encoding: 'utf8',
+            env: { ...process.env, WASM_TOOLS: '/configured/wasm-tools' }
+        }
+    );
+    const graph = JSON.parse(output);
+    const matchingTask = graph.tasks.find(({ taskId }) => taskId === `${packageName}#${task}`);
+    assert.ok(matchingTask, `Turbo did not include ${packageName}#${task}`);
+    return matchingTask.resolvedTaskDefinition;
+}
 
 after(() => {
     for (const root of temporaryRoots) fs.rmSync(root, { recursive: true, force: true });
@@ -152,5 +177,19 @@ describe('buildTaskEnvironment', () => {
             STATIC_HERMES_CACHE_DIR: '/workspace/.cache/hermes',
             PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED: '1'
         });
+    });
+});
+
+describe('Turbo WASM_TOOLS environment', () => {
+    it('passes WASM_TOOLS through to plugin build tasks', () => {
+        const task = resolvedTurboTask('build', '@pumpkin-plugins/tab-display');
+
+        assert.ok(task.passThroughEnv.includes('WASM_TOOLS'));
+    });
+
+    it('passes WASM_TOOLS through to plugin integration tests', () => {
+        const task = resolvedTurboTask('test:integration', '@pumpkin-plugins/tab-display');
+
+        assert.ok(task.passThroughEnv.includes('WASM_TOOLS'));
     });
 });

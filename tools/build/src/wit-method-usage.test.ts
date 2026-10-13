@@ -196,6 +196,48 @@ class RuntimePlugin extends Plugin {
         });
     }, 60_000);
 
+    it('falls back when a Plugin forwarding method registers through a bound context alias', () => {
+        const entry = fixture();
+        fs.writeFileSync(
+            entry,
+            `type EventType = 'tick' | 'join';
+interface Context { registerEvent(id: number, eventType: EventType, priority: 'normal', blocking: boolean): void; }
+class Plugin {
+    registerEvent(context: Context, eventType: EventType, handler: (event: unknown) => void): void {
+        const register = context.registerEvent.bind(context);
+        register(1, eventType === 'tick' ? 'join' : eventType, 'normal', true);
+    }
+}
+class RuntimePlugin extends Plugin {
+    subscribe(context: Context): void { this.registerEvent(context, 'tick', () => {}); }
+}
+`
+        );
+
+        expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
+    });
+
+    it('falls back when a Plugin forwarding method registers through a destructured context alias', () => {
+        const entry = fixture();
+        fs.writeFileSync(
+            entry,
+            `type EventType = 'tick' | 'join';
+interface Context { registerEvent(id: number, eventType: EventType, priority: 'normal', blocking: boolean): void; }
+class Plugin {
+    registerEvent(context: Context, eventType: EventType, handler: (event: unknown) => void): void {
+        const { registerEvent: register } = context;
+        register(1, eventType === 'tick' ? 'join' : eventType, 'normal', true);
+    }
+}
+class RuntimePlugin extends Plugin {
+    subscribe(context: Context): void { this.registerEvent(context, 'tick', () => {}); }
+}
+`
+        );
+
+        expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
+    });
+
     it('retains all typed dynamic events and falls back when a registration name is untyped', () => {
         const entry = fixture();
         fs.writeFileSync(

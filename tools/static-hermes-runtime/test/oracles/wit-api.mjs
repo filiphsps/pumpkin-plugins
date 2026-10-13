@@ -2216,6 +2216,9 @@ function primitiveInput(type, expression, runtime) {
     if (type.name === 'string') return `wasiInputString(${runtime}, ${expression})`;
     if (type.name === 'u64') return `${expression}.asBigInt(${runtime}).asUint64(${runtime})`;
     if (type.name === 's64') return `${expression}.asBigInt(${runtime}).asInt64(${runtime})`;
+    if (['u8', 's8', 'u16', 's16', 'u32', 's32'].includes(type.name)) {
+        return `wasiInputInteger<${witCScalarType(type.name)}>(${runtime}, ${expression}, ${JSON.stringify(type.name)})`;
+    }
     return `static_cast<${witCScalarType(type.name)}>(${expression}.asNumber())`;
 }
 

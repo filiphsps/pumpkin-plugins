@@ -243,8 +243,10 @@ export function findUsedWitMethods(entry: string, additionalTypesDir?: string): 
                     continue;
                 }
                 const name = binding.propertyName ?? binding.name;
-                if (ts.isIdentifier(name) || ts.isStringLiteral(name)) collectMethod(name, node.initializer, name.text);
-                else collectAllMembers(checker.getTypeAtLocation(node.initializer), name, node.initializer);
+                if (ts.isIdentifier(name) || ts.isStringLiteral(name)) {
+                    if (name.text === 'registerEvent') incompleteEventTypes = true;
+                    collectMethod(name, node.initializer, name.text);
+                } else collectAllMembers(checker.getTypeAtLocation(node.initializer), name, node.initializer);
             }
         }
         ts.forEachChild(node, visit);
@@ -274,13 +276,23 @@ export function findUsedWitMethods(entry: string, additionalTypesDir?: string): 
     }
 
     function isPluginEventForwarder(node: ts.Node): boolean {
+        if (!ts.isCallExpression(node)) return false;
+        const access = node.expression;
+        if (!ts.isPropertyAccessExpression(access) && !ts.isElementAccessExpression(access)) return false;
+        const receiver = access.expression;
+        if (!ts.isIdentifier(receiver)) return false;
+
         for (let parent = node.parent; parent; parent = parent.parent) {
             if (!ts.isMethodDeclaration(parent)) continue;
+            const contextParameter = parent.parameters[0]?.name;
             return (
                 ts.isIdentifier(parent.name) &&
                 parent.name.text === 'registerEvent' &&
                 ts.isClassDeclaration(parent.parent) &&
-                parent.parent.name?.text === 'Plugin'
+                parent.parent.name?.text === 'Plugin' &&
+                contextParameter !== undefined &&
+                ts.isIdentifier(contextParameter) &&
+                checker.getSymbolAtLocation(receiver) === checker.getSymbolAtLocation(contextParameter)
             );
         }
         return false;

@@ -21,7 +21,7 @@ supported API calls. Development, integration and release builds use the configu
 build tool provisions Static Hermes's pinned WASI SDK and `wit-bindgen` under `.cache/hermes/` when
 needed, then prepares Hermes automatically when Static Hermes is selected.
 
-It resolves the plugin's installed `@pumpkin-plugins/pumpkin-api` dependency and fetches the
+It resolves the plugin's declared `@pumpkin-plugins/pumpkin-api` dependency or npm alias and fetches the
 WIT files from the subdirectory pinned by its `wit.lock.json` (the WIT ABI must match the Pumpkin server),
 then resolves esbuild and the selected engine. On first use, and whenever the lockfile contents
 change, Git fetches the pinned commit into `.cache/pumpkin-api-wit/<lock-digest>/`; existing cache
