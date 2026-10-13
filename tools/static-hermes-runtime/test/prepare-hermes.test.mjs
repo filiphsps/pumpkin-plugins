@@ -38,6 +38,35 @@ it('keeps LLVH Unix and Windows implementations independent when adding WASI', (
     expect(patch).not.toMatch(/^\+#elif defined\((?:LLVM_ON_UNIX|_WIN32)\)$/m);
 });
 
+it('returns an explicit unsupported error when WASI footprint is unavailable', () => {
+    const patch = fs.readFileSync(
+        path.join(runtimeDir, 'hermes-patches/0004-wasi-p2-runtime-compatibility.patch'),
+        'utf8'
+    );
+    const vmFootprint = patch.match(
+        /^\+llvh::ErrorOr<size_t> vm_footprint\(char \*start, char \*end\) \{\n(?:^\+.*\n)*?^\+\}/m
+    )?.[0];
+
+    expect(vmFootprint).toContain('std::errc::operation_not_supported');
+    expect(vmFootprint).not.toContain('errno');
+});
+
+it('rounds WASI aligned allocation sizes up to the requested alignment', () => {
+    const patch = fs.readFileSync(
+        path.join(runtimeDir, 'hermes-patches/0004-wasi-p2-runtime-compatibility.patch'),
+        'utf8'
+    );
+    const allocation = patch.match(
+        /^\+vm_allocate_aligned\(size_t sz, size_t alignment, void \* \/\* hint \*\/\) \{\n(?:^\+.*\n)*?^\+\}/m
+    )?.[0];
+
+    expect(allocation).toContain('std::numeric_limits<size_t>::max() - (alignment - 1)');
+    expect(allocation).toMatch(/const size_t allocationSize =\n\+\s+\(sz \+ alignment - 1\) & ~\(alignment - 1\);/);
+    expect(allocation).toContain('aligned_alloc(alignment, allocationSize)');
+    expect(allocation).toMatch(/if \(!p\)\n\+\s+return std::make_error_code\(std::errc::not_enough_memory\);/);
+    expect(allocation).not.toContain('aligned_alloc(alignment, sz)');
+});
+
 it('reuses shared LLVH Unix helpers instead of copying them into the WASI tree', () => {
     const patch = fs
         .readdirSync(path.join(runtimeDir, 'hermes-patches'))

@@ -49,10 +49,10 @@ index e9b6692..5063a64 100644
  #include "hermes/Support/ErrorHandling.h"
 diff --git a/lib/Support/OSCompatWASI.cpp b/lib/Support/OSCompatWASI.cpp
 new file mode 100644
-index 0000000..4990ed2
+index 0000000..444d755
 --- /dev/null
 +++ b/lib/Support/OSCompatWASI.cpp
-@@ -0,0 +1,278 @@
+@@ -0,0 +1,288 @@
 +/*
 + * Copyright (c) 2026 Filiph Sandström.
 + *
@@ -67,6 +67,10 @@ index 0000000..4990ed2
 +
 +#include <cassert>
 +#include <cstdint>
++#include <cstdlib>
++#include <cstring>
++#include <limits>
++#include <system_error>
 +#include <vector>
 +
 +#include <sys/mman.h>
@@ -161,9 +165,15 @@ index 0000000..4990ed2
 +
 +  // Use aligned_alloc for large alignments because WASI has no partial mapping
 +  // operation that preserves the requested alignment.
-+  auto *p = aligned_alloc(alignment, sz);
++  // aligned_alloc requires its size to be a multiple of the requested alignment.
++  if (sz > std::numeric_limits<size_t>::max() - (alignment - 1)) {
++    return std::make_error_code(std::errc::not_enough_memory);
++  }
++  const size_t allocationSize =
++      (sz + alignment - 1) & ~(alignment - 1);
++  auto *p = aligned_alloc(alignment, allocationSize);
 +  if (!p)
-+    return std::error_code(errno, std::generic_category());
++    return std::make_error_code(std::errc::not_enough_memory);
 +  memset(p, 0, sz);
 +  return p;
 +}
@@ -242,7 +252,7 @@ index 0000000..4990ed2
 +}
 +
 +llvh::ErrorOr<size_t> vm_footprint(char *start, char *end) {
-+  return std::error_code(errno, std::generic_category());
++  return std::make_error_code(std::errc::operation_not_supported);
 +}
 +
 +int pages_in_ram(const void *p, size_t sz, llvh::SmallVectorImpl<int> *runs) {
