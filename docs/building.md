@@ -38,12 +38,13 @@ native code for size while keeping Hermes source locations and native line table
 
 | Command | Result |
 | --- | --- |
-| `pumpkin-plugins-build` | `build/<plugin>.wasm`, with the WIT it was built from in `build/wit/` (a copy, since the WASI imports are added) |
+| `pumpkin-plugins-build` | `build/<plugin>.wasm`, plus the latest combined WIT snapshot in `build/wit/` when WASI imports are added |
 | `pumpkin-plugins-build --types-only` | Guest declarations in `build/types/bindings/` for `tsc` and your editor |
 
 Only declarations persist under `build/types/`, so `build` and `typecheck` can run in parallel
 without touching the same files or keeping a second WIT tree. When a plugin requests WASI imports,
-type generation prepares its WIT in a temporary directory and removes it afterward. Run
+each build uses a private WIT snapshot while it runs, then publishes a copy to `build/wit/` for
+inspection. Type generation prepares its WIT in a temporary directory and removes it afterward. Run
 `pnpm typecheck` once after a fresh checkout so your editor finds the types.
 The shared `plugin-kit` package does the same for its own source, generating declarations for its
 filesystem imports in its ignored `build/types/` directory.
@@ -83,10 +84,10 @@ Static Hermes plugins use the WASI 2 C API path in `tools/static-hermes-runtime`
 currently implements only part of the Pumpkin API. The runtime consumes the prepared WIT directory
 from `@pumpkin-plugins/build`, which owns the WASI version and WIT files. It validates every operation
 in imported WASI interfaces, including operations the plugin does not currently use, and generates
-native adapters for operations the bundle calls. The imported WASI 0.2.3 operations cover filesystem,
-HTTP, streams, clocks, TCP, UDP and sockets. Feature-gated operations enable their WIT feature when
-selected. It also generates event converters for the WIT variants and fields used by the bundled
-plugin. Static Hermes development builds disable the shared automatic update check. WASI 3 support is
+native adapters for the operations selected by build analysis. The imported WASI 0.2.3 operations
+cover filesystem, HTTP, streams, clocks, TCP, UDP and sockets. Feature-gated operations enable their
+WIT feature when selected. Event converters include every declared WIT event case and payload field.
+Static Hermes development builds disable the shared automatic update check. WASI 3 support is
 deferred.
 
 ## Turborepo
