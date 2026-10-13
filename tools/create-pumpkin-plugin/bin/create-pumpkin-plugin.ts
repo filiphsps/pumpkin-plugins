@@ -235,7 +235,8 @@ function publishStagedProject(stagingDirectory: string, destination: string): vo
 function copyStagedProject(source: string, destination: string, createdEntries: CreatedEntry[]): void {
     for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
         const sourcePath = path.join(source, entry.name);
-        const destinationPath = path.join(destination, entry.name);
+        const destinationName = entry.isFile() && entry.name === 'gitignore' ? '.gitignore' : entry.name;
+        const destinationPath = path.join(destination, destinationName);
         if (entry.isDirectory()) {
             fs.mkdirSync(destinationPath);
             createdEntries.push(createdDirectory(destinationPath));
