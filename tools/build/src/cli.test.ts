@@ -1,15 +1,16 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { bundlePlugin } from './bundle.ts';
 import { main, resolveApiWit, run } from './cli.ts';
 import { BuildError } from './errors.ts';
 import { cacheDir } from './repo.ts';
 import { generateTypes } from './types.ts';
+import { withWasiWitFileLock } from './wasi-wit-lock.ts';
 
 vi.mock('./bundle.ts', () => ({ bundlePlugin: vi.fn() }));
 vi.mock('./types.ts', () => ({ generateTypes: vi.fn() }));
@@ -113,7 +114,7 @@ function writeWitLock(
 ): string {
     const lock = `${JSON.stringify(
         {
-            $schema: '../../schemas/upstream-git-pin.schema.json',
+            $schema: 'schemas/upstream-git-pin.schema.json',
             repository: pathToFileURL(repositoryDir).href,
             branch,
             commit,
@@ -234,6 +235,124 @@ describe('run arguments', () => {
         }
     });
 
+    it('uses the consumer API alias when the canonical package only exists under the builder', () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-api-alias-'));
+        const aliasApiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-alias-'));
+        const builderApiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-builder-'));
+        const repositoryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-wit-repo-'));
+        const aliasPin = createWitRepository(repositoryDir, 'v0.1', '@0.1.0');
+        const builderCommit = commitWitFile(
+            repositoryDir,
+            'package pumpkin:plugin@0.2.0;\nworld plugin {\n    export run: func();\n}\n'
+        );
+        writeApiPackageManifest(aliasApiDir);
+        const aliasLock = writeWitLock(aliasApiDir, repositoryDir, aliasPin.branch, aliasPin.commit);
+        writeApiPackageManifest(builderApiDir);
+        writeWitLock(builderApiDir, repositoryDir, aliasPin.branch, builderCommit);
+
+        const nodeModulesDir = path.join(pluginDir, 'node_modules');
+        const aliasScopeDir = path.join(nodeModulesDir, '@pumpkinmc');
+        fs.mkdirSync(aliasScopeDir, { recursive: true });
+        fs.symlinkSync(aliasApiDir, path.join(aliasScopeDir, 'pumpkin-api-ts'), 'dir');
+
+        const builderDir = path.join(
+            nodeModulesDir,
+            '.pnpm',
+            '@pumpkin-plugins+build@0.1.0',
+            'node_modules',
+            '@pumpkin-plugins',
+            'build'
+        );
+        const builderApiScopeDir = path.join(builderDir, 'node_modules', '@pumpkin-plugins');
+        fs.mkdirSync(builderApiScopeDir, { recursive: true });
+        fs.symlinkSync(builderApiDir, path.join(builderApiScopeDir, 'pumpkin-api'), 'dir');
+        const canonicalScopeDir = path.join(nodeModulesDir, '@pumpkin-plugins');
+        fs.mkdirSync(canonicalScopeDir, { recursive: true });
+        fs.symlinkSync(builderDir, path.join(canonicalScopeDir, 'build'), 'dir');
+        expect(fs.existsSync(path.join(canonicalScopeDir, 'pumpkin-api'))).toBe(false);
+        fs.writeFileSync(
+            path.join(pluginDir, 'package.json'),
+            JSON.stringify({
+                dependencies: {
+                    '@pumpkinmc/pumpkin-api-ts': 'npm:@pumpkin-plugins/pumpkin-api@^0.1.0',
+                    '@pumpkin-plugins/build': '0.1.0'
+                }
+            })
+        );
+
+        try {
+            const cliUrl = pathToFileURL(fileURLToPath(new URL('./cli.ts', import.meta.url))).href;
+            const script = `
+                import { resolveApiWit } from ${JSON.stringify(cliUrl)};
+                console.log(resolveApiWit(${JSON.stringify(pluginDir)}));
+            `;
+            const result = spawnSync(
+                process.execPath,
+                ['--experimental-strip-types', '--input-type=module', '-e', script],
+                {
+                    cwd: pluginDir,
+                    encoding: 'utf8',
+                    env: { ...process.env, NODE_PATH: '' }
+                }
+            );
+            expect(result.error).toBeUndefined();
+            expect(result.status, result.stderr).toBe(0);
+            const witDir = result.stdout.trim();
+
+            expect(witDir).toBe(cachedWitDir(pluginDir, aliasLock));
+            expect(fs.readFileSync(path.join(witDir, 'plugin.wit'), 'utf8')).toContain('package pumpkin:plugin@0.1.0');
+        } finally {
+            fs.rmSync(pluginDir, { recursive: true, force: true });
+            fs.rmSync(aliasApiDir, { recursive: true, force: true });
+            fs.rmSync(builderApiDir, { recursive: true, force: true });
+            fs.rmSync(repositoryDir, { recursive: true, force: true });
+        }
+    }, 30_000);
+
+    it('prefers a directly installed API package when a pnpm alias is also declared', () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-api-alias-precedence-'));
+        const canonicalApiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-canonical-'));
+        const aliasApiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-alias-'));
+        const repositoryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-wit-repo-'));
+        const canonicalPin = createWitRepository(repositoryDir, 'v0.1', '@0.1.0');
+        const aliasCommit = commitWitFile(
+            repositoryDir,
+            'package pumpkin:plugin@0.2.0;\nworld plugin {\n    export run: func();\n}\n'
+        );
+        writeApiPackageManifest(canonicalApiDir);
+        const canonicalLock = writeWitLock(canonicalApiDir, repositoryDir, canonicalPin.branch, canonicalPin.commit);
+        writeApiPackageManifest(aliasApiDir);
+        writeWitLock(aliasApiDir, repositoryDir, canonicalPin.branch, aliasCommit);
+
+        const canonicalScopeDir = path.join(pluginDir, 'node_modules', '@pumpkin-plugins');
+        const aliasScopeDir = path.join(pluginDir, 'node_modules', '@pumpkinmc');
+        fs.mkdirSync(canonicalScopeDir, { recursive: true });
+        fs.mkdirSync(aliasScopeDir, { recursive: true });
+        fs.symlinkSync(canonicalApiDir, path.join(canonicalScopeDir, 'pumpkin-api'), 'dir');
+        fs.symlinkSync(aliasApiDir, path.join(aliasScopeDir, 'pumpkin-api-ts'), 'dir');
+        fs.writeFileSync(
+            path.join(pluginDir, 'package.json'),
+            JSON.stringify({
+                dependencies: {
+                    '@pumpkin-plugins/pumpkin-api': '0.1.0',
+                    '@pumpkinmc/pumpkin-api-ts': 'npm:@pumpkin-plugins/pumpkin-api@^0.1.0'
+                }
+            })
+        );
+
+        try {
+            const witDir = resolveApiWit(pluginDir);
+
+            expect(witDir).toBe(cachedWitDir(pluginDir, canonicalLock));
+            expect(fs.readFileSync(path.join(witDir, 'plugin.wit'), 'utf8')).toContain('package pumpkin:plugin@0.1.0');
+        } finally {
+            fs.rmSync(pluginDir, { recursive: true, force: true });
+            fs.rmSync(canonicalApiDir, { recursive: true, force: true });
+            fs.rmSync(aliasApiDir, { recursive: true, force: true });
+            fs.rmSync(repositoryDir, { recursive: true, force: true });
+        }
+    });
+
     it('fetches a new WIT cache after the lock commit changes', async () => {
         const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-wit-refresh-'));
         const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
@@ -305,7 +424,7 @@ describe('run arguments', () => {
                     throw new Error('MODULE_NOT_FOUND');
                 })
             ).toThrow(
-                'cannot resolve @pumpkin-plugins/pumpkin-api from this plugin; add it to the plugin dependencies and run your package manager install'
+                'cannot resolve @pumpkin-plugins/pumpkin-api or its declared package alias from this plugin; add it to the plugin dependencies and run your package manager install'
             );
         } finally {
             fs.rmSync(pluginDir, { recursive: true, force: true });
@@ -501,6 +620,149 @@ describe('run arguments', () => {
         }
     });
 
+    it('removes the published WIT snapshot after a build no longer imports WASI', async () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-wit-no-wasi-'));
+        const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
+        installApiPackage(pluginDir, apiDir);
+        const manifest = {
+            version: '1.2.3',
+            pumpkinPlugin: {
+                entry: 'src/plugin.ts',
+                output: 'build/plugin.wasm',
+                wasi: ['http']
+            }
+        };
+        fs.writeFileSync(path.join(pluginDir, 'package.json'), JSON.stringify(manifest));
+        vi.mocked(bundlePlugin).mockReset().mockResolvedValue(1);
+        const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+        let releasePublication = () => {};
+        let activePublisher: Promise<void> | undefined;
+        let noWasiBuild: Promise<void> | undefined;
+
+        try {
+            await run([], pluginDir);
+
+            const snapshot = path.join(pluginDir, 'build', 'wit');
+            expect(fs.readFileSync(path.join(snapshot, 'plugin.wit'), 'utf8')).toContain(
+                'import wasi:http/types@0.2.3;'
+            );
+
+            const publicationLock = path.join(pluginDir, 'build', '.wit-publish.lock');
+            let signalPublication = () => {};
+            const publicationStarted = new Promise<void>((resolve) => {
+                signalPublication = resolve;
+            });
+            const publicationGate = new Promise<void>((resolve) => {
+                releasePublication = resolve;
+            });
+            activePublisher = withWasiWitFileLock(publicationLock, async () => {
+                signalPublication();
+                await publicationGate;
+            });
+            await publicationStarted;
+
+            manifest.pumpkinPlugin.wasi = [];
+            fs.writeFileSync(path.join(pluginDir, 'package.json'), JSON.stringify(manifest));
+            let noWasiBuildFinished = false;
+            noWasiBuild = run([], pluginDir).then(() => {
+                noWasiBuildFinished = true;
+            });
+            await new Promise<void>((resolve) => setTimeout(resolve, 50));
+
+            expect(noWasiBuildFinished).toBe(false);
+            expect(fs.existsSync(snapshot)).toBe(true);
+
+            releasePublication();
+            await activePublisher;
+            await noWasiBuild;
+
+            expect(fs.existsSync(snapshot)).toBe(false);
+        } finally {
+            releasePublication();
+            if (activePublisher) await activePublisher.catch(() => {});
+            if (noWasiBuild) await noWasiBuild.catch(() => {});
+            consoleLog.mockRestore();
+            vi.mocked(bundlePlugin).mockReset();
+            fs.rmSync(pluginDir, { recursive: true, force: true });
+            fs.rmSync(apiDir, { recursive: true, force: true });
+        }
+    });
+
+    it('keeps a running build on its WIT snapshot while a concurrent build publishes newer WIT', async () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-concurrent-wit-'));
+        const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
+        const repositoryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-wit-repo-'));
+        const pin = createWitRepository(repositoryDir);
+        writeApiPackageManifest(apiDir);
+        writeWitLock(apiDir, repositoryDir, pin.branch, pin.commit);
+        const scopeDir = path.join(pluginDir, 'node_modules', '@pumpkin-plugins');
+        fs.mkdirSync(scopeDir, { recursive: true });
+        fs.symlinkSync(apiDir, path.join(scopeDir, 'pumpkin-api'), 'dir');
+        fs.writeFileSync(
+            path.join(pluginDir, 'package.json'),
+            JSON.stringify({
+                version: '1.2.3',
+                pumpkinPlugin: {
+                    entry: 'src/plugin.ts',
+                    output: 'build/plugin.wasm',
+                    wasi: ['http']
+                }
+            })
+        );
+
+        let releaseFirstBuild = () => {};
+        const firstBuildGate = new Promise<void>((resolve) => {
+            releaseFirstBuild = resolve;
+        });
+        let signalFirstBuild = () => {};
+        const firstBuildStarted = new Promise<void>((resolve) => {
+            signalFirstBuild = resolve;
+        });
+        const observedWit: string[] = [];
+        vi.mocked(bundlePlugin)
+            .mockReset()
+            .mockImplementationOnce(async ({ witDir }) => {
+                signalFirstBuild();
+                await firstBuildGate;
+                observedWit[0] = fs.readFileSync(path.join(witDir, 'plugin.wit'), 'utf8');
+                return 1;
+            })
+            .mockImplementationOnce(async ({ witDir }) => {
+                observedWit[1] = fs.readFileSync(path.join(witDir, 'plugin.wit'), 'utf8');
+                return 1;
+            });
+
+        let firstBuild: Promise<void> | undefined;
+        try {
+            firstBuild = run([], pluginDir);
+            await firstBuildStarted;
+
+            const updatedCommit = commitWitFile(
+                repositoryDir,
+                'package pumpkin:plugin;\nworld plugin {\n    export stop: func();\n}\n'
+            );
+            writeWitLock(apiDir, repositoryDir, pin.branch, updatedCommit);
+            await run([], pluginDir);
+
+            releaseFirstBuild();
+            await firstBuild;
+
+            expect(observedWit[0]).toContain('export run: func();');
+            expect(observedWit[0]).not.toContain('export stop: func();');
+            expect(observedWit[1]).toContain('export stop: func();');
+            expect(fs.readFileSync(path.join(pluginDir, 'build', 'wit', 'plugin.wit'), 'utf8')).toContain(
+                'export stop: func();'
+            );
+        } finally {
+            releaseFirstBuild();
+            if (firstBuild) await firstBuild.catch(() => {});
+            vi.mocked(bundlePlugin).mockReset();
+            fs.rmSync(pluginDir, { recursive: true, force: true });
+            fs.rmSync(apiDir, { recursive: true, force: true });
+            fs.rmSync(repositoryDir, { recursive: true, force: true });
+        }
+    });
+
     it('links the lean Hermes archive by default', async () => {
         const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-lean-default-'));
         const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
@@ -630,18 +892,41 @@ describe('run arguments', () => {
 });
 
 describe('main error handling', () => {
-    it('prints build errors and exits with status 1', async () => {
-        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-        const exitError = new Error('process exit');
-        const processExit = vi.spyOn(process, 'exit').mockImplementation(() => {
-            throw exitError;
-        });
+    it('flushes the complete build error before exiting when stderr is piped', () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-large-error-'));
+        const cliPath = fileURLToPath(new URL('./cli.ts', import.meta.url));
+        fs.writeFileSync(
+            path.join(pluginDir, 'package.json'),
+            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: ['x'.repeat(1024 * 1024)] } })
+        );
 
         try {
-            await expect(main(['--unknown'], '/not-a-package')).rejects.toBe(exitError);
-            expect(consoleError).toHaveBeenCalledWith("[build] Error: \u001b[1;31munknown option '--unknown'\u001b[0m");
-            expect(processExit).toHaveBeenCalledWith(1);
+            const result = spawnSync(process.execPath, [cliPath], {
+                cwd: pluginDir,
+                encoding: 'utf8',
+                maxBuffer: 2 * 1024 * 1024
+            });
+
+            expect(result.error).toBeUndefined();
+            expect(result.status).toBe(1);
+            expect(result.stderr).toContain('(known: ');
         } finally {
+            fs.rmSync(pluginDir, { recursive: true, force: true });
+        }
+    });
+
+    it('prints build errors and sets the exit code to 1', async () => {
+        const previousExitCode = process.exitCode;
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const processExit = vi.spyOn(process, 'exit');
+
+        try {
+            await expect(main(['--unknown'], '/not-a-package')).resolves.toBeUndefined();
+            expect(consoleError).toHaveBeenCalledWith("[build] Error: \u001b[1;31munknown option '--unknown'\u001b[0m");
+            expect(process.exitCode).toBe(1);
+            expect(processExit).not.toHaveBeenCalled();
+        } finally {
+            process.exitCode = previousExitCode;
             processExit.mockRestore();
             consoleError.mockRestore();
         }

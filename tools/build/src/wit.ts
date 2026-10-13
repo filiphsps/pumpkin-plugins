@@ -84,6 +84,50 @@ export function prepareWit(options: PrepareWitOptions): string {
     return options.target;
 }
 
+/**
+ * Publishes a prepared WIT snapshot for inspection without changing the path a build consumes.
+ * The caller serializes concurrent publishers for the same target.
+ * @param source - The complete WIT directory used by one build.
+ * @param target - The persistent directory to expose to users.
+ */
+export function publishWitSnapshot(source: string, target: string): void {
+    const parent = path.dirname(target);
+    fs.mkdirSync(parent, { recursive: true });
+    const temporary = fs.mkdtempSync(path.join(parent, `.${path.basename(target)}-`));
+    let backup: string | undefined;
+    try {
+        fs.cpSync(source, temporary, { recursive: true });
+
+        if (fs.existsSync(target)) {
+            backup = fs.mkdtempSync(path.join(parent, `.${path.basename(target)}-backup-`));
+            fs.rmSync(backup, { recursive: true, force: true });
+            fs.renameSync(target, backup);
+        }
+
+        try {
+            fs.renameSync(temporary, target);
+        } catch (error) {
+            if (backup !== undefined) {
+                try {
+                    fs.renameSync(backup, target);
+                    backup = undefined;
+                } catch (restoreError) {
+                    throw new AggregateError(
+                        [error, restoreError],
+                        `could not publish WIT snapshot; previous snapshot remains at ${backup}`
+                    );
+                }
+            }
+            throw error;
+        }
+
+        if (backup !== undefined) fs.rmSync(backup, { recursive: true, force: true });
+    } catch (error) {
+        fs.rmSync(temporary, { recursive: true, force: true });
+        throw error;
+    }
+}
+
 function retryTransientCopy(copy: () => void, reset: () => void): void {
     for (let attempt = 0; ; attempt += 1) {
         try {

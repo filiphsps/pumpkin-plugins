@@ -3,13 +3,28 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const filesystemState = vi.hoisted(() => ({ failSnapshotPublishTarget: undefined as string | undefined }));
+
 vi.mock('node:fs', async (importOriginal) => {
     const actual = await importOriginal<typeof import('node:fs')>();
-    return { ...actual, cpSync: vi.fn(actual.cpSync) };
+    return {
+        ...actual,
+        cpSync: vi.fn(actual.cpSync),
+        renameSync: (...args: Parameters<typeof actual.renameSync>) => {
+            if (
+                filesystemState.failSnapshotPublishTarget === path.resolve(String(args[1])) &&
+                path.basename(String(args[0])).startsWith('.wit-')
+            ) {
+                filesystemState.failSnapshotPublishTarget = undefined;
+                throw new Error('injected snapshot publish failure');
+            }
+            return actual.renameSync(...args);
+        }
+    };
 });
 
 import { BuildError } from './errors.ts';
-import { injectWasiImports, prepareWit } from './wit.ts';
+import { injectWasiImports, prepareWit, publishWitSnapshot } from './wit.ts';
 
 const copy = vi.mocked(fs.cpSync).getMockImplementation();
 if (!copy) throw new Error('node:fs.cpSync mock has no implementation');
@@ -30,6 +45,7 @@ const tmp = () => {
 };
 afterEach(() => {
     vi.mocked(fs.cpSync).mockReset().mockImplementation(copy);
+    filesystemState.failSnapshotPublishTarget = undefined;
     for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -129,5 +145,23 @@ describe('prepareWit', () => {
     it('needs the WASI files when it has interfaces to import', () => {
         const { apiWit, target } = layout();
         expect(() => prepareWit({ apiWit, target, interfaces: ['io/poll'] })).toThrow(BuildError);
+    });
+});
+
+describe('publishWitSnapshot', () => {
+    it('preserves the previous snapshot when publishing the staged snapshot fails', () => {
+        const root = tmp();
+        const source = path.join(root, 'source');
+        const target = path.join(root, 'build', 'wit');
+        fs.mkdirSync(source);
+        fs.mkdirSync(target, { recursive: true });
+        fs.writeFileSync(path.join(source, 'plugin.wit'), 'new snapshot');
+        fs.writeFileSync(path.join(target, 'plugin.wit'), 'previous snapshot');
+        filesystemState.failSnapshotPublishTarget = target;
+
+        expect(() => publishWitSnapshot(source, target)).toThrow('injected snapshot publish failure');
+
+        expect(fs.readFileSync(path.join(target, 'plugin.wit'), 'utf8')).toBe('previous snapshot');
+        expect(fs.readdirSync(path.dirname(target))).toEqual(['wit']);
     });
 });
