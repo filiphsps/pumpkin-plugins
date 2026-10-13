@@ -35,7 +35,7 @@ Create comprehensive inline documentation for TypeScript codebases.
  * ```
  */
 export function calculateTotal(price: number, taxRate: number): number {
-  return price * (1 + taxRate);
+    return price * (1 + taxRate);
 }
 ```
 
@@ -65,20 +65,20 @@ export function calculateTotal(price: number, taxRate: number): number {
  * ```
  */
 export async function fetchUser(
-  userId: string,
-  options?: FetchOptions
+    userId: string,
+    options?: FetchOptions
 ): Promise<User> {
-  const response = await fetch(`/api/users/${userId}`, options);
+    const response = await fetch(`/api/users/${userId}`, options);
 
-  if (response.status === 404) {
-    throw new NotFoundError(`User ${userId} not found`);
-  }
+    if (response.status === 404) {
+        throw new NotFoundError(`User ${userId} not found`);
+    }
 
-  if (!response.ok) {
-    throw new NetworkError('Failed to fetch user');
-  }
+    if (!response.ok) {
+        throw new NetworkError('Failed to fetch user');
+    }
 
-  return response.json();
+    return response.json();
 }
 ```
 
@@ -101,10 +101,10 @@ export async function fetchUser(
  * ```
  */
 export function filterArray<T>(
-  array: T[],
-  predicate: (item: T, index: number) => boolean
+    array: T[],
+    predicate: (item: T, index: number) => boolean
 ): T[] {
-  return array.filter(predicate);
+    return array.filter(predicate);
 }
 ```
 
@@ -130,13 +130,13 @@ export function format(value: number, formatStr: string): string;
  * @internal
  */
 export function format(value: number, formatStr?: string): string {
-  if (formatStr === 'currency') {
-    return `$${value.toFixed(2)}`;
-  }
-  if (formatStr === 'percent') {
-    return `${(value * 100).toFixed(1)}%`;
-  }
-  return value.toString();
+    if (formatStr === 'currency') {
+        return `$${value.toFixed(2)}`;
+    }
+    if (formatStr === 'percent') {
+        return `${(value * 100).toFixed(1)}%`;
+    }
+    return value.toString();
 }
 ```
 
@@ -158,63 +158,63 @@ export function format(value: number, formatStr?: string): string {
  * ```
  */
 export interface User {
-  /**
-   * The unique identifier for the user.
-   * @example 'user-123'
-   */
-  id: string;
+    /**
+     * The unique identifier for the user.
+     * @example 'user-123'
+     */
+    id: string;
 
-  /**
-   * The user's email address.
-   * @example 'john@example.com'
-   */
-  email: string;
+    /**
+     * The user's email address.
+     * @example 'john@example.com'
+     */
+    email: string;
 
-  /**
-   * The user's display name.
-   * @example 'John Doe'
-   */
-  name: string;
+    /**
+     * The user's display name.
+     * @example 'John Doe'
+     */
+    name: string;
 
-  /**
-   * The user's role in the system.
-   * @default 'user'
-   */
-  role: 'admin' | 'user' | 'guest';
+    /**
+     * The user's role in the system.
+     * @default 'user'
+     */
+    role: 'admin' | 'user' | 'guest';
 
-  /**
-   * When the user account was created.
-   */
-  createdAt: Date;
+    /**
+     * When the user account was created.
+     */
+    createdAt: Date;
 
-  /**
-   * When the user account was last updated.
-   * @optional
-   */
-  updatedAt?: Date;
+    /**
+     * When the user account was last updated.
+     * @optional
+     */
+    updatedAt?: Date;
 
-  /**
-   * The user's profile settings.
-   * @see {@link UserProfile}
-   */
-  profile?: UserProfile;
+    /**
+     * The user's profile settings.
+     * @see {@link UserProfile}
+     */
+    profile?: UserProfile;
 }
 
 /**
  * User profile configuration.
  */
 export interface UserProfile {
-  /** URL to the user's avatar image */
-  avatarUrl?: string;
+    /** URL to the user's avatar image */
+    avatarUrl?: string;
 
-  /** User's preferred language code (e.g., 'en', 'es') */
-  language: string;
+    /** User's preferred language code (e.g., 'en', 'es') */
+    language: string;
 
-  /** User's timezone (e.g., 'America/New_York') */
-  timezone: string;
+    /** User's timezone (e.g., 'America/New_York') */
+    timezone: string;
 
-  /** User notification preferences */
-  notifications: NotificationSettings;
+    /** User notification preferences */
+    notifications: NotificationSettings;
 }
 ```
 
@@ -232,20 +232,20 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
  * @typeParam TBody - The type of the request body
  */
 export type RequestConfig<TBody = unknown> = {
-  /** HTTP method to use */
-  method: HttpMethod;
+    /** HTTP method to use */
+    method: HttpMethod;
 
-  /** Request headers */
-  headers?: Record<string, string>;
+    /** Request headers */
+    headers?: Record<string, string>;
 
-  /** Request body (for POST, PUT, PATCH) */
-  body?: TBody;
+    /** Request body (for POST, PUT, PATCH) */
+    body?: TBody;
 
-  /** Request timeout in milliseconds */
-  timeout?: number;
+    /** Request timeout in milliseconds */
+    timeout?: number;
 
-  /** Number of retry attempts on failure */
-  retries?: number;
+    /** Number of retry attempts on failure */
+    retries?: number;
 };
 
 /**
@@ -264,9 +264,7 @@ export type RequestConfig<TBody = unknown> = {
  * }
  * ```
  */
-export type Result<T, E = Error> =
-  | { success: true; data: T }
-  | { success: false; error: E };
+export type Result<T, E = Error> = { success: true; data: T } | { success: false; error: E };
 ```
 
 ## Class Documentation
@@ -291,82 +289,82 @@ export type Result<T, E = Error> =
  * ```
  */
 export class ApiClient {
-  /**
-   * The base URL for all API requests.
-   * @readonly
-   */
-  readonly baseUrl: string;
+    /**
+     * The base URL for all API requests.
+     * @readonly
+     */
+    readonly baseUrl: string;
 
-  /**
-   * Creates a new ApiClient instance.
-   *
-   * @param config - The client configuration
-   * @returns A new ApiClient instance
-   *
-   * @example
-   * ```typescript
-   * const client = ApiClient.create({ baseUrl: 'https://api.example.com' });
-   * ```
-   */
-  static create(config: ApiClientConfig): ApiClient {
-    return new ApiClient(config);
-  }
+    /**
+     * Creates a new ApiClient instance.
+     *
+     * @param config - The client configuration
+     * @returns A new ApiClient instance
+     *
+     * @example
+     * ```typescript
+     * const client = ApiClient.create({ baseUrl: 'https://api.example.com' });
+     * ```
+     */
+    static create(config: ApiClientConfig): ApiClient {
+        return new ApiClient(config);
+    }
 
-  /**
-   * @internal
-   */
-  private constructor(private config: ApiClientConfig) {
-    this.baseUrl = config.baseUrl;
-  }
+    /**
+     * @internal
+     */
+    private constructor(private config: ApiClientConfig) {
+        this.baseUrl = config.baseUrl;
+    }
 
-  /**
-   * Performs a GET request.
-   *
-   * @typeParam T - The expected response type
-   * @param endpoint - The API endpoint (relative to baseUrl)
-   * @param options - Optional request configuration
-   * @returns A promise that resolves to the response data
-   *
-   * @throws {ApiError} When the request fails
-   *
-   * @example
-   * ```typescript
-   * interface User { id: string; name: string; }
-   * const users = await client.get<User[]>('/users');
-   * ```
-   */
-  async get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
-    return this.request<T>('GET', endpoint, options);
-  }
+    /**
+     * Performs a GET request.
+     *
+     * @typeParam T - The expected response type
+     * @param endpoint - The API endpoint (relative to baseUrl)
+     * @param options - Optional request configuration
+     * @returns A promise that resolves to the response data
+     *
+     * @throws {ApiError} When the request fails
+     *
+     * @example
+     * ```typescript
+     * interface User { id: string; name: string; }
+     * const users = await client.get<User[]>('/users');
+     * ```
+     */
+    async get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
+        return this.request<T>('GET', endpoint, options);
+    }
 
-  /**
-   * Performs a POST request.
-   *
-   * @typeParam T - The expected response type
-   * @typeParam TBody - The request body type
-   * @param endpoint - The API endpoint
-   * @param body - The request body
-   * @param options - Optional request configuration
-   * @returns A promise that resolves to the response data
-   */
-  async post<T, TBody = unknown>(
-    endpoint: string,
-    body: TBody,
-    options?: RequestOptions
-  ): Promise<T> {
-    return this.request<T>('POST', endpoint, { ...options, body });
-  }
+    /**
+     * Performs a POST request.
+     *
+     * @typeParam T - The expected response type
+     * @typeParam TBody - The request body type
+     * @param endpoint - The API endpoint
+     * @param body - The request body
+     * @param options - Optional request configuration
+     * @returns A promise that resolves to the response data
+     */
+    async post<T, TBody = unknown>(
+        endpoint: string,
+        body: TBody,
+        options?: RequestOptions
+    ): Promise<T> {
+        return this.request<T>('POST', endpoint, { ...options, body });
+    }
 
-  /**
-   * @internal
-   */
-  private async request<T>(
-    method: HttpMethod,
-    endpoint: string,
-    options?: RequestOptions
-  ): Promise<T> {
-    // Implementation
-  }
+    /**
+     * @internal
+     */
+    private async request<T>(
+        method: HttpMethod,
+        endpoint: string,
+        options?: RequestOptions
+    ): Promise<T> {
+        // Implementation
+    }
 }
 ```
 
@@ -381,23 +379,23 @@ export class ApiClient {
  * though they may skip directly to `Cancelled` from any state.
  */
 export enum OrderStatus {
-  /** Order has been created but not yet processed */
-  Pending = 'pending',
+    /** Order has been created but not yet processed */
+    Pending = 'pending',
 
-  /** Payment has been received and order is being prepared */
-  Processing = 'processing',
+    /** Payment has been received and order is being prepared */
+    Processing = 'processing',
 
-  /** Order has been shipped to the customer */
-  Shipped = 'shipped',
+    /** Order has been shipped to the customer */
+    Shipped = 'shipped',
 
-  /** Order has been delivered to the customer */
-  Delivered = 'delivered',
+    /** Order has been delivered to the customer */
+    Delivered = 'delivered',
 
-  /** Order has been cancelled */
-  Cancelled = 'cancelled',
+    /** Order has been cancelled */
+    Cancelled = 'cancelled',
 
-  /** Order has been returned by the customer */
-  Returned = 'returned',
+    /** Order has been returned by the customer */
+    Returned = 'returned',
 }
 ```
 
@@ -425,36 +423,35 @@ export enum OrderStatus {
  * <Button loading>Submitting...</Button>
  * ```
  */
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  /**
-   * The visual style variant.
-   * @default 'primary'
-   */
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+    /**
+    * The visual style variant.
+    * @default 'primary'
+    */
+    variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
 
-  /**
-   * The size of the button.
-   * @default 'md'
-   */
-  size?: 'sm' | 'md' | 'lg';
+    /**
+    * The size of the button.
+    * @default 'md'
+    */
+    size?: 'sm' | 'md' | 'lg';
 
-  /**
-   * Whether the button is in a loading state.
-   * When true, the button is disabled and shows a spinner.
-   * @default false
-   */
-  loading?: boolean;
+    /**
+    * Whether the button is in a loading state.
+    * When true, the button is disabled and shows a spinner.
+    * @default false
+    */
+    loading?: boolean;
 
-  /**
-   * Icon to display before the button text.
-   */
-  leftIcon?: React.ReactNode;
+    /**
+    * Icon to display before the button text.
+    */
+    leftIcon?: React.ReactNode;
 
-  /**
-   * Icon to display after the button text.
-   */
-  rightIcon?: React.ReactNode;
+    /**
+    * Icon to display after the button text.
+    */
+    rightIcon?: React.ReactNode;
 }
 
 /**
@@ -466,9 +463,9 @@ export interface ButtonProps
  * @see {@link ButtonProps} for available props
  */
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', loading, children, ...props }, ref) => {
-    // Implementation
-  }
+    ({ variant = 'primary', size = 'md', loading, children, ...props }, ref) => {
+        // Implementation
+    }
 );
 
 Button.displayName = 'Button';
@@ -479,44 +476,44 @@ Button.displayName = 'Button';
 ```json
 // typedoc.json
 {
-  "entryPoints": ["./src/index.ts"],
-  "out": "./docs",
-  "name": "My Library",
-  "readme": "./README.md",
-  "plugin": [
-    "typedoc-plugin-markdown",
-    "typedoc-plugin-mdn-links"
-  ],
-  "excludePrivate": true,
-  "excludeProtected": true,
-  "excludeInternal": true,
-  "includeVersion": true,
-  "categorizeByGroup": true,
-  "categoryOrder": ["Core", "Utilities", "Types", "*"],
-  "navigationLinks": {
-    "GitHub": "https://github.com/user/repo",
-    "npm": "https://www.npmjs.com/package/my-package"
-  },
-  "validation": {
-    "notExported": true,
-    "invalidLink": true,
-    "notDocumented": false
-  }
+    "entryPoints": ["./src/index.ts"],
+    "out": "./docs",
+    "name": "My Library",
+    "readme": "./README.md",
+    "plugin": [
+        "typedoc-plugin-markdown",
+        "typedoc-plugin-mdn-links"
+    ],
+    "excludePrivate": true,
+    "excludeProtected": true,
+    "excludeInternal": true,
+    "includeVersion": true,
+    "categorizeByGroup": true,
+    "categoryOrder": ["Core", "Utilities", "Types", "*"],
+    "navigationLinks": {
+        "GitHub": "https://github.com/user/repo",
+        "npm": "https://www.npmjs.com/package/my-package"
+    },
+    "validation": {
+        "notExported": true,
+        "invalidLink": true,
+        "notDocumented": false
+    }
 }
 ```
 
 ```json
 // package.json
 {
-  "scripts": {
-    "docs": "typedoc",
-    "docs:watch": "typedoc --watch"
-  },
-  "devDependencies": {
-    "typedoc": "^0.25.0",
-    "typedoc-plugin-markdown": "^3.17.0",
-    "typedoc-plugin-mdn-links": "^3.1.0"
-  }
+    "scripts": {
+        "docs": "typedoc",
+        "docs:watch": "typedoc --watch"
+    },
+    "devDependencies": {
+        "typedoc": "^0.25.0",
+        "typedoc-plugin-markdown": "^3.17.0",
+        "typedoc-plugin-mdn-links": "^3.1.0"
+    }
 }
 ```
 
@@ -569,7 +566,7 @@ Button.displayName = 'Button';
 4. **Document errors**: What can be thrown
 5. **Link related items**: Use @see tags
 6. **Keep updated**: Sync docs with code
-7. **Generate HTML**: TypeDoc for browsable docs
+7. **Generate HTML**: TypeDoc for browseable docs
 8. **Validate in CI**: Check for missing docs
 
 ## Output Checklist
