@@ -6,6 +6,7 @@ import { afterEach, describe, it } from 'node:test';
 import { partitionReleasePaths } from './release-fanout.mjs';
 import {
     assertPublicToolPackage,
+    assertPackedBuilderDependencies,
     assertStarterToolDependencies,
     syncStarterToolDependencies
 } from './tool-packages.mjs';
@@ -114,6 +115,32 @@ describe('starter tool dependency versions', () => {
                     '@pumpkin-plugins/build': '0.3.4'
                 }),
             /must be \^0\.2\.0/
+        );
+    });
+});
+
+describe('packed builder tool dependencies', () => {
+    it('requires packed API and runtime versions to match the builder manifest', () => {
+        const builder = {
+            dependencies: {
+                '@pumpkin-plugins/pumpkin-api': '0.2.0',
+                '@pumpkin-plugins/static-hermes-runtime': '0.4.1'
+            }
+        };
+
+        assert.doesNotThrow(() =>
+            assertPackedBuilderDependencies(builder, {
+                '@pumpkin-plugins/pumpkin-api': '0.2.0',
+                '@pumpkin-plugins/static-hermes-runtime': '0.4.1'
+            })
+        );
+        assert.throws(
+            () =>
+                assertPackedBuilderDependencies(builder, {
+                    '@pumpkin-plugins/pumpkin-api': '0.3.0',
+                    '@pumpkin-plugins/static-hermes-runtime': '0.4.1'
+                }),
+            /must resolve to packed version 0\.3\.0/
         );
     });
 });

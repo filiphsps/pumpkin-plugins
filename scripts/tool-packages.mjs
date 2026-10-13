@@ -13,6 +13,10 @@ const STARTER_TOOL_PACKAGE_PATHS = Object.freeze({
     '@pumpkin-plugins/pumpkin-api': 'tools/pumpkin-api',
     '@pumpkin-plugins/build': 'tools/build'
 });
+const BUILDER_TOOL_PACKAGE_NAMES = Object.freeze([
+    '@pumpkin-plugins/pumpkin-api',
+    '@pumpkin-plugins/static-hermes-runtime'
+]);
 
 const TEMPLATE_LANGUAGES = ['typescript', 'javascript'];
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -34,6 +38,28 @@ export function assertPublicToolPackage(packageJson, expectedName) {
         throw new Error(`${expectedName} publishConfig.access must be public`);
     }
     assertVersion(packageJson.version, `${expectedName} version`);
+}
+
+/**
+ * Checks that the packed builder resolves its public API and runtime dependencies to the packed versions.
+ *
+ * @param {{ dependencies?: Record<string, string> }} packageJson - The packed builder package metadata.
+ * @param {Record<string, string>} versions - Package names and versions represented by packed tarballs.
+ * @returns {void}
+ * @throws {Error} When a builder dependency does not exactly resolve to its packed package version.
+ */
+export function assertPackedBuilderDependencies(packageJson, versions) {
+    for (const packageName of BUILDER_TOOL_PACKAGE_NAMES) {
+        const version = versions[packageName];
+        assertVersion(version, `${packageName} packed version`);
+        if (packageJson.dependencies?.[packageName] !== version) {
+            throw new Error(
+                `${packageName} builder dependency must resolve to packed version ${version}; received ${String(
+                    packageJson.dependencies?.[packageName]
+                )}`
+            );
+        }
+    }
 }
 
 /**
