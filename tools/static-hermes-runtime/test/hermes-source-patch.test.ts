@@ -107,6 +107,7 @@ it('retries an initial Hermes clone after a failed fetch', () => {
     expect(() => ensureHermesSource({ pin, source, managedSource: true, managedPaths: [], process: runner })).toThrow(
         'network interrupted'
     );
+    expect(fs.readdirSync(root)).toEqual([]);
     expect(ensureHermesSource({ pin, source, managedSource: true, managedPaths: [], process: runner })).toBe(source);
     expect(cloneAttempts).toBe(2);
 });

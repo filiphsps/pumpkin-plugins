@@ -89,7 +89,7 @@ export function readHermesSourcePin(
 export function ensureHermesSource(options: EnsureHermesSourceOptions): string {
     const filesystem = options.filesystem ?? hermesFileSystem;
     const process = options.process ?? hermesProcess;
-    if (!filesystem.existsSync(options.source)) clonePinnedSource(options.pin, options.source, filesystem, process);
+    if (!filesystem.existsSync(options.source)) installPinnedSource(options, filesystem, process);
     if (!hasGitDirectory(options.source, process)) {
         throw new Error(`Hermes source path is not a Git checkout: ${options.source}`);
     }
@@ -143,6 +143,22 @@ function clonePinnedSource(
     process.run('git', ['clone', '--filter=blob:none', '--no-checkout', pin.repository, destination]);
     process.run('git', ['-C', destination, 'fetch', '--depth', '1', 'origin', pin.commit]);
     process.run('git', ['-C', destination, 'checkout', '--detach', pin.commit]);
+}
+
+/** Clone a first checkout beside its destination, then move it into place after Git succeeds. */
+function installPinnedSource(
+    options: EnsureHermesSourceOptions,
+    filesystem: HermesFileSystem,
+    runner: HermesProcessRunner
+): void {
+    const installing = `${options.source}.install-${process.pid}-${Date.now()}`;
+    try {
+        clonePinnedSource(options.pin, installing, filesystem, runner);
+        filesystem.renameSync(installing, options.source);
+    } catch (error) {
+        filesystem.rmSync(installing, { recursive: true, force: true });
+        throw error;
+    }
 }
 
 function rebuildPinnedSource(
