@@ -47,7 +47,7 @@ describe('setup-static-hermes action', () => {
 
     it('reads configured toolchain versions and uses them in cache keys', () => {
         const versionScript = step('versions').run;
-        assert.match(versionScript, /wasi-sdk\.json/);
+        assert.match(versionScript, /wasi-sdk\.lock\.json/);
         assert.match(versionScript, /toolchain-versions\.json/);
         assert.match(versionScript, /\.tools\["wit-bindgen"\]/);
         assert.match(versionScript, /\.tools\.rust/);
