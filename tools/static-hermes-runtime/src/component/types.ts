@@ -16,6 +16,8 @@ export interface ComponentBuildOptions {
     wasiMethods?: string[];
     /** Pumpkin API operation identifiers for native dispatch; omission includes every declared operation. */
     apiMethods?: string[];
+    /** Event variants referenced by static registrations; omission includes every declared variant. */
+    eventTypes?: string[];
     /** Hermes archive profile; omitted to use the configured default. */
     runtimeVariant?: 'full' | 'lean';
 }

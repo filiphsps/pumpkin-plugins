@@ -2,6 +2,16 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
 
+/** WIT operations and event variants referenced by the plugin implementation. */
+export interface UsedWitMethods {
+    /** Sorted Pumpkin API operation identifiers required by the plugin. */
+    pumpkinMethods: string[];
+    /** Sorted WASI operation identifiers required by the plugin. */
+    wasiMethods: string[];
+    /** Sorted event names when registrations are static; `undefined` retains every event variant. */
+    eventTypes: string[] | undefined;
+}
+
 /**
  * Finds the Pumpkin host operations referenced by a plugin's TypeScript or JavaScript sources.
  *
@@ -36,12 +46,10 @@ export function findUsedWasiWitMethods(entry: string, additionalTypesDir?: strin
  * Select WIT operations referenced by the plugin and its typed dependencies.
  *
  * Dynamic keys retain every possible member. Declaration-only runtime dependencies cannot
- * reveal their host calls, so they return `undefined` to request full native adapters.
+ * reveal their host calls, so they return `undefined` to request full native adapters. Dynamic
+ * event registrations set `eventTypes` to `undefined` so callers retain every event converter.
  */
-export function findUsedWitMethods(
-    entry: string,
-    additionalTypesDir?: string
-): { pumpkinMethods: string[]; wasiMethods: string[] } | undefined {
+export function findUsedWitMethods(entry: string, additionalTypesDir?: string): UsedWitMethods | undefined {
     const absoluteEntry = path.resolve(entry);
     if (!fs.existsSync(absoluteEntry)) return undefined;
     const configPath = ts.findConfigFile(path.dirname(absoluteEntry), ts.sys.fileExists, 'tsconfig.json');
@@ -87,6 +95,8 @@ export function findUsedWitMethods(
     }
     const pumpkinMethods = new Set<string>();
     const wasiMethods = new Set<string>();
+    const eventTypes = new Set<string>();
+    let incompleteEventTypes = false;
     const witDeclarations = new Map<string, ts.Declaration[]>();
     const calledValues = new Set<ts.Symbol>();
     const constructedValues = new Set<ts.Symbol>();
@@ -102,7 +112,8 @@ export function findUsedWitMethods(
     if (incomplete) return undefined;
     return {
         pumpkinMethods: [...pumpkinMethods].sort(),
-        wasiMethods: [...wasiMethods].sort()
+        wasiMethods: [...wasiMethods].sort(),
+        eventTypes: incompleteEventTypes ? undefined : [...eventTypes].sort()
     };
 
     function indexDeclarations(node: ts.Node): void {
@@ -186,16 +197,41 @@ export function findUsedWitMethods(
             incomplete = true;
         }
 
+        if (ts.isCallExpression(node) && registerEventMember(node.expression) === 'registerEvent') {
+            if (!isPluginEventForwarder(node)) collectRegisteredEventType(node);
+        } else if (
+            (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
+            registerEventMember(node) === 'registerEvent' &&
+            !(ts.isCallExpression(node.parent) && node.parent.expression === node) &&
+            !isPluginEventForwarder(node)
+        ) {
+            incompleteEventTypes = true;
+        }
+
         if (ts.isPropertyAccessExpression(node)) collectMethod(node.name, node.expression, node.name.text);
         else if (ts.isElementAccessExpression(node)) {
             const keyType = checker.getTypeAtLocation(node.argumentExpression);
             const keys = keyType.isUnion() ? keyType.types : [keyType];
             if (keys.every((key) => key.isStringLiteral())) {
+                if (
+                    keys.some((key) => key.isStringLiteral() && key.value === 'registerEvent') &&
+                    isUnknownDynamicHostCall(node)
+                ) {
+                    incompleteEventTypes = true;
+                }
                 for (const key of keys) {
                     if (key.isStringLiteral()) collectMethod(node.argumentExpression, node.expression, key.value);
                 }
             } else {
-                collectAllMembers(checker.getTypeAtLocation(node.expression), node.argumentExpression, node.expression);
+                const receiverType = checker.getTypeAtLocation(node.expression);
+                if (
+                    (receiverType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown) ||
+                        checker.getPropertyOfType(receiverType, 'registerEvent')) &&
+                    isUnknownDynamicHostCall(node)
+                ) {
+                    incompleteEventTypes = true;
+                }
+                collectAllMembers(receiverType, node.argumentExpression, node.expression);
             }
         } else if (ts.isIdentifier(node)) collectMethod(node);
         if (ts.isNewExpression(node)) collectConstructor(node.expression);
@@ -212,6 +248,42 @@ export function findUsedWitMethods(
             }
         }
         ts.forEachChild(node, visit);
+    }
+
+    function registerEventMember(expression: ts.Expression): string | undefined {
+        if (ts.isPropertyAccessExpression(expression)) return expression.name.text;
+        if (ts.isElementAccessExpression(expression) && expression.argumentExpression) {
+            const keyType = checker.getTypeAtLocation(expression.argumentExpression);
+            if (keyType.isStringLiteral()) return keyType.value;
+        }
+        return undefined;
+    }
+
+    function collectRegisteredEventType(call: ts.CallExpression): void {
+        const eventType = call.arguments[1];
+        if (!eventType || ts.isSpreadElement(eventType)) {
+            incompleteEventTypes = true;
+            return;
+        }
+        const type = checker.getTypeAtLocation(eventType);
+        if (!type.isStringLiteral()) {
+            incompleteEventTypes = true;
+            return;
+        }
+        eventTypes.add(type.value);
+    }
+
+    function isPluginEventForwarder(node: ts.Node): boolean {
+        for (let parent = node.parent; parent; parent = parent.parent) {
+            if (!ts.isMethodDeclaration(parent)) continue;
+            return (
+                ts.isIdentifier(parent.name) &&
+                parent.name.text === 'registerEvent' &&
+                ts.isClassDeclaration(parent.parent) &&
+                parent.parent.name?.text === 'Plugin'
+            );
+        }
+        return false;
     }
 
     function runtimeModuleSpecifier(node: ts.Node): ts.Expression | undefined {

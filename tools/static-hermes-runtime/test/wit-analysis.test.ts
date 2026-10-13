@@ -134,9 +134,21 @@ it('selects every declared event case and payload field without a bundle', () =>
                             { name: 'player-id', type: 'u32', resolvedType: { kind: 'primitive', name: 'u32' } },
                             { name: 'message', type: 'string', resolvedType: { kind: 'primitive', name: 'string' } }
                         ]
+                    },
+                    {
+                        name: 'leave-data',
+                        fields: [{ name: 'player-id', type: 'u32', resolvedType: { kind: 'primitive', name: 'u32' } }]
                     }
                 ],
-                variants: [{ name: 'event', cases: [{ name: 'join', type: 'join-data' }] }],
+                variants: [
+                    {
+                        name: 'event',
+                        cases: [
+                            { name: 'join', type: 'join-data' },
+                            { name: 'leave', type: 'leave-data' }
+                        ]
+                    }
+                ],
                 enums: [],
                 flags: [],
                 types: []
@@ -145,6 +157,16 @@ it('selects every declared event case and payload field without a bundle', () =>
     };
 
     expect(selectWitEventFields(apiPackage)).toEqual([
-        { event: 'join', record: 'join-data', fields: ['player-id', 'message'] }
+        { event: 'join', record: 'join-data', fields: ['player-id', 'message'] },
+        { event: 'leave', record: 'leave-data', fields: ['player-id'] }
+    ]);
+
+    expect(selectWitEventFields(apiPackage, ['leave'])).toEqual([
+        { event: 'leave', record: 'leave-data', fields: ['player-id'] }
+    ]);
+    expect(selectWitEventFields(apiPackage, [])).toEqual([]);
+    expect(selectWitEventFields(apiPackage, ['future-event'])).toEqual([
+        { event: 'join', record: 'join-data', fields: ['player-id', 'message'] },
+        { event: 'leave', record: 'leave-data', fields: ['player-id'] }
     ]);
 });

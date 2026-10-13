@@ -21,6 +21,8 @@ export interface WitAnalysisOptions {
     wasiMethods?: readonly string[];
     /** Optional Pumpkin API operation identifiers; omission includes every declared operation. */
     apiMethods?: readonly string[];
+    /** Optional statically registered event names; omission includes every declared event case. */
+    eventTypes?: readonly string[];
 }
 
 /** Complete event records retained for JavaScript callbacks. */
@@ -53,7 +55,7 @@ export interface WitAnalysis {
     wasiFeatures: string[];
     /** Fully resolved signatures and adapter shapes for selected WASI operations. */
     wasiAdapters: WitWasiAdapterPlan[];
-    /** All declared event cases and their complete payload fields. */
+    /** Selected declared event cases and their complete payload fields. */
     eventFields: WitEventFieldSelection[];
 }
 
@@ -94,7 +96,7 @@ export function analyzeWitUsage(resolved: ResolvedWitDocument, options: WitAnaly
         wasiMethods,
         wasiFeatures: selectWasiFeatures({ interfaces: wasi.interfaces }, wasiMethods),
         wasiAdapters: planWasiAdapterOperations(wasi.interfaces, requestedWasiMethods),
-        eventFields: selectWitEventFields(apiPackage)
+        eventFields: selectWitEventFields(apiPackage, options.eventTypes)
     };
 }
 
@@ -206,15 +208,23 @@ export function planWasiAdapterOperations(
 }
 
 /**
- * Retain complete event payloads because JavaScript tags and field access can be dynamic.
+ * Retain complete payloads for selected events because JavaScript field access can be dynamic.
  *
  * @param apiPackage - Resolved Pumpkin API package containing the event variant and records.
- * @returns Every declared event case and all fields from its payload record.
+ * @param eventTypes - Static event registrations; omission or an unknown event retains every case.
+ * @returns Selected event cases and all fields from their payload records.
  */
-export function selectWitEventFields(apiPackage: WitApiPackage): WitEventFieldSelection[] {
+export function selectWitEventFields(
+    apiPackage: WitApiPackage,
+    eventTypes?: readonly string[]
+): WitEventFieldSelection[] {
     const eventInterface = apiPackage.interfaces.find(({ name }) => name === 'event');
     const eventVariant = eventInterface?.variants.find(({ name }) => name === 'event');
     if (!eventVariant) return [];
+    const requestedEvents = eventTypes === undefined ? undefined : new Set(eventTypes);
+    const hasUnknownEvent =
+        requestedEvents &&
+        [...requestedEvents].some((requested) => eventVariant.cases.every(({ name }) => name !== requested));
     const records = new Map(
         apiPackage.interfaces.flatMap(({ records: declarations }) =>
             declarations.map((record) => [record.name, record])
@@ -222,6 +232,7 @@ export function selectWitEventFields(apiPackage: WitApiPackage): WitEventFieldSe
     );
     const selected: WitEventFieldSelection[] = [];
     for (const event of eventVariant.cases) {
+        if (requestedEvents && !hasUnknownEvent && !requestedEvents.has(event.name)) continue;
         const record = records.get(event.type.replace(/^%/, ''));
         if (!record) throw new Error(`WIT event ${event.name} refers to missing record ${event.type}`);
         const fields = record.fields.map(({ name }) => name);

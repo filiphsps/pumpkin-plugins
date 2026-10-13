@@ -205,8 +205,8 @@ use of a lock digest fetches its upstream commit into the consumer's ignored cac
 generates the component ABI and the ignored `generated/api-enums.generated.h`. Component builds use
 the build package's source analysis to select API operations when it can determine the full set;
 direct codegen can select operations with `--api-methods`, and omission includes all imported API
-operations. Event conversion always covers every WIT event variant and every declared payload field.
-Event tags and payload access may be computed dynamically, so source scans cannot safely prune them.
+operations. Event conversion keeps complete payload fields for statically registered event types;
+dynamic or unresolved registrations retain every event case and payload field.
 
 The native JSI shim implements part of the Pumpkin API: plugin lifecycle and metadata, command and
 task dispatch, event registration and dispatch, selected server/player/world methods, logging,

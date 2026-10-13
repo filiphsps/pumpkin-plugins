@@ -126,7 +126,10 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                         ? {}
                         : {
                               apiMethods: usedWitMethods.pumpkinMethods,
-                              wasiMethods: usedWitMethods.wasiMethods
+                              wasiMethods: usedWitMethods.wasiMethods,
+                              ...(usedWitMethods.eventTypes === undefined
+                                  ? {}
+                                  : { eventTypes: usedWitMethods.eventTypes })
                           })
                 });
             } catch (error) {

@@ -33,12 +33,14 @@ export interface StaticHermesBuildOptions {
     wasiMethods?: string[];
     /** Pumpkin API operation identifiers for native dispatch; omission includes every declared operation. */
     apiMethods?: string[];
+    /** Event variants referenced by static registrations; omission retains every event variant. */
+    eventTypes?: string[];
 }
 
 /**
  * Builds a plugin component using the runtime package's pinned shim and external Hermes toolchain.
  *
- * @param options - Bundle, WIT, output, development, and operation-selection inputs.
+ * @param options - Bundle, WIT, output, development, and adapter-selection inputs.
  * @throws {Error} If the Static Hermes CLI cannot prepare or build the requested component.
  */
 export function buildStaticHermesComponent(options: StaticHermesBuildOptions): void {
@@ -61,6 +63,7 @@ export function buildStaticHermesComponent(options: StaticHermesBuildOptions): v
             JSON.stringify(options.wasiImports ?? []),
             ...(options.wasiMethods === undefined ? [] : ['--wasi-methods', JSON.stringify(options.wasiMethods)]),
             ...(options.apiMethods === undefined ? [] : ['--api-methods', JSON.stringify(options.apiMethods)]),
+            ...(options.eventTypes === undefined ? [] : ['--event-types', JSON.stringify(options.eventTypes)]),
             ...(options.runtimeVariant === undefined ? [] : ['--runtime-variant', options.runtimeVariant])
         ],
         {

@@ -21,7 +21,8 @@ it('forwards selected build options to the packaged CLI', () => {
         quietOutput: true,
         wasiImports: ['wasi:filesystem/types@0.2.3'],
         wasiMethods: ['wasi:filesystem/types@0.2.3#read-via-stream'],
-        apiMethods: ['logging.log']
+        apiMethods: ['logging.log'],
+        eventTypes: ['server-tick-end-event']
     };
 
     buildStaticHermesComponent(options);
@@ -48,6 +49,8 @@ it('forwards selected build options to the packaged CLI', () => {
             JSON.stringify(options.wasiMethods),
             '--api-methods',
             JSON.stringify(options.apiMethods),
+            '--event-types',
+            JSON.stringify(options.eventTypes),
             '--runtime-variant',
             'full'
         ],
@@ -80,5 +83,6 @@ it('uses empty WASI imports and omits optional selections by default', () => {
     expect(args).not.toContain('--development-mode');
     expect(args).not.toContain('--wasi-methods');
     expect(args).not.toContain('--api-methods');
+    expect(args).not.toContain('--event-types');
     expect(args).not.toContain('--runtime-variant');
 });

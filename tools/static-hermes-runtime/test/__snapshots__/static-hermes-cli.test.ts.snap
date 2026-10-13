@@ -94,6 +94,7 @@ Options:
   --wasi-methods <json-array>  WASI operation identifiers; omit to include all
   --api-methods <json-array>   Pumpkin operation identifiers; omit to include
                                all
+  --event-types <json-array>   Event type names; omit to include all
   --runtime-variant <variant>  Hermes archive profile (choices: "full", "lean")
   -h, --help                   display help for command
 "

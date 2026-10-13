@@ -108,6 +108,7 @@ export function createStaticHermesProgram(dependencies: StaticHermesCliDependenc
         .option('--wasi-imports <json-array>', 'WASI interface specifiers', '[]')
         .option('--wasi-methods <json-array>', 'WASI operation identifiers; omit to include all')
         .option('--api-methods <json-array>', 'Pumpkin operation identifiers; omit to include all')
+        .option('--event-types <json-array>', 'Event type names; omit to include all')
         .addOption(new Option('--runtime-variant <variant>', 'Hermes archive profile').choices(['full', 'lean']))
         .action(async (options) => dependencies.componentBuild(parseComponentBuild(options)));
 
@@ -187,10 +188,12 @@ function parseComponentBuild(options: {
     wasiImports: string;
     wasiMethods?: string;
     apiMethods?: string;
+    eventTypes?: string;
     runtimeVariant?: 'full' | 'lean';
 }): ComponentBuildOptions {
     const wasiMethods = parseJsonStringArray(options.wasiMethods, 'wasi-methods', 'WASI method identifiers');
     const apiMethods = parseJsonStringArray(options.apiMethods, 'api-methods', 'method identifiers');
+    const eventTypes = parseJsonStringArray(options.eventTypes, 'event-types', 'event type names');
     return {
         bundle: path.resolve(options.bundle),
         wit: path.resolve(options.wit),
@@ -200,6 +203,7 @@ function parseComponentBuild(options: {
         wasiImports: parseJsonStringArray(options.wasiImports, 'wasi-imports', 'module specifiers') ?? [],
         ...(wasiMethods === undefined ? {} : { wasiMethods }),
         ...(apiMethods === undefined ? {} : { apiMethods }),
+        ...(eventTypes === undefined ? {} : { eventTypes }),
         ...(options.runtimeVariant === undefined ? {} : { runtimeVariant: options.runtimeVariant })
     };
 }

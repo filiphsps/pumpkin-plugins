@@ -91,3 +91,21 @@ it('forwards explicit operation selections without collapsing empty lists to inf
         })
     );
 });
+
+it('forwards statically selected event variants to WIT analysis', () => {
+    const options: ComponentBuildOptions = {
+        bundle: path.join(root, 'bundle.js'),
+        wit: path.join(root, 'wit'),
+        output: path.join(root, 'plugin.wasm'),
+        developmentMode: false,
+        wasiImports: [],
+        eventTypes: ['server-tick-end-event']
+    };
+
+    analyzeComponentWit(options);
+
+    expect(mocks.analyzeUsage).toHaveBeenCalledWith(
+        { id: 'resolved-document' },
+        expect.objectContaining({ eventTypes: ['server-tick-end-event'] })
+    );
+});

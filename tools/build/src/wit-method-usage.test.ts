@@ -172,6 +172,68 @@ afterEach(() => {
 });
 
 describe('findUsedPumpkinWitMethods', () => {
+    it('selects only statically registered events and ignores the generic Plugin forwarding method', () => {
+        const entry = fixture();
+        fs.writeFileSync(
+            entry,
+            `type EventType = 'tick' | 'join';
+interface Context { registerEvent(id: number, eventType: EventType, priority: 'normal', blocking: boolean): void; }
+class Plugin {
+    registerEvent(context: Context, eventType: EventType, handler: (event: unknown) => void): void {
+        context.registerEvent(1, eventType, 'normal', true);
+    }
+}
+class RuntimePlugin extends Plugin {
+    subscribe(context: Context): void { this.registerEvent(context, 'tick', () => {}); }
+}
+`
+        );
+
+        expect(findUsedWitMethods(entry)).toEqual({
+            pumpkinMethods: [],
+            wasiMethods: [],
+            eventTypes: ['tick']
+        });
+    });
+
+    it('retains all typed dynamic events and falls back when a registration name is untyped', () => {
+        const entry = fixture();
+        fs.writeFileSync(
+            entry,
+            `type EventType = 'tick' | 'join';
+interface Context { registerEvent(id: number, eventType: EventType, priority: 'normal', blocking: boolean): void; }
+class Plugin { registerEvent(context: Context, eventType: EventType, handler: (event: unknown) => void): void { context.registerEvent(1, eventType, 'normal', true); } }
+class RuntimePlugin extends Plugin {
+    subscribeAll(context: Context, eventType: EventType): void { this.registerEvent(context, eventType, () => {}); }
+    subscribeUnknown(context: Context, eventType: string): void { this.registerEvent(context, eventType, () => {}); }
+}
+`
+        );
+
+        expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
+    });
+
+    it('falls back when a computed method could invoke event registration', () => {
+        const entry = fixture();
+        fs.writeFileSync(
+            entry,
+            `type EventType = 'tick' | 'join';
+interface Context {
+    registerEvent(id: number, eventType: EventType, priority: 'normal', blocking: boolean): void;
+    noop(id: number, eventType: EventType, priority: 'normal', blocking: boolean): void;
+}
+class Plugin { registerEvent(context: Context, eventType: EventType, handler: (event: unknown) => void): void { context.registerEvent(1, eventType, 'normal', true); } }
+class RuntimePlugin extends Plugin {
+    subscribe(context: Context, method: 'registerEvent' | 'noop', eventType: EventType): void {
+        context[method](1, eventType, 'normal', true);
+    }
+}
+`
+        );
+
+        expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
+    });
+
     it('reports called methods by their declared Pumpkin interface and resource', () => {
         const methods = findUsedPumpkinWitMethods(fixture());
 
@@ -256,7 +318,8 @@ describe('findUsedPumpkinWitMethods', () => {
 
         expect(findUsedWitMethods(entry)).toEqual({
             pumpkinMethods: ['command.command.constructor'],
-            wasiMethods: []
+            wasiMethods: [],
+            eventTypes: []
         });
     });
 
@@ -380,7 +443,7 @@ describe('findUsedPumpkinWitMethods', () => {
             entry,
             'import type { Command } from "pumpkin:plugin/command@0.1.0"; type PluginCommand = Command;'
         );
-        expect(findUsedWitMethods(entry)).toEqual({ pumpkinMethods: [], wasiMethods: [] });
+        expect(findUsedWitMethods(entry)).toEqual({ pumpkinMethods: [], wasiMethods: [], eventTypes: [] });
     });
 
     it('falls back to full adapters when a runtime dependency has only declarations', () => {

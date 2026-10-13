@@ -22,7 +22,8 @@ export function analyzeComponentWit(options: ComponentBuildOptions): ComponentWi
         pluginImportOrder: imports,
         wasiImports: options.wasiImports,
         ...(options.wasiMethods === undefined ? {} : { wasiMethods: options.wasiMethods }),
-        ...(options.apiMethods === undefined ? {} : { apiMethods: options.apiMethods })
+        ...(options.apiMethods === undefined ? {} : { apiMethods: options.apiMethods }),
+        ...(options.eventTypes === undefined ? {} : { eventTypes: options.eventTypes })
     });
     return { analysis, apiPackage };
 }

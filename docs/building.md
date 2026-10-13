@@ -86,7 +86,8 @@ from `@pumpkin-plugins/build`, which owns the WASI version and WIT files. It val
 in imported WASI interfaces, including operations the plugin does not currently use, and generates
 native adapters for the operations selected by build analysis. The imported WASI 0.2.3 operations
 cover filesystem, HTTP, streams, clocks, TCP, UDP and sockets. Feature-gated operations enable their
-WIT feature when selected. Event converters include every declared WIT event case and payload field.
+WIT feature when selected. Event converters keep complete payload fields for statically registered
+event types; dynamic or unresolved registrations retain every event case and payload field.
 Static Hermes development builds disable the shared automatic update check. WASI 3 support is
 deferred.
 

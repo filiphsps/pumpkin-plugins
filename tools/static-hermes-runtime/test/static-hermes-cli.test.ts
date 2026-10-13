@@ -107,6 +107,7 @@ it.each([
             '--output <file>',
             '--workspace-root <dir>',
             '--development-mode',
+            '--event-types <json-array>',
             '--runtime-variant'
         ]
     }
@@ -224,7 +225,9 @@ it('forwards the consumer project root to the component build action', async () 
             '--output',
             'plugin.wasm',
             '--workspace-root',
-            'consumer'
+            'consumer',
+            '--event-types',
+            '["server-tick-end-event"]'
         ],
         { from: 'user' }
     );
@@ -236,7 +239,8 @@ it('forwards the consumer project root to the component build action', async () 
             output: path.resolve('plugin.wasm'),
             workspaceRoot: path.resolve('consumer'),
             developmentMode: false,
-            wasiImports: []
+            wasiImports: [],
+            eventTypes: ['server-tick-end-event']
         }
     ]);
 });
