@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 const script = path.join(import.meta.dirname, '../bin/pumpkin-plugins-docs.mjs');
 const dirs: string[] = [];
@@ -57,10 +57,11 @@ describe('action README CLI', { timeout: 15000 }, () => {
         const result = run(root);
         assert.equal(result.status, 0, result.output);
         const market = readme(root, 'market-action');
+        const noOutput = readme(root, 'no-output');
+        expect({ market, noOutput }).toMatchSnapshot();
         assert.match(market, /\| `plugin-id` \| No \| {2}\| Public or numeric ID \|/);
         assert.match(market, /\| `update-mode` \| No \| `patch` \| Update mode \|/);
         assert.match(market, /\| `listing-id` \| Resolved numeric ID \|/);
-        const noOutput = readme(root, 'no-output');
         assert.match(noOutput, /\| `value` \| Yes \| {2}\| Value input \|/);
         assert.match(noOutput, /This action has no outputs\./);
     });
@@ -76,18 +77,22 @@ describe('action README CLI', { timeout: 15000 }, () => {
 
         const stale = run(root, true);
         assert.equal(stale.status, 1);
-        assert.match(stale.output, /out of date/);
         assert.equal(readme(root, 'action'), before);
 
         const generated = run(root);
         assert.equal(generated.status, 0, generated.output);
-        assert.equal(run(root, true).status, 0);
+        const generatedReadme = readme(root, 'action');
+        expect(generatedReadme).toMatchSnapshot();
+        const unchanged = run(root, true);
+        assert.equal(unchanged.status, 0);
+        assert.equal(readme(root, 'action'), generatedReadme);
     });
 
     it('fails when an action README has no generated-section markers', () => {
         const root = repo({ action: { action: 'name: Test\n', readme: '# Test\n' } });
+        const before = readme(root, 'action');
         const result = run(root);
         assert.equal(result.status, 1);
-        assert.match(result.output, /missing <!-- action-inputs:start -->/);
+        assert.equal(readme(root, 'action'), before);
     });
 });

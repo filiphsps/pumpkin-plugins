@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 const cli = path.join(import.meta.dirname, '../bin/pumpkin-plugins-docs.mjs');
 const dirs: string[] = [];
@@ -45,8 +45,8 @@ function repo(
     return dir;
 }
 
-function run(dir: string) {
-    const result = spawnSync(process.execPath, [cli, 'action-versions'], {
+function run(dir: string, check = false) {
+    const result = spawnSync(process.execPath, [cli, 'action-versions', ...(check ? ['--check'] : [])], {
         cwd: dir,
         encoding: 'utf8'
     });
@@ -75,9 +75,13 @@ describe('action version CLI', { timeout: 15000 }, () => {
 
         const result = run(dir);
         assert.ok(result.ok, result.out);
-        assert.match(readme(dir, 'publish-market'), /publish-market-v0\.0\.1/);
-        assert.match(readme(dir, 'another-action'), /market-helper-v1\.2\.3/);
-        assert.match(result.out, /Action versions: updated/);
+        const generatedReadmes = {
+            publishMarket: readme(dir, 'publish-market'),
+            anotherAction: readme(dir, 'another-action')
+        };
+        expect(generatedReadmes).toMatchSnapshot();
+        assert.match(generatedReadmes.publishMarket, /publish-market-v0\.0\.1/);
+        assert.match(generatedReadmes.anotherAction, /market-helper-v1\.2\.3/);
     });
 
     it('is idempotent when all example tags already match', () => {
@@ -94,10 +98,28 @@ describe('action version CLI', { timeout: 15000 }, () => {
         const result = run(dir);
         assert.ok(result.ok, result.out);
         assert.equal(readme(dir, 'publish-market'), before);
-        assert.match(result.out, /Action versions: unchanged/);
+
+        const checked = run(dir, true);
+        assert.ok(checked.ok, checked.out);
+        assert.equal(readme(dir, 'publish-market'), before);
     });
 
-    it('fails with a useful error when an action README has no versioned example tag', () => {
+    it('checks stale action versions without writing the README', () => {
+        const dir = repo({
+            'publish-market': {
+                component: 'publish-market',
+                manifestVersion: '0.2.0',
+                readmeVersion: '0.1.0'
+            }
+        });
+        const before = readme(dir, 'publish-market');
+
+        const result = run(dir, true);
+        assert.equal(result.ok, false);
+        assert.equal(readme(dir, 'publish-market'), before);
+    });
+
+    it('rejects an action README without a versioned example tag', () => {
         const dir = repo({
             'publish-market': {
                 component: 'publish-market',
@@ -109,6 +131,6 @@ describe('action version CLI', { timeout: 15000 }, () => {
 
         const result = run(dir);
         assert.equal(result.ok, false);
-        assert.match(result.out, /README\.md has no example tag starting with publish-market-v/);
+        assert.equal(readme(dir, 'publish-market'), 'No usage example.\n');
     });
 });

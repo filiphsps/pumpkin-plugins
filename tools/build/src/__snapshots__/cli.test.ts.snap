@@ -1,0 +1,13 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CLI informational options > prints help for --help without reading plugin configuration 1`] = `
+"Usage: pumpkin-plugins-build [options]
+
+Build the Pumpkin plugin in the current directory.
+
+Options:
+  -V, --version  output the version number
+  --types-only   Generate guest declarations without building a component
+  -h, --help     display help for command
+"
+`;

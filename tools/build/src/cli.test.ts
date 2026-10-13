@@ -136,6 +136,8 @@ function cachedWitDir(pluginDir: string, lock: string): string {
 describe('CLI informational options', () => {
     it.each(['--help', '-h'])('prints help for %s without reading plugin configuration', async (argument) => {
         const output: string[] = [];
+        vi.mocked(bundlePlugin).mockClear();
+        vi.mocked(generateTypes).mockClear();
         const stdout = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
             output.push(String(chunk));
             return true;
@@ -144,6 +146,9 @@ describe('CLI informational options', () => {
             await expect(run([argument], '/not-a-package')).resolves.toBeUndefined();
             expect(output.join('')).toContain('Usage: pumpkin-plugins-build');
             expect(output.join('')).toContain('--types-only');
+            if (argument === '--help') expect(output.join('')).toMatchSnapshot();
+            expect(bundlePlugin).not.toHaveBeenCalled();
+            expect(generateTypes).not.toHaveBeenCalled();
         } finally {
             stdout.mockRestore();
         }

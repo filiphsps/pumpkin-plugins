@@ -429,10 +429,20 @@ it('shows Commander help', () => {
     const result = runCli(['--help'], { cwd });
 
     expect(result.status).toBe(0);
+    expect(fs.readdirSync(cwd)).toEqual([]);
     expect(result.stdout).toContain('create-pumpkin-plugin');
     expect(result.stdout).toContain('--skip-install');
     expect(result.stdout).toContain('--ts');
     expect(result.stdout).toContain('--js');
+    expect(result.stdout).toMatchSnapshot();
+});
+
+it('rejects a missing directory without creating a project', () => {
+    const cwd = temporaryDirectory('create-pumpkin-plugin-missing-directory-');
+    const result = runCli([], { cwd });
+
+    expect(result.status).not.toBe(0);
+    expect(fs.readdirSync(cwd)).toEqual([]);
 });
 
 function isWithin(parent: string, child: string): boolean {
