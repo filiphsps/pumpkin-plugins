@@ -1,0 +1,8 @@
+{
+    "compilerOptions": {
+        "paths": {
+            "@pumpkin-plugins/pumpkin-api": ["../pumpkin-api/src/index.ts"]
+        }
+    },
+    "files": ["../pumpkin-api/build/types/index.d.ts"]
+}

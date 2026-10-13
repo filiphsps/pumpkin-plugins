@@ -128,6 +128,7 @@ const PNPM_BUILTINS = new Set([
     'remove',
     'update',
     'exec',
+    'create',
     'dlx',
     'why',
     'list',

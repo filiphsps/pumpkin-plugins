@@ -1,0 +1,61 @@
+{
+    "name": "create-pumpkin-plugin",
+    "version": "0.1.0",
+    "description": "Create a minimal Pumpkin plugin project",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/create-pumpkin-plugin#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
+        "directory": "tools/create-pumpkin-plugin"
+    },
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/filiphsps"
+        },
+        {
+            "type": "custom",
+            "url": "https://paypal.me/filiph"
+        }
+    ],
+    "type": "module",
+    "bin": {
+        "create-pumpkin-plugin": "dist/create-pumpkin-plugin.js"
+    },
+    "files": [
+        "bin",
+        "dist",
+        "templates",
+        "README.md"
+    ],
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "prepack": "pnpm build",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --project unit",
+        "test:integration": "vitest run --project integration"
+    },
+    "dependencies": {
+        "@commander-js/extra-typings": "catalog:",
+        "commander": "catalog:"
+    },
+    "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:"
+    },
+    "engines": {
+        "node": ">=24.21.0"
+    }
+}

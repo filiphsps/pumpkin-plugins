@@ -1,0 +1,26 @@
+{
+    "name": "__PLUGIN_NAME__",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "engines": {
+        "node": ">=24.21.0"
+    },
+    "scripts": {
+        "build": "pumpkin-plugins-build",
+        "typecheck": "pumpkin-plugins-build --types-only && tsc --noEmit"
+    },
+    "dependencies": {
+        "@pumpkin-plugins/pumpkin-api": "0.1.0",
+        "@pumpkin-plugins/build": "0.1.0"
+    },
+    "devDependencies": {
+        "typescript": "6.0.3"
+    },
+    "pumpkinPlugin": {
+        "entry": "src/plugin.js",
+        "output": "build/__PLUGIN_NAME__.wasm",
+        "engine": "static-hermes",
+        "wasi": []
+    }
+}

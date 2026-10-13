@@ -1,0 +1,12 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "rootDir": "bin",
+        "outDir": "dist",
+        "noEmit": false,
+        "noEmitOnError": true,
+        "declaration": false,
+        "rewriteRelativeImportExtensions": true
+    },
+    "include": ["bin/create-pumpkin-plugin.ts"]
+}

@@ -1,0 +1,14 @@
+{
+    "extends": "../../tsconfig.templates.json",
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "allowImportingTsExtensions": true,
+        "strict": true,
+        "noEmit": true,
+        "skipLibCheck": true,
+        "types": []
+    },
+    "include": ["build/types/bindings/**/*.d.ts", "src/**/*.ts"]
+}
