@@ -36,6 +36,9 @@
         "runtime",
         "wasi-wit.lock.json"
     ],
+    "publishConfig": {
+        "access": "public"
+    },
     "scripts": {
         "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --target=node24 --packages=external --alias:@pumpkin-plugins/minecraft-colors=../minecraft-colors/src/index.ts --outfile=dist/cli.js",
         "prepack": "pnpm build",
