@@ -300,10 +300,7 @@ export function saveHermesBuildCache(
  * @returns A unique token identifying this lock owner.
  * @throws {Error} If the lock cannot be acquired before the configured timeout.
  */
-export async function acquireHermesBuildLock(
-    lockPath: string,
-    options: HermesBuildLockOptions = {}
-): Promise<string> {
+export async function acquireHermesBuildLock(lockPath: string, options: HermesBuildLockOptions = {}): Promise<string> {
     const filesystem = options.filesystem ?? hermesFileSystem;
     const timeoutMs = options.timeoutMs ?? 30 * 60_000;
     const wait = options.wait ?? ((delayMs) => new Promise<void>((resolve) => setTimeout(resolve, delayMs)));
@@ -335,7 +332,7 @@ export async function acquireHermesBuildLock(
 /**
  * Run a cache operation while holding the exclusive Hermes preparation lock.
  *
- * @typeParam T - Result returned by the locked operation
+ * @template T - Result returned by the locked operation
  * @param cacheRoot - Shared root that contains the lock file.
  * @param operation - Source, patch, and build work that must be serialized.
  * @param options - Optional filesystem and lock-wait controls.
