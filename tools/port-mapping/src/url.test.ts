@@ -17,10 +17,15 @@ describe('parseHttpUrl', () => {
             'http://router.local/',
             'http://[::1]/',
             'http://10.0.0.1:99999/',
+            'http://10.0.0.1:abc/',
             'ftp://10.0.0.1',
             'x'
         ])
             expect(parseHttpUrl(bad)).toBeUndefined();
+    });
+
+    it('rejects long malformed authorities without a backtracking expression', () => {
+        expect(parseHttpUrl(`http://${'""'.repeat(20_000)}`)).toBeUndefined();
     });
 });
 
