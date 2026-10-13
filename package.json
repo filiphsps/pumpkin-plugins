@@ -41,6 +41,7 @@
         "dev:no-hot-reload": "node scripts/dev.mjs --no-hot-reload",
         "dev:nightly:no-hot-reload": "node scripts/dev.mjs --nightly --no-hot-reload",
         "test:scripts": "node --test scripts/*.test.mjs .agents/hooks/*.test.mjs",
+        "test:external-consumer": "node scripts/test-external-consumer.mjs",
         "test:integration": "turbo run test:integration --concurrency=4",
         "readme": "turbo run readme && pumpkin-plugins-docs actions && pumpkin-plugins-docs root",
         "readme:check": "turbo run readme:check && pumpkin-plugins-docs actions --check && pumpkin-plugins-docs root --check",
