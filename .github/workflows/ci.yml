@@ -395,6 +395,9 @@ jobs:
                   name: update-check-fixture
                   path: tools/update-check/build/
 
+            - name: 🏗️ Build plugin CLI for isolated integration tests
+              run: pnpm exec turbo run build --filter=@pumpkin-plugins/build
+
             - name: 🎃 Integration tests
               env:
                   BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}

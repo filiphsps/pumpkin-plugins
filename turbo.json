@@ -64,7 +64,7 @@
             "outputs": ["coverage/**"]
         },
         "test:integration": {
-            "dependsOn": ["build"],
+            "dependsOn": ["build", "@pumpkin-plugins/build#build"],
             "passThroughEnv": [
                 "STATIC_HERMES_CACHE_DIR",
                 "STATIC_HERMES_SOURCE_DIR",
