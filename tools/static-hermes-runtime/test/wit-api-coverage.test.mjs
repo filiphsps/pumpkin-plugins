@@ -1,14 +1,17 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { ensurePumpkinWit, parsePumpkinWitPin } from '@pumpkin-plugins/pumpkin-api/wit';
 import { afterEach, expect, it } from 'vitest';
 import { CAPABILITIES, wasiInterfaces } from '../../build/src/capabilities.ts';
 import { cacheDir } from '../../build/src/repo.ts';
 import { ensureWasiWit, readLock } from '../../build/src/wasi-wit.ts';
 import { prepareWit } from '../../build/src/wit.ts';
+import { PUMPKIN_RELEASE } from '../../test-harness/src/pumpkin-version.ts';
 import { setupHermesToolchainEnvironment } from '../src/hermes/toolchain-environment.ts';
 import { analyzeWitUsage } from '../src/wit/analysis.ts';
 import { emitPumpkinMethodDispatch, emitWasiAdapterDispatch } from '../src/wit/emitters.ts';
@@ -28,10 +31,8 @@ import {
 
 const directories = [];
 const runtimeRoot = path.resolve(import.meta.dirname, '..');
-const apiWitDir = path.join(
-    path.dirname(createRequire(import.meta.url).resolve('@pumpkinmc/pumpkin-api-ts/package.json')),
-    'wit/v0.1'
-);
+const apiRoot = path.dirname(createRequire(import.meta.url).resolve('@pumpkin-plugins/pumpkin-api/package.json'));
+const witLockFile = path.join(apiRoot, 'wit.lock.json');
 
 afterEach(() => {
     for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
@@ -40,6 +41,11 @@ afterEach(() => {
 it('generates facades and native adapters for the full pinned Pumpkin and WASI WIT surface', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-wit-coverage-'));
     directories.push(directory);
+    const apiWitDir = ensurePumpkinWit({
+        lockFile: witLockFile,
+        cacheRoot: cacheDir(import.meta.dirname)
+    });
+    const sourceWit = parsePumpkinWitPin(fs.readFileSync(witLockFile, 'utf8'), witLockFile);
 
     const lock = readLock();
     const wasiWit = await ensureWasiWit({ cacheDir: cacheDir(import.meta.dirname), lock });
@@ -60,6 +66,22 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
             resource.functions.map((operation) => `${apiInterface.name}.${resource.name}.${operation.name}`)
         )
     ]);
+    const operationInventoryPath = path.join(runtimeRoot, 'test/fixtures/pumpkin-api-operation-inventory.json');
+    expect(fs.existsSync(operationInventoryPath)).toBe(true);
+    if (!fs.existsSync(operationInventoryPath)) return;
+    const operationInventory = JSON.parse(fs.readFileSync(operationInventoryPath, 'utf8'));
+    const apiPackageJson = JSON.parse(fs.readFileSync(path.join(apiRoot, 'package.json'), 'utf8'));
+    expect(operationInventory).toMatchObject({
+        apiPackage: '@pumpkin-plugins/pumpkin-api',
+        apiPackageVersion: apiPackageJson.version,
+        witPackage: `${apiPackage.packageName}@${apiPackage.version}`,
+        sourceWit,
+        sourceWitSha256: digestWitDirectory(apiWitDir),
+        pumpkinRelease: PUMPKIN_RELEASE,
+        operationCount: apiMethods.length
+    });
+    const mappedOperations = operationInventory.operations.map(({ operationId }) => operationId).sort();
+    expect(mappedOperations).toEqual([...apiMethods].sort());
     const wasiMethods = wasiPackage.interfaces.flatMap((apiInterface) => [
         ...apiInterface.functions.map((operation) => `${apiInterface.specifier}#${operation.name}`),
         ...apiInterface.resources.flatMap((resource) =>
@@ -132,9 +154,10 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
     expect(document.packages).toHaveLength(6);
     expect(document.interfaces).toHaveLength(63);
     expect(document.types).toHaveLength(1998);
-    expect(typedApi.interfaces).toHaveLength(44);
-    expect(typedApiOperationCount).toBe(957);
+    expect(typedApi.interfaces).toHaveLength(apiPackage.interfaces.length);
+    expect(typedApiOperationCount).toBe(apiMethods.length);
     expect(typedAnalysis.apiMethods).toEqual(apiMethods);
+    expect(typedAnalysis.apiAdapters.map(({ operationId }) => operationId).sort()).toEqual([...apiMethods].sort());
     expect(typedWasi.interfaces).toHaveLength(15);
     expect(typedAnalysis.wasiMethods).toHaveLength(157);
     expect(typedAnalysis.wasiAdapters).toHaveLength(157);
@@ -235,7 +258,11 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
     const legacyApiEnumPath = path.join(directory, 'legacy-api-enums.generated.h');
     const eventUsagePath = path.join(directory, 'event-usage.js');
     fs.writeFileSync(pluginHeaderPath, pluginHeader);
-    fs.writeFileSync(eventUsagePath, eventSource);
+    // Ask the frozen oracle for complete enum tables; current output retains them unconditionally.
+    const priorities = apiPackage.interfaces
+        .find(({ name }) => name === 'event')
+        .enums.find(({ name }) => name === 'event-priority').values;
+    fs.writeFileSync(eventUsagePath, `${eventSource}\n${priorities.map((value) => JSON.stringify(value)).join(';')}`);
     const typedOutput = generateWitOutputs({
         analysis: typedAnalysis,
         apiPackage: typedApi,
@@ -260,22 +287,34 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
         { stdio: 'pipe' }
     );
     expect(typedOutput.apiEnumHeader).toBe(fs.readFileSync(legacyApiEnumPath, 'utf8'));
-    const expectedRuntime = runtimeTemplate
-        .replace(
-            '/* <PUMPKIN_WASI_RUNTIME> */',
-            generateWasiAdapterDispatch(wasiPackage.interfaces, wasiPackage.interfaces, wasiMethods)
-        )
-        .replace('/* <PUMPKIN_WASI_INITIALIZATION> */', 'installGeneratedWasiApiFunctions(*jsRuntime);')
-        .replace(
-            '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
-            generateWitSimpleMethodDispatch(apiPackage, eventSource, apiMethods)
-        )
-        .replace('/* <PUMPKIN_WIT_EVENT_DISPATCH> */', generateWitEventDispatch(apiPackage, eventSource));
-    expect(typedOutput.runtimeSource).toBe(expectedRuntime);
+    // Keep compatibility checks for unaffected adapter sections. Event conversion intentionally
+    // diverges from the frozen oracle: callbacks receive and return complete payloads.
+    expect(typedOutput.runtimeSource).toContain(
+        generateWasiAdapterDispatch(wasiPackage.interfaces, wasiPackage.interfaces, wasiMethods)
+    );
+    expect(typedOutput.runtimeSource).toContain('installGeneratedWasiApiFunctions(*jsRuntime);');
+    expect(typedOutput.runtimeSource).toContain(generateWitSimpleMethodDispatch(apiPackage, eventSource, apiMethods));
+    expect(count(typedOutput.runtimeSource, /case PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_/g)).toBe(eventVariant.cases.length);
+    expect(count(typedOutput.runtimeSource, /data\.setProperty\(runtime,/g)).toBeGreaterThanOrEqual(eventFieldCount);
+    expect(typedOutput.runtimeSource).not.toContain('<PUMPKIN_WIT_EVENT_');
 }, 30_000);
 
 function count(source, expression) {
     return source.match(expression)?.length ?? 0;
+}
+
+function digestWitDirectory(directory) {
+    const hash = createHash('sha256');
+    for (const filename of fs
+        .readdirSync(directory)
+        .filter((name) => name.endsWith('.wit'))
+        .sort()) {
+        hash.update(filename);
+        hash.update('\0');
+        hash.update(fs.readFileSync(path.join(directory, filename)));
+        hash.update('\0');
+    }
+    return hash.digest('hex');
 }
 
 /** Include every event tag and recursively referenced field in the generated event bundle source. */

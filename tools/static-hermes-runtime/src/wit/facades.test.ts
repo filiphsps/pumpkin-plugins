@@ -60,8 +60,12 @@ it('wraps WASI resource lifetimes and turns native error markers into JavaScript
     expect(file.read('hello')).toBe('HELLO');
     expect(calls).toEqual(['hello']);
     expect(() => module.lookup()).toThrow('WASI error: not-found');
+    const savedRead = file.read;
     file[Symbol.dispose]();
+    expect(nativeResource.__isValid).toBe(false);
     expect(() => file.read('again')).toThrow('Cannot use a disposed or transferred resource');
+    expect(() => savedRead('again')).toThrow('Cannot use a disposed or transferred resource');
+    expect(calls).toEqual(['hello']);
 });
 
 async function importFacade(source: string): Promise<Record<string, unknown>> {

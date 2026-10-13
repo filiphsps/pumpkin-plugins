@@ -1388,6 +1388,12 @@ Object makeEvent(Runtime &runtime, plugin_event_t *event,
     return result;
 }
 
+void returnEvent(Runtime &rt, const Value &value, plugin_event_t *event,
+                 plugin_event_t *ret,
+                 std::vector<std::shared_ptr<ResourceState>> *eventResources) {
+    /* <PUMPKIN_WIT_EVENT_RESULT> */
+}
+
 } // namespace
 
 extern "C" {
@@ -1452,7 +1458,8 @@ void exports_plugin_handle_event(uint32_t event_id,
     Value args[] = {Value(static_cast<double>(event_id)),
                     std::move(serverObject), std::move(eventObject)};
     try {
-        callExport("handleEvent", args, 3);
+        auto result = callExport("handleEvent", args, 3);
+        returnEvent(*jsRuntime, result, event, ret, &eventResources);
     } catch (const std::exception &exception) {
         logPluginError(exception.what());
     }

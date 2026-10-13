@@ -13,7 +13,7 @@ import type {
 
 /** Bundle contents and explicit API/WASI selections used to construct a WIT usage plan. */
 export interface WitAnalysisOptions {
-    /** Bundled JavaScript scanned to infer used Pumpkin methods and event fields. */
+    /** Bundled JavaScript used to infer Pumpkin methods when no explicit selection is available. */
     bundleSource: string;
     /** Plugin WIT import order, used to keep generated interface ordering stable. */
     pluginImportOrder?: readonly string[];
@@ -25,13 +25,13 @@ export interface WitAnalysisOptions {
     apiMethods?: readonly string[];
 }
 
-/** Selected fields from an event record that the plugin bundle uses. */
+/** Complete event records retained for JavaScript callbacks. */
 export interface WitEventFieldSelection {
-    /** Event case used by the plugin bundle. */
+    /** Declared event case supported by the dispatcher. */
     event: string;
     /** WIT record associated with the event case. */
     record: string;
-    /** Record fields referenced by the bundled JavaScript. */
+    /** All fields declared by the event payload record. */
     fields: string[];
 }
 
@@ -55,7 +55,7 @@ export interface WitAnalysis {
     wasiFeatures: string[];
     /** Fully resolved signatures and adapter shapes for selected WASI operations. */
     wasiAdapters: WitWasiAdapterPlan[];
-    /** Event cases and payload fields referenced by the plugin bundle. */
+    /** All declared event cases and their complete payload fields. */
     eventFields: WitEventFieldSelection[];
 }
 
@@ -85,7 +85,6 @@ export function analyzeWitUsage(resolved: ResolvedWitDocument, options: WitAnaly
     const apiMethods = selectApiMethods(apiOperations, options.bundleSource, options.apiMethods);
     const wasiOperations = allWasiOperations(wasi.interfaces);
     const wasiMethods = selectWasiMethods(wasiOperations, requestedWasiMethods);
-    const selectedWasiMethods = requestedWasiMethods ?? [];
 
     return {
         apiInterfaces: apiPackage.interfaces.map(({ specifier }) => specifier),
@@ -95,7 +94,7 @@ export function analyzeWitUsage(resolved: ResolvedWitDocument, options: WitAnaly
         wasiInterfaces: wasi.interfaces.map(({ specifier }) => specifier),
         resolvedWasiInterfaces: wasi.interfaces,
         wasiMethods,
-        wasiFeatures: selectWasiFeatures({ interfaces: wasi.interfaces }, selectedWasiMethods),
+        wasiFeatures: selectWasiFeatures({ interfaces: wasi.interfaces }, wasiMethods),
         wasiAdapters: planWasiAdapterOperations(wasi.interfaces, requestedWasiMethods),
         eventFields: selectWitEventFields(apiPackage, options.bundleSource)
     };
@@ -209,13 +208,13 @@ export function planWasiAdapterOperations(
 }
 
 /**
- * Select event payload fields by scanning the generated bundle for enum tags and property paths.
+ * Retain complete event payloads because JavaScript tags and field access can be dynamic.
  *
  * @param apiPackage - Resolved Pumpkin API package containing the event variant and records.
- * @param bundleSource - Bundled JavaScript source to inspect.
- * @returns Event cases and record fields referenced by the bundle.
+ * @param _bundleSource - Bundle source retained for compatibility; never used to prune payloads.
+ * @returns Every declared event case and all fields from its payload record.
  */
-export function selectWitEventFields(apiPackage: WitApiPackage, bundleSource: string): WitEventFieldSelection[] {
+export function selectWitEventFields(apiPackage: WitApiPackage, _bundleSource: string): WitEventFieldSelection[] {
     const eventInterface = apiPackage.interfaces.find(({ name }) => name === 'event');
     const eventVariant = eventInterface?.variants.find(({ name }) => name === 'event');
     if (!eventVariant) return [];
@@ -226,12 +225,9 @@ export function selectWitEventFields(apiPackage: WitApiPackage, bundleSource: st
     );
     const selected: WitEventFieldSelection[] = [];
     for (const event of eventVariant.cases) {
-        if (!bundleUsesString(bundleSource, event.name)) continue;
         const record = records.get(event.type.replace(/^%/, ''));
         if (!record) throw new Error(`WIT event ${event.name} refers to missing record ${event.type}`);
-        const fields = record.fields
-            .filter(({ name }) => bundleUsesProperty(bundleSource, jsName(name)))
-            .map(({ name }) => name);
+        const fields = record.fields.map(({ name }) => name);
         selected.push({ event: event.name, record: record.name, fields });
     }
     return selected;
@@ -301,9 +297,14 @@ function selectApiMethods(
         }
         return selected;
     }
+    if (isEsbuildIifeBundle(bundleSource)) return operations.map(({ operationId }) => operationId);
     return operations
         .filter((entry) => bundleUsesApiOperation(bundleSource, entry))
         .map(({ operationId }) => operationId);
+}
+
+function isEsbuildIifeBundle(bundleSource: string): boolean {
+    return /^\s*var\s+[$\w]+\s*=\s*\(\(\)\s*=>\s*\{/.test(bundleSource);
 }
 
 function selectWasiMethods(operations: WitOperation[], requestedMethods?: readonly string[]): string[] {
@@ -403,15 +404,6 @@ function isSupportedWitResult(type: ResolvedWitType): boolean {
     if (type.kind === 'tuple') return type.items.every(isSupportedWitResult);
     if (type.kind === 'result') return isSupportedWitResult(type.ok) && isSupportedWitResult(type.error);
     return false;
-}
-
-function bundleUsesString(source: string, value: string): boolean {
-    return source.includes(JSON.stringify(value)) || source.includes(`'${value}'`);
-}
-
-function bundleUsesProperty(source: string, property: string): boolean {
-    const escaped = escapeRegExp(property);
-    return new RegExp(`(?:\\.|\\[\\s*["'])${escaped}(?:\\b|["']\\s*\\])`).test(source);
 }
 
 function jsName(name: string): string {

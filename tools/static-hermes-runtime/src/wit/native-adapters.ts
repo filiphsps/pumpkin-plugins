@@ -1301,3 +1301,17 @@ function witTypeOwner(
         interfaceSpecifier: 'interfaceSpecifier' in type ? type.interfaceSpecifier : undefined
     };
 }
+
+/** Emit an owned export result without transferring resources until conversion succeeds. */
+export function generateWitExportValue(
+    apiPackage: WitApiPackage,
+    apiInterface: WitApiInterface,
+    type: ResolvedWitType,
+    input: string,
+    name: string,
+    ownership: string
+): { setup: string[]; expression: string } {
+    const result = generateWitInputValue(apiPackage, apiInterface, type, input, name, ownership, true);
+    if (!result) throw new Error(`Cannot convert WIT export result ${name}`);
+    return result;
+}

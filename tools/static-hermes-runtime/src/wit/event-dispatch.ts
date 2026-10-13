@@ -1,9 +1,9 @@
 import type { WitEventFieldSelection } from './analysis.ts';
+import { generateWitExportValue } from './native-adapters.ts';
 import type { ResolvedWitType, WitApiPackage, WitOwnedType, WitRecord, WitRecordField } from './types.ts';
 
 interface EventGenerationContext {
     apiPackage: WitApiPackage;
-    bundleSource: string;
 }
 
 interface GeneratedEventValue {
@@ -25,17 +25,17 @@ const C_RESERVED_FIELD_NAMES = new Set(
 );
 
 /**
- * Generate native event payload conversion for WIT events and fields used by the plugin bundle.
+ * Generate native event payload conversion without pruning nested JavaScript record fields.
  *
  * @param apiPackage - Resolved Pumpkin API package containing event variants and payload records.
- * @param bundleSource - Bundled JavaScript used to validate field selections and nested property access.
+ * @param _bundleSource - Bundle source retained for compatibility; payload conversion is source independent.
  * @param selections - Event cases and payload fields selected during WIT analysis.
  * @returns C++ event dispatch code, or an empty string when there are no selected events.
  * @throws {Error} If a selected event or payload record is missing from the WIT package.
  */
 export function generateWitEventDispatch(
     apiPackage: WitApiPackage,
-    bundleSource: string,
+    _bundleSource: string,
     selections: readonly WitEventFieldSelection[]
 ): string {
     const eventInterface = apiPackage.interfaces.find((apiInterface) => apiInterface.name === 'event');
@@ -45,7 +45,7 @@ export function generateWitEventDispatch(
     const records = new Map<string, WitRecord>(
         apiPackage.interfaces.flatMap((apiInterface) => apiInterface.records.map((record) => [record.name, record]))
     );
-    const context: EventGenerationContext = { apiPackage, bundleSource };
+    const context: EventGenerationContext = { apiPackage };
     const cases = [];
 
     for (const selection of selections) {
@@ -221,7 +221,6 @@ function generateRecursiveEventValue(
             const setup = [`Object ${name}(runtime);`];
             for (const field of type.fields) {
                 const childName = jsName(field.name);
-                if (!bundleUsesNestedProperty(context.bundleSource, path, childName)) continue;
                 const fieldType = requireResolvedEventType(field.resolvedType, `event field ${field.name}`);
                 const fieldValue = generateRecursiveEventValue(
                     fieldType,
@@ -299,27 +298,6 @@ function propertyName(path: string): string {
     return path.split('.').at(-1) ?? path;
 }
 
-/** Check whether the plugin bundle contains a quoted occurrence of a WIT name. */
-function _bundleUsesString(source: string, value: string): boolean {
-    return source.includes(JSON.stringify(value)) || source.includes(`'${value}'`);
-}
-
-/** Check whether the bundle accesses a property using dot or bracket notation. */
-function bundleUsesProperty(source: string, property: string): boolean {
-    const escaped = escapeRegExp(property);
-    return new RegExp(`(?:\\.|\\[\\s*["'])${escaped}(?:\\b|["']\\s*\\])`).test(source);
-}
-
-/** Check whether the bundle accesses a property nested under a dotted parent path. */
-function bundleUsesNestedProperty(source: string, parent: string, property: string): boolean {
-    const escapedParent = parent.split('.').map(escapeRegExp).join('\\s*\\.\\s*');
-    const escapedProperty = escapeRegExp(property);
-    return (
-        new RegExp(`\\.${escapedParent}\\s*\\.\\s*${escapedProperty}\\b`).test(source) ||
-        bundleUsesProperty(source, property)
-    );
-}
-
 /** Prefix every line with the requested number of spaces. */
 function indent(value: string, spaces: number): string {
     const prefix = ' '.repeat(spaces);
@@ -362,6 +340,41 @@ function cIdentifier(witName: string): string {
         .toLowerCase();
 }
 
-function escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Generate event return lowering, committing owned resources only after the payload converts. */
+export function generateWitEventResultDispatch(
+    apiPackage: WitApiPackage,
+    selections: readonly WitEventFieldSelection[]
+): string {
+    const apiInterface = apiPackage.interfaces.find(({ name }) => name === 'event');
+    if (!apiInterface || selections.length === 0) return '';
+    const variant = apiInterface.variants.find(({ name }) => name === 'event');
+    if (!variant) return '';
+    const cases = variant.cases.filter(({ name }) => selections.some(({ event }) => event === name));
+    const type: ResolvedWitType = {
+        kind: 'variant',
+        name: variant.name,
+        interfaceName: apiInterface.name,
+        packageName: apiPackage.packageName,
+        interfaceSpecifier: apiInterface.specifier,
+        interfaceDependencies: [],
+        cases
+    };
+    const result = generateWitExportValue(
+        apiPackage,
+        apiInterface,
+        type,
+        'value',
+        'returnedEvent',
+        'returnedResources'
+    );
+    return [
+        'const auto returnedTag = utf8(rt, value.asObject(rt).getProperty(rt, "tag"));',
+        'if (returnedTag != eventName(event->tag)) throw JSError(rt, "Event handlers cannot change the event type");',
+        'std::vector<std::shared_ptr<ResourceState>> returnedResources;',
+        ...result.setup,
+        'for (const auto &resource : returnedResources) resource->transfer();',
+        'plugin_event_free(event);',
+        `*ret = ${result.expression};`,
+        'for (const auto &resource : *eventResources) resource->drop();'
+    ].join('\n');
 }

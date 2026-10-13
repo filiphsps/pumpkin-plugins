@@ -27,7 +27,10 @@ globalThis.__staticHermesWrapResource = (resource) => {
             }
             if (isDisposed()) throw new Error("Cannot use a disposed or transferred resource");
             const member = Reflect.get(target, key, target);
-            return typeof member === "function" ? (...args) => Reflect.apply(member, target, args) : member;
+            return typeof member === "function" ? (...args) => {
+                if (isDisposed()) throw new Error("Cannot use a disposed or transferred resource");
+                return Reflect.apply(member, target, args);
+            } : member;
         }
     });
 };

@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { WitAnalysis } from './analysis.ts';
 import { emitEventDispatch, emitPumpkinMethodDispatch, emitWasiAdapterDispatch } from './emitters.ts';
+import { generateWitEventResultDispatch } from './event-dispatch.ts';
 import type { WitApiPackage, WitWasiInterface } from './types.ts';
 
 /** Resolved WIT analysis and source fragments used to generate component runtime files. */
@@ -12,7 +13,7 @@ export interface WitGenerationInput {
     apiPackage: WitApiPackage;
     /** Resolved WASI interfaces to pass to native adapter generation. */
     wasiInterfaces: readonly WitWasiInterface[];
-    /** Bundled JavaScript scanned for operation and event usage. */
+    /** Bundled JavaScript scanned for operation usage. */
     bundleSource: string;
     /** Generated `plugin.h` used to validate native enum constants. */
     pluginHeader: string;
@@ -54,9 +55,16 @@ export function generateWitOutputs(input: WitGenerationInput): WitGenerationOutp
         '/* <PUMPKIN_WIT_EVENT_DISPATCH> */',
         emitEventDispatch(input.apiPackage, input.bundleSource, input.analysis)
     );
+    if (runtimeSource.includes('/* <PUMPKIN_WIT_EVENT_RESULT> */')) {
+        runtimeSource = replaceMarker(
+            runtimeSource,
+            '/* <PUMPKIN_WIT_EVENT_RESULT> */',
+            generateWitEventResultDispatch(input.apiPackage, input.analysis.eventFields)
+        );
+    }
     return {
         runtimeSource,
-        apiEnumHeader: generateApiEnumHeader(input.apiPackage, input.bundleSource, input.pluginHeader)
+        apiEnumHeader: generateApiEnumHeader(input.apiPackage, input.pluginHeader)
     };
 }
 
@@ -72,7 +80,7 @@ export function writeWitGeneration(outputDirectory: string, output: WitGeneratio
     writeAtomically(path.join(outputDirectory, 'api-enums.generated.h'), output.apiEnumHeader);
 }
 
-function generateApiEnumHeader(apiPackage: WitApiPackage, bundleSource: string, pluginHeader: string): string {
+function generateApiEnumHeader(apiPackage: WitApiPackage, pluginHeader: string): string {
     const enumSpecs = [
         ['eventTypes', 'event', 'event-type', 'PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_'],
         ['eventPriorities', 'event', 'event-priority', 'PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_'],
@@ -83,16 +91,13 @@ function generateApiEnumHeader(apiPackage: WitApiPackage, bundleSource: string, 
         const apiInterface = apiPackage.interfaces.find((candidate) => candidate.name === interfaceName);
         const declaration = apiInterface?.enums.find(({ name: candidate }) => candidate === enumName);
         if (!declaration) throw new Error(`WIT enum ${enumName} not found in interface ${interfaceName}`);
-        const requiresBundleMatch = name === 'eventTypes' || name === 'eventPriorities';
-        const values = declaration.values
-            .filter((variant) => !requiresBundleMatch || bundleUsesString(bundleSource, variant))
-            .map((variant) => {
-                const cName = `${prefix}${variant.toUpperCase().replaceAll('-', '_')}`;
-                if (!new RegExp(`^#define ${cName} \\d+$`, 'm').test(pluginHeader)) {
-                    throw new Error(`Generated Pumpkin C bindings are missing ${cName}`);
-                }
-                return { variant, cName };
-            });
+        const values = declaration.values.map((variant) => {
+            const cName = `${prefix}${variant.toUpperCase().replaceAll('-', '_')}`;
+            if (!new RegExp(`^#define ${cName} \\d+$`, 'm').test(pluginHeader)) {
+                throw new Error(`Generated Pumpkin C bindings are missing ${cName}`);
+            }
+            return { variant, cName };
+        });
         return { name, values };
     });
     return `// Generated from pumpkin-api-ts WIT and wit-bindgen C bindings. Do not edit.
@@ -122,10 +127,6 @@ function replaceMarker(source: string, marker: string, replacement: string): str
     if (source.split(marker).length !== 2)
         throw new Error(`runtime template must contain exactly one ${marker} marker`);
     return source.replace(marker, replacement);
-}
-
-function bundleUsesString(bundleSource: string, value: string): boolean {
-    return bundleSource.includes(JSON.stringify(value)) || bundleSource.includes(`'${value}'`);
 }
 
 function writeAtomically(filename: string, contents: string): void {

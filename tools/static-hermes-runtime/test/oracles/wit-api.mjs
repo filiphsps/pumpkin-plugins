@@ -169,7 +169,13 @@ const __wrapWasi = (value) => {
             }
             const member = Reflect.get(target, key, target);
             if (typeof member !== "function") return __wrapWasi(member);
-            return (...args) => __wrapWasi(Reflect.apply(member, target, args.map(__unwrapWasi)));
+            const isDrop = key === "drop";
+            return (...args) => {
+                if (!isDrop) __assertWasiResourceUsable(target);
+                const unwrappedArgs = args.map(__unwrapWasi);
+                if (!isDrop) __assertWasiResourceUsable(target);
+                return __wrapWasi(Reflect.apply(member, target, unwrappedArgs));
+            };
         }
     });
 };`;

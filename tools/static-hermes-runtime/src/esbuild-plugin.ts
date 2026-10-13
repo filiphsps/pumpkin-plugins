@@ -6,6 +6,8 @@ import { resolvePluginApi, resolveWasiImports, resolveWitDocument } from './wit/
 
 /** Options for resolving Pumpkin and WASI package imports while bundling for Static Hermes. */
 export interface StaticHermesImportsOptions {
+    /** Consumer project root used for runtime toolchain caches. */
+    workspaceRoot?: string;
     /** Directory used to resolve the development update-check module. */
     resolveDir: string;
     /** Prepared WIT world used to resolve and generate Pumpkin and WASI interfaces. */
@@ -32,7 +34,7 @@ export function staticHermesImportsPlugin(options: StaticHermesImportsOptions): 
         name: 'pumpkin-static-hermes-imports',
         async setup(build) {
             const toolchain = await setupHermesToolchainEnvironment({
-                workspaceRoot: process.cwd(),
+                workspaceRoot: options.workspaceRoot ?? process.cwd(),
                 includeWasiSdk: false,
                 includeWitBindgen: false,
                 includeWasmTools: true
@@ -84,7 +86,7 @@ export function staticHermesImportsPlugin(options: StaticHermesImportsOptions): 
                     loader: 'js',
                     resolveDir: options.resolveDir,
                     contents: /* JavaScript */ `
-                        import { registerPlugin } from '@pumpkinmc/pumpkin-api-ts';
+                        import { registerPlugin } from '@pumpkin-plugins/pumpkin-api';
                         /** Register a plugin without running automatic update checks. */
                         export function registerPluginWithUpdates(plugin) { registerPlugin(plugin); }
                     `

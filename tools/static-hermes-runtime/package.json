@@ -29,10 +29,13 @@
     ],
     "type": "module",
     "sideEffects": false,
-    "module": "./src/index.ts",
+    "module": "./dist/index.js",
     "types": "./src/index.ts",
     "exports": {
-        ".": "./src/index.ts"
+        ".": {
+            "types": "./src/index.ts",
+            "import": "./dist/index.js"
+        }
     },
     "bin": {
         "static-hermes-runtime": "dist/cli.js"
@@ -54,19 +57,22 @@
     "scripts": {
         "build": "tsc -p tsconfig.build.json",
         "prepack": "pnpm build",
+        "compatibility:refresh": "node test/fixtures/generate-pumpkin-api-fixtures.mjs",
         "prepare-hermes": "pnpm build && node dist/cli.js hermes prepare",
         "typecheck": "tsc --noEmit",
-        "test": "pnpm build && vitest run src/component/analyze.test.ts src/component/build.test.ts src/component/generate.test.ts src/esbuild-plugin.test.ts src/hermes/build.test.ts src/hermes/prepare.test.ts src/hermes/toolchain-environment.test.ts src/index.test.ts src/wit/facades.test.ts src/wit/wasi-dispatch.test.ts test/bundle-diagnostics.test.mjs test/component-compile.test.ts test/embed-bytecode.test.mjs test/generate-api-enums.test.mjs test/generate-runtime.test.mjs test/hermes-source-patch.test.ts test/prepare-hermes.test.mjs test/static-hermes-cli.test.ts test/toolchain-environment.test.mjs test/wasi-wit.test.mjs test/wit-api.test.mjs test/wit-api-coverage.test.mjs test/wit-analysis.test.ts test/wit-event-dispatch.test.ts test/wit-resolver.test.ts test/wit-tools-model.test.ts test/wit-tools-reader.test.ts"
+        "test": "pnpm build && vitest run src/component/analyze.test.ts src/component/build.test.ts src/component/generate.test.ts src/esbuild-plugin.test.ts src/hermes/build.test.ts src/hermes/prepare.test.ts src/hermes/toolchain-environment.test.ts src/index.test.ts src/wit/facades.test.ts src/wit/wasi-dispatch.test.ts test/bundle-diagnostics.test.mjs test/component-compile.test.ts test/embed-bytecode.test.mjs test/generate-api-enums.test.mjs test/generate-runtime.test.mjs test/hermes-source-patch.test.ts test/prepare-hermes.test.mjs test/static-hermes-cli.test.ts test/toolchain-environment.test.mjs test/wasi-wit.test.mjs test/wit-api.test.mjs test/wit-api-coverage.test.mjs test/wit-analysis.test.ts test/wit-event-dispatch.test.ts test/wit-resolver.test.ts test/wit-tools-model.test.ts test/wit-tools-reader.test.ts",
+        "test:integration": "pnpm build && vitest run --config vitest.integration.config.ts"
     },
     "dependencies": {
         "@commander-js/extra-typings": "catalog:",
         "commander": "catalog:"
     },
     "devDependencies": {
-        "@pumpkinmc/pumpkin-api-ts": "catalog:",
+        "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@types/node": "catalog:",
         "esbuild": "catalog:",
-        "vitest": "catalog:"
+        "vitest": "catalog:",
+        "@pumpkin-plugins/test-harness": "workspace:*"
     },
     "engines": {
         "node": ">=24.21.0"
