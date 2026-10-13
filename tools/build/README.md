@@ -2,7 +2,8 @@
 
 Builds a plugin to a `.wasm` file: bundles `src/plugin.ts`, adds the WASI imports the plugin asked for and generates the guest types. It provides the `pumpkin-plugins-build` command.
 
-This package is internal to the repository and is not published to npm. See the
+This package is configured for public npm publication as `@pumpkin-plugins/build`. Release tags
+publish its packed tarball; see [CI and releases](../../docs/ci-and-releases.md#releases) and the
 [build guide](../../docs/building.md).
 
 <!-- docs:begin reference -->

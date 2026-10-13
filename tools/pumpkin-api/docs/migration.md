@@ -29,7 +29,10 @@ The active compatibility matrix follows the Pumpkin release in `tools/test-harne
 
 New, changed and removed WIT declarations are marked `review-required`; tests stay red until each has an explicit decision and migration note. Changed and removed declarations are recorded as breaking even when upstream reuses its existing release version. A Pumpkin release change starts a new active audit and keeps the previous release snapshot.
 
-The install commands below require both replacement packages to be published. `@pumpkin-plugins/build` is marked private in this repository, so an external project cannot install it from npm until it is released.
+The install commands below require the first public releases of both replacement packages. This
+repository configures the builder for public npm publication; wait for its release tag before
+installing it from npm. Repository maintainers must configure npm trusted publishers before the
+release workflow can publish packages; see [CI and releases](../../../docs/ci-and-releases.md#github-settings).
 
 ## 1. Choose How to Change the Package Name
 

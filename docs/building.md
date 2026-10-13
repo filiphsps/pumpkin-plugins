@@ -57,7 +57,8 @@ Packed consumer builds use Node `24.21.0` and pnpm `12.10.1`. The host toolchain
 `4.4.4`, Ninja `1.13.2`, Rust/Cargo `1.99.0`, `wit-bindgen` `0.62.0`, and WASI SDK `34`; Windows
 x64 uses Visual Studio 2022 MSVC toolset `14.44`. Set `STATIC_HERMES_CACHE_DIR` to move Hermes
 source and build artifacts outside the default workspace cache. Run
-`pnpm run test:external-consumer` to pack the internal dependencies, install them from a temporary
+`pnpm run test:external-consumer` to pack the public tool packages and their workspace dependencies,
+verify the packed public metadata and starter dependency ranges, install them from a temporary
 registry, and typecheck/build both generated standalone starters from a temporary consumer.
 
 ## Runtime caveats

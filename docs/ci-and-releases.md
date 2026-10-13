@@ -5,7 +5,7 @@ navigation:
 
 # CI and releases
 
-Plugin and action checks are in `.github/workflows/ci.yml`; release orchestration is in the
+Plugin, action and public tool checks are in `.github/workflows/ci.yml`; release orchestration is in the
 reusable `.github/workflows/release.yml`, called after the CI gates pass. Action tests run through
 the reusable `.github/workflows/actions.yml`, scoped to action code. The documentation site has its own
 `.github/workflows/docs.yml`, which checks and publishes the VitePress site and mirrors it to
@@ -22,7 +22,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
 | 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
-| 📦 External consumer | code changes | Packs the production tool packages, installs and builds the creator's TypeScript and JavaScript starters outside the repository on Linux, macOS arm64 and Windows x64 with the pinned Node and pnpm versions |
+| 📦 External consumer | code changes | Packs public tools and their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters outside the repository on Linux, macOS arm64 and Windows x64 with the pinned Node and pnpm versions |
 | 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or common plus all four public consumers for shared helper changes, then uploads c8 coverage to Codecov |
 | 🛡️ Action test gate | every CI run, after classification and action tests | Requires every selected action suite to pass; accepts skipped tests only for an empty matrix |
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
@@ -30,8 +30,8 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 📊 Engine comparison | code changes, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`; the private `benchmarks/engine-comparison` package compares QuickJS and Hermes size, behavior and workloads on real Pumpkin |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint | Generates a throwaway plugin and action, checks release registration and READMEs, tests the action, then typechecks, builds and integration-tests the plugin |
-| 🚢 Release | plugin or action release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; action releases create a versioned tag and GitHub release without a plugin artifact |
-| 📝 Prepare release PR | all open release PRs on release runs | Keeps plugin READMEs, action README examples and first-release pins for plugins and actions current |
+| 🚢 Release | plugin, action or public tool release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; actions create GitHub releases, public tools publish npm tarballs, and plugins produce signed artifacts and Market listings |
+| 📝 Prepare release PR | all open release PRs on release runs | Keeps plugin READMEs, action README examples, starter dependency ranges and first-release pins current |
 | 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs and uploads the exact build artifact, publishes it to an existing Market listing, then syncs its description and commands |
 | 🧹 Cleanup artifacts | after successful consumers | Deletes integration and release handoff artifacts after their last use |
 
@@ -105,8 +105,8 @@ Changes to the dependency catalog or shared TypeScript configuration count for e
 ## Releases
 
 On `master`, once the checks pass, [release-please](https://github.com/googleapis/release-please)
-keeps an independent release PR up to date for each plugin or action with releasable conventional
-commits. Merging a plugin release PR:
+keeps an independent release PR up to date for each plugin, action, and public npm tool with
+releasable conventional commits. Merging a plugin release PR:
 
 - bumps each changed plugin's version and changelog,
 - tags it `<folder>-v<version>` and creates its GitHub release,
@@ -126,6 +126,24 @@ attach WebAssembly files, or publish to Pumpkin Market.
 Actions import shared runtime helpers from `actions/common/src/`. Each action tag contains its own
 snapshot of those files, so changes to a shared helper must also include releasable changes under
 each consuming action directory to publish the updated helper with those actions.
+
+Public tools are registered at `tools/build`, `tools/create-pumpkin-plugin`, `tools/pumpkin-api`,
+and `tools/static-hermes-runtime`. Their first npm release is `0.1.0`; the manifest uses `0.0.0`
+until each first release, and the repository check enforces the first-release pins. Tool tags use
+their component name, such as `build-v0.1.0`. The `📦 Publish npm` job checks out the exact tagged
+commit, runs pnpm's package pack command so pnpm resolves `catalog:` and `workspace:` specs in the published
+manifest, then publishes that tarball with npm trusted publishing and provenance. An already-published
+version is accepted only when its tarball integrity matches. Builder releases include changes from
+the public API and Static Hermes runtime because those packages are builder dependencies. Release PR
+preparation syncs both creator templates to the API and builder versions on the release branch.
+
+Before the first npm release, configure a GitHub Actions trusted publisher on each of the four npm
+packages. Use organization or user `filiphsps`, repository `pumpkin-plugins`, workflow filename
+`ci.yml`, and no environment name. npm validates the caller workflow filename when a reusable
+workflow publishes, and OIDC needs `id-token: write` in both the caller job and reusable publish
+job. The workflows use Node `24.21.0` with npm `11.5.1` or newer; no npm write token is stored in
+GitHub Actions. See [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) for the npm
+side setup.
 
 The merge of a release PR is its own commit, so its push can start a run while the previous commit's
 run is still active. The older run may create the tag and release first, using an artifact built from
@@ -338,7 +356,7 @@ generator and the checks can't drift:
 
 | Script | Fails when |
 | --- | --- |
-| `scripts/check-release-config.mjs` | a plugin or action is missing from either release-please file, a paused plugin is still tracked, an action is not using the `simple` strategy, `component` isn't the folder name, the manifest and package/version file disagree, an unreleased component lacks `release-as: 0.0.1`, or a released one still has it |
+| `scripts/check-release-config.mjs` | a plugin, action or public tool is missing from either release-please file, a paused plugin is still tracked, an action is not using the `simple` strategy, `component` isn't the folder name, the manifest and package/version file disagree, an unreleased component lacks its required first-release pin, or a released one still has it |
 | `scripts/package-metadata.mjs` | a `package.json` lacks the license, author, contributors, homepage, repository, bugs, funding or a short description, or a library lacks `sideEffects`, `module`, `types`, `files` and `publishConfig`. `--fix` writes everything but the description |
 | `scripts/check-docs.mjs` | a package has no README, a link, heading or path in the docs doesn't exist, a `pnpm` command isn't a script, a doc page isn't in the docs index, a root script isn't documented, or a CI job isn't in the table above |
 
