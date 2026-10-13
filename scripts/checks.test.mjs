@@ -103,13 +103,11 @@ describe('upstream pin workflow', () => {
         const ciWorkflow = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/ci.yml'), 'utf8'));
         const callerPermissions = ciWorkflow.jobs.release.permissions;
         const publish = releaseWorkflow.jobs['publish-tools'];
-        const callerExpression = ['$', '{{ needs.release.outputs.tool_paths_released }}'].join('');
-
         assert.ok(releaseWorkflow.jobs.release.outputs.tool_paths_released);
         assert.equal(callerPermissions['id-token'], 'write');
         assert.ok(publish, 'release workflow needs a separate npm publish job for tools');
         assert.equal(publish.permissions['id-token'], 'write');
-        assert.equal(publish.if.includes(callerExpression), true);
+        assert.match(publish.if, /needs\.release\.outputs\.tool_paths_released/);
         assert.equal(publish.strategy.matrix.path, ['$', '{{ fromJSON(needs.release.outputs.tool_paths_released) }}'].join(''));
         assert.match(publish.steps.map((step) => step.run ?? '').join('\n'), /npm publish .*--access public/);
         assert.match(publish.steps.map((step) => step.run ?? '').join('\n'), /pnpm pack/);
@@ -531,7 +529,10 @@ describe('check-release-config', () => {
 
         const result = run('check-release-config.mjs', repo(paused));
         assert.ok(result.ok, result.out);
-        assert.match(result.out, /1 plugin and 0 actions: packages\/plug; 1 paused: packages\/not-ready/);
+        assert.match(
+            result.out,
+            /1 plugin, 0 actions, and 4 public tools: .*packages\/plug.*; 1 paused: packages\/not-ready/
+        );
     });
 
     it('rejects a paused plugin that remains tracked or has no reason', () => {
@@ -575,11 +576,9 @@ describe('check-release-config', () => {
     });
 
     it('still checks registration and matching versions', () => {
-        const unregistered = {
-            'packages/plug/package.json': { name: 'plug', version: '0.0.0' },
-            '.release-please-manifest.json': {},
-            'release-please-config.json': { packages: {} }
-        };
+        const unregistered = files();
+        delete unregistered['release-please-config.json'].packages['packages/plug'];
+        delete unregistered['.release-please-manifest.json']['packages/plug'];
         assert.match(run('check-release-config.mjs', repo(unregistered)).out, /not in release-please-config\.json/);
         assert.match(
             run('check-release-config.mjs', repo(files({ manifest: '0.0.0', version: '0.0.5' }))).out,
@@ -590,7 +589,7 @@ describe('check-release-config', () => {
     it('registers actions as simple release components with matching version.txt entries', () => {
         const result = run('check-release-config.mjs', repo(withAction()));
         assert.ok(result.ok, result.out);
-        assert.match(result.out, /1 plugin and 1 action/);
+        assert.match(result.out, /1 plugin, 1 action, and 4 public tools/);
 
         const wrongType = run('check-release-config.mjs', repo(withAction(files(), { releaseType: 'node' })));
         assert.match(wrongType.out, /needs "release-type": "simple"/);

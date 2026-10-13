@@ -75,6 +75,8 @@ describe('bundled release commits', () => {
             'packages/plugin',
             'tools/build',
             'tools/plugin-kit',
+            'tools/pumpkin-api',
+            'tools/static-hermes-runtime',
             'tools/update-check'
         ]);
         assert.throws(() => bundledPaths(packages, 'packages/missing'), /Unknown release package/);
