@@ -1,10 +1,9 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
-import { createServer } from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createInternalRegistry } from './external-consumer-registry.mjs';
 import {
     assertPackedBuilderDependencies,
     assertPackedToolSchemaReferences,
@@ -292,81 +291,6 @@ try {
     } finally {
         fs.rmSync(temporaryRoot, { recursive: true, force: true });
     }
-}
-
-function createInternalRegistry(packages) {
-    const packageNames = new Set(packages.keys());
-    const tarballs = new Map([...packages.values()].map(({ filename, bytes }) => [filename, bytes]));
-
-    return createServer(async (request, response) => {
-        try {
-            if (request.headers.authorization) {
-                throw new Error('Temporary registry request unexpectedly included authorization');
-            }
-            const url = new URL(request.url ?? '/', 'http://127.0.0.1');
-            const decodedPath = decodeURIComponent(url.pathname).replace(/^\/+/, '');
-            if (decodedPath.startsWith('tarballs/')) {
-                const filename = path.basename(decodedPath.slice('tarballs/'.length));
-                const bytes = tarballs.get(filename);
-                if (!bytes) {
-                    response.writeHead(404).end('Unknown tarball');
-                    return;
-                }
-                response.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': bytes.length });
-                response.end(bytes);
-                return;
-            }
-
-            const latestPackage = decodedPath.endsWith('/latest') ? decodedPath.slice(0, -'/latest'.length) : undefined;
-            if (latestPackage && packageNames.has(latestPackage)) {
-                response.writeHead(200, { 'content-type': 'application/json' });
-                response.end(JSON.stringify(packageVersionMetadata(packages.get(latestPackage), request)));
-                return;
-            }
-
-            if (packageNames.has(decodedPath)) {
-                const packageMetadata = packages.get(decodedPath);
-                const version = packageMetadata.packageJson.version;
-                response.writeHead(200, { 'content-type': 'application/json' });
-                response.end(
-                    JSON.stringify({
-                        name: decodedPath,
-                        'dist-tags': { latest: version },
-                        versions: { [version]: packageVersionMetadata(packageMetadata, request) }
-                    })
-                );
-                return;
-            }
-
-            const upstream = await fetch(`https://registry.npmjs.org${request.url}`);
-            const body = Buffer.from(await upstream.arrayBuffer());
-            response.writeHead(upstream.status, {
-                'content-type': upstream.headers.get('content-type') ?? 'application/octet-stream',
-                'content-length': body.length
-            });
-            response.end(body);
-        } catch (error) {
-            response.writeHead(500, { 'content-type': 'text/plain' });
-            response.end(error instanceof Error ? error.stack : String(error));
-        }
-    });
-}
-
-function packageVersionMetadata({ packageJson, filename, bytes }, request) {
-    return {
-        ...packageJson,
-        dist: {
-            tarball: `${registryOrigin(request)}/tarballs/${encodeURIComponent(filename)}`,
-            integrity: `sha512-${createHash('sha512').update(bytes).digest('base64')}`,
-            shasum: createHash('sha1').update(bytes).digest('hex')
-        }
-    };
-}
-
-function registryOrigin(request) {
-    const host = request.headers.host;
-    if (!host) throw new Error('Temporary registry request has no Host header');
-    return `http://${host}`;
 }
 
 function tarballName(name) {
