@@ -44,7 +44,7 @@
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/port-mapping": "workspace:*",
         "@pumpkin-plugins/upnpumpkin-api": "workspace:*",
-        "@pumpkinmc/pumpkin-api-ts": "catalog:",
+        "@pumpkin-plugins/pumpkin-api": "catalog:",
         "fflate": "0.8.3"
     },
     "devDependencies": {

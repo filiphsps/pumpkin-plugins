@@ -3,7 +3,7 @@ import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
-import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
+import { handleCommand as apiHandleCommand } from '@pumpkin-plugins/pumpkin-api';
 import { registerCommands } from './commands/register.ts';
 import { info } from './info.ts';
 import { PackManager } from './manager.ts';
@@ -65,4 +65,4 @@ export function handleCommand(id: number, sender: CommandSender, server: Server,
     return runCommand(id, sender, args) ?? apiHandleCommand(id, sender, server, args);
 }
 
-export * from '@pumpkinmc/pumpkin-api-ts';
+export * from '@pumpkin-plugins/pumpkin-api';

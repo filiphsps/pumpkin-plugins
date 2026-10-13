@@ -30,4 +30,4 @@ class AppleSkinPumpkin extends PluginBase {
 registerPlugin(new AppleSkinPumpkin());
 
 export { handleTask } from '@pumpkin-plugins/plugin-kit/plugin';
-export * from '@pumpkinmc/pumpkin-api-ts';
+export * from '@pumpkin-plugins/pumpkin-api';

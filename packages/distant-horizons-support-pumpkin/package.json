@@ -42,7 +42,7 @@
         "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/terrain": "workspace:*",
-        "@pumpkinmc/pumpkin-api-ts": "catalog:",
+        "@pumpkin-plugins/pumpkin-api": "catalog:",
         "pretty-bytes": "7.2.0"
     },
     "devDependencies": {

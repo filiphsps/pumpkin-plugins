@@ -45,12 +45,12 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
                 hostLogger.warn(`${PLUGIN_NAME}: cannot open DH session: ${String(err)}`);
             }
         });
-        this.registerEvent(ctx, 'player-leave-event', (_server, event: PlayerLeaveEventData) =>
-            sessions.playerLeft(event.player.getName())
-        );
-        this.registerEvent(ctx, 'server-tick-end-event', (server) =>
-            sessions.tick(serverPeers(server, settings, hostLogger), server.getMspt())
-        );
+        this.registerEvent(ctx, 'player-leave-event', (_server, event: PlayerLeaveEventData) => {
+            sessions.playerLeft(event.player.getName());
+        });
+        this.registerEvent(ctx, 'server-tick-end-event', (server) => {
+            sessions.tick(serverPeers(server, settings, hostLogger), server.getMspt());
+        });
         this.registerEvent(ctx, 'block-place-event', (_server, event: BlockPlaceEventData) => {
             if (event.cancelled) return;
             const world = event.player.getWorld();
@@ -69,12 +69,12 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
                 disposeWasiResource(world);
             }
         });
-        this.registerEvent(ctx, 'block-grow-event', (_server, event: BlockGrowEventData) =>
-            invalidateBlockGrow(sessions, event)
-        );
-        this.registerEvent(ctx, 'block-spread-event', (_server, event: BlockSpreadEventData) =>
-            invalidateBlockSpread(sessions, event)
-        );
+        this.registerEvent(ctx, 'block-grow-event', (_server, event: BlockGrowEventData) => {
+            invalidateBlockGrow(sessions, event);
+        });
+        this.registerEvent(ctx, 'block-spread-event', (_server, event: BlockSpreadEventData) => {
+            invalidateBlockSpread(sessions, event);
+        });
         hostLogger.info(
             `${PLUGIN_NAME}: serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain. Distant chunk generation is unavailable; see the plugin README TODO.`
         );
@@ -83,4 +83,4 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
 registerPlugin(new DistantHorizonsSupportPumpkin());
 
 export { handleCommand, handleTask } from '@pumpkin-plugins/plugin-kit/plugin';
-export * from '@pumpkinmc/pumpkin-api-ts';
+export * from '@pumpkin-plugins/pumpkin-api';

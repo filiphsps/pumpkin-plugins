@@ -4,8 +4,8 @@ import type { IpcMessage, PluginId } from 'pumpkin:plugin/ipc@0.1.0';
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import type { PluginMetadata } from 'pumpkin:plugin/metadata@0.1.0';
 import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
+import { handleIpcMessage as apiHandleIpcMessage, Plugin, registerPlugin } from '@pumpkin-plugins/pumpkin-api';
 import { PieSession } from '@pumpkin-plugins/pumpkin-pie-api';
-import { handleIpcMessage as apiHandleIpcMessage, Plugin, registerPlugin } from '@pumpkinmc/pumpkin-api-ts';
 import { strFromU8, strToU8 } from 'fflate';
 
 const fixtureName = 'TabDisplayPIEFixture';
@@ -85,7 +85,7 @@ class PieExpansionFixture extends Plugin {
 
 registerPlugin(new PieExpansionFixture());
 
-export { handleTask } from '@pumpkinmc/pumpkin-api-ts';
+export { handleTask } from '@pumpkin-plugins/pumpkin-api';
 
 /** Routes provider callbacks into the registered expansion router. */
 export function handleIpcMessage(sender: PluginId, message: IpcMessage): IpcMessage {
@@ -93,4 +93,4 @@ export function handleIpcMessage(sender: PluginId, message: IpcMessage): IpcMess
 }
 
 /** Uses the API package's command handler registry. */
-export * from '@pumpkinmc/pumpkin-api-ts';
+export * from '@pumpkin-plugins/pumpkin-api';

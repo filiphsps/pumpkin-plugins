@@ -59,7 +59,7 @@
     "dependencies": {
         "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/update-check": "workspace:*",
-        "@pumpkinmc/pumpkin-api-ts": "catalog:"
+        "@pumpkin-plugins/pumpkin-api": "catalog:"
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",

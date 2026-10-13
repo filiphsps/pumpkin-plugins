@@ -4,7 +4,7 @@ import { log } from 'pumpkin:plugin/logging@0.1.0';
 import type { PluginMetadata } from 'pumpkin:plugin/metadata@0.1.0';
 import { scheduleDelayedTask } from 'pumpkin:plugin/scheduler@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
-import { handleCommand as apiHandleCommand, handleTask as apiHandleTask, Plugin } from '@pumpkinmc/pumpkin-api-ts';
+import { handleCommand as apiHandleCommand, handleTask as apiHandleTask, Plugin } from '@pumpkin-plugins/pumpkin-api';
 import { registerPluginWithUpdates, requestMarketJsonAsync } from '../src/index.ts';
 
 /** A real Pumpkin plugin that executes the update checker with a deterministic transport response. */
@@ -44,7 +44,7 @@ registerPluginWithUpdates(
     }
 );
 
-export * from '@pumpkinmc/pumpkin-api-ts';
+export * from '@pumpkin-plugins/pumpkin-api';
 
 const tasks = new Map<number, () => void>();
 let nextTask = 800_000;

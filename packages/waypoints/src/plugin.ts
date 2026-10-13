@@ -16,7 +16,7 @@ import { cancelTask, runCommand, scheduleRepeating } from '@pumpkin-plugins/plug
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
-import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
+import { handleCommand as apiHandleCommand } from '@pumpkin-plugins/pumpkin-api';
 import {
     commandHandlers,
     onlinePlayerNameSuggestions,
@@ -68,10 +68,12 @@ class Waypoints extends PluginBase {
         // Pumpkin disables scheduled plugin tasks before shutting down the WASM store.
         this.hudTaskId = scheduleRepeating(1, () => hud.tick());
 
-        this.registerEvent(ctx, 'player-join-event', (_server, event: PlayerJoinEventData) => hud.joined(event.player));
-        this.registerEvent(ctx, 'player-changed-world-event', (_server, event: PlayerChangedWorldEventData) =>
-            hud.changedWorld(event.player)
-        );
+        this.registerEvent(ctx, 'player-join-event', (_server, event: PlayerJoinEventData) => {
+            hud.joined(event.player);
+        });
+        this.registerEvent(ctx, 'player-changed-world-event', (_server, event: PlayerChangedWorldEventData) => {
+            hud.changedWorld(event.player);
+        });
         this.registerEvent(ctx, 'player-command-send-event', (_server, event: PlayerCommandSendEventData) => {
             const playerKey = event.player.getName().toLowerCase();
             const itemInput = itemIconInputFromCommand(event.command);
@@ -160,4 +162,4 @@ export function handleCommand(id: number, sender: CommandSender, server: Server,
     return runCommand(id, sender, args) ?? apiHandleCommand(id, sender, server, args);
 }
 
-export * from '@pumpkinmc/pumpkin-api-ts';
+export * from '@pumpkin-plugins/pumpkin-api';

@@ -3,10 +3,10 @@ import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import type { PluginMetadata } from 'pumpkin:plugin/metadata@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
-import { Plugin, registerPlugin } from '@pumpkinmc/pumpkin-api-ts';
+import { Plugin, registerPlugin } from '@pumpkin-plugins/pumpkin-api';
 import { measureSyntheticWorkloads, measureWorkload } from './benchmark-workloads.ts';
 
-export * from '@pumpkinmc/pumpkin-api-ts';
+export * from '@pumpkin-plugins/pumpkin-api';
 
 const PLAYER_QUERIES_PER_SAMPLE = 10_000;
 const EVENT_LISTENER_COUNT = 3;

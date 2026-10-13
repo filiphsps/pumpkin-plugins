@@ -3,8 +3,8 @@ import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { PluginMetadata } from 'pumpkin:plugin/metadata@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { type PluginInfo, pluginMetadata } from '@pumpkin-plugins/docs';
+import { handleCommand as apiHandleCommand, handleTask as apiHandleTask, Plugin } from '@pumpkin-plugins/pumpkin-api';
 import { registerPluginWithUpdates } from '@pumpkin-plugins/update-check';
-import { handleCommand as apiHandleCommand, handleTask as apiHandleTask, Plugin } from '@pumpkinmc/pumpkin-api-ts';
 import { runCommand, runTask, scheduleDelayed } from './host.ts';
 
 /** Base class for plugins, keeping metadata, lifecycle hooks, logging and update checks consistent. */

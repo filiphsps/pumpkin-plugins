@@ -37,7 +37,7 @@ vi.mock('pumpkin:plugin/uuid@0.1.0', () => ({
     parse: () => ({ high: 1n, low: 2n }),
     toString: () => '11111111-1111-4111-8111-111111111111'
 }));
-vi.mock('@pumpkinmc/pumpkin-api-ts', () => ({ handleCommand: vi.fn() }));
+vi.mock('@pumpkin-plugins/pumpkin-api', () => ({ handleCommand: vi.fn() }));
 vi.mock('@pumpkin-plugins/plugin-kit/plugin', () => ({
     PluginBase: class {
         registerEvent(_ctx: Context, name: string, run: (server: Server, event: unknown) => void): void {

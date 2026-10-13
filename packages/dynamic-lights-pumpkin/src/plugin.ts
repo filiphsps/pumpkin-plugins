@@ -22,7 +22,7 @@ import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
 import { cancelTask, runCommand, scheduleDelayed, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
-import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
+import { handleCommand as apiHandleCommand } from '@pumpkin-plugins/pumpkin-api';
 import { registerCommands } from './commands/register.ts';
 import { loadPluginConfig } from './config/load.ts';
 import { info } from './info.ts';
@@ -115,7 +115,9 @@ class DynamicLightsPumpkin extends PluginBase {
             'inventory-creative-event',
             'inventory-drag-event'
         ] as const) {
-            this.registerEvent(ctx, eventType, (_server, event) => this.deferPlayerSync(event.player.getName()));
+            this.registerEvent(ctx, eventType, (_server, event) => {
+                this.deferPlayerSync(event.player.getName());
+            });
         }
         this.registerEvent(ctx, 'player-move-event', (_server, event: PlayerMoveEventData) => {
             this.syncMovedPlayer(event.player, event.toPosition);
@@ -341,4 +343,4 @@ export function handleCommand(id: number, sender: CommandSender, server: Server,
     return runCommand(id, sender, args) ?? apiHandleCommand(id, sender, server, args);
 }
 
-export * from '@pumpkinmc/pumpkin-api-ts';
+export * from '@pumpkin-plugins/pumpkin-api';

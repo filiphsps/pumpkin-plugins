@@ -1,6 +1,6 @@
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import type { PluginInfo } from '@pumpkin-plugins/docs';
-import { type Plugin, registerPlugin } from '@pumpkinmc/pumpkin-api-ts';
+import { type Plugin, registerPlugin } from '@pumpkin-plugins/pumpkin-api';
 import { requestMarketJsonAsync, type SchedulePoll } from './http.ts';
 import { checkMarketUpdate, marketUpdateUrl } from './sources/market.ts';
 import type { JsonRequest } from './updates.ts';

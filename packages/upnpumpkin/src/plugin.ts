@@ -4,7 +4,10 @@ import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
 import { cancelTask, hostLogger, runCommand, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
-import { handleCommand as apiHandleCommand, handleIpcMessage as apiHandleIpcMessage } from '@pumpkinmc/pumpkin-api-ts';
+import {
+    handleCommand as apiHandleCommand,
+    handleIpcMessage as apiHandleIpcMessage
+} from '@pumpkin-plugins/pumpkin-api';
 import { registerCommands } from './commands/register.ts';
 import { PortForwarder } from './forwarder.ts';
 import { info } from './info.ts';
@@ -72,4 +75,4 @@ export function handleIpcMessage(sender: string, message: Uint8Array): Uint8Arra
     return forwarder ? forwarder.handleMessage(sender, message) : apiHandleIpcMessage(sender, message);
 }
 
-export * from '@pumpkinmc/pumpkin-api-ts';
+export * from '@pumpkin-plugins/pumpkin-api';

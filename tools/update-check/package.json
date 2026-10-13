@@ -48,7 +48,7 @@
         "test:integration": "vitest run --project integration"
     },
     "dependencies": {
-        "@pumpkinmc/pumpkin-api-ts": "catalog:",
+        "@pumpkin-plugins/pumpkin-api": "catalog:",
         "fflate": "0.8.3"
     },
     "devDependencies": {

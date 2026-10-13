@@ -9,8 +9,8 @@ import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
+import { handleCommand as apiHandleCommand } from '@pumpkin-plugins/pumpkin-api';
 import { PieSession } from '@pumpkin-plugins/pumpkin-pie-api';
-import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
 import { strFromU8, strToU8 } from 'fflate';
 import { commandHandlers } from './commands/handlers.ts';
 import { commands } from './commands/spec.ts';
@@ -197,4 +197,4 @@ export function handleCommand(id: number, sender: CommandSender, server: Server,
     return runHostCommand(id, sender, args) ?? apiHandleCommand(id, sender, server, args);
 }
 
-export * from '@pumpkinmc/pumpkin-api-ts';
+export * from '@pumpkin-plugins/pumpkin-api';

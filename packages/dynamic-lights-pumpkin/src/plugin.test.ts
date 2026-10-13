@@ -19,7 +19,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('pumpkin:plugin/logging@0.1.0', () => ({ log: vi.fn() }));
-vi.mock('@pumpkinmc/pumpkin-api-ts', () => ({ handleCommand: vi.fn() }));
+vi.mock('@pumpkin-plugins/pumpkin-api', () => ({ handleCommand: vi.fn() }));
 vi.mock('@pumpkin-plugins/plugin-kit/plugin', () => ({
     PluginBase: class {
         registerEvent(_ctx: Context, name: string, run: (server: Server, event: unknown) => void): void {

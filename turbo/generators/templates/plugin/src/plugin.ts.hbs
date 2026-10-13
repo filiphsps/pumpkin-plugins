@@ -4,7 +4,7 @@ import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { runCommand } from '@pumpkin-plugins/plugin-kit/host';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands';
-import { handleCommand as apiHandleCommand } from '@pumpkinmc/pumpkin-api-ts';
+import { handleCommand as apiHandleCommand } from '@pumpkin-plugins/pumpkin-api';
 import { info } from './info.ts';
 import { commands } from './commands/spec.ts';
 import { PLUGIN_NAME } from './name.ts';
@@ -30,4 +30,4 @@ export function handleCommand(id: number, sender: CommandSender, server: Server,
     return runCommand(id, sender, args) ?? apiHandleCommand(id, sender, server, args);
 }
 
-export * from '@pumpkinmc/pumpkin-api-ts';
+export * from '@pumpkin-plugins/pumpkin-api';

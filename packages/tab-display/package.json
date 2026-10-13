@@ -42,7 +42,7 @@
         "@pumpkin-plugins/config": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/pumpkin-pie-api": "workspace:*",
-        "@pumpkinmc/pumpkin-api-ts": "catalog:",
+        "@pumpkin-plugins/pumpkin-api": "catalog:",
         "fflate": "catalog:"
     },
     "devDependencies": {

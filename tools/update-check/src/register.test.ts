@@ -7,10 +7,10 @@ const calls = vi.hoisted(() => ({
 }));
 
 vi.mock('pumpkin:plugin/logging@0.1.0', () => ({ log: calls.log }));
-vi.mock('@pumpkinmc/pumpkin-api-ts', () => ({ registerPlugin: calls.register }));
+vi.mock('@pumpkin-plugins/pumpkin-api', () => ({ registerPlugin: calls.register }));
 vi.mock('./http.ts', () => ({ requestMarketJsonAsync: calls.requestAsync }));
 
-import type { Plugin } from '@pumpkinmc/pumpkin-api-ts';
+import type { Plugin } from '@pumpkin-plugins/pumpkin-api';
 import { registerPluginWithUpdates, type UpdateRegistrationOptions } from './register.ts';
 
 const info = { name: 'ExamplePlugin', description: 'An example plugin.' };

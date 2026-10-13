@@ -12,7 +12,7 @@ const calls = vi.hoisted(() => ({
     scheduleDelayed: vi.fn()
 }));
 
-vi.mock('@pumpkinmc/pumpkin-api-ts', () => ({
+vi.mock('@pumpkin-plugins/pumpkin-api', () => ({
     Plugin: class {
         onLoad(ctx: unknown): void {
             calls.apiLoad(ctx);
