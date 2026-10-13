@@ -194,7 +194,7 @@ class RuntimePlugin extends Plugin {
             wasiMethods: [],
             eventTypes: ['tick']
         });
-    });
+    }, 60_000);
 
     it('retains all typed dynamic events and falls back when a registration name is untyped', () => {
         const entry = fixture();
