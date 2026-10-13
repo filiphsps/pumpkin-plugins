@@ -5,8 +5,9 @@ navigation:
 
 # CI and releases
 
-Plugin, action and public tool checks are in `.github/workflows/ci.yml`; release orchestration is in the
-reusable `.github/workflows/release.yml`, called after the CI gates pass. Action tests run through
+Plugin, action and public tool checks are in `.github/workflows/ci.yml`; the external-consumer matrix is
+in the reusable `.github/workflows/external-consumer.yml`. Release orchestration is in the reusable
+`.github/workflows/release.yml`, called after the CI gates pass. Action tests run through
 the reusable `.github/workflows/actions.yml`, scoped to action code. The documentation site has its own
 `.github/workflows/docs.yml`, which checks and publishes the VitePress site and mirrors it to
 `gh-pages`. The shared setup (pnpm, Node,

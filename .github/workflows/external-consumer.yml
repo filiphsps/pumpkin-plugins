@@ -1,0 +1,102 @@
+name: External consumer
+
+on:
+    workflow_call:
+
+env:
+    CI: true
+    DO_NOT_TRACK: 1
+
+permissions:
+    contents: read
+
+jobs:
+    external-consumer:
+        name: 📦 External consumer (${{ matrix.platform }})
+        timeout-minutes: 90
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - platform: Linux x64
+                      os: ubuntu-26.04
+                    - platform: macOS arm64
+                      os: macos-15
+                    - platform: Windows x64
+                      os: windows-2025
+        runs-on: ${{ matrix.os }}
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🐍 Setup Python for pinned host tools
+              uses: actions/setup-python@v6.1.0
+              with:
+                  python-version: '3.13'
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 🪟 Setup MSVC 2022 toolset 14.44
+              if: runner.os == 'Windows'
+              uses: ilammy/msvc-dev-cmd@v1.13.0
+              with:
+                  arch: x64
+                  toolset: '14.44'
+
+            - name: 📦 Install CMake 4.4.4 and Ninja 1.13.2
+              if: runner.os != 'Windows'
+              shell: bash
+              run: |
+                  host_tools="$RUNNER_TEMP/host-tools"
+                  python -m pip install --disable-pip-version-check --target "$host_tools" cmake==4.4.4 ninja==1.13.2
+                  {
+                      echo "$host_tools/bin"
+                      echo "$host_tools/cmake/data/bin"
+                  } >> "$GITHUB_PATH"
+
+            - name: 📦 Install CMake 4.4.4 and Ninja 1.13.2
+              if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  $hostTools = Join-Path $env:RUNNER_TEMP 'host-tools'
+                  python -m pip install --disable-pip-version-check --target $hostTools cmake==4.4.4 ninja==1.13.2
+                  Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $hostTools 'bin')
+                  Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $hostTools 'cmake/data/bin')
+
+            - name: 🔎 Verify pinned Ninja executable on Windows
+              if: runner.os == 'Windows'
+              shell: pwsh
+              run: |
+                  $expected = [System.IO.Path]::GetFullPath((Join-Path $env:RUNNER_TEMP 'host-tools/bin/ninja.exe'))
+                  $resolved = Get-Command ninja -ErrorAction Stop
+                  $actual = [System.IO.Path]::GetFullPath($resolved.Source)
+                  if ($actual -ne $expected) {
+                      throw "Expected pinned Ninja at '$expected', but PATH resolved '$actual'"
+                  }
+                  $version = (& $actual --version).Trim()
+                  if ($version -notmatch '^1\.13\.2(?:$|[.+-])') {
+                      throw "Expected Ninja 1.13.2 at '$actual', got '$version'"
+                  }
+
+            - name: 🔎 Verify pinned host toolchain
+              shell: bash
+              run: |
+                  test "$(cmake --version | head -n 1)" = 'cmake version 4.4.4'
+                  ninja_version="$(ninja --version)"
+                  case "$ninja_version" in
+                      1.13.2|1.13.2.*|1.13.2+*|1.13.2-*) ;;
+                      *) echo "Expected Ninja 1.13.2, got '$ninja_version'" >&2; exit 1 ;;
+                  esac
+                  rustup toolchain install 1.99.0 --profile minimal
+                  rustc +1.99.0 --version
+                  cargo +1.99.0 --version
+                  if [[ "$RUNNER_OS" == Windows ]]; then
+                      printf 'int main(void) { return 0; }\n' > "$RUNNER_TEMP/cl-smoke.c"
+                      MSYS_NO_PATHCONV=1 cl /Bv /nologo /c "$RUNNER_TEMP/cl-smoke.c" /Fo"$RUNNER_TEMP/cl-smoke.obj"
+                  fi
+
+            - name: 📦 Pack, install, create, typecheck and build outside the monorepo
+              run: pnpm run test:external-consumer
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
