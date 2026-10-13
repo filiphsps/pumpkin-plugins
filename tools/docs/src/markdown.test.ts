@@ -4,6 +4,7 @@ import { cell, code, table } from './markdown.ts';
 describe('markdown helpers', () => {
     it('keeps a table cell on one line and escapes pipes', () => {
         expect(cell('a | b\n   c')).toBe('a \\| b c');
+        expect(cell('a\n \n b')).toBe('a b');
     });
 
     it('renders a table with a separator row', () => {

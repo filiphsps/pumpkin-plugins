@@ -6,7 +6,14 @@ export interface TableOptions {
 /** Escape pipes and normalize line breaks in a Markdown table cell. */
 export function cell(text: string, options: TableOptions = {}): string {
     const escaped = text.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
-    return options.multiline === 'break' ? escaped.replace(/\r?\n/g, '<br>') : escaped.replace(/\s*\n\s*/g, ' ').trim();
+    if (options.multiline === 'break') return escaped.replace(/\r?\n/g, '<br>');
+
+    // Keep normalization linear to avoid regex denial of service on long generated cells.
+    return escaped
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join(' ');
 }
 
 /** Render a Markdown table, escaping headers and values without a trailing newline. */
