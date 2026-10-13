@@ -1,0 +1,31 @@
+{
+    "description": "Run the repository's portable guards and checks in Codex.",
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": "Bash|apply_patch|Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/codex.mjs\"",
+                        "commandWindows": "node (Join-Path (git rev-parse --show-toplevel) '.agents/hooks/codex.mjs')",
+                        "timeout": 30,
+                        "statusMessage": "Checking repository tool call"
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/codex.mjs\"",
+                        "commandWindows": "node (Join-Path (git rev-parse --show-toplevel) '.agents/hooks/codex.mjs')",
+                        "statusMessage": "Checking repository changes"
+                    }
+                ]
+            }
+        ]
+    }
+}

@@ -10,11 +10,11 @@ The repo keeps agent instructions, skills and executable checks separate:
 - [AGENTS.md](https://github.com/filiphsps/pumpkin-plugins/blob/master/AGENTS.md) holds the shared rules and routes tasks to relevant docs and skills.
 - `.agents/skills/` holds focused workflows. An agent can discover them or read the linked `SKILL.md`
   directly. They don't install hooks or grant permission for external actions.
-- `.agents/hooks/` holds client-neutral Node scripts. A client or agent must invoke them; they do not
-  run automatically.
+- `.agents/hooks/` holds the client-neutral Node scripts and client adapters. Codex's
+  `.codex/hooks.json` registers `.agents/hooks/codex.mjs`; other clients need their own adapters.
 
-There is no client-specific hook configuration in this repo. The portable runner inspects git status,
-so shell writes, deletions and renames are included alongside edits made through dedicated tools.
+The portable runner inspects git status, so shell writes, deletions and renames are included alongside
+edits made through dedicated tools.
 
 ## Run checks directly
 
@@ -92,10 +92,15 @@ loops. A hook failure must be visible; don't interpret malformed JSON, process e
 successful check. A blocking check report should tell the agent to preserve unrelated work.
 
 Client APIs, hook trust, discovery locations and continuation schemas differ. Keep those details in
-an adapter owned by that client rather than baking them into shared repo checks. For example, consult
-the [Codex hook documentation](https://learn.chatgpt.com/docs/hooks) or
-[OpenCode plugin documentation](https://opencode.ai/v2/docs/build/plugins) before writing an adapter.
-Neither is installed by this repo.
+an adapter owned by that client rather than baking them into shared repo checks. This repo includes a
+Codex adapter in `.agents/hooks/codex.mjs` and project hook configuration in `.codex/hooks.json`.
+Codex's `PreToolUse` hook translates shell and patch calls into the portable guard protocol; its
+`Stop` hook runs the changed-file check and asks Codex to continue once when checks fail. Project
+hooks load only for trusted projects, and Codex requires review and trust for each non-managed hook
+definition before it runs. See the [Codex Hooks guide](https://learn.chatgpt.com/docs/hooks) for the
+current trust flow and hook behavior.
+
+For other clients, consult their hook documentation before writing a client-specific adapter.
 
 ## Verify the tooling
 
