@@ -209,7 +209,7 @@ export async function main(args: string[], pluginDir: string): Promise<void> {
     } catch (err) {
         if (!(err instanceof BuildError)) throw err;
         printBuildOutput({ type: 'error', message: err.message });
-        process.exit(1);
+        process.exitCode = 1;
     }
 }
 
