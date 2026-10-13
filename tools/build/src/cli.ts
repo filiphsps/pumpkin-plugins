@@ -105,7 +105,8 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
             type: 'bundle',
             entry,
             engine,
-            ...(staticHermesRuntime === undefined ? {} : { runtimeVariant: staticHermesRuntime })
+            ...(staticHermesRuntime === undefined ? {} : { runtimeVariant: staticHermesRuntime }),
+            ...(parseTs ? { parseTypeScript: true } : {})
         });
         const size = await bundlePlugin({
             projectRoot: pluginDir,

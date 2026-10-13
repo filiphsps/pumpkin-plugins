@@ -13,6 +13,20 @@ it('formats both componentizers and results with the shared build prefix', () =>
     );
 });
 
+it('shows when Static Hermes uses its TypeScript parser', () => {
+    expect(
+        formatBuildOutput({ type: 'bundle', entry: 'src/plugin.ts', engine: 'static-hermes', parseTypeScript: true })
+    ).toBe('[build] Bundling \u001b[36msrc/plugin.ts\u001b[0m with \u001b[36mStatic Hermes (-parse-ts)\u001b[0m...');
+    expect(
+        formatBuildOutput({
+            type: 'componentize',
+            engine: 'static-hermes',
+            runtimeVariant: 'lean',
+            parseTypeScript: true
+        })
+    ).toBe('[build] Componentizing with \u001b[36mStatic Hermes (lean, -parse-ts)\u001b[0m...');
+});
+
 it('prints Static Hermes selections and explains omitted all-operation filters', () => {
     expect(
         formatBuildOutput({

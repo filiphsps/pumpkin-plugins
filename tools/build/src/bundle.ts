@@ -111,6 +111,7 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                 type: 'componentize',
                 engine,
                 ...(options.staticHermesRuntime === undefined ? {} : { runtimeVariant: options.staticHermesRuntime }),
+                ...(options.parseTypeScript ? { parseTypeScript: true } : {}),
                 ...(engine === 'static-hermes' && !quietRuntimeOutput
                     ? {
                           selections: {

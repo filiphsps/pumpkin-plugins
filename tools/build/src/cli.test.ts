@@ -663,7 +663,12 @@ describe('run arguments', () => {
         vi.mocked(bundlePlugin)
             .mockClear()
             .mockImplementationOnce(async (options) => {
-                options.onOutput?.({ type: 'componentize', engine: 'static-hermes', runtimeVariant: 'lean' });
+                options.onOutput?.({
+                    type: 'componentize',
+                    engine: 'static-hermes',
+                    runtimeVariant: 'lean',
+                    parseTypeScript: options.parseTypeScript
+                });
                 return 2048;
             });
         const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -685,8 +690,8 @@ describe('run arguments', () => {
                 onOutput: expect.any(Function)
             });
             expect(consoleLog.mock.calls.map(([message]) => message)).toEqual([
-                '[build] Bundling \u001b[36msrc/plugin.ts\u001b[0m with \u001b[36mStatic Hermes (lean)\u001b[0m...',
-                '[build] Componentizing with \u001b[36mStatic Hermes (lean)\u001b[0m...',
+                '[build] Bundling \u001b[36msrc/plugin.ts\u001b[0m with \u001b[36mStatic Hermes (lean, -parse-ts)\u001b[0m...',
+                '[build] Componentizing with \u001b[36mStatic Hermes (lean, -parse-ts)\u001b[0m...',
                 '[build] Built \u001b[36mbuild/plugin.wasm\u001b[0m (\u001b[94m2 KiB\u001b[0m)'
             ]);
         } finally {

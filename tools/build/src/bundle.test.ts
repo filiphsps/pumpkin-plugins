@@ -236,6 +236,7 @@ describe('bundlePlugin', () => {
 
     it('builds Static Hermes plugins as a bundled IIFE and bypasses QuickJS componentization', async () => {
         const { output } = buildAt();
+        const onOutput = vi.fn();
         esbuild.mockImplementationOnce((options) => {
             if (!options.outfile) throw new Error('missing JavaScript bundle output');
             fs.writeFileSync(options.outfile, 'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();');
@@ -262,7 +263,8 @@ describe('bundlePlugin', () => {
             version: '1.0.0',
             engine: 'static-hermes',
             staticHermesRuntime: 'lean',
-            parseTypeScript: true
+            parseTypeScript: true,
+            onOutput
         });
 
         expect(esbuild).toHaveBeenCalledWith(
@@ -275,6 +277,14 @@ describe('bundlePlugin', () => {
         expect(componentize.mock.calls[0]?.[1]).toContain('lean');
         expect(componentize.mock.calls[0]?.[1]).toContain('--parse-ts');
         expect(componentize.mock.calls[0]?.[1]).not.toContainEqual(expect.stringContaining('componentize-qjs.cjs'));
+        expect(onOutput).toHaveBeenCalledWith(
+            expect.objectContaining({
+                type: 'componentize',
+                engine: 'static-hermes',
+                runtimeVariant: 'lean',
+                parseTypeScript: true
+            })
+        );
     });
 
     it('allows WASI-looking string literals in Static Hermes bundles', async () => {

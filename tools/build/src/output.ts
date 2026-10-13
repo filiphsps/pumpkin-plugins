@@ -3,11 +3,18 @@ import type { PluginEngine, StaticHermesRuntime } from './plugin-config.ts';
 
 /** A message emitted by the shared plugin build output formatter. */
 export type BuildOutputMessage =
-    | { type: 'bundle'; entry: string; engine: PluginEngine; runtimeVariant?: StaticHermesRuntime }
+    | {
+          type: 'bundle';
+          entry: string;
+          engine: PluginEngine;
+          runtimeVariant?: StaticHermesRuntime;
+          parseTypeScript?: boolean;
+      }
     | {
           type: 'componentize';
           engine: PluginEngine;
           runtimeVariant?: StaticHermesRuntime;
+          parseTypeScript?: boolean;
           selections?: {
               wasiImports: string[];
               wasiMethods?: string[];
@@ -34,7 +41,9 @@ export function formatBuildOutput(message: BuildOutputMessage): string {
         return `[build] Built ${ansi.named.name(message.output)} (${ansi.named.number(size)})`;
     }
 
-    const runtime = ansi.named.name(runtimeLabel(message.engine, message.runtimeVariant));
+    const runtime = ansi.named.name(
+        runtimeLabel(message.engine, message.runtimeVariant, message.parseTypeScript ?? false)
+    );
     if (message.type === 'bundle') return `[build] Bundling ${ansi.named.name(message.entry)} with ${runtime}...`;
 
     const output = `[build] Componentizing with ${runtime}...`;
@@ -56,9 +65,16 @@ export function printBuildOutput(message: BuildOutputMessage): void {
     else console.log(formatted);
 }
 
-function runtimeLabel(engine: PluginEngine, runtimeVariant?: StaticHermesRuntime): string {
+function runtimeLabel(
+    engine: PluginEngine,
+    runtimeVariant: StaticHermesRuntime | undefined,
+    parseTypeScript: boolean
+): string {
     if (engine === 'quickjs') return 'QuickJS';
-    return `Static Hermes${runtimeVariant === undefined ? '' : ` (${runtimeVariant})`}`;
+    const options = [runtimeVariant, ...(parseTypeScript ? ['-parse-ts'] : [])].filter(
+        (option): option is string => option !== undefined
+    );
+    return `Static Hermes${options.length === 0 ? '' : ` (${options.join(', ')})`}`;
 }
 
 function formatSelectionOption(option: string, selection: string[] | undefined, omittedValue: string): string {
