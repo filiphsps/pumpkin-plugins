@@ -108,9 +108,15 @@ describe('upstream pin workflow', () => {
         assert.ok(publish, 'release workflow needs a separate npm publish job for tools');
         assert.equal(publish.permissions['id-token'], 'write');
         assert.match(publish.if, /needs\.release\.outputs\.tool_paths_released/);
-        assert.equal(publish.strategy.matrix.path, ['$', '{{ fromJSON(needs.release.outputs.tool_paths_released) }}'].join(''));
+        assert.equal(
+            publish.strategy.matrix.path,
+            ['$', '{{ fromJSON(needs.release.outputs.tool_paths_released) }}'].join('')
+        );
         assert.match(publish.steps.map((step) => step.run ?? '').join('\n'), /npm publish .*--access public/);
         assert.match(publish.steps.map((step) => step.run ?? '').join('\n'), /pnpm pack/);
+        const tagCheck = publish.steps.find((step) => step.name === '🔒 Check the tag is the commit this run built');
+        assert.match(tagCheck.run, /git\/tags\/\$sha/);
+        assert.doesNotMatch(tagCheck.run, /git\/tags\/\$RELEASE_TAG/);
     });
 });
 
@@ -505,18 +511,21 @@ describe('check-release-config', () => {
 
     it('requires the public tool release pin and package version to match its first 0.1.0 release', () => {
         const missingPin = files();
-        delete missingPin['release-please-config.json'].packages['tools/build']['release-as'];
+        missingPin['release-please-config.json'].packages['tools/build']['release-as'] = undefined;
         assert.match(run('check-release-config.mjs', repo(missingPin)).out, /tools\/build.*release-as.*0\.1\.0/);
 
         const mismatchedVersion = files();
         mismatchedVersion['tools/build/package.json'].version = '0.1.1';
-        assert.match(run('check-release-config.mjs', repo(mismatchedVersion)).out, /tools\/build\/package\.json must be/);
+        assert.match(
+            run('check-release-config.mjs', repo(mismatchedVersion)).out,
+            /tools\/build\/package\.json must be/
+        );
     });
 
     it('retires a public tool pin only after the manifest records its first release', () => {
         const released = files();
         released['.release-please-manifest.json']['tools/build'] = '0.1.0';
-        delete released['release-please-config.json'].packages['tools/build']['release-as'];
+        released['release-please-config.json'].packages['tools/build']['release-as'] = undefined;
         assert.ok(run('check-release-config.mjs', repo(released)).ok);
     });
 
@@ -577,8 +586,8 @@ describe('check-release-config', () => {
 
     it('still checks registration and matching versions', () => {
         const unregistered = files();
-        delete unregistered['release-please-config.json'].packages['packages/plug'];
-        delete unregistered['.release-please-manifest.json']['packages/plug'];
+        unregistered['release-please-config.json'].packages['packages/plug'] = undefined;
+        unregistered['.release-please-manifest.json']['packages/plug'] = undefined;
         assert.match(run('check-release-config.mjs', repo(unregistered)).out, /not in release-please-config\.json/);
         assert.match(
             run('check-release-config.mjs', repo(files({ manifest: '0.0.0', version: '0.0.5' }))).out,

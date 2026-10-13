@@ -242,7 +242,7 @@ jobs:
                   ref="$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha')"
                   sha="${ref##* }"
                   if [ "${ref%% *}" = tag ]; then
-                      sha="$(gh api "repos/$GH_REPO/git/tags/$RELEASE_TAG" --jq '.object.sha')"
+                      sha="$(gh api "repos/$GH_REPO/git/tags/$sha" --jq '.object.sha')"
                   fi
                   if [ "$sha" != "$GITHUB_SHA" ]; then
                       echo "::error::$RELEASE_TAG releases $sha, but this run checked out $GITHUB_SHA. Not publishing anything."
