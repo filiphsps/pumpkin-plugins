@@ -88,6 +88,9 @@ jobs:
             - name: 🧪 Test documentation helpers
               run: node --test docs/.vitepress/team.data.test.mjs docs/.vitepress/doc-links.test.mjs
 
+            - name: 🔨 Build the plugin builder CLI
+              run: pnpm --filter @pumpkin-plugins/build build
+
             - name: 🏗️ Build the documentation site
               run: pnpm run docs
               env:
