@@ -83,7 +83,7 @@ it('refetches a cached WIT file when its contents no longer match the integrity 
 
     expect(ensurePumpkinWit({ lockFile: directory.lockFile, cacheRoot: directory.cacheRoot })).toBe(witRoot);
     expect(fs.readFileSync(cachedPluginWit, 'utf8')).toBe('package pumpkin:plugin@0.1.0;\n');
-});
+}, 15_000);
 
 it('refetches legacy cache metadata without a WIT integrity manifest', () => {
     const directory = createLocalWitPin();

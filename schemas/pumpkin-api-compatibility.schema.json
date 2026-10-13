@@ -22,7 +22,9 @@
     "properties": {
         "$schema": {
             "type": "string",
-            "const": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json"
+            "format": "uri-reference",
+            "const": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json",
+            "minLength": 1
         },
         "baseline": {
             "type": "object",

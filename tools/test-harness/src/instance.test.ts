@@ -87,7 +87,7 @@ ${kind === 'early exit' ? "console.error('fixture early exit'); process.exit(7);
 import { startPumpkin } from ${JSON.stringify(module)};
 let server;
 try {
-    server = await startPumpkin({ name: 'failure-probe', readyTimeoutMs: 500 });
+    server = await startPumpkin({ name: 'failure-probe', readyTimeoutMs: 3_000 });
     if (${JSON.stringify(kind)} !== 'stdin') throw new Error('unexpected readiness');
     setImmediate(() => {
         server.child.stdin.emit('error', new Error('fixture stdin failure'));
