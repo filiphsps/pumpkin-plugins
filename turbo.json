@@ -34,6 +34,27 @@
             "passThroughEnv": ["PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED", "WASM_TOOLS"],
             "outputs": ["build/**", "!build/types/**", "dist/**"]
         },
+        "build:parse-ts": {
+            "dependsOn": ["transit", "@pumpkin-plugins/build#build"],
+            "env": [
+                "PUMPKIN_DEV_MODE",
+                "PUMPKIN_PLUGINS_VERBOSE_BUILD",
+                "STATIC_HERMES_CACHE_DIR",
+                "STATIC_HERMES_SOURCE_DIR",
+                "STATIC_HERMES_HOST_BUILD_DIR",
+                "STATIC_HERMES_WASI_BUILD_DIR",
+                "STATIC_HERMES_WASI_SDK_PATH",
+                "STATIC_HERMES_STACK_SIZE",
+                "STATIC_HERMES_ENABLE_JSI_EXTENSIONS",
+                "STATIC_HERMES_ENABLE_LEAN_ARCHIVE",
+                "STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES",
+                "WASI_SDK_PATH",
+                "WASI_SDK",
+                "WIT_BINDGEN"
+            ],
+            "passThroughEnv": ["PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED", "WASM_TOOLS"],
+            "outputs": ["build/**", "!build/types/**", "dist/**"]
+        },
         "@pumpkin-plugins/build#build": {
             "dependsOn": ["transit", "@pumpkin-plugins/static-hermes-runtime#build"],
             "outputs": ["dist/**"]

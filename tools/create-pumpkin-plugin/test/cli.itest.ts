@@ -82,6 +82,7 @@ it.each([
     expect(manifest.dependencies['@pumpkin-plugins/pumpkin-api']).toBeTruthy();
     expect(manifest.dependencies['@pumpkin-plugins/build']).toBeTruthy();
     expect(manifest.scripts.build).toMatch(/pumpkin-plugins-build/);
+    expect(manifest.scripts['build:parse-ts']).toBe('pumpkin-plugins-build --parse-ts');
     expect(manifest.scripts.typecheck).toContain('tsc --noEmit');
     expect(tsconfig.errors).toHaveLength(0);
     expect(tsconfig.fileNames).toContain(entryPath);

@@ -5,6 +5,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import * as buildModule from './build.mjs';
 import {
     buildTaskEnvironment,
     hasStaticHermesBuild,
@@ -91,6 +92,69 @@ describe('hasStaticHermesBuild', () => {
             ),
             false
         );
+    });
+
+    it('detects Static Hermes parse-ts build tasks', () => {
+        const root = createWorkspace({ hermes: { name: '@pumpkin-plugins/hermes', pumpkinPlugin: {} } });
+
+        assert.equal(
+            hasStaticHermesBuild(
+                { tasks: [{ package: '@pumpkin-plugins/hermes', task: 'build:parse-ts' }] },
+                root,
+                'build:parse-ts'
+            ),
+            true
+        );
+    });
+});
+
+describe('parse-ts build commands', () => {
+    it('registers the parser command for every plugin and starter template', () => {
+        const packagesDirectory = path.join(workspaceRoot, 'packages');
+        const packageDirectories = fs
+            .readdirSync(packagesDirectory, { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => path.join(packagesDirectory, entry.name, 'package.json'));
+        const templateDirectory = path.join(workspaceRoot, 'tools/create-pumpkin-plugin/templates');
+        const templateManifests = fs
+            .readdirSync(templateDirectory, { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => path.join(templateDirectory, entry.name, 'package.json'));
+        const manifests = [...packageDirectories, ...templateManifests]
+            .filter((manifestPath) => fs.existsSync(manifestPath))
+            .map((manifestPath) => ({
+                path: manifestPath,
+                manifest: JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+            }))
+            .filter(({ manifest }) => manifest.pumpkinPlugin !== undefined);
+
+        for (const { path: manifestPath, manifest } of manifests) {
+            assert.equal(
+                manifest.scripts['build:parse-ts'],
+                'pumpkin-plugins-build --parse-ts',
+                `${path.relative(workspaceRoot, manifestPath)} must define build:parse-ts`
+            );
+        }
+        assert.equal(manifests.length, 9, 'expected every plugin and both starter templates');
+    });
+
+    it('registers the root command and matching Turbo task', () => {
+        const rootPackage = JSON.parse(fs.readFileSync(path.join(workspaceRoot, 'package.json'), 'utf8'));
+        const turbo = JSON.parse(fs.readFileSync(path.join(workspaceRoot, 'turbo.json'), 'utf8'));
+
+        assert.match(rootPackage.scripts['build:parse-ts'], /scripts\/build\.mjs .*--parse-ts/);
+        assert.deepEqual(turbo.tasks['build:parse-ts'], turbo.tasks.build);
+    });
+
+    it('selects the parser task and removes its selector before calling Turbo', () => {
+        assert.deepEqual(buildModule.normalizeBuildRequest?.(['--parse-ts', '--', '--filter=example']), {
+            task: 'build:parse-ts',
+            args: ['--filter=example']
+        });
+        assert.deepEqual(buildModule.normalizeBuildRequest?.(['--', '--filter=example']), {
+            task: 'build',
+            args: ['--filter=example']
+        });
     });
 });
 

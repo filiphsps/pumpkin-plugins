@@ -32,6 +32,7 @@
         "lint:fix": "biome check --write --unsafe --html-formatter-enabled=true . && eslint --fix .",
         "lint:commits": "commitlint --from HEAD~1",
         "build": "node scripts/build.mjs --log-order=grouped --log-prefix=task --output-logs=new-only",
+        "build:parse-ts": "node scripts/build.mjs --parse-ts --log-order=grouped --log-prefix=task --output-logs=new-only",
         "clean": "pnpm purge && node scripts/clean.mjs",
         "typecheck": "turbo run typecheck",
         "test": "turbo run test",

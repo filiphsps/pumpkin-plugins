@@ -9,12 +9,13 @@ const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)),
 const turboCli = path.join(workspaceRoot, 'node_modules/turbo/bin/turbo');
 const alreadyPreparedVariable = 'PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED';
 
-/** Check whether the planned Turbo graph contains a plugin that uses Static Hermes.
+/** Check whether the selected Turbo task graph contains a plugin that uses Static Hermes.
  * @param graph - Turbo's dry-run task graph.
  * @param root - Workspace root used to resolve plugin manifests.
+ * @param taskName - Turbo task name selected for the build.
  * @returns Whether a selected build task belongs to a non-QuickJS plugin.
  */
-export function hasStaticHermesBuild(graph, root = workspaceRoot) {
+export function hasStaticHermesBuild(graph, root = workspaceRoot, taskName = 'build') {
     const packagesDirectory = path.join(root, 'packages');
     const engines = new Map();
     for (const entry of fs.readdirSync(packagesDirectory, { withFileTypes: true })) {
@@ -27,7 +28,7 @@ export function hasStaticHermesBuild(graph, root = workspaceRoot) {
 
     return graph.tasks.some(
         ({ package: packageName, task }) =>
-            task === 'build' && engines.has(packageName) && engines.get(packageName) !== 'quickjs'
+            task === taskName && engines.has(packageName) && engines.get(packageName) !== 'quickjs'
     );
 }
 
@@ -38,6 +39,19 @@ export function hasStaticHermesBuild(graph, root = workspaceRoot) {
 export function normalizeTurboArgs(args) {
     const separator = args.indexOf('--');
     return separator === -1 ? args : [...args.slice(0, separator), ...args.slice(separator + 1)];
+}
+
+/** Choose the Turbo task from the root parser flag and remove that flag from forwarded arguments.
+ * @param args - Arguments received by the root build script.
+ * @returns The selected Turbo task and its remaining arguments.
+ */
+export function normalizeBuildRequest(args) {
+    const turboArgs = normalizeTurboArgs(args);
+    const parseTypeScript = turboArgs.includes('--parse-ts');
+    return {
+        task: parseTypeScript ? 'build:parse-ts' : 'build',
+        args: parseTypeScript ? turboArgs.filter((argument) => argument !== '--parse-ts') : turboArgs
+    };
 }
 
 /**
@@ -98,13 +112,13 @@ export async function prepareHermesInIsolatedEnvironment({
 
 /** Run the root Turbo build and prepare its shared Hermes inputs once when needed. */
 async function build() {
-    const args = normalizeTurboArgs(process.argv.slice(2));
+    const { task, args } = normalizeBuildRequest(process.argv.slice(2));
     if (args.some((argument) => argument === '--dry' || argument.startsWith('--dry='))) {
-        process.exitCode = runTurbo(args).status ?? 1;
+        process.exitCode = runTurbo(task, args).status ?? 1;
         return;
     }
 
-    const dryRun = runTurbo(['--dry=json', ...args], { captureOutput: true });
+    const dryRun = runTurbo(task, ['--dry=json', ...args], { captureOutput: true });
     if (dryRun.status !== 0) {
         process.exitCode = dryRun.status ?? 1;
         return;
@@ -114,12 +128,12 @@ async function build() {
     if (!Array.isArray(graph.tasks)) throw new Error('Turbo dry run did not return a task graph.');
 
     let env = process.env;
-    if (hasStaticHermesBuild(graph)) {
+    if (hasStaticHermesBuild(graph, workspaceRoot, task)) {
         const preparedEnvironment = await prepareHermesInIsolatedEnvironment({ workspaceRoot });
         env = buildTaskEnvironment(process.env, preparedEnvironment);
     }
 
-    process.exitCode = runTurbo(args, { env }).status ?? 1;
+    process.exitCode = runTurbo(task, args, { env }).status ?? 1;
 }
 
 /** Pass the shared cache location to Turbo without exposing host-specific toolchain defaults.
@@ -133,9 +147,14 @@ export function buildTaskEnvironment(env, preparedEnvironment) {
     return { ...env, STATIC_HERMES_CACHE_DIR: cacheDirectory, [alreadyPreparedVariable]: '1' };
 }
 
-/** Run Turbo, optionally capturing its JSON task graph instead of printing it. */
-function runTurbo(args, { captureOutput = false, env = process.env } = {}) {
-    const result = spawnSync(process.execPath, [turboCli, 'run', 'build', ...args], {
+/** Run the selected Turbo task, optionally capturing its JSON task graph.
+ * @param task - Turbo task to run.
+ * @param args - Arguments forwarded to Turbo.
+ * @param options - Output and environment options.
+ * @returns Turbo's process result.
+ */
+function runTurbo(task, args, { captureOutput = false, env = process.env } = {}) {
+    const result = spawnSync(process.execPath, [turboCli, 'run', task, ...args], {
         cwd: workspaceRoot,
         env,
         encoding: 'utf8',

@@ -30,6 +30,7 @@
     "type": "module",
     "scripts": {
         "build": "pumpkin-plugins-build",
+        "build:parse-ts": "pumpkin-plugins-build --parse-ts",
         "types": "pumpkin-plugins-build --types-only",
         "typecheck": "pnpm types && tsc --noEmit",
         "test": "vitest run --project unit",

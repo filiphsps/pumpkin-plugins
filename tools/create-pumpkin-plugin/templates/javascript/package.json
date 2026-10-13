@@ -8,6 +8,7 @@
     },
     "scripts": {
         "build": "pumpkin-plugins-build",
+        "build:parse-ts": "pumpkin-plugins-build --parse-ts",
         "typecheck": "pumpkin-plugins-build --types-only && tsc --noEmit"
     },
     "dependencies": {
