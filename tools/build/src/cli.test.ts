@@ -620,6 +620,46 @@ describe('run arguments', () => {
         }
     });
 
+    it('shows runtime tool output when verbose build logs are enabled', async () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-verbose-build-'));
+        const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
+        const previousVerboseBuild = process.env.PUMPKIN_PLUGINS_VERBOSE_BUILD;
+        installApiPackage(pluginDir, apiDir);
+        fs.writeFileSync(
+            path.join(pluginDir, 'package.json'),
+            JSON.stringify({
+                version: '1.2.3',
+                pumpkinPlugin: {
+                    entry: 'src/plugin.ts',
+                    output: 'build/plugin.wasm',
+                    wasi: [],
+                    engine: 'static-hermes'
+                }
+            })
+        );
+        process.env.PUMPKIN_PLUGINS_VERBOSE_BUILD = '1';
+        vi.mocked(bundlePlugin)
+            .mockClear()
+            .mockImplementationOnce(async () => 2048);
+        const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        try {
+            await run([], pluginDir);
+
+            expect(bundlePlugin).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    quietRuntimeOutput: false
+                })
+            );
+        } finally {
+            consoleLog.mockRestore();
+            if (previousVerboseBuild === undefined) delete process.env.PUMPKIN_PLUGINS_VERBOSE_BUILD;
+            else process.env.PUMPKIN_PLUGINS_VERBOSE_BUILD = previousVerboseBuild;
+            fs.rmSync(pluginDir, { recursive: true, force: true });
+            fs.rmSync(apiDir, { recursive: true, force: true });
+        }
+    });
+
     it('removes the published WIT snapshot after a build no longer imports WASI', async () => {
         const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-wit-no-wasi-'));
         const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));

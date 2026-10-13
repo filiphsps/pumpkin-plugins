@@ -110,7 +110,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
             witDir,
             version: config.version,
             engine,
-            quietRuntimeOutput: true,
+            quietRuntimeOutput: process.env.PUMPKIN_PLUGINS_VERBOSE_BUILD !== '1',
             onOutput: printBuildOutput,
             ...(staticHermesRuntime === undefined ? {} : { staticHermesRuntime }),
             developmentMode: process.env.PUMPKIN_DEV_MODE === '1'

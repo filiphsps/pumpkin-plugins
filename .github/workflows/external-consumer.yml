@@ -100,3 +100,4 @@ jobs:
               run: pnpm run test:external-consumer
               env:
                   GITHUB_TOKEN: ${{ github.token }}
+                  PUMPKIN_PLUGINS_VERBOSE_BUILD: ${{ matrix.platform == 'Windows x64' && '1' || '0' }}
