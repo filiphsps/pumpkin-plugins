@@ -8,12 +8,14 @@ Plugins live in `packages/`; shared libraries and tooling live in
 
 ## Before you work
 
+- At the start of every task in this repository, read [Commit discipline](.agents/skills/commit-discipline/SKILL.md).
 - Inspect `git status --short` before editing and preserve existing work. Never stash, revert, stage
   or reformat someone else's changes; avoid `git checkout`, `git restore`, `git reset` and `git clean`
   when they could affect that work.
-- Keep repository changes local until requested. Commit, push, tag, or create, change or review PRs
-  and issues only on the user's request. When asked to commit, stage only your files, inspect the
-  staged diff and use a Conventional Commit message.
+- Keep repository changes local until requested. For requested feature work, make small local commits
+  as slices are completed, following [Commit discipline](.agents/skills/commit-discipline/SKILL.md).
+  Push, tag, or create, change or review PRs and issues only on the user's request. Stage only your
+  files, inspect the staged diff, and use a Conventional Commit message.
 - Use pnpm: `pnpm exec` for local binaries and `pnpm dlx` for one-offs. Pin dependency versions;
   put dependencies shared by packages in the `catalog:` of `pnpm-workspace.yaml`.
 - For every code-writing task, read [JSDoc TypeScript Documentation](.agents/skills/jsdoc-typescript-docs/SKILL.md)
