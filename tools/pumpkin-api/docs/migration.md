@@ -5,7 +5,7 @@ navigation:
 
 # Migrate From `@pumpkinmc/pumpkin-api-ts`
 
-This guide moves a plugin from an audited API baseline to `@pumpkin-plugins/pumpkin-api` and its `pumpkin-plugins-build` command. The facade and WIT API are compatible; the package name and build setup change.
+This guide moves a plugin from an audited API baseline to `@pumpkin-plugins/pumpkin-api` and its `pumpkin-plugins-build` command. The compatibility inventory records the public exports, types and WIT surface; the facade behavior changes are listed below. The package name and build setup also change.
 
 ## Before You Migrate
 
@@ -21,7 +21,7 @@ Each compatibility entry records the source package version it audits, its suppo
 
 The replacement package's npm version and WIT ABI version are separate. The compatibility matrix records the current ABI and the Pumpkin release it was audited against. Make sure the Pumpkin server you target supports that ABI.
 
-The compatibility inventories record decisions for the runtime facade, public TypeScript types, and WIT API. The only facade behavior change is the missing command-suggestion-handler error described below.
+The compatibility inventories record decisions for the runtime facade, public TypeScript types, and WIT API. Facade behavior also changed for diagnostics, callback cleanup and runtime tick validation; the sections below describe those changes.
 
 ## Updating the Upstream WIT Audit
 
@@ -52,6 +52,9 @@ pnpm records the alias in `package.json` like this:
   }
 }
 ```
+
+The build tool follows this declared alias to read the installed API package's `wit.lock.json`, so
+you do not need a second direct dependency under `@pumpkin-plugins/pumpkin-api`.
 
 Use the alias only to reduce a broad rename in a large existing project. For an existing plugin with a manageable number of imports, use the new package name directly and update the imports in step 2:
 
@@ -84,7 +87,7 @@ Keep the `export *` in the plugin entry point so the facade's host callbacks are
 
 ## 3. Move the Build Command Into `package.json`
 
-The old [`pumpkin-plugin-build <entry-file.ts> <output-file.wasm>` command](https://github.com/Pumpkin-MC/pumpkin-api-ts#building-your-plugin) takes positional paths. The new builder reads them from the `pumpkinPlugin` field and accepts no positional entry or output arguments. Add or adapt these fields in your existing `package.json`. This example uses the direct package name; if you chose an alias, keep the dependency key shown in step 1:
+The old [`pumpkin-plugin-build <entry-file.ts> <output-file.wasm>` command](https://github.com/Pumpkin-MC/pumpkin-api-ts#building-your-plugin) takes positional paths. The new builder reads them from the `pumpkinPlugin` field and accepts no positional entry or output arguments. Add or adapt these fields in your existing `package.json`. This example uses the direct package name; if you chose an alias, keep the alias dependency and specifier from step 1:
 
 ```json
 {
@@ -137,5 +140,17 @@ No command suggestion handler registered for ID <id>
 ```
 
 The old implementation reported `undefined` in this error. Plugin source does not need to change, but tests that asserted the old message should use the corrected text.
+
+## 6. Update Tests That Check IPC Rejection Diagnostics
+
+When a plugin does not override `Plugin.handleIpcMessage`, the default now throws `Error('This plugin does not handle IPC messages')` instead of the string `This plugin cannot recieve messages`. Calling the exported `handleIpcMessage` before `registerPlugin()` now throws `Error('Cannot handle IPC messages before a plugin is registered')` instead of `Error('No plugin instance available?')`. Plugins that override the handler do not need a source change, but tests that assert either previous rejection value or message should be updated.
+
+## 7. Account for Callback Cleanup
+
+The facade releases event, command, suggestion, AI-goal and chunk-generator callbacks when `onUnload()` finishes, including when the plugin's unload hook throws. It also removes event and command callbacks if registration with the host fails. A command resource may keep its assigned handler ID if host registration fails after assignment. Re-register callbacks from a later `onLoad()`; no migration is needed for plugins that already follow that lifecycle.
+
+## 8. Pass Runtime Tick Values With the Declared Types
+
+Scheduled task helpers now reject runtime values other than numbers or bigints before coercion. JavaScript callers must pass a number or bigint; TypeScript call sites already checked against the declared types need no source change. Safe-integer, unsigned 64-bit range and positive repeating-period rules still apply.
 
 The replacement package declares the MIT license; the old package declared `MIT OR Apache-2.0`. Update any dependency license inventory you maintain.

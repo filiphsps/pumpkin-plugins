@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { metadata, Plugin } from './core.ts';
+import { handleIpcMessage, metadata, Plugin } from './core.ts';
 
 class TestPlugin extends Plugin {
     metadata() {
@@ -26,5 +26,15 @@ it('returns fallback metadata before a plugin is registered', () => {
 });
 
 it('rejects IPC messages when a plugin does not provide a handler', () => {
-    expect(() => new TestPlugin().handleIpcMessage('sender' as never, {} as never)).toThrow();
+    expect(() => new TestPlugin().handleIpcMessage('sender' as never, {} as never)).toThrowError(Error);
+    expect(() => new TestPlugin().handleIpcMessage('sender' as never, {} as never)).toThrowError(
+        'This plugin does not handle IPC messages'
+    );
+});
+
+it('rejects IPC messages before a plugin is registered', () => {
+    expect(() => handleIpcMessage('sender' as never, {} as never)).toThrowError(Error);
+    expect(() => handleIpcMessage('sender' as never, {} as never)).toThrowError(
+        'Cannot handle IPC messages before a plugin is registered'
+    );
 });

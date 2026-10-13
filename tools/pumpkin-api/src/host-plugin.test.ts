@@ -51,6 +51,16 @@ beforeEach(() => {
 
 describe('scheduled callback lifetime', () => {
     it.each([
+        ['string', '1'],
+        ['boolean', true],
+        ['null', null],
+        ['object with a bigint coercion', { valueOf: () => 1n }]
+    ])('rejects a %s tick value before calling the scheduler', (_name, value) => {
+        expect(() => new TestPlugin().scheduleDelayedTask(value as never, () => {})).toThrow(RangeError);
+        expect(host.scheduled).toEqual([]);
+    });
+
+    it.each([
         {
             name: 'unsafe number delay',
             schedule: (plugin: TestPlugin) => plugin.scheduleDelayedTask(Number.MAX_SAFE_INTEGER + 1, () => {})

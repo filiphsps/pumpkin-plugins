@@ -85,10 +85,10 @@ export abstract class Plugin {
      * @param _sender - ID of the sending plugin.
      * @param _message - Message payload.
      * @returns The reply sent to the caller.
-     * @throws {string} The default implementation rejects IPC messages.
+     * @throws {Error} When the plugin does not implement IPC message handling.
      */
     handleIpcMessage(_sender: PluginId, _message: IpcMessage): IpcMessage {
-        throw 'This plugin cannot recieve messages';
+        throw new Error('This plugin does not handle IPC messages');
     }
 
     /**
@@ -111,7 +111,12 @@ export abstract class Plugin {
     ): void {
         const handlerId = getNextHandlerId();
         eventHandlers.set(handlerId, (server, event) => handler(server, event as EventPayload<T>));
-        context.registerEvent(handlerId, eventType, priority, blocking);
+        try {
+            context.registerEvent(handlerId, eventType, priority, blocking);
+        } catch (error) {
+            eventHandlers.delete(handlerId);
+            throw error;
+        }
     }
 
     /**
@@ -121,12 +126,20 @@ export abstract class Plugin {
      * @param command - Command tree configured with Pumpkin's command API.
      * @param handler - Callback invoked for the command.
      * @param permission - Permission required to run the command; defaults to no permission.
+     * @remarks If assigning the handler ID or registering with the host fails, the callback is removed from the
+     * dispatch registry. The command resource has no method to unset an assigned ID, so it may retain that ID after a
+     * failed registration.
      */
     registerCommand(context: Context, command: Command, handler: CommandHandler, permission = ''): void {
         const handlerId = getNextHandlerId();
         commandHandlers.set(handlerId, handler);
-        command.executeWithHandlerId(handlerId);
-        context.registerCommand(command, permission);
+        try {
+            command.executeWithHandlerId(handlerId);
+            context.registerCommand(command, permission);
+        } catch (error) {
+            commandHandlers.delete(handlerId);
+            throw error;
+        }
     }
 
     /** Register a command suggestion callback and return its handler ID. */
@@ -170,6 +183,11 @@ export function onUnload(context: Context): void {
         pluginInstance?.onUnload(context);
     } finally {
         clearTaskHandlers();
+        eventHandlers.clear();
+        commandHandlers.clear();
+        commandSuggestionHandlers.clear();
+        aiGoals.clear();
+        chunkGenerators.clear();
     }
 }
 
@@ -211,9 +229,13 @@ export function handleTask(handlerId: number, server: Server): void {
     dispatchTask(handlerId, server);
 }
 
-/** Forward an IPC message to the registered plugin. */
+/**
+ * Forward an IPC message to the registered plugin.
+ *
+ * @throws {Error} When no plugin is registered or the plugin rejects the message.
+ */
 export function handleIpcMessage(sender: PluginId, message: IpcMessage): IpcMessage {
-    if (!pluginInstance) throw new Error('No plugin instance available?');
+    if (!pluginInstance) throw new Error('Cannot handle IPC messages before a plugin is registered');
     return pluginInstance.handleIpcMessage(sender, message);
 }
 

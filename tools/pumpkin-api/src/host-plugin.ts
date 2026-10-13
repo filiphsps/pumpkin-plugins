@@ -5,6 +5,10 @@ import { getTaskHandlerId, registerTaskHandler, releaseTaskHandler, trackTaskId 
 const MAX_U64 = (1n << 64n) - 1n;
 
 function validateTicks(value: number | bigint, name: string, minimum: bigint): bigint {
+    if (typeof value !== 'number' && typeof value !== 'bigint') {
+        throw new RangeError(`${name} must be a number or bigint.`);
+    }
+
     if (typeof value === 'number' && !Number.isSafeInteger(value)) {
         throw new RangeError(`${name} must be a safe integer.`);
     }
