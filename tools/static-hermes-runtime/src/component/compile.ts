@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { wasiSdkCompilerPath } from '../hermes/toolchain-paths.ts';
 import { wrapBundleForDiagnostics } from './bundle-diagnostics.ts';
 import { renderEmbeddedBytecode } from './embed-bytecode.ts';
 import type { ComponentGeneratedFiles } from './generate.ts';
@@ -48,8 +49,8 @@ export function compileAndLinkComponent(input: ComponentCompilationInput): void 
     const bytecodeHeader = path.join(temporaryDirectory, 'plugin-bytecode.generated.h');
     const bindingsObject = path.join(temporaryDirectory, 'plugin.o');
     const shimObject = path.join(temporaryDirectory, 'runtime.o');
-    const compiler = path.join(toolchain.wasiSdk, 'bin', 'wasm32-wasip2-clang');
-    const cxx = `${compiler}++`;
+    const compiler = wasiSdkCompilerPath(toolchain.wasiSdk, 'wasm32-wasip2-clang');
+    const cxx = wasiSdkCompilerPath(toolchain.wasiSdk, 'wasm32-wasip2-clang++');
     const hermesIncludes = [
         path.join(toolchain.hermesSource, 'include'),
         path.join(toolchain.hermesSource, 'public'),

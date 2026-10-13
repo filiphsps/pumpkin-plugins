@@ -12,11 +12,13 @@ beforeEach(() => mocks.execFileSync.mockReset());
 
 it('forwards selected build options to the packaged CLI', () => {
     const options = {
+        workspaceRoot: '/plugin',
         bundle: '/plugin/build/plugin.js',
         witDir: '/plugin/build/wit',
         output: '/plugin/build/plugin.wasm',
         developmentMode: true,
         runtimeVariant: 'full' as const,
+        quietOutput: true,
         wasiImports: ['wasi:filesystem/types@0.2.3'],
         wasiMethods: ['wasi:filesystem/types@0.2.3#read-via-stream'],
         apiMethods: ['logging.log']
@@ -37,6 +39,8 @@ it('forwards selected build options to the packaged CLI', () => {
             options.witDir,
             '--output',
             options.output,
+            '--workspace-root',
+            options.workspaceRoot,
             '--development-mode',
             '--wasi-imports',
             JSON.stringify(options.wasiImports),
@@ -47,8 +51,19 @@ it('forwards selected build options to the packaged CLI', () => {
             '--runtime-variant',
             'full'
         ],
-        { stdio: 'inherit' }
+        { stdio: ['inherit', 'ignore', 'pipe'], maxBuffer: 16 * 1024 * 1024 }
     );
+});
+
+it('inherits runtime output by default for direct component builds', () => {
+    buildStaticHermesComponent({
+        bundle: 'bundle.js',
+        witDir: 'wit',
+        output: 'plugin.wasm',
+        developmentMode: false
+    });
+
+    expect(mocks.execFileSync).toHaveBeenCalledWith(expect.any(String), expect.any(Array), { stdio: 'inherit' });
 });
 
 it('uses empty WASI imports and omits optional selections by default', () => {

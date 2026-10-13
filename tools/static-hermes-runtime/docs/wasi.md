@@ -33,7 +33,7 @@ In this repository there are two distinct interface families:
   sockets.
 
 Both use WIT contracts, but they have different owners and host implementations. The build obtains
-Pumpkin WIT from the pinned `@pumpkinmc/pumpkin-api-ts` dependency. WASI WIT is separately pinned by
+Pumpkin WIT from the pinned `@pumpkin-plugins/pumpkin-api` dependency. WASI WIT is separately pinned by
 [`wasi-wit.lock.json`](../../build/wasi-wit.lock.json). The lock currently selects WASI 0.2.3; the
 [WASI 0.2.3 interface definitions][^wasi-023] are locked by file hash. The [WASI HTTP
 definitions][^wasi-http] come from the corresponding `wasi-http` 0.2.3 release. The plugin API
@@ -54,11 +54,12 @@ last step leaves those imports for the Pumpkin runtime to resolve.
 1. **The plugin opts into a capability bundle.** `pumpkinPlugin.wasi` in the plugin's
    `package.json` accepts the names `http`, `filesystem`, `sockets`, and `udp`. An omitted list
    means no WASI interfaces are added.
-2. **The build retrieves pinned WIT definitions.** `@pumpkin-plugins/build` reads
-   [`wasi-wit.lock.json`](../../build/wasi-wit.lock.json), downloads any missing upstream files,
-   checks each file against its SHA-256 hash, and caches the verified files by WASI version. A
-   complete cache needs no network access; the first build needs network access if the files are
-   not already cached.
+2. **The build retrieves pinned WIT definitions.** `@pumpkin-plugins/build` reads the API package's
+   `wit.lock.json` and [`wasi-wit.lock.json`](../../build/wasi-wit.lock.json). It fetches the
+   upstream Pumpkin WIT commit on first use and when the API lock changes, caching it under
+   `.cache/pumpkin-api-wit/<lock-digest>/`. It downloads any missing WASI files, checks each file
+   against its SHA-256 hash, and caches them by WASI version. Complete caches need no network
+   access; a missing or changed pin needs network access.
 3. **The build prepares one WIT world.** It copies the Pumpkin API WIT into the plugin build
    directory, copies only the locked WASI files, then adds the selected `wasi:*` imports to the
    `plugin` world. The build records this prepared copy under the plugin's `build/wit/` directory.
@@ -75,6 +76,9 @@ last step leaves those imports for the Pumpkin runtime to resolve.
 6. **The native adapters and component are built.** The build analyzes the plugin's typed source
    graph to identify called WIT methods. `wit-bindgen c` generates C bindings for the plugin world;
    the runtime generator emits JSI host functions and WASI adapters for selected operations.
+   If source analysis cannot provide Pumpkin API selections, the runtime keeps every operation in
+   the imported Pumpkin API interfaces because esbuild has already inlined their facades into the
+   IIFE bundle.
    Hermes compiles the JavaScript bundle to bytecode, and the WASI SDK compiles and links that
    bytecode, Hermes, JSI, the generated bindings, and the runtime shim into a component.
 7. **The server resolves the imports at runtime.** The component imports the declared interfaces
@@ -333,7 +337,7 @@ When adding or upgrading an interface:
    build can generate bindings; they do not prove the server supplies an import, grants a
    permission, or implements an operation with the expected host behavior.
 
-Keep the pinned `@pumpkinmc/pumpkin-api-ts` version aligned with the Pumpkin server plugin ABI as
+Keep the pinned `@pumpkin-plugins/pumpkin-api` version aligned with the Pumpkin server plugin ABI as
 documented in [Building](../../../docs/building.md). WASI versions have their own lock and host
 compatibility requirements.
 

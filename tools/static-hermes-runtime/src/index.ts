@@ -11,6 +11,8 @@ export type StaticHermesRuntimeVariant = 'full' | 'lean';
 
 /** Inputs for compiling a bundled plugin as a Static Hermes WASI component. */
 export interface StaticHermesBuildOptions {
+    /** Consumer project root used for runtime toolchain caches. */
+    workspaceRoot?: string;
     /** Path to the bundled JavaScript source. */
     bundle: string;
     /** Path to the prepared WIT directory containing the plugin world. */
@@ -19,6 +21,8 @@ export interface StaticHermesBuildOptions {
     output: string;
     /** Whether to retain development symbols and Hermes source line information. */
     developmentMode: boolean;
+    /** Suppress runtime stdout while preserving stderr for a caller's shared formatter. */
+    quietOutput?: boolean;
     /** Hermes archive profile; defaults to the configured profile, usually `lean`. */
     runtimeVariant?: StaticHermesRuntimeVariant;
     /** WASI interface specifiers requested by the plugin; defaults to no additional imports. */
@@ -49,6 +53,7 @@ export function buildStaticHermesComponent(options: StaticHermesBuildOptions): v
             options.witDir,
             '--output',
             options.output,
+            ...(options.workspaceRoot === undefined ? [] : ['--workspace-root', options.workspaceRoot]),
             ...(options.developmentMode ? ['--development-mode'] : []),
             '--wasi-imports',
             JSON.stringify(options.wasiImports ?? []),
@@ -56,6 +61,9 @@ export function buildStaticHermesComponent(options: StaticHermesBuildOptions): v
             ...(options.apiMethods === undefined ? [] : ['--api-methods', JSON.stringify(options.apiMethods)]),
             ...(options.runtimeVariant === undefined ? [] : ['--runtime-variant', options.runtimeVariant])
         ],
-        { stdio: 'inherit' }
+        {
+            stdio: options.quietOutput ? ['inherit', 'ignore', 'pipe'] : 'inherit',
+            ...(options.quietOutput ? { maxBuffer: 16 * 1024 * 1024 } : {})
+        }
     );
 }

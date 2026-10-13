@@ -58,7 +58,12 @@ afterEach(() => {
 
 it('bundles declared Pumpkin and WASI imports through generated facades', async () => {
     const onWasiImport = vi.fn();
-    const plugin = staticHermesImportsPlugin({ resolveDir: process.cwd(), witDir: witDirectory, onWasiImport });
+    const plugin = staticHermesImportsPlugin({
+        resolveDir: process.cwd(),
+        workspaceRoot: process.cwd(),
+        witDir: witDirectory,
+        onWasiImport
+    });
     const result = await build({
         stdin: {
             contents: `import { pumpkinValue } from ${JSON.stringify(apiInterface.specifier)}; import { wasiValue } from ${JSON.stringify(wasiInterface.specifier)}; console.log(pumpkinValue, wasiValue);`,
@@ -97,7 +102,7 @@ it('replaces update checks in development bundles and rejects undeclared imports
             sourcefile: 'plugin-entry.js'
         },
         bundle: true,
-        external: ['@pumpkinmc/pumpkin-api-ts'],
+        external: ['@pumpkin-plugins/pumpkin-api'],
         write: false,
         plugins: [developmentPlugin],
         logLevel: 'silent'

@@ -19,7 +19,8 @@ pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
 ```
 
 Preparation uses the SDK release configured in `wasi-sdk.lock.json`, verifies its published checksum,
-installs the configured `wit-bindgen` version if needed, and caches the toolchain under
+installs the configured `wit-bindgen` version if needed, and requires the selected executable to report
+that exact version with `--version`. It caches the toolchain under
 `.cache/hermes/` by default. It checks out the source commit in `hermes-source.lock.json`, applies the ordered
 patches in `hermes-patches/`, then builds host `hermesc` and the full and lean WASI 2 Hermes/JSI
 libraries.
@@ -38,6 +39,12 @@ versions are pinned in `toolchain-versions.json`; the files follow the
 the WASI 2 CMake toolchain adjustment required by Hermes. Optional paths and build settings are
 listed under [Build flags](#build-flags).
 
+The external-consumer CI contract uses Node `24.21.0`, pnpm `12.10.1`, CMake `4.4.4`, Ninja
+`1.13.2`, Rust/Cargo `1.99.0`, `wit-bindgen` `0.62.0`, and WASI SDK `34`. Windows x64 uses the
+Visual Studio 2022 MSVC `14.44` toolset. Override the default `.cache/hermes/` location with
+`STATIC_HERMES_CACHE_DIR`; the packed-consumer check also keeps its pnpm store in a temporary
+directory outside the consumer's `node_modules`.
+
 ## CLI and package API
 
 The package CLI is compiled from `src/cli.ts` to `dist/cli.js` and registered as
@@ -50,7 +57,9 @@ pnpm --filter @pumpkin-plugins/static-hermes-runtime exec static-hermes-runtime 
 
 Package consumers can import `buildStaticHermesComponent`, `prepareHermes`, and the other public
 runtime functions directly from `@pumpkin-plugins/static-hermes-runtime`. Use the CLI for WIT
-analysis and code generation.
+analysis and code generation. Set `quietOutput: true` on `buildStaticHermesComponent` when a caller
+owns the console format; runtime stdout is suppressed, while command failures retain stderr
+diagnostics.
 
 ## Engine and runtime profiles
 
@@ -104,7 +113,7 @@ compilation, and WASI C/C++ compilation and linking.
 | `STATIC_HERMES_SOURCE_DIR` | Hermes checkout; defaults to `source/` under the cache root. |
 | `STATIC_HERMES_HOST_BUILD_DIR` | Host build directory; defaults to `build-host/` under the cache root. |
 | `STATIC_HERMES_WASI_BUILD_DIR` | WASI build directory; defaults to `build-wasip2/` under the cache root. |
-| `WIT_BINDGEN` | Optional `wit-bindgen` path override. Setup reuses the configured version from `.cache/hermes/toolchain/` or `~/.cargo/bin/wit-bindgen`, then installs it if needed. |
+| `WIT_BINDGEN` | Optional `wit-bindgen` path override. The override, cached executable, and `~/.cargo/bin/wit-bindgen` must report the pinned `tools.wit-bindgen` version from `toolchain-versions.json`; a mismatch fails setup. If no executable exists, setup installs the pinned version. |
 
 ### Hermes configuration
 
@@ -174,10 +183,12 @@ See [Benchmarking](../../docs/benchmarking.md) for the comparison command, workl
 
 ### Pumpkin API
 
-`@pumpkin-plugins/build` supplies the pinned WIT directory and owns the Pumpkin API version and WASI
-definitions. Each build generates the component ABI and the ignored
-`generated/api-enums.generated.h`. It also generates event payload converters only for the WIT
-variants and fields used by the bundled plugin.
+`@pumpkin-plugins/build` resolves the Pumpkin API WIT from the installed API package's
+`wit.lock.json`, then supplies the pinned WIT directory alongside the WASI definitions. The first
+use of a lock digest fetches its upstream commit into the consumer's ignored cache. Each build
+generates the component ABI and the ignored
+`generated/api-enums.generated.h`. It also generates complete event payload converters for all WIT event variants and fields.
+Event tags and payload access may be computed dynamically, so source scans cannot safely prune them.
 
 The native JSI shim implements part of the Pumpkin API: plugin lifecycle and metadata, command and
 task dispatch, event registration and dispatch, selected server/player/world methods, logging,

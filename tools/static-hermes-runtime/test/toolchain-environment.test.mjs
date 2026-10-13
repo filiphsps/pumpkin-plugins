@@ -19,7 +19,7 @@ it('uses the installed QuickJS WASI SDK and wit-bindgen paths when provided', as
     const wasiSdk = path.join(workspaceRoot, 'wasi-sdk');
     const witBindgen = path.join(workspaceRoot, 'bin', 'wit-bindgen');
     writeExecutable(path.join(wasiSdk, 'bin', 'wasm32-wasip2-clang'));
-    writeExecutable(witBindgen);
+    writeExecutable(witBindgen, '#!/bin/sh\necho "wit-bindgen-cli 0.62.0 (fixture)"\n');
     const installWasiSdk = vi.fn();
     const installWitBindgen = vi.fn();
 
@@ -45,8 +45,8 @@ it('installs missing pinned toolchain dependencies under .cache/hermes', async (
         writeExecutable(path.join(destination, 'bin', 'wasm32-wasip2-clang'));
         return destination;
     });
-    const installWitBindgen = vi.fn(({ destination }) => {
-        writeExecutable(destination);
+    const installWitBindgen = vi.fn(({ destination, version }) => {
+        writeExecutable(destination, `#!/bin/sh\necho "wit-bindgen-cli ${version} (fixture)"\n`);
         return destination;
     });
 
@@ -138,8 +138,8 @@ it('uses the configured wit-bindgen version for its install cache', async () => 
     const workspaceRoot = temporaryDirectory('static-hermes-configured-bindgen-');
     const wasiSdk = path.join(workspaceRoot, 'wasi-sdk');
     writeExecutable(path.join(wasiSdk, 'bin', 'wasm32-wasip2-clang'));
-    const installWitBindgen = vi.fn(({ destination }) => {
-        writeExecutable(destination);
+    const installWitBindgen = vi.fn(({ destination, version }) => {
+        writeExecutable(destination, `#!/bin/sh\necho "wit-bindgen-cli ${version} (fixture)"\n`);
         return destination;
     });
 

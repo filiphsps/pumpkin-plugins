@@ -109,6 +109,7 @@ export function createStaticHermesProgram(dependencies: StaticHermesCliDependenc
         .requiredOption('--bundle <file>', 'Bundled JavaScript source')
         .requiredOption('--wit <dir>', 'Prepared WIT directory')
         .requiredOption('--output <file>', 'Output component file')
+        .option('--workspace-root <dir>', 'Consumer project root used for caches')
         .option('--development-mode', 'Keep development symbols and line tables')
         .option('--wasi-imports <json-array>', 'WASI interface specifiers', '[]')
         .option('--wasi-methods <json-array>', 'Used WASI operation identifiers')
@@ -184,10 +185,13 @@ function parseCodegenGenerate(options: {
     };
 }
 
+/** Resolve component-build CLI values into the runtime's build options. */
 function parseComponentBuild(options: {
     bundle: string;
     wit: string;
     output: string;
+    /** Consumer project root used to place shared runtime caches. */
+    workspaceRoot?: string;
     developmentMode?: boolean;
     wasiImports: string;
     wasiMethods?: string;
@@ -200,6 +204,7 @@ function parseComponentBuild(options: {
         bundle: path.resolve(options.bundle),
         wit: path.resolve(options.wit),
         output: path.resolve(options.output),
+        ...(options.workspaceRoot === undefined ? {} : { workspaceRoot: path.resolve(options.workspaceRoot) }),
         developmentMode: options.developmentMode ?? false,
         wasiImports: parseJsonStringArray(options.wasiImports, 'wasi-imports', 'module specifiers') ?? [],
         ...(wasiMethods === undefined ? {} : { wasiMethods }),

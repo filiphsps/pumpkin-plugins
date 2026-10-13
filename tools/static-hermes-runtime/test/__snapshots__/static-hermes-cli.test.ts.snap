@@ -87,6 +87,7 @@ Options:
   --bundle <file>              Bundled JavaScript source
   --wit <dir>                  Prepared WIT directory
   --output <file>              Output component file
+  --workspace-root <dir>       Consumer project root used for caches
   --development-mode           Keep development symbols and line tables
   --wasi-imports <json-array>  WASI interface specifiers (default: "[]")
   --wasi-methods <json-array>  Used WASI operation identifiers

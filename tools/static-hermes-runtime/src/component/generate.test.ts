@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
+import { generateWitOutputs } from '../wit/generation.ts';
 import type { WitApiInterface, WitApiPackage } from '../wit/types.ts';
 import type { ComponentWitAnalysis } from './analyze.ts';
 import { generateComponentFiles } from './generate.ts';
@@ -176,3 +177,31 @@ function apiInterface(name: string, enums: WitApiInterface['enums']): WitApiInte
         types: []
     };
 }
+
+it('keeps enum lookup entries for computed event tags and priorities', () => {
+    const input = emptyAnalysis([]);
+    const eventInterface = input.apiPackage.interfaces[0];
+    if (!eventInterface) throw new Error('event fixture is missing');
+    eventInterface.enums = [
+        { name: 'event-type', values: ['join'] },
+        { name: 'event-priority', values: ['normal'] }
+    ];
+    const output = generateWitOutputs({
+        ...input,
+        wasiInterfaces: [],
+        bundleSource: 'registerEvent(["jo", "in"].join(""), ["nor", "mal"].join(""), callback);',
+        pluginHeader:
+            '#define PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_JOIN 7\n#define PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_NORMAL 3',
+        runtimeTemplate: [
+            '/* <PUMPKIN_WASI_RUNTIME> */',
+            '/* <PUMPKIN_WASI_INITIALIZATION> */',
+            '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
+            '/* <PUMPKIN_WIT_EVENT_DISPATCH> */'
+        ].join('\n')
+    });
+    const lookup = new Map(
+        [...output.apiEnumHeader.matchAll(/\{"([^"}]+)", ([A-Z_]+)\}/g)].map(([, name, constant]) => [name, constant])
+    );
+    expect(lookup.get(['jo', 'in'].join(''))).toBe('PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_JOIN');
+    expect(lookup.get(['nor', 'mal'].join(''))).toBe('PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_NORMAL');
+});

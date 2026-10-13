@@ -8,7 +8,7 @@ import { setupHermesToolchainEnvironment } from './toolchain-environment.ts';
 
 /** Optional paths, environment, and setup hook for Hermes preparation. */
 export interface HermesPreparationOptions {
-    /** Root of the Pumpkin Plugins workspace; defaults to the runtime package's workspace. */
+    /** Root of the `pumpkin-plugins` workspace; defaults to the runtime package's workspace. */
     workspaceRoot?: string;
     /** Root of `tools/static-hermes-runtime`; defaults to this package's location. */
     packageRoot?: string;

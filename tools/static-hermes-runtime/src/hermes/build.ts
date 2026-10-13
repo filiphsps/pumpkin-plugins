@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { ensurePatchOnlyChanges, type HermesPatch, verifyHermesPatchSeriesApplied } from './patch.ts';
 import type { HermesSourcePin } from './source.ts';
 import { type HermesFileSystem, type HermesProcessRunner, hermesFileSystem, hermesProcess } from './system.ts';
+import { executablePath, hermesHostCompilerPath, wasiSdkCompilerPath } from './toolchain-paths.ts';
 
 /** Paths, pins, patches, and injectable dependencies used to prepare Hermes artifacts. */
 export interface HermesBuildOptions {
@@ -28,6 +29,8 @@ export interface HermesBuildOptions {
     patches: readonly HermesPatch[];
     /** Environment values that can affect compiler configuration. */
     environment?: NodeJS.ProcessEnv;
+    /** Host platform override used for platform-specific executable paths and compiler identity. */
+    platform?: NodeJS.Platform;
     /** Optional filesystem implementation for tests. */
     filesystem?: HermesFileSystem;
     /** Optional process runner for tests. */
@@ -65,7 +68,8 @@ export async function buildHermes(options: HermesBuildOptions): Promise<void> {
 
     const buildStatePath = path.join(options.cacheRoot, 'prepared-build.json');
     const buildLockPath = path.join(options.cacheRoot, 'prepare.lock');
-    const artifacts = requiredHermesArtifacts(options.hostBuild, options.wasiBuild);
+    const platform = options.platform ?? process.platform;
+    const artifacts = requiredHermesArtifacts(options.hostBuild, options.wasiBuild, platform);
     await acquireHermesBuildLock(buildLockPath, { filesystem });
     try {
         const fingerprint = hermesBuildFingerprint(options, artifacts, environment, filesystem, runner);
@@ -94,11 +98,16 @@ export async function buildHermes(options: HermesBuildOptions): Promise<void> {
  */
 export function hermesBuildFingerprint(
     options: HermesBuildOptions,
-    requiredArtifacts = requiredHermesArtifacts(options.hostBuild, options.wasiBuild),
+    requiredArtifacts = requiredHermesArtifacts(
+        options.hostBuild,
+        options.wasiBuild,
+        options.platform ?? process.platform
+    ),
     environment = options.environment ?? process.env,
     filesystem: HermesFileSystem = options.filesystem ?? hermesFileSystem,
     runner: HermesProcessRunner = options.process ?? hermesProcess
 ): string {
+    const platform = options.platform ?? process.platform;
     const status = runner.output('git', ['-C', options.source, 'status', '--porcelain', '--untracked-files=all']);
     const untrackedFiles = runner
         .output('git', ['-C', options.source, 'ls-files', '--others', '--exclude-standard', '-z'])
@@ -113,7 +122,9 @@ export function hermesBuildFingerprint(
         path.join(options.packageRoot, 'src/cli.ts'),
         path.join(options.packageRoot, 'src/hermes/toolchain-environment.ts')
     ].filter((filename) => filesystem.existsSync(filename));
+    const cmakeVersion = runner.output('cmake', ['--version']);
     const inputs = {
+        platform,
         schema: 1,
         source: {
             commit: runner.output('git', ['-C', options.source, 'rev-parse', 'HEAD']),
@@ -136,31 +147,47 @@ export function hermesBuildFingerprint(
         ].map((filename) => [path.relative(options.packageRoot, filename), fileDigest(filename, filesystem)]),
         toolchain: {
             wasiSdk: options.wasiSdk,
-            wasiC: runner.output(path.join(options.wasiSdk, 'bin/wasm32-wasip2-clang'), ['--version']),
-            wasiCxx: runner.output(path.join(options.wasiSdk, 'bin/wasm32-wasip2-clang++'), ['--version']),
-            hostC: compilerIdentity(options.hostBuild, 'CMAKE_C_COMPILER', environment.CC ?? 'cc', filesystem, runner),
+            wasiC: runner.output(wasiSdkCompilerPath(options.wasiSdk, 'wasm32-wasip2-clang', platform), ['--version']),
+            wasiCxx: runner.output(wasiSdkCompilerPath(options.wasiSdk, 'wasm32-wasip2-clang++', platform), [
+                '--version'
+            ]),
+            hostC: compilerIdentity(
+                options.hostBuild,
+                'CMAKE_C_COMPILER',
+                environment.CC ?? (platform === 'win32' ? 'cl.exe' : 'cc'),
+                filesystem,
+                runner,
+                platform,
+                cmakeVersion
+            ),
             hostCxx: compilerIdentity(
                 options.hostBuild,
                 'CMAKE_CXX_COMPILER',
-                environment.CXX ?? 'c++',
+                environment.CXX ?? (platform === 'win32' ? 'cl.exe' : 'c++'),
                 filesystem,
-                runner
+                runner,
+                platform,
+                cmakeVersion
             ),
             wasiHostC: compilerIdentity(
                 options.wasiBuild,
                 'CMAKE_C_COMPILER',
-                path.join(options.wasiSdk, 'bin/wasm32-wasip2-clang'),
+                wasiSdkCompilerPath(options.wasiSdk, 'wasm32-wasip2-clang', platform),
                 filesystem,
-                runner
+                runner,
+                platform,
+                cmakeVersion
             ),
             wasiHostCxx: compilerIdentity(
                 options.wasiBuild,
                 'CMAKE_CXX_COMPILER',
-                path.join(options.wasiSdk, 'bin/wasm32-wasip2-clang++'),
+                wasiSdkCompilerPath(options.wasiSdk, 'wasm32-wasip2-clang++', platform),
                 filesystem,
-                runner
+                runner,
+                platform,
+                cmakeVersion
             ),
-            cmake: runner.output('cmake', ['--version']),
+            cmake: cmakeVersion,
             ninja: runner.output('ninja', ['--version'])
         },
         environment: Object.fromEntries(
@@ -179,7 +206,7 @@ export function hermesBuildFingerprint(
                 .map((name) => [name, environment[name]])
         ),
         options: {
-            platform: process.platform,
+            platform,
             arch: process.arch,
             source: options.source,
             hostBuild: options.hostBuild,
@@ -331,11 +358,23 @@ export function staleHermesBuildLock(
     return now() - stat.mtimeMs > 60_000;
 }
 
-function requiredHermesArtifacts(hostBuild: string, wasiBuild: string): string[] {
+/**
+ * Return the files required for a reusable Hermes build, using host executable names.
+ *
+ * @param hostBuild - Host CMake build directory.
+ * @param wasiBuild - WASI CMake build directory.
+ * @param platform - Host platform; defaults to the current process platform.
+ * @returns Required host compiler, imported compiler metadata, and WASI archives.
+ */
+export function requiredHermesArtifacts(
+    hostBuild: string,
+    wasiBuild: string,
+    platform: NodeJS.Platform = process.platform
+): string[] {
     return [
         path.join(hostBuild, 'ImportHostCompilers.cmake'),
-        path.join(hostBuild, 'bin/shermes'),
-        path.join(hostBuild, 'bin/hermesc'),
+        executablePath(path.join(hostBuild, 'bin'), 'shermes', platform),
+        hermesHostCompilerPath(hostBuild, platform),
         path.join(wasiBuild, 'lib/libhermesvm_a.a'),
         path.join(wasiBuild, 'lib/libhermesvmlean_a.a'),
         path.join(wasiBuild, 'jsi/libjsi.a')
@@ -415,18 +454,86 @@ function configureAndBuildHermes(
     ]);
 }
 
+/** Determine the configured compiler command and a stable identity for cache keys.
+ *
+ * @param buildDirectory - CMake build directory containing compiler configuration.
+ * @param cacheKey - CMake variable name for the compiler, such as `CMAKE_C_COMPILER`.
+ * @param fallback - Compiler command to use when CMake has not recorded one.
+ * @param filesystem - Filesystem used to read CMake's cache and generated metadata.
+ * @param runner - Process runner used to query compiler versions.
+ * @param platform - Host platform used to handle MSVC without shelling out to `cl.exe`.
+ * @param cmakeVersion - CMake version used to locate the active compiler metadata file.
+ * @returns The compiler command and version string used in the build fingerprint.
+ */
 function compilerIdentity(
     buildDirectory: string,
     cacheKey: string,
     fallback: string,
     filesystem: HermesFileSystem,
-    runner: HermesProcessRunner
+    runner: HermesProcessRunner,
+    platform: NodeJS.Platform,
+    cmakeVersion: string
 ): { command: string; version: string } {
     const cache = path.join(buildDirectory, 'CMakeCache.txt');
     const cacheText = filesystem.existsSync(cache) ? filesystem.readFileSync(cache, 'utf8') : '';
     const cachedCompiler = cacheText.match(new RegExp(`^${cacheKey}:[^=]+=([^\\n]+)$`, 'm'))?.[1];
     const command = cachedCompiler ?? fallback;
+    const metadata = compilerMetadata(buildDirectory, cacheKey, cacheText, filesystem, cmakeVersion);
+    if (cachedCompiler && metadata.id && metadata.version) {
+        return { command, version: `${metadata.id} ${metadata.version}` };
+    }
+    if (platform === 'win32' && /^cl(?:\.exe)?$/i.test(path.basename(command))) {
+        return { command, version: 'MSVC compiler identity recorded by CMake after configuration' };
+    }
     return { command, version: runner.output(command, ['--version']) };
+}
+
+/** Read compiler ID and version from CMake's cache or generated compiler metadata.
+ *
+ * @param buildDirectory - CMake build directory containing the cache and generated metadata.
+ * @param cacheKey - CMake compiler variable whose ID and version are required.
+ * @param cacheText - Contents of the CMake cache, if one exists.
+ * @param filesystem - Filesystem used to inspect and read generated metadata.
+ * @param cmakeVersion - CMake version used to prefer its matching metadata directory.
+ * @returns Available compiler ID and version values.
+ */
+function compilerMetadata(
+    buildDirectory: string,
+    cacheKey: string,
+    cacheText: string,
+    filesystem: HermesFileSystem,
+    cmakeVersion: string
+): { id?: string; version?: string } {
+    let id = cacheText.match(new RegExp(`^${cacheKey}_ID:[^=]+=([^\\r\\n]+)$`, 'm'))?.[1];
+    let version = cacheText.match(new RegExp(`^${cacheKey}_VERSION:[^=]+=([^\\r\\n]+)$`, 'm'))?.[1];
+    if (id && version) return { id, version };
+
+    const compilerFile = cacheKey === 'CMAKE_C_COMPILER' ? 'CMakeCCompiler.cmake' : 'CMakeCXXCompiler.cmake';
+    const cmakeFilesDirectory = path.join(buildDirectory, 'CMakeFiles');
+    if (!filesystem.existsSync(cmakeFilesDirectory)) return { id, version };
+
+    const directories = filesystem.readdirSync(cmakeFilesDirectory).sort();
+    const activeCMakeVersion = cmakeVersion.match(/\bcmake version\s+([\d.]+)/i)?.[1];
+    const orderedDirectories = activeCMakeVersion ? [activeCMakeVersion] : directories;
+    for (const versionDirectory of orderedDirectories) {
+        const filename = path.join(cmakeFilesDirectory, versionDirectory, compilerFile);
+        if (!filesystem.existsSync(filename)) continue;
+        const metadataText = filesystem.readFileSync(filename, 'utf8');
+        id ??= cmakeSetValue(metadataText, `${cacheKey}_ID`);
+        version ??= cmakeSetValue(metadataText, `${cacheKey}_VERSION`);
+        if (id && version) return { id, version };
+    }
+    return { id, version };
+}
+
+/** Extract a quoted `set(NAME "value")` assignment from a CMake compiler file.
+ *
+ * @param source - CMake file contents to search.
+ * @param name - Variable name assigned by the CMake file.
+ * @returns The assigned value, or `undefined` when no matching assignment exists.
+ */
+function cmakeSetValue(source: string, name: string): string | undefined {
+    return source.match(new RegExp(`^set\\(${name} "([^"]*)"\\)$`, 'm'))?.[1];
 }
 
 function artifactState(filename: string, filesystem: HermesFileSystem): HermesArtifactState | null {

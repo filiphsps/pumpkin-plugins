@@ -61,6 +61,7 @@ it.each([
             '--bundle <file>',
             '--wit <dir>',
             '--output <file>',
+            '--workspace-root <dir>',
             '--development-mode',
             '--runtime-variant'
         ]
@@ -113,6 +114,47 @@ it('forwards parsed options to the selected Commander action', async () => {
             wit: path.resolve('wit'),
             bundle: path.resolve('plugin.js'),
             wasiImports: ['wasi:io/poll@0.2.3']
+        }
+    ]);
+});
+
+it('forwards the consumer project root to the component build action', async () => {
+    const calls: unknown[] = [];
+    const program = createStaticHermesProgram({
+        hermesSource: () => undefined,
+        hermesPatch: () => undefined,
+        hermesBuild: () => undefined,
+        hermesPrepare: () => undefined,
+        analyze: () => undefined,
+        generate: () => undefined,
+        componentBuild: (options) => {
+            calls.push(options);
+        }
+    });
+    await program.parseAsync(
+        [
+            'component',
+            'build',
+            '--bundle',
+            'bundle.js',
+            '--wit',
+            'wit',
+            '--output',
+            'plugin.wasm',
+            '--workspace-root',
+            'consumer'
+        ],
+        { from: 'user' }
+    );
+
+    expect(calls).toEqual([
+        {
+            bundle: path.resolve('bundle.js'),
+            wit: path.resolve('wit'),
+            output: path.resolve('plugin.wasm'),
+            workspaceRoot: path.resolve('consumer'),
+            developmentMode: false,
+            wasiImports: []
         }
     ]);
 });

@@ -1,5 +1,7 @@
 /** Bundle, WIT, output, and feature selections for a Static Hermes component build. */
 export interface ComponentBuildOptions {
+    /** Consumer project root used for runtime toolchain caches. */
+    workspaceRoot?: string;
     /** Path to the bundled JavaScript source. */
     bundle: string;
     /** Path to the prepared WIT directory containing the plugin world. */

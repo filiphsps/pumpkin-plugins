@@ -5,6 +5,7 @@ import { createReadStream } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { configuredExecutablePath, executablePath, findExecutable, wasiSdkCompilerPath } from './toolchain-paths.ts';
 
 interface WasiSdkConfig {
     version: string;
@@ -35,11 +36,20 @@ interface WasiSdkInstallOptions {
     fetchImpl: typeof fetch;
 }
 
+/** Inputs needed to install a pinned wit-bindgen executable. */
 interface WitBindgenInstallOptions {
+    /** Destination path for the installed executable. */
     destination: string;
+    /** Pinned wit-bindgen release version. */
     version: string;
+    /** Rust toolchain version used to build wit-bindgen. */
     rustToolchainVersion: string;
+    /** User home directory used for Rust toolchain installation. */
     homeDirectory: string;
+    /** Environment used when locating rustup, cargo, and related tools. */
+    environment: NodeJS.ProcessEnv;
+    /** Host platform used to resolve executable suffixes and tool archives. */
+    platform: NodeJS.Platform;
 }
 
 interface WasmToolsInstallOptions {
@@ -52,7 +62,7 @@ interface WasmToolsInstallOptions {
 
 /** Options for installing or resolving the tools needed by a Static Hermes build. */
 export interface HermesToolchainSetupOptions {
-    /** Root of the Pumpkin Plugins workspace. */
+    /** Root of the `pumpkin-plugins` workspace. */
     workspaceRoot: string;
     /** Environment used to resolve configured tool paths. */
     env?: NodeJS.ProcessEnv;
@@ -84,7 +94,7 @@ export interface HermesToolchainSetupOptions {
 
 /** Setup and preparation hooks used before a component build. */
 export interface StaticHermesBuildPreparationOptions {
-    /** Root of the Pumpkin Plugins workspace. */
+    /** Root of the `pumpkin-plugins` workspace. */
     workspaceRoot: string;
     /** Environment used to select toolchain paths. */
     env?: NodeJS.ProcessEnv;
@@ -140,7 +150,7 @@ export async function setupHermesToolchainEnvironment({
     if (includeWasiSdk) {
         const configuredWasiSdk = env.STATIC_HERMES_WASI_SDK_PATH ?? env.WASI_SDK_PATH ?? env.WASI_SDK;
         const wasiSdkPath = configuredWasiSdk
-            ? validateWasiSdk(path.resolve(configuredWasiSdk), 'configured WASI SDK')
+            ? validateWasiSdk(path.resolve(configuredWasiSdk), 'configured WASI SDK', platform)
             : await resolveCachedWasiSdk({
                   toolchainRoot,
                   platform,
@@ -154,10 +164,22 @@ export async function setupHermesToolchainEnvironment({
     }
 
     if (includeWitBindgen) {
+        const version = toolchainConfig.tools['wit-bindgen'];
         const configuredBindgen = env.WIT_BINDGEN;
         const bindgenPath = configuredBindgen
-            ? validateWitBindgen(path.resolve(configuredBindgen), 'configured wit-bindgen')
-            : await resolveWitBindgen({ toolchainRoot, homeDirectory, toolchainConfig, installWitBindgen });
+            ? validateWitBindgen(
+                  path.resolve(configuredExecutablePath(configuredBindgen, platform)),
+                  version,
+                  'configured wit-bindgen'
+              )
+            : await resolveWitBindgen({
+                  toolchainRoot,
+                  homeDirectory,
+                  toolchainConfig,
+                  environment: env,
+                  platform,
+                  installWitBindgen
+              });
         environment.WIT_BINDGEN = bindgenPath;
     }
 
@@ -220,7 +242,7 @@ async function resolveCachedWasiSdk({
 }): Promise<string> {
     const { repository, version } = wasiSdkConfig;
     const destination = path.join(toolchainRoot, `wasi-sdk-${version}`);
-    if (isWasiSdk(destination)) return destination;
+    if (isWasiSdk(destination, platform)) return destination;
     const installed = await installWasiSdk({
         destination,
         platform,
@@ -230,36 +252,48 @@ async function resolveCachedWasiSdk({
         env,
         fetchImpl
     });
-    return validateWasiSdk(path.resolve(installed), 'automatically installed WASI SDK');
+    return validateWasiSdk(path.resolve(installed), 'automatically installed WASI SDK', platform);
 }
 
-/** Reuse a cached or user-installed wit-bindgen, otherwise install its pinned version. */
+/** Reuse a cached or user-installed wit-bindgen, otherwise install its pinned version for the selected platform. */
 async function resolveWitBindgen({
     toolchainRoot,
     homeDirectory,
     toolchainConfig,
+    environment,
+    platform,
     installWitBindgen
 }: {
     toolchainRoot: string;
     homeDirectory: string;
     toolchainConfig: HermesToolchainConfig;
+    environment: NodeJS.ProcessEnv;
+    platform: NodeJS.Platform;
     installWitBindgen: NonNullable<HermesToolchainSetupOptions['installWitBindgen']>;
 }): Promise<string> {
     const witBindgenVersion = toolchainConfig.tools['wit-bindgen'];
     const rustToolchainVersion = toolchainConfig.tools.rust;
-    const destination = path.join(toolchainRoot, `wit-bindgen-${witBindgenVersion}`, 'bin', 'wit-bindgen');
-    if (fs.existsSync(destination)) return destination;
+    const destination = executablePath(
+        path.join(toolchainRoot, `wit-bindgen-${witBindgenVersion}`, 'bin'),
+        'wit-bindgen',
+        platform
+    );
+    if (fs.existsSync(destination)) return validateWitBindgen(destination, witBindgenVersion, 'cached wit-bindgen');
 
-    const userInstall = path.join(homeDirectory, '.cargo', 'bin', 'wit-bindgen');
-    if (fs.existsSync(userInstall)) return userInstall;
+    const userInstall = executablePath(path.join(homeDirectory, '.cargo', 'bin'), 'wit-bindgen', platform);
+    if (fs.existsSync(userInstall)) {
+        return validateWitBindgen(userInstall, witBindgenVersion, 'user-installed wit-bindgen');
+    }
 
     const installed = await installWitBindgen({
         destination,
         version: witBindgenVersion,
         rustToolchainVersion,
-        homeDirectory
+        homeDirectory,
+        environment,
+        platform
     });
-    return validateWitBindgen(path.resolve(installed), 'automatically installed wit-bindgen');
+    return validateWitBindgen(path.resolve(installed), witBindgenVersion, 'automatically installed wit-bindgen');
 }
 
 /** Reuse a cached wasm-tools binary or install the pinned release archive. */
@@ -370,8 +404,8 @@ async function installPinnedWasiSdk({
 
         fs.mkdirSync(extraction, { recursive: true });
         execFileSync('tar', ['-xzf', archive, '--strip-components=1', '-C', extraction], { stdio: 'inherit' });
-        validateWasiSdk(extraction, 'downloaded WASI SDK');
-        return publishWasiSdkDirectory(extraction, destination);
+        validateWasiSdk(extraction, 'downloaded WASI SDK', platform);
+        return publishWasiSdkDirectory(extraction, destination, platform);
     } finally {
         fs.rmSync(installationDirectory, { recursive: true, force: true });
     }
@@ -382,14 +416,19 @@ async function installPinnedWasiSdk({
  *
  * @param extraction - Directory containing the validated SDK.
  * @param destination - Shared cache directory for this SDK version.
+ * @param platform - Host platform used to check the SDK compiler suffix.
  * @returns The shared SDK directory.
  * @throws {Error} If the destination exists but does not contain a complete SDK.
  */
-export function publishWasiSdkDirectory(extraction: string, destination: string): string {
+export function publishWasiSdkDirectory(
+    extraction: string,
+    destination: string,
+    platform: NodeJS.Platform = process.platform
+): string {
     try {
         fs.renameSync(extraction, destination);
     } catch (error) {
-        if (isWasiSdk(destination)) return destination;
+        if (isWasiSdk(destination, platform)) return destination;
         if (fs.existsSync(destination)) {
             throw new Error(`WASI SDK cache is incomplete at ${destination}; remove it and retry`, { cause: error });
         }
@@ -541,15 +580,20 @@ function escapeRegExp(value: string): string {
 }
 
 /** Install the pinned wit-bindgen CLI using the configured Rust toolchain. */
+/** Install the pinned wit-bindgen release using rustup or an available cargo toolchain. */
 async function installPinnedWitBindgen({
     destination,
     version,
     rustToolchainVersion,
-    homeDirectory
+    homeDirectory,
+    environment,
+    platform
 }: WitBindgenInstallOptions): Promise<string> {
     const installRoot = path.dirname(path.dirname(destination));
     fs.mkdirSync(installRoot, { recursive: true });
-    const rustup = findExecutable('rustup') ?? path.join(homeDirectory, '.cargo', 'bin', 'rustup');
+    const rustup =
+        findExecutable('rustup', environment, platform) ??
+        executablePath(path.join(homeDirectory, '.cargo', 'bin'), 'rustup', platform);
     if (fs.existsSync(rustup)) {
         execFileSync(rustup, ['toolchain', 'install', rustToolchainVersion, '--profile', 'minimal'], {
             stdio: 'inherit'
@@ -571,7 +615,9 @@ async function installPinnedWitBindgen({
             { stdio: 'inherit' }
         );
     } else {
-        const cargo = findExecutable('cargo') ?? path.join(homeDirectory, '.cargo', 'bin', 'cargo');
+        const cargo =
+            findExecutable('cargo', environment, platform) ??
+            executablePath(path.join(homeDirectory, '.cargo', 'bin'), 'cargo', platform);
         if (!fs.existsSync(cargo)) {
             throw new Error(
                 `Static Hermes needs wit-bindgen ${version}; install Rust with rustup or set WIT_BINDGEN to an existing executable`
@@ -585,32 +631,44 @@ async function installPinnedWitBindgen({
     return destination;
 }
 
-/** Find an executable by searching the current PATH. */
-function findExecutable(name: string): string | undefined {
-    for (const directory of (process.env.PATH ?? '').split(path.delimiter)) {
-        if (!directory) continue;
-        const candidate = path.join(directory, name);
-        if (fs.existsSync(candidate)) return candidate;
-    }
-    return undefined;
+/** Check whether a WASI SDK directory contains its platform-specific target C compiler.
+ *
+ * @param directory - WASI SDK directory to inspect.
+ * @param platform - Host platform used to resolve the compiler executable suffix.
+ * @returns `true` when the target compiler exists.
+ */
+function isWasiSdk(directory: string, platform: NodeJS.Platform): boolean {
+    return fs.existsSync(wasiSdkCompilerPath(directory, 'wasm32-wasip2-clang', platform));
 }
 
-/** Check whether a directory contains the WASI SDK's target C compiler. */
-function isWasiSdk(directory: string): boolean {
-    return fs.existsSync(path.join(directory, 'bin', 'wasm32-wasip2-clang'));
-}
-
-/** Validate a WASI SDK directory and return its path. */
-function validateWasiSdk(directory: string, description: string): string {
-    if (!isWasiSdk(directory)) {
-        throw new Error(`${description} is missing bin/wasm32-wasip2-clang: ${directory}`);
+/** Validate a WASI SDK directory and return its path.
+ *
+ * @param directory - SDK directory to inspect.
+ * @param description - Source label included in validation errors.
+ * @param platform - Host platform that determines the expected compiler executable suffix.
+ * @returns The validated SDK directory.
+ * @throws {Error} If the SDK target compiler is missing.
+ */
+function validateWasiSdk(directory: string, description: string, platform: NodeJS.Platform): string {
+    if (!isWasiSdk(directory, platform)) {
+        const compiler = path.basename(wasiSdkCompilerPath(directory, 'wasm32-wasip2-clang', platform));
+        throw new Error(`${description} is missing bin/${compiler}: ${directory}`);
     }
     return directory;
 }
 
-/** Validate a wit-bindgen executable path and return it. */
-function validateWitBindgen(executable: string, description: string): string {
+/** Validate a wit-bindgen executable path, run it, and ensure it matches the pinned version. */
+function validateWitBindgen(executable: string, version: string, description: string): string {
     if (!fs.existsSync(executable)) throw new Error(`${description} executable not found: ${executable}`);
+    let output: string;
+    try {
+        output = execFileSync(executable, ['--version'], { encoding: 'utf8' });
+    } catch (error) {
+        throw new Error(`${description} could not run: ${executable}`, { cause: error });
+    }
+    if (!new RegExp(`^wit-bindgen-cli ${escapeRegExp(version)}(?:\\s|$)`).test(output.trim())) {
+        throw new Error(`${description} must be wit-bindgen-cli ${version}: ${output.trim()}`);
+    }
     return executable;
 }
 

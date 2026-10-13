@@ -61,17 +61,24 @@ afterEach(() => {
 describe('buildStaticHermesComponent', () => {
     it('prepares missing Hermes artifacts, defaults to lean, and cleans temporary files', async () => {
         configureToolchain();
+        const options = { ...buildOptions(), workspaceRoot: root };
 
-        await buildStaticHermesComponent(buildOptions());
+        await buildStaticHermesComponent(options);
 
         expect(mocks.setupToolchain).toHaveBeenCalledWith(
-            expect.objectContaining({ includeWasiSdk: true, includeWitBindgen: true, includeWasmTools: true })
+            expect.objectContaining({
+                workspaceRoot: root,
+                includeWasiSdk: true,
+                includeWitBindgen: true,
+                includeWasmTools: true
+            })
         );
         expect(mocks.prepareHermes).toHaveBeenCalledOnce();
-        expect(mocks.analyze).toHaveBeenCalledWith(buildOptions());
+        expect(mocks.prepareHermes).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: root }));
+        expect(mocks.analyze).toHaveBeenCalledWith(options);
         expect(mocks.compile).toHaveBeenCalledWith(
             expect.objectContaining({
-                options: buildOptions(),
+                options,
                 stackSizeBytes: '262144',
                 toolchain: expect.objectContaining({
                     hermesRuntimeArchive: path.join(root, 'wasi-build/lib/libhermesvmlean_a.a')

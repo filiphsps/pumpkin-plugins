@@ -41,4 +41,29 @@ describe('wrapBundleForDiagnostics', () => {
         expect(thrown).toBe('initialization failed');
         expect(context.__pumpkinPluginInitError).toBe('initialization failed');
     });
+
+    it('rejects a saved resource method after the resource is dropped', () => {
+        const context = { calls: [] };
+        let thrown;
+
+        try {
+            runInNewContext(
+                wrapBundleForDiagnostics(`
+                    const resource = __staticHermesWrapResource({
+                        read() { calls.push('read'); },
+                        drop() { calls.push('drop'); }
+                    });
+                    const read = resource.read;
+                    resource.drop();
+                    read();
+                `),
+                context
+            );
+        } catch (error) {
+            thrown = error;
+        }
+
+        expect(thrown).toMatchObject({ message: 'Cannot use a disposed or transferred resource' });
+        expect(context.calls).toEqual(['drop']);
+    });
 });

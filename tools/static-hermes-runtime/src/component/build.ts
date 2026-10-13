@@ -3,13 +3,13 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { prepareHermes } from '../hermes/prepare.ts';
 import { setupHermesToolchainEnvironment } from '../hermes/toolchain-environment.ts';
+import { hermesHostCompilerPath } from '../hermes/toolchain-paths.ts';
 import { analyzeComponentWit } from './analyze.ts';
 import { compileAndLinkComponent } from './compile.ts';
 import { generateComponentFiles } from './generate.ts';
 import type { ComponentBuildOptions } from './types.ts';
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const workspaceRoot = path.resolve(runtimeRoot, '../..');
 
 /**
  * Analyze WIT, generate adapters, compile Hermes bytecode, and link one component.
@@ -19,6 +19,7 @@ const workspaceRoot = path.resolve(runtimeRoot, '../..');
  * @throws {Error} If required toolchain setup, WIT analysis, compilation, or linking fails.
  */
 export async function buildStaticHermesComponent(options: ComponentBuildOptions): Promise<void> {
+    const workspaceRoot = path.resolve(options.workspaceRoot ?? path.dirname(options.output));
     const environment = process.env;
     const toolchain = await setupHermesToolchainEnvironment({
         workspaceRoot,
@@ -57,7 +58,7 @@ export async function buildStaticHermesComponent(options: ComponentBuildOptions)
         hermesWasiBuild,
         `lib/libhermesvm${runtimeVariant === 'lean' ? 'lean' : ''}_a.a`
     );
-    const hermesc = path.join(hermesHostBuild, 'bin', 'hermesc');
+    const hermesc = hermesHostCompilerPath(hermesHostBuild);
     requirePath('Hermes source', hermesSource);
     requirePath('Hermes host compiler', hermesc);
     requirePath(`WASI Hermes ${runtimeVariant} runtime archive`, hermesRuntimeArchive);

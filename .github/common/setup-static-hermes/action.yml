@@ -46,8 +46,12 @@ runs:
           run: |
               set -euo pipefail
               install_root="$RUNNER_TEMP/wit-bindgen-$WIT_BINDGEN_VERSION"
+              wit_bindgen="$install_root/bin/wit-bindgen"
+              if [[ "$RUNNER_OS" == 'Windows' ]]; then
+                  wit_bindgen="$wit_bindgen.exe"
+              fi
               rustup toolchain install "$RUST_TOOLCHAIN_VERSION" --profile minimal
-              if [[ ! -x "$install_root/bin/wit-bindgen" ]]; then
+              if [[ ! -f "$wit_bindgen" ]]; then
                   cargo "+$RUST_TOOLCHAIN_VERSION" install wit-bindgen-cli --version "$WIT_BINDGEN_VERSION" --locked \
                       --root "$install_root"
               fi
@@ -62,10 +66,14 @@ runs:
         - name: 🔧 Export Static Hermes toolchain paths
           shell: bash
           run: |
+              wit_bindgen="$RUNNER_TEMP/wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}/bin/wit-bindgen"
+              if [[ "$RUNNER_OS" == 'Windows' ]]; then
+                  wit_bindgen="$wit_bindgen.exe"
+              fi
               {
                   echo "STATIC_HERMES_CACHE_DIR=$GITHUB_WORKSPACE/.cache/hermes"
                   echo "STATIC_HERMES_SOURCE_DIR=$GITHUB_WORKSPACE/.cache/hermes/source"
                   echo "STATIC_HERMES_HOST_BUILD_DIR=$GITHUB_WORKSPACE/.cache/hermes/build-host"
                   echo "STATIC_HERMES_WASI_BUILD_DIR=$GITHUB_WORKSPACE/.cache/hermes/build-wasip2"
-                  echo "WIT_BINDGEN=$RUNNER_TEMP/wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}/bin/wit-bindgen"
+                  echo "WIT_BINDGEN=$wit_bindgen"
               } >> "$GITHUB_ENV"
