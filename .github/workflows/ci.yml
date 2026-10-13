@@ -439,6 +439,8 @@ jobs:
 
             - name: 📦 Pack, install, create, typecheck and build outside the monorepo
               run: pnpm run test:external-consumer
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
 
     engine-comparison:
         name: 📊 Engine comparison
