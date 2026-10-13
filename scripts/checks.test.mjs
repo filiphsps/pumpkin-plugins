@@ -292,6 +292,7 @@ describe('package-metadata', () => {
             files: ['src'],
             publishConfig: { access: 'public' }
         },
+        'tools/lib/src/index.ts': '',
         ...override
     });
 

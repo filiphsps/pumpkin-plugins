@@ -47,6 +47,7 @@ test('does not package a source bin directory when the CLI is compiled under dis
     const { root, run } = fixture(t);
     const runtime = path.join(root, 'tools/static-hermes-runtime');
     fs.mkdirSync(runtime, { recursive: true });
+    fs.mkdirSync(path.join(runtime, 'src'));
     const manifest = path.join(runtime, 'package.json');
     fs.writeFileSync(
         manifest,
