@@ -434,7 +434,7 @@ jobs:
                   cargo +1.99.0 --version
                   if [[ "$RUNNER_OS" == Windows ]]; then
                       printf 'int main(void) { return 0; }\n' > "$RUNNER_TEMP/cl-smoke.c"
-                      cl /Bv /nologo /c "$RUNNER_TEMP/cl-smoke.c" /Fo"$RUNNER_TEMP/cl-smoke.obj"
+                      MSYS_NO_PATHCONV=1 cl /Bv /nologo /c "$RUNNER_TEMP/cl-smoke.c" /Fo"$RUNNER_TEMP/cl-smoke.obj"
                   fi
 
             - name: 📦 Pack, install, create, typecheck and build outside the monorepo
