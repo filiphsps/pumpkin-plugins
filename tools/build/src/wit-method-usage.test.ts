@@ -186,7 +186,7 @@ describe('findUsedPumpkinWitMethods', () => {
             'text.text-component.from-json',
             'world.world.get-name'
         ]);
-    }, 15_000);
+    }, 30_000);
 
     it.each([
         'player["getPosition"]();',

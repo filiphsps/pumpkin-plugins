@@ -34,10 +34,12 @@
             "outputs": ["build/**", "!build/types/**", "dist/**"]
         },
         "@pumpkin-plugins/build#build": {
-            "dependsOn": ["transit", "@pumpkin-plugins/static-hermes-runtime#build"]
+            "dependsOn": ["transit", "@pumpkin-plugins/static-hermes-runtime#build"],
+            "outputs": ["dist/**"]
         },
         "@pumpkin-plugins/static-hermes-runtime#build": {
-            "dependsOn": ["transit"]
+            "dependsOn": ["transit"],
+            "outputs": ["dist/**"]
         },
         "typecheck": {
             "dependsOn": ["transit", "@pumpkin-plugins/build#build"],
@@ -46,12 +48,19 @@
         "test": {
             "dependsOn": ["transit"]
         },
+        "@pumpkin-plugins/build#test": {
+            "dependsOn": ["transit", "@pumpkin-plugins/static-hermes-runtime#build"]
+        },
         "@pumpkin-plugins/static-hermes-runtime#test": {
             "dependsOn": ["transit"],
             "outputs": ["dist/**"]
         },
         "test:coverage": {
             "dependsOn": ["transit"],
+            "outputs": ["coverage/**"]
+        },
+        "@pumpkin-plugins/build#test:coverage": {
+            "dependsOn": ["transit", "@pumpkin-plugins/static-hermes-runtime#build"],
             "outputs": ["coverage/**"]
         },
         "test:integration": {

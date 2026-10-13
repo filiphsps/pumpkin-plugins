@@ -104,6 +104,10 @@ Tasks are defined in `turbo.json` and run with the root scripts (`pnpm build`, `
 | `test:integration` | Depends on `build`, never cached (it starts a real server) |
 | `readme`, `readme:check` | Never cached, they write or inspect files |
 
+The `@pumpkin-plugins/build` test tasks also build `@pumpkin-plugins/static-hermes-runtime` first because
+the build tool imports its compiled package entry. Both public tools declare their `dist/**` output so
+Turbo restores the compiled files when those builds come from cache.
+
 Run `pnpm clean` to remove workspace `node_modules`, root and workspace `build/` and `dist/` output,
 and `.turbo/cache/`. It preserves `.cache/`.
 
