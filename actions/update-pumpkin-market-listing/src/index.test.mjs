@@ -57,8 +57,13 @@ function readMetadataFromMultipart(request, body) {
     assert.ok(boundary, 'multipart request should have a boundary');
     const part = body.split(`--${boundary}`).find((candidate) => candidate.includes('name="metadata"'));
     assert.ok(part, 'multipart request should contain metadata');
-    const json = /\r\n\r\n([\s\S]*?)\r\n$/.exec(part)?.[1];
-    assert.ok(json, 'metadata part should contain JSON');
+    // Keep malformed long responses from stalling the test parser through regex backtracking.
+    const jsonStart = part.indexOf('\r\n\r\n');
+    assert.notEqual(jsonStart, -1, 'metadata part should contain headers and a body');
+    const bodyStart = jsonStart + '\r\n\r\n'.length;
+    const bodyEnd = part.lastIndexOf('\r\n');
+    assert.ok(bodyEnd >= bodyStart, 'metadata part should end with a CRLF');
+    const json = part.slice(bodyStart, bodyEnd);
     return JSON.parse(json);
 }
 
