@@ -15,6 +15,25 @@ it('routes the prepare-hermes package script through the compiled CLI', () => {
     expect(fs.existsSync(runtimeCli)).toBe(true);
 });
 
+it('normalizes Windows SDK paths before CMake propagates them to try_compile', () => {
+    const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-toolchain-path-'));
+    try {
+        const probe = path.join(temporaryDir, 'toolchain-path-probe.cmake');
+        const toolchainFile = path.join(runtimeDir, 'cmake/wasi-sdk-hermes-p2.cmake').replaceAll('\\', '/');
+        fs.writeFileSync(probe, `include("${toolchainFile}")\nmessage(STATUS "WASI_SDK_PREFIX=\${WASI_SDK_PREFIX}")\n`);
+
+        const result = spawnSync('cmake', ['-DWASI_SDK_PREFIX=C:\\Users\\runner\\wasi-sdk', '-P', probe], {
+            encoding: 'utf8'
+        });
+        const output = `${result.stdout}\n${result.stderr}`;
+
+        expect(result.status, output).toBe(0);
+        expect(output).toContain('WASI_SDK_PREFIX=C:/Users/runner/wasi-sdk');
+    } finally {
+        fs.rmSync(temporaryDir, { recursive: true, force: true });
+    }
+});
+
 it('extends Hermes OS compatibility sources without replacing existing platforms', () => {
     const patch = fs.readFileSync(
         path.join(runtimeDir, 'hermes-patches/0001-wasi-p2-configure-platform.patch'),
@@ -36,6 +55,18 @@ it('keeps LLVH Unix and Windows implementations independent when adding WASI', (
     expect(patch).toContain('+#if defined(__wasi__)');
     expect(patch).not.toMatch(/^-[ \t]*#ifdef _WIN32$/m);
     expect(patch).not.toMatch(/^\+#elif defined\((?:LLVM_ON_UNIX|_WIN32)\)$/m);
+});
+
+it('does not apply Windows host defines to WASI Hermes builds', () => {
+    const patch = fs.readFileSync(
+        path.join(runtimeDir, 'hermes-patches/0001-wasi-p2-configure-platform.patch'),
+        'utf8'
+    );
+
+    expect(patch).toContain('+if (WIN32 AND NOT CMAKE_TOOLCHAIN_FILE MATCHES "wasi-sdk-hermes-p2.cmake")');
+    expect(patch).toContain('+if (WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "WASI")');
+    expect(patch).toContain('-else (WIN32)\n-  if (FUCHSIA OR UNIX)\n+else ()');
+    expect(patch).toContain('-  endif (FUCHSIA OR UNIX)\n-endif (WIN32)\n+  endif ()\n+endif ()');
 });
 
 it('returns an explicit unsupported error when WASI footprint is unavailable', () => {

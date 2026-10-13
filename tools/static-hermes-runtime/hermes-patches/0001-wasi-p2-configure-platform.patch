@@ -1,12 +1,32 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -62,3 +62,3 @@
+-if (WIN32)
++if (WIN32 AND NOT CMAKE_TOOLCHAIN_FILE MATCHES "wasi-sdk-hermes-p2.cmake")
+ add_definitions(-D_WINDOWS)
+ endif()
+
 diff --git a/cmake/modules/Hermes.cmake b/cmake/modules/Hermes.cmake
-index 466b01d98..d210a1618 100644
+index 466b01d98..0820cdc1a 100644
 --- a/cmake/modules/Hermes.cmake
 +++ b/cmake/modules/Hermes.cmake
-@@ -49,7 +49,13 @@ if (WIN32)
+@@ -39,7 +39,7 @@ elseif (MINGW) # FIXME: Also cygwin?
+   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--stack,16777216")
+ endif ()
+ 
+-if (WIN32)
++if (WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "WASI")
+   set(LLVM_HAVE_LINK_VERSION_SCRIPT 0)
+   if (CYGWIN)
+     set(LLVM_ON_WIN32 0)
+@@ -48,8 +48,14 @@ if (WIN32)
+     set(LLVM_ON_WIN32 1)
      set(LLVM_ON_UNIX 0)
    endif (CYGWIN)
- else (WIN32)
+-else (WIN32)
 -  if (FUCHSIA OR UNIX)
++else ()
 +  if (CMAKE_SYSTEM_NAME STREQUAL "WASI")
 +    set(LLVM_ON_WIN32 0)
 +    # WASI exposes Unix file-status structures but lacks some APIs used by
@@ -17,7 +37,7 @@ index 466b01d98..d210a1618 100644
      set(LLVM_ON_WIN32 0)
      set(LLVM_ON_UNIX 1)
      if (APPLE OR ${CMAKE_SYSTEM_NAME} MATCHES "AIX")
-@@ -57,9 +63,9 @@ else (WIN32)
+@@ -57,10 +63,10 @@ else (WIN32)
      else ()
        set(LLVM_HAVE_LINK_VERSION_SCRIPT 1)
      endif ()
@@ -25,10 +45,13 @@ index 466b01d98..d210a1618 100644
 +  else ()
      MESSAGE(SEND_ERROR "Unable to determine platform")
 -  endif (FUCHSIA OR UNIX)
+-endif (WIN32)
 +  endif ()
- endif (WIN32)
++endif ()
  
  # Set C++ exception handling and RTTI flags for a target.
+ # Uses generator expressions to apply flags only to C++ source files,
+
 diff --git a/external/llvh/CMakeLists.txt b/external/llvh/CMakeLists.txt
 index 5944b9c0e..6e4fc052f 100644
 --- a/external/llvh/CMakeLists.txt

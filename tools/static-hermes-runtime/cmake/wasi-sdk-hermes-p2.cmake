@@ -6,7 +6,7 @@ set(CMAKE_SYSTEM_PROCESSOR wasm32)
 set(CMAKE_EXECUTABLE_SUFFIX .wasm)
 set(triple wasm32-wasip2)
 
-if(WIN32)
+if(CMAKE_HOST_WIN32)
     set(WASI_HOST_EXE_SUFFIX ".exe")
 else()
     set(WASI_HOST_EXE_SUFFIX "")
@@ -15,6 +15,9 @@ endif()
 if(NOT WASI_SDK_PREFIX)
     message(FATAL_ERROR "WASI_SDK_PREFIX must point to the WASI SDK installation")
 endif()
+
+# CMake re-emits this variable in try_compile scripts; forward slashes avoid invalid Windows escapes.
+string(REPLACE "\\" "/" WASI_SDK_PREFIX "${WASI_SDK_PREFIX}")
 
 list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES WASI_SDK_PREFIX)
 list(APPEND CMAKE_MODULE_PATH "${WASI_SDK_PREFIX}/share/cmake")
