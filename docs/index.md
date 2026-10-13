@@ -1,7 +1,7 @@
 ---
 layout: home
 hero:
-    name: Pumpkin Plugins
+    name: pumpkin-plugins
     text: Documentation
     tagline: Guides and references for server owners and developers.
     actions:

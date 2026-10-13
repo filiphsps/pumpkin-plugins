@@ -2,7 +2,7 @@
 layout: page
 sidebar: false
 title: Team
-description: Meet the people contributing to Pumpkin Plugins.
+description: Meet the people contributing to pumpkin-plugins.
 ---
 
 <script setup>
@@ -12,7 +12,7 @@ import { data as members } from './.vitepress/team.data.mts';
 
 <VPTeamPage>
     <VPTeamPageTitle>
-        <template #title>The people behind Pumpkin Plugins</template>
+        <template #title>The people behind pumpkin-plugins</template>
         <template #lead>
             These contributors help develop our plugins, tools, actions, and documentation.
         </template>

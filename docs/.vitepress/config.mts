@@ -384,7 +384,7 @@ function generateLlmsText(): string {
     const siteLink = publishedSiteUrl ?? siteBase;
 
     return [
-        '# Pumpkin Plugins',
+        '# `pumpkin-plugins`',
         '',
         '> TypeScript plugins, shared tools, and GitHub Actions for Pumpkin Minecraft servers.',
         '',
@@ -654,7 +654,7 @@ const themeConfig = {
     search: { provider: 'local' as const },
     socialLinks: [{ icon: 'github' as const, link: repoUrl }],
     footer: {
-        message: 'Pumpkin Plugins documentation',
+        message: 'pumpkin-plugins documentation',
         copyright: 'MIT License'
     }
 } satisfies DefaultTheme.Config & { megaMenus: MegaMenu[] };
@@ -768,8 +768,8 @@ export default defineConfig({
         ['meta', { name: 'google-site-verification', content: 'Ac8kmcoez1w3jlR5BxcQ8mBc5f0gcZ4s40xNXad4804' }],
         ['link', { rel: 'describedby', href: `${siteBase}llms.txt` }]
     ],
-    title: 'Pumpkin Plugins',
-    description: 'Guides and references for Pumpkin plugins, actions, and developer tools.',
+    title: 'pumpkin-plugins',
+    description: 'Guides and references for pumpkin-plugins, actions, and developer tools.',
     cleanUrls: true,
     base: siteBase,
     lastUpdated: true,

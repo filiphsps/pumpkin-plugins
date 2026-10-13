@@ -76,12 +76,34 @@ const anchors = (file) =>
 /** Markdown text without code, so examples don't count as links. */
 const prose = (text) => text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '');
 
+/** Resolve an absolute documentation-site route to its source Markdown file.
+ *
+ * @param href - Absolute VitePress route.
+ * @returns Repository-relative Markdown path, or `undefined` for an unknown route family.
+ */
+function resolveSiteRoute(href) {
+    const route = href.replace(/^\//, '');
+    if (route.startsWith('guides/')) {
+        const source = path.posix.join('docs', route.slice('guides/'.length));
+        return source.endsWith('/') ? `${source}index.md` : /\.md$/.test(source) ? source : `${source}.md`;
+    }
+    if (route.startsWith('api/')) {
+        const source = path.posix.join('docs', route);
+        return source.endsWith('/') ? `${source}index.md` : /\.md$/.test(source) ? source : `${source}/index.md`;
+    }
+    return undefined;
+}
+
 for (const file of docs) {
     for (const match of prose(read(file)).matchAll(/\]\(([^)\s]+)\)/g)) {
         const target = match[1] ?? '';
         if (/^(https?:|mailto:)/.test(target)) continue;
         const [href, anchor] = target.split('#');
-        const resolved = href ? path.posix.normalize(path.posix.join(path.posix.dirname(file), href)) : file;
+        const resolved = href
+            ? href.startsWith('/')
+                ? (resolveSiteRoute(href) ?? path.posix.normalize(path.posix.join(path.posix.dirname(file), href)))
+                : path.posix.normalize(path.posix.join(path.posix.dirname(file), href))
+            : file;
         if (!exists(resolved)) {
             problems.push(`${file} links to ${target}, which does not exist`);
         } else if (anchor && resolved.endsWith('.md') && !anchors(resolved).has(anchor)) {
