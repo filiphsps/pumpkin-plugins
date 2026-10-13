@@ -671,6 +671,8 @@ function configureAndBuildHermes(
     filesystem: HermesFileSystem,
     runner: HermesProcessRunner
 ): void {
+    const hostPlatform = options.platform ?? process.platform;
+    const hostCxxReleaseFlags = hostPlatform === 'win32' ? '-Os -DNDEBUG' : '-Os -DNDEBUG -Wno-unused-template';
     filesystem.mkdirSync(path.join(options.wasiSdk, 'share/wasi-sysroot/include/c++/v1'), { recursive: true });
     filesystem.mkdirSync(options.hostBuild, { recursive: true });
     filesystem.mkdirSync(options.wasiBuild, { recursive: true });
@@ -694,7 +696,7 @@ function configureAndBuildHermes(
         '-DHERMES_UNICODE_LITE=ON',
         '-DHERMES_ALLOW_BOOST_CONTEXT=0',
         '-DCMAKE_C_FLAGS_RELEASE=-Os -DNDEBUG',
-        '-DCMAKE_CXX_FLAGS_RELEASE=-Os -DNDEBUG -Wno-unused-template'
+        `-DCMAKE_CXX_FLAGS_RELEASE=${hostCxxReleaseFlags}`
     ]);
     runner.run('cmake', ['--build', options.hostBuild, '--target', 'shermes', 'hermesc', '--parallel']);
     runner.run('cmake', [

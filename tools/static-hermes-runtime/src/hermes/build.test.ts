@@ -391,6 +391,18 @@ it('builds and reuses Windows Hermes artifacts without probing MSVC as a GNU com
     expect(outputCalls.some(({ command }) => command === 'cl.exe')).toBe(false);
 });
 
+it('omits GNU-only host compiler flags when configuring Hermes with MSVC', async () => {
+    const { options, calls, setPlatform } = fixture();
+    setPlatform('win32');
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await buildHermes(options);
+
+    const hostConfigure = cmakeCalls(calls).find(({ args }) => args[0] === '-S' && args[3] === options.hostBuild);
+    expect(hostConfigure?.args).toContain('-DCMAKE_CXX_FLAGS_RELEASE=-Os -DNDEBUG');
+    expect(hostConfigure?.args).not.toContain('-DCMAKE_CXX_FLAGS_RELEASE=-Os -DNDEBUG -Wno-unused-template');
+});
+
 function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
     options: HermesBuildOptions;
     packageRoot: string;
