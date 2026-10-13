@@ -5,6 +5,12 @@ import { createServer } from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+    assertPackedBuilderDependencies,
+    assertPublicToolPackage,
+    assertStarterToolDependencies,
+    PUBLIC_TOOL_PACKAGE_PATHS
+} from './tool-packages.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const buildCliOnly = process.argv.includes('--build-cli-only');
@@ -68,6 +74,8 @@ for (const packagePath of packagePaths) {
     if (packedPackageJson.name !== packageJson.name) {
         throw new Error(`Packed package name changed from ${packageJson.name} to ${packedPackageJson.name}`);
     }
+    const expectedPublicName = PUBLIC_TOOL_PACKAGE_PATHS[packagePath];
+    if (expectedPublicName) assertPublicToolPackage(packedPackageJson, expectedPublicName);
     if (packedPackageJson.name === '@pumpkin-plugins/pumpkin-api') {
         assertPumpkinApiPackageContents(tarballPath);
     }
@@ -76,6 +84,24 @@ for (const packagePath of packagePaths) {
         filename: tarball,
         bytes: fs.readFileSync(tarballPath)
     });
+}
+
+const packedToolVersions = Object.fromEntries(
+    [...packedPackages].map(([name, { packageJson }]) => [name, packageJson.version])
+);
+assertPackedBuilderDependencies(packedPackages.get('@pumpkin-plugins/build').packageJson, packedToolVersions);
+if (!buildCliOnly) {
+    const creatorPackage = packedPackages.get('create-pumpkin-plugin');
+    for (const language of ['typescript', 'javascript']) {
+        const templatePackageJson = JSON.parse(
+            execFileSync(
+                'tar',
+                ['-xOf', path.join(tarballDirectory, creatorPackage.filename), `package/templates/${language}/package.json`],
+                { encoding: 'utf8' }
+            )
+        );
+        assertStarterToolDependencies(templatePackageJson, packedToolVersions);
+    }
 }
 
 const registry = createInternalRegistry(packedPackages);
@@ -189,7 +215,7 @@ try {
             consumerDirectory,
             environment
         );
-        assertStarter(path.join(consumerDirectory, 'packed-bin'), 'typescript', pnpmVersion.trim());
+        assertStarter(path.join(consumerDirectory, 'packed-bin'), 'typescript', pnpmVersion.trim(), packedToolVersions);
 
         for (const [directory, language] of [
             ['pnpm-create-typescript', 'typescript'],
@@ -208,7 +234,7 @@ try {
                 environment
             );
             const starter = path.join(consumerDirectory, directory);
-            assertStarter(starter, language, pnpmVersion.trim());
+            assertStarter(starter, language, pnpmVersion.trim(), packedToolVersions);
             await run(packageManager.command, [...packageManager.args, 'run', 'typecheck'], starter, environment);
             await run(packageManager.command, [...packageManager.args, 'run', 'build'], starter, environment);
 
@@ -311,8 +337,9 @@ function tarballName(name) {
     return `${name.replace(/^@/, '').replaceAll('/', '-')}-`;
 }
 
-function assertStarter(directory, language, expectedPnpmVersion) {
+function assertStarter(directory, language, expectedPnpmVersion, versions) {
     const packageJson = JSON.parse(fs.readFileSync(path.join(directory, 'package.json'), 'utf8'));
+    assertStarterToolDependencies(packageJson, versions);
     const sourcePath = path.resolve(directory, packageJson.pumpkinPlugin.entry);
     const expectedExtension = language === 'typescript' ? '.ts' : '.js';
     if (
