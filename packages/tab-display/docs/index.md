@@ -36,8 +36,9 @@ modify names, scores, identities, skins or roster membership.
 
 ## PumpkinPIE placeholders
 
-PumpkinPIE is optional. TabDisplay talks to the configured plugin name through the shared
-PumpkinPIE API and does not require the provider as plugin metadata. If it is absent, the display
+PumpkinPIE is an optional external plugin, built and released separately from TabDisplay. TabDisplay
+talks to the configured plugin name through the shared PumpkinPIE client API and does not require
+the provider as plugin metadata. If it is absent, the display
 commands still work and templates use the configured `placeholders.missing_provider` fallback
 (`literal` by default, or `empty`). Once the provider returns, one shared session resumes bounded
 placeholder work. Unknown identifiers follow `placeholders.unresolved`.
