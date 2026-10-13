@@ -51,7 +51,7 @@ version fails setup. The files follow the
 the WASI 2 CMake toolchain adjustment required by Hermes. Optional paths and build settings are
 listed under [Build flags](#build-flags).
 
-The external-consumer CI contract uses Node `24.21.0`, pnpm `12.10.1`, CMake `4.4.4`, Ninja
+The external-consumer CI contract uses Node `24.21.0`, pnpm `12.11.2`, CMake `4.4.4`, Ninja
 `1.13.2`, Rust/Cargo `1.99.0`, `wit-bindgen` `0.62.0`, and WASI SDK `34`. Windows x64 uses the
 Visual Studio 2022 MSVC `14.44` toolset. Override the default `.cache/hermes/` location with
 `STATIC_HERMES_CACHE_DIR`; the packed-consumer check also keeps its pnpm store in a temporary

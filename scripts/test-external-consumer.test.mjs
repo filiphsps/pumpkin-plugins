@@ -6,6 +6,8 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 
 const script = path.resolve(import.meta.dirname, 'test-external-consumer.mjs');
+const requiredPnpmVersion = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '..', 'package.json'), 'utf8'))
+    .devEngines.packageManager.version;
 
 test('removes the temporary workspace when package packing fails', (t) => {
     const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-external-consumer-test-'));
@@ -16,7 +18,7 @@ test('removes the temporary workspace when package packing fails', (t) => {
     const packageManagerPath = path.join(fixtureRoot, 'pnpm.cjs');
     fs.writeFileSync(
         packageManagerPath,
-        `if (process.argv[2] === '--version') console.log('12.10.1');
+        `if (process.argv[2] === '--version') console.log('${requiredPnpmVersion}');
 else if (process.argv[2] === 'pack') { console.error('forced pack failure'); process.exit(1); }
 else process.exit(2);\n`
     );

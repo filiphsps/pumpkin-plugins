@@ -67,7 +67,7 @@ plugin build in the integration job.
 
 ## Packed standalone consumer
 
-Run `pnpm run test:external-consumer` with Node `24.21.0` and pnpm `12.10.1` to pack the internal
+Run `pnpm run test:external-consumer` with Node `24.21.0` and pnpm `12.11.2` to pack the internal
 production dependencies, install them from a temporary local registry, invoke the packed creator
 binary and both real `pnpm create pumpkin-plugin` language flows, then typecheck and build both
 starters. The check uses a temporary pnpm store and Static Hermes cache outside the consumer and

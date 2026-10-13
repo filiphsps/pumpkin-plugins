@@ -54,7 +54,7 @@ declarations from the fetched source into `build/types/bindings/`; a plugin's `t
 includes those declarations before its source files and preserves WIT `u64`/`s64` values as
 `bigint`.
 
-Packed consumer builds use Node `24.21.0` and pnpm `12.10.1`. The host toolchain pins are CMake
+Packed consumer builds use Node `24.21.0` and pnpm `12.11.2`. The host toolchain pins are CMake
 `4.4.4`, Ninja `1.13.2`, Rust/Cargo `1.99.0`, `wit-bindgen` `0.62.0`, and WASI SDK `34`; Windows
 x64 uses Visual Studio 2022 MSVC toolset `14.44`. Set `STATIC_HERMES_CACHE_DIR` to move Hermes
 source and build artifacts outside the default workspace cache. Run

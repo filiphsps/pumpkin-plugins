@@ -30,7 +30,12 @@ const packagePaths = buildCliOnly
           'tools/create-pumpkin-plugin'
       ];
 const requiredNodeVersion = 'v24.21.0';
-const requiredPnpmVersion = '12.10.1';
+const requiredPnpmVersion = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8')).devEngines
+    ?.packageManager?.version;
+
+if (typeof requiredPnpmVersion !== 'string') {
+    throw new Error('Root package.json must set devEngines.packageManager.version');
+}
 
 if (process.version !== requiredNodeVersion) {
     throw new Error(`External consumer requires Node ${requiredNodeVersion}; received ${process.version}`);

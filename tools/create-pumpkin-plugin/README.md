@@ -24,7 +24,7 @@ The TypeScript template uses `src/plugin.ts`. The JavaScript template uses `src/
 
 ## Node.js and package manager support
 
-The generator uses Node.js type stripping and requires Node `24.21.0` or newer. It runs the package manager entrypoint that launched it when installing dependencies; otherwise use the commands it prints after creation. The packed-consumer CI matrix targets pnpm `12.10.1` on Linux x64, macOS arm64 and Windows x64.
+The generator uses Node.js type stripping and requires Node `24.21.0` or newer. It runs the package manager entrypoint that launched it when installing dependencies; otherwise use the commands it prints after creation. The packed-consumer CI matrix targets pnpm `12.11.2` on Linux x64, macOS arm64 and Windows x64.
 
 ## API and ABI versions
 
