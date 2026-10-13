@@ -32,6 +32,8 @@ export interface BundleOptions {
     engine?: PluginEngine;
     /** Static Hermes VM profile. Defaults to lean, which omits runtime `eval`. */
     staticHermesRuntime?: StaticHermesRuntime;
+    /** Pass the bundle to Hermes's partial, unstable TypeScript parser. Static Hermes only. */
+    parseTypeScript?: boolean;
     /** Whether this is a development build. */
     developmentMode?: boolean;
     /** Suppress runtime stdout while preserving stderr for the build command's shared formatter. */
@@ -138,6 +140,7 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                     ...(options.staticHermesRuntime === undefined
                         ? {}
                         : { runtimeVariant: options.staticHermesRuntime }),
+                    ...(options.parseTypeScript ? { parseTypeScript: true } : {}),
                     ...(usedWitMethods === undefined
                         ? {}
                         : {

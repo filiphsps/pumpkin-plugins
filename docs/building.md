@@ -40,6 +40,7 @@ native code for size while keeping Hermes source locations and native line table
 | --- | --- |
 | `pumpkin-plugins-build` | `build/<plugin>.wasm`, plus the latest combined WIT snapshot in `build/wit/` when WASI imports are added |
 | `pumpkin-plugins-build --types-only` | Guest declarations in `build/types/bindings/` for `tsc` and your editor |
+| `pumpkin-plugins-build --parse-ts` | Opts Static Hermes into its partial, unstable TypeScript parser; unavailable with QuickJS |
 
 Set `PUMPKIN_PLUGINS_VERBOSE_BUILD=1` to include Static Hermes tool output and the selected
 `--wasi-imports`, `--wasi-methods`, `--api-methods` and `--event-types` for each component. Root builds

@@ -147,6 +147,7 @@ describe('CLI informational options', () => {
             await expect(run([argument], '/not-a-package')).resolves.toBeUndefined();
             expect(output.join('')).toContain('Usage: pumpkin-plugins-build');
             expect(output.join('')).toContain('--types-only');
+            expect(output.join('')).toContain('--parse-ts');
             if (argument === '--help') expect(output.join('')).toMatchSnapshot();
             expect(bundlePlugin).not.toHaveBeenCalled();
             expect(generateTypes).not.toHaveBeenCalled();
@@ -452,6 +453,29 @@ describe('run arguments', () => {
         await expect(run(['--types-onyl'], '/not-a-package')).rejects.toThrow("unknown option '--types-onyl'");
     });
 
+    it('rejects TypeScript parsing for QuickJS before resolving build dependencies', async () => {
+        const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-parse-ts-quickjs-'));
+        fs.writeFileSync(
+            path.join(pluginDir, 'package.json'),
+            JSON.stringify({
+                version: '1.0.0',
+                pumpkinPlugin: {
+                    entry: 'src/plugin.ts',
+                    output: 'build/plugin.wasm',
+                    wasi: [],
+                    engine: 'quickjs'
+                }
+            })
+        );
+
+        try {
+            await expect(run(['--parse-ts'], pluginDir)).rejects.toThrow('--parse-ts requires Static Hermes');
+            expect(bundlePlugin).not.toHaveBeenCalled();
+        } finally {
+            fs.rmSync(pluginDir, { recursive: true, force: true });
+        }
+    });
+
     it('reports missing build fields before resolving build dependencies', async () => {
         const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-'));
         fs.writeFileSync(
@@ -645,7 +669,7 @@ describe('run arguments', () => {
         const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
 
         try {
-            await run([], pluginDir);
+            await run(['--parse-ts'], pluginDir);
 
             expect(bundlePlugin).toHaveBeenCalledWith({
                 projectRoot: pluginDir,
@@ -655,6 +679,7 @@ describe('run arguments', () => {
                 version: '1.2.3',
                 engine: 'static-hermes',
                 staticHermesRuntime: 'lean',
+                parseTypeScript: true,
                 developmentMode: false,
                 quietRuntimeOutput: true,
                 onOutput: expect.any(Function)

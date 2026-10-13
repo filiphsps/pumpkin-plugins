@@ -8,6 +8,7 @@ Build the Pumpkin plugin in the current directory.
 Options:
   -V, --version  output the version number
   --types-only   Generate guest declarations without building a component
+  --parse-ts     Use Hermes TypeScript parsing for the component bundle
   -h, --help     display help for command
 "
 `;

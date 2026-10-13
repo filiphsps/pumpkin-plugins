@@ -26,6 +26,9 @@ Run the build command with `--types-only` to generate guest types without produc
 Those declarations are consumed by TypeScript and the editor. They are build output, so edit the
 plugin source and package configuration rather than generated files.
 
+Pass `--parse-ts` to use Hermes's partial, unstable TypeScript parser when compiling a Static Hermes
+component bundle. The option is off by default and is unavailable with QuickJS.
+
 The build tool owns console output for both engines. It reports the entry point, selected runtime,
 componentization stage and final artifact size with a shared `[build]` prefix. Routine output from
 the QuickJS and Static Hermes toolchains is suppressed; failures include captured stderr diagnostics

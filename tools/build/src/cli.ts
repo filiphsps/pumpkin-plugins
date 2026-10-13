@@ -29,6 +29,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
         .description('Build the Pumpkin plugin in the current directory.')
         .version((createRequire(import.meta.url)('../package.json') as { version: string }).version)
         .option('--types-only', 'Generate guest declarations without building a component')
+        .option('--parse-ts', 'Use Hermes TypeScript parsing for the component bundle')
         .configureOutput({ outputError: () => {} })
         .exitOverride();
     try {
@@ -38,9 +39,12 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
         if (error.exitCode === 0) return;
         throw new BuildError(error.message.replace(/^error: /, ''));
     }
-    const { typesOnly } = command.opts();
+    const { typesOnly, parseTs } = command.opts();
 
     const config = readPluginConfig(pluginDir);
+    if (parseTs && config.engine !== 'static-hermes') {
+        throw new BuildError('--parse-ts requires Static Hermes');
+    }
     const buildFields = typesOnly ? undefined : requireBuildFields(config);
     const buildDir = path.join(pluginDir, 'build');
     const apiWit = resolveApiWit(pluginDir);
@@ -113,6 +117,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
             quietRuntimeOutput: process.env.PUMPKIN_PLUGINS_VERBOSE_BUILD !== '1',
             onOutput: printBuildOutput,
             ...(staticHermesRuntime === undefined ? {} : { staticHermesRuntime }),
+            ...(parseTs ? { parseTypeScript: true } : {}),
             developmentMode: process.env.PUMPKIN_DEV_MODE === '1'
         });
         printBuildOutput({ type: 'built', output, sizeBytes: size });

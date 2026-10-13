@@ -81,6 +81,7 @@ describe('bundlePlugin', () => {
             stdio: ['inherit', 'ignore', 'pipe'],
             maxBuffer: 16 * 1024 * 1024
         });
+        expect(componentize.mock.calls[0]?.[1]).not.toContain('--parse-ts');
         expect(onOutput).toHaveBeenCalledWith({
             type: 'componentize',
             engine,
@@ -260,7 +261,8 @@ describe('bundlePlugin', () => {
             witDir: apiWitDir,
             version: '1.0.0',
             engine: 'static-hermes',
-            staticHermesRuntime: 'lean'
+            staticHermesRuntime: 'lean',
+            parseTypeScript: true
         });
 
         expect(esbuild).toHaveBeenCalledWith(
@@ -271,6 +273,7 @@ describe('bundlePlugin', () => {
         expect(componentize.mock.calls[0]?.[1]).toContain('build');
         expect(componentize.mock.calls[0]?.[1]).toContain('--runtime-variant');
         expect(componentize.mock.calls[0]?.[1]).toContain('lean');
+        expect(componentize.mock.calls[0]?.[1]).toContain('--parse-ts');
         expect(componentize.mock.calls[0]?.[1]).not.toContainEqual(expect.stringContaining('componentize-qjs.cjs'));
     });
 
