@@ -10,8 +10,8 @@ reusable `.github/workflows/release.yml`, called after the CI gates pass. Action
 the reusable `.github/workflows/actions.yml`, scoped to action code. The documentation site has its own
 `.github/workflows/docs.yml`, which checks and publishes the VitePress site and mirrors it to
 `gh-pages`. The shared setup (pnpm, Node,
-install, Turborepo cache) is the composite action in `.github/common/bootstrap`. CI jobs use
-`ubuntu-26.04`.
+install, Turborepo cache) is the composite action in `.github/common/bootstrap`. Most CI jobs use
+`ubuntu-26.04`; the external-consumer matrix also runs on `macos-15` and `windows-2025`.
 
 ## Jobs
 
@@ -22,6 +22,7 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
 | 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
+| 📦 External consumer | code changes | Packs the production tool packages, installs and builds the creator's TypeScript and JavaScript starters outside the repository on Linux, macOS arm64 and Windows x64 with the pinned Node and pnpm versions |
 | 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or common plus all four public consumers for shared helper changes, then uploads c8 coverage to Codecov |
 | 🛡️ Action test gate | every CI run, after classification and action tests | Requires every selected action suite to pass; accepts skipped tests only for an empty matrix |
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |

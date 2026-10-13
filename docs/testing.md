@@ -64,6 +64,20 @@ parallel. The root command runs up to four package suites at a time to reduce to
 time without starting every package's servers simultaneously. CI also reuses the WASM files from its
 build job, avoiding a second plugin build in the integration job.
 
+## Packed standalone consumer
+
+Run `pnpm run test:external-consumer` with Node `24.21.0` and pnpm `12.10.1` to pack the internal
+production dependencies, install them from a temporary local registry, invoke the packed creator
+binary and both real `pnpm create pumpkin-plugin` language flows, then typecheck and build both
+starters. The check uses a temporary pnpm store and Static Hermes cache outside the consumer and
+removes its temporary project when it finishes. CI runs this cold-cache build on Linux x64, macOS
+arm64 and Windows x64; host-tool versions are pinned in the [Static Hermes Runtime guide](../tools/static-hermes-runtime/README.md).
+
+The check also installs only the packed builder's production dependencies with pnpm hoisting disabled
+and runs its CLI without an ambient TypeScript installation. Run
+`pnpm run test:external-consumer --build-cli-only` to check that packaging boundary without compiling
+the starter components.
+
 Ports come from 20000 to 30000, below the range the operating system hands out for connections
 (32768 up on Linux, 49152 on macOS and Windows), so nothing that connects while a server is starting
 can take the port a test was given. A server that still finds one of its ports taken is started again
@@ -71,8 +85,8 @@ on ports of its own, three times over, before the start is failed.
 
 ## The server binary
 
-The release is pinned in `tools/test-harness/src/pumpkin-version.ts`, and it should match the
-`pumpkin-api-ts` version in `pnpm-workspace.yaml`. Which binary runs:
+The release is pinned in `tools/test-harness/src/pumpkin-version.ts`, and its plugin ABI should match
+the WIT ABI carried by `@pumpkin-plugins/pumpkin-api` in `pnpm-workspace.yaml`. Which binary runs:
 
 1. `PUMPKIN_BIN`, if set.
 2. Otherwise the pinned release, downloaded once into `.cache/pumpkin` and verified against the

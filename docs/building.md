@@ -21,9 +21,12 @@ supported API calls. Development, integration and release builds use the configu
 build tool provisions Static Hermes's pinned WASI SDK and `wit-bindgen` under `.cache/hermes/` when
 needed, then prepares Hermes automatically when Static Hermes is selected.
 
-It uses the WIT from the pinned `@pumpkinmc/pumpkin-api-ts` (the version is the `catalog:` entry in
-`pnpm-workspace.yaml`, and it must match the Pumpkin server's plugin ABI), esbuild and the selected
-engine. Static Hermes uses its generated WASI C bindings and component linker. QuickJS uses the Wasmtime 48
+It resolves the plugin's installed `@pumpkin-plugins/pumpkin-api` dependency and fetches the
+WIT files from the subdirectory pinned by its `wit.lock.json` (the WIT ABI must match the Pumpkin server),
+then resolves esbuild and the selected engine. On first use, and whenever the lockfile contents
+change, Git fetches the pinned commit into `.cache/pumpkin-api-wit/<lock-digest>/`; existing cache
+entries need no network access. Set `PUMPKIN_PLUGINS_CACHE_DIR` to move that cache. Static Hermes
+uses its generated WASI C bindings and component linker. QuickJS uses the Wasmtime 48
 CLI fork of `componentize-qjs`. The fork is needed because the upstream Wasmtime 47 CLI fails to link
 the WASI HTTP types used by plugins. The pinned release's own build script uses a componentizer that
 produces 55 MB plugins and can't run the WASI socket code.
@@ -45,14 +48,17 @@ type generation prepares its WIT in a temporary directory and removes it afterwa
 The shared `plugin-kit` package does the same for its own source, generating declarations for its
 filesystem imports in its ignored `build/types/` directory.
 
-`PUMPKIN_API_DIR` points the tool at a different `pumpkin-api-ts` checkout.
+The API package ships `wit.lock.json`, not a vendored WIT tree. The build command generates guest
+declarations from the fetched source into `build/types/bindings/`; a plugin's `tsconfig.json`
+includes those declarations before its source files and preserves WIT `u64`/`s64` values as
+`bigint`.
 
-A plugin is built against the API's WIT as `pumpkin-api-ts` ships it, plus the WASI imports it asks for.
-
-`pumpkin-api-ts` ships its own declarations for `pumpkin:plugin/*`, and TypeScript keeps the first
-declaration of a module it sees. So a plugin's `tsconfig.json` lists the generated
-`build/types/bindings/**/*.d.ts` before `src` in `include` (the generator's template does), which
-makes the generated declarations win and preserves WIT `u64`/`s64` values as `bigint`.
+Packed consumer builds use Node `24.21.0` and pnpm `12.10.1`. The host toolchain pins are CMake
+`4.4.4`, Ninja `1.13.2`, Rust/Cargo `1.99.0`, `wit-bindgen` `0.62.0`, and WASI SDK `34`; Windows
+x64 uses Visual Studio 2022 MSVC toolset `14.44`. Set `STATIC_HERMES_CACHE_DIR` to move Hermes
+source and build artifacts outside the default workspace cache. Run
+`pnpm run test:external-consumer` to pack the internal dependencies, install them from a temporary
+registry, and typecheck/build both generated standalone starters from a temporary consumer.
 
 ## Runtime caveats
 
@@ -130,6 +136,11 @@ Set `PUMPKIN_BIN` to use a local server binary instead of downloading the latest
 `PUMPKIN_CACHE_DIR` to change the binary cache directory. To reset the dev server's world, config and
 plugins, stop the server and remove `.cache/pumpkin-dev`.
 
+The compiled build executable lives at `tools/build/dist/cli.js`. Turbo builds it and its Static
+Hermes runtime dependency before plugin builds or typechecks. For direct package commands after a
+fresh checkout, run `pnpm --filter @pumpkin-plugins/static-hermes-runtime build` and
+`pnpm --filter @pumpkin-plugins/build build` first.
+
 The build tool and test harness `typecheck` tasks run `tsc --noEmit`, so their package-level Turbo
 configurations declare no outputs. Plugin typechecks keep the root `build/types/**` outputs because
 they generate guest declarations needed by builds and editors.
@@ -144,13 +155,11 @@ Things to know when changing `turbo.json`:
   `wasi-wit.lock.json` and `src/` decide what a plugin is built from) invalidates exactly its
   dependents. New tools need nothing added, as long as a plugin lists them in its `package.json`.
   `globalDependencies` is only for inputs outside any package: `tsconfig.base.json` and
-  `pnpm-workspace.yaml` (the API version). The lockfile and the root `package.json` invalidate
+  `pnpm-workspace.yaml` (the API package and ABI pin). The lockfile and the root `package.json` invalidate
   everything, and so do the packages the root `package.json` depends on (`tools/docs` and
   `tools/signing`), because Turborepo treats those as global.
 - **Environment variables.** Turborepo runs tasks in strict env mode, so a variable a task reads
-  has to be declared, or it never reaches the task. `PUMPKIN_API_DIR` (another `pumpkin-api-ts`
-  checkout) changes what `build` and `typecheck` produce, so it is in their `env` and part of their
-  cache key. The `PUMPKIN_*` variables the test harness and the build's download cache read are in
+  has to be declared, or it never reaches the task. The `PUMPKIN_*` variables the test harness and the build's download cache read are in
   `globalPassThroughEnv`; they don't affect cache keys, which is fine because they only say where
   things are or what to run in uncached tasks. `TMPDIR` isn't passed through, so tests run under Turborepo create their
   temp directories in `/tmp`. Static Hermes toolchain paths pass through to the uncached

@@ -92,3 +92,21 @@ things are easy to forget:
 - `pnpm install` has to run so the workspace links are created.
 - `pnpm readme` has to run so the package table lists it and its docs-site reference links are
   generated.
+
+## Standalone projects
+
+Use [`create-pumpkin-plugin`](../tools/create-pumpkin-plugin/README.md) for a small project outside
+this monorepo. It offers TypeScript and JavaScript starters with the API and build dependencies, but
+does not add `plugin-kit`, Release Please registration or repository integration-test scaffolding.
+
+```sh
+pnpm create pumpkin-plugin my-plugin
+pnpm create pumpkin-plugin my-plugin --ts
+pnpm create pumpkin-plugin my-plugin --js
+```
+
+The interactive command asks which language to use. Pass `--skip-install` to create files without
+installing dependencies. The creator refuses existing destinations. Its README documents npm,
+Yarn Classic, Yarn Modern and Bun launch forms; only pnpm packed-consumer builds are part of the
+validated external support contract. See the [Plugin API guide](plugin-api/index.md) for API setup,
+lifecycle, ABI and migration details.
