@@ -91,17 +91,20 @@ function packageManagerInvocation(
     environment: NodeJS.ProcessEnv = process.env
 ): { command: string; args: string[] } {
     const executable = environment.npm_execpath ?? environment.NPM_CONFIG_EXECPATH;
-    if (!executable) return { command: packageManager, args: [] };
-
-    const scriptName = path.basename(executable).toLowerCase();
     const launchers: Record<PackageManager, RegExp> = {
         pnpm: /^pnpm(?:-cli)?\.(?:cjs|mjs|js)$/,
         npm: /^npm(?:-cli)?\.(?:cjs|mjs|js)$/,
         yarn: /^yarn(?:-cli)?\.(?:cjs|mjs|js)$/,
         bun: /^bun(?:-cli)?\.(?:cjs|mjs|js)$/
     };
-    if (!launchers[packageManager].test(scriptName)) return { command: packageManager, args: [] };
-    return { command: process.execPath, args: [executable] };
+    const scriptName = executable ? path.basename(executable).toLowerCase() : '';
+    if (executable && launchers[packageManager].test(scriptName)) {
+        return { command: process.execPath, args: [executable] };
+    }
+    if (process.platform === 'win32') {
+        return { command: environment.ComSpec ?? 'cmd.exe', args: ['/d', '/s', '/c', `${packageManager}.cmd`] };
+    }
+    return { command: packageManager, args: [] };
 }
 
 /** Create the Commander program that parses creator arguments and options. */

@@ -354,6 +354,53 @@ it('forwards dependency installation to the package manager that launched it', (
     expect(invocation.cwd).toBe(fs.realpathSync(path.join(cwd, 'my-plugin')));
 });
 
+it('invokes pnpm through cmd.exe when running on Windows without a JavaScript launcher', () => {
+    const cwd = temporaryDirectory('create-pumpkin-plugin-windows-pnpm-');
+    const fakeBin = path.join(cwd, 'bin');
+    const capture = path.join(cwd, 'install.txt');
+    const platformPreload = path.join(cwd, 'windows-platform.mjs');
+    fs.mkdirSync(fakeBin);
+    fs.writeFileSync(
+        platformPreload,
+        `const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+Object.defineProperty(process, 'platform', { ...descriptor, value: 'win32' });
+`
+    );
+
+    const environment: NodeJS.ProcessEnv = {
+        NODE_OPTIONS: `--import=${pathToFileURL(platformPreload).href}`,
+        CREATE_PUMPKIN_CAPTURE: capture,
+        npm_config_user_agent: 'pnpm/12.10.1 npm/? node/v24.21.0 win32 x64',
+        npm_execpath: '',
+        NPM_CONFIG_EXECPATH: ''
+    };
+
+    if (process.platform === 'win32') {
+        fs.writeFileSync(path.join(fakeBin, 'pnpm.cmd'), '@echo off\r\n> "%CREATE_PUMPKIN_CAPTURE%" echo %*\r\n');
+        environment.ComSpec = process.env.ComSpec ?? 'cmd.exe';
+        environment.PATH = `${fakeBin}${path.delimiter}${process.env.PATH ?? ''}`;
+    } else {
+        const commandShell = path.join(cwd, 'cmd.cjs');
+        fs.writeFileSync(
+            commandShell,
+            '#!/usr/bin/env node\nrequire("node:fs").writeFileSync(process.env.CREATE_PUMPKIN_CAPTURE, JSON.stringify(process.argv.slice(2)));\n'
+        );
+        fs.chmodSync(commandShell, 0o755);
+        environment.ComSpec = commandShell;
+        environment.PATH = `${path.dirname(process.execPath)}${path.delimiter}/usr/bin${path.delimiter}/bin`;
+    }
+
+    const result = runCli(['my-plugin', '--ts'], { cwd, env: environment });
+
+    expect(result.status, result.stderr).toBe(0);
+    const invocation = fs.readFileSync(capture, 'utf8').trim();
+    if (process.platform === 'win32') {
+        expect(invocation).toBe('install');
+    } else {
+        expect(JSON.parse(invocation)).toEqual(['/d', '/s', '/c', 'pnpm.cmd', 'install']);
+    }
+});
+
 it('reuses the exact JavaScript package-manager entrypoint when the launcher provides it', () => {
     const cwd = temporaryDirectory('create-pumpkin-plugin-execpath-');
     const capture = path.join(cwd, 'install.json');
