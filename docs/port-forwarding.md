@@ -12,7 +12,7 @@ This repo does that with UPnP and NAT-PMP, in layers that a plugin can use at th
 | --- | --- | --- |
 | Engine | `@pumpkin-plugins/port-mapping` (`tools/port-mapping`) | Finds the router and keeps ports open on it. No Pumpkin or WASI imports: it runs on a small `Network` interface, so it is unit-tested with a fake router. |
 | Plugin | UPnPumpkin (`packages/upnpumpkin`) | Runs the engine on WASI sockets, opens the Java and Bedrock ports, and answers other plugins. |
-| API | `@pumpkin-plugins/upnpumpkin-api` (`tools/upnpumpkin-api`) | The messages, a client and a watcher for plugins that want a port opened. |
+| API | `@pumpkin-plugins/upnpumpkin-api` (`tools/apis/upnpumpkin-api`) | The messages, a client and a watcher for plugins that want a port opened. |
 | Host | `@pumpkin-plugins/plugin-kit` (`tools/plugin-kit`) | What every plugin needs from the host: data folder, logging, scheduling, commands, IPC. |
 
 BedrockAddonManager is the first user of the API: it asks UPnPumpkin to open its web port when

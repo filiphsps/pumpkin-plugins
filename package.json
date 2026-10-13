@@ -1,7 +1,7 @@
 {
     "name": "pumpkin-plugins",
     "private": true,
-    "description": "Pumpkin plugins written in TypeScript",
+    "description": "pumpkin-plugins written in TypeScript",
     "license": "MIT",
     "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
     "contributors": [

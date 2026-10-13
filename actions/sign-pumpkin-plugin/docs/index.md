@@ -1,4 +1,4 @@
-# Sign Pumpkin plugins
+# Sign PumpkinMC Plugins
 
 The signing action adds Pumpkin's Ed25519 signature and release metadata to one or more existing
 plugin `.wasm` files. It signs in place and does not build them. Run it on the exact artifact from

@@ -1,7 +1,7 @@
 # Plugin kit
 
 `@pumpkin-plugins/plugin-kit` contains shared lifecycle, scheduling, command, logging, data-folder,
-plugin-message, and payload helpers used by Pumpkin plugins. It also provides in-memory fakes for
+plugin-message, and payload helpers used by `pumpkin-plugins`. It also provides in-memory fakes for
 testing code that depends on host services.
 
 ## Plugin lifecycle

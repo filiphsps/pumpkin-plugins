@@ -1,4 +1,4 @@
-# pumpkin-plugins
+# `pumpkin-plugins`
 
 [![CI](https://github.com/filiphsps/pumpkin-plugins/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/filiphsps/pumpkin-plugins/actions/workflows/ci.yml?query=branch%3Amaster)
 [![codecov](https://codecov.io/gh/filiphsps/pumpkin-plugins/branch/master/graph/badge.svg)](https://codecov.io/gh/filiphsps/pumpkin-plugins)
@@ -40,19 +40,21 @@ Browse the [public documentation site](https://filiphsps.github.io/pumpkin-plugi
 
 | Package | Description | License |
 | --- | --- | --- |
+| [@pumpkin-plugins/pumpkin-pie-api](tools/apis/pumpkin-pie-api) | Validated PumpkinPIE client, expansions and provider lifecycle | MIT |
+| [@pumpkin-plugins/upnpumpkin-api](tools/apis/upnpumpkin-api) | Asks UPnPumpkin to open a port | MIT |
 | [@pumpkin-plugins/build](tools/build) | Shared build tool for the plugins | MIT |
 | [@pumpkin-plugins/config](tools/config) | Schema-driven TOML config for plugins | MIT |
+| [create-pumpkin-plugin](tools/create-pumpkin-plugin) | Create a minimal Pumpkin plugin project | MIT |
 | [@pumpkin-plugins/docs](tools/docs) | Generates component READMEs, doc links, and repository catalogs | MIT |
 | [@pumpkin-plugins/minecraft-colors](tools/minecraft-colors) | Chalk-like Minecraft text formatting for plugins | MIT |
 | [@pumpkin-plugins/plugin-kit](tools/plugin-kit) | Host helpers shared by plugins | MIT |
 | [@pumpkin-plugins/port-mapping](tools/port-mapping) | UPnP and NAT-PMP port mapping | MIT |
-| [@pumpkin-plugins/pumpkin-pie-api](tools/pumpkin-pie-api) | Validated PumpkinPIE client, expansions and provider lifecycle | MIT |
+| [@pumpkin-plugins/pumpkin-api](tools/pumpkin-api) | TypeScript API for PumpkinMC plugins | [MIT](tools/pumpkin-api/LICENSE) |
 | [@pumpkin-plugins/signing](tools/signing) | Ed25519 signing for plugin builds | MIT |
 | [@pumpkin-plugins/static-hermes-runtime](tools/static-hermes-runtime) | Static Hermes Runtime shim for Pumpkin plugin components | MIT |
 | [@pumpkin-plugins/terrain](tools/terrain) | Shared terrain capture and access contracts | MIT |
 | [@pumpkin-plugins/test-harness](tools/test-harness) | Runs plugins on a real Pumpkin in vitest | MIT |
 | [@pumpkin-plugins/update-check](tools/update-check) | Check plugin versions against Pumpkin Market | MIT |
-| [@pumpkin-plugins/upnpumpkin-api](tools/upnpumpkin-api) | Asks UPnPumpkin to open a port | MIT |
 <!-- docs:end packages -->
 
 ## Getting started

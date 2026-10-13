@@ -1,6 +1,6 @@
 # @pumpkin-plugins/terrain
 
-MIT-licensed terrain capture primitives and chunk access contracts for Pumpkin plugins. The package is independent of Pumpkin APIs and wire protocols, so plugins can provide their own host adapters and output encoders.
+MIT-licensed terrain capture primitives and chunk access contracts for `pumpkin-plugins`. The package is independent of Pumpkin APIs and wire protocols, so plugins can provide their own host adapters and output encoders.
 
 `TerrainCapture` samples rectangular regions within a caller-provided per-step budget, groups material runs into columns, and can skip empty blocks above a height bound.
 

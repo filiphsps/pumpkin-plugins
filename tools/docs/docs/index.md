@@ -135,7 +135,7 @@ those blocks while preserving handwritten content. These host-safe `/markdown` h
 by generation, Market descriptions and the agent edit guard. Extraction accepts spaced markers and
 leaves incomplete pairs untouched; generation separately enforces its declared marker pairs.
 
-The PumpkinPIE API's [document module](../../pumpkin-pie-api/docs.ts) uses this CLI and the shared
+The PumpkinPIE API's [document module](../../apis/pumpkin-pie-api/docs.ts) uses this CLI and the shared
 Markdown helpers to render protocol facts and provider provenance from source metadata. It keeps
 only its component-specific renderer and has no separate file updater or drift-check command.
 
