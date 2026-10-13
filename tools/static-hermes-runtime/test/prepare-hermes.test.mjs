@@ -98,7 +98,7 @@ it('builds patched Hermes once, reuses the cache, and invalidates it when settin
 case " $* " in
   *" rev-parse --git-dir "*) printf '.git\\n' ;;
   *" rev-parse HEAD "*) printf '820aa0d4b5fe5d3ed7900e1274211ef561081b3f\\n' ;;
-  *" status --porcelain "*) printf ' M cmake/modules/Hermes.cmake\\n' ;;
+  *" status --porcelain"*) printf ' M cmake/modules/Hermes.cmake\\0' ;;
   *" apply --check --reverse "*0004-wasi-p2-runtime-compatibility.patch*)
     if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 0; else exit 1; fi
     ;;
@@ -222,9 +222,9 @@ case "$args" in
     ;;
   *" rev-parse --git-dir "*) printf '.git\\n' ;;
   *" rev-parse HEAD "*) printf '820aa0d4b5fe5d3ed7900e1274211ef561081b3f\\n' ;;
-  *" status --porcelain "*)
+  *" status --porcelain"*)
     case "$repo" in *source.rebuild-*) exit 0 ;; esac
-    printf ' M cmake/modules/Hermes.cmake\\n'
+    printf ' M cmake/modules/Hermes.cmake\\0'
     ;;
   *" apply --check --reverse "*0004-wasi-p2-runtime-compatibility.patch*)
     if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 0; fi
