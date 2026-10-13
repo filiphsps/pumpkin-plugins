@@ -16,6 +16,8 @@ Plugins live in `packages/`; shared libraries and tooling live in
   staged diff and use a Conventional Commit message.
 - Use pnpm: `pnpm exec` for local binaries and `pnpm dlx` for one-offs. Pin dependency versions;
   put dependencies shared by packages in the `catalog:` of `pnpm-workspace.yaml`.
+- For every code-writing task, read [JSDoc TypeScript Documentation](.agents/skills/jsdoc-typescript-docs/SKILL.md)
+  before editing and follow the repo-specific JSDoc contract in [Code style](docs/code-style.md).
 - Before changing an area, read its relevant guide from [docs/README.md](docs/README.md) and load
   any skill whose description matches the task. Project skill files live in `.agents/skills/`.
 
