@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { ensurePatchOnlyChanges, type HermesPatch, verifyHermesPatchSeriesApplied } from './patch.ts';
 import type { HermesSourcePin } from './source.ts';
@@ -49,6 +49,20 @@ interface BuildCacheRecord {
     fingerprint: string;
 }
 
+/** Optional dependencies and timing controls for the shared Hermes cache lock. */
+export interface HermesBuildLockOptions {
+    /** Filesystem used to create, read, and remove the lock file. */
+    filesystem?: HermesFileSystem;
+    /** Maximum wait for another live build to release the lock. */
+    timeoutMs?: number;
+    /** Delay implementation used between acquisition attempts. */
+    wait?: (delayMs: number) => Promise<void>;
+    /** Clock used to enforce the timeout. */
+    now?: () => number;
+    /** Process-liveness check used to identify stale owners. */
+    isProcessAlive?: (pid: number) => boolean;
+}
+
 /**
  * Build or reuse the pinned host compiler and the full/lean WASI Hermes archives.
  *
@@ -56,6 +70,18 @@ interface BuildCacheRecord {
  * @throws {Error} If source validation, patch validation, cache locking, or compilation fails.
  */
 export async function buildHermes(options: HermesBuildOptions): Promise<void> {
+    const filesystem = options.filesystem ?? hermesFileSystem;
+    await withHermesBuildLock(options.cacheRoot, () => buildHermesWithLockHeld(options), { filesystem });
+}
+
+/**
+ * Build or reuse Hermes artifacts while the caller holds the shared cache lock.
+ *
+ * @internal
+ * @param options - Pinned source, patch series, build paths, toolchain, and injected dependencies.
+ * @throws {Error} If source validation, patch validation, or compilation fails.
+ */
+export async function buildHermesWithLockHeld(options: HermesBuildOptions): Promise<void> {
     const filesystem = options.filesystem ?? hermesFileSystem;
     const runner = options.process ?? hermesProcess;
     const environment = options.environment ?? process.env;
@@ -67,21 +93,15 @@ export async function buildHermes(options: HermesBuildOptions): Promise<void> {
     verifyHermesPatchSeriesApplied(options.source, options.patches, runner);
 
     const buildStatePath = path.join(options.cacheRoot, 'prepared-build.json');
-    const buildLockPath = path.join(options.cacheRoot, 'prepare.lock');
     const platform = options.platform ?? process.platform;
     const artifacts = requiredHermesArtifacts(options.hostBuild, options.wasiBuild, platform);
-    await acquireHermesBuildLock(buildLockPath, { filesystem });
-    try {
-        const fingerprint = hermesBuildFingerprint(options, artifacts, environment, filesystem, runner);
-        if (isHermesBuildCacheCurrent(fingerprint, buildStatePath, artifacts, filesystem)) {
-            console.log('Hermes build cache is current; skipping rebuild.');
-        } else {
-            configureAndBuildHermes(options, environment, filesystem, runner);
-            const completedFingerprint = hermesBuildFingerprint(options, artifacts, environment, filesystem, runner);
-            saveHermesBuildCache(completedFingerprint, buildStatePath, options.cacheRoot, filesystem);
-        }
-    } finally {
-        filesystem.rmSync(buildLockPath, { force: true });
+    const fingerprint = hermesBuildFingerprint(options, artifacts, environment, filesystem, runner);
+    if (isHermesBuildCacheCurrent(fingerprint, buildStatePath, artifacts, filesystem)) {
+        console.log('Hermes build cache is current; skipping rebuild.');
+    } else {
+        configureAndBuildHermes(options, environment, filesystem, runner);
+        const completedFingerprint = hermesBuildFingerprint(options, artifacts, environment, filesystem, runner);
+        saveHermesBuildCache(completedFingerprint, buildStatePath, options.cacheRoot, filesystem);
     }
     console.log(`Static Hermes is ready. Source: ${options.source}; WASI 2 libraries: ${options.wasiBuild}`);
 }
@@ -277,36 +297,29 @@ export function saveHermesBuildCache(
  *
  * @param lockPath - Path to the lock file created with exclusive-write semantics.
  * @param options - Optional filesystem, timeout, clock, wait, and process-liveness hooks.
+ * @returns A unique token identifying this lock owner.
  * @throws {Error} If the lock cannot be acquired before the configured timeout.
  */
 export async function acquireHermesBuildLock(
     lockPath: string,
-    options: {
-        /** Filesystem used to create, read, and remove the lock file. */
-        filesystem?: HermesFileSystem;
-        /** Maximum wait for another live build to release the lock. */
-        timeoutMs?: number;
-        /** Delay implementation used between acquisition attempts. */
-        wait?: (delayMs: number) => Promise<void>;
-        /** Clock used to enforce the timeout. */
-        now?: () => number;
-        /** Process-liveness check used to identify stale owners. */
-        isProcessAlive?: (pid: number) => boolean;
-    } = {}
-): Promise<void> {
+    options: HermesBuildLockOptions = {}
+): Promise<string> {
     const filesystem = options.filesystem ?? hermesFileSystem;
     const timeoutMs = options.timeoutMs ?? 30 * 60_000;
     const wait = options.wait ?? ((delayMs) => new Promise<void>((resolve) => setTimeout(resolve, delayMs)));
     const now = options.now ?? Date.now;
     const isProcessAlive = options.isProcessAlive ?? processIsAlive;
+    const ownerToken = randomUUID();
     filesystem.mkdirSync(path.dirname(lockPath), { recursive: true });
     const deadline = now() + timeoutMs;
     while (true) {
         try {
-            filesystem.writeFileSync(lockPath, `${JSON.stringify({ pid: process.pid, startedAt: now() })}\n`, {
-                flag: 'wx'
-            });
-            return;
+            filesystem.writeFileSync(
+                lockPath,
+                `${JSON.stringify({ pid: process.pid, startedAt: now(), token: ownerToken })}\n`,
+                { flag: 'wx' }
+            );
+            return ownerToken;
         } catch (error) {
             if (errorCode(error) !== 'EEXIST') throw error;
             if (staleHermesBuildLock(lockPath, filesystem, now, isProcessAlive)) {
@@ -317,6 +330,50 @@ export async function acquireHermesBuildLock(
             await wait(250);
         }
     }
+}
+
+/**
+ * Run a cache operation while holding the exclusive Hermes preparation lock.
+ *
+ * @typeParam T - Result returned by the locked operation
+ * @param cacheRoot - Shared root that contains the lock file.
+ * @param operation - Source, patch, and build work that must be serialized.
+ * @param options - Optional filesystem and lock-wait controls.
+ * @returns The result of the locked operation.
+ * @throws {Error} If the lock cannot be acquired or the operation fails.
+ */
+export async function withHermesBuildLock<T>(
+    cacheRoot: string,
+    operation: () => T | Promise<T>,
+    options: HermesBuildLockOptions = {}
+): Promise<T> {
+    const filesystem = options.filesystem ?? hermesFileSystem;
+    const lockPath = path.join(cacheRoot, 'prepare.lock');
+    const ownerToken = await acquireHermesBuildLock(lockPath, options);
+    try {
+        return await operation();
+    } finally {
+        releaseHermesBuildLock(lockPath, ownerToken, filesystem);
+    }
+}
+
+function releaseHermesBuildLock(lockPath: string, ownerToken: string, filesystem: HermesFileSystem): void {
+    let contents: string;
+    try {
+        contents = filesystem.readFileSync(lockPath, 'utf8');
+    } catch (error) {
+        if (errorCode(error) === 'ENOENT') return;
+        throw error;
+    }
+    let owner: unknown;
+    try {
+        owner = JSON.parse(contents) as unknown;
+    } catch (error) {
+        if (error instanceof SyntaxError) return;
+        throw error;
+    }
+    if (typeof owner !== 'object' || owner === null || !('token' in owner) || owner.token !== ownerToken) return;
+    filesystem.rmSync(lockPath, { force: true });
 }
 
 /**

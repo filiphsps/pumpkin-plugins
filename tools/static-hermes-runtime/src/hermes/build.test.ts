@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { HermesBuildOptions } from './build.ts';
-import { buildHermes, hermesBuildFingerprint, requiredHermesArtifacts } from './build.ts';
+import { buildHermes, hermesBuildFingerprint, requiredHermesArtifacts, withHermesBuildLock } from './build.ts';
 import type { HermesProcessRunner } from './system.ts';
 
 const directories: string[] = [];
@@ -65,6 +65,60 @@ it('releases the preparation lock when a CMake build fails', async () => {
     expect(cmakeCalls(calls).some(({ args }) => args[0] === '--build')).toBe(true);
     expect(fs.existsSync(path.join(options.cacheRoot, 'prepare.lock'))).toBe(false);
     expect(fs.existsSync(path.join(options.cacheRoot, 'prepared-build.json'))).toBe(false);
+});
+
+it('serializes cache operations until the current preparation releases its lock', async () => {
+    const { options } = fixture();
+    const operations: string[] = [];
+    let signalFirstEntered = (): void => undefined;
+    let releaseFirst = (): void => undefined;
+    const firstEntered = new Promise<void>((resolve) => {
+        signalFirstEntered = resolve;
+    });
+    const firstGate = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+    });
+
+    const first = withHermesBuildLock(options.cacheRoot, async () => {
+        operations.push('first:start');
+        signalFirstEntered();
+        await firstGate;
+        operations.push('first:end');
+    });
+    await firstEntered;
+    const second = withHermesBuildLock(options.cacheRoot, () => {
+        operations.push('second');
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const operationsBeforeRelease = [...operations];
+
+    releaseFirst();
+    await Promise.all([first, second]);
+
+    expect(operationsBeforeRelease).toEqual(['first:start']);
+    expect(operations).toEqual(['first:start', 'first:end', 'second']);
+    expect(fs.existsSync(path.join(options.cacheRoot, 'prepare.lock'))).toBe(false);
+});
+
+it('does not remove a replacement lock owned by another preparation', async () => {
+    const { options } = fixture();
+    const lockPath = path.join(options.cacheRoot, 'prepare.lock');
+
+    try {
+        await withHermesBuildLock(options.cacheRoot, () => {
+            const owner = JSON.parse(fs.readFileSync(lockPath, 'utf8')) as { token?: unknown };
+            expect(typeof owner.token).toBe('string');
+            fs.rmSync(lockPath);
+            fs.writeFileSync(
+                lockPath,
+                `${JSON.stringify({ pid: process.pid, startedAt: Date.now(), token: 'replacement-owner' })}\n`
+            );
+        });
+
+        expect(fs.existsSync(lockPath)).toBe(true);
+    } finally {
+        fs.rmSync(lockPath, { force: true });
+    }
 });
 
 it('builds and reuses Windows Hermes artifacts without probing MSVC as a GNU compiler', async () => {
