@@ -826,9 +826,15 @@ importers:
       '@commander-js/extra-typings':
         specifier: 'catalog:'
         version: 15.0.0(commander@15.0.0)
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
       commander:
         specifier: 'catalog:'
         version: 15.0.0
+      esbuild:
+        specifier: 'catalog:'
+        version: 0.28.2
     devDependencies:
       '@pumpkin-plugins/pumpkin-api':
         specifier: 'catalog:'
@@ -836,12 +842,6 @@ importers:
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../test-harness
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.19.1
-      esbuild:
-        specifier: 'catalog:'
-        version: 0.28.2
       vitest:
         specifier: 'catalog:'
         version: 5.0.3(@types/node@24.19.1)(@vitest/coverage-v8@5.0.3)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.6.1)(yaml@2.9.1))

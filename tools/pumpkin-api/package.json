@@ -39,7 +39,12 @@
         }
     },
     "files": [
-        "src",
+        "src/**/*.ts",
+        "src/**/*.mts",
+        "src/**/*.mjs",
+        "!src/**/*.test.ts",
+        "!src/**/*.spec.ts",
+        "schemas",
         "wit.lock.json",
         "compatibility",
         "docs",

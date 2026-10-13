@@ -31,7 +31,7 @@
         "create-pumpkin-plugin": "dist/create-pumpkin-plugin.js"
     },
     "files": [
-        "bin",
+        "bin/create-pumpkin-plugin.ts",
         "dist",
         "templates",
         "README.md"

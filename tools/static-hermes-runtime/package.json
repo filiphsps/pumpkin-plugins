@@ -40,14 +40,17 @@
         "static-hermes-runtime": "dist/cli.js"
     },
     "files": [
-        "src",
+        "src/**/*.ts",
+        "!src/**/*.test.ts",
+        "!src/**/*.spec.ts",
+        "src/**/*.template",
         "dist",
         "cmake",
         "hermes-patches",
+        "schemas",
         "hermes-source.lock.json",
         "toolchain-versions.json",
         "wasi-sdk.lock.json",
-        "native",
         "README.md"
     ],
     "publishConfig": {
@@ -64,12 +67,12 @@
     },
     "dependencies": {
         "@commander-js/extra-typings": "catalog:",
-        "commander": "catalog:"
+        "@types/node": "catalog:",
+        "commander": "catalog:",
+        "esbuild": "catalog:"
     },
     "devDependencies": {
         "@pumpkin-plugins/pumpkin-api": "catalog:",
-        "@types/node": "catalog:",
-        "esbuild": "catalog:",
         "vitest": "catalog:",
         "@pumpkin-plugins/test-harness": "workspace:*"
     },

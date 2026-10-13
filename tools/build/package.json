@@ -31,7 +31,6 @@
         "pumpkin-plugins-build": "dist/cli.js"
     },
     "files": [
-        "src",
         "dist",
         "runtime",
         "wasi-wit.lock.json"
