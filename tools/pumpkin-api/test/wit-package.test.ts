@@ -9,6 +9,8 @@ import { ensurePumpkinWit, parsePumpkinWitPin } from '../src/wit.mjs';
 
 const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryDirectories: string[] = [];
+const upstreamGitPinSchemaUrl =
+    'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/schemas/upstream-git-pin.schema.json';
 
 afterEach(() => {
     for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
@@ -29,7 +31,6 @@ it('publishes a schema requiring the same fields as the Pumpkin WIT pin parser',
     const schema = JSON.parse(fs.readFileSync(path.join(apiRoot, 'schemas/upstream-git-pin.schema.json'), 'utf8'));
 
     expect(schema.required).toEqual(['$schema', 'repository', 'branch', 'commit', 'subdirectory']);
-    expect(schema.properties.$schema.const).toBe('schemas/upstream-git-pin.schema.json');
     expect(schema.properties.subdirectory.minLength).toBe(1);
     expect(parsePumpkinWitPin(JSON.stringify(lock), lockFile)).toMatchObject({
         repository: lock.repository,
@@ -419,7 +420,7 @@ function writeLocalWitLock(lockFile: string, repository: string, commit: string)
         lockFile,
         `${JSON.stringify(
             {
-                $schema: 'schemas/upstream-git-pin.schema.json',
+                $schema: upstreamGitPinSchemaUrl,
                 repository: pathToFileURL(repository).href,
                 branch: 'main',
                 commit,

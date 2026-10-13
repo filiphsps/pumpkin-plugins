@@ -6,11 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { createInternalRegistry } from './external-consumer-registry.mjs';
 import {
     assertPackedBuilderDependencies,
-    assertPackedToolSchemaReferences,
     assertPublicToolPackage,
     assertPublicToolPackageContents,
     assertStarterToolDependencies,
-    PACKED_TOOL_SCHEMA_LOCK_FILES,
     PUBLIC_TOOL_PACKAGE_PATHS,
     parseTarEntries
 } from './tool-packages.mjs';
@@ -90,13 +88,6 @@ try {
             assertPublicToolPackage(packedPackageJson, expectedPublicName);
             const entries = parseTarEntries(execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' }));
             assertPublicToolPackageContents(entries, packagePath);
-            const schemaLockFiles = Object.fromEntries(
-                (PACKED_TOOL_SCHEMA_LOCK_FILES[packagePath] ?? []).map((entry) => [
-                    entry,
-                    execFileSync('tar', ['-xOf', tarballPath, entry], { encoding: 'utf8' })
-                ])
-            );
-            assertPackedToolSchemaReferences(entries, schemaLockFiles);
         }
         if (packedPackageJson.name === '@pumpkin-plugins/pumpkin-api') {
             assertPumpkinApiPackageContents(tarballPath);

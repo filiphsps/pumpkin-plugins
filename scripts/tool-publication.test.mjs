@@ -6,7 +6,6 @@ import { afterEach, describe, it } from 'node:test';
 import { partitionReleasePaths } from './release-fanout.mjs';
 import {
     assertPackedBuilderDependencies,
-    assertPackedToolSchemaReferences,
     assertPublicToolPackage,
     assertPublicToolPackageContents,
     assertStarterToolDependencies,
@@ -77,58 +76,6 @@ describe('packed public tool contents', () => {
         ]);
     });
 
-    it('requires each packed lockfile schema to resolve to a packed package-local file', () => {
-        const entries = ['package/wit.lock.json', 'package/schemas/upstream-git-pin.schema.json'];
-        const lockFiles = {
-            'package/wit.lock.json': JSON.stringify({ $schema: 'schemas/upstream-git-pin.schema.json' })
-        };
-
-        assert.doesNotThrow(() => assertPackedToolSchemaReferences(entries, lockFiles));
-        assert.throws(
-            () =>
-                assertPackedToolSchemaReferences(entries, {
-                    ...lockFiles,
-                    'package/wit.lock.json': JSON.stringify({ $schema: '../../schemas/upstream-git-pin.schema.json' })
-                }),
-            /schema escapes its package/
-        );
-        assert.throws(
-            () => assertPackedToolSchemaReferences(['package/wit.lock.json'], lockFiles),
-            /references missing schema package\/schemas\/upstream-git-pin\.schema\.json/
-        );
-    });
-
-    it('requires the schemas referenced by packed Pumpkin API lockfiles', () => {
-        const entries = [
-            'package/src/index.ts',
-            'package/src/wit.mjs',
-            'package/src/wit.d.mts',
-            'package/wit.lock.json'
-        ];
-
-        assert.throws(
-            () => assertPublicToolPackageContents(entries, 'tools/pumpkin-api'),
-            /missing package\/schemas\/upstream-git-pin\.schema\.json/
-        );
-    });
-
-    it('requires the schemas referenced by packed Static Hermes lockfiles', () => {
-        const entries = [
-            'package/src/index.ts',
-            'package/dist/index.js',
-            'package/cmake/wasi-sdk-hermes-p2.cmake',
-            'package/hermes-patches/0001-wasi-p2-configure-platform.patch',
-            'package/hermes-source.lock.json',
-            'package/wasi-sdk.lock.json',
-            'package/toolchain-versions.json'
-        ];
-
-        assert.throws(
-            () => assertPublicToolPackageContents(entries, 'tools/static-hermes-runtime'),
-            /missing package\/schemas\/upstream-git-pin\.schema\.json/
-        );
-    });
-
     it('keeps Pumpkin API type sources and excludes source tests', () => {
         const entries = [
             'package/src/index.ts',
@@ -136,7 +83,6 @@ describe('packed public tool contents', () => {
             'package/src/wit.mjs',
             'package/src/wit.d.mts',
             'package/wit.lock.json',
-            'package/schemas/upstream-git-pin.schema.json',
             'package/src/index.test.ts'
         ];
 
@@ -155,9 +101,6 @@ describe('packed public tool contents', () => {
             'package/dist/index.js',
             'package/cmake/wasi-sdk-hermes-p2.cmake',
             'package/hermes-patches/0001-wasi-p2-configure-platform.patch',
-            'package/schemas/upstream-git-pin.schema.json',
-            'package/schemas/wasi-sdk-release-pin.schema.json',
-            'package/schemas/toolchain-versions.schema.json',
             'package/src/component/build.test.ts'
         ];
 

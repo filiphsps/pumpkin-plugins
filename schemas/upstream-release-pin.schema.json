@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://github.com/filiphsps/pumpkin-plugins/schemas/upstream-release-pin.schema.json",
+    "$id": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/upstream-release-pin.schema.json",
     "title": "Upstream release pin",
     "description": "A package pinned to a release published by its upstream repository.",
     "type": "object",

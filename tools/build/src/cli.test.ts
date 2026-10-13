@@ -114,7 +114,8 @@ function writeWitLock(
 ): string {
     const lock = `${JSON.stringify(
         {
-            $schema: 'schemas/upstream-git-pin.schema.json',
+            $schema:
+                'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/schemas/upstream-git-pin.schema.json',
             repository: pathToFileURL(repositoryDir).href,
             branch,
             commit,

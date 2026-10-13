@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://github.com/filiphsps/pumpkin-plugins/schemas/toolchain-versions.schema.json",
+    "$id": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/toolchain-versions.schema.json",
     "title": "Toolchain versions",
     "description": "Version pins keyed by the names of tools required for a build.",
     "type": "object",
@@ -10,6 +10,7 @@
         "$schema": {
             "type": "string",
             "format": "uri-reference",
+            "const": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/toolchain-versions.schema.json",
             "minLength": 1
         },
         "tools": {

@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://github.com/filiphsps/pumpkin-plugins/schemas/wasi-sdk-release-pin.schema.json",
+    "$id": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/wasi-sdk-release-pin.schema.json",
     "title": "WASI SDK release pin",
     "description": "A WASI SDK release pinned to its upstream repository and per-platform archive digests.",
     "type": "object",
@@ -10,6 +10,7 @@
         "$schema": {
             "type": "string",
             "format": "uri-reference",
+            "const": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/wasi-sdk-release-pin.schema.json",
             "minLength": 1
         },
         "repository": {

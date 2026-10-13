@@ -28,30 +28,16 @@ const PACKED_TOOL_CONTENTS = Object.freeze({
         'package/src/index.ts',
         'package/src/wit.mjs',
         'package/src/wit.d.mts',
-        'package/wit.lock.json',
-        'package/schemas/upstream-git-pin.schema.json'
+        'package/wit.lock.json'
     ],
     'tools/static-hermes-runtime': [
         'package/src/index.ts',
         'package/dist/index.js',
         'package/cmake/wasi-sdk-hermes-p2.cmake',
-        'package/hermes-patches/0001-wasi-p2-configure-platform.patch',
-        'package/schemas/upstream-git-pin.schema.json',
-        'package/schemas/wasi-sdk-release-pin.schema.json',
-        'package/schemas/toolchain-versions.schema.json'
+        'package/hermes-patches/0001-wasi-p2-configure-platform.patch'
     ],
     'tools/build': ['package/dist/cli.js', 'package/runtime/quickjs-runtime-bigint.wasm', 'package/wasi-wit.lock.json']
 });
-/** Lockfile entries in public tool tarballs whose schema references must be package-local. */
-export const PACKED_TOOL_SCHEMA_LOCK_FILES = Object.freeze({
-    'tools/pumpkin-api': ['package/wit.lock.json'],
-    'tools/static-hermes-runtime': [
-        'package/hermes-source.lock.json',
-        'package/wasi-sdk.lock.json',
-        'package/toolchain-versions.json'
-    ]
-});
-
 const TEMPLATE_LANGUAGES = ['typescript', 'javascript'];
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
@@ -111,46 +97,6 @@ export function assertPublicToolPackageContents(entries, packagePath) {
     if (packagePath === 'tools/build') {
         const sourceFile = entries.find((entry) => entry.startsWith('package/src/'));
         if (sourceFile) throw new Error(`CLI-only package contains source: ${sourceFile}`);
-    }
-}
-
-/**
- * Checks that lockfile schema references resolve to files inside a packed package.
- *
- * @param {string[]} entries - Tarball entries, including their `package/` prefix.
- * @param {Record<string, string>} lockFiles - Packed lockfile entry paths and their JSON contents.
- * @returns {void}
- * @throws {Error} When a lockfile has no local schema reference or its schema is not packed.
- */
-export function assertPackedToolSchemaReferences(entries, lockFiles) {
-    for (const [lockEntry, source] of Object.entries(lockFiles)) {
-        if (!entries.includes(lockEntry)) throw new Error(`Packed package is missing lockfile ${lockEntry}`);
-
-        let lock;
-        try {
-            lock = JSON.parse(source);
-        } catch (error) {
-            throw new Error(`Packed lockfile is invalid JSON: ${lockEntry}`, { cause: error });
-        }
-
-        const schemaReference = lock?.$schema;
-        if (
-            typeof schemaReference !== 'string' ||
-            !schemaReference ||
-            path.posix.isAbsolute(schemaReference) ||
-            /^[a-z][a-z0-9+.-]*:/i.test(schemaReference) ||
-            schemaReference.startsWith('//')
-        ) {
-            throw new Error(`Packed lockfile must use a package-local $schema reference: ${lockEntry}`);
-        }
-
-        const schemaEntry = path.posix.normalize(path.posix.join(path.posix.dirname(lockEntry), schemaReference));
-        if (!schemaEntry.startsWith('package/')) {
-            throw new Error(`Packed lockfile schema escapes its package: ${lockEntry} -> ${schemaReference}`);
-        }
-        if (!entries.includes(schemaEntry)) {
-            throw new Error(`Packed lockfile references missing schema ${schemaEntry}: ${lockEntry}`);
-        }
     }
 }
 

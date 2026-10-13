@@ -21,7 +21,6 @@ afterEach(() => {
 
 it('resolves the pinned Pumpkin WIT and verifies its active compatibility digests', () => {
     const lockSource = fs.readFileSync(witLockFile, 'utf8');
-    const lock = JSON.parse(lockSource);
     const pin = parsePumpkinWitPin(lockSource, witLockFile);
     const cacheRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-api-upstream-wit-'));
     temporaryDirectories.push(cacheRoot);
@@ -30,7 +29,6 @@ it('resolves the pinned Pumpkin WIT and verifies its active compatibility digest
         cacheRoot
     });
 
-    expect(fs.existsSync(path.resolve(apiRoot, lock.$schema))).toBe(true);
     expect(pin.repository).toBe('https://github.com/Pumpkin-MC/pumpkin-plugin-wit');
     expect(pin.branch.length).toBeGreaterThan(0);
     expect(pin.commit).toMatch(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/);

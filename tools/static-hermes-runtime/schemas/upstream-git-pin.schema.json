@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://github.com/filiphsps/pumpkin-plugins/schemas/upstream-git-pin.schema.json",
+    "$id": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/upstream-git-pin.schema.json",
     "title": "Upstream Git pin",
     "description": "A Git repository branch pinned to an immutable Git object ID.",
     "type": "object",
@@ -10,6 +10,7 @@
         "$schema": {
             "type": "string",
             "format": "uri-reference",
+            "const": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/upstream-git-pin.schema.json",
             "minLength": 1
         },
         "repository": {

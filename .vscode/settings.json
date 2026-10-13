@@ -77,6 +77,22 @@
         {
             "fileMatch": ["tools/pumpkin-api/compatibility/**/*.json"],
             "url": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json"
+        },
+        {
+            "fileMatch": ["tools/pumpkin-api/wit.lock.json"],
+            "url": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/schemas/upstream-git-pin.schema.json"
+        },
+        {
+            "fileMatch": ["tools/static-hermes-runtime/hermes-source.lock.json"],
+            "url": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/upstream-git-pin.schema.json"
+        },
+        {
+            "fileMatch": ["tools/static-hermes-runtime/wasi-sdk.lock.json"],
+            "url": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/wasi-sdk-release-pin.schema.json"
+        },
+        {
+            "fileMatch": ["tools/static-hermes-runtime/toolchain-versions.json"],
+            "url": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/toolchain-versions.schema.json"
         }
     ],
     "notebook.defaultFormatter": "biomejs.biome",

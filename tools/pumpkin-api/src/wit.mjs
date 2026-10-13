@@ -3,7 +3,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const upstreamGitPinSchema = 'schemas/upstream-git-pin.schema.json';
+const upstreamGitPinSchema =
+    'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/schemas/upstream-git-pin.schema.json';
 const lockWait = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
 const staleLockAgeMs = 30_000;
 const maxLockWaitMs = 15 * 60_000;
