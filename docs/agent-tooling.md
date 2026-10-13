@@ -46,8 +46,10 @@ Markdown-only package edits skip package tests. `tools/build/src/` is source, no
 Real-server tests are deliberately separate; see [Testing](testing.md) and
 [the testing skill](https://github.com/filiphsps/pumpkin-plugins/blob/master/.agents/skills/pumpkin-testing/SKILL.md).
 
-The default run may report failures in somebody else's dirty files. Preserve their work and either
-report the failure or use explicit paths for your own validation. Passing these fast checks does not
+The direct no-path runner checks every dirty file in the checkout. Codex completion hooks instead
+compare the working tree before and after each tool call, then check only files changed during that
+agent's turn. Root agents and subagents get separate scopes, so concurrent work in the same checkout
+does not add its failures to another agent's completion report. Passing these fast checks does not
 prove runtime behavior, correct prose or the full CI workflow.
 
 ## Portable hook protocol
@@ -94,11 +96,12 @@ successful check. A blocking check report should tell the agent to preserve unre
 Client APIs, hook trust, discovery locations and continuation schemas differ. Keep those details in
 an adapter owned by that client rather than baking them into shared repo checks. This repo includes a
 Codex adapter in `.agents/hooks/codex.mjs` and project hook configuration in `.codex/hooks.json`.
-Codex's `PreToolUse` hook translates shell and patch calls into the portable guard protocol; its
-`Stop` hook runs the changed-file check and asks Codex to continue once when checks fail. Project
-hooks load only for trusted projects, and Codex requires review and trust for each non-managed hook
-definition before it runs. See the [Codex Hooks guide](https://learn.chatgpt.com/docs/hooks) for the
-current trust flow and hook behavior.
+Codex's `PreToolUse` hook translates shell and patch calls into the portable guard protocol. `PostToolUse`
+records paths changed by each tool call, and `Stop` and `SubagentStop` run checks against that agent's
+scope, asking it to continue once when checks fail. The per-turn scope uses Codex's `turn_id` together
+with its session id. Project hooks load only for trusted projects, and Codex requires review and trust
+for each non-managed hook definition before it runs. See the [Codex Hooks guide](https://learn.chatgpt.com/docs/hooks)
+for the current trust flow and hook behavior.
 
 For other clients, consult their hook documentation before writing a client-specific adapter.
 

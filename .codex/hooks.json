@@ -15,6 +15,32 @@
                 ]
             }
         ],
+        "PostToolUse": [
+            {
+                "matcher": "Bash|apply_patch|Edit|Write",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/codex.mjs\"",
+                        "commandWindows": "node (Join-Path (git rev-parse --show-toplevel) '.agents/hooks/codex.mjs')",
+                        "timeout": 30,
+                        "statusMessage": "Recording repository changes"
+                    }
+                ]
+            }
+        ],
+        "SubagentStop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "node \"$(git rev-parse --show-toplevel)/.agents/hooks/codex.mjs\"",
+                        "commandWindows": "node (Join-Path (git rev-parse --show-toplevel) '.agents/hooks/codex.mjs')",
+                        "statusMessage": "Checking agent changes"
+                    }
+                ]
+            }
+        ],
         "Stop": [
             {
                 "hooks": [

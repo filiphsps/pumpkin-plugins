@@ -2,6 +2,7 @@
 // Adapts Codex lifecycle hooks to the repository's client-neutral protocol.
 import * as path from 'node:path';
 import { handle } from './run.mjs';
+import { hookScope } from './scope.mjs';
 
 /** Convert a Codex tool name to the portable runner's aliases. */
 function portableTool(name) {
@@ -44,7 +45,7 @@ function checkFailure(report, retrying) {
  * @param {(request: object) => Promise<object>} runner The portable hook request handler.
  * @returns {Promise<object | null>} A Codex hook response, or null when no response is needed.
  */
-export async function handleCodexHook(request, runner = handle) {
+export async function handleCodexHook(request, runner = handle, scope = hookScope) {
     if (request?.hook_event_name === 'PreToolUse') {
         if (typeof request.tool_name !== 'string') return deny('Codex did not provide a tool name.');
 
@@ -58,6 +59,8 @@ export async function handleCodexHook(request, runner = handle) {
             });
             if (result?.ok !== true)
                 return deny(result?.reason ?? result?.error ?? 'The repository hook refused this tool call.');
+
+            await scope.beforeTool?.(request);
 
             if (Object.hasOwn(result, 'input') && JSON.stringify(result.input) !== JSON.stringify(originalInput)) {
                 return {
@@ -75,14 +78,37 @@ export async function handleCodexHook(request, runner = handle) {
         }
     }
 
-    if (request?.hook_event_name === 'Stop') {
+    if (request?.hook_event_name === 'PostToolUse') {
         try {
-            const result = await runner({ event: 'check', cwd: request.cwd });
-            if (result?.ok === true) return { continue: true };
-            return checkFailure(result?.report ?? result?.error, request.stop_hook_active === true);
+            await scope.afterTool?.(request);
+            return null;
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            return checkFailure(`The repository hook failed: ${message}`, request.stop_hook_active === true);
+            return { systemMessage: `Could not record this tool call for scoped repository checks: ${message}` };
+        }
+    }
+
+    if (request?.hook_event_name === 'Stop' || request?.hook_event_name === 'SubagentStop') {
+        const retrying = request.stop_hook_active === true;
+        if (typeof request.session_id !== 'string' || typeof request.turn_id !== 'string') {
+            return checkFailure(
+                'Codex did not provide session_id and turn_id; repository checks cannot be scoped safely.',
+                retrying
+            );
+        }
+        try {
+            const identity =
+                request.hook_event_name === 'SubagentStop'
+                    ? `subagent:${request.agent_id ?? request.turn_id ?? 'unknown'}`
+                    : 'root';
+            const files = await scope.files(request.session_id, request.turn_id, { retrying, identity });
+            const result = await runner({ event: 'check', cwd: request.cwd, files });
+            await scope.finish?.(request, files, result?.ok === true);
+            if (result?.ok === true) return { continue: true };
+            return checkFailure(result?.report ?? result?.error, retrying);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return checkFailure(`The repository hook failed: ${message}`, retrying);
         }
     }
 
