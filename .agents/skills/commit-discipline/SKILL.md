@@ -1,17 +1,18 @@
 ---
 name: commit-discipline
-description: Use throughout feature and bug-fix work in Pumpkin Plugins to create small, self-contained, single-domain commits and handle branch history safely.
+description: Use when creating or updating commits in Pumpkin Plugins to keep them small, self-contained, single-domain, and preserve branch history safely.
 ---
 
 # Commit discipline
 
-Shape feature work into commits as you go. A commit should be tiny or small, self-contained, and
-limited to one domain or area. Keep the implementation, tests, and documentation for that same area
-together when they form one coherent change. Split unrelated areas into separate commits, even when
-they belong to one feature request.
+Create commits as slices complete only when the user explicitly asks for incremental commits or to
+ship as you go. Otherwise, finish and validate the requested work before following any applicable
+commit instructions.
 
-Commit each completed slice after its relevant checks pass. Keep slices independently understandable
-and in dependency order; avoid saving all commits until the end of the feature.
+When shipping incrementally, keep each commit tiny or small, self-contained, and limited to one domain
+or area. Keep the implementation, tests, and documentation for that same area together when they form
+one coherent change. Split unrelated areas into separate commits, even when they belong to one feature
+request. Commit each completed slice after its relevant checks pass, in dependency order.
 
 ## Before each commit
 
