@@ -400,7 +400,7 @@ function assertStarter(directory, language, expectedPnpmVersion, versions) {
 }
 
 function assertPumpkinApiPackageContents(tarballPath) {
-    const entries = execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' }).split('\n').filter(Boolean);
+    const entries = parseTarEntries(execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' }));
     if (!entries.includes('package/wit.lock.json')) {
         throw new Error('Packed Pumpkin API package is missing wit.lock.json');
     }
