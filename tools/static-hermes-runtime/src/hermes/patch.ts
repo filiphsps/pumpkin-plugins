@@ -89,19 +89,24 @@ export function applyHermesPatchSeries(options: ApplyHermesPatchesOptions): void
         }
     }
     ensurePatchOnlyChanges(options.source, options.patches, runner);
-    const states = options.patches.map((patch) => ({
-        patch,
-        applied: canApply(runner, options.source, patch.filename, true),
-        applicable: canApply(runner, options.source, patch.filename, false)
-    }));
-    for (const { patch, applied, applicable } of states) {
+    const filesystem = options.filesystem ?? hermesFileSystem;
+    const states = options.patches.map((patch) => {
+        const contents = readPatchContents(filesystem, patch.filename);
+        return {
+            patch,
+            contents,
+            applied: canApply(runner, options.source, contents, true),
+            applicable: canApply(runner, options.source, contents, false)
+        };
+    });
+    for (const { patch, contents, applied, applicable } of states) {
         if (applied) continue;
         if (!applicable) {
             throw new Error(
                 `Hermes patch does not apply to the pinned source (conflict or partial application): ${patch.filename}`
             );
         }
-        runner.run('git', ['-C', options.source, 'apply', patch.filename]);
+        runner.run('git', ['-C', options.source, 'apply'], { input: contents, stdio: 'pipe' });
     }
 }
 
@@ -111,15 +116,18 @@ export function applyHermesPatchSeries(options: ApplyHermesPatchesOptions): void
  * @param source - Hermes source checkout to inspect.
  * @param patches - Validated patch series that must already be applied.
  * @param runner - Git command runner used to check each patch in reverse.
+ * @param filesystem - File system used to read patch contents.
  * @throws {Error} If any patch is missing from the checkout.
  */
 export function verifyHermesPatchSeriesApplied(
     source: string,
     patches: readonly HermesPatch[],
-    runner: HermesProcessRunner = hermesProcess
+    runner: HermesProcessRunner = hermesProcess,
+    filesystem: HermesFileSystem = hermesFileSystem
 ): void {
     for (const patch of patches) {
-        if (!canApply(runner, source, patch.filename, true)) {
+        const contents = readPatchContents(filesystem, patch.filename);
+        if (!canApply(runner, source, contents, true)) {
             throw new Error(`Hermes patch is not applied: ${patch.filename}; run hermes patch first`);
         }
     }
@@ -156,13 +164,19 @@ function patchPaths(contents: string): string[] {
         .filter((filename): filename is string => filename !== undefined && filename !== '/dev/null');
 }
 
-function canApply(runner: HermesProcessRunner, source: string, patch: string, reverse: boolean): boolean {
+function canApply(runner: HermesProcessRunner, source: string, contents: string, reverse: boolean): boolean {
     try {
-        runner.run('git', ['-C', source, 'apply', '--check', ...(reverse ? ['--reverse'] : []), patch], {
-            stdio: 'ignore'
+        runner.run('git', ['-C', source, 'apply', '--check', ...(reverse ? ['--reverse'] : [])], {
+            input: contents,
+            stdio: 'pipe'
         });
         return true;
     } catch {
         return false;
     }
+}
+
+/** Read patch text and normalize its line endings before sending it to Git. */
+function readPatchContents(filesystem: HermesFileSystem, filename: string): string {
+    return filesystem.readFileSync(filename, 'utf8').replace(/\r\n/g, '\n');
 }

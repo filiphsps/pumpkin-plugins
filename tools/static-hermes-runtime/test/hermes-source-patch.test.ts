@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import { acquireHermesBuildLock, isHermesBuildCacheCurrent, saveHermesBuildCache } from '../src/hermes/build.ts';
-import { applyHermesPatchSeries, readHermesPatchSeries } from '../src/hermes/patch.ts';
+import { applyHermesPatchSeries, readHermesPatchSeries, verifyHermesPatchSeriesApplied } from '../src/hermes/patch.ts';
 import {
     ensureHermesSource,
     parseHermesSourcePin,
@@ -183,10 +183,9 @@ it('applies each ordered patch once and skips patches already applied', () => {
     const applied = new Set<string>();
     const commands: string[] = [];
     const runner: HermesProcessRunner = {
-        run(_command, args) {
+        run(_command, args, options) {
             commands.push(args.join(' '));
-            const filename = args.at(-1);
-            if (filename === undefined) throw new Error('Git patch filename is missing');
+            const filename = patchTargetFromInput(options);
             if (args.includes('--check')) {
                 if (args.includes('--reverse') ? applied.has(filename) : !applied.has(filename)) return;
                 throw new Error('patch check failed');
@@ -204,7 +203,58 @@ it('applies each ordered patch once and skips patches already applied', () => {
     applyHermesPatchSeries({ source: directory, patches, process: runner });
 
     expect([...applied]).toHaveLength(2);
-    expect(commands.filter((command) => command.includes(' apply ') && !command.includes('--check'))).toHaveLength(2);
+    expect(commands.filter((command) => command.includes(' apply') && !command.includes('--check'))).toHaveLength(2);
+});
+
+it('applies long-path CRLF patches from stdin on Windows', () => {
+    const root = temporaryDirectory();
+    const base = path.join(root, `workspace-${'x'.repeat(80)}`);
+    const source = path.join(base, 'cache', 'hermes', 'source');
+    const patchesDirectory = path.join(
+        base,
+        'consumer',
+        'pnpm-create-typescript',
+        'node_modules',
+        '.pnpm',
+        '@pumpkin-plugins+static-hermes-runtime@0.1.0',
+        'node_modules',
+        '@pumpkin-plugins',
+        'static-hermes-runtime',
+        'hermes-patches'
+    );
+    fs.mkdirSync(source, { recursive: true });
+    fs.mkdirSync(patchesDirectory, { recursive: true });
+    writePatch(patchesDirectory, '0001-first.patch', 'first.txt');
+    const patchFilename = path.join(patchesDirectory, '0001-first.patch');
+    fs.writeFileSync(patchFilename, fs.readFileSync(patchFilename, 'utf8').replace(/\n/g, '\r\n'));
+    const patches = readHermesPatchSeries(patchesDirectory);
+    const patch = patches[0];
+    if (!patch) throw new Error('Long-path fixture patch is missing');
+    expect(patch.filename.length).toBeGreaterThan(260);
+    fs.writeFileSync(path.join(source, 'first.txt'), 'old\n');
+    execFileSync('git', ['-C', source, 'init'], { stdio: 'ignore' });
+    execFileSync('git', ['-C', source, 'config', 'user.name', 'Hermes test'], { stdio: 'ignore' });
+    execFileSync('git', ['-C', source, 'config', 'user.email', 'hermes-test@example.com'], { stdio: 'ignore' });
+    execFileSync('git', ['-C', source, 'add', 'first.txt'], { stdio: 'ignore' });
+    execFileSync('git', ['-C', source, 'commit', '-m', 'source fixture'], { stdio: 'ignore' });
+    const runner: HermesProcessRunner = {
+        run(command, args, options) {
+            if (typeof options?.input !== 'string') throw new Error('Git patch contents must be sent through stdin');
+            if (args.includes(patch.filename))
+                throw new Error('Git must not receive the long patch path as an argument');
+            hermesProcess.run(command, args, options);
+        },
+        output(command, args, options) {
+            return hermesProcess.output(command, args, options);
+        },
+        buffer(command, args, options) {
+            return hermesProcess.buffer(command, args, options);
+        }
+    };
+
+    expect(() => applyHermesPatchSeries({ source, patches, process: runner })).not.toThrow();
+    expect(() => verifyHermesPatchSeriesApplied(source, patches, runner)).not.toThrow();
+    expect(fs.readFileSync(path.join(source, 'first.txt'), 'utf8')).toBe('new\n');
 });
 
 it('rejects unrelated edits and patch conflicts with actionable paths', () => {
@@ -381,6 +431,14 @@ function writePatch(directory: string, name: string, filename: string): void {
         path.join(directory, name),
         `diff --git a/${filename} b/${filename}\n--- a/${filename}\n+++ b/${filename}\n@@ -1 +1 @@\n-old\n+new\n`
     );
+}
+
+function patchTargetFromInput(options: Parameters<HermesProcessRunner['run']>[2]): string {
+    const contents = options?.input;
+    if (typeof contents !== 'string') throw new Error('Git patch contents are missing');
+    const filename = contents.match(/^diff --git a\/([^\s]+) b\//m)?.[1];
+    if (filename === undefined) throw new Error('Git patch target is missing');
+    return filename;
 }
 
 function isPorcelainStatusCommand(args: readonly string[]): boolean {

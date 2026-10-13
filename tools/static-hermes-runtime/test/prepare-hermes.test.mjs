@@ -95,17 +95,28 @@ it('builds patched Hermes once, reuses the cache, and invalidates it when settin
         fs.writeFileSync(
             fakeGit,
             `#!/bin/sh
-case " $* " in
+args=" $* "
+patch_contents=
+case "$args" in *" apply "*) patch_contents=$(cat) ;; esac
+case "$args" in
   *" rev-parse --git-dir "*) printf '.git\\n' ;;
   *" rev-parse HEAD "*) printf '820aa0d4b5fe5d3ed7900e1274211ef561081b3f\\n' ;;
   *" status --porcelain"*) printf ' M cmake/modules/Hermes.cmake\\0' ;;
-  *" apply --check --reverse "*0004-wasi-p2-runtime-compatibility.patch*)
-    if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 0; else exit 1; fi
+  *" apply --check --reverse "*)
+    case "$patch_contents" in
+      *"include/hermes/VM/JSLib/DateCache.h"*)
+        if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 0; else exit 1; fi
+        ;;
+      *) exit 0 ;;
+    esac
     ;;
-  *" apply --check --reverse "*) exit 0 ;;
   *" apply --check "*) exit 0 ;;
-  *" apply "*0004-wasi-p2-runtime-compatibility.patch*) touch "$STATIC_HERMES_TEST_PATCHED_0004"; exit 0 ;;
-  *" apply "*) exit 0 ;;
+  *" apply "*)
+    case "$patch_contents" in
+      *"include/hermes/VM/JSLib/DateCache.h"*) touch "$STATIC_HERMES_TEST_PATCHED_0004" ;;
+    esac
+    exit 0
+    ;;
   *) exit 0 ;;
 esac
 `
@@ -213,6 +224,8 @@ it('rebuilds a stale source cache when a managed Hermes patch no longer applies'
 args=" $* "
 repo=
 if [ "$1" = "-C" ]; then repo="$2"; fi
+patch_contents=
+case "$args" in *" apply "*) patch_contents=$(cat) ;; esac
 case "$args" in
   *" clone "*)
     target=
@@ -226,22 +239,35 @@ case "$args" in
     case "$repo" in *source.rebuild-*) exit 0 ;; esac
     printf ' M cmake/modules/Hermes.cmake\\0'
     ;;
-  *" apply --check --reverse "*0004-wasi-p2-runtime-compatibility.patch*)
-    if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 0; fi
-    case "$repo" in *source.rebuild-*) exit 1 ;; esac
-    exit 1
-    ;;
   *" apply --check --reverse "*)
-    case "$repo" in *source.rebuild-*) exit 1 ;; esac
+    case "$patch_contents" in
+      *"include/hermes/VM/JSLib/DateCache.h"*)
+        if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 0; fi
+        case "$repo" in *source.rebuild-*) exit 1 ;; esac
+        exit 1
+        ;;
+      *)
+        case "$repo" in *source.rebuild-*) exit 1 ;; esac
+        exit 0
+        ;;
+    esac
+    ;;
+  *" apply --check "*)
+    case "$patch_contents" in
+      *"include/hermes/VM/JSLib/DateCache.h"*)
+        if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 1; fi
+        if [ -f "$STATIC_HERMES_TEST_FRESH_SOURCE" ]; then exit 0; fi
+        exit 1
+        ;;
+      *) exit 0 ;;
+    esac
+    ;;
+  *" apply "*)
+    case "$patch_contents" in
+      *"include/hermes/VM/JSLib/DateCache.h"*) touch "$STATIC_HERMES_TEST_PATCHED_0004" ;;
+    esac
     exit 0
     ;;
-  *" apply --check "*0004-wasi-p2-runtime-compatibility.patch*)
-    if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 1; fi
-    if [ -f "$STATIC_HERMES_TEST_FRESH_SOURCE" ]; then exit 0; fi
-    exit 1
-    ;;
-  *" apply "*0004-wasi-p2-runtime-compatibility.patch*) touch "$STATIC_HERMES_TEST_PATCHED_0004"; exit 0 ;;
-  *" apply --check "*) exit 0 ;;
   *) exit 0 ;;
 esac
 `
