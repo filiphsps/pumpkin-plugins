@@ -392,8 +392,8 @@ jobs:
                   host_tools="$RUNNER_TEMP/host-tools"
                   python -m pip install --disable-pip-version-check --target "$host_tools" cmake==4.4.4 ninja==1.13.2
                   {
-                      echo "$host_tools/cmake/data/bin"
                       echo "$host_tools/bin"
+                      echo "$host_tools/cmake/data/bin"
                   } >> "$GITHUB_PATH"
 
             - name: 📦 Install CMake 4.4.4 and Ninja 1.13.2
@@ -402,22 +402,21 @@ jobs:
               run: |
                   $hostTools = Join-Path $env:RUNNER_TEMP 'host-tools'
                   python -m pip install --disable-pip-version-check --target $hostTools cmake==4.4.4 ninja==1.13.2
-                  Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $hostTools 'cmake/data/bin')
                   Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $hostTools 'bin')
-                  Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $hostTools 'Scripts')
+                  Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $hostTools 'cmake/data/bin')
 
             - name: 🔎 Verify pinned Ninja executable on Windows
               if: runner.os == 'Windows'
               shell: pwsh
               run: |
-                  $expected = [System.IO.Path]::GetFullPath((Join-Path $env:RUNNER_TEMP 'host-tools/Scripts/ninja.exe'))
+                  $expected = [System.IO.Path]::GetFullPath((Join-Path $env:RUNNER_TEMP 'host-tools/bin/ninja.exe'))
                   $resolved = Get-Command ninja -ErrorAction Stop
                   $actual = [System.IO.Path]::GetFullPath($resolved.Source)
                   if ($actual -ne $expected) {
                       throw "Expected pinned Ninja at '$expected', but PATH resolved '$actual'"
                   }
                   $version = (& $actual --version).Trim()
-                  if ($version -ne '1.13.2') {
+                  if ($version -notmatch '^1\.13\.2(?:$|[.+-])') {
                       throw "Expected Ninja 1.13.2 at '$actual', got '$version'"
                   }
 
@@ -425,7 +424,11 @@ jobs:
               shell: bash
               run: |
                   test "$(cmake --version | head -n 1)" = 'cmake version 4.4.4'
-                  test "$(ninja --version)" = '1.13.2'
+                  ninja_version="$(ninja --version)"
+                  case "$ninja_version" in
+                      1.13.2|1.13.2.*|1.13.2+*|1.13.2-*) ;;
+                      *) echo "Expected Ninja 1.13.2, got '$ninja_version'" >&2; exit 1 ;;
+                  esac
                   rustup toolchain install 1.99.0 --profile minimal
                   rustc +1.99.0 --version
                   cargo +1.99.0 --version
