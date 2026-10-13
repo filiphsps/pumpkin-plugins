@@ -1,3 +1,6 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { prepareHermes, runHermesPreparationStages } from './prepare.ts';
 
@@ -114,7 +117,9 @@ it('prepares the pinned source, applies patches, and builds with resolved cache 
         expectedCommit: pin.commit,
         patches
     });
-    expect(mocks.withBuildLock).toHaveBeenCalledWith('/cache/hermes', expect.any(Function));
+    expect(mocks.withBuildLock).toHaveBeenCalledWith('/cache/hermes', expect.any(Function), {
+        resources: ['/cache/hermes/source', '/cache/hermes/build-host', '/cache/hermes/build-wasip2']
+    });
     expect(mocks.buildHermesWithLockHeld).toHaveBeenCalledWith(
         expect.objectContaining({
             packageRoot: '/package',
@@ -129,6 +134,88 @@ it('prepares the pinned source, applies patches, and builds with resolved cache 
             environment
         })
     );
+});
+
+it('serializes preparations that share an overridden source across independent cache roots', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-shared-source-'));
+    const firstCache = path.join(root, 'cache-first');
+    const secondCache = path.join(root, 'cache-second');
+    const sharedSource = path.join(root, 'shared-source');
+    fs.mkdirSync(sharedSource, { recursive: true });
+    const { withHermesBuildLock: realBuildLock } = await vi.importActual<typeof import('./build.ts')>('./build.ts');
+    mocks.withBuildLock.mockImplementation((cacheRoot, operation, options) =>
+        realBuildLock(cacheRoot, operation, options)
+    );
+    mocks.setupToolchain.mockImplementation(async () => ({ STATIC_HERMES_WASI_SDK_PATH: '/toolchain/wasi-sdk' }));
+
+    let markFirstBuildEntered = (): void => undefined;
+    let releaseFirstBuild = (): void => undefined;
+    const firstBuildEntered = new Promise<void>((resolve) => {
+        markFirstBuildEntered = resolve;
+    });
+    const firstBuildGate = new Promise<void>((resolve) => {
+        releaseFirstBuild = resolve;
+    });
+    const buildStarts: string[] = [];
+    mocks.buildHermesWithLockHeld.mockImplementation(async ({ cacheRoot }) => {
+        buildStarts.push(cacheRoot);
+        if (cacheRoot === firstCache) {
+            markFirstBuildEntered();
+            await firstBuildGate;
+        }
+    });
+
+    const createEnvironment = (cacheRoot: string): NodeJS.ProcessEnv => ({
+        STATIC_HERMES_CACHE_DIR: cacheRoot,
+        STATIC_HERMES_SOURCE_DIR: sharedSource,
+        STATIC_HERMES_HOST_BUILD_DIR: path.join(cacheRoot, 'host-build'),
+        STATIC_HERMES_WASI_BUILD_DIR: path.join(cacheRoot, 'wasi-build')
+    });
+
+    try {
+        const first = prepareHermes({
+            workspaceRoot: root,
+            packageRoot: '/package',
+            environment: createEnvironment(firstCache)
+        });
+        await firstBuildEntered;
+        const second = prepareHermes({
+            workspaceRoot: root,
+            packageRoot: '/package',
+            environment: createEnvironment(secondCache)
+        });
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        const startsBeforeRelease = [...buildStarts];
+
+        releaseFirstBuild();
+        await Promise.all([first, second]);
+
+        expect(startsBeforeRelease).toEqual([firstCache]);
+        expect(buildStarts).toEqual([firstCache, secondCache]);
+    } finally {
+        releaseFirstBuild();
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
+it('uses the consumer working directory when the runtime package is installed under node_modules', async () => {
+    const consumerRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-prepare-consumer-'));
+    const originalWorkingDirectory = process.cwd();
+    const packageRoot = path.join(consumerRoot, 'node_modules/@pumpkin-plugins/static-hermes-runtime');
+    fs.mkdirSync(packageRoot, { recursive: true });
+    process.chdir(consumerRoot);
+    const expectedWorkspaceRoot = process.cwd();
+
+    try {
+        await prepareHermes({ packageRoot, environment: {} });
+
+        expect(mocks.setupToolchain.mock.calls[0]?.[0].workspaceRoot).toBe(expectedWorkspaceRoot);
+        expect(mocks.setupToolchain.mock.calls[0]?.[0].includeWitBindgen).toBe(false);
+        expect(mocks.readPin).toHaveBeenCalledWith(path.join(packageRoot, 'hermes-source.lock.json'));
+    } finally {
+        process.chdir(originalWorkingDirectory);
+        fs.rmSync(consumerRoot, { recursive: true, force: true });
+    }
 });
 
 it('waits for the preparation lock before touching source, patches, or build artifacts', async () => {

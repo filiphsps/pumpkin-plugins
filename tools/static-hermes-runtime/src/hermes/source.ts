@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { parseHermesGitStatusPaths } from './git-status.ts';
 import { type HermesFileSystem, type HermesProcessRunner, hermesFileSystem, hermesProcess } from './system.ts';
 
 /** Repository, branch, and commit that identify the pinned Hermes source. */
@@ -191,10 +192,10 @@ function rebuildPinnedSource(
 }
 
 function verifyManagedChanges(source: string, managedPaths: readonly string[], process: HermesProcessRunner): void {
-    const status = process.output('git', ['-C', source, 'status', '--porcelain', '--untracked-files=all']);
+    const status = process.output('git', ['-C', source, 'status', '--porcelain=v1', '-z', '--untracked-files=all']);
     if (!status) return;
     const allowed = new Set(managedPaths);
-    const changedPaths = status.split('\n').map((line) => line.slice(3).replace(/ -> .*/, ''));
+    const changedPaths = parseHermesGitStatusPaths(status);
     const unexpected = changedPaths.filter((filename) => !allowed.has(filename));
     if (unexpected.length > 0) {
         throw new Error(

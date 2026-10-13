@@ -26,8 +26,16 @@ export const hermesProcess: HermesProcessRunner = {
 
 /** Filesystem operations used by Hermes preparation, with an injectable test boundary. */
 export interface HermesFileSystem {
+    /** Close an open file descriptor. */
+    closeSync(fd: number): void;
+    /** Read file metadata directly from an open file descriptor. */
+    fstatSync(fd: number): fs.Stats;
     /** Test whether a file or directory exists. */
     existsSync(path: fs.PathLike): boolean;
+    /** Open a file with the requested flags and return its descriptor. */
+    openSync(path: fs.PathLike, flags: fs.OpenMode): number;
+    /** Read file metadata without following a symbolic link. */
+    lstatSync(path: fs.PathLike): fs.Stats;
     /** Create a directory, optionally including its parents. */
     mkdirSync(path: fs.PathLike, options?: fs.MakeDirectoryOptions): string | undefined;
     /** Read a file as text using the requested encoding. */

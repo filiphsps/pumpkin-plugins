@@ -3,8 +3,14 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { HermesBuildOptions } from './build.ts';
-import { buildHermes, hermesBuildFingerprint, requiredHermesArtifacts, withHermesBuildLock } from './build.ts';
-import type { HermesProcessRunner } from './system.ts';
+import {
+    acquireHermesBuildLock,
+    buildHermes,
+    hermesBuildFingerprint,
+    requiredHermesArtifacts,
+    withHermesBuildLock
+} from './build.ts';
+import { type HermesFileSystem, type HermesProcessRunner, hermesFileSystem } from './system.ts';
 
 const directories: string[] = [];
 
@@ -23,6 +29,21 @@ it('fingerprints Hermes source modules deterministically and invalidates when on
     expect(hermesBuildFingerprint(options)).toBe(original);
     fs.writeFileSync(sourceFile, 'export const version = 2;\n');
     expect(hermesBuildFingerprint(options)).not.toBe(original);
+});
+
+it('does not invalidate the Hermes build fingerprint when a colocated test source changes', () => {
+    const { options, packageRoot } = fixture();
+    const testSources = ['build.test.ts', 'build.spec.ts'].map((filename) =>
+        path.join(packageRoot, 'src/hermes', filename)
+    );
+    for (const testSource of testSources) fs.writeFileSync(testSource, 'export const testVersion = 1;\n');
+
+    const original = hermesBuildFingerprint(options);
+
+    for (const testSource of testSources) {
+        fs.writeFileSync(testSource, 'export const testVersion = 2;\n');
+        expect(hermesBuildFingerprint(options)).toBe(original);
+    }
 });
 
 it('includes the compiled CLI source in the Hermes build fingerprint', () => {
@@ -100,6 +121,47 @@ it('serializes cache operations until the current preparation releases its lock'
     expect(fs.existsSync(path.join(options.cacheRoot, 'prepare.lock'))).toBe(false);
 });
 
+it('serializes separate cache roots that point at the same mutable Hermes directory', async () => {
+    const { options } = fixture();
+    const otherCacheRoot = `${options.cacheRoot}-other`;
+    const operations: string[] = [];
+    let signalFirstEntered = (): void => undefined;
+    let releaseFirst = (): void => undefined;
+    const firstEntered = new Promise<void>((resolve) => {
+        signalFirstEntered = resolve;
+    });
+    const firstGate = new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+    });
+
+    const first = withHermesBuildLock(
+        options.cacheRoot,
+        async () => {
+            operations.push('first:start');
+            signalFirstEntered();
+            await firstGate;
+            operations.push('first:end');
+        },
+        { resources: [options.source] }
+    );
+    await firstEntered;
+    const second = withHermesBuildLock(
+        otherCacheRoot,
+        () => {
+            operations.push('second');
+        },
+        { resources: [options.source] }
+    );
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    const operationsBeforeRelease = [...operations];
+
+    releaseFirst();
+    await Promise.all([first, second]);
+
+    expect(operationsBeforeRelease).toEqual(['first:start']);
+    expect(operations).toEqual(['first:start', 'first:end', 'second']);
+});
+
 it('does not remove a replacement lock owned by another preparation', async () => {
     const { options } = fixture();
     const lockPath = path.join(options.cacheRoot, 'prepare.lock');
@@ -119,6 +181,162 @@ it('does not remove a replacement lock owned by another preparation', async () =
     } finally {
         fs.rmSync(lockPath, { force: true });
     }
+});
+
+it('removes a partially written Hermes lock when the owner write fails', async () => {
+    const { options } = fixture();
+    const lockPath = path.join(options.cacheRoot, 'partial-write.lock');
+    let injectedFailure = false;
+    const failingFilesystem: HermesFileSystem = {
+        ...hermesFileSystem,
+        writeFileSync(filename, data, writeOptions) {
+            if (!injectedFailure && (typeof filename === 'number' || String(filename) === lockPath)) {
+                injectedFailure = true;
+                if (typeof filename === 'number') {
+                    hermesFileSystem.writeFileSync(filename, '{"pid":');
+                } else {
+                    hermesFileSystem.writeFileSync(filename, '{"pid":', { flag: 'wx' });
+                }
+                throw Object.assign(new Error('fixture partial lock write'), { code: 'EIO' });
+            }
+            hermesFileSystem.writeFileSync(filename, data, writeOptions);
+        }
+    };
+
+    await expect(acquireHermesBuildLock(lockPath, { filesystem: failingFilesystem })).rejects.toThrow(
+        'fixture partial lock write'
+    );
+
+    expect(injectedFailure).toBe(true);
+    expect(fs.existsSync(lockPath)).toBe(false);
+});
+
+it('preserves a replacement lock after a partial Hermes lock write fails', async () => {
+    const { options } = fixture();
+    const lockPath = path.join(options.cacheRoot, 'replacement-after-partial-write.lock');
+    let replacementContents: string | undefined;
+    let injectedFailure = false;
+    let installedReplacement = false;
+    const failingFilesystem: HermesFileSystem = {
+        ...hermesFileSystem,
+        writeFileSync(filename, data, writeOptions) {
+            if (!injectedFailure && (typeof filename === 'number' || String(filename) === lockPath)) {
+                injectedFailure = true;
+                replacementContents = String(data);
+                if (typeof filename === 'number') {
+                    hermesFileSystem.writeFileSync(filename, '{"pid":');
+                } else {
+                    hermesFileSystem.writeFileSync(filename, '{"pid":', { flag: 'wx' });
+                }
+                throw Object.assign(new Error('fixture partial lock write'), { code: 'EIO' });
+            }
+            hermesFileSystem.writeFileSync(filename, data, writeOptions);
+        },
+        closeSync(descriptor: number) {
+            hermesFileSystem.closeSync(descriptor);
+            if (injectedFailure && !installedReplacement) {
+                if (replacementContents === undefined) throw new Error('Fixture is missing the lock contents');
+                fs.rmSync(lockPath, { force: true });
+                fs.writeFileSync(lockPath, replacementContents);
+                installedReplacement = true;
+            }
+        }
+    };
+
+    await expect(acquireHermesBuildLock(lockPath, { filesystem: failingFilesystem })).rejects.toThrow(
+        'fixture partial lock write'
+    );
+
+    expect(injectedFailure).toBe(true);
+    expect(installedReplacement).toBe(true);
+    expect(fs.readFileSync(lockPath, 'utf8')).toBe(replacementContents);
+});
+
+it('does not let concurrent stale-lock recovery delete a replacement lock', async () => {
+    const { options } = fixture();
+    const lockPath = path.join(options.cacheRoot, 'stale-race.lock');
+    fs.mkdirSync(options.cacheRoot, { recursive: true });
+    fs.writeFileSync(lockPath, JSON.stringify({ pid: 99999999, startedAt: 1 }));
+    let nestedAcquisition: Promise<string> | undefined;
+    let injectedNestedRecovery = false;
+    const raceFilesystem: HermesFileSystem = {
+        ...hermesFileSystem,
+        rmSync(filename, removeOptions) {
+            if (!injectedNestedRecovery && path.resolve(String(filename)) === lockPath) {
+                injectedNestedRecovery = true;
+                nestedAcquisition = acquireHermesBuildLock(lockPath, {
+                    filesystem: raceFilesystem,
+                    timeoutMs: 20,
+                    wait: async (delayMs) => new Promise((resolve) => setTimeout(resolve, Math.min(delayMs, 1))),
+                    isProcessAlive: (pid) => pid === process.pid
+                });
+            }
+            hermesFileSystem.rmSync(filename, removeOptions);
+        }
+    };
+
+    try {
+        const firstOwnerToken = await acquireHermesBuildLock(lockPath, {
+            filesystem: raceFilesystem,
+            timeoutMs: 20,
+            wait: async (delayMs) => new Promise((resolve) => setTimeout(resolve, Math.min(delayMs, 1))),
+            isProcessAlive: (pid) => pid === process.pid
+        });
+        expect(nestedAcquisition).toBeDefined();
+        await expect(nestedAcquisition).rejects.toThrow(`Timed out waiting for Hermes build lock: ${lockPath}`);
+        const owner = JSON.parse(fs.readFileSync(lockPath, 'utf8')) as { token?: unknown };
+
+        expect(owner.token).toBe(firstOwnerToken);
+    } finally {
+        fs.rmSync(lockPath, { force: true });
+        fs.rmSync(`${lockPath}.reclaim`, { force: true });
+    }
+});
+
+it('recovers a stale build lock when its recovery owner has exited', async () => {
+    const { options } = fixture();
+    const lockPath = path.join(options.cacheRoot, 'stale-recovery.lock');
+    const reclaimLockPath = `${lockPath}.reclaim`;
+    fs.mkdirSync(options.cacheRoot, { recursive: true });
+    const staleLock = JSON.stringify({ pid: 99999999, startedAt: 1 });
+    const abandonedClaim = JSON.stringify({ pid: 99999999, startedAt: 1, token: 'abandoned' });
+    fs.writeFileSync(lockPath, staleLock);
+    fs.writeFileSync(reclaimLockPath, abandonedClaim);
+
+    const ownerToken = await acquireHermesBuildLock(lockPath, {
+        timeoutMs: 10,
+        isProcessAlive: () => false,
+        wait: async (delayMs) => new Promise((resolve) => setTimeout(resolve, Math.min(delayMs, 1)))
+    });
+    const owner = JSON.parse(fs.readFileSync(lockPath, 'utf8')) as { token?: unknown };
+
+    expect(owner.token).toBe(ownerToken);
+    expect(fs.existsSync(reclaimLockPath)).toBe(false);
+    fs.rmSync(lockPath, { force: true });
+});
+
+it('keeps a live build recovery owner while waiting for a stale lock', async () => {
+    const { options } = fixture();
+    const lockPath = path.join(options.cacheRoot, 'live-recovery.lock');
+    const reclaimLockPath = `${lockPath}.reclaim`;
+    fs.mkdirSync(options.cacheRoot, { recursive: true });
+    const staleLock = JSON.stringify({ pid: 99999999, startedAt: 1 });
+    const liveClaim = JSON.stringify({ pid: process.pid, startedAt: 1, token: 'live-recovery' });
+    fs.writeFileSync(lockPath, staleLock);
+    fs.writeFileSync(reclaimLockPath, liveClaim);
+
+    await expect(
+        acquireHermesBuildLock(lockPath, {
+            timeoutMs: 10,
+            isProcessAlive: (pid) => pid === process.pid,
+            wait: async (delayMs) => new Promise((resolve) => setTimeout(resolve, Math.min(delayMs, 1)))
+        })
+    ).rejects.toThrow(`inspect recovery claim ${reclaimLockPath}`);
+
+    expect(fs.readFileSync(lockPath, 'utf8')).toBe(staleLock);
+    expect(fs.readFileSync(reclaimLockPath, 'utf8')).toBe(liveClaim);
+    fs.rmSync(lockPath, { force: true });
+    fs.rmSync(reclaimLockPath, { force: true });
 });
 
 it('builds and reuses Windows Hermes artifacts without probing MSVC as a GNU compiler', async () => {

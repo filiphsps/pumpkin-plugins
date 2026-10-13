@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ensurePatchOnlyChanges, type HermesPatch, verifyHermesPatchSeriesApplied } from './patch.ts';
 import type { HermesSourcePin } from './source.ts';
@@ -49,8 +50,10 @@ interface BuildCacheRecord {
     fingerprint: string;
 }
 
-/** Optional dependencies and timing controls for the shared Hermes cache lock. */
+/** Optional mutable resources, dependencies, and timing controls for Hermes preparation locks. */
 export interface HermesBuildLockOptions {
+    /** Additional mutable Hermes directories that must share this lock with the cache root. */
+    resources?: readonly string[];
     /** Filesystem used to create, read, and remove the lock file. */
     filesystem?: HermesFileSystem;
     /** Maximum wait for another live build to release the lock. */
@@ -71,7 +74,10 @@ export interface HermesBuildLockOptions {
  */
 export async function buildHermes(options: HermesBuildOptions): Promise<void> {
     const filesystem = options.filesystem ?? hermesFileSystem;
-    await withHermesBuildLock(options.cacheRoot, () => buildHermesWithLockHeld(options), { filesystem });
+    await withHermesBuildLock(options.cacheRoot, () => buildHermesWithLockHeld(options), {
+        filesystem,
+        resources: [options.source, options.hostBuild, options.wasiBuild]
+    });
 }
 
 /**
@@ -137,10 +143,12 @@ export function hermesBuildFingerprint(
     const moduleFiles = [
         ...filesystem
             .readdirSync(path.join(options.packageRoot, 'src/hermes'))
-            .filter((filename) => filename.endsWith('.ts'))
+            .filter(
+                (filename) =>
+                    filename.endsWith('.ts') && !filename.endsWith('.test.ts') && !filename.endsWith('.spec.ts')
+            )
             .map((filename) => path.join(options.packageRoot, 'src/hermes', filename)),
-        path.join(options.packageRoot, 'src/cli.ts'),
-        path.join(options.packageRoot, 'src/hermes/toolchain-environment.ts')
+        path.join(options.packageRoot, 'src/cli.ts')
     ].filter((filename) => filesystem.existsSync(filename));
     const cmakeVersion = runner.output('cmake', ['--version']);
     const inputs = {
@@ -295,6 +303,10 @@ export function saveHermesBuildCache(
 /**
  * Acquire the exclusive preparation lock, removing stale owners and waiting for active builds.
  *
+ * @remarks
+ * A separate recovery claim serializes stale-owner removal. A claim owned by an exited process is removed only while
+ * its file identity and contents still match the stale claim that was inspected.
+ *
  * @param lockPath - Path to the lock file created with exclusive-write semantics.
  * @param options - Optional filesystem, timeout, clock, wait, and process-liveness hooks.
  * @returns A unique token identifying this lock owner.
@@ -307,35 +319,209 @@ export async function acquireHermesBuildLock(lockPath: string, options: HermesBu
     const now = options.now ?? Date.now;
     const isProcessAlive = options.isProcessAlive ?? processIsAlive;
     const ownerToken = randomUUID();
+    const reclaimLockPath = `${lockPath}.reclaim`;
     filesystem.mkdirSync(path.dirname(lockPath), { recursive: true });
     const deadline = now() + timeoutMs;
     while (true) {
         try {
-            filesystem.writeFileSync(
-                lockPath,
-                `${JSON.stringify({ pid: process.pid, startedAt: now(), token: ownerToken })}\n`,
-                { flag: 'wx' }
-            );
+            writeHermesLock(lockPath, ownerToken, now(), filesystem);
             return ownerToken;
         } catch (error) {
             if (errorCode(error) !== 'EEXIST') throw error;
             if (staleHermesBuildLock(lockPath, filesystem, now, isProcessAlive)) {
-                filesystem.rmSync(lockPath, { force: true });
-                continue;
+                const reclaimToken = tryAcquireHermesReclaimLock(reclaimLockPath, now, isProcessAlive, filesystem);
+                if (reclaimToken !== null) {
+                    try {
+                        if (staleHermesBuildLock(lockPath, filesystem, now, isProcessAlive)) {
+                            filesystem.rmSync(lockPath, { force: true });
+                            try {
+                                writeHermesLock(lockPath, ownerToken, now(), filesystem);
+                                return ownerToken;
+                            } catch (writeError) {
+                                if (errorCode(writeError) !== 'EEXIST') throw writeError;
+                            }
+                        }
+                    } finally {
+                        releaseHermesBuildLock(reclaimLockPath, reclaimToken, filesystem);
+                    }
+                    continue;
+                }
             }
-            if (now() >= deadline) throw new Error(`Timed out waiting for Hermes build lock: ${lockPath}`);
+            if (now() >= deadline) {
+                if (filesystem.existsSync(reclaimLockPath)) {
+                    throw new Error(
+                        `Timed out waiting for Hermes build lock: ${lockPath}; inspect recovery claim ${reclaimLockPath} and remove it only after confirming no recovery is active`
+                    );
+                }
+                throw new Error(`Timed out waiting for Hermes build lock: ${lockPath}`);
+            }
             await wait(250);
         }
     }
 }
 
+function tryAcquireHermesReclaimLock(
+    lockPath: string,
+    now: () => number,
+    isProcessAlive: (pid: number) => boolean,
+    filesystem: HermesFileSystem
+): string | null {
+    const ownerToken = randomUUID();
+    try {
+        writeHermesLock(lockPath, ownerToken, now(), filesystem);
+        return ownerToken;
+    } catch (error) {
+        if (errorCode(error) !== 'EEXIST') throw error;
+        if (!removeStaleHermesReclaimLock(lockPath, now, isProcessAlive, filesystem)) return null;
+        try {
+            writeHermesLock(lockPath, ownerToken, now(), filesystem);
+            return ownerToken;
+        } catch (writeError) {
+            if (errorCode(writeError) === 'EEXIST') return null;
+            throw writeError;
+        }
+    }
+}
+
+function removeStaleHermesReclaimLock(
+    lockPath: string,
+    now: () => number,
+    isProcessAlive: (pid: number) => boolean,
+    filesystem: HermesFileSystem
+): boolean {
+    let originalFile: fs.Stats;
+    try {
+        originalFile = filesystem.lstatSync(lockPath);
+    } catch (error) {
+        if (errorCode(error) === 'ENOENT') return true;
+        throw error;
+    }
+
+    let originalContents: string;
+    try {
+        originalContents = filesystem.readFileSync(lockPath, 'utf8');
+    } catch (error) {
+        if (errorCode(error) === 'ENOENT') return true;
+        throw error;
+    }
+    if (!staleHermesBuildLock(lockPath, filesystem, now, isProcessAlive)) return false;
+
+    let currentFile: fs.Stats;
+    try {
+        currentFile = filesystem.lstatSync(lockPath);
+    } catch (error) {
+        if (errorCode(error) === 'ENOENT') return true;
+        throw error;
+    }
+    if (!sameHermesLockFile(originalFile, currentFile)) return false;
+
+    let currentContents: string;
+    try {
+        currentContents = filesystem.readFileSync(lockPath, 'utf8');
+    } catch (error) {
+        if (errorCode(error) === 'ENOENT') return true;
+        throw error;
+    }
+    if (currentContents !== originalContents || !staleHermesBuildLock(lockPath, filesystem, now, isProcessAlive)) {
+        return false;
+    }
+
+    filesystem.rmSync(lockPath, { force: true });
+    return true;
+}
+
+function writeHermesLock(lockPath: string, ownerToken: string, startedAt: number, filesystem: HermesFileSystem): void {
+    const descriptor = filesystem.openSync(lockPath, 'wx');
+    let createdFile: fs.Stats;
+    try {
+        createdFile = filesystem.fstatSync(descriptor);
+    } catch (error) {
+        filesystem.closeSync(descriptor);
+        throw error;
+    }
+
+    let failure: unknown;
+    let failed = false;
+    try {
+        filesystem.writeFileSync(descriptor, `${JSON.stringify({ pid: process.pid, startedAt, token: ownerToken })}\n`);
+    } catch (error) {
+        failure = error;
+        failed = true;
+    }
+    try {
+        filesystem.closeSync(descriptor);
+    } catch (error) {
+        if (!failed) {
+            failure = error;
+            failed = true;
+        }
+    }
+
+    if (!failed) return;
+    try {
+        removeIncompleteHermesLock(lockPath, ownerToken, createdFile, filesystem);
+    } catch (cleanupError) {
+        throw new AggregateError(
+            [failure, cleanupError],
+            `Failed to write and clean up Hermes build lock: ${lockPath}`
+        );
+    }
+    throw failure;
+}
+
+/** Remove an incomplete lock only while its original file identity and owner token still match. */
+function removeIncompleteHermesLock(
+    lockPath: string,
+    ownerToken: string,
+    createdFile: fs.Stats,
+    filesystem: HermesFileSystem
+): void {
+    let currentFile: fs.Stats;
+    try {
+        currentFile = filesystem.lstatSync(lockPath);
+    } catch (error) {
+        if (errorCode(error) === 'ENOENT') return;
+        throw error;
+    }
+    if (!sameHermesLockFile(createdFile, currentFile)) return;
+
+    let currentContents: string;
+    try {
+        currentContents = filesystem.readFileSync(lockPath, 'utf8');
+    } catch (error) {
+        if (errorCode(error) === 'ENOENT') return;
+        throw error;
+    }
+
+    let owner: unknown;
+    try {
+        owner = JSON.parse(currentContents) as unknown;
+    } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+    }
+    if (typeof owner === 'object' && owner !== null && 'token' in owner && owner.token !== ownerToken) return;
+
+    try {
+        currentFile = filesystem.lstatSync(lockPath);
+    } catch (error) {
+        if (errorCode(error) === 'ENOENT') return;
+        throw error;
+    }
+    if (sameHermesLockFile(createdFile, currentFile)) filesystem.rmSync(lockPath, { force: true });
+}
+
+/** Compare file device and inode values to identify one lock-file entry. */
+function sameHermesLockFile(left: fs.Stats, right: fs.Stats): boolean {
+    return left.dev === right.dev && left.ino === right.ino;
+}
+
 /**
- * Run a cache operation while holding the exclusive Hermes preparation lock.
+ * Run a cache operation while holding exclusive locks for the cache root and mutable Hermes directories.
  *
  * @template T - Result returned by the locked operation
- * @param cacheRoot - Shared root that contains the lock file.
+ * @param cacheRoot - Shared cache root that contains the build-state record.
  * @param operation - Source, patch, and build work that must be serialized.
- * @param options - Optional filesystem and lock-wait controls.
+ * @param options - Optional mutable resource paths, filesystem, and lock-wait controls.
  * @returns The result of the locked operation.
  * @throws {Error} If the lock cannot be acquired or the operation fails.
  */
@@ -345,12 +531,56 @@ export async function withHermesBuildLock<T>(
     options: HermesBuildLockOptions = {}
 ): Promise<T> {
     const filesystem = options.filesystem ?? hermesFileSystem;
-    const lockPath = path.join(cacheRoot, 'prepare.lock');
-    const ownerToken = await acquireHermesBuildLock(lockPath, options);
+    const canonicalCacheRoot = canonicalHermesResourcePath(cacheRoot);
+    const lockPaths = [
+        path.join(canonicalCacheRoot, 'prepare.lock'),
+        ...[cacheRoot, ...(options.resources ?? [])].map(hermesResourceLockPath)
+    ]
+        .filter((lockPath, index, allLockPaths) => allLockPaths.indexOf(lockPath) === index)
+        .sort();
+    const owners: Array<{ lockPath: string; ownerToken: string }> = [];
     try {
+        for (const lockPath of lockPaths) {
+            owners.push({ lockPath, ownerToken: await acquireHermesBuildLock(lockPath, options) });
+        }
         return await operation();
     } finally {
-        releaseHermesBuildLock(lockPath, ownerToken, filesystem);
+        for (const { lockPath, ownerToken } of owners.reverse()) {
+            releaseHermesBuildLock(lockPath, ownerToken, filesystem);
+        }
+    }
+}
+
+/**
+ * Return the stable lock file path for a mutable Hermes directory.
+ *
+ * @param resourcePath - Directory whose concurrent mutations must be serialized.
+ * @returns Lock file path shared by callers that resolve to the same directory.
+ */
+function hermesResourceLockPath(resourcePath: string): string {
+    const canonicalPath = canonicalHermesResourcePath(resourcePath);
+    const identity =
+        process.platform === 'win32' || process.platform === 'darwin' ? canonicalPath.toLowerCase() : canonicalPath;
+    const lockName = createHash('sha256').update(identity).digest('hex');
+    return path.join(path.dirname(canonicalPath), '.static-hermes-locks', `${lockName}.lock`);
+}
+
+/**
+ * Resolve existing path components and retain any missing suffix for a directory that will be created later.
+ *
+ * @param resourcePath - Directory path to canonicalize.
+ * @returns Absolute path with existing symbolic links resolved.
+ * @throws {Error} If an existing path component cannot be read.
+ */
+function canonicalHermesResourcePath(resourcePath: string): string {
+    const absolutePath = path.resolve(resourcePath);
+    try {
+        return fs.realpathSync(absolutePath);
+    } catch (error) {
+        if (errorCode(error) !== 'ENOENT' && errorCode(error) !== 'ENOTDIR') throw error;
+        const parentPath = path.dirname(absolutePath);
+        if (parentPath === absolutePath) return absolutePath;
+        return path.join(canonicalHermesResourcePath(parentPath), path.basename(absolutePath));
     }
 }
 

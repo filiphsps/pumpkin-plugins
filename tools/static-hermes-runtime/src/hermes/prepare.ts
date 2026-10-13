@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveConsumerWorkspaceRoot } from '../workspace-root.ts';
 import { buildHermes, buildHermesWithLockHeld, withHermesBuildLock } from './build.ts';
 import { affectedHermesPaths, applyHermesPatchSeries, readHermesPatchSeries } from './patch.ts';
 import { ensureHermesSource, readHermesSourcePin, refreshHermesSource } from './source.ts';
@@ -8,7 +9,7 @@ import { setupHermesToolchainEnvironment } from './toolchain-environment.ts';
 
 /** Optional paths, environment, and setup hook for Hermes preparation. */
 export interface HermesPreparationOptions {
-    /** Root of the `pumpkin-plugins` workspace; defaults to the runtime package's workspace. */
+    /** Project root for caches; defaults to the nearest pnpm workspace, or the current directory if standalone. */
     workspaceRoot?: string;
     /** Root of `tools/static-hermes-runtime`; defaults to this package's location. */
     packageRoot?: string;
@@ -54,33 +55,37 @@ export async function prepareHermes(options: HermesPreparationOptions = {}): Pro
     const paths = configuredHermesPaths(context.packageRoot, context.workspaceRoot, context.environment);
     const pin = readHermesSourcePin(paths.pinFile);
     const patches = readHermesPatchSeries(paths.patchesDirectory);
-    await withHermesBuildLock(paths.cacheRoot, async () => {
-        await runHermesPreparationStages({
-            source: () => {
-                ensurePinnedSource(paths, pin, patches);
-            },
-            patch: () => {
-                try {
-                    applyCurrentPatches(paths.source, pin.commit, patches);
-                } catch (error) {
-                    if (!(error instanceof Error) || !error.message.includes('conflict or partial application')) {
-                        throw error;
+    await withHermesBuildLock(
+        paths.cacheRoot,
+        async () => {
+            await runHermesPreparationStages({
+                source: () => {
+                    ensurePinnedSource(paths, pin, patches);
+                },
+                patch: () => {
+                    try {
+                        applyCurrentPatches(paths.source, pin.commit, patches);
+                    } catch (error) {
+                        if (!(error instanceof Error) || !error.message.includes('conflict or partial application')) {
+                            throw error;
+                        }
+                        refreshHermesSource({
+                            pin,
+                            source: paths.source,
+                            managedSource: paths.managedSource,
+                            managedPaths: affectedHermesPaths(patches)
+                        });
+                        console.log(
+                            'Rebuilt stale Hermes source cache from the pinned commit; applying current patch series.'
+                        );
+                        applyCurrentPatches(paths.source, pin.commit, patches);
                     }
-                    refreshHermesSource({
-                        pin,
-                        source: paths.source,
-                        managedSource: paths.managedSource,
-                        managedPaths: affectedHermesPaths(patches)
-                    });
-                    console.log(
-                        'Rebuilt stale Hermes source cache from the pinned commit; applying current patch series.'
-                    );
-                    applyCurrentPatches(paths.source, pin.commit, patches);
-                }
-            },
-            build: () => buildCurrentHermes(context, paths, pin, patches, buildHermesWithLockHeld)
-        });
-    });
+                },
+                build: () => buildCurrentHermes(context, paths, pin, patches, buildHermesWithLockHeld)
+            });
+        },
+        { resources: [paths.source, paths.hostBuild, paths.wasiBuild] }
+    );
 }
 
 /**
@@ -94,7 +99,9 @@ export async function prepareHermesSource(options: HermesPreparationOptions = {}
     const paths = configuredHermesPaths(context.packageRoot, context.workspaceRoot, context.environment);
     const pin = readHermesSourcePin(paths.pinFile);
     const patches = readHermesPatchSeries(paths.patchesDirectory);
-    return withHermesBuildLock(paths.cacheRoot, () => ensurePinnedSource(paths, pin, patches));
+    return withHermesBuildLock(paths.cacheRoot, () => ensurePinnedSource(paths, pin, patches), {
+        resources: [paths.source]
+    });
 }
 
 /**
@@ -108,12 +115,16 @@ export async function patchHermesSource(options: HermesPreparationOptions = {}):
     const paths = configuredHermesPaths(context.packageRoot, context.workspaceRoot, context.environment);
     const pin = readHermesSourcePin(paths.pinFile);
     const patches = readHermesPatchSeries(paths.patchesDirectory);
-    await withHermesBuildLock(paths.cacheRoot, () => {
-        if (!fs.existsSync(paths.source)) {
-            throw new Error(`Hermes source not found at ${paths.source}; run hermes source first`);
-        }
-        applyCurrentPatches(paths.source, pin.commit, patches);
-    });
+    await withHermesBuildLock(
+        paths.cacheRoot,
+        () => {
+            if (!fs.existsSync(paths.source)) {
+                throw new Error(`Hermes source not found at ${paths.source}; run hermes source first`);
+            }
+            applyCurrentPatches(paths.source, pin.commit, patches);
+        },
+        { resources: [paths.source] }
+    );
 }
 
 /**
@@ -153,7 +164,7 @@ function createHermesContext(options: HermesPreparationOptions): HermesContext {
     const packageRoot = path.resolve(
         options.packageRoot ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
     );
-    const workspaceRoot = path.resolve(options.workspaceRoot ?? path.resolve(packageRoot, '../..'));
+    const workspaceRoot = path.resolve(options.workspaceRoot ?? resolveConsumerWorkspaceRoot());
     return {
         packageRoot,
         workspaceRoot,

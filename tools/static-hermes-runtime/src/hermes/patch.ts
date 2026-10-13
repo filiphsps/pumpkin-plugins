@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { parseHermesGitStatusPaths } from './git-status.ts';
 import { type HermesFileSystem, type HermesProcessRunner, hermesFileSystem, hermesProcess } from './system.ts';
 
 /** A numbered source patch and the paths it is allowed to modify. */
@@ -137,10 +138,10 @@ export function ensurePatchOnlyChanges(
     patches: readonly HermesPatch[],
     runner: HermesProcessRunner = hermesProcess
 ): void {
-    const status = runner.output('git', ['-C', source, 'status', '--porcelain', '--untracked-files=all']);
+    const status = runner.output('git', ['-C', source, 'status', '--porcelain=v1', '-z', '--untracked-files=all']);
     if (!status) return;
     const allowed = new Set(affectedHermesPaths(patches));
-    const changed = status.split('\n').map((line) => line.slice(3).replace(/ -> .*/, ''));
+    const changed = parseHermesGitStatusPaths(status);
     const unexpected = changed.filter((filename) => !allowed.has(filename));
     if (unexpected.length > 0) {
         throw new Error(
