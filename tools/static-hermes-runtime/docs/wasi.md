@@ -60,14 +60,16 @@ last step leaves those imports for the Pumpkin runtime to resolve.
    `.cache/pumpkin-api-wit/<lock-digest>/`. It downloads any missing WASI files, checks each file
    against its SHA-256 hash, and caches them by WASI version. Complete caches need no network
    access; a missing or changed pin needs network access.
-3. **The build prepares one WIT world.** It copies the Pumpkin API WIT into the plugin build
-   directory, copies only the locked WASI files, then adds the selected `wasi:*` imports to the
-   `plugin` world. The build records this prepared copy under the plugin's `build/wit/` directory.
+3. **The build prepares the WIT world it will consume.** When WASI imports are enabled, it combines
+   the cached Pumpkin API WIT with only the locked WASI files, then adds the selected `wasi:*`
+   imports to the `plugin` world in a private temporary directory. The component build consumes
+   that copy and publishes another copy to `build/wit/` for inspection. With no WASI imports, the
+   build uses the cached API WIT directly and removes any stale `build/wit/` snapshot.
 4. **TypeScript declarations come from that world.** The build uses `jco guest-types` to generate
-   declarations under `build/types/`. When type generation runs separately, it prepares the WIT in a
-   temporary directory and removes the copy afterward. Those declarations let the editor and
-   TypeScript check imported WASI modules and resource methods against the same WIT used for the
-   component.
+   declarations under `build/types/`. With WASI imports, `--types-only` prepares the combined WIT in
+   a temporary directory and removes it afterward; it leaves no combined snapshot under
+   `build/wit/`. Those declarations let the editor and TypeScript check imported WASI modules and
+   resource methods against the same WIT used for the component.
 5. **esbuild replaces the external imports with facades.** Imports such as
    `wasi:http/outgoing-handler@0.2.3` remain external to the ordinary JavaScript bundle. For
    Static Hermes, an esbuild plugin checks that each imported interface is present in the prepared
@@ -118,7 +120,8 @@ and socket APIs. Selecting both `sockets` and `udp` deduplicates the shared netw
 These names are bundles maintained by this repository, not every interface in the WASI standard.
 The list is closed: a package cannot add an arbitrary capability string. An interface also brings
 its WIT dependencies into the prepared world, but the build copies only the files listed in the
-lock. The exact imports are visible in the generated `build/wit/plugin.wit` file.
+lock. After a component build with WASI imports, the exact imports are visible in the inspection
+snapshot at `build/wit/plugin.wit`.
 
 For the currently locked WIT, the
 [`wit-api-coverage` test](../test/wit-api-coverage.test.mjs) enumerates every function and resource

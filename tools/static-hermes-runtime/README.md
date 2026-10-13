@@ -9,33 +9,45 @@ Start with the [runtime documentation](docs/index.md). It links to the
 [benchmarking guide](../../docs/benchmarking.md); this README covers toolchain setup, build profiles,
 compiler and linker flags, and API coverage.
 
-## Prepare the toolchain
+## Prepare Hermes
 
-Requirements: Git, CMake, and Ninja. Rust/Cargo is needed only if the configured `wit-bindgen`
-version is not already installed.
+`prepare-hermes` prebuilds Hermes and its WASI runtime libraries. It needs Git, CMake, Ninja, a
+host C/C++ compiler, and a WASI SDK. The command resolves the pinned WASI SDK automatically unless
+`STATIC_HERMES_WASI_SDK_PATH`, `WASI_SDK_PATH`, or `WASI_SDK` points to a valid installation. It
+reuses a valid cached SDK when no path is configured; an incomplete cached SDK is replaced
+automatically. Concurrent setup processes share one SDK installation. If no valid cache exists,
+`curl` and `tar` must be available to download and extract the pinned SDK. It does not install `wit-bindgen` or
+`wasm-tools`, so Rust/Cargo is not needed for this preparation command.
 
 ```sh
 pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
 ```
 
-Preparation uses the SDK release configured in `wasi-sdk.lock.json`, verifies its published checksum,
-installs the configured `wit-bindgen` version if needed, and requires the selected executable to report
-that exact version with `--version`. It caches the toolchain under
-`.cache/hermes/` by default. It checks out the source commit in `hermes-source.lock.json`, applies the ordered
-patches in `hermes-patches/`, then builds host `hermesc` and the full and lean WASI 2 Hermes/JSI
-libraries.
+Preparation uses the SDK release and platform SHA-256 pins in `wasi-sdk.lock.json`. Release metadata
+must report the same digest before download, and the downloaded archive is checked against the local
+pin. It caches the SDK under `.cache/hermes/` by default. It checks out the source commit in
+`hermes-source.lock.json`, applies the ordered patches in `hermes-patches/`, then builds host
+`hermesc` and the full and lean WASI 2 Hermes/JSI libraries.
 
 The cache is reused while its source pin, patches, toolchain, and build settings match. A changed
 input triggers a rebuild. Preparation refreshes the managed checkout when the source pin changes and
-rejects local Hermes source changes outside the managed patch set. Concurrent builds share a
-preparation lock.
+rejects local Hermes source changes outside the managed patch set. Concurrent preparations lock the
+cache, source checkout, host build directory, and WASI build directory by resolved path, so separate
+workspaces that share any of those directories serialize.
 
 Plugin builds prepare Hermes automatically when `engine` is omitted or set to `"static-hermes"`.
-Run the command above to prewarm the toolchain or prepare it explicitly before a build. Toolchain
-versions are pinned in `toolchain-versions.json`; the files follow the
-[upstream release pin schema](../../schemas/upstream-release-pin.schema.json),
-[upstream Git pin schema](../../schemas/upstream-git-pin.schema.json), and
-[toolchain versions schema](../../schemas/toolchain-versions.schema.json). The package also carries
+Run the command above to prewarm Hermes or prepare it explicitly before a build. A full component
+build also resolves the pinned `wit-bindgen` and `wasm-tools` versions from
+`toolchain-versions.json`; it sets them up automatically. If `WASM_TOOLS` is unset and no valid cached
+binary is available, setup downloads the pinned `wasm-tools` release and replaces an invalid cache entry.
+A valid `WIT_BINDGEN` override,
+shared-cache binary, or `~/.cargo/bin/wit-bindgen` is reused. With no `WIT_BINDGEN` override and no
+cached or user-installed executable, setup installs `wit-bindgen` and needs Rust/Cargo (using the
+pinned Rust toolchain through `rustup` when available). An executable that reports the wrong pinned
+version fails setup. The files follow the
+[WASI SDK release pin schema](schemas/wasi-sdk-release-pin.schema.json),
+[upstream Git pin schema](schemas/upstream-git-pin.schema.json), and
+[toolchain versions schema](schemas/toolchain-versions.schema.json). The package also carries
 the WASI 2 CMake toolchain adjustment required by Hermes. Optional paths and build settings are
 listed under [Build flags](#build-flags).
 
@@ -56,9 +68,12 @@ pnpm --filter @pumpkin-plugins/static-hermes-runtime exec static-hermes-runtime 
 ```
 
 Package consumers can import `buildStaticHermesComponent`, `prepareHermes`, and the other public
-runtime functions directly from `@pumpkin-plugins/static-hermes-runtime`. Use the CLI for WIT
-analysis and code generation. Set `quietOutput: true` on `buildStaticHermesComponent` when a caller
-owns the console format; runtime stdout is suppressed, while command failures retain stderr
+runtime functions directly from `@pumpkin-plugins/static-hermes-runtime`. The `codegen analyze` and
+`codegen generate` commands take prepared WIT inputs and do not read a JavaScript bundle. Use
+`--api-methods` and `--wasi-methods` to select operation identifiers; when omitted, codegen includes
+all operations in the selected interfaces. `component build` still requires the bundled JavaScript
+file for Hermes bytecode compilation. Set `quietOutput: true` on `buildStaticHermesComponent` when a
+caller owns the console format; runtime stdout is suppressed, while command failures retain stderr
 diagnostics.
 
 ## Engine and runtime profiles
@@ -108,12 +123,13 @@ compilation, and WASI C/C++ compilation and linking.
 
 | Setting | Effect |
 | --- | --- |
-| `STATIC_HERMES_WASI_SDK_PATH` | Optional WASI SDK path override. Otherwise setup reuses `WASI_SDK_PATH` or `WASI_SDK`, or discovers the matching archive and SHA-256 digest from the release configured in `wasi-sdk.lock.json` and caches it under `.cache/hermes/toolchain/`. |
-| `STATIC_HERMES_CACHE_DIR` | Cache root; defaults to `.cache/hermes/` at the workspace root. |
+| `STATIC_HERMES_WASI_SDK_PATH` | Optional WASI SDK path override. Otherwise setup reuses `WASI_SDK_PATH` or `WASI_SDK`, or selects the matching archive from `wasi-sdk.lock.json`, checks its published digest against the lock, verifies the downloaded archive, and caches it under `.cache/hermes/toolchain/`. |
+| `STATIC_HERMES_CACHE_DIR` | Cache root override. By default, Static Hermes uses `.cache/hermes/` under the nearest pnpm workspace containing the consumer project directory, or under that directory for standalone projects. |
 | `STATIC_HERMES_SOURCE_DIR` | Hermes checkout; defaults to `source/` under the cache root. |
 | `STATIC_HERMES_HOST_BUILD_DIR` | Host build directory; defaults to `build-host/` under the cache root. |
 | `STATIC_HERMES_WASI_BUILD_DIR` | WASI build directory; defaults to `build-wasip2/` under the cache root. |
 | `WIT_BINDGEN` | Optional `wit-bindgen` path override. The override, cached executable, and `~/.cargo/bin/wit-bindgen` must report the pinned `tools.wit-bindgen` version from `toolchain-versions.json`; a mismatch fails setup. If no executable exists, setup installs the pinned version. |
+| `WASM_TOOLS` | Optional `wasm-tools` path override for component builds and WIT analysis. It must report the pinned `tools.wasm-tools` version from `toolchain-versions.json`; otherwise setup reuses a valid cache or downloads and replaces an invalid cached executable. |
 
 ### Hermes configuration
 
@@ -174,7 +190,7 @@ components retain those line tables; the linker does not use `--strip-debug` or 
 | `-Wl,--gc-sections` | Removes unreferenced sections from the final component. |
 | `-Wl,--strip-all` | Removes symbol and debug tables from production components. |
 | `-Wl,--stack-first` | Places the stack before static data so stack overflow is trapped. |
-| `-Wl,-z,stack-size=262144` | Reserves the default 256 KiB WASI stack; `STATIC_HERMES_STACK_SIZE` changes it (a multiple of 16 bytes, at least 131072). |
+| `-Wl,-z,stack-size=262144` | Reserves the default 256 KiB WASI stack; `STATIC_HERMES_STACK_SIZE` changes it (a multiple of 16 bytes from 131072 through 4294967280, the largest 16-byte-aligned size below wasm32's 4 GiB address-space limit). |
 | `-lc++abi -lunwind` | Links C++ ABI and unwinding support used by the JSI shim. |
 
 See [Benchmarking](../../docs/benchmarking.md) for the comparison command, workload coverage, and report interpretation.
@@ -186,8 +202,10 @@ See [Benchmarking](../../docs/benchmarking.md) for the comparison command, workl
 `@pumpkin-plugins/build` resolves the Pumpkin API WIT from the installed API package's
 `wit.lock.json`, then supplies the pinned WIT directory alongside the WASI definitions. The first
 use of a lock digest fetches its upstream commit into the consumer's ignored cache. Each build
-generates the component ABI and the ignored
-`generated/api-enums.generated.h`. It also generates complete event payload converters for all WIT event variants and fields.
+generates the component ABI and the ignored `generated/api-enums.generated.h`. Component builds use
+the build package's source analysis to select API operations when it can determine the full set;
+direct codegen can select operations with `--api-methods`, and omission includes all imported API
+operations. Event conversion always covers every WIT event variant and every declared payload field.
 Event tags and payload access may be computed dynamically, so source scans cannot safely prune them.
 
 The native JSI shim implements part of the Pumpkin API: plugin lifecycle and metadata, command and
@@ -204,9 +222,11 @@ from re-entering the WASM store during shutdown.
 
 Static Hermes reads the WIT directory prepared by `@pumpkin-plugins/build`. It validates every
 operation in an imported WASI interface, including operations the plugin does not use, and emits
-native adapters only for operations used by the bundle. The current imported WASI 0.2.3 surface
-covers filesystem, HTTP, streams, clocks, TCP, UDP, and sockets. The build enables a feature-gated WIT
-operation when the bundle uses it.
+native adapters for selected operations. Component builds use the build package's source analysis
+when it can determine the full set; direct codegen can select operations with `--wasi-methods`, and
+omission includes all operations in the selected WASI imports. The current imported WASI 0.2.3
+surface covers filesystem, HTTP, streams, clocks, TCP, UDP, and sockets. The build enables a
+feature-gated WIT operation when it is selected.
 
 Static Hermes development builds bypass the shared automatic Market update check. WASI 3 support is
 deferred.
