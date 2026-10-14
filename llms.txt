@@ -14,6 +14,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 ## Guides
 
 - [Benchmarking QuickJS and Static Hermes](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/benchmarking.md): This guide explains what the engine comparison measures, how to read its report, and what conclusions its results support.
+- [Creating a VS Code extension](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-extension.md): Create an extension package with the Turbo generator.
 
 ## Plugin API
 
@@ -35,7 +36,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 ## Repository maintenance
 
 - [Agent tooling](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agent-tooling.md): The repo keeps agent instructions, skills and executable checks separate.
-- [CI and releases](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/ci-and-releases.md): Plugin, action and public tool checks are in .github/workflows/ci.yml; the external-consumer matrix is in the reusable .github/workflows/external-consumer.yml.
+- [CI and releases](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/ci-and-releases.md): Plugin, action, extension and public tool checks are in .github/workflows/ci.yml; the external-consumer matrix is in the reusable .github/workflows/external-consumer.yml.
 
 ## Server operations
 
@@ -81,6 +82,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Plugin configuration library](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/config/docs/index.md): Schema-driven TOML config for plugins
 - [Plugin configuration library README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/config/README.md): Additional component overview and usage details.
 - [create-pumpkin-plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/create-pumpkin-plugin/README.md): Create a minimal Pumpkin plugin project
+- [@pumpkin-plugins/cspell-dict-minecraft](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/cspell-dict-minecraft/README.md): Minecraft terminology for Code Spell Checker and cspell
 - [Documentation generator](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/docs/docs/index.md): Generates component READMEs, doc links, and repository catalogs
 - [Documentation generator README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/docs/README.md): Additional component overview and usage details.
 - [Minecraft colors](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/minecraft-colors/docs/index.md): Chalk-like Minecraft text formatting for plugins
