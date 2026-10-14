@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { verifyWasm } from '../../../tools/signing/src/index.ts';
-import { getInput, setOutput } from '../../common/src/utils.mjs';
+import { escapeWorkflowCommand, getInput, setOutput } from '../../common/src/utils.mjs';
 
 const wasmFile = getInput('wasm-file').trim();
 const pluginsManifest = getInput('plugins-manifest').trim();
@@ -121,12 +121,8 @@ function verifyPlugin(fileName, { fileLabel, expectedName, expectedVersion, inde
     }
 
     console.log(
-        `Verified ${fileLabel}: ${result.metadata.plugin_name} ${result.metadata.version} ` +
+        `Verified ${escapeWorkflowCommand(fileLabel)}: ${escapeWorkflowCommand(result.metadata.plugin_name)} ${escapeWorkflowCommand(result.metadata.version)} ` +
             `(Ed25519 ${result.publicKeyHex}).`,
     );
     return result;
-}
-
-function escapeWorkflowCommand(value) {
-    return value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
 }

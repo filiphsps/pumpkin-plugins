@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
-import { getInput, setOutput } from './utils.mjs';
+import { escapeWorkflowCommand, getInput, setOutput } from './utils.mjs';
 
 const hyphenatedKey = 'INPUT_ACTION-TEST-HYPHENATED-NAME';
 const underscoreKey = 'INPUT_ACTION_TEST_HYPHENATED_NAME';
@@ -38,6 +38,13 @@ describe('shared action utilities', () => {
         process.env[spacedKey] = 'spaced value';
 
         assert.equal(getInput('action test-spaced-name'), 'spaced value');
+    });
+
+    it('encodes workflow command delimiters without creating new lines', () => {
+        const escaped = escapeWorkflowCommand('100% ready\r\n::warning::injected');
+
+        assert.equal(escaped, '100%25 ready%0D%0A::warning::injected');
+        assert.doesNotMatch(escaped, /[\r\n]/);
     });
 
     it('writes outputs with a delimiter-safe GitHub output file entry', () => {

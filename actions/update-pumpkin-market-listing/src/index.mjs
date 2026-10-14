@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { safeBody } from '../../common/src/diagnostics.mjs';
-import { getInput, setOutput } from '../../common/src/utils.mjs';
+import { readBoundedJson, safeResponseBody } from '../../common/src/diagnostics.mjs';
+import { escapeMarkdownText, escapeWorkflowCommand, getInput, setOutput } from '../../common/src/utils.mjs';
 
 const pluginName = getInput('plugin-name').trim();
 const pluginId = getInput('plugin-id').trim();
@@ -31,8 +31,8 @@ async function updateListing() {
         body: form,
     });
     if (!response.ok) {
-        const body = await response.text();
-        throw new Error(`Market metadata update failed (${response.status}): ${safeBody(body, token)}`);
+        const body = await safeResponseBody(response, token);
+        throw new Error(`Market metadata update failed (${response.status}): ${body}`);
     }
 
     setOutput('listing-id', String(listing.id));
@@ -40,7 +40,7 @@ async function updateListing() {
     setOutput('status', 'success');
     const message = `Updated metadata for Market listing ${JSON.stringify(listing.name)} (${listing.id}).`;
     console.log(message);
-    summary(`### 🛒 Updated Pumpkin Market listing\n${message}\n`);
+    summary(`### 🛒 Updated Pumpkin Market listing\n${escapeMarkdownText(message)}\n`);
 }
 
 function validateInputs() {
@@ -238,8 +238,11 @@ async function findListingByName(name) {
     searchUrl.searchParams.set('q', name);
     searchUrl.searchParams.set('limit', '20');
     const response = await marketFetch(searchUrl);
-    if (!response.ok) throw new Error(`Could not search Market plugins (${response.status}): ${await response.text()}`);
-    const listings = await response.json();
+    if (!response.ok) {
+        const body = await safeResponseBody(response, token);
+        throw new Error(`Could not search Market plugins (${response.status}): ${body}`);
+    }
+    const listings = await readBoundedJson(response);
     if (!Array.isArray(listings)) throw new Error('Market plugin search response was not an array');
     const matches = listings.filter((listing) => isExactName(listing, name) && Number.isInteger(listing.id));
     if (matches.length > 1) throw new Error(`Market has multiple listings named ${JSON.stringify(name)}`);
@@ -249,8 +252,9 @@ async function findListingByName(name) {
 
 async function readListing(response) {
     try {
-        return await response.json();
+        return await readBoundedJson(response);
     } catch (error) {
+        if (error instanceof RangeError) throw error;
         throw new Error(
             `Market listing lookup returned invalid JSON: ${error instanceof Error ? error.message : error}`,
         );
@@ -271,10 +275,6 @@ function isStringRecord(value) {
 
 function marketFetch(url, options = {}) {
     return fetch(url, { ...options, signal: AbortSignal.timeout(30_000) });
-}
-
-function escapeWorkflowCommand(value) {
-    return value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
 }
 
 function summary(content) {

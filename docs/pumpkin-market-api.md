@@ -20,14 +20,15 @@ The public REST API is rooted at `https://market.pumpkinmc.org/api/v1/rest`.
 
 The response includes the numeric `id`, `public_id`, `name`, `category`, `version` and basic listing
 information. PPM accepts public IDs, numeric IDs, exact names, and author/name input when resolving a
-plugin. This repository's publisher currently tries the direct endpoint first, then uses a bounded
-search and requires a case-insensitive exact name match. A name is not a valid direct path value:
-`GET /plugins/TemporaryAPIExperiment` returned 404, while the search endpoint found the listing.
+plugin. This repository's publisher uses bounded search for names and requires a case-insensitive
+exact match. In one observed lookup, `GET /plugins/TemporaryAPIExperiment` returned 404 while the
+search endpoint found the listing; that observation does not establish behavior for every name.
 
-The current publisher action accepts a plugin name or a numeric/public ID. For a name, it first
-tries that value as a direct path, accepts the result only if the returned listing name matches,
-and then falls back to bounded search with an exact-name check. The write endpoint itself requires
-the numeric database ID in its path.
+The current publisher action accepts a plugin name or a numeric/public ID. It searches by name, then
+uses the listing's numeric database ID for the upload endpoint.
+
+Both Market actions limit successful listing-lookup JSON responses to 1 MiB. An oversized response
+fails before either action uploads a plugin or updates listing metadata.
 
 The public API documentation lists read endpoints, including plugin lookup and download. It does
 not document the developer listing-write endpoint described below.
