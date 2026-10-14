@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-const PROJECT_FOLDERS = ['packages', 'tools'];
+const PROJECT_FOLDERS = ['packages', 'tools', 'extensions', 'benchmarks'];
 const BASE_DIRS = [
     // Gets matched in root and the folders defined in `PROJECT_FOLDERS`
     '.turbo/cache',
