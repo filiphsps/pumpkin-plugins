@@ -13,7 +13,7 @@ export const migratePumpkinApiTs: CodemodDefinition = {
     transform(context) {
         const basename = path.basename(context.relativePath);
         if (basename === 'package.json') return migratePackageJson(context.source);
-        if (basename === 'tsconfig.json') return migrateTsconfig(context.source);
+        if (basename === 'tsconfig.json') return migrateTsconfig(context.source, context.absolutePath);
         return migrateSource(context);
     },
 };

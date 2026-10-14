@@ -58,7 +58,13 @@ The `migrate-pumpkin-api-ts` codemod follows the repository's
   engine stable and initializes the capabilities list for manual review; existing values are kept.
 - `scripts.typecheck` as `pumpkin-plugins-build --types-only && tsc --noEmit` when the codemod has
   both builder paths and the field is missing or exactly `tsc --noEmit`.
-- `build/types/bindings/**/*.d.ts` in an explicit `tsconfig.json` `include` array.
+- `build/types/bindings/**/*.d.ts` in an explicit `tsconfig.json` `include` array. If the project
+  inherits a restrictive include, it copies the effective patterns into the local config before
+  adding the generated declarations. If there is no effective include but a local or inherited
+  `files` list, it adds only the generated declaration glob and preserves the existing file roots.
+  If an effective `exclude` pattern or `compilerOptions.outDir` omits those declarations, it leaves
+  the config unchanged and reports a manual review note rather than changing the project's file
+  roots. If it cannot resolve the extended config, it also reports a manual review note.
 
 The source transform changes parsed module specifiers only; it leaves comments, examples and other
 string values alone. Existing custom build and typecheck commands are kept and reported for manual
@@ -82,8 +88,10 @@ Then complete the project-specific steps:
    [capability reference](../../../docs/creating-a-plugin.md#files-and-network-access) to identify
    capability names and related permissions. The codemod initializes a missing list as `[]`; it
    cannot determine capability use from arbitrary plugin code.
-3. Confirm `tsconfig.json` includes the generated declaration glob if it has an explicit `include`
-   list. If there is no explicit list, TypeScript uses its default file inclusion.
+3. Confirm `tsconfig.json` includes the generated declaration glob. When there is no effective
+   `include`, a local or inherited `files` list stays in place and only generated declarations are
+   added. If neither `include` nor `files` is defined, TypeScript uses its default file inclusion.
+   Check the codemod's manual review note if `exclude` or `compilerOptions.outDir` covers `build`.
 4. Run the project's typecheck, build and tests.
 5. Review the migration guide's behavior and license notes, including diagnostics, IPC rejections,
    callback cleanup and runtime tick validation.
