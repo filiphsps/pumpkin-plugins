@@ -1,6 +1,9 @@
+import { parse } from 'smol-toml';
 import { describe, expect, it } from 'vitest';
+import { mutableValueField } from '../test/mutable-value.ts';
 import { demo } from '../test/schema.ts';
 import { readConfig } from './read.ts';
+import { defineConfig, section, table } from './schema.ts';
 
 describe('readConfig', () => {
     it('fills in defaults and reports what the file lacks', () => {
@@ -13,6 +16,61 @@ describe('readConfig', () => {
         ]);
     });
 
+    it('returns an independent structured default when a section field is absent', () => {
+        const schema = defineConfig('Demo', {
+            settings: section({
+                description: 'General settings.',
+                fields: { policy: mutableValueField() },
+            }),
+        });
+
+        const first = readConfig(schema, {});
+        first.values.settings.policy?.nested.levels.push(3);
+        first.values.settings.policy?.nested.timestamp.setUTCFullYear(2000);
+
+        expect(readConfig(schema, {}).values.settings.policy).toEqual({
+            nested: { levels: [1, 2], timestamp: new Date('2025-01-02T03:04:05.000Z') },
+        });
+    });
+
+    it('returns an independent structured default for a missing table-entry field', () => {
+        const schema = defineConfig('Demo', {
+            sources: table({
+                description: 'Configured sources.',
+                entryName: 'source',
+                exampleKey: 'torch',
+                fields: { policy: mutableValueField() },
+            }),
+        });
+
+        const first = readConfig(schema, { sources: { torch: {} } });
+        first.values.sources.torch.policy?.nested.levels.push(3);
+        first.values.sources.torch.policy?.nested.timestamp.setUTCFullYear(2000);
+
+        expect(readConfig(schema, { sources: { torch: {} } }).values.sources.torch.policy).toEqual({
+            nested: { levels: [1, 2], timestamp: new Date('2025-01-02T03:04:05.000Z') },
+        });
+    });
+
+    it('returns independent structured defaults for invalid and migrated values', () => {
+        const schema = defineConfig('Demo', {
+            settings: section({
+                description: 'General settings.',
+                fields: { policy: mutableValueField({ migrateFrom: ['legacy', 'policy'] }) },
+            }),
+        });
+
+        for (const raw of [{ settings: { policy: 'invalid' } }, { legacy: { policy: 'invalid' } }]) {
+            const first = readConfig(schema, raw);
+            first.values.settings.policy?.nested.levels.push(3);
+            first.values.settings.policy?.nested.timestamp.setUTCFullYear(2000);
+
+            expect(readConfig(schema, raw).values.settings.policy).toEqual({
+                nested: { levels: [1, 2], timestamp: new Date('2025-01-02T03:04:05.000Z') },
+            });
+        }
+    });
+
     it('reads valid values', () => {
         const { values, issues } = readConfig(demo, {
             web: { enabled: false, port: 9000, base_url: 'https://x.test//', token: 't' },
@@ -23,6 +81,14 @@ describe('readConfig', () => {
             web: { enabled: false, port: 9000, base_url: 'https://x.test', token: 't' },
             overrides: { 'a.txt': { order: 3 }, 'b.c.txt': { enabled: false } },
         });
+    });
+
+    it('keeps a table entry named __proto__ as an own key', () => {
+        const { values } = readConfig(demo, parse('[overrides."__proto__"]\norder = 3'));
+
+        expect(Object.hasOwn(values.overrides, '__proto__')).toBe(true);
+        expect(Object.getOwnPropertyDescriptor(values.overrides, '__proto__')?.value).toEqual({ order: 3 });
+        expect(Object.getPrototypeOf(values.overrides)).toBe(Object.prototype);
     });
 
     it('falls back to the default and says which one for invalid values', () => {
@@ -48,6 +114,21 @@ describe('readConfig', () => {
             'unknown option web.prot',
             'unknown option overrides."a.txt".ordr',
             'unknown section [extra]',
+        ]);
+    });
+
+    it('reports unknown keys that match Object prototype properties', () => {
+        const { issues } = readConfig(demo, {
+            web: { constructor: true, toString: true },
+            constructor: {},
+            toString: {},
+        });
+
+        expect(issues.filter((issue) => issue.kind === 'unknown').map((issue) => issue.path)).toEqual([
+            'web.constructor',
+            'web.toString',
+            'constructor',
+            'toString',
         ]);
     });
 

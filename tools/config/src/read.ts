@@ -1,3 +1,4 @@
+import { cloneConfigValue } from './clone.ts';
 import type { Field, Fields } from './fields.ts';
 import { type ConfigSchema, type ConfigValues, defaultValues } from './schema.ts';
 
@@ -22,7 +23,11 @@ export interface Issue {
 
 /** The values read from a file and everything noticed on the way. */
 export interface ReadResult<V> {
-    /** Problems and omissions, in file order. */
+    /**
+     * Problems and omissions follow schema-node order. Table entries follow object order; known
+     * fields follow schema order, followed by unknown keys in object order. Unknown sections come
+     * last in object order.
+     */
     issues: Issue[];
     /** Every setting, with defaults filled in. */
     values: V;
@@ -43,10 +48,11 @@ const entryPath = (table: string, key: string) => `${table}.${JSON.stringify(key
 
 /**
  * Validates a parsed TOML document against a schema. Bad values fall back to their defaults;
- * nothing throws.
+ * malformed file values are reported as issues.
  * @param schema - The config schema.
  * @param raw - The parsed TOML document.
  * @returns The typed values and the issues found.
+ * @throws When a schema default contains unsupported data, a cycle, or an unsupported object type.
  */
 export function readConfig<S extends ConfigSchema>(
     schema: S,
@@ -68,15 +74,22 @@ export function readConfig<S extends ConfigSchema>(
             const entries: Record<string, unknown> = {};
             for (const [key, entry] of Object.entries(found ?? {})) {
                 const path = entryPath(name, key);
-                if (isTable(entry)) entries[key] = readFields(node.fields, entry, path, issues, false, raw);
-                else issues.push({ kind: 'invalid', path, message: `${path} must be a table; ignoring it` });
+                if (isTable(entry)) {
+                    Object.defineProperty(entries, key, {
+                        configurable: true,
+                        enumerable: true,
+                        value: readFields(node.fields, entry, path, issues, false, raw),
+                        writable: true,
+                    });
+                } else issues.push({ kind: 'invalid', path, message: `${path} must be a table; ignoring it` });
             }
             values[name] = entries;
         }
     }
 
     for (const key of Object.keys(raw)) {
-        if (!(key in schema.nodes)) issues.push({ kind: 'unknown', path: key, message: `unknown section [${key}]` });
+        if (!Object.hasOwn(schema.nodes, key))
+            issues.push({ kind: 'unknown', path: key, message: `unknown section [${key}]` });
     }
     return { values: values as ConfigValues<S>, issues };
 }
@@ -101,7 +114,7 @@ function readFields(
                     out[key] = parsed.value;
                 } else {
                     issues.push({ kind: 'invalid', path: at, message: invalidMessage(at, f) });
-                    if (f.default !== undefined) out[key] = f.default;
+                    if (f.default !== undefined) out[key] = cloneConfigValue(f.default);
                 }
                 if (f.default !== undefined && reportMissing)
                     issues.push({ kind: 'missing', path: at, message: `${at} is not in the file` });
@@ -109,7 +122,7 @@ function readFields(
             }
             if (f.default === undefined) continue;
             if (reportMissing) issues.push({ kind: 'missing', path: at, message: `${at} is not in the file` });
-            out[key] = f.default;
+            out[key] = cloneConfigValue(f.default);
             continue;
         }
         const parsed = f.parse(value);
@@ -117,11 +130,11 @@ function readFields(
             out[key] = parsed.value;
         } else {
             issues.push({ kind: 'invalid', path: at, message: invalidMessage(at, f) });
-            if (f.default !== undefined) out[key] = f.default;
+            if (f.default !== undefined) out[key] = cloneConfigValue(f.default);
         }
     }
     for (const key of Object.keys(raw)) {
-        if (!(key in fields))
+        if (!Object.hasOwn(fields, key))
             issues.push({ kind: 'unknown', path: `${path}.${key}`, message: `unknown option ${path}.${key}` });
     }
     return out;

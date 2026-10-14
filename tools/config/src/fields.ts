@@ -1,8 +1,8 @@
 /** Outcome of reading one raw TOML value. */
 export type Parsed<T> = { ok: true; value: T } | { ok: false };
 
-/** Type names the generated documentation uses. */
-export type FieldType = 'boolean' | 'integer' | 'string';
+/** TOML value labels shown in generated settings documentation. */
+export type FieldType = 'boolean' | 'integer' | 'string' | 'string[]' | 'table' | 'table[]';
 
 /**
  * One setting: how to read it, write it and document it. `T` includes `undefined` for
@@ -45,7 +45,12 @@ export interface BaseOptions<T> {
 /** Writes a string as a TOML basic string, which JSON string syntax is a valid subset of. */
 export const tomlString = (value: string): string => JSON.stringify(value);
 
-/** Builds a field from its pieces. Prefer `bool`, `int` and `str`. */
+/**
+ * Builds a field from custom TOML-compatible values. Prefer `bool`, `int` and `str`. Defaults that
+ * contain objects must use plain tables, dense arrays and `Date` values so config results can copy
+ * them. Root `undefined` is reserved for the optional default; nested `undefined`, `null`, functions,
+ * symbols, symbol-keyed table entries, cycles and other JavaScript object types are rejected.
+ */
 export function field<T>(spec: {
     type: FieldType;
     description: string;
@@ -80,16 +85,32 @@ export function bool(options: BaseOptions<boolean>): Field<boolean | undefined> 
     });
 }
 
-/** A whole-number setting, optionally limited to a range. */
-export function int(options: BaseOptions<number> & { default: number; min?: number; max?: number }): Field<number>;
-export function int(options: BaseOptions<number> & { min?: number; max?: number }): Field<number | undefined>;
 /**
  * A whole-number setting, optionally limited to a range.
  * @param options - Description, optional bounds and, unless the setting is optional, its default.
  * @returns The field.
+ * @throws {RangeError} If a bound, default or example is not a safe integer, the range is inverted,
+ * or the default or example falls outside the range.
  */
+export function int(options: BaseOptions<number> & { default: number; min?: number; max?: number }): Field<number>;
+/**
+ * A whole-number setting, optionally limited to a range.
+ * @param options - Description, optional bounds and, unless the setting is optional, its default.
+ * @returns The field.
+ * @throws {RangeError} If a bound, default or example is not a safe integer, the range is inverted,
+ * or the default or example falls outside the range.
+ */
+export function int(options: BaseOptions<number> & { min?: number; max?: number }): Field<number | undefined>;
 export function int(options: BaseOptions<number> & { min?: number; max?: number }): Field<number | undefined> {
     const { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER } = options;
+    assertSafeInteger('min', min);
+    assertSafeInteger('max', max);
+    if (min > max) throw new RangeError('int() min must not exceed max');
+    if (options.default !== undefined) assertIntInRange('default', options.default, min, max);
+
+    const example = options.example ?? options.default ?? min;
+    assertIntInRange('example', example, min, max);
+
     let expected = 'a whole number';
     if (options.min !== undefined && options.max !== undefined) expected += ` from ${min} to ${max}`;
     else if (options.min !== undefined) expected += ` of at least ${min}`;
@@ -100,7 +121,7 @@ export function int(options: BaseOptions<number> & { min?: number; max?: number 
         description: options.description,
         default: options.default,
         expected,
-        example: options.example ?? options.default ?? min,
+        example,
         migrateFrom: options.migrateFrom,
         parse: (raw) => {
             const n = typeof raw === 'bigint' ? Number(raw) : raw;
@@ -110,6 +131,15 @@ export function int(options: BaseOptions<number> & { min?: number; max?: number 
         },
         format: String,
     });
+}
+
+function assertSafeInteger(name: string, value: number): void {
+    if (!Number.isSafeInteger(value)) throw new RangeError(`int() ${name} must be a safe integer`);
+}
+
+function assertIntInRange(name: string, value: number, min: number, max: number): void {
+    assertSafeInteger(name, value);
+    if (value < min || value > max) throw new RangeError(`int() ${name} must be within the declared bounds`);
 }
 
 /** Extra rules for a string setting. */
@@ -129,20 +159,31 @@ export function str(options: BaseOptions<string> & { check?: StringCheck }): Fie
  * A text setting, optionally restricted by a check.
  * @param options - Description, optional check and, unless the setting is optional, its default.
  * @returns The field.
+ * @throws When the configured default or example does not pass the string check.
  */
 export function str(options: BaseOptions<string> & { check?: StringCheck }): Field<string | undefined> {
     const { check } = options;
+    const expected = check?.expected ?? 'a string';
+    const parse = (raw: unknown): Parsed<string> => {
+        if (typeof raw !== 'string' || (check && !check.test(raw))) return { ok: false };
+        return { ok: true, value: check?.normalize ? check.normalize(raw) : raw };
+    };
+    const configuredValue = (name: 'default' | 'example', value: string): string => {
+        const parsed = parse(value);
+        if (!parsed.ok) throw new TypeError(`str() ${name} must be ${expected}`);
+        return parsed.value;
+    };
+    const defaultValue = options.default === undefined ? undefined : configuredValue('default', options.default);
+    const example = configuredValue('example', options.example ?? options.default ?? '');
+
     return field<string>({
         type: 'string',
         description: options.description,
-        default: options.default,
-        expected: check?.expected ?? 'a string',
-        example: options.example ?? options.default ?? '',
+        default: defaultValue,
+        expected,
+        example,
         migrateFrom: options.migrateFrom,
-        parse: (raw) => {
-            if (typeof raw !== 'string' || (check && !check.test(raw))) return { ok: false };
-            return { ok: true, value: check?.normalize ? check.normalize(raw) : raw };
-        },
+        parse,
         format: tomlString,
     });
 }
