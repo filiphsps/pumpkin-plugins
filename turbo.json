@@ -1,5 +1,5 @@
 {
-    "$schema": "https://v2-11-7.turborepo.dev/schema.json",
+    "$schema": "https://v2-11-8.turborepo.dev/schema.json",
     "agentGuidance": false,
     "globalDependencies": ["pnpm-workspace.yaml", "tsconfig.base.json"],
     "globalPassThroughEnv": [
@@ -69,6 +69,7 @@
                 "STATIC_HERMES_ENABLE_JSI_EXTENSIONS",
                 "STATIC_HERMES_ENABLE_LEAN_ARCHIVE",
                 "STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES",
+                "ENGINE_COMPARISON_VARIANT",
                 "WASI_SDK_PATH",
                 "WASI_SDK",
                 "WIT_BINDGEN"
