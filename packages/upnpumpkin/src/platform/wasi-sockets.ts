@@ -10,5 +10,5 @@ import type { Sockets } from './wasi-network.ts';
 export const wasiSockets: Sockets = {
     instance: () => instanceNetwork(),
     tcp: () => createTcpSocket('ipv4'),
-    udp: () => createUdpSocket('ipv4')
+    udp: () => createUdpSocket('ipv4'),
 };

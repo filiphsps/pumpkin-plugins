@@ -21,7 +21,7 @@ describe('chooseLanguage', () => {
         const prompt = vi.fn(async () => 'typescript' as const);
 
         await expect(chooseLanguage({ ts: true, js: true }, true, prompt)).rejects.toThrow(
-            '--ts and --js cannot be used together'
+            '--ts and --js cannot be used together',
         );
         expect(prompt).not.toHaveBeenCalled();
     });
@@ -40,7 +40,7 @@ describe('detectPackageManager', () => {
         ['npm/11.0.0 node/v24.21.0 darwin arm64', 'npm'],
         ['yarn/1.22.22 npm/? node/v24.21.0 darwin arm64', 'yarn'],
         ['yarn/4.9.2 npm/? node/v24.21.0 darwin arm64', 'yarn'],
-        ['bun/1.2.0', 'bun']
+        ['bun/1.2.0', 'bun'],
     ] as const)('detects %s from the package-manager user agent', (userAgent, expected) => {
         expect(detectPackageManager({ npm_config_user_agent: userAgent })).toBe(expected);
     });
@@ -57,8 +57,8 @@ describe('detectPackageManager', () => {
         expect(
             detectPackageManager({
                 npm_config_user_agent: 'custom/1.0.0 node/v24.21.0',
-                npm_execpath: '/opt/custom/bin/custom-cli.js'
-            })
+                npm_execpath: '/opt/custom/bin/custom-cli.js',
+            }),
         ).toBeUndefined();
     });
 });

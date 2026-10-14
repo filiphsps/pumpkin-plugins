@@ -29,12 +29,12 @@ const REASONS: Record<string, string> = {
     'connection-refused': 'the connection was refused',
     timeout: 'the connection timed out',
     'network-unreachable': 'the network is unreachable',
-    'host-unreachable': 'the host is unreachable'
+    'host-unreachable': 'the host is unreachable',
 };
 
 const address = ({ address, port }: Endpoint): IpSocketAddress => ({
     tag: 'ipv4',
-    val: { port, address: [...address] as Ipv4 & [number, number, number, number] }
+    val: { port, address: [...address] as Ipv4 & [number, number, number, number] },
 });
 
 function describe(err: unknown): string {
@@ -66,7 +66,7 @@ class WasiDatagramSocket implements DatagramSocket {
     constructor(
         private readonly socket: UdpSocket,
         private readonly incoming: ReturnType<UdpSocket['stream']>[0],
-        private readonly outgoing: ReturnType<UdpSocket['stream']>[1]
+        private readonly outgoing: ReturnType<UdpSocket['stream']>[1],
     ) {}
 
     send(to: Endpoint, data: Uint8Array): void {
@@ -107,7 +107,7 @@ class WasiConnection implements Connection {
         private readonly socket: TcpSocket,
         private readonly input: InputStream,
         private readonly output: OutputStream,
-        readonly localAddress: Ipv4
+        readonly localAddress: Ipv4,
     ) {}
 
     read(max: number): Uint8Array | null | 'closed' {

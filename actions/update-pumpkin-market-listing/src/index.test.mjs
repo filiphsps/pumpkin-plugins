@@ -71,8 +71,8 @@ function outputs(file) {
     return Object.fromEntries(
         [...fs.readFileSync(file, 'utf8').matchAll(/^([a-z-]+)<<([^\n]+)\n([\s\S]*?)\n\2$/gm)].map((match) => [
             match[1],
-            match[3]
-        ])
+            match[3],
+        ]),
     );
 }
 
@@ -85,7 +85,7 @@ describe('update-pumpkin-market-listing action', () => {
 
         const bothSelectors = await run(
             dir,
-            inputs({ 'INPUT_PLUGIN-NAME': 'Test listing', INPUT_DESCRIPTION: 'Description' })
+            inputs({ 'INPUT_PLUGIN-NAME': 'Test listing', INPUT_DESCRIPTION: 'Description' }),
         );
         assert.equal(bothSelectors.status, 1);
         assert.match(bothSelectors.stderr, /Set exactly one of plugin-name or plugin-id/);
@@ -101,7 +101,7 @@ describe('update-pumpkin-market-listing action', () => {
         const outputFile = path.join(dir, 'outputs.txt');
         fs.writeFileSync(
             metadataFile,
-            JSON.stringify({ category: 'Utilities', translatedDescriptions: { fr: 'Description française' } })
+            JSON.stringify({ category: 'Utilities', translatedDescriptions: { fr: 'Description française' } }),
         );
         let putRequest;
         const market = await server(async (request, response) => {
@@ -123,11 +123,11 @@ describe('update-pumpkin-market-listing action', () => {
                     'INPUT_METADATA-FILE': 'metadata.json',
                     INPUT_DESCRIPTION: 'Updated English description',
                     INPUT_COMMANDS: JSON.stringify([
-                        { name: 'hello', aliases: ['hi'], description: { 'en-US': 'Say hello' }, display_order: 0 }
+                        { name: 'hello', aliases: ['hi'], description: { 'en-US': 'Say hello' }, display_order: 0 },
                     ]),
                     'INPUT_API-URL': market.url,
-                    GITHUB_OUTPUT: outputFile
-                })
+                    GITHUB_OUTPUT: outputFile,
+                }),
             );
 
             assert.equal(result.status, 0, result.stderr);
@@ -138,12 +138,12 @@ describe('update-pumpkin-market-listing action', () => {
             assert.deepEqual(metadata, {
                 category: 'Utilities',
                 translatedDescriptions: { fr: 'Description française', 'en-US': 'Updated English description' },
-                commands: [{ name: 'hello', aliases: ['hi'], description: { 'en-US': 'Say hello' }, display_order: 0 }]
+                commands: [{ name: 'hello', aliases: ['hi'], description: { 'en-US': 'Say hello' }, display_order: 0 }],
             });
             assert.deepEqual(outputs(outputFile), {
                 'listing-id': '42',
                 'listing-name': 'Test Listing',
-                status: 'success'
+                status: 'success',
             });
         } finally {
             market.instance.close();
@@ -163,8 +163,8 @@ describe('update-pumpkin-market-listing action', () => {
                 keywords: 'pumpkin, tools',
                 translatedDescriptions: { 'en-US': 'A full listing' },
                 isEarlyAccess: false,
-                commands: []
-            })
+                commands: [],
+            }),
         );
         const requests = [];
         const market = await server(async (request, response) => {
@@ -187,7 +187,7 @@ describe('update-pumpkin-market-listing action', () => {
                 'INPUT_METADATA-FILE': 'metadata.json',
                 'INPUT_UPDATE-MODE': 'full',
                 'INPUT_API-TOKEN': 'test-token',
-                'INPUT_API-URL': market.url
+                'INPUT_API-URL': market.url,
             });
             assert.equal(result.status, 0, result.stderr);
             assert.equal(requests[0].url, '/api/v1/rest/plugins/Test%20Listing');
@@ -195,7 +195,7 @@ describe('update-pumpkin-market-listing action', () => {
             assert.equal(requests[2].url, '/api/plugins/17');
             assert.deepEqual(
                 readMetadataFromMultipart(requests[2], requests[2].body),
-                JSON.parse(fs.readFileSync(metadataFile))
+                JSON.parse(fs.readFileSync(metadataFile)),
             );
         } finally {
             market.instance.close();
@@ -217,8 +217,8 @@ describe('update-pumpkin-market-listing action', () => {
                 inputs({
                     'INPUT_METADATA-FILE': 'metadata.json',
                     'INPUT_UPDATE-MODE': 'full',
-                    'INPUT_API-URL': market.url
-                })
+                    'INPUT_API-URL': market.url,
+                }),
             );
             assert.equal(result.status, 1);
             assert.match(result.stderr, /Full metadata is missing fields/);
@@ -240,7 +240,7 @@ describe('update-pumpkin-market-listing action', () => {
 
         const invalidCommandId = await run(
             dir,
-            inputs({ INPUT_COMMANDS: JSON.stringify([{ name: 'hello', id: 'invalid' }]) })
+            inputs({ INPUT_COMMANDS: JSON.stringify([{ name: 'hello', id: 'invalid' }]) }),
         );
         assert.equal(invalidCommandId.status, 1);
         assert.match(invalidCommandId.stderr, /commands\[0\]\.id must be a positive integer/);
@@ -259,8 +259,8 @@ describe('update-pumpkin-market-listing action', () => {
                 response.end(
                     JSON.stringify([
                         { id: 1, name: 'Test Listing' },
-                        { id: 2, name: 'test listing' }
-                    ])
+                        { id: 2, name: 'test listing' },
+                    ]),
                 );
             }
         });
@@ -270,7 +270,7 @@ describe('update-pumpkin-market-listing action', () => {
                 'INPUT_PLUGIN-NAME': 'Test Listing',
                 INPUT_DESCRIPTION: 'Description',
                 'INPUT_API-TOKEN': 'test-token',
-                'INPUT_API-URL': market.url
+                'INPUT_API-URL': market.url,
             });
             assert.equal(result.status, 1);
             assert.match(result.stderr, /multiple listings named/);
@@ -297,7 +297,7 @@ describe('update-pumpkin-market-listing action', () => {
         try {
             const result = await run(
                 dir,
-                inputs({ INPUT_DESCRIPTION: 'Description', 'INPUT_API-URL': market.url, GITHUB_OUTPUT: outputFile })
+                inputs({ INPUT_DESCRIPTION: 'Description', 'INPUT_API-URL': market.url, GITHUB_OUTPUT: outputFile }),
             );
             assert.equal(result.status, 1);
             assert.match(result.stderr, /rejected \[REDACTED\]/);

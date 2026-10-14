@@ -22,7 +22,7 @@ export async function loadTeamMembers() {
     const repo = repository.pathname.slice(1);
     const headers = {
         Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28'
+        'X-GitHub-Api-Version': '2022-11-28',
     };
     // biome-ignore lint/suspicious/noUndeclaredEnvVars: VitePress runs directly through pnpm, outside Turborepo.
     const token = process.env.GITHUB_TOKEN;
@@ -31,7 +31,7 @@ export async function loadTeamMembers() {
     for (let page = 1; ; page++) {
         const response = await fetch(`${GITHUB_API}/repos/${repo}/contributors?per_page=100&page=${page}`, {
             headers,
-            signal: AbortSignal.timeout(30_000)
+            signal: AbortSignal.timeout(30_000),
         });
         if (response.status === 204) break;
         if (!response.ok)
@@ -44,8 +44,8 @@ export async function loadTeamMembers() {
             (contributor) =>
                 contributor.type === 'User' &&
                 !/(?:\[bot\]$|[-_]bot$)|^(?:renovate|dependabot|github-actions|github-bot|web-flow)$/i.test(
-                    contributor.login
-                )
+                    contributor.login,
+                ),
         );
         const names = new Map(humans.map(({ login }) => [login, login]));
         if (
@@ -59,9 +59,9 @@ export async function loadTeamMembers() {
                     headers: { ...headers, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         query: TEAM_NAME_QUERY,
-                        variables: { ids: humans.map(({ node_id }) => node_id) }
+                        variables: { ids: humans.map(({ node_id }) => node_id) },
                     }),
-                    signal: AbortSignal.timeout(30_000)
+                    signal: AbortSignal.timeout(30_000),
                 });
                 if (!profileResponse.ok) {
                     throw new Error(`GitHub contributor name lookup failed (HTTP ${profileResponse.status}).`);
@@ -91,7 +91,7 @@ export async function loadTeamMembers() {
                 avatar: contributor.avatar_url,
                 title: name === contributor.login ? 'Contributor' : `@${contributor.login}`,
                 desc: `${owner ? '<span class="team-owner-label">Owner</span>' : ''}<span class="team-contribution-count">${contributionLabel}</span>`,
-                links: [{ icon: 'github', link: contributor.html_url }]
+                links: [{ icon: 'github', link: contributor.html_url }],
             });
         }
         if (contributors.length < 100) break;

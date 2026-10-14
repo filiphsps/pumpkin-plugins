@@ -9,7 +9,7 @@ class TestPlugin extends Plugin {
             authors: [],
             description: 'A plugin used by the API unit tests.',
             dependencies: [],
-            permissions: []
+            permissions: [],
         };
     }
 }
@@ -21,20 +21,20 @@ it('returns fallback metadata before a plugin is registered', () => {
         authors: [],
         description: 'No metadata',
         dependencies: [],
-        permissions: []
+        permissions: [],
     });
 });
 
 it('rejects IPC messages when a plugin does not provide a handler', () => {
     expect(() => new TestPlugin().handleIpcMessage('sender' as never, {} as never)).toThrowError(Error);
     expect(() => new TestPlugin().handleIpcMessage('sender' as never, {} as never)).toThrowError(
-        'This plugin does not handle IPC messages'
+        'This plugin does not handle IPC messages',
     );
 });
 
 it('rejects IPC messages before a plugin is registered', () => {
     expect(() => handleIpcMessage('sender' as never, {} as never)).toThrowError(Error);
     expect(() => handleIpcMessage('sender' as never, {} as never)).toThrowError(
-        'Cannot handle IPC messages before a plugin is registered'
+        'Cannot handle IPC messages before a plugin is registered',
     );
 });

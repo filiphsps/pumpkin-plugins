@@ -20,10 +20,10 @@ export interface ResponseBody {
 
 /** What to send for a request. */
 export interface ResponsePlan {
-    /** The status line, headers and, for small error responses, the whole body. */
-    head: Uint8Array;
     /** A pack to stream after the head. Absent for errors, `HEAD` requests and empty ranges. */
     body?: ResponseBody;
+    /** The status line, headers and, for small error responses, the whole body. */
+    head: Uint8Array;
 }
 
 function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
@@ -65,7 +65,7 @@ export function planResponse(request: HttpRequest | undefined, lookup: PackLooku
     const headers: Record<string, string | number> = {
         'Content-Type': 'application/zip',
         'Content-Length': length,
-        'Accept-Ranges': 'bytes'
+        'Accept-Ranges': 'bytes',
     };
     if (range) headers['Content-Range'] = `bytes ${slice.start}-${slice.end}/${file.size}`;
     const head = responseHead(range ? 206 : 200, headers);

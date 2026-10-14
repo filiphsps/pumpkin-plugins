@@ -20,11 +20,11 @@ function fixture() {
                 $schema: upstreamGitPinSchemaUrl,
                 repository: 'https://github.com/example/hermes.git',
                 branch: 'static_h',
-                commit: 'a'.repeat(40)
+                commit: 'a'.repeat(40),
             },
             null,
-            4
-        )}\n`
+            4,
+        )}\n`,
     );
     writeFileSync(
         catalogPath,
@@ -37,13 +37,13 @@ function fixture() {
                         pinFile,
                         pinField: 'commit',
                         labels: ['dependencies', 'area: runtime', 'runtime: static-hermes'],
-                        validation: ['pnpm', '--filter', '@example/hermes', 'prepare']
-                    }
-                ]
+                        validation: ['pnpm', '--filter', '@example/hermes', 'prepare'],
+                    },
+                ],
             },
             null,
-            4
-        )}\n`
+            4,
+        )}\n`,
     );
     return { root, pinFile, catalogPath };
 }
@@ -58,7 +58,7 @@ it('discovers newer upstream commits from each pin file and returns review metad
                 assert.equal(repository, 'https://github.com/example/hermes.git');
                 assert.equal(branch, 'static_h');
                 return 'b'.repeat(40);
-            }
+            },
         });
 
         assert.deepEqual(updates, [
@@ -74,8 +74,8 @@ it('discovers newer upstream commits from each pin file and returns review metad
                 needsUpdate: true,
                 compareUrl: `https://github.com/example/hermes/compare/${'a'.repeat(40)}...${'b'.repeat(40)}`,
                 labels: ['dependencies', 'area: runtime', 'runtime: static-hermes'],
-                validation: ['pnpm', '--filter', '@example/hermes', 'prepare']
-            }
+                validation: ['pnpm', '--filter', '@example/hermes', 'prepare'],
+            },
         ]);
     } finally {
         rmSync(f.root, { recursive: true, force: true });
@@ -89,14 +89,14 @@ it('updates only the configured pin field and preserves other source metadata', 
             workspaceRoot: f.root,
             catalogPath: f.catalogPath,
             id: 'static-hermes',
-            commit: 'c'.repeat(40)
+            commit: 'c'.repeat(40),
         });
 
         assert.deepEqual(JSON.parse(readFileSync(join(f.root, f.pinFile), 'utf8')), {
             $schema: upstreamGitPinSchemaUrl,
             repository: 'https://github.com/example/hermes.git',
             branch: 'static_h',
-            commit: 'c'.repeat(40)
+            commit: 'c'.repeat(40),
         });
     } finally {
         rmSync(f.root, { recursive: true, force: true });
@@ -109,7 +109,7 @@ it('marks a pin current when the upstream branch still points to its pinned comm
         const updates = await discoverUpstreamPins({
             workspaceRoot: f.root,
             catalogPath: f.catalogPath,
-            lookupRef: async () => 'a'.repeat(40)
+            lookupRef: async () => 'a'.repeat(40),
         });
 
         assert.equal(updates[0].needsUpdate, false);
@@ -121,19 +121,19 @@ it('marks a pin current when the upstream branch still points to its pinned comm
 
 it('keeps upstream pin schemas reusable across repositories and release tag formats', () => {
     const gitPin = JSON.parse(
-        readFileSync(new URL('../schemas/upstream-git-pin.schema.json', import.meta.url), 'utf8')
+        readFileSync(new URL('../schemas/upstream-git-pin.schema.json', import.meta.url), 'utf8'),
     );
     const releasePin = JSON.parse(
-        readFileSync(new URL('../schemas/upstream-release-pin.schema.json', import.meta.url), 'utf8')
+        readFileSync(new URL('../schemas/upstream-release-pin.schema.json', import.meta.url), 'utf8'),
     );
     const wasiSdkPin = JSON.parse(
-        readFileSync(new URL('../schemas/wasi-sdk-release-pin.schema.json', import.meta.url), 'utf8')
+        readFileSync(new URL('../schemas/wasi-sdk-release-pin.schema.json', import.meta.url), 'utf8'),
     );
     const toolchainSchema = JSON.parse(
-        readFileSync(new URL('../schemas/toolchain-versions.schema.json', import.meta.url), 'utf8')
+        readFileSync(new URL('../schemas/toolchain-versions.schema.json', import.meta.url), 'utf8'),
     );
     const toolchainVersions = JSON.parse(
-        readFileSync(new URL('../tools/static-hermes-runtime/toolchain-versions.json', import.meta.url), 'utf8')
+        readFileSync(new URL('../tools/static-hermes-runtime/toolchain-versions.json', import.meta.url), 'utf8'),
     );
 
     assert.equal(gitPin.properties.repository.format, 'uri');
@@ -160,9 +160,12 @@ it('keeps shared upstream schemas synchronized with the repository schema source
         ['schemas/upstream-git-pin.schema.json', 'tools/static-hermes-runtime/schemas/upstream-git-pin.schema.json'],
         [
             'schemas/wasi-sdk-release-pin.schema.json',
-            'tools/static-hermes-runtime/schemas/wasi-sdk-release-pin.schema.json'
+            'tools/static-hermes-runtime/schemas/wasi-sdk-release-pin.schema.json',
         ],
-        ['schemas/toolchain-versions.schema.json', 'tools/static-hermes-runtime/schemas/toolchain-versions.schema.json']
+        [
+            'schemas/toolchain-versions.schema.json',
+            'tools/static-hermes-runtime/schemas/toolchain-versions.schema.json',
+        ],
     ]) {
         const source = JSON.parse(readFileSync(new URL(`../${sourcePath}`, import.meta.url), 'utf8'));
         const packaged = JSON.parse(readFileSync(new URL(`../${packagePath}`, import.meta.url), 'utf8'));

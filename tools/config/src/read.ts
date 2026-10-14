@@ -14,18 +14,18 @@ export type IssueKind =
 export interface Issue {
     /** The kind of problem. */
     kind: IssueKind;
-    /** Dotted path of the setting, such as `web.port` or `overrides."a.mcpack".order`. */
-    path: string;
     /** A sentence for the server log. */
     message: string;
+    /** Dotted path of the setting, such as `web.port` or `overrides."a.mcpack".order`. */
+    path: string;
 }
 
 /** The values read from a file and everything noticed on the way. */
 export interface ReadResult<V> {
-    /** Every setting, with defaults filled in. */
-    values: V;
     /** Problems and omissions, in file order. */
     issues: Issue[];
+    /** Every setting, with defaults filled in. */
+    values: V;
 }
 
 type Table = Record<string, unknown>;
@@ -50,7 +50,7 @@ const entryPath = (table: string, key: string) => `${table}.${JSON.stringify(key
  */
 export function readConfig<S extends ConfigSchema>(
     schema: S,
-    raw: Record<string, unknown>
+    raw: Record<string, unknown>,
 ): ReadResult<ConfigValues<S>> {
     const issues: Issue[] = [];
     const values: Record<string, unknown> = defaultValues(schema);
@@ -87,7 +87,7 @@ function readFields(
     path: string,
     issues: Issue[],
     reportMissing: boolean,
-    document: Table
+    document: Table,
 ) {
     const out: Record<string, unknown> = {};
     for (const [key, f] of Object.entries(fields)) {

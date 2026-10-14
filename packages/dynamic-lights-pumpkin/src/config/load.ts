@@ -6,7 +6,7 @@ import { CONFIG_FILE, type Config, configSchema } from './schema.ts';
 /** Loads settings from the plugin data folder, leaving an invalid file untouched for the user to fix. */
 export function loadPluginConfig(
     files: DataFiles,
-    report: (level: 'info' | 'warn' | 'error', message: string) => void
+    report: (level: 'info' | 'warn' | 'error', message: string) => void,
 ): Config {
     try {
         const result = loadConfig(configSchema, configStore(files));
@@ -23,6 +23,6 @@ export function loadPluginConfig(
 function configStore(files: DataFiles): ConfigStore {
     return {
         read: () => (files.stat(CONFIG_FILE) ? strFromU8(files.readFile(CONFIG_FILE)) : undefined),
-        write: (text) => files.writeFile(CONFIG_FILE, strToU8(text))
+        write: (text) => files.writeFile(CONFIG_FILE, strToU8(text)),
     };
 }

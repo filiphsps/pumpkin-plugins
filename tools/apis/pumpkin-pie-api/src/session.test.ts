@@ -24,8 +24,8 @@ function setup() {
                         name: 'PumpkinPIE',
                         version: '0.2.3',
                         placeholders: 11,
-                        expansions: namespaces.size
-                    }
+                        expansions: namespaces.size,
+                    },
                 },
                 register_expansion: {
                     registered_expansion: {
@@ -34,15 +34,15 @@ function setup() {
                         cache:
                             r.cache?.kind === 'ttl'
                                 ? { kind: 'ttl', ms: Math.min(r.cache.ms, 60000) }
-                                : { kind: 'never' }
-                    }
+                                : { kind: 'never' },
+                    },
                 },
-                unregister_expansion: { unregistered: { namespaces: [...namespaces] } }
+                unregister_expansion: { unregistered: { namespaces: [...namespaces] } },
             };
             if (r.op === 'register_expansion') namespaces.add(r.namespace);
             if (r.op === 'unregister_expansion') namespaces.clear();
             return strToU8(JSON.stringify({ ok: true, ...bodies[r.op] }));
-        }
+        },
     });
     return {
         session,
@@ -57,7 +57,7 @@ function setup() {
         },
         protocol: (value: number) => {
             protocol = value;
-        }
+        },
     };
 }
 it('retries with bounded backoff, warns on transitions and recovers desired expansions', () => {
@@ -151,7 +151,7 @@ it('clears local callbacks without IPC during host teardown', () => {
     expect(() => f.session.registerExpansion('extra', {})).toThrow(api.InputError);
     const reply = f.session.router.handle(
         'PumpkinPIE',
-        strToU8('{"op":"on_request","namespace":"ranks","id":"ranks_prefix","name":"prefix"}')
+        strToU8('{"op":"on_request","namespace":"ranks","id":"ranks_prefix","name":"prefix"}'),
     );
     expect(JSON.parse(strFromU8(reply))).toEqual({ ok: true, on_request: {} });
 });
@@ -162,12 +162,12 @@ it('shares the callback guard with session client and restores it after stop re-
         prefix: () => {
             f.session.stop();
             return 'bad';
-        }
+        },
     });
     f.session.tick();
     const reply = f.session.router.handle(
         'PumpkinPIE',
-        strToU8('{"op":"on_request","namespace":"ranks","id":"ranks_prefix","name":"prefix"}')
+        strToU8('{"op":"on_request","namespace":"ranks","id":"ranks_prefix","name":"prefix"}'),
     );
     expect(JSON.parse(strFromU8(reply)).ok).toBe(false);
     expect(f.session.state.kind).toBe('ready');
@@ -180,7 +180,7 @@ it('rejects invalid desired registrations before changing callback ownership', (
     expect(() => f.session.registerExpansion('ranks', handlers)).toThrow(api.InputError);
     const reply = f.session.router.handle(
         'PumpkinPIE',
-        strToU8('{"op":"on_request","namespace":"ranks","id":"ranks_x","name":"x"}')
+        strToU8('{"op":"on_request","namespace":"ranks","id":"ranks_x","name":"x"}'),
     );
     expect(JSON.parse(strFromU8(reply))).toEqual({ ok: true, on_request: {} });
 });
@@ -192,7 +192,7 @@ it('cleans up partial registrations when a reachable provider rejects another na
             const request = JSON.parse(strFromU8(bytes));
             if (request.op === 'ping')
                 return strToU8(
-                    '{"ok":true,"ping":{"protocol":0,"name":"PumpkinPIE","version":"0.2.3","placeholders":11,"expansions":0}}'
+                    '{"ok":true,"ping":{"protocol":0,"name":"PumpkinPIE","version":"0.2.3","placeholders":11,"expansions":0}}',
                 );
             if (request.op === 'unregister_expansion') {
                 unregisters++;
@@ -200,9 +200,9 @@ it('cleans up partial registrations when a reachable provider rejects another na
             }
             if (request.namespace === 'waypoints') return strToU8('{"ok":false,"error":"refused"}');
             return strToU8(
-                '{"ok":true,"registered_expansion":{"namespace":"ranks","placeholders":["prefix"],"cache":{"kind":"never"}}}'
+                '{"ok":true,"registered_expansion":{"namespace":"ranks","placeholders":["prefix"],"cache":{"kind":"never"}}}',
             );
-        }
+        },
     });
     session.registerExpansion('ranks', { prefix: () => 'Admin' });
     session.registerExpansion('waypoints', { count: () => '2' });

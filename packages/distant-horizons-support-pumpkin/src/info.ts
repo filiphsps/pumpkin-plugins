@@ -11,7 +11,7 @@ import {
     SECTION_SIZE_BLOCKS,
     TRANSFER_FRAGMENT_OVERHEAD_BYTES,
     TRANSFER_FRAGMENT_SAFE_WINDOW_MS,
-    TRANSFER_PACKET_BYTES
+    TRANSFER_PACKET_BYTES,
 } from './protocol/constants.ts';
 
 /**
@@ -22,7 +22,7 @@ export const info = {
     description: 'Unofficial Distant Horizons server-side support for Pumpkin',
     permissions: [
         { name: 'fs.read.data', reason: 'Read settings and cached LOD terrain.' },
-        { name: 'fs.write.data', reason: 'Write settings and persist captured LOD terrain.' }
+        { name: 'fs.write.data', reason: 'Write settings and persist captured LOD terrain.' },
     ],
     commands: commandInfos(commands),
     config: configInfo,
@@ -31,7 +31,7 @@ export const info = {
             `Targets Distant Horizons **${DH_VERSION}**, using network protocol ${PROTOCOL} on Java Edition.`,
             'Bedrock players do not open DH sessions. Install the Distant Horizons client mod separately.',
             'A client using another DH protocol is disconnected with an incompatibility message.',
-            `The protocol format follows [Distant Horizons core ${DH_VERSION}](https://gitlab.com/distant-horizons-team/distant-horizons-core/-/tree/${DH_VERSION}).`
+            `The protocol format follows [Distant Horizons core ${DH_VERSION}](https://gitlab.com/distant-horizons-team/distant-horizons-core/-/tree/${DH_VERSION}).`,
         ].join(' '),
         terrain: [
             `The plugin builds LOD sections covering ${SECTION_SIZE_BLOCKS} × ${SECTION_SIZE_BLOCKS} blocks`,
@@ -42,7 +42,7 @@ export const info = {
             'By default, each vertical column uses its surface biome. Set `sample_biomes_3d = true` under that world in `[worlds."<world>"]` to sample cave and other vertical biomes; this adds a biome lookup for each sampled block.',
             'Player edits, crop growth and fire spread invalidate affected cached sections. Mutations without exact world and changed-position data from the pinned Pumpkin API may remain cached until refresh.',
             `Captures are limited to ${MAX_POINTS_PER_SECTION} material segments per section,`,
-            `transfer packets carry at most ${TRANSFER_PACKET_BYTES} data bytes; finite-bandwidth fragments fit within a ${TRANSFER_FRAGMENT_SAFE_WINDOW_MS / 1000}-second credit window including the ${TRANSFER_FRAGMENT_OVERHEAD_BYTES}-byte protocol overhead; a finite client bandwidth bucket can accumulate one ${MAX_TRANSFER_MESSAGE_BYTES}-byte DH fragment message.`
-        ].join(' ')
-    }
+            `transfer packets carry at most ${TRANSFER_PACKET_BYTES} data bytes; finite-bandwidth fragments fit within a ${TRANSFER_FRAGMENT_SAFE_WINDOW_MS / 1000}-second credit window including the ${TRANSFER_FRAGMENT_OVERHEAD_BYTES}-byte protocol overhead; a finite client bandwidth bucket can accumulate one ${MAX_TRANSFER_MESSAGE_BYTES}-byte DH fragment message.`,
+        ].join(' '),
+    },
 } satisfies PluginInfo<typeof PLUGIN_NAME>;

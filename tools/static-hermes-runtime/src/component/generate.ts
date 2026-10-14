@@ -6,32 +6,32 @@ import type { ComponentWitAnalysis } from './analyze.ts';
 
 /** Paths to generated WIT bindings and the component runtime source. */
 export interface ComponentGeneratedFiles {
+    /** Compiled component type object produced by wit-bindgen. */
+    componentType: string;
     /** Directory containing the generated C bindings and component type object. */
     directory: string;
     /** Generated C implementation for the plugin's WIT world. */
     pluginC: string;
     /** Generated header included by the native bindings. */
     pluginHeader: string;
-    /** Compiled component type object produced by wit-bindgen. */
-    componentType: string;
     /** Generated C++ runtime shim source. */
     runtimeSource: string;
 }
 
 /** Inputs for generating per-plugin native bindings from resolved WIT analysis. */
 export interface ComponentGenerationInput {
-    /** Prepared WIT directory passed to wit-bindgen. */
-    witDirectory: string;
-    /** C++ runtime template populated with generated adapters and dispatch. */
-    templatePath: string;
-    /** Temporary output directory for generated bindings and runtime source. */
-    outputDirectory: string;
-    /** Path to the pinned wit-bindgen executable. */
-    bindgenPath: string;
     /** Resolved API and WASI analysis used to generate native adapters. */
     analysis: ComponentWitAnalysis;
+    /** Path to the pinned wit-bindgen executable. */
+    bindgenPath: string;
+    /** Temporary output directory for generated bindings and runtime source. */
+    outputDirectory: string;
     /** Optional command runner, primarily for tests that inspect tool invocations. */
     run?: (command: string, args: string[]) => void;
+    /** C++ runtime template populated with generated adapters and dispatch. */
+    templatePath: string;
+    /** Prepared WIT directory passed to wit-bindgen. */
+    witDirectory: string;
 }
 
 /**
@@ -57,7 +57,7 @@ export function generateComponentFiles(input: ComponentGenerationInput): Compone
             ? []
             : ['--features', input.analysis.analysis.wasiFeatures.join(',')]),
         '--out-dir',
-        generatedDirectory
+        generatedDirectory,
     ]);
 
     const generated = generateWitOutputs({
@@ -65,7 +65,7 @@ export function generateComponentFiles(input: ComponentGenerationInput): Compone
         apiPackage: input.analysis.apiPackage,
         wasiInterfaces: input.analysis.analysis.resolvedWasiInterfaces,
         pluginHeader: fs.readFileSync(pluginHeader, 'utf8'),
-        runtimeTemplate: fs.readFileSync(input.templatePath, 'utf8')
+        runtimeTemplate: fs.readFileSync(input.templatePath, 'utf8'),
     });
     writeWitGeneration(input.outputDirectory, generated);
     return { directory: generatedDirectory, pluginC, pluginHeader, componentType, runtimeSource };

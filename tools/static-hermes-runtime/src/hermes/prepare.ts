@@ -11,30 +11,30 @@ import { setupHermesToolchainEnvironment } from './toolchain-environment.ts';
 
 /** Optional paths, environment, and setup hook for Hermes preparation. */
 export interface HermesPreparationOptions {
-    /** Project root for caches; defaults to the nearest pnpm workspace, or the current directory if standalone. */
-    workspaceRoot?: string;
-    /** Root of `tools/static-hermes-runtime`; defaults to this package's location. */
-    packageRoot?: string;
     /** Environment used to select source, cache, and toolchain locations. */
     environment?: NodeJS.ProcessEnv;
     /** Garbage collector to compile; defaults to Hades. */
     gcVariant?: HermesGcVariant;
+    /** Root of `tools/static-hermes-runtime`; defaults to this package's location. */
+    packageRoot?: string;
     /** Optional setup hook for resolving the tools needed by Hermes preparation. */
     setupEnvironment?: (options: {
         workspaceRoot: string;
         env: NodeJS.ProcessEnv;
         includeWitBindgen: false;
     }) => Promise<Record<string, string>>;
+    /** Project root for caches; defaults to the nearest pnpm workspace, or the current directory if standalone. */
+    workspaceRoot?: string;
 }
 
 /** Ordered source, patch, and build stages for Hermes preparation. */
 export interface HermesStageRunner {
-    /** Ensure the repository is checked out at its pinned commit. */
-    source(): Promise<void> | void;
-    /** Apply the configured patches to the pinned checkout. */
-    patch(): Promise<void> | void;
     /** Build or reuse the host compiler and WASI archives. */
     build(): Promise<void> | void;
+    /** Apply the configured patches to the pinned checkout. */
+    patch(): Promise<void> | void;
+    /** Ensure the repository is checked out at its pinned commit. */
+    source(): Promise<void> | void;
 }
 
 /**
@@ -60,7 +60,7 @@ export async function prepareHermes(options: HermesPreparationOptions = {}): Pro
         context.packageRoot,
         context.workspaceRoot,
         context.environment,
-        context.gcVariant
+        context.gcVariant,
     );
     const pin = readHermesSourcePin(paths.pinFile);
     const patches = readHermesPatchSeries(paths.patchesDirectory);
@@ -82,18 +82,18 @@ export async function prepareHermes(options: HermesPreparationOptions = {}): Pro
                             pin,
                             source: paths.source,
                             managedSource: paths.managedSource,
-                            managedPaths: affectedHermesPaths(patches)
+                            managedPaths: affectedHermesPaths(patches),
                         });
                         console.log(
-                            'Rebuilt stale Hermes source cache from the pinned commit; applying current patch series.'
+                            'Rebuilt stale Hermes source cache from the pinned commit; applying current patch series.',
                         );
                         applyCurrentPatches(paths.source, pin.commit, patches);
                     }
                 },
-                build: () => buildCurrentHermes(context, paths, pin, patches, buildHermesWithLockHeld)
+                build: () => buildCurrentHermes(context, paths, pin, patches, buildHermesWithLockHeld),
             });
         },
-        { resources: [paths.source, paths.hostBuild, paths.wasiBuild] }
+        { resources: [paths.source, paths.hostBuild, paths.wasiBuild] },
     );
 }
 
@@ -109,12 +109,12 @@ export async function prepareHermesSource(options: HermesPreparationOptions = {}
         context.packageRoot,
         context.workspaceRoot,
         context.environment,
-        context.gcVariant
+        context.gcVariant,
     );
     const pin = readHermesSourcePin(paths.pinFile);
     const patches = readHermesPatchSeries(paths.patchesDirectory);
     return withHermesBuildLock(paths.cacheRoot, () => ensurePinnedSource(paths, pin, patches), {
-        resources: [paths.source]
+        resources: [paths.source],
     });
 }
 
@@ -130,7 +130,7 @@ export async function patchHermesSource(options: HermesPreparationOptions = {}):
         context.packageRoot,
         context.workspaceRoot,
         context.environment,
-        context.gcVariant
+        context.gcVariant,
     );
     const pin = readHermesSourcePin(paths.pinFile);
     const patches = readHermesPatchSeries(paths.patchesDirectory);
@@ -142,7 +142,7 @@ export async function patchHermesSource(options: HermesPreparationOptions = {}):
             }
             applyCurrentPatches(paths.source, pin.commit, patches);
         },
-        { resources: [paths.source] }
+        { resources: [paths.source] },
     );
 }
 
@@ -158,7 +158,7 @@ export async function buildHermesArtifacts(options: HermesPreparationOptions = {
         context.packageRoot,
         context.workspaceRoot,
         context.environment,
-        context.gcVariant
+        context.gcVariant,
     );
     const pin = readHermesSourcePin(paths.pinFile);
     const patches = readHermesPatchSeries(paths.patchesDirectory);
@@ -166,28 +166,28 @@ export async function buildHermesArtifacts(options: HermesPreparationOptions = {
 }
 
 interface HermesContext {
-    packageRoot: string;
-    workspaceRoot: string;
     environment: NodeJS.ProcessEnv;
     gcVariant: HermesGcVariant;
+    packageRoot: string;
     setupEnvironment: NonNullable<HermesPreparationOptions['setupEnvironment']>;
+    workspaceRoot: string;
 }
 
 interface HermesPaths {
     cacheRoot: string;
-    source: string;
-    managedSource: boolean;
     hostBuild: string;
+    managedSource: boolean;
+    patchesDirectory: string;
+    pinFile: string;
+    source: string;
+    toolchainFile: string;
     wasiBuild: string;
     wasiSdk: string;
-    pinFile: string;
-    patchesDirectory: string;
-    toolchainFile: string;
 }
 
 function createHermesContext(options: HermesPreparationOptions): HermesContext {
     const packageRoot = path.resolve(
-        options.packageRoot ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+        options.packageRoot ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'),
     );
     const workspaceRoot = path.resolve(options.workspaceRoot ?? resolveConsumerWorkspaceRoot());
     return {
@@ -195,7 +195,7 @@ function createHermesContext(options: HermesPreparationOptions): HermesContext {
         workspaceRoot,
         environment: options.environment ?? process.env,
         gcVariant: options.gcVariant ?? 'hades',
-        setupEnvironment: options.setupEnvironment ?? setupHermesToolchainEnvironment
+        setupEnvironment: options.setupEnvironment ?? setupHermesToolchainEnvironment,
     };
 }
 
@@ -203,7 +203,7 @@ async function setupBuildEnvironment(context: HermesContext): Promise<void> {
     const environment = await context.setupEnvironment({
         workspaceRoot: context.workspaceRoot,
         env: context.environment,
-        includeWitBindgen: false
+        includeWitBindgen: false,
     });
     Object.assign(context.environment, environment);
 }
@@ -212,7 +212,7 @@ function configuredHermesPaths(
     packageRoot: string,
     workspaceRoot: string,
     environment: NodeJS.ProcessEnv,
-    gcVariant: HermesGcVariant
+    gcVariant: HermesGcVariant,
 ): HermesPaths {
     const cacheRoot = path.resolve(environment.STATIC_HERMES_CACHE_DIR ?? path.join(workspaceRoot, '.cache/hermes'));
     const defaultSource = path.join(cacheRoot, 'source');
@@ -226,27 +226,27 @@ function configuredHermesPaths(
         wasiSdk: path.resolve(environment.STATIC_HERMES_WASI_SDK_PATH ?? ''),
         pinFile: path.join(packageRoot, 'hermes-source.lock.json'),
         patchesDirectory: path.join(packageRoot, 'hermes-patches'),
-        toolchainFile: path.join(packageRoot, 'cmake/wasi-sdk-hermes-p2.cmake')
+        toolchainFile: path.join(packageRoot, 'cmake/wasi-sdk-hermes-p2.cmake'),
     };
 }
 
 function ensurePinnedSource(
     paths: HermesPaths,
     pin: ReturnType<typeof readHermesSourcePin>,
-    patches: ReturnType<typeof readHermesPatchSeries>
+    patches: ReturnType<typeof readHermesPatchSeries>,
 ): string {
     return ensureHermesSource({
         pin,
         source: paths.source,
         managedSource: paths.managedSource,
-        managedPaths: affectedHermesPaths(patches)
+        managedPaths: affectedHermesPaths(patches),
     });
 }
 
 function applyCurrentPatches(
     source: string,
     expectedCommit: string,
-    patches: ReturnType<typeof readHermesPatchSeries>
+    patches: ReturnType<typeof readHermesPatchSeries>,
 ): void {
     applyHermesPatchSeries({ source, expectedCommit, patches });
 }
@@ -256,7 +256,7 @@ async function buildCurrentHermes(
     paths: HermesPaths,
     pin: ReturnType<typeof readHermesSourcePin>,
     patches: ReturnType<typeof readHermesPatchSeries>,
-    build: typeof buildHermes = buildHermes
+    build: typeof buildHermes = buildHermes,
 ): Promise<void> {
     if (!context.environment.STATIC_HERMES_WASI_SDK_PATH) {
         throw new Error('Static Hermes WASI SDK path is not configured; run the Hermes build setup first');
@@ -273,6 +273,6 @@ async function buildCurrentHermes(
         pinFile: paths.pinFile,
         pin,
         patches,
-        environment: context.environment
+        environment: context.environment,
     });
 }

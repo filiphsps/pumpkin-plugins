@@ -16,36 +16,36 @@ function fixture() {
     fs.mkdirSync(wit);
     fs.writeFileSync(
         path.join(wit, 'plugin.wit'),
-        'package pumpkin:plugin@0.1.0;\nworld plugin {\n  import %world;\n  import context;\n  import server;\n  import player;\n  import command;\n  import text;\n  import common;\n  import event;\n  import wasi:filesystem/preopens@0.2.3;\n  import wasi:http/types@0.2.3;\n  import wasi:http/outgoing-handler@0.2.3;\n  import wasi:io/streams@0.2.3;\n  import wasi:clocks/monotonic-clock@0.2.3;\n  export init: func();\n}\n'
+        'package pumpkin:plugin@0.1.0;\nworld plugin {\n  import %world;\n  import context;\n  import server;\n  import player;\n  import command;\n  import text;\n  import common;\n  import event;\n  import wasi:filesystem/preopens@0.2.3;\n  import wasi:http/types@0.2.3;\n  import wasi:http/outgoing-handler@0.2.3;\n  import wasi:io/streams@0.2.3;\n  import wasi:clocks/monotonic-clock@0.2.3;\n  export init: func();\n}\n',
     );
     fs.writeFileSync(
         path.join(wit, 'world.wit'),
-        'interface %world { resource world { get-min-y: func() -> s32; } }\n'
+        'interface %world { resource world { get-min-y: func() -> s32; } }\n',
     );
     fs.writeFileSync(
         path.join(wit, 'context.wit'),
-        'interface context { resource context { get-server: func() -> server; } }\n'
+        'interface context { resource context { get-server: func() -> server; } }\n',
     );
     fs.writeFileSync(
         path.join(wit, 'server.wit'),
-        'interface server { use world.{world}; resource server { get-mspt: func() -> f64; get-all-worlds: func() -> list<world>; } }\n'
+        'interface server { use world.{world}; resource server { get-mspt: func() -> f64; get-all-worlds: func() -> list<world>; } }\n',
     );
     fs.writeFileSync(
         path.join(wit, 'player.wit'),
-        'interface player { resource player { get-saturation: func() -> f32; } }\n'
+        'interface player { resource player { get-saturation: func() -> f32; } }\n',
     );
     fs.writeFileSync(path.join(wit, 'command.wit'), 'interface command { resource command { then: func(); } }\n');
     fs.writeFileSync(
         path.join(wit, 'text.wit'),
-        'interface text { resource text-component { color-named: func(); } }\n'
+        'interface text { resource text-component { color-named: func(); } }\n',
     );
     fs.writeFileSync(
         path.join(wit, 'common.wit'),
-        'interface common { record block-pos { x: s32, y: s32, z: s32 } }\n'
+        'interface common { record block-pos { x: s32, y: s32, z: s32 } }\n',
     );
     fs.writeFileSync(
         path.join(wit, 'event.wit'),
-        'interface event { use common.{block-pos}; use player.{player}; record player-custom-payload-event-data { player: player, channel: string, data: list<u8>, unused: string } record server-tick-end-event-data { tick: s32, duration-nanos: s64 } variant event { player-custom-payload-event(player-custom-payload-event-data), server-tick-end-event(server-tick-end-event-data), unused-event(string) } }\n'
+        'interface event { use common.{block-pos}; use player.{player}; record player-custom-payload-event-data { player: player, channel: string, data: list<u8>, unused: string } record server-tick-end-event-data { tick: s32, duration-nanos: s64 } variant event { player-custom-payload-event(player-custom-payload-event-data), server-tick-end-event(server-tick-end-event-data), unused-event(string) } }\n',
     );
     const wasiDefinitions = {
         'filesystem/preopens.wit':
@@ -58,7 +58,7 @@ function fixture() {
             'package wasi:http@0.2.3; interface outgoing-handler { use types.{outgoing-request, request-options}; handle: func(request: outgoing-request, options: option<request-options>); }\n',
         'io/streams.wit':
             'package wasi:io@0.2.3; interface streams { variant stream-error { closed } resource input-stream { read: func(len: u64) -> result<list<u8>, stream-error>; } }\n',
-        'clocks/monotonic-clock.wit': 'package wasi:clocks@0.2.3; interface monotonic-clock { now: func() -> u64; }\n'
+        'clocks/monotonic-clock.wit': 'package wasi:clocks@0.2.3; interface monotonic-clock { now: func() -> u64; }\n',
     };
     for (const [relativePath, source] of Object.entries(wasiDefinitions)) {
         const file = path.join(wit, 'deps', relativePath);
@@ -74,17 +74,17 @@ function addUnsupportedWasiRuntime(witDir) {
     const pluginSource = fs.readFileSync(pluginPath, 'utf8');
     fs.writeFileSync(
         pluginPath,
-        pluginSource.replace('  export init: func();', '  import wasi:test/runtime@0.2.3;\n  export init: func();')
+        pluginSource.replace('  export init: func();', '  import wasi:test/runtime@0.2.3;\n  export init: func();'),
     );
     const dependencyDir = path.join(witDir, 'deps/test');
     fs.mkdirSync(dependencyDir, { recursive: true });
     fs.writeFileSync(
         path.join(dependencyDir, 'world.wit'),
-        'package wasi:test@0.2.3; world imports { import runtime; }\n'
+        'package wasi:test@0.2.3; world imports { import runtime; }\n',
     );
     fs.writeFileSync(
         path.join(dependencyDir, 'runtime.wit'),
-        'package wasi:test@0.2.3; interface runtime { unsupported: func(value: future-value); }\n'
+        'package wasi:test@0.2.3; interface runtime { unsupported: func(value: future-value); }\n',
     );
 }
 
@@ -104,9 +104,9 @@ function generate({ wit, template, output, wasiImports, wasiMethods, bundle, bun
             JSON.stringify(wasiImports),
             ...(wasiMethods === undefined ? [] : ['--wasi-methods', JSON.stringify(wasiMethods)]),
             '--output',
-            output
+            output,
         ],
-        { stdio: 'pipe' }
+        { stdio: 'pipe' },
     );
 }
 
@@ -494,7 +494,7 @@ describe('generate-runtime', () => {
 
         expect(failure).toBeDefined();
         expect(failure.stderr?.toString()).toContain(
-            'No Static Hermes JSI adapter is generated for wasi:test/runtime@0.2.3#unsupported'
+            'No Static Hermes JSI adapter is generated for wasi:test/runtime@0.2.3#unsupported',
         );
     });
 
@@ -554,7 +554,7 @@ describe('generate-runtime', () => {
         f.wasiMethods = [
             'wasi:http/types@0.2.3#fields.constructor',
             'wasi:http/types@0.2.3#outgoing-request.constructor',
-            'wasi:http/types@0.2.3#future-incoming-response.get'
+            'wasi:http/types@0.2.3#future-incoming-response.get',
         ];
 
         generate(f);
@@ -579,7 +579,7 @@ describe('generate-runtime', () => {
         const resourceMethod = generatedBlock(output, 'Value generatedWasiResourceMethod(Runtime &runtime');
         compileAndRunCpp(
             f.root,
-            WASI_RESOURCE_RESULT_HARNESS.replace('/* GENERATED_WASI_RESOURCE_METHOD */', resourceMethod)
+            WASI_RESOURCE_RESULT_HARNESS.replace('/* GENERATED_WASI_RESOURCE_METHOD */', resourceMethod),
         );
     }, 15_000);
 

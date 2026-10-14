@@ -7,16 +7,16 @@ export const EXHAUSTION_THRESHOLD = 0.01;
 
 /** What the plugin last sent one player. */
 interface LastSent {
-    saturation: number;
     exhaustion: number;
+    saturation: number;
 }
 
 /** What to send one player now. A field is missing when that value has not moved enough to send. */
 export interface SyncUpdate {
-    /** The player's saturation level, when it moved since the last packet. */
-    saturation?: number;
     /** The player's exhaustion level, when it moved by at least `EXHAUSTION_THRESHOLD`. */
     exhaustion?: number;
+    /** The player's saturation level, when it moved since the last packet. */
+    saturation?: number;
 }
 
 /**

@@ -9,7 +9,7 @@ describe('parseIdentity', () => {
             manufacturer: 'AVM Berlin',
             modelName: 'FRITZ!Box 7590',
             modelNumber: 'avme',
-            friendlyName: 'FRITZ!Box 7590'
+            friendlyName: 'FRITZ!Box 7590',
         };
         const xml = new FakeIgd({ device }).handleHttp('GET', '/rootDesc.xml', {}, '').body;
         expect(parseIdentity(xml)).toEqual({
@@ -17,7 +17,7 @@ describe('parseIdentity', () => {
             model: 'FRITZ!Box 7590',
             modelNumber: 'avme',
             name: 'FRITZ!Box 7590',
-            source: 'upnp'
+            source: 'upnp',
         });
     });
 
@@ -36,8 +36,8 @@ describe('parseDescription', () => {
         expect(parseDescription(xml, location)).toEqual([
             {
                 serviceType: 'urn:schemas-upnp-org:service:WANIPConnection:1',
-                controlUrl: 'http://192.168.1.1:5000/ctl/IPConn'
-            }
+                controlUrl: 'http://192.168.1.1:5000/ctl/IPConn',
+            },
         ]);
     });
 
@@ -48,7 +48,7 @@ describe('parseDescription', () => {
         expect(parseDescription(xml, location).map((c) => c.controlUrl)).toEqual([
             'http://10.0.0.1:49000/ip2',
             'http://10.0.0.1:49000/ip1',
-            'http://10.0.0.1:49000/ppp'
+            'http://10.0.0.1:49000/ppp',
         ]);
     });
 
@@ -62,7 +62,7 @@ describe('SOAP', () => {
     it('builds an envelope and escapes the arguments', () => {
         const xml = soapEnvelope('urn:x:service:S:1', 'Act', [
             ['NewDescription', 'a <b> & "c"'],
-            ['NewPort', 80]
+            ['NewPort', 80],
         ]);
         expect(xml).toContain('<u:Act xmlns:u="urn:x:service:S:1">');
         expect(xml).toContain('<NewDescription>a &lt;b&gt; &amp; &quot;c&quot;</NewDescription><NewPort>80</NewPort>');
@@ -78,7 +78,7 @@ describe('SOAP', () => {
         ['missing body', 200, '<Envelope><AddPortMappingResponse/></Envelope>'],
         ['unrelated action', 200, envelope('<u:DeletePortMappingResponse xmlns:u="x"/>')],
         ['unrecognized failure', 500, envelope('<u:AddPortMappingResponse xmlns:u="x"/>')],
-        ['unrecognized fault', 500, envelope('<Fault><faultstring>Failed</faultstring></Fault>')]
+        ['unrecognized fault', 500, envelope('<Fault><faultstring>Failed</faultstring></Fault>')],
     ])('rejects %s rather than recording mapping success', (_name, status, body) => {
         const igd = new FakeIgd();
         igd.handleHttp = () => ({ status: Number(status), body: String(body) });
@@ -93,11 +93,11 @@ describe('SOAP', () => {
                         internalPort: 8123,
                         externalPort: 8123,
                         description: 'Packs',
-                        leaseSeconds: 3600
+                        leaseSeconds: 3600,
                     },
-                    [192, 168, 1, 50]
-                )
-            )
+                    [192, 168, 1, 50],
+                ),
+            ),
         ).toThrow();
         expect(net.leaks).toBe(0);
     });
@@ -116,11 +116,11 @@ describe('SOAP', () => {
                         internalPort: 8123,
                         externalPort: 8123,
                         description: 'Packs',
-                        leaseSeconds: 3600
+                        leaseSeconds: 3600,
                     },
-                    [192, 168, 1, 50]
-                )
-            )
+                    [192, 168, 1, 50],
+                ),
+            ),
         ).toEqual({ externalPort: 8123, leaseSeconds: 3600 });
         expect(net.leaks).toBe(0);
     });
@@ -133,7 +133,7 @@ describe('SOAP', () => {
             'POST',
             '/ctl/IPConn',
             { soapaction: '"x#AddPortMapping"' },
-            ''
+            '',
         ).body;
         expect(() => parseSoapResponse(fault, 'AddPortMapping', 500)).toThrow(UpnpError);
         expect(() => parseSoapResponse(fault, 'AddPortMapping', 500)).toThrow('(501)');

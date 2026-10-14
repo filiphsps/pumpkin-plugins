@@ -26,7 +26,7 @@ const engineProfiles = [
     { name: 'default engine and runtime', options: {} },
     { name: 'Static Hermes full runtime', options: { engine: 'static-hermes', staticHermesRuntime: 'full' } },
     { name: 'Static Hermes lean runtime', options: { engine: 'static-hermes', staticHermesRuntime: 'lean' } },
-    { name: 'Static Hermes malloc collector', options: { engine: 'static-hermes', staticHermesGc: 'malloc' } }
+    { name: 'Static Hermes malloc collector', options: { engine: 'static-hermes', staticHermesGc: 'malloc' } },
 ] as const;
 const componentize = vi.mocked(execFileSync);
 const esbuild = vi.mocked(build);
@@ -61,7 +61,7 @@ describe('bundlePlugin', () => {
             if (!buildOptions.outfile) throw new Error('missing JavaScript bundle output');
             fs.writeFileSync(
                 buildOptions.outfile,
-                'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();'
+                'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();',
             );
             return {} as never;
         });
@@ -73,7 +73,7 @@ describe('bundlePlugin', () => {
             version: '1.0.0',
             quietRuntimeOutput: true,
             onOutput,
-            ...options
+            ...options,
         });
 
         const engine = 'engine' in options ? options.engine : 'static-hermes';
@@ -81,14 +81,14 @@ describe('bundlePlugin', () => {
         const gcVariant = 'staticHermesGc' in options ? options.staticHermesGc : undefined;
         expect(componentize.mock.calls[0]?.[2]).toEqual({
             stdio: ['inherit', 'ignore', 'pipe'],
-            maxBuffer: 16 * 1024 * 1024
+            maxBuffer: 16 * 1024 * 1024,
         });
         expect(componentize.mock.calls[0]?.[1]).not.toContain('--parse-ts');
         expect(onOutput).toHaveBeenCalledWith({
             type: 'componentize',
             engine,
             ...(runtimeVariant === undefined ? {} : { runtimeVariant }),
-            ...(gcVariant === undefined ? {} : { gcVariant })
+            ...(gcVariant === undefined ? {} : { gcVariant }),
         });
         if (gcVariant === undefined) expect(componentize.mock.calls[0]?.[1]).not.toContain('--gc-variant');
         else {
@@ -104,14 +104,14 @@ describe('bundlePlugin', () => {
             if (!buildOptions.outfile) throw new Error('missing JavaScript bundle output');
             fs.writeFileSync(
                 buildOptions.outfile,
-                'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();'
+                'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();',
             );
             return { metafile: { outputs: { [buildOptions.outfile]: { imports: [] } } } } as never;
         });
         vi.mocked(findUsedWitMethods).mockReturnValue({
             pumpkinMethods: ['player.player.get-position'],
             wasiMethods: ['wasi:filesystem/types@0.2.3#read-via-stream'],
-            eventTypes: ['server-tick-end-event']
+            eventTypes: ['server-tick-end-event'],
         });
 
         await bundlePlugin({
@@ -121,7 +121,7 @@ describe('bundlePlugin', () => {
             version: '1.0.0',
             engine: 'static-hermes',
             quietRuntimeOutput: false,
-            onOutput
+            onOutput,
         });
 
         expect(onOutput).toHaveBeenCalledWith({
@@ -131,8 +131,8 @@ describe('bundlePlugin', () => {
                 wasiImports: [],
                 wasiMethods: ['wasi:filesystem/types@0.2.3#read-via-stream'],
                 apiMethods: ['player.player.get-position'],
-                eventTypes: ['server-tick-end-event']
-            }
+                eventTypes: ['server-tick-end-event'],
+            },
         });
     });
 
@@ -149,8 +149,8 @@ describe('bundlePlugin', () => {
                 witDir: apiWitDir,
                 version: '1.0.0',
                 engine: 'quickjs',
-                quietRuntimeOutput: true
-            })
+                quietRuntimeOutput: true,
+            }),
         ).rejects.toThrow('QuickJS componentizer failed:\nlink failed');
     });
 
@@ -167,7 +167,7 @@ describe('bundlePlugin', () => {
             entry: 'src/plugin.ts',
             output,
             witDir: apiWitDir,
-            version: '1.0.0'
+            version: '1.0.0',
         });
 
         expect(esbuild).toHaveBeenCalledWith(expect.objectContaining({ format: 'iife' }));
@@ -185,8 +185,8 @@ describe('bundlePlugin', () => {
                 '--workspace-root',
                 dir,
                 '--wasi-imports',
-                '[]'
-            ])
+                '[]',
+            ]),
         );
     });
 
@@ -196,7 +196,7 @@ describe('bundlePlugin', () => {
             if (!buildOptions.outfile) throw new Error('missing JavaScript bundle output');
             fs.writeFileSync(
                 buildOptions.outfile,
-                'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();'
+                'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();',
             );
             return {} as never;
         });
@@ -206,7 +206,7 @@ describe('bundlePlugin', () => {
             output,
             witDir: apiWitDir,
             version: '1.0.0',
-            engine: 'static-hermes'
+            engine: 'static-hermes',
         });
 
         const generatedTypesDir = vi.mocked(generateTypes).mock.calls[0]?.[1];
@@ -226,7 +226,7 @@ describe('bundlePlugin', () => {
             witDir: 'wit',
             version: '1.0.0',
             engine: 'quickjs',
-            developmentMode: true
+            developmentMode: true,
         });
 
         expect(esbuild).toHaveBeenCalledWith(
@@ -234,11 +234,11 @@ describe('bundlePlugin', () => {
                 define: {
                     __PLUGIN_VERSION__: JSON.stringify('1.0.0'),
                     __PUMPKIN_DEV_MODE__: JSON.stringify(true),
-                    'process.env.NODE_ENV': JSON.stringify('development')
+                    'process.env.NODE_ENV': JSON.stringify('development'),
                 },
                 treeShaking: true,
-                minify: false
-            })
+                minify: false,
+            }),
         );
     });
 
@@ -255,7 +255,7 @@ describe('bundlePlugin', () => {
             const bundlePath = args?.[bundleIndex + 1];
             if (!bundlePath) throw new Error('missing Static Hermes bundle argument');
             expect(fs.readFileSync(bundlePath, 'utf8')).toBe(
-                'var __pumpkinPlugin=(()=>{var exports={};return exports;})();'
+                'var __pumpkinPlugin=(()=>{var exports={};return exports;})();',
             );
             const outputIndex = args?.indexOf('--output') ?? -1;
             const staged = args?.[outputIndex + 1];
@@ -272,11 +272,11 @@ describe('bundlePlugin', () => {
             engine: 'static-hermes',
             staticHermesRuntime: 'lean',
             parseTypeScript: true,
-            onOutput
+            onOutput,
         });
 
         expect(esbuild).toHaveBeenCalledWith(
-            expect.objectContaining({ format: 'iife', globalName: '__pumpkinPlugin', bundle: true })
+            expect.objectContaining({ format: 'iife', globalName: '__pumpkinPlugin', bundle: true }),
         );
         expect(componentize.mock.calls[0]?.[1]).toContainEqual(expect.stringContaining('dist/cli.js'));
         expect(componentize.mock.calls[0]?.[1]).toContain('component');
@@ -290,8 +290,8 @@ describe('bundlePlugin', () => {
                 type: 'componentize',
                 engine: 'static-hermes',
                 runtimeVariant: 'lean',
-                parseTypeScript: true
-            })
+                parseTypeScript: true,
+            }),
         );
     });
 
@@ -301,12 +301,12 @@ describe('bundlePlugin', () => {
             if (!options.outfile) throw new Error('missing JavaScript bundle output');
             fs.writeFileSync(
                 options.outfile,
-                'var __pumpkinPlugin=(()=>{var note="wasi:http/types@0.2.3";var exports={};return wrap(exports);})();'
+                'var __pumpkinPlugin=(()=>{var note="wasi:http/types@0.2.3";var exports={};return wrap(exports);})();',
             );
             return {
                 metafile: {
-                    outputs: { [options.outfile]: { imports: [] } }
-                }
+                    outputs: { [options.outfile]: { imports: [] } },
+                },
             } as never;
         });
 
@@ -315,7 +315,7 @@ describe('bundlePlugin', () => {
             output,
             witDir: apiWitDir,
             version: '1.0.0',
-            engine: 'static-hermes'
+            engine: 'static-hermes',
         });
 
         expect(componentize).toHaveBeenCalled();
@@ -327,7 +327,7 @@ describe('bundlePlugin', () => {
             if (!options.outfile) throw new Error('missing JavaScript bundle output');
             fs.writeFileSync(
                 options.outfile,
-                'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();\n/*! Bundled license information */\n'
+                'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();\n/*! Bundled license information */\n',
             );
             return {} as never;
         });
@@ -350,7 +350,7 @@ describe('bundlePlugin', () => {
             output,
             witDir: apiWitDir,
             version: '1.0.0',
-            engine: 'static-hermes'
+            engine: 'static-hermes',
         });
     });
 
@@ -363,10 +363,10 @@ describe('bundlePlugin', () => {
                 metafile: {
                     outputs: {
                         [options.outfile]: {
-                            imports: [{ path: 'wasi:http/types@0.2.3', external: true }]
-                        }
-                    }
-                }
+                            imports: [{ path: 'wasi:http/types@0.2.3', external: true }],
+                        },
+                    },
+                },
             } as never;
         });
 
@@ -376,10 +376,10 @@ describe('bundlePlugin', () => {
                 output,
                 witDir: apiWitDir,
                 version: '1.0.0',
-                engine: 'static-hermes'
-            })
+                engine: 'static-hermes',
+            }),
         ).rejects.toThrow(
-            'Static Hermes JavaScript bundle imports WASI interface without a JSI adapter: wasi:http/types@0.2.3'
+            'Static Hermes JavaScript bundle imports WASI interface without a JSI adapter: wasi:http/types@0.2.3',
         );
 
         expect(esbuild).toHaveBeenCalledWith(expect.objectContaining({ metafile: true }));
@@ -396,7 +396,7 @@ describe('bundlePlugin', () => {
             output,
             witDir: 'wit',
             version: '1.0.0',
-            engine: 'quickjs'
+            engine: 'quickjs',
         });
 
         expect(size).toBe(Buffer.byteLength('component'));
@@ -406,8 +406,8 @@ describe('bundlePlugin', () => {
             expect.objectContaining({
                 minify: true,
                 treeShaking: true,
-                define: expect.objectContaining({ 'process.env.NODE_ENV': JSON.stringify('production') })
-            })
+                define: expect.objectContaining({ 'process.env.NODE_ENV': JSON.stringify('production') }),
+            }),
         );
     });
 
@@ -422,7 +422,7 @@ describe('bundlePlugin', () => {
             output,
             witDir: 'wit',
             version: '1.0.0',
-            engine: 'quickjs'
+            engine: 'quickjs',
         });
 
         expect(fs.existsSync(abandoned)).toBe(false);
@@ -439,7 +439,7 @@ describe('bundlePlugin', () => {
             output,
             witDir: 'wit',
             version: '1.0.0',
-            engine: 'quickjs'
+            engine: 'quickjs',
         });
 
         expect(fs.existsSync(abandoned)).toBe(false);
@@ -452,7 +452,7 @@ describe('bundlePlugin', () => {
             if (!buildOptions.outfile) throw new Error('missing JavaScript bundle output');
             fs.writeFileSync(
                 buildOptions.outfile,
-                'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();'
+                'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();',
             );
             return {} as never;
         });
@@ -470,7 +470,7 @@ describe('bundlePlugin', () => {
             output,
             witDir: apiWitDir,
             version: '1.0.0',
-            ...options
+            ...options,
         });
 
         expect(size).toBe(limit);
@@ -487,7 +487,7 @@ describe('bundlePlugin', () => {
                 if (!buildOptions.outfile) throw new Error('missing JavaScript bundle output');
                 fs.writeFileSync(
                     buildOptions.outfile,
-                    'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();'
+                    'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();',
                 );
                 return {} as never;
             });
@@ -501,14 +501,14 @@ describe('bundlePlugin', () => {
             });
 
             await expect(
-                bundlePlugin({ entry: 'src/plugin.ts', output, witDir: apiWitDir, version: '1.0.0', ...options })
+                bundlePlugin({ entry: 'src/plugin.ts', output, witDir: apiWitDir, version: '1.0.0', ...options }),
             ).rejects.toThrow(
-                `Production WebAssembly component is ${MAX_PRODUCTION_COMPONENT_BYTES + 1} bytes; maximum is ${MAX_PRODUCTION_COMPONENT_BYTES} bytes (5 MiB)`
+                `Production WebAssembly component is ${MAX_PRODUCTION_COMPONENT_BYTES + 1} bytes; maximum is ${MAX_PRODUCTION_COMPONENT_BYTES} bytes (5 MiB)`,
             );
 
             expect(fs.readFileSync(output, 'utf8')).toBe('known-good artifact');
             expect(fs.readdirSync(path.dirname(output))).toEqual(['plugin.wasm']);
-        }
+        },
     );
 
     it.each(engineProfiles)(
@@ -520,7 +520,7 @@ describe('bundlePlugin', () => {
                 if (!buildOptions.outfile) throw new Error('missing JavaScript bundle output');
                 fs.writeFileSync(
                     buildOptions.outfile,
-                    'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();'
+                    'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();',
                 );
                 return {} as never;
             });
@@ -540,12 +540,12 @@ describe('bundlePlugin', () => {
                     witDir: apiWitDir,
                     version: '1.0.0',
                     ...options,
-                    developmentMode: true
-                })
+                    developmentMode: true,
+                }),
             ).resolves.toBe(size);
 
             expect(fs.statSync(output).size).toBe(size);
-        }
+        },
     );
 
     it('keeps the previous artifact and removes staging files when componentization fails', async () => {
@@ -560,7 +560,7 @@ describe('bundlePlugin', () => {
         });
 
         await expect(
-            bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0', engine: 'quickjs' })
+            bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0', engine: 'quickjs' }),
         ).rejects.toThrow('componentizer failed');
 
         expect(fs.readFileSync(output, 'utf8')).toBe('known-good artifact');
@@ -579,7 +579,7 @@ describe('bundlePlugin', () => {
             output,
             witDir: 'wit',
             version: '1.0.0',
-            engine: 'quickjs'
+            engine: 'quickjs',
         });
 
         expect(size).toBe(Buffer.byteLength('component'));
@@ -605,7 +605,7 @@ describe('bundlePlugin', () => {
             .mockImplementationOnce((source, destination) => actualRename(source, destination));
 
         await expect(
-            bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0', engine: 'quickjs' })
+            bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0', engine: 'quickjs' }),
         ).rejects.toThrow('disk full');
 
         expect(fs.readFileSync(output, 'utf8')).toBe('known-good artifact');
@@ -636,7 +636,7 @@ describe('bundlePlugin', () => {
             output,
             witDir: 'wit',
             version: '1.0.0',
-            engine: 'quickjs'
+            engine: 'quickjs',
         }).catch((error: unknown) => error);
 
         expect(failure).toBeInstanceOf(AggregateError);
@@ -650,7 +650,7 @@ describe('bundlePlugin', () => {
             output: path.join(path.dirname(output), 'next-plugin.wasm'),
             witDir: 'wit',
             version: '1.0.0',
-            engine: 'quickjs'
+            engine: 'quickjs',
         });
 
         expect(fs.readFileSync(recoveryPath ?? '', 'utf8')).toBe('known-good artifact');
@@ -685,15 +685,15 @@ describe('bundlePlugin', () => {
                 output: first.output,
                 witDir: 'wit',
                 version: '1.0.0',
-                engine: 'quickjs'
+                engine: 'quickjs',
             }),
             bundlePlugin({
                 entry: 'src/second.ts',
                 output: second.output,
                 witDir: 'wit',
                 version: '1.0.0',
-                engine: 'quickjs'
-            })
+                engine: 'quickjs',
+            }),
         ]);
 
         expect(new Set(bundles).size).toBe(2);

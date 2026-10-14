@@ -111,7 +111,7 @@ ${[constructorMethod, ...staticMethods].join('\n')}
  */
 export function generateEsmFacade(
     apiInterface: WitApiInterface,
-    allInterfaces: readonly WitApiInterface[] = [apiInterface]
+    allInterfaces: readonly WitApiInterface[] = [apiInterface],
 ): string {
     const allowsTaskCancellationDuringUnload = apiInterface.specifier.startsWith('pumpkin:plugin/scheduler@');
     const prelude = /* JavaScript */ `const __allowTaskCancellationDuringUnload = ${allowsTaskCancellationDuringUnload};
@@ -157,7 +157,7 @@ const __wrap = (Type, value) => {
 };`;
 
     const resourceTypes = new Map<string, InterfaceResource>(
-        apiInterface.resources.map((resource) => [resource.name, { ...resource, interfaceName: apiInterface.name }])
+        apiInterface.resources.map((resource) => [resource.name, { ...resource, interfaceName: apiInterface.name }]),
     );
     for (const dependencyName of apiInterface.dependencies ?? []) {
         const dependency = allInterfaces.find((candidate) => candidate.name === dependencyName);
@@ -208,7 +208,7 @@ const __wrap = (Type, value) => {
             const localResource = resource.interfaceName === apiInterface.name;
             const constructorOperation = resource.functions.find((operation) => operation.name === 'constructor');
             const instanceFunctions = resource.functions.filter(
-                (operation) => !operation.isStatic && operation.name !== 'constructor'
+                (operation) => !operation.isStatic && operation.name !== 'constructor',
             );
             const staticFunctions = localResource ? resource.functions.filter((operation) => operation.isStatic) : [];
             const constructorMethod = !localResource

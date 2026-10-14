@@ -16,7 +16,7 @@ vi.mock('./bundle.ts', () => ({ bundlePlugin: vi.fn() }));
 vi.mock('./types.ts', () => ({ generateTypes: vi.fn() }));
 vi.mock('./wasi-wit.ts', () => ({
     ensureWasiWit: vi.fn(async () => '/unused-wasi-wit'),
-    readLock: vi.fn(() => ({ version: '0.2.3', files: {} }))
+    readLock: vi.fn(() => ({ version: '0.2.3', files: {} })),
 }));
 
 let sharedWitRepository: { directory: string; branch: string; commit: string };
@@ -44,20 +44,20 @@ function writeApiPackageManifest(apiDir: string): void {
         JSON.stringify({
             name: '@pumpkin-plugins/pumpkin-api',
             version: '0.1.0',
-            exports: { './package.json': './package.json' }
-        })
+            exports: { './package.json': './package.json' },
+        }),
     );
 }
 
 function createWitRepository(
     repositoryDir: string,
     subdirectory = 'v0.1',
-    packageVersion = ''
+    packageVersion = '',
 ): { branch: string; commit: string } {
     fs.mkdirSync(path.join(repositoryDir, subdirectory), { recursive: true });
     fs.writeFileSync(
         path.join(repositoryDir, subdirectory, 'plugin.wit'),
-        `package pumpkin:plugin${packageVersion};\nworld plugin {\n    export run: func();\n}\n`
+        `package pumpkin:plugin${packageVersion};\nworld plugin {\n    export run: func();\n}\n`,
     );
     execFileSync('git', ['init', '--quiet', repositoryDir], { stdio: 'ignore' });
     execFileSync('git', ['-C', repositoryDir, 'add', `${subdirectory}/plugin.wit`], { stdio: 'ignore' });
@@ -73,13 +73,13 @@ function createWitRepository(
             'commit',
             '--quiet',
             '-m',
-            'pin WIT'
+            'pin WIT',
         ],
-        { stdio: 'ignore' }
+        { stdio: 'ignore' },
     );
     return {
         branch: execFileSync('git', ['-C', repositoryDir, 'branch', '--show-current'], { encoding: 'utf8' }).trim(),
-        commit: execFileSync('git', ['-C', repositoryDir, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+        commit: execFileSync('git', ['-C', repositoryDir, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
     };
 }
 
@@ -98,9 +98,9 @@ function commitWitFile(repositoryDir: string, source: string): string {
             'commit',
             '--quiet',
             '-m',
-            'update WIT'
+            'update WIT',
         ],
-        { stdio: 'ignore' }
+        { stdio: 'ignore' },
     );
     return execFileSync('git', ['-C', repositoryDir, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 }
@@ -110,7 +110,7 @@ function writeWitLock(
     repositoryDir: string,
     branch: string,
     commit: string,
-    subdirectory = 'v0.1'
+    subdirectory = 'v0.1',
 ): string {
     const lock = `${JSON.stringify(
         {
@@ -119,10 +119,10 @@ function writeWitLock(
             repository: pathToFileURL(repositoryDir).href,
             branch,
             commit,
-            subdirectory
+            subdirectory,
         },
         null,
-        4
+        4,
     )}\n`;
     fs.writeFileSync(path.join(apiDir, 'wit.lock.json'), lock);
     return lock;
@@ -165,7 +165,7 @@ describe('CLI informational options', () => {
         try {
             await expect(run(['--version'], '/not-a-package')).resolves.toBeUndefined();
             expect(output.join('').trim()).toBe(
-                JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
+                JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version,
             );
         } finally {
             stdout.mockRestore();
@@ -190,7 +190,7 @@ describe('run arguments', () => {
         fs.symlinkSync(apiDir, path.join(scopeDir, 'pumpkin-api'), 'dir');
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
-            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } })
+            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } }),
         );
         vi.mocked(generateTypes).mockClear();
 
@@ -199,7 +199,7 @@ describe('run arguments', () => {
 
             const cachedWit = cachedWitDir(pluginDir, lock);
             expect(fs.readFileSync(path.join(cachedWit, 'plugin.wit'), 'utf8')).toContain(
-                'package pumpkin:plugin@0.2.0'
+                'package pumpkin:plugin@0.2.0',
             );
             expect(generateTypes).toHaveBeenCalledWith(cachedWit, path.join(pluginDir, 'build', 'types', 'bindings'));
         } finally {
@@ -221,7 +221,7 @@ describe('run arguments', () => {
         fs.symlinkSync(apiDir, path.join(scopeDir, 'pumpkin-api'), 'dir');
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
-            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } })
+            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } }),
         );
         vi.mocked(generateTypes).mockClear();
 
@@ -250,7 +250,7 @@ describe('run arguments', () => {
         const aliasPin = createWitRepository(repositoryDir, 'v0.1', '@0.1.0');
         const builderCommit = commitWitFile(
             repositoryDir,
-            'package pumpkin:plugin@0.2.0;\nworld plugin {\n    export run: func();\n}\n'
+            'package pumpkin:plugin@0.2.0;\nworld plugin {\n    export run: func();\n}\n',
         );
         writeApiPackageManifest(aliasApiDir);
         const aliasLock = writeWitLock(aliasApiDir, repositoryDir, aliasPin.branch, aliasPin.commit);
@@ -268,7 +268,7 @@ describe('run arguments', () => {
             '@pumpkin-plugins+build@0.1.0',
             'node_modules',
             '@pumpkin-plugins',
-            'build'
+            'build',
         );
         const builderApiScopeDir = path.join(builderDir, 'node_modules', '@pumpkin-plugins');
         fs.mkdirSync(builderApiScopeDir, { recursive: true });
@@ -282,9 +282,9 @@ describe('run arguments', () => {
             JSON.stringify({
                 dependencies: {
                     '@pumpkinmc/pumpkin-api-ts': 'npm:@pumpkin-plugins/pumpkin-api@^0.1.0',
-                    '@pumpkin-plugins/build': '0.1.0'
-                }
-            })
+                    '@pumpkin-plugins/build': '0.1.0',
+                },
+            }),
         );
 
         try {
@@ -299,8 +299,8 @@ describe('run arguments', () => {
                 {
                     cwd: pluginDir,
                     encoding: 'utf8',
-                    env: { ...process.env, NODE_PATH: '' }
-                }
+                    env: { ...process.env, NODE_PATH: '' },
+                },
             );
             expect(result.error).toBeUndefined();
             expect(result.status, result.stderr).toBe(0);
@@ -324,7 +324,7 @@ describe('run arguments', () => {
         const canonicalPin = createWitRepository(repositoryDir, 'v0.1', '@0.1.0');
         const aliasCommit = commitWitFile(
             repositoryDir,
-            'package pumpkin:plugin@0.2.0;\nworld plugin {\n    export run: func();\n}\n'
+            'package pumpkin:plugin@0.2.0;\nworld plugin {\n    export run: func();\n}\n',
         );
         writeApiPackageManifest(canonicalApiDir);
         const canonicalLock = writeWitLock(canonicalApiDir, repositoryDir, canonicalPin.branch, canonicalPin.commit);
@@ -342,9 +342,9 @@ describe('run arguments', () => {
             JSON.stringify({
                 dependencies: {
                     '@pumpkin-plugins/pumpkin-api': '0.1.0',
-                    '@pumpkinmc/pumpkin-api-ts': 'npm:@pumpkin-plugins/pumpkin-api@^0.1.0'
-                }
-            })
+                    '@pumpkinmc/pumpkin-api-ts': 'npm:@pumpkin-plugins/pumpkin-api@^0.1.0',
+                },
+            }),
         );
 
         try {
@@ -368,7 +368,7 @@ describe('run arguments', () => {
         const canonicalPin = createWitRepository(repositoryDir, 'v0.1', '@0.1.0');
         const aliasCommit = commitWitFile(
             repositoryDir,
-            'package pumpkin:plugin@0.2.0;\nworld plugin {\n    export run: func();\n}\n'
+            'package pumpkin:plugin@0.2.0;\nworld plugin {\n    export run: func();\n}\n',
         );
         writeApiPackageManifest(canonicalApiDir);
         writeWitLock(canonicalApiDir, repositoryDir, canonicalPin.branch, canonicalPin.commit);
@@ -387,9 +387,9 @@ describe('run arguments', () => {
                 dependencies: {
                     '@pumpkin-plugins/build': '0.1.0',
                     '@missing/pumpkin-api': 'npm:@pumpkin-plugins/pumpkin-api@^0.1.0',
-                    '@pumpkinmc/pumpkin-api-ts': 'npm:@pumpkin-plugins/pumpkin-api@^0.1.0'
-                }
-            })
+                    '@pumpkinmc/pumpkin-api-ts': 'npm:@pumpkin-plugins/pumpkin-api@^0.1.0',
+                },
+            }),
         );
 
         try {
@@ -417,7 +417,7 @@ describe('run arguments', () => {
         fs.symlinkSync(apiDir, path.join(scopeDir, 'pumpkin-api'), 'dir');
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
-            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } })
+            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } }),
         );
         vi.mocked(generateTypes).mockClear();
 
@@ -429,7 +429,7 @@ describe('run arguments', () => {
 
             const secondCommit = commitWitFile(
                 repositoryDir,
-                'package pumpkin:plugin;\nworld plugin {\n    export stop: func();\n}\n'
+                'package pumpkin:plugin;\nworld plugin {\n    export stop: func();\n}\n',
             );
             const secondLock = writeWitLock(apiDir, repositoryDir, pin.branch, secondCommit);
             await run(['--types-only'], pluginDir);
@@ -439,7 +439,7 @@ describe('run arguments', () => {
             expect(secondWit).toBe(cachedWitDir(pluginDir, secondLock));
             expect(fs.readFileSync(path.join(secondWit, 'plugin.wit'), 'utf8')).toContain('export stop: func()');
             expect(createHash('sha256').update(firstLock).digest('hex')).not.toBe(
-                createHash('sha256').update(secondLock).digest('hex')
+                createHash('sha256').update(secondLock).digest('hex'),
             );
         } finally {
             fs.rmSync(pluginDir, { recursive: true, force: true });
@@ -463,9 +463,9 @@ describe('run arguments', () => {
                     entry: 'src/plugin.ts',
                     output: 'build/plugin.wasm',
                     wasi: [],
-                    engine: 'quickjs'
-                }
-            })
+                    engine: 'quickjs',
+                },
+            }),
         );
 
         try {
@@ -480,7 +480,7 @@ describe('run arguments', () => {
         const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-cli-'));
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
-            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } })
+            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } }),
         );
 
         try {
@@ -497,9 +497,9 @@ describe('run arguments', () => {
             expect(() =>
                 resolveApiWit(pluginDir, () => {
                     throw new Error('MODULE_NOT_FOUND');
-                })
+                }),
             ).toThrow(
-                'cannot resolve @pumpkin-plugins/pumpkin-api or its declared package alias from this plugin; add it to the plugin dependencies and run your package manager install'
+                'cannot resolve @pumpkin-plugins/pumpkin-api or its declared package alias from this plugin; add it to the plugin dependencies and run your package manager install',
             );
         } finally {
             fs.rmSync(pluginDir, { recursive: true, force: true });
@@ -515,7 +515,7 @@ describe('run arguments', () => {
         fs.symlinkSync(apiDir, path.join(scopeDir, 'pumpkin-api'), 'dir');
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
-            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } })
+            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } }),
         );
 
         try {
@@ -554,7 +554,7 @@ describe('run arguments', () => {
 
         try {
             expect(() => resolveApiWit(pluginDir)).toThrow(
-                /could not resolve pinned WIT.*could not fetch Pumpkin WIT.*first build after a lock change needs Git and network access/
+                /could not resolve pinned WIT.*could not fetch Pumpkin WIT.*first build after a lock change needs Git and network access/,
             );
         } finally {
             fs.rmSync(pluginDir, { recursive: true, force: true });
@@ -573,7 +573,7 @@ describe('run arguments', () => {
 
             try {
                 expect(() => resolveApiWit(pluginDir)).toThrow(
-                    /cache must stay outside node_modules and the pnpm store/
+                    /cache must stay outside node_modules and the pnpm store/,
                 );
             } finally {
                 if (previousCache === undefined) delete process.env.PUMPKIN_PLUGINS_CACHE_DIR;
@@ -581,7 +581,7 @@ describe('run arguments', () => {
                 fs.rmSync(pluginDir, { recursive: true, force: true });
                 fs.rmSync(apiDir, { recursive: true, force: true });
             }
-        }
+        },
     );
 
     it('generates guest types without requiring a plugin entry point or output', async () => {
@@ -590,7 +590,7 @@ describe('run arguments', () => {
         installApiPackage(pluginDir, apiDir);
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
-            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } })
+            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: [] } }),
         );
         vi.mocked(generateTypes).mockClear();
 
@@ -599,7 +599,7 @@ describe('run arguments', () => {
             const lock = fs.readFileSync(path.join(apiDir, 'wit.lock.json'), 'utf8');
             expect(generateTypes).toHaveBeenCalledWith(
                 cachedWitDir(pluginDir, lock),
-                path.join(pluginDir, 'build', 'types', 'bindings')
+                path.join(pluginDir, 'build', 'types', 'bindings'),
             );
         } finally {
             fs.rmSync(pluginDir, { recursive: true, force: true });
@@ -617,14 +617,14 @@ describe('run arguments', () => {
         fs.writeFileSync(path.join(legacyTypesWit, 'old.wit'), 'stale generated copy');
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
-            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: ['http'] } })
+            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: ['http'] } }),
         );
         vi.mocked(generateTypes)
             .mockReset()
             .mockImplementation((witDir) => {
                 generatedFrom = witDir;
                 expect(fs.readFileSync(path.join(witDir, 'plugin.wit'), 'utf8')).toContain(
-                    'import wasi:http/types@0.2.3;'
+                    'import wasi:http/types@0.2.3;',
                 );
             });
 
@@ -656,9 +656,9 @@ describe('run arguments', () => {
                     output: 'build/plugin.wasm',
                     wasi: [],
                     engine: 'static-hermes',
-                    staticHermesRuntime: 'lean'
-                }
-            })
+                    staticHermesRuntime: 'lean',
+                },
+            }),
         );
         vi.mocked(bundlePlugin)
             .mockClear()
@@ -667,7 +667,7 @@ describe('run arguments', () => {
                     type: 'componentize',
                     engine: 'static-hermes',
                     runtimeVariant: 'lean',
-                    parseTypeScript: options.parseTypeScript
+                    parseTypeScript: options.parseTypeScript,
                 });
                 return 2048;
             });
@@ -688,12 +688,12 @@ describe('run arguments', () => {
                 parseTypeScript: true,
                 developmentMode: false,
                 quietRuntimeOutput: true,
-                onOutput: expect.any(Function)
+                onOutput: expect.any(Function),
             });
             expect(consoleLog.mock.calls.map(([message]) => message)).toEqual([
                 '[build] Bundling \u001b[36msrc/plugin.ts\u001b[0m with \u001b[36mStatic Hermes (lean, hades, -parse-ts)\u001b[0m...',
                 '[build] Componentizing with \u001b[36mStatic Hermes (lean, hades, -parse-ts)\u001b[0m...',
-                '[build] Built \u001b[36mbuild/plugin.wasm\u001b[0m (\u001b[94m2 KiB\u001b[0m)'
+                '[build] Built \u001b[36mbuild/plugin.wasm\u001b[0m (\u001b[94m2 KiB\u001b[0m)',
             ]);
         } finally {
             consoleLog.mockRestore();
@@ -715,9 +715,9 @@ describe('run arguments', () => {
                     entry: 'src/plugin.ts',
                     output: 'build/plugin.wasm',
                     wasi: [],
-                    engine: 'static-hermes'
-                }
-            })
+                    engine: 'static-hermes',
+                },
+            }),
         );
         process.env.PUMPKIN_PLUGINS_VERBOSE_BUILD = '1';
         vi.mocked(bundlePlugin)
@@ -730,8 +730,8 @@ describe('run arguments', () => {
 
             expect(bundlePlugin).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    quietRuntimeOutput: false
-                })
+                    quietRuntimeOutput: false,
+                }),
             );
         } finally {
             consoleLog.mockRestore();
@@ -751,8 +751,8 @@ describe('run arguments', () => {
             pumpkinPlugin: {
                 entry: 'src/plugin.ts',
                 output: 'build/plugin.wasm',
-                wasi: ['http']
-            }
+                wasi: ['http'],
+            },
         };
         fs.writeFileSync(path.join(pluginDir, 'package.json'), JSON.stringify(manifest));
         vi.mocked(bundlePlugin).mockReset().mockResolvedValue(1);
@@ -766,7 +766,7 @@ describe('run arguments', () => {
 
             const snapshot = path.join(pluginDir, 'build', 'wit');
             expect(fs.readFileSync(path.join(snapshot, 'plugin.wit'), 'utf8')).toContain(
-                'import wasi:http/types@0.2.3;'
+                'import wasi:http/types@0.2.3;',
             );
 
             const publicationLock = path.join(pluginDir, 'build', '.wit-publish.lock');
@@ -827,9 +827,9 @@ describe('run arguments', () => {
                 pumpkinPlugin: {
                     entry: 'src/plugin.ts',
                     output: 'build/plugin.wasm',
-                    wasi: ['http']
-                }
-            })
+                    wasi: ['http'],
+                },
+            }),
         );
 
         let releaseFirstBuild = () => {};
@@ -861,7 +861,7 @@ describe('run arguments', () => {
 
             const updatedCommit = commitWitFile(
                 repositoryDir,
-                'package pumpkin:plugin;\nworld plugin {\n    export stop: func();\n}\n'
+                'package pumpkin:plugin;\nworld plugin {\n    export stop: func();\n}\n',
             );
             writeWitLock(apiDir, repositoryDir, pin.branch, updatedCommit);
             await run([], pluginDir);
@@ -873,7 +873,7 @@ describe('run arguments', () => {
             expect(observedWit[0]).not.toContain('export stop: func();');
             expect(observedWit[1]).toContain('export stop: func();');
             expect(fs.readFileSync(path.join(pluginDir, 'build', 'wit', 'plugin.wit'), 'utf8')).toContain(
-                'export stop: func();'
+                'export stop: func();',
             );
         } finally {
             releaseFirstBuild();
@@ -890,7 +890,7 @@ describe('run arguments', () => {
         const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
         installApiPackage(pluginDir, apiDir);
         const previous = {
-            lean: process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE
+            lean: process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE,
         };
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
@@ -900,9 +900,9 @@ describe('run arguments', () => {
                     entry: 'src/plugin.ts',
                     output: 'build/plugin.wasm',
                     wasi: [],
-                    engine: 'static-hermes'
-                }
-            })
+                    engine: 'static-hermes',
+                },
+            }),
         );
         delete process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE;
         vi.mocked(bundlePlugin).mockClear().mockResolvedValue(1);
@@ -912,7 +912,7 @@ describe('run arguments', () => {
             await run([], pluginDir);
 
             expect(bundlePlugin).toHaveBeenCalledWith(
-                expect.objectContaining({ engine: 'static-hermes', staticHermesRuntime: 'lean' })
+                expect.objectContaining({ engine: 'static-hermes', staticHermesRuntime: 'lean' }),
             );
         } finally {
             consoleLog.mockRestore();
@@ -928,7 +928,7 @@ describe('run arguments', () => {
         const apiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plugin-api-'));
         installApiPackage(pluginDir, apiDir);
         const previous = {
-            lean: process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE
+            lean: process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE,
         };
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
@@ -938,9 +938,9 @@ describe('run arguments', () => {
                     entry: 'src/plugin.ts',
                     output: 'build/plugin.wasm',
                     wasi: [],
-                    engine: 'static-hermes'
-                }
-            })
+                    engine: 'static-hermes',
+                },
+            }),
         );
         process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE = '0';
         vi.mocked(bundlePlugin).mockClear().mockResolvedValue(1);
@@ -950,7 +950,7 @@ describe('run arguments', () => {
             await run([], pluginDir);
 
             expect(bundlePlugin).toHaveBeenCalledWith(
-                expect.objectContaining({ engine: 'static-hermes', staticHermesRuntime: 'full' })
+                expect.objectContaining({ engine: 'static-hermes', staticHermesRuntime: 'full' }),
             );
         } finally {
             consoleLog.mockRestore();
@@ -967,7 +967,7 @@ describe('run arguments', () => {
         installApiPackage(pluginDir, apiDir);
         const previous = {
             dev: process.env.PUMPKIN_DEV_MODE,
-            lean: process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE
+            lean: process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE,
         };
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
@@ -977,9 +977,9 @@ describe('run arguments', () => {
                     entry: 'src/plugin.ts',
                     output: 'build/plugin.wasm',
                     wasi: [],
-                    engine: 'static-hermes'
-                }
-            })
+                    engine: 'static-hermes',
+                },
+            }),
         );
         process.env.PUMPKIN_DEV_MODE = '1';
         delete process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE;
@@ -1000,7 +1000,7 @@ describe('run arguments', () => {
                 staticHermesGc: 'hades',
                 developmentMode: true,
                 quietRuntimeOutput: true,
-                onOutput: expect.any(Function)
+                onOutput: expect.any(Function),
             });
         } finally {
             consoleLog.mockRestore();
@@ -1020,14 +1020,14 @@ describe('main error handling', () => {
         const cliPath = fileURLToPath(new URL('./cli.ts', import.meta.url));
         fs.writeFileSync(
             path.join(pluginDir, 'package.json'),
-            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: ['x'.repeat(1024 * 1024)] } })
+            JSON.stringify({ version: '1.0.0', pumpkinPlugin: { wasi: ['x'.repeat(1024 * 1024)] } }),
         );
 
         try {
             const result = spawnSync(process.execPath, [cliPath], {
                 cwd: pluginDir,
                 encoding: 'utf8',
-                maxBuffer: 2 * 1024 * 1024
+                maxBuffer: 2 * 1024 * 1024,
             });
 
             expect(result.error).toBeUndefined();
@@ -1064,8 +1064,8 @@ describe('main error handling', () => {
             path.join(pluginDir, 'package.json'),
             JSON.stringify({
                 version: '1.2.3',
-                pumpkinPlugin: { entry: 'src/plugin.ts', output: 'build/plugin.wasm', wasi: [] }
-            })
+                pumpkinPlugin: { entry: 'src/plugin.ts', output: 'build/plugin.wasm', wasi: [] },
+            }),
         );
         vi.mocked(bundlePlugin).mockRejectedValue(unexpectedError);
         const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});

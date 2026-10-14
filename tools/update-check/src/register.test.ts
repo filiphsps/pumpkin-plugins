@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const calls = vi.hoisted(() => ({
     log: vi.fn(),
     register: vi.fn(),
-    requestAsync: vi.fn()
+    requestAsync: vi.fn(),
 }));
 
 vi.mock('pumpkin:plugin/logging@0.1.0', () => ({ log: calls.log }));
@@ -18,7 +18,7 @@ const info = { name: 'ExamplePlugin', description: 'An example plugin.' };
 function fixture(): Plugin {
     return {
         onLoad: vi.fn(),
-        metadata: () => ({ version: '1.2.0' })
+        metadata: () => ({ version: '1.2.0' }),
     } as unknown as Plugin;
 }
 
@@ -44,7 +44,7 @@ describe('registerPluginWithUpdates', () => {
         const queued: Array<() => void> = [];
         const schedule = (callback: () => void) => queued.push(callback);
         calls.requestAsync.mockImplementation((_url, _schedule, complete) =>
-            complete({ ok: true, value: { latest_version: '1.3.0', update_available: true } })
+            complete({ ok: true, value: { latest_version: '1.3.0', update_available: true } }),
         );
 
         registerPluginWithUpdates(plugin, info, { schedule });
@@ -66,7 +66,7 @@ describe('registerPluginWithUpdates', () => {
         expect(calls.requestAsync).not.toHaveBeenCalled();
         expect(calls.log).toHaveBeenCalledWith(
             'warn',
-            expect.stringContaining('A scheduler is required for the automatic update check')
+            expect.stringContaining('A scheduler is required for the automatic update check'),
         );
     });
     it('preserves the original load context and registers the same plugin', () => {
@@ -99,7 +99,7 @@ describe('registerPluginWithUpdates', () => {
         registerPluginWithUpdates(plugin, info, { request, marketplaceUrl: 'http://market.test/' });
         plugin.onLoad({} as never);
         expect(request).toHaveBeenCalledWith(
-            'http://market.test/api/v1/rest/check-update?plugin_name=ExamplePlugin&current_version=1.2.0'
+            'http://market.test/api/v1/rest/check-update?plugin_name=ExamplePlugin&current_version=1.2.0',
         );
         expect(calls.log).toHaveBeenCalledWith('info', 'ExamplePlugin update available: 1.2.0 -> 1.3.0');
         expect(calls.requestAsync).not.toHaveBeenCalled();
@@ -108,7 +108,7 @@ describe('registerPluginWithUpdates', () => {
     it.each([
         { ok: false, error: new Error('network failed') },
         { ok: true, value: {} },
-        { ok: true, value: { latest_version: 'invalid', update_available: true } }
+        { ok: true, value: { latest_version: 'invalid', update_available: true } },
     ])('logs asynchronous failures without interrupting the task: %j', (result) => {
         const plugin = fixture();
         const queued: Array<() => void> = [];
@@ -117,14 +117,14 @@ describe('registerPluginWithUpdates', () => {
             schedule: (callback) => {
                 queued.push(callback);
             },
-            marketplaceUrl: 'http://market.test'
+            marketplaceUrl: 'http://market.test',
         });
         plugin.onLoad({} as never);
         expect(() => queued.shift()?.()).not.toThrow();
         expect(calls.requestAsync).toHaveBeenCalledWith(
             'http://market.test/api/v1/rest/check-update?plugin_name=ExamplePlugin&current_version=1.2.0',
             expect.any(Function),
-            expect.any(Function)
+            expect.any(Function),
         );
         expect(calls.log).toHaveBeenCalledWith('warn', expect.stringContaining('ExamplePlugin update check failed:'));
     });
@@ -135,7 +135,7 @@ describe('registerPluginWithUpdates', () => {
         registerPluginWithUpdates(plugin, info, {
             schedule: () => {
                 throw new Error('scheduler failed');
-            }
+            },
         });
         expect(() => plugin.onLoad({} as never)).not.toThrow();
         expect(onLoad).toHaveBeenCalledOnce();
@@ -147,7 +147,7 @@ describe('registerPluginWithUpdates', () => {
         registerPluginWithUpdates(plugin, info, {
             request: () => {
                 throw new Error('request failed');
-            }
+            },
         });
         expect(() => plugin.onLoad({} as never)).not.toThrow();
         expect(calls.log).toHaveBeenCalledWith('warn', 'ExamplePlugin update check failed: request failed');

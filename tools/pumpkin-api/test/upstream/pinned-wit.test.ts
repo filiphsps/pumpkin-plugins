@@ -26,7 +26,7 @@ it('resolves the pinned Pumpkin WIT and verifies its active compatibility digest
     temporaryDirectories.push(cacheRoot);
     const witRoot = ensurePumpkinWit({
         lockFile: witLockFile,
-        cacheRoot
+        cacheRoot,
     });
 
     expect(pin.repository).toBe('https://github.com/Pumpkin-MC/pumpkin-plugin-wit');

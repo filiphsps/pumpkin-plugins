@@ -29,7 +29,7 @@ function repo(actions: Record<string, { action: string; readme: string }>) {
 function run(root: string, check = false) {
     const result = spawnSync(process.execPath, [script, 'actions', ...(check ? ['--check'] : [])], {
         cwd: root,
-        encoding: 'utf8'
+        encoding: 'utf8',
     });
     return { status: result.status, output: `${result.stdout}${result.stderr}` };
 }
@@ -46,12 +46,12 @@ describe('action README CLI', { timeout: 15000 }, () => {
         const root = repo({
             'market-action': {
                 action: 'name: Market action\ninputs:\n  plugin-id:\n    description: Public or numeric ID\n    required: false\n  update-mode:\n    description: Update mode\n    required: false\n    default: patch\noutputs:\n  listing-id:\n    description: Resolved numeric ID\n',
-                readme: markers
+                readme: markers,
             },
             'no-output': {
                 action: 'name: No output action\ninputs:\n  value:\n    description: Value input\n    required: true\n',
-                readme: markers
-            }
+                readme: markers,
+            },
         });
 
         const result = run(root);
@@ -70,8 +70,8 @@ describe('action README CLI', { timeout: 15000 }, () => {
         const root = repo({
             action: {
                 action: 'name: Test\noutputs:\n  result:\n    description: Result value\n',
-                readme: markers
-            }
+                readme: markers,
+            },
         });
         const before = readme(root, 'action');
 

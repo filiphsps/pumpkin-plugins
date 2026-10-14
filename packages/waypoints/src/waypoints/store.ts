@@ -7,7 +7,7 @@ import {
     isWaypoint,
     normalizeWaypointName,
     type Waypoint,
-    waypointNameKey
+    waypointNameKey,
 } from './model.ts';
 
 const STORE_FILE = 'waypoints.json';
@@ -27,7 +27,7 @@ export class WaypointStore {
     /** Loads and validates the store once. Invalid files remain untouched and disable writes. */
     constructor(
         private readonly files: DataFiles,
-        private readonly logger: Pick<Logger, 'error' | 'warn'>
+        private readonly logger: Pick<Logger, 'error' | 'warn'>,
     ) {
         this.load();
     }
@@ -84,7 +84,7 @@ export class WaypointStore {
         const changed = change(cloneWaypoint(current));
         if (!isWaypoint(changed) || changed.id.toLowerCase() !== id || this.nameInUse(changed.name, id)) return false;
         const next = [...this.waypoints.values()].map((waypoint) =>
-            waypoint.id === id ? { ...cloneWaypoint(changed), id } : waypoint
+            waypoint.id === id ? { ...cloneWaypoint(changed), id } : waypoint,
         );
         this.persist(next);
         this.replace(next);
@@ -133,7 +133,7 @@ export class WaypointStore {
             const name = uniqueName(record.name, usedNames);
             if (name !== record.name) {
                 this.logger.warn(
-                    `Renamed duplicate legacy waypoint "${record.name}" to "${name}" during v1 migration.`
+                    `Renamed duplicate legacy waypoint "${record.name}" to "${name}" during v1 migration.`,
                 );
             }
             usedNames.add(waypointNameKey(name));
@@ -142,7 +142,7 @@ export class WaypointStore {
                 record.visibility === 'public'
                     ? []
                     : [record.ownerId, ...(record.visibility === 'allowlist' ? record.allowedPlayerIds : [])].map(
-                          (playerId) => ({ type: 'player' as const, playerId: playerId.toLowerCase() })
+                          (playerId) => ({ type: 'player' as const, playerId: playerId.toLowerCase() }),
                       );
             return createWaypoint({
                 id: record.id,
@@ -151,8 +151,8 @@ export class WaypointStore {
                 position: { x: record.x, y: record.y, z: record.z },
                 access: {
                     mode: record.visibility === 'public' ? 'public' : 'restricted',
-                    grants
-                }
+                    grants,
+                },
             });
         });
 
@@ -199,7 +199,7 @@ export class WaypointStore {
     private nameInUse(name: string, exceptId?: string): boolean {
         const key = waypointNameKey(name);
         return [...this.waypoints.values()].some(
-            (waypoint) => waypoint.id !== exceptId && waypointNameKey(waypoint.name) === key
+            (waypoint) => waypoint.id !== exceptId && waypointNameKey(waypoint.name) === key,
         );
     }
 
@@ -207,21 +207,21 @@ export class WaypointStore {
         this.available = false;
         this.invalidReason = error instanceof Error ? error.message : String(error);
         this.logger.error(
-            `Could not load ${STORE_FILE}; preserving the file and refusing waypoint writes: ${this.invalidReason}`
+            `Could not load ${STORE_FILE}; preserving the file and refusing waypoint writes: ${this.invalidReason}`,
         );
     }
 }
 
 interface LegacyWaypoint {
+    allowedPlayerIds: string[];
+    dimension: string;
     id: string;
     name: string;
-    dimension: string;
+    ownerId: string;
+    visibility: 'private' | 'public' | 'allowlist';
     x: number;
     y: number;
     z: number;
-    ownerId: string;
-    visibility: 'private' | 'public' | 'allowlist';
-    allowedPlayerIds: string[];
 }
 
 function validateV2(values: unknown[]): Waypoint[] {
@@ -278,7 +278,7 @@ function validateV1(values: unknown[]): LegacyWaypoint[] {
             z: value.z,
             ownerId: value.ownerId,
             visibility: value.visibility,
-            allowedPlayerIds: value.allowedPlayerIds
+            allowedPlayerIds: value.allowedPlayerIds,
         });
     }
     return records;

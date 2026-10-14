@@ -20,7 +20,7 @@ export class WaypointHudService {
     constructor(
         private readonly server: Server,
         private readonly catalog: WaypointCatalog,
-        options: WaypointHudServiceOptions = {}
+        options: WaypointHudServiceOptions = {},
     ) {
         this.onError = options.onError ?? (() => undefined);
         this.renderer = new WaypointHudRenderer({ onError: this.onError });
@@ -130,7 +130,7 @@ export class WaypointHudService {
         player: Player,
         id: string,
         waypoints: ReadonlyMap<string, readonly Waypoint[]>,
-        opManager: OpManager | undefined
+        opManager: OpManager | undefined,
     ): void {
         let java = undefined as ReturnType<Player['asJava']>;
         let world: ReturnType<Player['getWorld']> | undefined;
@@ -170,9 +170,9 @@ export class WaypointHudService {
                     hasPermission: (node) => player.hasPermission(node),
                     createEntityUuid: uuid.generate,
                     encodeTextComponent,
-                    sendPacket: (packet) => java?.sendPacket(packet)
+                    sendPacket: (packet) => java?.sendPacket(packet),
                 },
-                waypoints.get(dimension) ?? []
+                waypoints.get(dimension) ?? [],
             );
         } finally {
             disposeWasiResource(entity);

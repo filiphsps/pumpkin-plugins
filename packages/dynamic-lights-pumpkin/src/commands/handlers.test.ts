@@ -9,7 +9,7 @@ describe(commandHandlers.name, () => {
             togglePlayerLights: (player) => {
                 toggled.push(player.getName());
                 return false;
-            }
+            },
         });
 
         expect(handlers.dynamiclights(playerSender('Alex'))).toEqual(['Dynamic lights disabled.']);
@@ -20,7 +20,7 @@ describe(commandHandlers.name, () => {
         const handlers = commandHandlers({ togglePlayerLights: () => true });
 
         expect(handlers.dynamiclights({ asPlayer: () => null } as unknown as CommandSender)).toEqual([
-            { text: 'This command can only be used by a player.', tone: 'error' }
+            { text: 'This command can only be used by a player.', tone: 'error' },
         ]);
     });
 });

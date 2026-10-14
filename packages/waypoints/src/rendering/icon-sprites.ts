@@ -147,5 +147,5 @@ export const BLOCK_ICON_SPRITES: { readonly [key: string]: string } = {
     white_tulip: 'block/white_tulip',
     wither_rose: 'block/wither_rose',
     yellow_shulker_box: 'block/yellow_shulker_box',
-    yellow_stained_glass_pane: 'block/yellow_stained_glass'
+    yellow_stained_glass_pane: 'block/yellow_stained_glass',
 };

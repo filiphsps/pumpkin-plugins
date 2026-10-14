@@ -11,20 +11,20 @@ export interface WitGenerationInput {
     analysis: WitAnalysis;
     /** Resolved Pumpkin package used to emit API dispatch and enum constants. */
     apiPackage: WitApiPackage;
-    /** Resolved WASI interfaces to pass to native adapter generation. */
-    wasiInterfaces: readonly WitWasiInterface[];
     /** Generated `plugin.h` used to validate native enum constants. */
     pluginHeader: string;
     /** Runtime C++ template containing the generator marker comments. */
     runtimeTemplate: string;
+    /** Resolved WASI interfaces to pass to native adapter generation. */
+    wasiInterfaces: readonly WitWasiInterface[];
 }
 
 /** Generated runtime source and API enum header ready for component compilation. */
 export interface WitGenerationOutput {
-    /** Runtime C++ source with generated dispatch and WASI adapters inserted. */
-    runtimeSource: string;
     /** C header defining the API enum constants used by the generated bindings. */
     apiEnumHeader: string;
+    /** Runtime C++ source with generated dispatch and WASI adapters inserted. */
+    runtimeSource: string;
 }
 
 /**
@@ -42,28 +42,28 @@ export function generateWitOutputs(input: WitGenerationInput): WitGenerationOutp
     runtimeSource = replaceMarker(
         runtimeSource,
         '/* <PUMPKIN_WASI_INITIALIZATION> */',
-        'installGeneratedWasiApiFunctions(*jsRuntime);'
+        'installGeneratedWasiApiFunctions(*jsRuntime);',
     );
     runtimeSource = replaceMarker(
         runtimeSource,
         '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
-        emitPumpkinMethodDispatch(input.apiPackage, input.analysis)
+        emitPumpkinMethodDispatch(input.apiPackage, input.analysis),
     );
     runtimeSource = replaceMarker(
         runtimeSource,
         '/* <PUMPKIN_WIT_EVENT_DISPATCH> */',
-        emitEventDispatch(input.apiPackage, input.analysis)
+        emitEventDispatch(input.apiPackage, input.analysis),
     );
     if (runtimeSource.includes('/* <PUMPKIN_WIT_EVENT_RESULT> */')) {
         runtimeSource = replaceMarker(
             runtimeSource,
             '/* <PUMPKIN_WIT_EVENT_RESULT> */',
-            generateWitEventResultDispatch(input.apiPackage, input.analysis.eventFields)
+            generateWitEventResultDispatch(input.apiPackage, input.analysis.eventFields),
         );
     }
     return {
         runtimeSource,
-        apiEnumHeader: generateApiEnumHeader(input.apiPackage, input.pluginHeader)
+        apiEnumHeader: generateApiEnumHeader(input.apiPackage, input.pluginHeader),
     };
 }
 
@@ -94,7 +94,7 @@ function generateApiEnumHeader(apiPackage: WitApiPackage, pluginHeader: string):
         ['eventTypes', 'event', 'event-type', 'PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_'],
         ['eventPriorities', 'event', 'event-priority', 'PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_'],
         ['gameRules', 'game-rules', 'game-rule', 'PUMPKIN_PLUGIN_GAME_RULES_GAME_RULE_'],
-        ['namedColors', 'common', 'named-color', 'PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_']
+        ['namedColors', 'common', 'named-color', 'PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_'],
     ] as const;
     const entries = enumSpecs.map(([name, interfaceName, enumName, prefix]) => {
         const apiInterface = apiPackage.interfaces.find((candidate) => candidate.name === interfaceName);
@@ -125,7 +125,7 @@ ${entries
     .map(
         ({ name, values }) => `inline constexpr std::array<EnumEntry, ${values.length}> ${name}{{
 ${values.map(({ variant, cName }) => `  {"${variant}", ${cName}},`).join('\n')}
-}};`
+}};`,
     )
     .join('\n\n')}
 } // namespace pumpkin_static_api

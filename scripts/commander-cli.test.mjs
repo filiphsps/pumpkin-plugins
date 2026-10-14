@@ -23,7 +23,7 @@ const cliScripts = [
     'tools/pumpkin-api/scripts/gen-types.mjs',
     'tools/static-hermes-runtime/test/oracles/generate-api-enums.mjs',
     'tools/static-hermes-runtime/test/oracles/generate-runtime.mjs',
-    'packages/waypoints/scripts/generate-icon-sprites.mjs'
+    'packages/waypoints/scripts/generate-icon-sprites.mjs',
 ];
 
 it('prints help for each repository CLI', () => {
@@ -31,7 +31,7 @@ it('prints help for each repository CLI', () => {
         const result = spawnSync(process.execPath, [path.join(repositoryRoot, script), '--help'], {
             cwd: repositoryRoot,
             encoding: 'utf8',
-            timeout: 5000
+            timeout: 5000,
         });
         const output = `${result.stdout}${result.stderr}`;
         assert.equal(result.status, 0, `${script} --help failed:\n${output}`);

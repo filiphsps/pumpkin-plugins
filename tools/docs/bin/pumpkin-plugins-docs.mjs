@@ -8,7 +8,7 @@ import {
     generateActionVersions,
     generateDocuments,
     generatePluginReadme,
-    generateRootReadme
+    generateRootReadme,
 } from '../src/node.ts';
 
 const program = new Command()
@@ -17,7 +17,7 @@ const program = new Command()
     .addArgument(
         new Argument('[command]', 'Documentation target')
             .choices(['plugin', 'root', 'generate', 'actions', 'action-versions'])
-            .default('plugin')
+            .default('plugin'),
     )
     .addArgument(new Argument('[module]', 'Custom documents module; used with generate'))
     .option('--check', 'Check generated documentation without writing files')

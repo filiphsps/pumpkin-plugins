@@ -2,14 +2,14 @@ import { stripAnsi } from './util.ts';
 
 /** How a wait for a log line ends when the line never comes. */
 export interface WaitOptions {
-    /** Give up after this many milliseconds. */
-    timeoutMs: number;
     /** Only consider lines from this index on. */
     fromIndex: number;
     /** Whether the process has ended, so waiting is pointless. */
     isOver: () => boolean;
     /** What the process is, for the error message. */
     process: string;
+    /** Give up after this many milliseconds. */
+    timeoutMs: number;
 }
 
 /** Collects a process's output line by line, without color codes, and lets tests wait for a line. */

@@ -40,7 +40,7 @@ describe('waypoint commands', () => {
             '/wp set label <name> <label>',
             '/wp set description <name> <description>',
             '/wp set visibility-range <name> <range>',
-            '/wp reset <property> <name>'
+            '/wp reset <property> <name>',
         ]);
         expect(usages.some((usage) => /mark|locator|send|show|admin/.test(usage))).toBe(false);
     });
@@ -49,30 +49,30 @@ describe('waypoint commands', () => {
         const infos = commandInfos(commands);
         expect(infos.find(({ usage }) => usage === '/wp list')).toMatchObject({
             permission: COMMAND_PERMISSION,
-            defaultPermission: { tag: 'allow' }
+            defaultPermission: { tag: 'allow' },
         });
         expect(infos.find(({ usage }) => usage === '/wp info <name>')).toMatchObject({
             permission: COMMAND_PERMISSION,
-            defaultPermission: { tag: 'allow' }
+            defaultPermission: { tag: 'allow' },
         });
         expect(infos.find(({ usage }) => usage === '/wp create <name> <x> <y> <z>')).toMatchObject({
             permission: ADMIN_PERMISSION,
-            defaultPermission: { tag: 'op' }
+            defaultPermission: { tag: 'op' },
         });
         expect(infos.find(({ usage }) => usage === '/wp reload')).toMatchObject({
             permission: ADMIN_PERMISSION,
-            defaultPermission: { tag: 'op' }
+            defaultPermission: { tag: 'op' },
         });
         expect(infos.find(({ usage }) => usage === '/wp access grant permission <name> <permission>')).toMatchObject({
             permission: ADMIN_PERMISSION,
-            defaultPermission: { tag: 'op' }
+            defaultPermission: { tag: 'op' },
         });
     });
 
     it('uses Pumpkin item arguments for icon IDs and autocomplete', () => {
         expect(commands.wp.subcommands.set.subcommands.icon.arguments[1]).toEqual({
             name: 'item',
-            type: 'item'
+            type: 'item',
         });
     });
 });

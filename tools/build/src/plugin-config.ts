@@ -13,20 +13,20 @@ export type StaticHermesGc = StaticHermesGcVariant;
 
 /** What a package declares under `pumpkinPlugin` in its `package.json`. */
 export interface PluginBuildConfig {
+    /** JavaScript runtime used for the component. Defaults to Static Hermes. */
+    engine: PluginEngine;
     /** Source file to bundle. Only needed to build a `.wasm`. */
     entry?: string;
     /** Where to write the `.wasm`. Only needed to build one. */
     output?: string;
-    /** WASI capabilities the code uses. */
-    wasi: Capability[];
-    /** JavaScript runtime used for the component. Defaults to Static Hermes. */
-    engine: PluginEngine;
-    /** Optional Static Hermes VM profile. Lean omits runtime bytecode generation. */
-    staticHermesRuntime?: StaticHermesRuntime;
     /** Static Hermes garbage collector. Defaults to Hades. */
     staticHermesGc?: StaticHermesGc;
+    /** Optional Static Hermes VM profile. Lean omits runtime bytecode generation. */
+    staticHermesRuntime?: StaticHermesRuntime;
     /** The package's version, injected as `__PLUGIN_VERSION__`. */
     version: string;
+    /** WASI capabilities the code uses. */
+    wasi: Capability[];
 }
 
 /**
@@ -106,7 +106,7 @@ export function readPluginConfig(pluginDir: string): PluginBuildConfig {
         ...(staticHermesRuntime === undefined ? {} : { staticHermesRuntime }),
         ...(staticHermesGc === undefined ? {} : { staticHermesGc }),
         wasi,
-        version: pkg.version
+        version: pkg.version,
     };
 }
 
@@ -122,7 +122,7 @@ export function requireBuildFields(config: PluginBuildConfig): { entry: string; 
     }
     return {
         entry: requiredRelativePath(config.entry, 'entry'),
-        output: requiredRelativePath(config.output, 'output')
+        output: requiredRelativePath(config.output, 'output'),
     };
 }
 

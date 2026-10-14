@@ -17,7 +17,7 @@ function fixture(t) {
     const run = (...args) =>
         spawnSync(process.execPath, [script, ...args], {
             env: { ...process.env, PUMPKIN_PLUGINS_ROOT: root },
-            encoding: 'utf8'
+            encoding: 'utf8',
         });
     assert.equal(run('--fix').status, 0);
     return { root, file, run };
@@ -55,8 +55,8 @@ test('does not package a source bin directory when the CLI is compiled under dis
             name: '@pumpkin-plugins/static-hermes-runtime',
             description: 'Static Hermes runtime',
             exports: { '.': './src/index.ts' },
-            bin: { 'static-hermes-runtime': 'dist/cli.js' }
-        })
+            bin: { 'static-hermes-runtime': 'dist/cli.js' },
+        }),
     );
 
     assert.equal(run('--fix').status, 0);
@@ -74,7 +74,7 @@ test('does not package a source bin directory when the CLI is compiled under dis
         'hermes-source.lock.json',
         'toolchain-versions.json',
         'wasi-sdk.lock.json',
-        'README.md'
+        'README.md',
     ]);
 });
 
@@ -85,7 +85,7 @@ test('preserves each published tool package file allowlist when metadata is fixe
             name: '@pumpkin-plugins/build',
             description: 'Build Pumpkin plugins',
             bin: { 'pumpkin-plugins-build': 'dist/cli.js' },
-            files: ['dist', 'runtime', 'wasi-wit.lock.json']
+            files: ['dist', 'runtime', 'wasi-wit.lock.json'],
         },
         'tools/pumpkin-api': {
             name: '@pumpkin-plugins/pumpkin-api',
@@ -102,14 +102,14 @@ test('preserves each published tool package file allowlist when metadata is fixe
                 'compatibility',
                 'docs',
                 'README.md',
-                'LICENSE'
-            ]
+                'LICENSE',
+            ],
         },
         'tools/create-pumpkin-plugin': {
             name: 'create-pumpkin-plugin',
             description: 'Create a minimal Pumpkin plugin project',
             bin: { 'create-pumpkin-plugin': 'dist/create-pumpkin-plugin.js' },
-            files: ['bin/create-pumpkin-plugin.ts', 'dist', 'templates', 'README.md']
+            files: ['bin/create-pumpkin-plugin.ts', 'dist', 'templates', 'README.md'],
         },
         'tools/static-hermes-runtime': {
             name: '@pumpkin-plugins/static-hermes-runtime',
@@ -128,9 +128,9 @@ test('preserves each published tool package file allowlist when metadata is fixe
                 'hermes-source.lock.json',
                 'toolchain-versions.json',
                 'wasi-sdk.lock.json',
-                'README.md'
-            ]
-        }
+                'README.md',
+            ],
+        },
     };
 
     for (const [directory, manifest] of Object.entries(packages)) {

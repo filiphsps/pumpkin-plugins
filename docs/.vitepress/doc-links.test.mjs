@@ -9,9 +9,9 @@ function transformLinks(relativePath, hrefs) {
             ruler: {
                 push(_name, rule) {
                     rules.push(rule);
-                }
-            }
-        }
+                },
+            },
+        },
     };
     const links = hrefs.map((href) => ({
         type: 'link_open',
@@ -21,7 +21,7 @@ function transformLinks(relativePath, hrefs) {
         },
         attrSet(name, value) {
             if (name === 'href') this.href = value;
-        }
+        },
     }));
     const state = { env: { relativePath }, tokens: [{ children: links }] };
 
@@ -37,13 +37,13 @@ it('rewrites repository guide links to site routes and preserves other links', (
             '../../../docs/building.md',
             '../../../docs/creating-a-plugin.md#files-and-network-access',
             '../README.md',
-            'https://example.com/guide'
+            'https://example.com/guide',
         ]),
         [
             '/guides/building',
             '/guides/creating-a-plugin#files-and-network-access',
             '../README.md',
-            'https://example.com/guide'
-        ]
+            'https://example.com/guide',
+        ],
     );
 });

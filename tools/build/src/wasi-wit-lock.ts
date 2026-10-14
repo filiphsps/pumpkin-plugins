@@ -51,7 +51,7 @@ export async function withWasiWitFileLock<T>(lockPath: string, operation: () => 
             if (Date.now() >= deadline) {
                 if (fs.existsSync(reclaimLockPath)) {
                     throw new BuildError(
-                        `timed out waiting for the WASI WIT cache lock at ${lockPath}; inspect recovery claim ${reclaimLockPath} and remove it only after confirming no recovery is active`
+                        `timed out waiting for the WASI WIT cache lock at ${lockPath}; inspect recovery claim ${reclaimLockPath} and remove it only after confirming no recovery is active`,
                     );
                 }
                 throw new BuildError(`timed out waiting for the WASI WIT cache lock at ${lockPath}`);
@@ -66,7 +66,7 @@ export async function withWasiWitFileLock<T>(lockPath: string, operation: () => 
 async function operationWithWasiWitLock<T>(
     lockPath: string,
     ownerToken: string,
-    operation: () => T | Promise<T>
+    operation: () => T | Promise<T>,
 ): Promise<T> {
     try {
         return await operation();
@@ -95,7 +95,7 @@ function writeWasiWitLock(lockPath: string, ownerToken: string): void {
                 removeWasiWitLockIfOwned(lockPath, createdFile);
             } catch (cleanupError) {
                 throw new AggregateError([error, cleanupError], 'failed to write and clean up the WASI WIT lock', {
-                    cause: error
+                    cause: error,
                 });
             }
         }

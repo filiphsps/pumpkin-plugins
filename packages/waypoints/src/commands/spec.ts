@@ -21,13 +21,13 @@ const coordinate = { min: -30_000_000, max: 30_000_000 } as const;
 
 function admin<const Arguments extends readonly [CommandArgumentSpec, ...CommandArgumentSpec[]]>(
     description_: string,
-    arguments_: Arguments
+    arguments_: Arguments,
 ) {
     return {
         description: description_,
         permission: ADMIN_PERMISSION,
         defaultPermission: ADMIN_DEFAULT,
-        arguments: arguments_
+        arguments: arguments_,
     } as const;
 }
 
@@ -37,8 +37,8 @@ const namedCoordinateVariants = [
         name,
         { name: 'x', type: 'double', ...coordinate },
         { name: 'y', type: 'double' },
-        { name: 'z', type: 'double', ...coordinate }
-    ]
+        { name: 'z', type: 'double', ...coordinate },
+    ],
 ] as const;
 const teleportVariants = [[name], [name, { name: 'targets', type: 'players' }]] as const;
 
@@ -53,12 +53,12 @@ export const commands = defineCommands(PLUGIN_NAME, {
                 description: 'Create a waypoint at your position or explicit coordinates',
                 permission: ADMIN_PERMISSION,
                 defaultPermission: ADMIN_DEFAULT,
-                argumentVariants: namedCoordinateVariants
+                argumentVariants: namedCoordinateVariants,
             },
             reload: {
                 description: 'Reload waypoint data from disk',
                 permission: ADMIN_PERMISSION,
-                defaultPermission: ADMIN_DEFAULT
+                defaultPermission: ADMIN_DEFAULT,
             },
             delete: admin('Delete a waypoint by name', [name]),
             rename: admin('Rename a waypoint', [name, newName]),
@@ -66,17 +66,17 @@ export const commands = defineCommands(PLUGIN_NAME, {
                 description: 'Move a waypoint to your position or explicit coordinates',
                 permission: ADMIN_PERMISSION,
                 defaultPermission: ADMIN_DEFAULT,
-                argumentVariants: namedCoordinateVariants
+                argumentVariants: namedCoordinateVariants,
             },
             list: { description: 'List enabled waypoints you can access' },
             info: { description: 'Show details for an enabled waypoint you can access', arguments: [name] },
             teleport: {
                 description: 'Teleport to a waypoint or, as an operator, teleport selected players',
-                argumentVariants: teleportVariants
+                argumentVariants: teleportVariants,
             },
             tp: {
                 description: 'Alias for teleport',
-                argumentVariants: teleportVariants
+                argumentVariants: teleportVariants,
             },
             enable: admin('Enable a waypoint', [name]),
             disable: admin('Disable a waypoint', [name]),
@@ -92,18 +92,18 @@ export const commands = defineCommands(PLUGIN_NAME, {
                         subcommands: {
                             player: admin('Grant access to an online player', [name, player]),
                             permission: admin('Grant access to a permission node', [name, permission]),
-                            group: admin('Grant access to a permission marker group', [name, group])
-                        }
+                            group: admin('Grant access to a permission marker group', [name, group]),
+                        },
                     },
                     revoke: {
                         description: 'Remove an access grant',
                         subcommands: {
                             player: admin('Revoke an online player grant', [name, player]),
                             permission: admin('Revoke a permission node grant', [name, permission]),
-                            group: admin('Revoke a permission marker group grant', [name, group])
-                        }
-                    }
-                }
+                            group: admin('Revoke a permission marker group grant', [name, group]),
+                        },
+                    },
+                },
             },
             set: {
                 description: 'Set waypoint metadata',
@@ -114,14 +114,14 @@ export const commands = defineCommands(PLUGIN_NAME, {
                     description: admin('Set the waypoint description', [name, description]),
                     'visibility-range': admin('Set the waypoint rendering range in blocks', [
                         name,
-                        { name: 'range', type: 'double', min: Number.MIN_VALUE, max: 30_000_000 }
-                    ])
-                }
+                        { name: 'range', type: 'double', min: Number.MIN_VALUE, max: 30_000_000 },
+                    ]),
+                },
             },
             reset: admin('Reset one mutable waypoint property to its default', [
                 { name: 'property', type: 'string', mode: 'single-word' },
-                name
-            ])
-        }
-    }
+                name,
+            ]),
+        },
+    },
 });

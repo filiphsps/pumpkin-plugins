@@ -15,10 +15,10 @@ export interface ScanResult {
 }
 
 interface CacheEntry {
-    size: number;
     modified: number;
     outcome: ScanResult;
     reservations: string;
+    size: number;
 }
 
 const isMcpack = (name: string) => /\.mcpack$/i.test(name);
@@ -74,7 +74,7 @@ export class PackScanner {
                     size: info.size,
                     modified: info.modified,
                     reservations,
-                    outcome: this.read(directory, source, info, taken)
+                    outcome: this.read(directory, source, info, taken),
                 };
                 this.cache.set(source, entry);
             }
@@ -100,7 +100,7 @@ export class PackScanner {
         directory: string,
         source: string,
         info: { size: number; modified: number },
-        taken: ReadonlyMap<string, string>
+        taken: ReadonlyMap<string, string>,
     ): ScanResult {
         const path = `${directory}/${source}`;
         try {
@@ -109,7 +109,7 @@ export class PackScanner {
                 const manifest = readManifest(bytes);
                 return {
                     packs: [{ fileName: source, path, size: info.size, modified: info.modified, manifest }],
-                    problems: []
+                    problems: [],
                 };
             }
             return this.extract(directory, source, info.modified, bytes, taken);
@@ -124,7 +124,7 @@ export class PackScanner {
         source: string,
         modified: number,
         bytes: Uint8Array,
-        taken: ReadonlyMap<string, string>
+        taken: ReadonlyMap<string, string>,
     ): ScanResult {
         const { packs: found, skipped } = readAddon(bytes);
         const problems = skipped.map((s) => `${source}: left out ${s}`);

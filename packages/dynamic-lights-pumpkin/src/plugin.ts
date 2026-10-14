@@ -13,7 +13,7 @@ import type {
     PlayerMoveEventData,
     PlayerRespawnEventData,
     PlayerSwapHandsEventData,
-    PlayerTeleportEventData
+    PlayerTeleportEventData,
 } from 'pumpkin:plugin/event@0.1.0';
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
@@ -67,7 +67,7 @@ class DynamicLightsPumpkin extends PluginBase {
             return;
         }
         const config = loadPluginConfig(files, (level, message) =>
-            logging.log(level, `${ansi.named.name(info.name)}: ${message}`)
+            logging.log(level, `${ansi.named.name(info.name)}: ${message}`),
         );
         const journal = new LightJournal(files);
         this.preferences = new PlayerLightPreferences(files);
@@ -80,10 +80,10 @@ class DynamicLightsPumpkin extends PluginBase {
         if (config.entities.enabled) {
             logging.log(
                 'info',
-                `${ansi.named.name(info.name)} entity lights enabled for ${ansi.named.number(this.entityLevels.size)} type${this.entityLevels.size === 1 ? '' : 's'} every ${ansi.named.number(config.entities.refresh_interval_ticks)} ticks`
+                `${ansi.named.name(info.name)} entity lights enabled for ${ansi.named.number(this.entityLevels.size)} type${this.entityLevels.size === 1 ? '' : 's'} every ${ansi.named.number(config.entities.refresh_interval_ticks)} ticks`,
             );
             this.entityTask = scheduleRepeating(config.entities.refresh_interval_ticks, (server) =>
-                this.syncEntityLights(server)
+                this.syncEntityLights(server),
             );
         }
 
@@ -113,7 +113,7 @@ class DynamicLightsPumpkin extends PluginBase {
             'inventory-click-event',
             'inventory-close-event',
             'inventory-creative-event',
-            'inventory-drag-event'
+            'inventory-drag-event',
         ] as const) {
             this.registerEvent(ctx, eventType, (_server, event) => {
                 this.deferPlayerSync(event.player.getName());
@@ -145,7 +145,7 @@ class DynamicLightsPumpkin extends PluginBase {
                 const worldId = playerWorldId(event.player);
                 this.defer((server) => this.recordPlayerDrop(server, playerName, level, worldId, previous));
             },
-            'lowest'
+            'lowest',
         );
         this.registerEvent(
             ctx,
@@ -153,7 +153,7 @@ class DynamicLightsPumpkin extends PluginBase {
             (_server, event: ItemSpawnEventData) => {
                 if (!event.cancelled) this.droppedItemLevels?.recordSpawn(event.entityId, event.itemName);
             },
-            'lowest'
+            'lowest',
         );
         this.registerEvent(
             ctx,
@@ -161,7 +161,7 @@ class DynamicLightsPumpkin extends PluginBase {
             (_server, event: ItemMergeEventData) => {
                 if (!event.cancelled) this.droppedItemLevels?.merge(event.entityId, event.targetId);
             },
-            'lowest'
+            'lowest',
         );
         this.registerEvent(
             ctx,
@@ -169,7 +169,7 @@ class DynamicLightsPumpkin extends PluginBase {
             (_server, event: ItemDespawnEventData) => {
                 if (!event.cancelled) this.droppedItemLevels?.remove(event.entityId);
             },
-            'lowest'
+            'lowest',
         );
         this.registerEvent(ctx, 'entity-remove-event', (_server, event: EntityRemoveEventData) => {
             this.droppedItemLevels?.remove(event.entityId);
@@ -185,7 +185,7 @@ class DynamicLightsPumpkin extends PluginBase {
             if (recovered > 0)
                 logging.log(
                     'warn',
-                    `${ansi.named.name(info.name)} restored ${ansi.named.number(recovered)} stale temporary light level${recovered === 1 ? '' : 's'}`
+                    `${ansi.named.name(info.name)} restored ${ansi.named.number(recovered)} stale temporary light level${recovered === 1 ? '' : 's'}`,
                 );
             const players = server.getAllPlayers();
             try {
@@ -291,7 +291,7 @@ class DynamicLightsPumpkin extends PluginBase {
         }
         const lights = readEntityLights(
             player,
-            (entity) => this.droppedItemLevels?.level(entity.getId()) ?? this.entityLevels.get(entity.getType()) ?? 0
+            (entity) => this.droppedItemLevels?.level(entity.getId()) ?? this.entityLevels.get(entity.getType()) ?? 0,
         );
         this.observeWorld(playerName, lights.worldId);
         this.entityTracker?.sync(playerName, player, lights.visible);
@@ -302,7 +302,7 @@ class DynamicLightsPumpkin extends PluginBase {
         playerName: string,
         level: number,
         worldId: string,
-        previous: ReadonlySet<number>
+        previous: ReadonlySet<number>,
     ): void {
         const player = server.getPlayerByName(playerName);
         if (player == null) return;

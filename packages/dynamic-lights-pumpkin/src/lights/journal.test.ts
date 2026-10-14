@@ -11,7 +11,7 @@ describe(LightJournal.name, () => {
         [block(0, 64, 0), -1, 14],
         [block(0, 64, 0), 16, 14],
         [block(0, 64, 0), 0, 14.5],
-        [block(0, 64, 0), 0, 16]
+        [block(0, 64, 0), 0, 16],
     ] as const)('rejects invalid recovery coordinates or light levels: %j, %s, %s', (position, original, applied) => {
         const files = new MemoryFiles();
         const world = new FakeWorld();
@@ -71,10 +71,10 @@ function writeJournal(files: MemoryFiles, position: BlockPosition, originalLevel
                     worldId: 'overworld',
                     position,
                     originalLevel,
-                    appliedLevels: [appliedLevel]
-                }
-            ])
-        )
+                    appliedLevels: [appliedLevel],
+                },
+            ]),
+        ),
     );
 }
 

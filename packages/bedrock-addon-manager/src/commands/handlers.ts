@@ -13,6 +13,6 @@ export function commandHandlers(manager: PackManager): CommandHandlers<typeof co
         'baddon reload': () => {
             manager.reload();
             return reloadLines(manager.entries.length);
-        }
+        },
     };
 }

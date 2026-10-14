@@ -51,9 +51,9 @@ const components = new Map([
             type: 'action',
             version: fs.existsSync(path.join(root, dir, 'version.txt'))
                 ? fs.readFileSync(path.join(root, dir, 'version.txt'), 'utf8').trim()
-                : ''
-        }
-    ])
+                : '',
+        },
+    ]),
 ]);
 
 const FIRST_VERSION_BASE = '0.0.0';
@@ -68,12 +68,12 @@ if (config['always-update'] !== true) {
 }
 if (config['force-tag-creation'] !== true) {
     problems.push(
-        'release-please-config.json needs "force-tag-creation": true so the next run finds the previous release'
+        'release-please-config.json needs "force-tag-creation": true so the next run finds the previous release',
     );
 }
 for (const [option, behavior] of [
     ['bump-minor-pre-major', 'breaking changes bump the minor version below 1.0.0'],
-    ['bump-patch-for-minor-pre-major', 'features bump the patch version below 1.0.0']
+    ['bump-patch-for-minor-pre-major', 'features bump the patch version below 1.0.0'],
 ]) {
     if (config[option] !== true) {
         problems.push(`release-please-config.json needs "${option}": true so ${behavior}`);
@@ -90,11 +90,11 @@ for (const [dir, { type, version }] of components) {
     const entry = config.packages?.[dir];
     if (!entry) {
         problems.push(
-            `${dir} is not in release-please-config.json. Add under "packages": "${dir}": { "component": "${name}" }`
+            `${dir} is not in release-please-config.json. Add under "packages": "${dir}": { "component": "${name}" }`,
         );
     } else if (entry.component !== name) {
         problems.push(
-            `${dir} needs "component": "${name}" in release-please-config.json (it becomes the tag prefix, ${name}-v<version>)`
+            `${dir} needs "component": "${name}" in release-please-config.json (it becomes the tag prefix, ${name}-v<version>)`,
         );
     }
     if (type === 'action' && entry?.['release-type'] !== 'simple') {
@@ -106,15 +106,15 @@ for (const [dir, { type, version }] of components) {
     const releaseAs = entry?.['release-as'];
     if (type === 'tool' && entry && manifest[dir] === FIRST_VERSION_BASE && releaseAs !== FIRST_TOOL_RELEASE) {
         problems.push(
-            `${dir} has not been released yet, so it needs "release-as": "${FIRST_TOOL_RELEASE}" in release-please-config.json to make its first release ${FIRST_TOOL_RELEASE}`
+            `${dir} has not been released yet, so it needs "release-as": "${FIRST_TOOL_RELEASE}" in release-please-config.json to make its first release ${FIRST_TOOL_RELEASE}`,
         );
     } else if (entry && type !== 'tool' && manifest[dir] === FIRST_VERSION_BASE && releaseAs !== FIRST_RELEASE) {
         problems.push(
-            `${dir} has not been released yet, so it needs "release-as": "${FIRST_RELEASE}" in release-please-config.json to make its first release ${FIRST_RELEASE}`
+            `${dir} has not been released yet, so it needs "release-as": "${FIRST_RELEASE}" in release-please-config.json to make its first release ${FIRST_RELEASE}`,
         );
     } else if (entry && manifest[dir] !== FIRST_VERSION_BASE && releaseAs !== undefined) {
         problems.push(
-            `${dir} is released (${manifest[dir]}), so remove "release-as" from release-please-config.json: it would pin every later release to ${releaseAs}`
+            `${dir} is released (${manifest[dir]}), so remove "release-as" from release-please-config.json: it would pin every later release to ${releaseAs}`,
         );
     }
 
@@ -126,7 +126,7 @@ for (const [dir, { type, version }] of components) {
         }
     } else if (manifest[dir] !== version) {
         problems.push(
-            `.release-please-manifest.json has "${dir}": "${manifest[dir]}" but ${type === 'action' ? `${dir}/version.txt` : `${dir}/package.json`} is "${version}". They must match: release-please updates both on every release`
+            `.release-please-manifest.json has "${dir}": "${manifest[dir]}" but ${type === 'action' ? `${dir}/version.txt` : `${dir}/package.json`} is "${version}". They must match: release-please updates both on every release`,
         );
     }
 }
@@ -144,5 +144,5 @@ if (problems.length) {
 }
 const pausedSummary = pausedPlugins.size ? `; ${pausedPlugins.size} paused: ${[...pausedPlugins].join(', ')}` : '';
 console.log(
-    `Release config covers ${plugins.length} plugin${plugins.length === 1 ? '' : 's'}, ${actions.length} action${actions.length === 1 ? '' : 's'}, and ${tools.length} public tool${tools.length === 1 ? '' : 's'}: ${[...components.keys()].join(', ')}${pausedSummary}`
+    `Release config covers ${plugins.length} plugin${plugins.length === 1 ? '' : 's'}, ${actions.length} action${actions.length === 1 ? '' : 's'}, and ${tools.length} public tool${tools.length === 1 ? '' : 's'}: ${[...components.keys()].join(', ')}${pausedSummary}`,
 );

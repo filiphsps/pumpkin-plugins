@@ -38,7 +38,7 @@ export function acquireChunk<T>(
     position: ChunkPosition,
     getLoadedChunk: () => T | null | undefined,
     loader: ChunkLoader,
-    generator: TerrainGenerator
+    generator: TerrainGenerator,
 ): ChunkAcquisition<NonNullable<T>> {
     const loaded = getLoadedChunk();
     if (loaded !== undefined && loaded !== null) return { status: 'ready', chunk: loaded };
@@ -64,10 +64,10 @@ export function acquireChunk<T>(
 
 /** Provider stubs for platforms without saved-chunk loading support. */
 export const unavailableChunkLoader: ChunkLoader = {
-    load: () => ({ status: 'unavailable', reason: 'Saved chunk loading is unavailable' })
+    load: () => ({ status: 'unavailable', reason: 'Saved chunk loading is unavailable' }),
 };
 
 /** Provider stubs for platforms without terrain-generation support. */
 export const unavailableTerrainGenerator: TerrainGenerator = {
-    generate: () => ({ status: 'unavailable', reason: 'Terrain generation is unavailable' })
+    generate: () => ({ status: 'unavailable', reason: 'Terrain generation is unavailable' }),
 };

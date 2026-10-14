@@ -42,7 +42,7 @@ describe('plugin README', { timeout: 15000 }, () => {
         put('p/README.md', README);
         put(
             'p/src/info.ts',
-            plugin('Demo', 'Does demo things.', ', commands: [{ usage: "/demo list", description: "List" }]')
+            plugin('Demo', 'Does demo things.', ', commands: [{ usage: "/demo list", description: "List" }]'),
         );
     });
 
@@ -66,8 +66,8 @@ describe('plugin README', { timeout: 15000 }, () => {
             plugin(
                 'Demo',
                 'Does demo things.',
-                ', commands: [{ usage: "/demo list", description: "List" }, { usage: "/demo reload", description: "Reload" }]'
-            )
+                ', commands: [{ usage: "/demo list", description: "List" }, { usage: "/demo reload", description: "Reload" }]',
+            ),
         );
         const updated = run(p);
         expect(updated.status).toBe(0);
@@ -141,7 +141,7 @@ describe('root README', { timeout: 15000 }, () => {
         put('LICENSE', 'Root MIT license');
         put(
             'packages/alpha/package.json',
-            '{"name":"@x/alpha","description":"ignored, info wins","license":"MIT","type":"module"}'
+            '{"name":"@x/alpha","description":"ignored, info wins","license":"MIT","type":"module"}',
         );
         put('packages/alpha/src/info.ts', plugin('Alpha', 'Alpha plugin.'));
         put('packages/beta/package.json', '{"name":"@x/beta","description":"Beta from package.json","license":"MIT"}');
@@ -184,7 +184,7 @@ describe('root README', { timeout: 15000 }, () => {
     it('lists action metadata and detects changes without writing in check mode', () => {
         put(
             'actions/sign/action.yml',
-            'name: Sign plugin\ndescription: Add the plugin release signature\nruns:\n  using: node24\n'
+            'name: Sign plugin\ndescription: Add the plugin release signature\nruns:\n  using: node24\n',
         );
         put('actions/sign/README.md', '# Sign plugin\n');
         put('actions/not-an-action/README.md', '# Not an action\n');
@@ -203,7 +203,7 @@ describe('root README', { timeout: 15000 }, () => {
 
         put(
             'actions/sign/action.yml',
-            'name: Sign plugin\ndescription: Verify the plugin release signature\nruns:\n  using: node24\n'
+            'name: Sign plugin\ndescription: Verify the plugin release signature\nruns:\n  using: node24\n',
         );
         const stale = run(dir, 'root', '--check');
         expect(stale.status).toBe(1);
@@ -239,7 +239,7 @@ describe('root README', { timeout: 15000 }, () => {
             expect(run(dir, 'root').status).toBe(0);
             const generated = read('README.md');
             expect(generated).toContain(
-                `| [Alpha](packages/alpha) | Alpha plugin. | [LGPL-3.0-only](packages/alpha/${file}) |`
+                `| [Alpha](packages/alpha) | Alpha plugin. | [LGPL-3.0-only](packages/alpha/${file}) |`,
             );
             expect(generated).toContain(`| [@x/build](tools/build) | Builds | [MIT](tools/build/${file}) |`);
             expect(generated).toContain('| [@x/beta](packages/beta) | Beta from package.json | MIT |');
@@ -252,7 +252,7 @@ describe('root README', { timeout: 15000 }, () => {
             expect(run(dir, 'root').status).toBe(0);
             expect(read('README.md')).toContain('| [Alpha](packages/alpha) | Alpha plugin. | LGPL-3.0-only |');
             expect(read('README.md')).toContain('| [@x/build](tools/build) | Builds | MIT |');
-        }
+        },
     );
 
     it('ignores a directory named LICENSE and detects license metadata changes', () => {
@@ -286,7 +286,7 @@ describe('custom document CLI', () => {
             fs.writeFileSync(path.join(root, 'README.md'), readme);
             fs.writeFileSync(
                 path.join(root, 'docs.ts'),
-                'export const documents = [{ file: "README.md", blocks: { facts: "Fresh" }, note: "" }];'
+                'export const documents = [{ file: "README.md", blocks: { facts: "Fresh" }, note: "" }];',
             );
             const stale = run(root, 'generate', 'docs.ts', '--check');
             expect(stale.status).toBe(1);

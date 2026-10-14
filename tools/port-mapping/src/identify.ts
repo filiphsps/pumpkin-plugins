@@ -25,7 +25,7 @@ export class RouterRefusedError extends Error {
     /** Creates the error. */
     constructor(
         readonly reason: string,
-        readonly identity: RouterIdentity
+        readonly identity: RouterIdentity,
     ) {
         super(reason);
     }
@@ -44,10 +44,10 @@ export function describeIdentity({ manufacturer, model, name }: RouterIdentity):
 
 /** A web page that gives away what a router is, for routers that don't speak UPnP. */
 interface WebFingerprint {
-    /** Where the page is. Redirects are not followed, so this is the page itself. */
-    path: string;
     /** Recognizes the router from the page. */
     identify(response: HttpResponse): RouterIdentity | undefined;
+    /** Where the page is. Redirects are not followed, so this is the page itself. */
+    path: string;
 }
 
 /**
@@ -61,8 +61,8 @@ const WEB_FINGERPRINTS: readonly WebFingerprint[] = [
         identify: ({ status, body }) =>
             status === 200 && /<title>\s*Speedport\b/i.test(body)
                 ? { manufacturer: 'Telekom', name: 'Speedport', source: 'web' }
-                : undefined
-    }
+                : undefined,
+    },
 ];
 
 /** How long a router's web page may take. Local routers answer at once; a missing one should not hold things up. */
@@ -80,7 +80,7 @@ export function* probeWeb(net: Network, addresses: readonly Ipv4[]): Steps<Route
             const to: Endpoint = { address, port: HTTP_PORT };
             const response = yield* httpRequest(net, to, { method: 'GET', path: fingerprint.path }, PROBE_TIMEOUT_MS);
             return fingerprint.identify(response);
-        })
+        }),
     );
     const results = yield* parallel(probes);
     for (const result of results) if (result.ok && result.value) return result.value;

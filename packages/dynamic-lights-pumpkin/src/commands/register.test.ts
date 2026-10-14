@@ -22,7 +22,7 @@ describe('registerCommands', () => {
         expect(calls.register).toHaveBeenCalledWith(
             ctx,
             commands,
-            expect.objectContaining({ dynamiclights: expect.any(Function) })
+            expect.objectContaining({ dynamiclights: expect.any(Function) }),
         );
         expect(commandInfos(commands)[0]?.defaultPermission).toEqual({ tag: 'allow' });
     });

@@ -11,18 +11,18 @@ const mocks = vi.hoisted(() => ({
     readDocument: vi.fn(),
     readOrder: vi.fn(),
     resolveDocument: vi.fn(),
-    resolveApi: vi.fn()
+    resolveApi: vi.fn(),
 }));
 
 vi.mock('../wit/analysis.ts', () => ({ analyzeWitUsage: mocks.analyzeUsage }));
 vi.mock('../wit/parser.ts', () => ({
     readInterfaceDeclarationOrder: mocks.readOrder,
     readPluginImportOrder: mocks.readImports,
-    readWitToolsDocument: mocks.readDocument
+    readWitToolsDocument: mocks.readDocument,
 }));
 vi.mock('../wit/resolver.ts', () => ({
     resolvePluginApi: mocks.resolveApi,
-    resolveWitDocument: mocks.resolveDocument
+    resolveWitDocument: mocks.resolveDocument,
 }));
 
 let root = '';
@@ -46,7 +46,7 @@ it('resolves WIT inputs without reading the component bundle for operation selec
         wit: path.join(root, 'wit'),
         output: path.join(root, 'plugin.wasm'),
         developmentMode: false,
-        wasiImports: []
+        wasiImports: [],
     };
 
     const result = analyzeComponentWit(options);
@@ -60,11 +60,11 @@ it('resolves WIT inputs without reading the component bundle for operation selec
     expect(mocks.resolveApi).toHaveBeenCalledWith(resolved, imports);
     expect(mocks.analyzeUsage).toHaveBeenCalledWith(resolved, {
         pluginImportOrder: imports,
-        wasiImports: []
+        wasiImports: [],
     });
     expect(result).toEqual({
         apiPackage: { packageName: 'pumpkin:plugin', interfaces: [] },
-        analysis: { apiMethods: ['logging.log'] }
+        analysis: { apiMethods: ['logging.log'] },
     });
 });
 
@@ -77,7 +77,7 @@ it('forwards explicit operation selections without collapsing empty lists to inf
         developmentMode: false,
         wasiImports: ['wasi:filesystem/types@0.2.3'],
         wasiMethods: [],
-        apiMethods: []
+        apiMethods: [],
     };
 
     analyzeComponentWit(options);
@@ -87,8 +87,8 @@ it('forwards explicit operation selections without collapsing empty lists to inf
         expect.objectContaining({
             wasiImports: options.wasiImports,
             wasiMethods: [],
-            apiMethods: []
-        })
+            apiMethods: [],
+        }),
     );
 });
 
@@ -99,13 +99,13 @@ it('forwards statically selected event variants to WIT analysis', () => {
         output: path.join(root, 'plugin.wasm'),
         developmentMode: false,
         wasiImports: [],
-        eventTypes: ['server-tick-end-event']
+        eventTypes: ['server-tick-end-event'],
     };
 
     analyzeComponentWit(options);
 
     expect(mocks.analyzeUsage).toHaveBeenCalledWith(
         { id: 'resolved-document' },
-        expect.objectContaining({ eventTypes: ['server-tick-end-event'] })
+        expect.objectContaining({ eventTypes: ['server-tick-end-event'] }),
     );
 });

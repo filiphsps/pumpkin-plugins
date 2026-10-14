@@ -3,19 +3,14 @@
     "version": "0.1.0",
     "private": true,
     "description": "Generates component READMEs, doc links, and repository catalogs",
-    "license": "MIT",
-    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
-    "contributors": [
-        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
-    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/docs#readme",
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
         "directory": "tools/docs"
-    },
-    "bugs": {
-        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
     },
     "funding": [
         {
@@ -27,15 +22,20 @@
             "url": "https://paypal.me/filiph"
         }
     ],
-    "type": "module",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
     "sideEffects": false,
-    "module": "./src/info.ts",
-    "types": "./src/info.ts",
+    "type": "module",
     "exports": {
         ".": "./src/info.ts",
         "./markdown": "./src/markdown.ts",
         "./node": "./src/node.ts"
     },
+    "module": "./src/info.ts",
+    "types": "./src/info.ts",
     "bin": {
         "pumpkin-plugins-docs": "bin/pumpkin-plugins-docs.mjs"
     },
@@ -43,9 +43,6 @@
         "src",
         "bin"
     ],
-    "publishConfig": {
-        "access": "public"
-    },
     "scripts": {
         "test": "vitest run",
         "test:coverage": "vitest run --coverage",
@@ -60,5 +57,8 @@
         "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
+    },
+    "publishConfig": {
+        "access": "public"
     }
 }

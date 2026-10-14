@@ -12,7 +12,7 @@ import {
     planWasiAdapterDispatch,
     readWasiWitImports,
     readWitPackage,
-    wasiFeaturesForMethods
+    wasiFeaturesForMethods,
 } from './oracles/wit-api.mjs';
 
 const directories = [];
@@ -33,7 +33,7 @@ function wasiSocketFixture() {
             world plugin {
                 import wasi:sockets/instance-network@0.2.3;
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -44,7 +44,7 @@ function wasiSocketFixture() {
                 import network;
                 import instance-network;
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -57,7 +57,7 @@ function wasiSocketFixture() {
                 network-error-code: func() -> option<u32>;
                 unused-query: func() -> option<u32>;
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -67,7 +67,7 @@ function wasiSocketFixture() {
                 use network.{network};
                 instance-network: func() -> network;
             }
-        `
+        `,
     );
     return root;
 }
@@ -84,7 +84,7 @@ function wasiFilesystemFixture() {
                 import wasi:filesystem/types@0.2.3;
                 import wasi:http/types@0.2.3;
             }
-        `
+        `,
     );
     writeWit(root, 'deps/filesystem/world.wit', 'package wasi:filesystem@0.2.3; world imports { import types; }');
     writeWit(
@@ -103,19 +103,19 @@ function wasiFilesystemFixture() {
                     stat-at: func(path-flags: path-flags, path: string) -> result<descriptor-stat, error-code>;
                 }
             }
-        `
+        `,
     );
     writeWit(root, 'deps/http/world.wit', 'package wasi:http@0.2.3; world imports { import types; }');
     writeWit(
         root,
         'deps/http/types.wit',
-        'package wasi:http@0.2.3; interface types { enum error-code { protocol-error } }'
+        'package wasi:http@0.2.3; interface types { enum error-code { protocol-error } }',
     );
     writeWit(root, 'deps/clocks/world.wit', 'package wasi:clocks@0.2.3; world imports { import wall-clock; }');
     writeWit(
         root,
         'deps/clocks/wall-clock.wit',
-        'package wasi:clocks@0.2.3; interface wall-clock { record datetime { seconds: u64, nanoseconds: u32, } }'
+        'package wasi:clocks@0.2.3; interface wall-clock { record datetime { seconds: u64, nanoseconds: u32, } }',
     );
     return root;
 }
@@ -130,12 +130,12 @@ function wasiFilesystemPreopensFixture() {
             world plugin {
                 import wasi:filesystem/preopens@0.2.3;
             }
-        `
+        `,
     );
     writeWit(
         root,
         'deps/filesystem/world.wit',
-        'package wasi:filesystem@0.2.3; world imports { import types; import preopens; }'
+        'package wasi:filesystem@0.2.3; world imports { import types; import preopens; }',
     );
     writeWit(
         root,
@@ -146,7 +146,7 @@ function wasiFilesystemPreopensFixture() {
                 use types.{descriptor};
                 get-directories: func() -> list<tuple<descriptor, string>>;
             }
-        `
+        `,
     );
     return root;
 }
@@ -165,12 +165,12 @@ function wasiHttpStreamFixture() {
                 import wasi:clocks/monotonic-clock@0.2.3;
                 import wasi:io/streams@0.2.3;
             }
-        `
+        `,
     );
     writeWit(
         root,
         'deps/http/world.wit',
-        'package wasi:http@0.2.3; world imports { import types; import outgoing-handler; }'
+        'package wasi:http@0.2.3; world imports { import types; import outgoing-handler; }',
     );
     writeWit(
         root,
@@ -207,38 +207,38 @@ function wasiHttpStreamFixture() {
                     get: func() -> option<result<result<option<trailers>, error-code>>>;
                 }
             }
-        `
+        `,
     );
     writeWit(
         root,
         'deps/http/outgoing-handler.wit',
-        'package wasi:http@0.2.3; interface outgoing-handler { handle: func(); }'
+        'package wasi:http@0.2.3; interface outgoing-handler { handle: func(); }',
     );
     writeWit(root, 'deps/clocks/world.wit', 'package wasi:clocks@0.2.3; world imports { import monotonic-clock; }');
     writeWit(
         root,
         'deps/clocks/monotonic-clock.wit',
-        'package wasi:clocks@0.2.3; interface monotonic-clock { type duration = u64; now: func() -> u64; }'
+        'package wasi:clocks@0.2.3; interface monotonic-clock { type duration = u64; now: func() -> u64; }',
     );
     writeWit(
         root,
         'deps/io/world.wit',
-        'package wasi:io@0.2.3; world imports { import error; import poll; import streams; }'
+        'package wasi:io@0.2.3; world imports { import error; import poll; import streams; }',
     );
     writeWit(
         root,
         'deps/io/error.wit',
-        'package wasi:io@0.2.3; interface error { resource error { to-debug-string: func() -> string; } }'
+        'package wasi:io@0.2.3; interface error { resource error { to-debug-string: func() -> string; } }',
     );
     writeWit(
         root,
         'deps/io/poll.wit',
-        'package wasi:io@0.2.3; interface poll { resource pollable { ready: func() -> bool; block: func(); } poll: func(in: list<borrow<pollable>>) -> list<u32>; }'
+        'package wasi:io@0.2.3; interface poll { resource pollable { ready: func() -> bool; block: func(); } poll: func(in: list<borrow<pollable>>) -> list<u32>; }',
     );
     writeWit(
         root,
         'deps/io/streams.wit',
-        'package wasi:io@0.2.3; interface streams { use error.{error}; use poll.{pollable}; variant stream-error { last-operation-failed(error), closed } resource input-stream { read: func(len: u64) -> result<list<u8>, stream-error>; subscribe: func() -> pollable; } }'
+        'package wasi:io@0.2.3; interface streams { use error.{error}; use poll.{pollable}; variant stream-error { last-operation-failed(error), closed } resource input-stream { read: func(len: u64) -> result<list<u8>, stream-error>; subscribe: func() -> pollable; } }',
     );
     return root;
 }
@@ -255,12 +255,12 @@ function wasiSocketAddressFixture() {
                 import wasi:sockets/tcp@0.2.3;
                 import wasi:sockets/udp@0.2.3;
             }
-        `
+        `,
     );
     writeWit(
         root,
         'deps/sockets/world.wit',
-        'package wasi:sockets@0.2.3; world imports { import network; import tcp; import udp; }'
+        'package wasi:sockets@0.2.3; world imports { import network; import tcp; import udp; }',
     );
     writeWit(
         root,
@@ -276,7 +276,7 @@ function wasiSocketAddressFixture() {
                 record ipv6-socket-address { port: u16, flow-info: u32, address: ipv6-address, scope-id: u32 }
                 variant ip-socket-address { ipv4(ipv4-socket-address), ipv6(ipv6-socket-address) }
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -293,7 +293,7 @@ function wasiSocketAddressFixture() {
                 resource input-stream;
                 resource output-stream;
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -314,7 +314,7 @@ function wasiSocketAddressFixture() {
                     send: func(datagrams: list<outgoing-datagram>) -> result<u64, error-code>;
                 }
             }
-        `
+        `,
     );
     return root;
 }
@@ -330,7 +330,7 @@ function wasiResourceOperationsFixture() {
             world plugin {
                 import wasi:test/runtime@0.2.3;
             }
-        `
+        `,
     );
     writeWit(root, 'deps/test/world.wit', 'package wasi:test@0.2.3; world imports { import runtime; }');
     writeWit(
@@ -347,7 +347,7 @@ function wasiResourceOperationsFixture() {
                     release: static func(handle: handle);
                 }
             }
-        `
+        `,
     );
     return root;
 }
@@ -369,7 +369,7 @@ function fixture() {
                 import permission;
                 import ipc;
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -411,7 +411,7 @@ function fixture() {
                 block-state-to-info: func(state-id: u16) -> option<string>;
                 lookup-added-by-api-update: func(name: string) -> option<u16>;
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -434,7 +434,7 @@ function fixture() {
                     has-permission: func(server: borrow<server>, permission: string) -> bool;
                 }
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -452,7 +452,7 @@ function fixture() {
                     get-player-by-name: func(name: string) -> option<player>;
                 }
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -476,7 +476,7 @@ function fixture() {
                     send-custom-payload: func(channel: string, data: list<u8>);
                 }
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -486,7 +486,7 @@ function fixture() {
                 record block-pos { x: s32, y: s32, z: s32, }
                 type position = tuple<f64, f64, f64>;
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -495,7 +495,7 @@ function fixture() {
             interface biomes {
                 enum biome { plains, forest, }
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -505,7 +505,7 @@ function fixture() {
                 enum game-rule { natural-health-regeneration, }
                 variant game-rule-value { int(s32), bool(bool), }
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -515,7 +515,7 @@ function fixture() {
                 record uuid { high: u64, low: u64, }
                 to-string: func(id: uuid) -> string;
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -527,7 +527,7 @@ function fixture() {
                     encode: func() -> list<u8>;
                 }
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -539,7 +539,7 @@ function fixture() {
                     register-event: func(handler-id: u32, event-type: event-type, event-priority: event-priority, blocking: bool);
                 }
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -553,7 +553,7 @@ function fixture() {
                     register: func(value: permission);
                 }
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -564,7 +564,7 @@ function fixture() {
                     get-registry-key: func() -> string;
                 }
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -585,7 +585,7 @@ function fixture() {
                     unused-event(string),
                 }
             }
-        `
+        `,
     );
     writeWit(
         root,
@@ -596,7 +596,7 @@ function fixture() {
                 type ipc-message = list<u8>;
                 send-ipc-message: func(recipient: plugin-id, message: ipc-message) -> result<result<ipc-message, string>>;
             }
-        `
+        `,
     );
     return root;
 }
@@ -610,7 +610,7 @@ function schedulerFixture() {
         `
             package pumpkin:plugin@0.1.0;
             world plugin { import scheduler; }
-        `
+        `,
     );
     writeWit(
         root,
@@ -620,7 +620,7 @@ function schedulerFixture() {
                 schedule-delayed-task: func(handler-id: u32, delay-ticks: u64) -> u32;
                 cancel-task: func(task-id: u32);
             }
-        `
+        `,
     );
     return root;
 }
@@ -634,7 +634,7 @@ function packetListFixture() {
         `
             package pumpkin:plugin@0.1.0;
             world plugin { import java-packets; }
-        `
+        `,
     );
     writeWit(
         root,
@@ -645,7 +645,7 @@ function packetListFixture() {
                 variant clientbound-packet { c-remove-entities(c-remove-entities), }
                 resource java-player { send-packet: func(packet: clientbound-packet); }
             }
-        `
+        `,
     );
     return root;
 }
@@ -680,33 +680,33 @@ describe('WIT-derived Pumpkin API facades', () => {
         const commandHandle = {
             drop() {
                 calls.push({ kind: 'drop', receiver: this });
-            }
+            },
         };
         Object.defineProperty(commandHandle, 'then', {
             value(node) {
                 calls.push({ kind: 'then', receiver: this, node });
-            }
+            },
         });
         const nodeHandle = { drop() {} };
         const restoreHost = setHost({
             world: {
                 world: { constructor: () => worldHandle },
-                lookupAddedByApiUpdate: (name) => `resolved:${name}`
+                lookupAddedByApiUpdate: (name) => `resolved:${name}`,
             },
             command: {
                 command: {
                     constructor: (...args) => {
                         calls.push({ kind: 'constructor', args });
                         return commandHandle;
-                    }
+                    },
                 },
                 commandNode: {
                     literal: (name) => {
                         calls.push({ kind: 'literal', name });
                         return nodeHandle;
-                    }
-                }
-            }
+                    },
+                },
+            },
         });
 
         try {
@@ -739,7 +739,7 @@ describe('WIT-derived Pumpkin API facades', () => {
 
         const previousHost = globalThis.__pumpkinHost;
         globalThis.__pumpkinHost = {
-            ipc: { sendIpcMessage: (_recipient, message) => message }
+            ipc: { sendIpcMessage: (_recipient, message) => message },
         };
 
         try {
@@ -762,8 +762,8 @@ describe('WIT-derived Pumpkin API facades', () => {
         const restoreHost = setHost({
             scheduler: {
                 cancelTask: (taskId) => canceledTasks.push(taskId),
-                scheduleDelayedTask: () => 99
-            }
+                scheduleDelayedTask: () => 99,
+            },
         });
         const previousUnloading = globalThis.__staticHermesPluginUnloading;
         globalThis.__staticHermesPluginUnloading = true;
@@ -775,7 +775,7 @@ describe('WIT-derived Pumpkin API facades', () => {
 
             expect(canceledTasks).toEqual([42]);
             expect(() => facade.scheduleDelayedTask(7, 20n)).toThrow(
-                'Pumpkin host calls are unavailable during plugin unload'
+                'Pumpkin host calls are unavailable during plugin unload',
             );
         } finally {
             restoreHost();
@@ -817,7 +817,7 @@ describe('WIT-derived Pumpkin API facades', () => {
             },
             drop() {
                 valid = false;
-            }
+            },
         };
         const restoreHost = setHost({ world: { world: { constructor: () => worldHandle } } });
 
@@ -843,7 +843,7 @@ describe('WIT-derived Pumpkin API facades', () => {
             },
             drop() {
                 valid = false;
-            }
+            },
         };
         const serverHandle = { getAllWorlds: () => [worldHandle], drop() {} };
         const restoreHost = setHost({ server: { server: { constructor: () => serverHandle } } });
@@ -868,7 +868,7 @@ describe('WIT-derived Pumpkin API facades', () => {
             getDimension: () => 'overworld',
             drop() {
                 drops++;
-            }
+            },
         };
         const serverHandle = { getAllWorlds: () => [worldHandle], drop() {} };
         const restoreHost = setHost({ server: { server: { constructor: () => serverHandle } } });
@@ -893,7 +893,7 @@ describe('WIT-derived Pumpkin API facades', () => {
         const world = readWitPackage(root).interfaces.find((value) => value.name === 'world');
         const chunkHandles = [
             { getX: () => 3, drop() {} },
-            { getX: () => 9, drop() {} }
+            { getX: () => 9, drop() {} },
         ];
         const worldHandle = { getChunks: () => chunkHandles };
         const restoreHost = setHost({ world: { world: { constructor: () => worldHandle } } });
@@ -930,7 +930,7 @@ describe('WIT-derived Pumpkin API facades', () => {
             'event',
             'item-stack',
             'permission',
-            'ipc'
+            'ipc',
         ]);
 
         const world = api.interfaces.find((value) => value.name === 'world');
@@ -941,9 +941,9 @@ describe('WIT-derived Pumpkin API facades', () => {
             features: [],
             parameters: [
                 { name: 'x', type: 's32' },
-                { name: 'z', type: 's32' }
+                { name: 'z', type: 's32' },
             ],
-            result: 'option<chunk>'
+            result: 'option<chunk>',
         });
     });
 
@@ -965,13 +965,13 @@ describe('WIT-derived Pumpkin API facades', () => {
 
         expect(dispatch).toContain('Array eventValueToPosition(runtime, 3);');
         expect(dispatch).toContain(
-            'eventValueToPosition.setValueAtIndex(runtime, 0, Value(eventData.to_position.f0));'
+            'eventValueToPosition.setValueAtIndex(runtime, 0, Value(eventData.to_position.f0));',
         );
         expect(dispatch).toContain(
-            'eventValueToPosition.setValueAtIndex(runtime, 1, Value(eventData.to_position.f1));'
+            'eventValueToPosition.setValueAtIndex(runtime, 1, Value(eventData.to_position.f1));',
         );
         expect(dispatch).toContain(
-            'eventValueToPosition.setValueAtIndex(runtime, 2, Value(eventData.to_position.f2));'
+            'eventValueToPosition.setValueAtIndex(runtime, 2, Value(eventData.to_position.f2));',
         );
         expect(dispatch).toContain('data.setProperty(runtime, "toPosition", std::move(eventValueToPosition));');
     });
@@ -981,11 +981,11 @@ describe('WIT-derived Pumpkin API facades', () => {
 
         const dispatch = generateWitEventDispatch(
             api,
-            'registerEvent("player-click-event"); event.cursor?.getRegistryKey();'
+            'registerEvent("player-click-event"); event.cursor?.getRegistryKey();',
         );
 
         expect(dispatch).toContain(
-            'ResourceState{ResourceKind::Wit, eventData.cursor.val.__handle, true, "item-stack", "item-stack"}'
+            'ResourceState{ResourceKind::Wit, eventData.cursor.val.__handle, true, "item-stack", "item-stack"}',
         );
         expect(dispatch).toContain('wrapResourceObject(runtime, makeWitResourceObject(eventValueCursorValueState))');
     });
@@ -1001,7 +1001,7 @@ describe('WIT-derived Pumpkin API facades', () => {
         expect(dispatch).toContain('result.is_err');
         expect(dispatch).toContain('Uint8Array');
         expect(dispatch).toContain(
-            'if (!callSucceeded) { Object errorValue(rt); errorValue.setProperty(rt, "tag", "err"); return errorValue; }'
+            'if (!callSucceeded) { Object errorValue(rt); errorValue.setProperty(rt, "tag", "err"); return errorValue; }',
         );
         expect(dispatch).not.toContain('pumpkin_plugin_world_lookup_added_by_api_update');
         expect(unused).not.toContain('pumpkin_plugin_ipc_send_ipc_message');
@@ -1034,7 +1034,7 @@ describe('WIT-derived Pumpkin API facades', () => {
 
         expect(dispatch).toContain('argument0CRemoveEntitiesEntityIdsArray.isTypedArray(rt)');
         expect(dispatch).toContain(
-            'argument0CRemoveEntitiesEntityIdsArray.getProperty(rt, std::to_string(argument0CRemoveEntitiesEntityIdsIndex).c_str())'
+            'argument0CRemoveEntitiesEntityIdsArray.getProperty(rt, std::to_string(argument0CRemoveEntitiesEntityIdsIndex).c_str())',
         );
         expect(dispatch).not.toContain('argument0CRemoveEntitiesEntityIdsArray.asArray(rt)');
     });
@@ -1072,15 +1072,15 @@ describe('WIT-derived Pumpkin API facades', () => {
             textPath,
             source.replace(
                 'encode: func() -> list<u8>;',
-                'encode: func() -> list<u8>;\nround-trip-char: static func(value: char) -> char;'
-            )
+                'encode: func() -> list<u8>;\nround-trip-char: static func(value: char) -> char;',
+            ),
         );
         const api = readWitPackage(root);
 
         const dispatch = generateWitSimpleMethodDispatch(api, '', ['text.text-component.round-trip-char']);
 
         expect(dispatch).toContain(
-            'pumpkin_plugin_text_static_text_component_round_trip_char(wasiInputChar(rt, args[0]))'
+            'pumpkin_plugin_text_static_text_component_round_trip_char(wasiInputChar(rt, args[0]))',
         );
         expect(dispatch).toContain('return jsString(rt, wasiOutputChar(rt, static_cast<uint32_t>(result)));');
     });
@@ -1115,7 +1115,7 @@ describe('WIT-derived Pumpkin API facades', () => {
                         send-packet: func(packet: java-packet);
                     }
                 }
-            `
+            `,
         );
         writeWit(
             root,
@@ -1125,7 +1125,7 @@ describe('WIT-derived Pumpkin API facades', () => {
                     record action-packet { action-id: string, data: list<u8>, }
                     variant clientbound-packet { c-spawn-entity(action-packet), no-op, }
                 }
-            `
+            `,
         );
         writeWit(
             root,
@@ -1135,7 +1135,7 @@ describe('WIT-derived Pumpkin API facades', () => {
                     record other-packet { value: u32, }
                     variant clientbound-packet { other(other-packet), }
                 }
-            `
+            `,
         );
         const api = readWitPackage(root);
         const dispatch = generateWitSimpleMethodDispatch(api, '', ['player.java-player.send-packet']);
@@ -1154,12 +1154,12 @@ describe('WIT-derived Pumpkin API facades', () => {
         const source = fs.readFileSync(playerPath, 'utf8');
         fs.writeFileSync(
             playerPath,
-            source.replace('resource player {', 'resource player { unsupported: func(value: future-value);')
+            source.replace('resource player {', 'resource player { unsupported: func(value: future-value);'),
         );
         const api = readWitPackage(root);
 
         expect(() => generateWitSimpleMethodDispatch(api, '', ['player.player.unsupported'])).toThrow(
-            'No Static Hermes adapter is generated for pumpkin:plugin/player@0.1.0#player.unsupported: unsupported WIT input or result type'
+            'No Static Hermes adapter is generated for pumpkin:plugin/player@0.1.0#player.unsupported: unsupported WIT input or result type',
         );
     });
 
@@ -1167,7 +1167,7 @@ describe('WIT-derived Pumpkin API facades', () => {
         const api = readWitPackage(fixture());
         const dispatch = generateWitSimpleMethodDispatch(
             api,
-            'context.registerEvent(3, "server-tick-end-event", "normal", true)'
+            'context.registerEvent(3, "server-tick-end-event", "normal", true)',
         );
 
         expect(dispatch).toContain('pumpkin_plugin_context_method_context_register_event');
@@ -1191,7 +1191,7 @@ describe('WIT-derived Pumpkin API facades', () => {
         const api = readWitPackage(fixture());
         const dispatch = generateWitSimpleMethodDispatch(
             api,
-            'player.getPosition() player.getWorld() player.getId() player.asJava() player.sendSystemMessage(component, false) sender.hasPermission(server, "x") world.getWorldBorder() border.getCenterX() border.getCenterZ() border.getSize() server.getAllPlayers() server.getPlayerByName("Alex") world.getBlockStateId({x: 1, y: 2, z: 3}) world.getBiome({x: 1, y: 2, z: 3}) world.getGameRule("natural-health-regeneration") world.getChunk(1, 2) java.sendCustomPayload("channel", bytes)'
+            'player.getPosition() player.getWorld() player.getId() player.asJava() player.sendSystemMessage(component, false) sender.hasPermission(server, "x") world.getWorldBorder() border.getCenterX() border.getCenterZ() border.getSize() server.getAllPlayers() server.getPlayerByName("Alex") world.getBlockStateId({x: 1, y: 2, z: 3}) world.getBiome({x: 1, y: 2, z: 3}) world.getGameRule("natural-health-regeneration") world.getChunk(1, 2) java.sendCustomPayload("channel", bytes)',
         );
 
         expect(dispatch).toContain('pumpkin_plugin_player_method_player_get_position');
@@ -1225,7 +1225,7 @@ describe('WIT-derived Pumpkin API facades', () => {
         const api = readWitPackage(fixture());
         const dispatch = generateWitSimpleMethodDispatch(
             api,
-            'server.getMspt(); class Server { getPlayerCount(...args) {} } __resourceApi("server")["getPlayerCount"]()'
+            'server.getMspt(); class Server { getPlayerCount(...args) {} } __resourceApi("server")["getPlayerCount"]()',
         );
 
         expect(dispatch).toContain('getMspt');
@@ -1251,7 +1251,7 @@ describe('WIT-derived Pumpkin API facades', () => {
         expect(dispatch).toContain('String resultValuePistonBehavior = jsString(rt, "normal");');
         expect(dispatch).not.toContain('jsString(rt, result.piston_behavior)');
         expect(dispatch.indexOf('pumpkin_plugin_world_get_block_state(&result);')).toBeLessThan(
-            dispatch.indexOf('switch (result.piston_behavior)')
+            dispatch.indexOf('switch (result.piston_behavior)'),
         );
     });
 
@@ -1261,7 +1261,7 @@ describe('WIT-derived Pumpkin API facades', () => {
             'server.server.get-all-players',
             'server.server.get-player-by-name',
             'uuid.to-string',
-            'world.world.get-block-state-id'
+            'world.world.get-block-state-id',
         ]);
 
         expect(dispatch).toContain('pumpkin_plugin_server_list_own_player_free(&result);');
@@ -1292,7 +1292,7 @@ describe('WASI adapter planning', () => {
 
         expect(wasiFeaturesForMethods(root, [])).toEqual([]);
         expect(wasiFeaturesForMethods(root, ['wasi:sockets/network@0.2.3#network-error-code'])).toEqual([
-            'network-error-code'
+            'network-error-code',
         ]);
     });
 
@@ -1303,14 +1303,14 @@ describe('WASI adapter planning', () => {
             'wasi:test/runtime@0.2.3#handle.constructor',
             'wasi:test/runtime@0.2.3#handle.value',
             'wasi:test/runtime@0.2.3#handle.create',
-            'wasi:test/runtime@0.2.3#handle.release'
+            'wasi:test/runtime@0.2.3#handle.release',
         ];
 
         expect(planWasiAdapterDispatch(interfaces, interfaces).map(({ operationId }) => operationId)).toEqual(
-            operationIds
+            operationIds,
         );
         expect(
-            planWasiAdapterDispatch(interfaces, interfaces, operationIds).map(({ operationId }) => operationId)
+            planWasiAdapterDispatch(interfaces, interfaces, operationIds).map(({ operationId }) => operationId),
         ).toEqual(operationIds);
 
         const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, operationIds);
@@ -1330,8 +1330,8 @@ describe('WASI adapter planning', () => {
             handle: {
                 constructor: (value) => ({ value: () => value, drop() {} }),
                 create: (value) => ({ value: () => value + 1, drop() {} }),
-                release: (handle) => handle.value()
-            }
+                release: (handle) => handle.value(),
+            },
         };
 
         try {
@@ -1352,17 +1352,17 @@ describe('WASI adapter planning', () => {
 
         const plan = planWasiAdapterDispatch(interfaces, interfaces, [
             'wasi:sockets/instance-network@0.2.3#instance-network',
-            'wasi:sockets/network@0.2.3#network.get-network-id'
+            'wasi:sockets/network@0.2.3#network.get-network-id',
         ]);
 
         expect(plan.map(({ operationId }) => operationId)).toEqual([
             'wasi:sockets/instance-network@0.2.3#instance-network',
-            'wasi:sockets/network@0.2.3#network.get-network-id'
+            'wasi:sockets/network@0.2.3#network.get-network-id',
         ]);
 
         const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, [
             'wasi:sockets/instance-network@0.2.3#instance-network',
-            'wasi:sockets/network@0.2.3#network.get-network-id'
+            'wasi:sockets/network@0.2.3#network.get-network-id',
         ]);
         expect(dispatch).toContain('wasi_sockets_network_network_drop_own');
         expect(dispatch).not.toContain('wasi_sockets_network_unused_drop_own');
@@ -1373,9 +1373,9 @@ describe('WASI adapter planning', () => {
         const { interfaces } = readWasiWitImports(root, ['wasi:sockets/instance-network@0.2.3']);
 
         expect(() =>
-            planWasiAdapterDispatch(interfaces, interfaces, ['wasi:sockets/network@0.2.3#missing-operation'])
+            planWasiAdapterDispatch(interfaces, interfaces, ['wasi:sockets/network@0.2.3#missing-operation']),
         ).toThrow(
-            /WASI operation used by the plugin is not declared in WIT: wasi:sockets\/network@0\.2\.3#missing-operation/
+            /WASI operation used by the plugin is not declared in WIT: wasi:sockets\/network@0\.2\.3#missing-operation/,
         );
     });
 
@@ -1389,14 +1389,14 @@ describe('WASI adapter planning', () => {
             ...apiInterface.resources.flatMap((resource) =>
                 resource.functions
                     .filter((operation) => !operation.isStatic && operation.name !== 'constructor')
-                    .map((operation) => `${apiInterface.specifier}#${resource.name}.${operation.name}`)
-            )
+                    .map((operation) => `${apiInterface.specifier}#${resource.name}.${operation.name}`),
+            ),
         ]);
         expect(planWasiAdapterDispatch(interfaces, interfaces).map(({ operationId }) => operationId)).toEqual(
-            allOperations
+            allOperations,
         );
         expect(
-            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId)
+            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId),
         ).toEqual(usedMethods);
     });
 
@@ -1406,7 +1406,7 @@ describe('WASI adapter planning', () => {
         const usedMethods = ['wasi:filesystem/preopens@0.2.3#get-directories'];
 
         expect(
-            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId)
+            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId),
         ).toEqual(usedMethods);
     });
 
@@ -1416,7 +1416,7 @@ describe('WASI adapter planning', () => {
         const usedMethods = ['wasi:filesystem/types@0.2.3#descriptor.stat-at'];
 
         expect(
-            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId)
+            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId),
         ).toEqual(usedMethods);
 
         const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, usedMethods);
@@ -1437,11 +1437,11 @@ describe('WASI adapter planning', () => {
             'wasi:io/streams@0.2.3#input-stream.read',
             'wasi:io/streams@0.2.3#input-stream.subscribe',
             'wasi:io/poll@0.2.3#pollable.ready',
-            'wasi:io/poll@0.2.3#pollable.block'
+            'wasi:io/poll@0.2.3#pollable.block',
         ];
 
         expect(
-            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId)
+            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId),
         ).toEqual(usedMethods);
 
         const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, usedMethods);
@@ -1465,7 +1465,7 @@ describe('WASI adapter planning', () => {
             'wasi:http/types@0.2.3#accept-payload',
             'wasi:http/types@0.2.3#get-payload',
             'wasi:http/types@0.2.3#future-trailers.get',
-            'wasi:io/poll@0.2.3#poll'
+            'wasi:io/poll@0.2.3#poll',
         ];
 
         const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, usedMethods);
@@ -1493,7 +1493,7 @@ describe('WASI adapter planning', () => {
             'wasi:sockets/udp@0.2.3#udp-socket.start-bind',
             'wasi:sockets/udp@0.2.3#udp-socket.stream',
             'wasi:sockets/udp@0.2.3#incoming-datagram-stream.receive',
-            'wasi:sockets/udp@0.2.3#outgoing-datagram-stream.send'
+            'wasi:sockets/udp@0.2.3#outgoing-datagram-stream.send',
         ];
 
         const allOperations = interfaces.flatMap((apiInterface) => [
@@ -1501,14 +1501,14 @@ describe('WASI adapter planning', () => {
             ...apiInterface.resources.flatMap((resource) =>
                 resource.functions
                     .filter((operation) => !operation.isStatic && operation.name !== 'constructor')
-                    .map((operation) => `${apiInterface.specifier}#${resource.name}.${operation.name}`)
-            )
+                    .map((operation) => `${apiInterface.specifier}#${resource.name}.${operation.name}`),
+            ),
         ]);
         expect(planWasiAdapterDispatch(interfaces, interfaces).map(({ operationId }) => operationId)).toEqual(
-            allOperations
+            allOperations,
         );
         expect(
-            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId)
+            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId),
         ).toEqual(usedMethods);
 
         const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, usedMethods);
@@ -1527,12 +1527,12 @@ describe('WASI adapter planning', () => {
         const operationId = 'wasi:http/types@0.2.3#http-error-code';
 
         expect(planWasiAdapterDispatch(interfaces, interfaces).map(({ operationId: planned }) => planned)).toContain(
-            operationId
+            operationId,
         );
         const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, [operationId]);
         expect(dispatch).toContain('getWitResourceState(rt, args[0], "error", "error", "wasi:io")');
         expect(dispatch.indexOf('const bool hasResult = wasi_http_types_http_error_code')).toBeLessThan(
-            dispatch.indexOf('switch (result)')
+            dispatch.indexOf('switch (result)'),
         );
     });
 });

@@ -10,7 +10,7 @@ import {
     PIE_PROVIDER,
     type ProviderInfo,
     UnavailableError,
-    validateCache
+    validateCache,
 } from './protocol.ts';
 import { SESSION_TIMING } from './session-timing.ts';
 
@@ -21,11 +21,11 @@ export type SessionState =
     | { readonly kind: 'ready'; readonly info: ProviderInfo };
 /** Host-independent scheduling and transition reporting. Clock returns monotonic milliseconds. */
 export interface SessionOptions {
-    readonly send: SendMessage;
     readonly now: () => number;
     readonly onTransition?: (state: SessionState) => void;
-    readonly provider?: string;
     readonly pingIntervalMs?: number;
+    readonly provider?: string;
+    readonly send: SendMessage;
 }
 /** Plugin-wide expansion ownership, negotiation and bounded recovery. Call tick explicitly. */
 export class PieSession {
@@ -65,7 +65,7 @@ export class PieSession {
     registerExpansion(
         namespace: string,
         handlers: Readonly<Record<string, ExpansionHandler>>,
-        cache: Cache = { kind: 'never' }
+        cache: Cache = { kind: 'never' },
     ): void {
         this.guard.assertOutside();
         if (this.stopped) throw new InputError('Session is stopped');

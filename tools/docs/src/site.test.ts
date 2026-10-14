@@ -4,7 +4,7 @@ import { componentApiRoute, githubPagesUrl, githubRepositoryUrl } from './site.t
 describe('githubPagesUrl', () => {
     it('derives a project Pages URL from a repository object', () => {
         expect(githubPagesUrl({ url: 'git+https://github.com/FilipHsPs/pumpkin-plugins.git' })?.href).toBe(
-            'https://filiphsps.github.io/pumpkin-plugins/'
+            'https://filiphsps.github.io/pumpkin-plugins/',
         );
     });
 
@@ -19,7 +19,7 @@ describe('githubPagesUrl', () => {
 
 it('normalizes source repository URLs and derives shared API routes', () => {
     expect(githubRepositoryUrl({ url: 'git+https://github.com/example/repo.git' })?.href).toBe(
-        'https://github.com/example/repo'
+        'https://github.com/example/repo',
     );
     expect(githubRepositoryUrl('https://example.com/repo')).toBeUndefined();
     expect(componentApiRoute('packages', 'plugin')).toBe('api/plugins/plugin/');

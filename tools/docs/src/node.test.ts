@@ -11,7 +11,7 @@ beforeEach(() => {
     put('package.json', '{"repository":{"type":"git","url":"git+https://github.com/example/repo.git"}}');
     put(
         'README.md',
-        '# Repo\n\n<!-- docs:begin docs-site -->\n<!-- docs:end docs-site -->\n\n<!-- docs:begin packages -->\n<!-- docs:end packages -->\n'
+        '# Repo\n\n<!-- docs:begin docs-site -->\n<!-- docs:end docs-site -->\n\n<!-- docs:begin packages -->\n<!-- docs:end packages -->\n',
     );
 });
 
@@ -32,11 +32,11 @@ describe('generateRootReadme', () => {
         put('packages/sample-plugin/package.json', '{"name":"@example/sample-plugin","pumpkinPlugin":{}}');
         put(
             'packages/sample-plugin/src/info.ts',
-            'export const info = { name: "SamplePlugin", description: "Sample." };\n'
+            'export const info = { name: "SamplePlugin", description: "Sample." };\n',
         );
         put(
             'packages/sample-plugin/README.md',
-            '# SamplePlugin\n\n<!-- docs:begin reference -->\n<!-- docs:end reference -->\n'
+            '# SamplePlugin\n\n<!-- docs:begin reference -->\n<!-- docs:end reference -->\n',
         );
         put('packages/sample-plugin/docs/index.md', '# Sample plugin guide\n');
 
@@ -44,29 +44,29 @@ describe('generateRootReadme', () => {
         put('tools/sample-tool/src/index.ts', 'export {};\n');
         put(
             'tools/sample-tool/README.md',
-            '# Sample tool\n\n<!-- docs:begin reference -->\n<!-- docs:end reference -->\n'
+            '# Sample tool\n\n<!-- docs:begin reference -->\n<!-- docs:end reference -->\n',
         );
 
         put('actions/sample-action/action.yml', 'name: Sample action\ndescription: Do a sample thing\n');
         put('actions/sample-action/src/index.mjs', '');
         put(
             'actions/sample-action/README.md',
-            '# Sample action\n\n<!-- docs:begin reference -->\n<!-- docs:end reference -->\n'
+            '# Sample action\n\n<!-- docs:begin reference -->\n<!-- docs:end reference -->\n',
         );
 
         expect(await generateRootReadme(root)).toBe('updated');
         expect(read('README.md')).toContain('https://example.github.io/repo/');
         expect(read('packages/sample-plugin/README.md')).toContain(
-            '[plugin guide](https://example.github.io/repo/packages/sample-plugin/docs/)'
+            '[plugin guide](https://example.github.io/repo/packages/sample-plugin/docs/)',
         );
         expect(read('packages/sample-plugin/README.md')).toContain(
-            '[API reference](https://example.github.io/repo/api/plugins/sample-plugin/)'
+            '[API reference](https://example.github.io/repo/api/plugins/sample-plugin/)',
         );
         expect(read('tools/sample-tool/README.md')).toContain(
-            '[API reference](https://example.github.io/repo/api/tools/@example/sample-tool/)'
+            '[API reference](https://example.github.io/repo/api/tools/@example/sample-tool/)',
         );
         expect(read('actions/sample-action/README.md')).toContain(
-            '[API reference](https://example.github.io/repo/api/actions/sample-action/)'
+            '[API reference](https://example.github.io/repo/api/actions/sample-action/)',
         );
         expect(await generateRootReadme(root, true)).toBe('unchanged');
 
@@ -76,7 +76,7 @@ describe('generateRootReadme', () => {
         expect(read('packages/sample-plugin/README.md')).toBe(beforeSiteChange);
         expect(await generateRootReadme(root)).toBe('updated');
         expect(read('packages/sample-plugin/README.md')).toContain(
-            'https://example.github.io/new-repo/packages/sample-plugin/docs/'
+            'https://example.github.io/new-repo/packages/sample-plugin/docs/',
         );
     });
 
@@ -84,7 +84,7 @@ describe('generateRootReadme', () => {
         put('packages/sample-plugin/package.json', '{"name":"@example/sample-plugin","pumpkinPlugin":{}}');
         put(
             'packages/sample-plugin/src/info.ts',
-            'export const info = { name: "SamplePlugin", description: "Sample." };\n'
+            'export const info = { name: "SamplePlugin", description: "Sample." };\n',
         );
         put('packages/sample-plugin/README.md', '# SamplePlugin\n');
 
@@ -98,15 +98,15 @@ describe('generateRootReadme', () => {
         put('actions/quoted/action.yaml', `name: "A: B"\ndescription: 'Action with a ''quote'''\n`);
         put(
             'actions/folded/action.yml',
-            'name: Folded\ndescription: >-\n  First\n\n  Second\nruns:\n  using: node24\n'
+            'name: Folded\ndescription: >-\n  First\n\n  Second\nruns:\n  using: node24\n',
         );
         put(
             'actions/literal/action.yml',
-            'name: Literal\ndescription: |\n  First line\n  Second line\nruns:\n  using: node24\n'
+            'name: Literal\ndescription: |\n  First line\n  Second line\nruns:\n  using: node24\n',
         );
         put(
             'actions/blank/action.yml',
-            'name: Blank\ndescription: >-\n  \n  Starts after a blank\nruns:\n  using: node24\n'
+            'name: Blank\ndescription: >-\n  \n  Starts after a blank\nruns:\n  using: node24\n',
         );
         put('actions/no-metadata/README.md', '# Not an action\n');
         put('actions/not-a-directory.txt', 'ignored');
@@ -136,7 +136,7 @@ describe('generateRootReadme', () => {
         ['invalid double-quoted escape', 'name: "bad\\q"\ndescription: Description\n', 'invalid YAML'],
         ['malformed single-quoted value', "name: 'unfinished\ndescription: Description\n", 'invalid YAML'],
         ['empty quoted value', 'name: ""\ndescription: Description\n', 'has an empty name'],
-        ['empty block value', 'name: Name\ndescription: |\n', 'has an empty description']
+        ['empty block value', 'name: Name\ndescription: |\n', 'has an empty description'],
     ])('rejects %s action metadata', async (_case, contents, message) => {
         put('actions/broken/action.yml', contents);
 

@@ -12,7 +12,7 @@ import { cacheDir } from './repo.ts';
 const apiRoot = path.dirname(createRequire(import.meta.url).resolve('@pumpkin-plugins/pumpkin-api/package.json'));
 const apiWitDir = ensurePumpkinWit({
     lockFile: path.join(apiRoot, 'wit.lock.json'),
-    cacheRoot: cacheDir(import.meta.dirname)
+    cacheRoot: cacheDir(import.meta.dirname),
 });
 const temporaryDirectories: string[] = [];
 
@@ -34,7 +34,7 @@ function createWitDir(wasiFiles: Record<string, string>): string {
     if (!firstExport) throw new Error('plugin.wit has no export');
     fs.writeFileSync(
         pluginPath,
-        `${pluginWit.slice(0, firstExport.index)}${imports.join('\n')}\n${pluginWit.slice(firstExport.index)}`
+        `${pluginWit.slice(0, firstExport.index)}${imports.join('\n')}\n${pluginWit.slice(firstExport.index)}`,
     );
     for (const [relativePath, contents] of Object.entries(wasiFiles)) {
         const filePath = path.join(witDir, 'deps', relativePath);
@@ -58,16 +58,16 @@ describe('Static Hermes esbuild plugin', () => {
                     blockStateToInfo(0);
                 `,
                 resolveDir: path.resolve(import.meta.dirname, '../../../packages/distant-horizons-support-pumpkin/src'),
-                sourcefile: 'plugin.ts'
+                sourcefile: 'plugin.ts',
             },
             bundle: true,
             format: 'iife',
             write: false,
             minify: false,
             plugins: [
-                staticHermesImportsPlugin({ resolveDir: path.resolve(import.meta.dirname, '.'), witDir: apiWitDir })
+                staticHermesImportsPlugin({ resolveDir: path.resolve(import.meta.dirname, '.'), witDir: apiWitDir }),
             ],
-            external: ['pumpkin:plugin/*', 'wasi:*']
+            external: ['pumpkin:plugin/*', 'wasi:*'],
         });
 
         const bundle = result.outputFiles[0]?.text ?? '';
@@ -86,15 +86,15 @@ describe('Static Hermes esbuild plugin', () => {
                 contents:
                     "import { blockStateToInfo } from 'pumpkin:plugin/world@0.1.0'; globalThis.result = blockStateToInfo(42);",
                 resolveDir: path.resolve(import.meta.dirname, '.'),
-                sourcefile: 'plugin.ts'
+                sourcefile: 'plugin.ts',
             },
             bundle: true,
             format: 'iife',
             write: false,
             plugins: [
-                staticHermesImportsPlugin({ resolveDir: path.resolve(import.meta.dirname, '.'), witDir: apiWitDir })
+                staticHermesImportsPlugin({ resolveDir: path.resolve(import.meta.dirname, '.'), witDir: apiWitDir }),
             ],
-            external: ['pumpkin:plugin/*', 'wasi:*']
+            external: ['pumpkin:plugin/*', 'wasi:*'],
         });
         const hostResult = { name: 'stone' };
         const blockStateToInfo = vi.fn(() => hostResult);
@@ -120,15 +120,15 @@ describe('Static Hermes esbuild plugin', () => {
                       'http/outgoing-handler.wit':
                           'package wasi:http@0.2.3; interface outgoing-handler { handle: func(request: u32, options: u32); }',
                       'clocks/monotonic-clock.wit':
-                          'package wasi:clocks@0.2.3; interface monotonic-clock { now: func() -> u64; }'
-                  }
+                          'package wasi:clocks@0.2.3; interface monotonic-clock { now: func() -> u64; }',
+                  },
         );
         const result = await esbuild.build({
             stdin: {
                 contents:
                     "import { registerPluginWithUpdates } from '@pumpkin-plugins/update-check'; registerPluginWithUpdates({});",
                 resolveDir: path.resolve(import.meta.dirname, '../../plugin-kit/src'),
-                sourcefile: 'plugin.ts'
+                sourcefile: 'plugin.ts',
             },
             bundle: true,
             format: 'iife',
@@ -139,11 +139,11 @@ describe('Static Hermes esbuild plugin', () => {
                     resolveDir: path.resolve(import.meta.dirname, '../../../packages/apple-skin-pumpkin/src'),
                     witDir,
                     developmentMode,
-                    onWasiImport: (specifier) => imports.push(specifier)
-                })
+                    onWasiImport: (specifier) => imports.push(specifier),
+                }),
             ],
             external: ['pumpkin:plugin/*', 'wasi:*'],
-            define: { __PUMPKIN_DEV_MODE__: JSON.stringify(developmentMode) }
+            define: { __PUMPKIN_DEV_MODE__: JSON.stringify(developmentMode) },
         });
 
         expect(result.outputFiles[0]?.text).toContain('registerPlugin(');
@@ -163,14 +163,14 @@ describe('Static Hermes esbuild plugin', () => {
         const imports: string[] = [];
         const witDir = createWitDir({
             'filesystem/preopens.wit':
-                'package wasi:filesystem@0.2.3; interface preopens { get-directories: func() -> list<u32>; }'
+                'package wasi:filesystem@0.2.3; interface preopens { get-directories: func() -> list<u32>; }',
         });
         const result = await esbuild.build({
             stdin: {
                 contents:
                     "import { getDirectories } from 'wasi:filesystem/preopens@0.2.3'; globalThis.mounts = getDirectories();",
                 resolveDir: path.resolve(import.meta.dirname, '../../../packages/distant-horizons-support-pumpkin/src'),
-                sourcefile: 'plugin.ts'
+                sourcefile: 'plugin.ts',
             },
             bundle: true,
             format: 'iife',
@@ -180,14 +180,14 @@ describe('Static Hermes esbuild plugin', () => {
                 staticHermesImportsPlugin({
                     resolveDir: path.resolve(
                         import.meta.dirname,
-                        '../../../packages/distant-horizons-support-pumpkin/src'
+                        '../../../packages/distant-horizons-support-pumpkin/src',
                     ),
                     witDir,
                     developmentMode: false,
-                    onWasiImport: (specifier) => imports.push(specifier)
-                })
+                    onWasiImport: (specifier) => imports.push(specifier),
+                }),
             ],
-            external: ['pumpkin:plugin/*', 'wasi:*']
+            external: ['pumpkin:plugin/*', 'wasi:*'],
         });
 
         const bundle = result.outputFiles[0]?.text ?? '';
@@ -208,7 +208,7 @@ describe('Static Hermes esbuild plugin', () => {
     it('generates WASI module exports from the plugin WIT interface', async () => {
         const witDir = createWitDir({
             'clocks/monotonic-clock.wit':
-                'package wasi:clocks@0.2.3; interface monotonic-clock { now: func() -> u64; resolution: func() -> u64; }'
+                'package wasi:clocks@0.2.3; interface monotonic-clock { now: func() -> u64; resolution: func() -> u64; }',
         });
 
         const result = await esbuild.build({
@@ -216,14 +216,14 @@ describe('Static Hermes esbuild plugin', () => {
                 contents:
                     "import { resolution } from 'wasi:clocks/monotonic-clock@0.2.3'; globalThis.value = resolution();",
                 resolveDir: path.resolve(import.meta.dirname, '.'),
-                sourcefile: 'plugin.ts'
+                sourcefile: 'plugin.ts',
             },
             bundle: true,
             format: 'iife',
             write: false,
             minify: false,
             plugins: [staticHermesImportsPlugin({ resolveDir: path.resolve(import.meta.dirname, '.'), witDir })],
-            external: ['pumpkin:plugin/*', 'wasi:*']
+            external: ['pumpkin:plugin/*', 'wasi:*'],
         });
 
         const bundle = result.outputFiles[0]?.text ?? '';

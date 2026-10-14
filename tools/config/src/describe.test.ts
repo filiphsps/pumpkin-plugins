@@ -19,7 +19,7 @@ describe('describeConfig', () => {
             { key: 'web.base_url', type: 'string', default: '""', description: 'Base URL, without a trailing slash.' },
             { key: 'web.token', type: 'string', description: 'Optional access token.' },
             { key: 'overrides."<file>".order', type: 'integer', description: 'Sort order.' },
-            { key: 'overrides."<file>".enabled', type: 'boolean', description: 'Include the file.' }
+            { key: 'overrides."<file>".enabled', type: 'boolean', description: 'Include the file.' },
         ]);
     });
 });

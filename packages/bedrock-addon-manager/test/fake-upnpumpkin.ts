@@ -3,7 +3,7 @@ import {
     encodeReply,
     type PortStatus,
     type Request,
-    type SendMessage
+    type SendMessage,
 } from '@pumpkin-plugins/upnpumpkin-api';
 
 /** Stands in for the UPnPumpkin plugin: records what it is asked and answers with a status the test sets. */

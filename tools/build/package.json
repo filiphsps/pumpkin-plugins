@@ -2,19 +2,14 @@
     "name": "@pumpkin-plugins/build",
     "version": "0.1.0",
     "description": "Shared build tool for the plugins",
-    "license": "MIT",
-    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
-    "contributors": [
-        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
-    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/build#readme",
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
         "directory": "tools/build"
-    },
-    "bugs": {
-        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
     },
     "funding": [
         {
@@ -26,6 +21,11 @@
             "url": "https://paypal.me/filiph"
         }
     ],
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
     "type": "module",
     "bin": {
         "pumpkin-plugins-build": "dist/cli.js"
@@ -35,15 +35,12 @@
         "runtime",
         "wasi-wit.lock.json"
     ],
-    "publishConfig": {
-        "access": "public"
-    },
     "scripts": {
         "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --target=node24 --packages=external --alias:@pumpkin-plugins/minecraft-colors=../minecraft-colors/src/index.ts --outfile=dist/cli.js",
         "prepack": "pnpm build",
-        "typecheck": "tsc --noEmit",
         "test": "vitest run",
-        "test:coverage": "vitest run --coverage"
+        "test:coverage": "vitest run --coverage",
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "@bytecodealliance/jco": "catalog:",
@@ -63,5 +60,8 @@
     },
     "engines": {
         "node": ">=24.21.0"
+    },
+    "publishConfig": {
+        "access": "public"
     }
 }

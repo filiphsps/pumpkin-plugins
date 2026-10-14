@@ -44,13 +44,13 @@ export function commentLines(text: string, width = COMMENT_WIDTH): string[] {
 export function renderConfig<S extends ConfigSchema>(
     schema: S,
     values: ConfigValues<S>,
-    options: RenderOptions = {}
+    options: RenderOptions = {},
 ): string {
     const blocks = [[...commentLines(`${schema.title} configuration.`), ...commentLines(options.note ?? MANAGED_NOTE)]];
     for (const [name, node] of Object.entries(schema.nodes)) {
         const nodeValues = (values as Record<string, Record<string, unknown>>)[name];
         blocks.push(
-            ...(node.node === 'section' ? renderSection(name, node, nodeValues) : renderTable(name, node, nodeValues))
+            ...(node.node === 'section' ? renderSection(name, node, nodeValues) : renderTable(name, node, nodeValues)),
         );
     }
     return `${blocks.map((block) => block.join('\n')).join('\n\n')}\n`;
@@ -62,7 +62,7 @@ function renderSection(name: string, node: SectionNode, values: Record<string, u
         const value = values[key];
         blocks.push([
             ...commentLines(f.description),
-            value === undefined ? `# ${key} = ${f.example}` : `${key} = ${f.format(value as never)}`
+            value === undefined ? `# ${key} = ${f.example}` : `${key} = ${f.format(value as never)}`,
         ]);
     }
     return blocks;
@@ -74,13 +74,13 @@ function renderTable(name: string, node: TableNode, entries: Record<string, unkn
         ...commentLines(node.description),
         '#',
         `# [${name}.${header}]`,
-        ...Object.entries(node.fields).map(([key, f]) => `# ${key} = ${f.example}  # ${f.description}`)
+        ...Object.entries(node.fields).map(([key, f]) => `# ${key} = ${f.example}  # ${f.description}`),
     ];
     const blocks = [example];
     for (const [key, entry] of Object.entries(entries)) {
         blocks.push([
             `[${name}.${JSON.stringify(key)}]`,
-            ...renderEntry(node.fields, entry as Record<string, unknown>)
+            ...renderEntry(node.fields, entry as Record<string, unknown>),
         ]);
     }
     return blocks;

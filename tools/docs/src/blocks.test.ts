@@ -29,7 +29,7 @@ describe('applyBlocks', () => {
 
     it('rejects markers in the wrong order', () => {
         expect(() =>
-            applyBlocks('<!-- docs:end commands -->\n<!-- docs:begin commands -->', { commands: 'X' }, 'R.md')
+            applyBlocks('<!-- docs:end commands -->\n<!-- docs:begin commands -->', { commands: 'X' }, 'R.md'),
         ).toThrow(/comes before/);
     });
 
@@ -40,13 +40,13 @@ describe('applyBlocks', () => {
 
 it('requires configured blocks and validates legacy action marker pairs', () => {
     expect(() => applyBlocks('No markers', { facts: 'New' }, 'guide.md', '', { required: true })).toThrow(
-        'docs:begin facts'
+        'docs:begin facts',
     );
     const text = 'Intro\n<!-- action-inputs:start -->\nold\n<!-- action-inputs:end -->\nUsage';
     expect(applyBlocks(text, { inputs: 'New' }, 'R.md', '', { markers: 'action', required: true })).toBe(
-        'Intro\n<!-- action-inputs:start -->\nNew\n<!-- action-inputs:end -->\nUsage'
+        'Intro\n<!-- action-inputs:start -->\nNew\n<!-- action-inputs:end -->\nUsage',
     );
     expect(() => applyBlocks(`${text}${text}`, { inputs: 'New' }, 'R.md', '', { markers: 'action' })).toThrow(
-        'found 2 and 2'
+        'found 2 and 2',
     );
 });

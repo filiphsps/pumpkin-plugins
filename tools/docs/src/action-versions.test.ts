@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 function repo(
-    actions: Record<string, { component: string; manifestVersion: string; releaseAs?: string; readmeVersion: string }>
+    actions: Record<string, { component: string; manifestVersion: string; releaseAs?: string; readmeVersion: string }>,
 ) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'update-action-readmes-'));
     dirs.push(dir);
@@ -30,12 +30,12 @@ function repo(
         fs.writeFileSync(path.join(actionDir, 'version.txt'), `${action.manifestVersion}\n`);
         fs.writeFileSync(
             path.join(actionDir, 'README.md'),
-            `Use \`filiphsps/pumpkin-plugins/${releasePath}@${action.component}-v${action.readmeVersion}\`.\n`
+            `Use \`filiphsps/pumpkin-plugins/${releasePath}@${action.component}-v${action.readmeVersion}\`.\n`,
         );
         packages[releasePath] = {
             component: action.component,
             'release-type': 'simple',
-            ...(action.releaseAs ? { 'release-as': action.releaseAs } : {})
+            ...(action.releaseAs ? { 'release-as': action.releaseAs } : {}),
         };
         manifest[releasePath] = action.manifestVersion;
     }
@@ -48,7 +48,7 @@ function repo(
 function run(dir: string, check = false) {
     const result = spawnSync(process.execPath, [cli, 'action-versions', ...(check ? ['--check'] : [])], {
         cwd: dir,
-        encoding: 'utf8'
+        encoding: 'utf8',
     });
     return { ok: result.status === 0, out: `${result.stdout}${result.stderr}` };
 }
@@ -64,20 +64,20 @@ describe('action version CLI', { timeout: 15000 }, () => {
                 component: 'publish-market',
                 manifestVersion: '0.0.0',
                 releaseAs: '0.0.1',
-                readmeVersion: '0.0.0'
+                readmeVersion: '0.0.0',
             },
             'another-action': {
                 component: 'market-helper',
                 manifestVersion: '1.2.3',
-                readmeVersion: '1.0.0'
-            }
+                readmeVersion: '1.0.0',
+            },
         });
 
         const result = run(dir);
         assert.ok(result.ok, result.out);
         const generatedReadmes = {
             publishMarket: readme(dir, 'publish-market'),
-            anotherAction: readme(dir, 'another-action')
+            anotherAction: readme(dir, 'another-action'),
         };
         expect(generatedReadmes).toMatchSnapshot();
         assert.match(generatedReadmes.publishMarket, /publish-market-v0\.0\.1/);
@@ -90,8 +90,8 @@ describe('action version CLI', { timeout: 15000 }, () => {
                 component: 'publish-market',
                 manifestVersion: '0.0.0',
                 releaseAs: '0.0.1',
-                readmeVersion: '0.0.1'
-            }
+                readmeVersion: '0.0.1',
+            },
         });
 
         const before = readme(dir, 'publish-market');
@@ -109,8 +109,8 @@ describe('action version CLI', { timeout: 15000 }, () => {
             'publish-market': {
                 component: 'publish-market',
                 manifestVersion: '0.2.0',
-                readmeVersion: '0.1.0'
-            }
+                readmeVersion: '0.1.0',
+            },
         });
         const before = readme(dir, 'publish-market');
 
@@ -124,8 +124,8 @@ describe('action version CLI', { timeout: 15000 }, () => {
             'publish-market': {
                 component: 'publish-market',
                 manifestVersion: '0.1.0',
-                readmeVersion: '0.0.1'
-            }
+                readmeVersion: '0.0.1',
+            },
         });
         fs.writeFileSync(path.join(dir, 'actions', 'publish-market', 'README.md'), 'No usage example.\n');
 

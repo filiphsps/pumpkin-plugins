@@ -30,7 +30,7 @@ it('discovers sorted components by metadata and walks Markdown with explicit exc
             'a',
             'apis/upnpumpkin-api',
             'pumpkin-api',
-            'z'
+            'z',
         ]);
         expect(discoverComponents(root, 'actions').map((item) => item.slug)).toEqual(['x', 'y']);
         expect(discoverComponents(root, 'packages')).toEqual([]);
@@ -38,7 +38,7 @@ it('discovers sorted components by metadata and walks Markdown with explicit exc
         expect(localLicenseFile(join(root, 'tools/z'))).toBeUndefined();
         expect(walkMarkdown(join(root, 'docs'), { exclude: [join(root, 'docs/api')] })).toEqual([
             join(root, 'docs/index.md'),
-            join(root, 'docs/nested/guide.md')
+            join(root, 'docs/nested/guide.md'),
         ]);
     } finally {
         rmSync(root, { recursive: true, force: true });

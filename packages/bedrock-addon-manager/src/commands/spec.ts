@@ -13,12 +13,12 @@ export const commands = defineCommands(PLUGIN_NAME, {
             list: {
                 description: 'List detected packs and their effective settings',
                 permission: `${COMMAND_PERMISSION}.list`,
-                defaultPermission: { tag: 'allow' }
+                defaultPermission: { tag: 'allow' },
             },
             reload: {
                 description: 'Reload `config.toml` and rescan the packs folder',
-                permission: `${COMMAND_PERMISSION}.reload`
-            }
-        }
-    }
+                permission: `${COMMAND_PERMISSION}.reload`,
+            },
+        },
+    },
 });

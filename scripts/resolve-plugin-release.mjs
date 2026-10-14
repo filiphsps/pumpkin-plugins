@@ -14,7 +14,7 @@ export async function resolvePluginRelease(root, tag) {
         ([path, entry]) =>
             /^packages\/[^/]+$/.test(path) &&
             typeof entry.component === 'string' &&
-            tag.startsWith(`${entry.component}-v`)
+            tag.startsWith(`${entry.component}-v`),
     );
     if (matches.length !== 1) throw new Error(`No plugin release matches tag ${JSON.stringify(tag)}`);
 
@@ -61,7 +61,7 @@ export async function resolvePluginRelease(root, tag) {
         version,
         engine,
         pluginName,
-        wasmFile: `dist/${basename(packagePath)}.wasm`
+        wasmFile: `dist/${basename(packagePath)}.wasm`,
     };
 }
 
@@ -92,7 +92,7 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
         for (const [key, value] of Object.entries(release)) {
             appendFileSync(
                 process.env.GITHUB_OUTPUT,
-                `${key === 'pluginName' ? 'plugin_name' : key === 'wasmFile' ? 'wasm_file' : key}=${value}\n`
+                `${key === 'pluginName' ? 'plugin_name' : key === 'wasmFile' ? 'wasm_file' : key}=${value}\n`,
             );
         }
     }

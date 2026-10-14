@@ -24,7 +24,7 @@ class UpdateCheckFixture extends Plugin {
             authors: [],
             description: 'Exercises update checking inside a Pumpkin plugin.',
             dependencies: [],
-            permissions: ['http.outbound']
+            permissions: ['http.outbound'],
         };
     }
 }
@@ -34,14 +34,14 @@ registerPluginWithUpdates(
     {
         name: 'UpdateCheckFixture',
         description: 'Exercises automatic update checking inside a Pumpkin plugin.',
-        permissions: [{ name: 'http.outbound', reason: 'Check for updates.' }]
+        permissions: [{ name: 'http.outbound', reason: 'Check for updates.' }],
     },
     {
         request: (url) => {
             if (!url.includes('plugin_name=UpdateCheckFixture')) throw new Error('unexpected update URL');
             return { latest_version: '1.3.0', update_available: true };
-        }
-    }
+        },
+    },
 );
 
 export * from '@pumpkin-plugins/pumpkin-api';

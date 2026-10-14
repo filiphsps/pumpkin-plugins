@@ -16,7 +16,7 @@ const state = vi.hoisted(() => ({
     suggestionHandler: undefined as unknown,
     events: new Map<string, (server: Server, event: unknown) => void>(),
     tasks: new Map<number, (server: Server) => void>(),
-    nextTask: 0
+    nextTask: 0,
 }));
 
 vi.mock('pumpkin:plugin/logging@0.1.0', () => ({ log: vi.fn() }));
@@ -30,12 +30,12 @@ vi.mock('pumpkin:plugin/text@0.1.0', () => ({
         encode() {
             return new Uint8Array();
         }
-    }
+    },
 }));
 vi.mock('pumpkin:plugin/uuid@0.1.0', () => ({
     generate: () => ({ high: 3n, low: 4n }),
     parse: () => ({ high: 1n, low: 2n }),
-    toString: () => '11111111-1111-4111-8111-111111111111'
+    toString: () => '11111111-1111-4111-8111-111111111111',
 }));
 vi.mock('@pumpkin-plugins/pumpkin-api', () => ({ handleCommand: vi.fn() }));
 vi.mock('@pumpkin-plugins/plugin-kit/plugin', () => ({
@@ -51,7 +51,7 @@ vi.mock('@pumpkin-plugins/plugin-kit/plugin', () => ({
     registerPlugin: (plugin: LoadedPlugin) => {
         state.plugin = plugin;
     },
-    handleTask: vi.fn()
+    handleTask: vi.fn(),
 }));
 vi.mock('@pumpkin-plugins/plugin-kit/data-dir', () => ({ WasiDataDir: { open: () => state.files } }));
 vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({
@@ -61,12 +61,12 @@ vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({
         state.tasks.set(id, run);
         return id;
     },
-    cancelTask: (id: number) => state.tasks.delete(id)
+    cancelTask: (id: number) => state.tasks.delete(id),
 }));
 vi.mock('@pumpkin-plugins/plugin-kit/register-commands', () => ({
     registerCommands: (_ctx: unknown, _tree: unknown, _handlers: unknown, suggestions: unknown) => {
         state.commandSuggestions = suggestions;
-    }
+    },
 }));
 vi.mock('./commands/handlers.ts', () => ({
     commandHandlers: (runtime: unknown) => {
@@ -75,7 +75,7 @@ vi.mock('./commands/handlers.ts', () => ({
     },
     resetPropertySuggestions: vi.fn(),
     waypointNameSuggestions: vi.fn(() => vi.fn()),
-    onlinePlayerNameSuggestions: vi.fn(() => vi.fn())
+    onlinePlayerNameSuggestions: vi.fn(() => vi.fn()),
 }));
 
 describe('Waypoints plugin HUD lifecycle', () => {
@@ -97,7 +97,7 @@ describe('Waypoints plugin HUD lifecycle', () => {
         const opManager = { isOp: () => false, [Symbol.dispose]: vi.fn() };
         const server = {
             getAllPlayers: () => [],
-            getOpManager: () => opManager
+            getOpManager: () => opManager,
         } as unknown as Server;
         const context = { getServer: () => server } as Context;
 
@@ -108,7 +108,7 @@ describe('Waypoints plugin HUD lifecycle', () => {
             'player-changed-world-event',
             'player-command-send-event',
             'server-command-event',
-            'player-leave-event'
+            'player-leave-event',
         ]);
         expect(state.tasks.size).toBe(1);
         state.tasks.get(1)?.(server);
@@ -129,7 +129,7 @@ describe('Waypoints plugin HUD lifecycle', () => {
         const playerSender = { isPlayer: () => true, getName: () => 'Alex' } as never;
         state.events.get('player-command-send-event')?.(server, {
             player: { getName: () => 'Alex' },
-            command: 'wp set icon Pumpkin minecraft:pumpkin_pie'
+            command: 'wp set icon Pumpkin minecraft:pumpkin_pie',
         });
         expect(runtime.consumePendingItemIconInput(playerSender)).toBe('minecraft:pumpkin_pie');
         expect(runtime.consumePendingItemIconInput(playerSender)).toBeUndefined();

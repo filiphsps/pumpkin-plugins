@@ -4,12 +4,12 @@ import * as ts from 'typescript';
 
 /** WIT operations and event variants referenced by the plugin implementation. */
 export interface UsedWitMethods {
+    /** Sorted event names when registrations are static; `undefined` retains every event variant. */
+    eventTypes: string[] | undefined;
     /** Sorted Pumpkin API operation identifiers required by the plugin. */
     pumpkinMethods: string[];
     /** Sorted WASI operation identifiers required by the plugin. */
     wasiMethods: string[];
-    /** Sorted event names when registrations are static; `undefined` retains every event variant. */
-    eventTypes: string[] | undefined;
 }
 
 /**
@@ -60,7 +60,7 @@ export function findUsedWitMethods(entry: string, additionalTypesDir?: string): 
     const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath));
     if (parsed.errors.length) {
         throw new Error(
-            parsed.errors.map((error) => ts.flattenDiagnosticMessageText(error.messageText, '\n')).join('\n')
+            parsed.errors.map((error) => ts.flattenDiagnosticMessageText(error.messageText, '\n')).join('\n'),
         );
     }
 
@@ -71,7 +71,7 @@ export function findUsedWitMethods(entry: string, additionalTypesDir?: string): 
     const implementationFiles = new Set<string>();
     const runtimeHost: ts.ModuleResolutionHost = {
         ...ts.sys,
-        fileExists: (fileName) => !/\.d\.[cm]?ts$/.test(fileName) && ts.sys.fileExists(fileName)
+        fileExists: (fileName) => !/\.d\.[cm]?ts$/.test(fileName) && ts.sys.fileExists(fileName),
     };
     let incomplete = false;
     collectImplementations(absoluteEntry);
@@ -80,10 +80,10 @@ export function findUsedWitMethods(entry: string, additionalTypesDir?: string): 
             ...new Set([
                 ...implementationFiles,
                 ...parsed.fileNames.filter((fileName) => /\.d\.[cm]?ts$/.test(fileName)),
-                ...additionalTypeFiles
-            ])
+                ...additionalTypeFiles,
+            ]),
         ],
-        options
+        options,
     );
     const checker = program.getTypeChecker();
     const hostModules = new Set<string>();
@@ -113,7 +113,7 @@ export function findUsedWitMethods(entry: string, additionalTypesDir?: string): 
     return {
         pumpkinMethods: [...pumpkinMethods].sort(),
         wasiMethods: [...wasiMethods].sort(),
-        eventTypes: incompleteEventTypes ? undefined : [...eventTypes].sort()
+        eventTypes: incompleteEventTypes ? undefined : [...eventTypes].sort(),
     };
 
     function indexDeclarations(node: ts.Node): void {
@@ -468,7 +468,7 @@ export function findUsedWitMethods(entry: string, additionalTypesDir?: string): 
         type: ts.Type,
         memberName: string,
         declarations: Set<ts.Declaration>,
-        visited = new Set<ts.Type>()
+        visited = new Set<ts.Type>(),
     ): void {
         if (visited.has(type)) return;
         visited.add(type);

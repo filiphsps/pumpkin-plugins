@@ -19,8 +19,8 @@ describe('TabDisplay PumpkinPIE integration', () => {
             plugins: [
                 providerPath,
                 builtPluginPath(process.cwd()),
-                join(fixtureDir, 'tab-display-pie-expansion-fixture.wasm')
-            ]
+                join(fixtureDir, 'tab-display-pie-expansion-fixture.wasm'),
+            ],
         });
         await server.waitForLog(/Loaded.*PumpkinPIE/, 15_000);
         await server.waitForLog(/Loaded TabDisplay/);

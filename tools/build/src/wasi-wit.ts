@@ -6,14 +6,14 @@ import { withWasiWitFileLock } from './wasi-wit-lock.ts';
 
 /** The WASI WIT files a build needs, pinned by content hash. */
 export interface WasiWitLock {
-    /** WASI release the files come from. */
-    version: string;
     /** SHA-256 of each WIT file, by path below the cache directory. */
     files: Record<string, string>;
-    /** Alternate pinned source URLs for WIT files outside the wasi repository. */
-    sources?: Record<string, string>;
     /** Contents for pinned WIT files that have no upstream source file. */
     generatedFiles?: Record<string, string>;
+    /** Alternate pinned source URLs for WIT files outside the wasi repository. */
+    sources?: Record<string, string>;
+    /** WASI release the files come from. */
+    version: string;
 }
 /** Downloads a URL. */
 export type Fetcher = (url: string) => Promise<Uint8Array>;
@@ -22,10 +22,10 @@ export type Fetcher = (url: string) => Promise<Uint8Array>;
 export interface WasiWitOptions {
     /** Folder to cache under. The files go in `<cacheDir>/wasi-wit/<version>`. */
     cacheDir: string;
-    /** Validated WASI version and pinned relative file paths. Defaults to `wasi-wit.lock.json` next to the sources. */
-    lock?: WasiWitLock;
     /** Downloads a URL. Defaults to `fetch`. */
     fetchFile?: Fetcher;
+    /** Validated WASI version and pinned relative file paths. Defaults to `wasi-wit.lock.json` next to the sources. */
+    lock?: WasiWitLock;
 }
 
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
@@ -51,7 +51,7 @@ function isSafeWitPath(file: string): boolean {
 
 function assertWitLockEntries(
     kind: 'file' | 'source' | 'generated-file',
-    entries: unknown
+    entries: unknown,
 ): asserts entries is Record<string, string> {
     if (!isRecord(entries)) throw new BuildError(`WASI WIT lock ${kind} entries must be an object`);
 
@@ -154,7 +154,7 @@ export async function ensureWasiWit(options: WasiWitOptions): Promise<string> {
                     bytes = await fetchFile(url);
                 } catch (err) {
                     throw new BuildError(
-                        `could not download ${url} (${err instanceof Error ? err.message : err}). The first build needs network access; the files are cached in ${dir} afterwards.`
+                        `could not download ${url} (${err instanceof Error ? err.message : err}). The first build needs network access; the files are cached in ${dir} afterwards.`,
                     );
                 }
             }
@@ -164,7 +164,7 @@ export async function ensureWasiWit(options: WasiWitOptions): Promise<string> {
                 throw new BuildError(`${rel} from ${source} has hash ${actual}, expected ${hash}`);
             }
             await writeAtomically(path.join(dir, rel), bytes, hash, options.cacheDir);
-        })
+        }),
     );
     return dir;
 }
@@ -173,7 +173,7 @@ async function writeAtomically(
     file: string,
     bytes: Uint8Array,
     expectedHash: string,
-    stagingDirectory: string
+    stagingDirectory: string,
 ): Promise<void> {
     const parent = path.dirname(file);
     fs.mkdirSync(parent, { recursive: true });

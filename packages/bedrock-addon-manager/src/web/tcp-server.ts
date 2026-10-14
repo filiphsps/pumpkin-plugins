@@ -22,14 +22,14 @@ const MAX_SETTLE_ATTEMPTS = 100;
 const SESSION_LIMITS: Omit<SessionOptions, 'now'> = {
     idleTimeoutMs: 15_000,
     writeBudget: 1 << 20,
-    chunkSize: 256 << 10
+    chunkSize: 256 << 10,
 };
 
 const BIND_REASONS: Record<string, string> = {
     'address-in-use': 'the port is already in use',
     'address-not-bindable': 'that address does not belong to this machine',
     'access-denied': 'the server is not allowed to listen there (is network.tcp.bind granted?)',
-    'permanently-unavailable': 'listening is not available'
+    'permanently-unavailable': 'listening is not available',
 };
 
 /** Socket start/finish pairs may report `would-block` while the host works; try again until they settle. */
@@ -53,7 +53,7 @@ export class TcpWebServer implements WebServer {
     constructor(
         private readonly lookup: PackLookup,
         private readonly log: Logger,
-        private readonly now: () => number = () => Number(monotonicNow() / 1_000_000n)
+        private readonly now: () => number = () => Number(monotonicNow() / 1_000_000n),
     ) {}
 
     /** {@inheritDoc web/server!WebServer#start} */

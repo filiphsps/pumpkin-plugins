@@ -44,7 +44,7 @@ class TabDisplay extends PluginBase {
             provider: config.placeholders.provider,
             send: ipcSend,
             now: monotonicMilliseconds,
-            onTransition: (state) => logging.log('info', `${PLUGIN_NAME}: PumpkinPIE provider is ${state.kind}`)
+            onTransition: (state) => logging.log('info', `${PLUGIN_NAME}: PumpkinPIE provider is ${state.kind}`),
         });
         const service = new TabDisplayService({
             host,
@@ -52,11 +52,11 @@ class TabDisplay extends PluginBase {
                 get state() {
                     return session.state;
                 },
-                resolveBatch: (requests) => session.client.resolveBatch(requests)
+                resolveBatch: (requests) => session.client.resolveBatch(requests),
             },
             now: monotonicMilliseconds,
             config,
-            log: (message) => logging.log('warn', `${PLUGIN_NAME}: ${message}`)
+            log: (message) => logging.log('warn', `${PLUGIN_NAME}: ${message}`),
         });
 
         this.host = host;
@@ -77,10 +77,10 @@ class TabDisplay extends PluginBase {
                         name: player.name,
                         edition: player.edition,
                         ...(player.javaVersion === undefined ? {} : { javaVersion: player.javaVersion }),
-                        placeholderIds: player.placeholderIds
+                        placeholderIds: player.placeholderIds,
                     };
-                }
-            })
+                },
+            }),
         );
     }
 
@@ -100,7 +100,7 @@ class TabDisplay extends PluginBase {
             } catch (error) {
                 logging.log(
                     'warn',
-                    `${PLUGIN_NAME}: could not restore owned tab fields during unload: ${errorMessage(error)}`
+                    `${PLUGIN_NAME}: could not restore owned tab fields during unload: ${errorMessage(error)}`,
                 );
             } finally {
                 this.host.endTick();
@@ -140,7 +140,7 @@ class TabDisplay extends PluginBase {
         } catch (error) {
             logging.log(
                 'error',
-                `${PLUGIN_NAME}: invalid or unavailable config; using defaults: ${errorMessage(error)}`
+                `${PLUGIN_NAME}: invalid or unavailable config; using defaults: ${errorMessage(error)}`,
             );
             return loadTabDisplayConfig({ read: () => undefined, write: () => undefined }).config;
         }
@@ -175,7 +175,7 @@ class TabDisplay extends PluginBase {
                 if (file.kind !== 'file') throw new Error(`${CONFIG_FILE} is not a file`);
                 return strFromU8(files.readFile(CONFIG_FILE));
             },
-            (text) => files.writeFile(CONFIG_FILE, strToU8(text))
+            (text) => files.writeFile(CONFIG_FILE, strToU8(text)),
         );
     }
 }

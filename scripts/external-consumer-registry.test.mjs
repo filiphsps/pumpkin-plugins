@@ -52,10 +52,10 @@ test('uses the bound origin for tarball links when the request Host header is fo
                 {
                     packageJson: { name: 'test-package', version: '1.2.3' },
                     filename: 'test-package-1.2.3.tgz',
-                    bytes: Buffer.from('archive')
-                }
-            ]
-        ])
+                    bytes: Buffer.from('archive'),
+                },
+            ],
+        ]),
     );
     await new Promise((resolve) => registry.listen(0, '127.0.0.1', resolve));
     const address = registry.address();
@@ -66,7 +66,7 @@ test('uses the bound origin for tarball links when the request Host header is fo
         const metadata = JSON.parse(response.body);
         assert.equal(
             metadata.versions['1.2.3'].dist.tarball,
-            `http://127.0.0.1:${address.port}/tarballs/test-package-1.2.3.tgz`
+            `http://127.0.0.1:${address.port}/tarballs/test-package-1.2.3.tgz`,
         );
     } finally {
         await new Promise((resolve) => registry.close(resolve));

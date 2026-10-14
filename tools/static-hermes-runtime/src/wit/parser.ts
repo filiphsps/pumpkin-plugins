@@ -18,7 +18,7 @@ export function readWitToolsDocument(
         executable?: string;
         /** Optional command runner for tests and embedded callers. */
         run?: (executable: string, args: string[]) => string;
-    } = {}
+    } = {},
 ): WitToolsDocument {
     const executable = options.executable ?? process.env.WASM_TOOLS;
     if (!executable) throw new Error('WASM_TOOLS is not configured; run the Static Hermes toolchain setup first');
@@ -29,13 +29,13 @@ export function readWitToolsDocument(
             ? options.run(executable, ['component', 'wit', absoluteWitDir, '--json', '--all-features'])
             : execFileSync(executable, ['component', 'wit', absoluteWitDir, '--json', '--all-features'], {
                   encoding: 'utf8',
-                  maxBuffer: 64 * 1024 * 1024
+                  maxBuffer: 64 * 1024 * 1024,
               });
     } catch (error) {
         const detail = processErrorDetail(error);
         throw new Error(
             `wasm-tools component wit ${absoluteWitDir} --json --all-features failed${detail ? `: ${detail}` : ''}`,
-            { cause: error }
+            { cause: error },
         );
     }
     return parseWitToolsJson(source);
@@ -84,7 +84,7 @@ export function readInterfaceDeclarationOrder(witDir: string): Map<string, Inter
                 enums: declarationNames(body, 'enum'),
                 flags: declarationNames(body, 'flags'),
                 types: declarationNames(body, 'type'),
-                escapedNames: captureNames(body, /%([a-zA-Z][\w-]*)/g)
+                escapedNames: captureNames(body, /%([a-zA-Z][\w-]*)/g),
             };
             orders.set(`${packageName}/${name}${version ? `@${version}` : ''}`, order);
         }
@@ -94,20 +94,20 @@ export function readInterfaceDeclarationOrder(witDir: string): Map<string, Inter
 
 /** Source declaration names grouped by WIT declaration kind in their original order. */
 export interface InterfaceDeclarationOrder {
-    /** Resource names in source declaration order. */
-    resources: string[];
-    /** Record names in source declaration order. */
-    records: string[];
-    /** Variant names in source declaration order. */
-    variants: string[];
     /** Enum names in source declaration order. */
     enums: string[];
-    /** Flags names in source declaration order. */
-    flags: string[];
-    /** Type-alias names in source declaration order. */
-    types: string[];
     /** Escaped WIT identifiers encountered in the interface declaration. */
     escapedNames: string[];
+    /** Flags names in source declaration order. */
+    flags: string[];
+    /** Record names in source declaration order. */
+    records: string[];
+    /** Resource names in source declaration order. */
+    resources: string[];
+    /** Type-alias names in source declaration order. */
+    types: string[];
+    /** Variant names in source declaration order. */
+    variants: string[];
 }
 
 function packageDeclaration(source: string): string | undefined {

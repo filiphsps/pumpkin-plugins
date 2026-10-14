@@ -11,7 +11,7 @@ const COMMON_CONSUMERS = [
     'publish-to-pumpkin-market',
     'sign-pumpkin-plugin',
     'update-pumpkin-market-listing',
-    'verify-pumpkin-plugin'
+    'verify-pumpkin-plugin',
 ];
 
 const args = process.argv.slice(2);
@@ -54,8 +54,8 @@ const integrationScope = benchmarkOnly
     : code.length > 0 &&
         code.every((file) =>
             /^(packages\/[^/]+|tools\/(build|config|plugin-kit|port-mapping|test-harness|apis\/upnpumpkin-api))(?:\/|$)/.test(
-                file
-            )
+                file,
+            ),
         )
       ? 'affected'
       : 'all';
@@ -75,6 +75,6 @@ if (integrationExtra) console.log(`Additional integration package: ${integration
 if (process.env.GITHUB_OUTPUT) {
     appendFileSync(
         process.env.GITHUB_OUTPUT,
-        `code=${code.length > 0}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\ngenerated_readmes=${generatedReadmes}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n`
+        `code=${code.length > 0}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\ngenerated_readmes=${generatedReadmes}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n`,
     );
 }

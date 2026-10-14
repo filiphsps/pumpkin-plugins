@@ -18,7 +18,7 @@ describe('prepareServerDir', () => {
         const server = await prepareServerDir({
             plugins: [wasm],
             files: { 'plugins/data/P/config.toml': 'a = 1', 'deep/er/file.bin': new Uint8Array([1, 2, 3]) },
-            config: { plugins: { hot_reload: true }, extra: { x: 1 } }
+            config: { plugins: { hot_reload: true }, extra: { x: 1 } },
         });
         made.push(server.dir);
 

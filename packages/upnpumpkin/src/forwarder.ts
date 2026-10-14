@@ -7,14 +7,14 @@ import {
     type MappingState,
     type Network,
     PortMapper,
-    Task
+    Task,
 } from '@pumpkin-plugins/port-mapping';
 import {
     decodeRequest,
     encodeReply,
     type NetworkInfo,
     type PortStatus,
-    type Reply
+    type Reply,
 } from '@pumpkin-plugins/upnpumpkin-api';
 import { blockedReason } from './blocklist.ts';
 import { parseEndpoint } from './config/fields.ts';
@@ -29,9 +29,9 @@ const PRUNE_EVERY_MS = 10_000;
 const SHUTDOWN_BUDGET_MS = 3000;
 
 interface PluginRequest {
+    lastSeen: number;
     sender: string;
     spec: MappingSpec;
-    lastSeen: number;
 }
 
 const ownKey = (name: string) => `own:${name}`;
@@ -63,7 +63,7 @@ export class PortForwarder {
     constructor(
         private readonly files: DataFiles,
         private readonly log: Logger,
-        private readonly net: Network
+        private readonly net: Network,
     ) {}
 
     /** The current settings. Only available after `start`. */
@@ -76,7 +76,7 @@ export class PortForwarder {
     get snapshot() {
         return {
             info: this.mapper?.info() ?? {},
-            mappings: this.mapper?.mappings() ?? []
+            mappings: this.mapper?.mappings() ?? [],
         };
     }
 
@@ -160,7 +160,7 @@ export class PortForwarder {
                 if (!this.settings.plugins.allow_requests) {
                     return {
                         ok: false,
-                        error: 'requests from other plugins are turned off in the UPnPumpkin config (plugins.allow_requests)'
+                        error: 'requests from other plugins are turned off in the UPnPumpkin config (plugins.allow_requests)',
                     };
                 }
                 const known = this.requests.has(key);
@@ -168,12 +168,12 @@ export class PortForwarder {
                 if (!known && requestCount >= this.settings.plugins.max_requests_per_plugin) {
                     return {
                         ok: false,
-                        error: `at most ${this.settings.plugins.max_requests_per_plugin} ports can be requested per plugin`
+                        error: `at most ${this.settings.plugins.max_requests_per_plugin} ports can be requested per plugin`,
                     };
                 }
                 if (!known)
                     this.log.info(
-                        `${ansi.named.name(sender)} asked for ${request.protocol.toUpperCase()} port ${ansi.named.port(request.port)} to be opened (${request.description}).`
+                        `${ansi.named.name(sender)} asked for ${request.protocol.toUpperCase()} port ${ansi.named.port(request.port)} to be opened (${request.description}).`,
                     );
                 this.requests.set(key, { sender, spec: request, lastSeen: this.net.now() });
                 return { ok: true, status: toStatus(this.mapper.request(key, request)) };
@@ -186,7 +186,7 @@ export class PortForwarder {
         return {
             localAddress: localAddress && formatIpv4(localAddress),
             gateway: gateway && { kind: gateway.kind, address: formatIpv4(gateway.address) },
-            externalAddress: externalAddress && formatIpv4(externalAddress)
+            externalAddress: externalAddress && formatIpv4(externalAddress),
         };
     }
 
@@ -201,7 +201,7 @@ export class PortForwarder {
             natPmpGateway: parseEndpoint(router.nat_pmp_gateway),
             screen: blockedReason,
             onRefused: (refusal) => this.log.warn(refusalMessage(refusal)),
-            log: (message, level) => (level === 'warn' ? this.log.warn(message) : this.log.info(message))
+            log: (message, level) => (level === 'warn' ? this.log.warn(message) : this.log.info(message)),
         });
         for (const [key, { spec }] of this.requests) this.mapper.request(key, spec);
     }
@@ -238,7 +238,7 @@ export class PortForwarder {
         const { java, bedrock } = this.config;
         const own = [
             { name: 'java', setting: java, protocol: 'tcp' as const, description: 'Pumpkin Java Edition' },
-            { name: 'bedrock', setting: bedrock, protocol: 'udp' as const, description: 'Pumpkin Bedrock Edition' }
+            { name: 'bedrock', setting: bedrock, protocol: 'udp' as const, description: 'Pumpkin Bedrock Edition' },
         ];
         for (const { name, setting, protocol, description } of own) {
             if (setting.enabled) mapper.request(ownKey(name), { protocol, port: setting.port, description });

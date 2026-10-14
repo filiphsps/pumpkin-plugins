@@ -12,7 +12,7 @@ import {
     ProtocolError,
     type Request,
     type ResolvedLine,
-    type ResultFor
+    type ResultFor,
 } from './protocol.ts';
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
@@ -23,7 +23,7 @@ type Associations = [
     Expect<
         Equal<ResultFor<{ op: 'on_request'; namespace: string; name: string; id: string }>, { readonly value?: string }>
     >,
-    Expect<Equal<ResultFor<Request>, OperationResults[Request['op']]>>
+    Expect<Equal<ResultFor<Request>, OperationResults[Request['op']]>>,
 ];
 const associations: Associations = [true, true, true, true];
 it('keeps request/result associations and rejects invalid public arguments at compile time', () => {
@@ -48,7 +48,7 @@ it('decodes scalar Unicode and rejects malformed UTF-8 in every byte range', () 
         [0xe0, 0x80, 0x80],
         [0xe2, 0x28, 0xa1],
         [0xf0, 0x80, 0x80, 0x80],
-        [0xf5, 0x80, 0x80, 0x80]
+        [0xf5, 0x80, 0x80, 0x80],
     ])
         expect(() => decodeJson(new Uint8Array(bytes))).toThrow(ProtocolError);
 });
@@ -61,7 +61,7 @@ it('accepts exact message size with additive fields and rejects an extra byte', 
 });
 it('round trips callback replies with known empty values and declines', () => {
     const request = decodeCallback(
-        strToU8('{"op":"on_request","namespace":"waypoints","id":"waypoints_count","name":"count","viewer":"Steve"}')
+        strToU8('{"op":"on_request","namespace":"waypoints","id":"waypoints_count","name":"count","viewer":"Steve"}'),
     );
     expect(decodeResult(encodeCallbackReply(), request)).toEqual({});
     expect(decodeResult(encodeCallbackReply(''), request)).toEqual({ value: '' });

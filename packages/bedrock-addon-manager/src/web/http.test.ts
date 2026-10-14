@@ -9,7 +9,7 @@ describe('parseRequest', () => {
         expect(request('GET /packs/a.mcpack HTTP/1.1\r\nHost: x\r\nRange: bytes=0-9\r\n\r\n')).toEqual({
             method: 'GET',
             target: '/packs/a.mcpack',
-            headers: { host: 'x', range: 'bytes=0-9' }
+            headers: { host: 'x', range: 'bytes=0-9' },
         });
     });
 
@@ -55,7 +55,7 @@ describe('routePack', () => {
             '/packs/a%2Fb',
             '/packs/a%5Cb',
             '/packs/a%00b',
-            '/packs/%E0%A4%A'
+            '/packs/%E0%A4%A',
         ]) {
             expect(routePack(target), target).toBeNull();
         }
@@ -87,7 +87,7 @@ describe('parseRange', () => {
 describe('responseHead', () => {
     it('writes the status line, headers and always closes the connection', () => {
         expect(strFromU8(responseHead(206, { 'Content-Length': 10 }))).toBe(
-            'HTTP/1.1 206 Partial Content\r\nContent-Length: 10\r\nConnection: close\r\n\r\n'
+            'HTTP/1.1 206 Partial Content\r\nContent-Length: 10\r\nConnection: close\r\n\r\n',
         );
     });
 });

@@ -13,7 +13,7 @@ const entry = (over: Partial<PackEntry> = {}): PackEntry => ({
     addonPack: false,
     hasScripts: false,
     rtxEnabled: false,
-    ...over
+    ...over,
 });
 
 describe('formatSize', () => {
@@ -30,19 +30,19 @@ describe('formatSize', () => {
 describe('listLines', () => {
     it('says when there is nothing', () => {
         expect(listLines([])).toEqual([
-            'No Bedrock packs are listed. Put .mcpack or .mcaddon files in the packs folder and run /baddon reload.'
+            'No Bedrock packs are listed. Put .mcpack or .mcaddon files in the packs folder and run /baddon reload.',
         ]);
     });
 
     it('lists each pack with its flags and download url', () => {
         expect(
-            listLines([entry(), entry({ fileName: 'b.mcpack', addonPack: true, hasScripts: true, rtxEnabled: true })])
+            listLines([entry(), entry({ fileName: 'b.mcpack', addonPack: true, hasScripts: true, rtxEnabled: true })]),
         ).toEqual([
             'Bedrock packs (2), in the order they are listed:',
             '1. a.mcpack: 627409cd-5207-46f1-b1e8-0d4492616419 v1.0.1, 4.9 MiB',
             '   http://127.0.0.1:8123/packs/a.mcpack',
             '2. b.mcpack: 627409cd-5207-46f1-b1e8-0d4492616419 v1.0.1, 4.9 MiB, add-on pack, scripts, ray tracing',
-            '   http://127.0.0.1:8123/packs/a.mcpack'
+            '   http://127.0.0.1:8123/packs/a.mcpack',
         ]);
     });
 });

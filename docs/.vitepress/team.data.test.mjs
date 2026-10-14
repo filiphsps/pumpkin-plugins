@@ -22,7 +22,7 @@ function contributor(login, nodeId = `NODE_${login}`, overrides = {}) {
         avatar_url: `https://avatars.example.test/${login}`,
         html_url: `https://github.com/${login}`,
         contributions: 7,
-        ...overrides
+        ...overrides,
     };
 }
 
@@ -45,13 +45,13 @@ describe('Team data loader', () => {
                     contributor('alice'),
                     contributor('bob'),
                     contributor('renovate[bot]'),
-                    contributor('service', 'NODE_SERVICE', { type: 'Bot' })
+                    contributor('service', 'NODE_SERVICE', { type: 'Bot' }),
                 ]);
             }
             if (String(url) === 'https://api.github.com/graphql') {
                 return graphQLResponse([
                     { login: 'alice', name: 'Alice Example' },
-                    { login: 'bob', name: null }
+                    { login: 'bob', name: null },
                 ]);
             }
             assert.fail(`unexpected GitHub request: ${url}`);
@@ -70,8 +70,8 @@ describe('Team data loader', () => {
             members.map(({ login, name }) => ({ login, name })),
             [
                 { login: 'alice', name: 'Alice Example' },
-                { login: 'bob', name: 'bob' }
-            ]
+                { login: 'bob', name: 'bob' },
+            ],
         );
         assert.equal(members[0].contributions, 7);
         assert.equal(members[0].avatar, 'https://avatars.example.test/alice');
@@ -89,7 +89,7 @@ describe('Team data loader', () => {
                 return response(
                     calls.filter(({ url: calledUrl }) => calledUrl.includes('/contributors?')).length === 1
                         ? firstPage
-                        : secondPage
+                        : secondPage,
                 );
             }
             if (String(url) === 'https://api.github.com/graphql') {
@@ -105,11 +105,11 @@ describe('Team data loader', () => {
         assert.equal(graphqlCalls.length, 2);
         assert.deepEqual(
             graphqlCalls.map(({ options }) => JSON.parse(options.body).variables.ids.length),
-            [100, 1]
+            [100, 1],
         );
         assert.equal(
             calls.some(({ url }) => /\/users\//.test(url)),
-            false
+            false,
         );
     });
 
@@ -127,7 +127,7 @@ describe('Team data loader', () => {
         assert.equal(calls.length, 1);
         assert.equal(
             calls.some((url) => url.includes('/graphql') || /\/users\//.test(url)),
-            false
+            false,
         );
     });
 
@@ -147,7 +147,7 @@ describe('Team data loader', () => {
         assert.equal(calls.length, 2);
         assert.equal(
             calls.some((url) => /\/users\//.test(url)),
-            false
+            false,
         );
     });
 });

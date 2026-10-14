@@ -9,7 +9,7 @@ describe('portable hook protocol', () => {
     it('normalizes file paths from a package cwd and refuses outside paths', () => {
         assert.equal(
             repoPath('src/plugin.ts', path.join(ROOT, 'packages/upnpumpkin')),
-            'packages/upnpumpkin/src/plugin.ts'
+            'packages/upnpumpkin/src/plugin.ts',
         );
         assert.equal(repoPath(path.join(ROOT, '.agents/hooks/run.mjs')), '.agents/hooks/run.mjs');
         assert.throws(() => repoPath('../elsewhere/file.ts'), /outside this repo/);
@@ -21,7 +21,7 @@ describe('portable hook protocol', () => {
             const result = await handle({ event: 'before-tool', tool, input: { command: 'pnpm test', timeout: 30 } });
             assert.deepEqual(result, {
                 ok: true,
-                input: { command: 'pnpm test --output-logs=errors-only', timeout: 30 }
+                input: { command: 'pnpm test --output-logs=errors-only', timeout: 30 },
             });
         }
     });
@@ -30,13 +30,13 @@ describe('portable hook protocol', () => {
         const refused = await handle({
             event: 'before-tool',
             tool: 'write',
-            input: { filePath: 'pnpm-lock.yaml', content: '' }
+            input: { filePath: 'pnpm-lock.yaml', content: '' },
         });
         assert.equal(refused.ok, false);
         const allowed = await handle({
             event: 'before-tool',
             tool: 'edit',
-            input: { path: 'tools/build/src/cli.ts', oldString: 'x' }
+            input: { path: 'tools/build/src/cli.ts', oldString: 'x' },
         });
         assert.equal(allowed.ok, true);
         for (const input of ['*** Delete File: pnpm-lock.yaml', { patchText: '*** Move to: pnpm-lock.yaml' }]) {
@@ -50,8 +50,8 @@ describe('portable hook protocol', () => {
             { event: 'plan', files: ['src/plugin.ts'], cwd: path.join(ROOT, 'packages/upnpumpkin') },
             {
                 changedFiles: () => assert.fail('must not read git'),
-                runChecks: () => assert.fail('must not execute')
-            }
+                runChecks: () => assert.fail('must not execute'),
+            },
         );
         assert.equal(result.ok, true);
         assert.deepEqual(result.files, ['packages/upnpumpkin/src/plugin.ts']);
@@ -69,8 +69,8 @@ describe('portable hook protocol', () => {
                     ran = true;
                     assert.ok(steps.some((s) => s.args[0] === 'check'));
                     return [failure];
-                }
-            }
+                },
+            },
         );
         assert.equal(ran, true);
         assert.equal(result.ok, false);
@@ -84,7 +84,7 @@ describe('portable hook protocol', () => {
         await assert.rejects(handle({ event: 'before-tool', tool: 'bash', input: {} }), /Shell input/);
         assert.deepEqual(await handle({ event: 'before-tool', tool: 'read', input: { path: 'x' } }), {
             ok: true,
-            input: { path: 'x' }
+            input: { path: 'x' },
         });
     });
 
@@ -92,11 +92,11 @@ describe('portable hook protocol', () => {
         for (const [input, code] of [
             ['{"event":"check","files":[]}', 0],
             ['{"event":"before-tool","tool":"bash","input":{"command":"yarn add x"}}', 1],
-            ['not JSON', 1]
+            ['not JSON', 1],
         ]) {
             const result = spawnSync(process.execPath, [path.join(ROOT, '.agents/hooks/run.mjs')], {
                 input,
-                encoding: 'utf8'
+                encoding: 'utf8',
             });
             assert.equal(result.status, code, result.stderr);
             assert.equal(JSON.parse(result.stdout).ok, code === 0);

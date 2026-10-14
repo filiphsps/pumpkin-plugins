@@ -6,16 +6,16 @@ import { FakeNetwork, runSteps } from './testing/fake-network.ts';
 describe('describeIdentity', () => {
     it('joins the maker and the model, without repeating the maker', () => {
         expect(describeIdentity({ manufacturer: 'AVM', model: 'FRITZ!Box 7590', source: 'upnp' })).toBe(
-            'AVM FRITZ!Box 7590'
+            'AVM FRITZ!Box 7590',
         );
         expect(describeIdentity({ manufacturer: 'Netgear', model: 'Netgear R7000', source: 'upnp' })).toBe(
-            'Netgear R7000'
+            'Netgear R7000',
         );
     });
 
     it('falls back to what the router calls itself, then to the maker alone', () => {
         expect(describeIdentity({ manufacturer: 'Telekom', name: 'Speedport', source: 'web' })).toBe(
-            'Telekom Speedport'
+            'Telekom Speedport',
         );
         expect(describeIdentity({ manufacturer: 'Telekom', source: 'web' })).toBe('Telekom');
         expect(describeIdentity({ name: 'Home gateway', source: 'upnp' })).toBe('Home gateway');
@@ -28,20 +28,20 @@ describe('probeWeb', () => {
 
     it('recognizes a Speedport by its public login page', () => {
         const net = new FakeNetwork([
-            new FakeIgd({ upnp: false, natPmp: false, webPages: login('Speedport Konfigurationsprogramm') })
+            new FakeIgd({ upnp: false, natPmp: false, webPages: login('Speedport Konfigurationsprogramm') }),
         ]);
         expect(
             runSteps(
                 net,
                 probeWeb(net, [
                     [192, 168, 1, 254],
-                    [192, 168, 1, 1]
-                ])
-            )
+                    [192, 168, 1, 1],
+                ]),
+            ),
         ).toEqual({
             manufacturer: 'Telekom',
             name: 'Speedport',
-            source: 'web'
+            source: 'web',
         });
         expect(net.leaks).toBe(0);
     });
@@ -55,7 +55,7 @@ describe('probeWeb', () => {
         expect(runSteps(missing, probeWeb(missing, [[192, 168, 1, 1]]))).toBeUndefined();
 
         const error = new FakeNetwork([
-            new FakeIgd({ webPages: { '/html/login/index.html': { status: 404, body: '<title>Speedport</title>' } } })
+            new FakeIgd({ webPages: { '/html/login/index.html': { status: 404, body: '<title>Speedport</title>' } } }),
         ]);
         expect(runSteps(error, probeWeb(error, [[192, 168, 1, 1]]))).toBeUndefined();
     });

@@ -43,7 +43,7 @@ export class PumpkinInstance {
     private constructor(
         private readonly child: ChildProcessWithoutNullStreams,
         private readonly server: ServerDir,
-        private readonly name: string
+        private readonly name: string,
     ) {
         children.add(child);
         this.exited = new Promise((resolve) => {
@@ -91,7 +91,7 @@ export class PumpkinInstance {
                 cwd: server.dir,
                 stdio: 'pipe',
                 // Tests use INFO startup and plugin logs as observable readiness and behavior signals.
-                env: { ...process.env, RUST_LOG: 'info' }
+                env: { ...process.env, RUST_LOG: 'info' },
             });
             const instance = new PumpkinInstance(child, server, options.name ?? 'pumpkin');
             try {
@@ -164,12 +164,12 @@ export class PumpkinInstance {
                 timeoutMs,
                 fromIndex,
                 isOver: () => this.hasExited || Boolean(this.failure),
-                process: 'Pumpkin'
+                process: 'Pumpkin',
             });
         } catch (error) {
             if (this.failure)
                 throw new Error(`Pumpkin failed: ${this.failure.message}\n${(error as Error).message}`, {
-                    cause: this.failure
+                    cause: this.failure,
                 });
             throw error;
         }

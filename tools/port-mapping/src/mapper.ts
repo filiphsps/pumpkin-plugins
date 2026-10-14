@@ -9,13 +9,13 @@ import { UpnpError } from './upnp.ts';
 
 /** What to keep open. */
 export interface MappingSpec {
-    protocol: Protocol;
-    /** The port on this machine. */
-    port: number;
-    /** The public port to ask for. Defaults to `port`; the router may give another one. */
-    externalPort?: number;
     /** Shown in the router's list of forwarded ports. */
     description: string;
+    /** The public port to ask for. Defaults to `port`; the router may give another one. */
+    externalPort?: number;
+    /** The port on this machine. */
+    port: number;
+    protocol: Protocol;
 }
 
 /** Whether a mapping works yet, and where players reach it. */
@@ -26,14 +26,14 @@ export type MappingState =
 
 /** What the mapper has learned about the network. */
 export interface MapperInfo {
-    /** This machine's address toward the internet. */
-    localAddress?: Ipv4;
-    /** The router that opens the ports. */
-    gateway?: { kind: GatewayKind; address: Ipv4 };
     /** The router's address on the internet side. */
     externalAddress?: Ipv4;
+    /** The router that opens the ports. */
+    gateway?: { kind: GatewayKind; address: Ipv4 };
     /** What is known about the router's make and model. */
     identity?: RouterIdentity;
+    /** This machine's address toward the internet. */
+    localAddress?: Ipv4;
     /** Set when the router was turned down by the `screen`: nothing is opened on it and it is not asked again. */
     refused?: { identity: RouterIdentity; reason: string };
 }
@@ -42,8 +42,6 @@ export interface MapperInfo {
 export interface MapperOptions extends Omit<DiscoveryOptions, 'searchMs'> {
     /** How long routers keep a mapping without a renewal. Renewed at half this time. */
     leaseSeconds: number;
-    /** How long a UPnP search waits for answers. */
-    searchMs?: number;
     /**
      * Where messages for the server log go. Failures come with the level `warn`, and each is said
      * once until a port opens, so a router that stays away doesn't fill the log.
@@ -53,21 +51,23 @@ export interface MapperOptions extends Omit<DiscoveryOptions, 'searchMs'> {
     onRefused?: (refusal: { identity: RouterIdentity; reason: string }) => void;
     /** A number in [0, 1), for choosing another public port when the first is taken. */
     random?: () => number;
+    /** How long a UPnP search waits for answers. */
+    searchMs?: number;
 }
 
 interface Entry {
-    spec: MappingSpec;
     mapping: PhysicalMapping;
+    spec: MappingSpec;
 }
 
 interface PhysicalMapping {
-    spec: MappingSpec;
-    state: MappingState;
-    pending?: { found: Discovered; request: MappingRequest; internalClient: Ipv4 };
     applied?: { found: Discovered; request: MappingRequest; result: MappingResult; internalClient: Ipv4 };
+    failures: number;
+    pending?: { found: Discovered; request: MappingRequest; internalClient: Ipv4 };
     renewAt?: number;
     retryAt: number;
-    failures: number;
+    spec: MappingSpec;
+    state: MappingState;
 }
 
 class OwnershipConflictError extends Error {}
@@ -109,7 +109,7 @@ export class PortMapper {
     /** Creates a mapper that does nothing until a mapping is requested. */
     constructor(
         private readonly net: Network,
-        private readonly options: MapperOptions
+        private readonly options: MapperOptions,
     ) {}
 
     /**
@@ -131,7 +131,7 @@ export class PortMapper {
                 other.protocol === spec.protocol &&
                 other.port === spec.port &&
                 (other.externalPort ?? other.port) === (spec.externalPort ?? spec.port) &&
-                this.sameClient(mapping)
+                this.sameClient(mapping),
         );
         const mapping = shared?.mapping ?? { spec, state, retryAt: 0, failures: 0 };
         this.entries.set(key, { spec, mapping });
@@ -163,7 +163,7 @@ export class PortMapper {
             gateway: gateway && { kind: gateway.kind, address: gateway.address },
             externalAddress: this.discovered?.externalAddress,
             identity: this.refusal?.identity ?? this.discovered?.identity,
-            refused: this.refusal
+            refused: this.refusal,
         };
     }
 
@@ -233,7 +233,7 @@ export class PortMapper {
         found: Discovered,
         request: MappingRequest,
         internal: Ipv4,
-        except: PhysicalMapping
+        except: PhysicalMapping,
     ): PhysicalMapping | undefined {
         for (const { mapping } of this.entries.values()) {
             const applied = mapping.applied;
@@ -253,7 +253,7 @@ export class PortMapper {
             if (!samePort) continue;
             if (!sameClient || applied.request.internalPort !== request.internalPort) {
                 throw new OwnershipConflictError(
-                    `port ${request.externalPort} is already owned by another internal target`
+                    `port ${request.externalPort} is already owned by another internal target`,
                 );
             }
             return mapping;
@@ -282,7 +282,7 @@ export class PortMapper {
                 kind: 'open',
                 via: 'public',
                 address,
-                port: entry.spec.port
+                port: entry.spec.port,
             };
         }
         return true;
@@ -352,7 +352,7 @@ export class PortMapper {
                     internalPort: entry.spec.port,
                     externalPort,
                     description: entry.spec.description,
-                    leaseSeconds: entry.applied?.result.leaseSeconds === 0 ? 0 : this.options.leaseSeconds
+                    leaseSeconds: entry.applied?.result.leaseSeconds === 0 ? 0 : this.options.leaseSeconds,
                 };
                 const owner = this.ownerOf(found, request, internal, entry);
                 if (owner) {
@@ -366,7 +366,7 @@ export class PortMapper {
                         found,
                         request: { ...request, externalPort: result.externalPort },
                         result,
-                        internalClient: internal
+                        internalClient: internal,
                     };
                     break;
                 } catch (err) {
@@ -386,7 +386,7 @@ export class PortMapper {
                 this.net.now() + (result.leaseSeconds > 0 ? (result.leaseSeconds * 1000) / 2 : LOCAL_CHECK_MS);
             if (!wasOpen) {
                 this.options.log?.(
-                    `Opened ${entry.spec.protocol.toUpperCase()} port ${entry.spec.port} as ${formatIpv4(address)}:${result.externalPort} (${gateway.kind}).`
+                    `Opened ${entry.spec.protocol.toUpperCase()} port ${entry.spec.port} as ${formatIpv4(address)}:${result.externalPort} (${gateway.kind}).`,
                 );
             }
         } catch (err) {
@@ -397,11 +397,11 @@ export class PortMapper {
             entry.renewAt = undefined;
             entry.state = {
                 kind: 'failed',
-                reason: `the router would not open port ${entry.spec.port}: ${reason(err)}`
+                reason: `the router would not open port ${entry.spec.port}: ${reason(err)}`,
             };
             this.warn(
                 `open:${key}`,
-                `Could not open ${entry.spec.protocol.toUpperCase()} port ${entry.spec.port}: ${reason(err)}.`
+                `Could not open ${entry.spec.protocol.toUpperCase()} port ${entry.spec.port}: ${reason(err)}.`,
             );
             // The router may have gone or changed; look for it again when it is time to retry.
             if (!(err instanceof OwnershipConflictError)) {
@@ -419,7 +419,7 @@ export class PortMapper {
             ) {
                 this.warn(
                     `cleanup:${key}`,
-                    `Creation of port ${entry.spec.port}: outcome is unknown; attempting best-effort cleanup.`
+                    `Creation of port ${entry.spec.port}: outcome is unknown; attempting best-effort cleanup.`,
                 );
                 this.removals.push(entry.pending);
             }
@@ -433,7 +433,7 @@ export class PortMapper {
         } catch (err) {
             this.warn(
                 `cleanup:${request.protocol}:${request.externalPort}`,
-                `Best-effort cleanup of port ${request.externalPort} failed: ${reason(err)}. Remote mappings may remain.`
+                `Best-effort cleanup of port ${request.externalPort} failed: ${reason(err)}. Remote mappings may remain.`,
             );
         }
     }

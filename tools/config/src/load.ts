@@ -27,16 +27,16 @@ export type LoadStatus =
 
 /** The loaded values and what happened to the file. */
 export interface LoadResult<V> {
-    /** Every setting, with defaults filled in. */
-    values: V;
-    /** What was done to the file. */
-    status: LoadStatus;
-    /** Problems to show the user. Invalid values always appear; unknown settings only when the file was kept. */
-    warnings: string[];
     /** Settings written to the file because it didn't have them yet. */
     added: string[];
     /** Settings dropped from the file because the schema no longer has them. */
     removed: string[];
+    /** What was done to the file. */
+    status: LoadStatus;
+    /** Every setting, with defaults filled in. */
+    values: V;
+    /** Problems to show the user. Invalid values always appear; unknown settings only when the file was kept. */
+    warnings: string[];
 }
 
 /**
@@ -52,7 +52,7 @@ export interface LoadResult<V> {
 export function loadConfig<S extends ConfigSchema>(
     schema: S,
     store: ConfigStore,
-    options: RenderOptions = {}
+    options: RenderOptions = {},
 ): LoadResult<ConfigValues<S>> {
     const text = store.read();
     if (text === undefined) {
@@ -79,7 +79,7 @@ export function loadConfig<S extends ConfigSchema>(
             status: 'kept',
             warnings: [...warnings, ...unknown.map((i) => i.message)],
             added: [],
-            removed: []
+            removed: [],
         };
     }
 

@@ -24,7 +24,7 @@ function fixture() {
     const original = Buffer.concat([
         Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]),
         Buffer.from([0x01, 0x04, 0x01, 0x60, 0x00, 0x00]),
-        customSection('name', Buffer.from('fixture'))
+        customSection('name', Buffer.from('fixture')),
     ]);
     fs.writeFileSync(wasmFile, original);
     fs.writeFileSync(`${wasmFile}.sha256`, 'stale checksum\n');
@@ -42,9 +42,9 @@ function run(dir, inputs = {}) {
             'INPUT_DEVELOPER-NAME': 'Test Developer',
             'INPUT_SIGNING-KEY': SEED,
             INPUT_WARN: 'false',
-            ...inputs
+            ...inputs,
         },
-        encoding: 'utf8'
+        encoding: 'utf8',
     });
     return { ok: result.status === 0, out: `${result.stdout}${result.stderr}` };
 }
@@ -64,7 +64,7 @@ describe('sign-pumpkin-plugin action', () => {
         assert.equal(verification.metadata?.dev_name, 'Test Developer');
         assert.equal(
             fs.readFileSync(`${wasmFile}.sha256`, 'utf8'),
-            `${createHash('sha256').update(signed).digest('hex')}  plugin.wasm\n`
+            `${createHash('sha256').update(signed).digest('hex')}  plugin.wasm\n`,
         );
     });
 
@@ -77,21 +77,21 @@ describe('sign-pumpkin-plugin action', () => {
             path.join(dir, 'plugins.json'),
             JSON.stringify([
                 { 'plugin-name': 'TestPlugin', version: '1.2.3', 'wasm-file': 'plugin.wasm' },
-                { 'plugin-name': 'SecondPlugin', version: '4.5.6', 'wasm-file': 'second.wasm' }
-            ])
+                { 'plugin-name': 'SecondPlugin', version: '4.5.6', 'wasm-file': 'second.wasm' },
+            ]),
         );
 
         const result = run(dir, {
             'INPUT_PLUGIN-NAME': '',
             INPUT_VERSION: '',
             'INPUT_WASM-FILE': '',
-            'INPUT_PLUGINS-MANIFEST': 'plugins.json'
+            'INPUT_PLUGINS-MANIFEST': 'plugins.json',
         });
 
         assert.ok(result.ok, result.out);
         for (const [file, expectedName, expectedVersion] of [
             [wasmFile, 'TestPlugin', '1.2.3'],
-            [secondWasmFile, 'SecondPlugin', '4.5.6']
+            [secondWasmFile, 'SecondPlugin', '4.5.6'],
         ]) {
             const signed = fs.readFileSync(file);
             const verification = verifyWasm(signed);
@@ -100,7 +100,7 @@ describe('sign-pumpkin-plugin action', () => {
             assert.equal(verification.metadata?.version, expectedVersion);
             assert.equal(
                 fs.readFileSync(`${file}.sha256`, 'utf8'),
-                `${createHash('sha256').update(signed).digest('hex')}  ${path.basename(file)}\n`
+                `${createHash('sha256').update(signed).digest('hex')}  ${path.basename(file)}\n`,
             );
         }
     });
@@ -113,7 +113,7 @@ describe('sign-pumpkin-plugin action', () => {
             'INPUT_PLUGIN-NAME': '',
             INPUT_VERSION: '',
             'INPUT_WASM-FILE': '',
-            'INPUT_PLUGINS-MANIFEST': 'plugins.json'
+            'INPUT_PLUGINS-MANIFEST': 'plugins.json',
         });
 
         assert.equal(result.ok, false);

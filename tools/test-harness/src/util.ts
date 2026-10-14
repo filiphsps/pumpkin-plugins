@@ -28,7 +28,7 @@ export function assetName(platform: NodeJS.Platform, arch: string): string {
         'linux-x64': 'pumpkin-X64-Linux',
         'linux-arm64': 'pumpkin-ARM64-Linux',
         'win32-x64': 'pumpkin-X64-Windows.exe',
-        'win32-arm64': 'pumpkin-ARM64-Windows.exe'
+        'win32-arm64': 'pumpkin-ARM64-Windows.exe',
     };
     const name = names[key];
     if (!name) throw new Error(`No Pumpkin release binary for ${key}; set PUMPKIN_BIN to a local build`);

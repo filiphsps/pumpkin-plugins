@@ -8,16 +8,16 @@ const full: PluginInfo = {
     permissions: [{ name: 'fs.read.data', reason: 'Read packs | and config' }],
     commands: [
         { usage: '/demo list', description: 'List things', permission: 'Demo:list' },
-        { usage: '/demo help', description: 'Help' }
+        { usage: '/demo help', description: 'Help' },
     ],
     config: {
         file: 'config.toml',
         defaultContents: '[web]\nport = 8123\n\n',
         options: [
             { key: 'web.port', type: 'integer', default: '8123', description: 'HTTP port' },
-            { key: 'token', type: 'string', description: 'No default' }
-        ]
-    }
+            { key: 'token', type: 'string', description: 'No default' },
+        ],
+    },
 };
 
 describe('renderSections', () => {
@@ -48,27 +48,27 @@ describe('renderSections', () => {
             ['one', '1'],
             ['two', '2'],
             ['three', '3'],
-            ['four', '4']
+            ['four', '4'],
         ] as const;
         const commands: NonNullable<PluginInfo['commands']> = [
             {
                 usage: '/public',
                 description: 'Public',
                 permission: 'Demo:command.public',
-                defaultPermission: { tag: 'allow' }
+                defaultPermission: { tag: 'allow' },
             },
             ...operatorLevels.map(([val], index) => ({
                 usage: `/operator${index}`,
                 description: `Operator ${index}`,
                 permission: `Demo:command.operator${index}` as `${string}:${string}`,
-                defaultPermission: { tag: 'op' as const, val }
+                defaultPermission: { tag: 'op' as const, val },
             })),
             {
                 usage: '/denied',
                 description: 'Denied',
                 permission: 'Demo:command.denied' as `${string}:${string}`,
-                defaultPermission: { tag: 'deny' }
-            }
+                defaultPermission: { tag: 'deny' },
+            },
         ];
 
         const rendered = renderSections({ name: 'Demo', description: 'd', commands }).commands;
@@ -76,7 +76,7 @@ describe('renderSections', () => {
         expect(rendered).toContain('| `/public` | Public | `Demo:command.public` | everyone |');
         operatorLevels.forEach(([, level], index) => {
             expect(rendered).toContain(
-                `| \`/operator${index}\` | Operator ${index} | \`Demo:command.operator${index}\` | operators (level ${level}) |`
+                `| \`/operator${index}\` | Operator ${index} | \`Demo:command.operator${index}\` | operators (level ${level}) |`,
             );
         });
         expect(rendered).toContain('| `/denied` | Denied | `Demo:command.denied` | nobody |');

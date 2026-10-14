@@ -19,7 +19,7 @@ export function definePluginVitestConfig() {
                 provider: 'v8',
                 include: ['src/**/*.ts'],
                 exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
-                reporter: ['text', 'lcov']
+                reporter: ['text', 'lcov'],
             },
             projects: [
                 { extends: true, test: { name: 'unit', include: ['src/**/*.test.ts'] } },
@@ -30,10 +30,10 @@ export function definePluginVitestConfig() {
                         include: ['test/**/*.itest.ts'],
                         testTimeout: 120_000,
                         hookTimeout: 180_000,
-                        globalSetup: [fileURLToPath(new URL('./global-setup.ts', import.meta.url))]
-                    }
-                }
-            ]
-        }
+                        globalSetup: [fileURLToPath(new URL('./global-setup.ts', import.meta.url))],
+                    },
+                },
+            ],
+        },
     });
 }

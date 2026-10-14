@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
     ensurePumpkinWit: vi.fn(() => '/cached/wit'),
-    execFileSync: vi.fn()
+    execFileSync: vi.fn(),
 }));
 
 vi.mock('../src/wit.mjs', () => ({ ensurePumpkinWit: mocks.ensurePumpkinWit }));
@@ -21,7 +21,7 @@ it('uses the repository cache by default when generating API types', async () =>
 
         expect(mocks.ensurePumpkinWit).toHaveBeenCalledWith({
             lockFile: path.join(apiRoot, 'wit.lock.json'),
-            cacheRoot: path.resolve(apiRoot, '../..', '.cache')
+            cacheRoot: path.resolve(apiRoot, '../..', '.cache'),
         });
     } finally {
         if (previousCacheOverride === undefined) delete process.env.PUMPKIN_PLUGINS_CACHE_DIR;

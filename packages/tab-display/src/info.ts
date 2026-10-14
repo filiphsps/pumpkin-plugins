@@ -13,8 +13,8 @@ export const info = {
     description: 'Customizes Java tab displays with native Bedrock capability gates',
     permissions: [
         { name: 'fs.read.data', reason: 'Read TabDisplay settings from the plugin data folder.' },
-        { name: 'fs.write.data', reason: 'Create and update TabDisplay settings in the plugin data folder.' }
+        { name: 'fs.write.data', reason: 'Create and update TabDisplay settings in the plugin data folder.' },
     ],
     commands: commandInfos(commands),
-    config: configInfo
+    config: configInfo,
 } satisfies PluginInfo<typeof PLUGIN_NAME>;

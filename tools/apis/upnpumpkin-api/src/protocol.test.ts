@@ -11,7 +11,7 @@ describe('requests', () => {
             { ...ensure, externalPort: 9000 },
             { op: 'status', key: 'web' },
             { op: 'release', key: 'web' },
-            { op: 'info' }
+            { op: 'info' },
         ] as const) {
             expect(decodeRequest(encodeRequest(request))).toEqual({ request: expect.objectContaining(request) });
         }
@@ -45,7 +45,7 @@ describe('replies', () => {
         const replies = [
             { ok: true, status: { kind: 'open', via: 'upnp', address: '1.2.3.4', port: 8123 } },
             { ok: true, info: { localAddress: '192.168.1.5' } },
-            { ok: false, error: 'nope' }
+            { ok: false, error: 'nope' },
         ] as const;
         for (const reply of replies) expect(decodeReply(encodeReply(reply))).toEqual(reply);
     });

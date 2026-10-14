@@ -34,7 +34,7 @@ export function renderLodMap(cache: LodCache, level: string, blockX: number, blo
     lines.push(
         radius > displayRadius
             ? `§a█ built  §8█ empty  Center: §e█ built, §7█ empty (downsampled to ${displayRadius * 2 + 1}×${displayRadius * 2 + 1})`
-            : '§a█ built  §8█ empty  Center: §e█ built, §7█ empty (one cell = 64 blocks / 4×4 chunks)'
+            : '§a█ built  §8█ empty  Center: §e█ built, §7█ empty (one cell = 64 blocks / 4×4 chunks)',
     );
     return lines;
 }

@@ -8,63 +8,63 @@ import type {
     WitParameter,
     WitResource,
     WitWasiAdapterPlan,
-    WitWasiInterface
+    WitWasiInterface,
 } from './types.ts';
 
 /** Explicit API/WASI selections used to construct a WIT usage plan. */
 export interface WitAnalysisOptions {
+    /** Optional Pumpkin API operation identifiers; omission includes every declared operation. */
+    apiMethods?: readonly string[];
+    /** Optional statically registered event names; omission includes every declared event case. */
+    eventTypes?: readonly string[];
     /** Plugin WIT import order, used to keep generated interface ordering stable. */
     pluginImportOrder?: readonly string[];
     /** WASI interface specifiers explicitly requested by the component build. */
     wasiImports?: readonly string[];
     /** Optional fully qualified WASI operation identifiers selected for adapter generation. */
     wasiMethods?: readonly string[];
-    /** Optional Pumpkin API operation identifiers; omission includes every declared operation. */
-    apiMethods?: readonly string[];
-    /** Optional statically registered event names; omission includes every declared event case. */
-    eventTypes?: readonly string[];
 }
 
 /** Complete event records retained for JavaScript callbacks. */
 export interface WitEventFieldSelection {
     /** Declared event case supported by the dispatcher. */
     event: string;
-    /** WIT record associated with the event case. */
-    record: string;
     /** All fields declared by the event payload record. */
     fields: string[];
+    /** WIT record associated with the event case. */
+    record: string;
 }
 
 /** Resolved API and WASI operations, features, adapters, and event fields for a build. */
 export interface WitAnalysis {
+    /** Fully resolved signatures and adapter shapes for selected Pumpkin operations. */
+    apiAdapters: WitApiAdapterPlan[];
     /** Pumpkin API interface specifiers available to the plugin. */
     apiInterfaces: string[];
     /** Pumpkin operations selected for native dispatch. */
     apiMethods: string[];
-    /** Fully resolved signatures and adapter shapes for selected Pumpkin operations. */
-    apiAdapters: WitApiAdapterPlan[];
+    /** Selected declared event cases and their complete payload fields. */
+    eventFields: WitEventFieldSelection[];
+    /** Resolved WASI interfaces consumed by adapter generation. */
+    resolvedWasiInterfaces: WitWasiInterface[];
+    /** Fully resolved signatures and adapter shapes for selected WASI operations. */
+    wasiAdapters: WitWasiAdapterPlan[];
+    /** Feature flags required by the selected WASI operations. */
+    wasiFeatures: string[];
     /** Direct WASI interface specifiers selected for the plugin. */
     wasiImports: string[];
     /** WASI interface specifiers in the selected dependency closure. */
     wasiInterfaces: string[];
-    /** Resolved WASI interfaces consumed by adapter generation. */
-    resolvedWasiInterfaces: WitWasiInterface[];
     /** WASI operation identifiers selected for adapter generation. */
     wasiMethods: string[];
-    /** Feature flags required by the selected WASI operations. */
-    wasiFeatures: string[];
-    /** Fully resolved signatures and adapter shapes for selected WASI operations. */
-    wasiAdapters: WitWasiAdapterPlan[];
-    /** Selected declared event cases and their complete payload fields. */
-    eventFields: WitEventFieldSelection[];
 }
 
 interface WitOperation {
     apiInterface: WitApiInterface;
-    operation: WitFunction;
-    resource?: WitResource;
-    operationId: string;
     kind: WitWasiAdapterPlan['kind'];
+    operation: WitFunction;
+    operationId: string;
+    resource?: WitResource;
 }
 
 /**
@@ -78,7 +78,7 @@ export function analyzeWitUsage(resolved: ResolvedWitDocument, options: WitAnaly
     const apiPackage = resolvePluginApi(resolved, options.pluginImportOrder);
     const requestedWasiMethods = options.wasiMethods === undefined ? undefined : [...new Set(options.wasiMethods)];
     const wasiImports = [
-        ...new Set([...(options.wasiImports ?? []), ...importsFromMethodIds(requestedWasiMethods ?? [])])
+        ...new Set([...(options.wasiImports ?? []), ...importsFromMethodIds(requestedWasiMethods ?? [])]),
     ];
     const wasi = resolveWasiImports(resolved, wasiImports, options.pluginImportOrder);
     const apiOperations = allApiOperations(apiPackage);
@@ -96,7 +96,7 @@ export function analyzeWitUsage(resolved: ResolvedWitDocument, options: WitAnaly
         wasiMethods,
         wasiFeatures: selectWasiFeatures({ interfaces: wasi.interfaces }, wasiMethods),
         wasiAdapters: planWasiAdapterOperations(wasi.interfaces, requestedWasiMethods),
-        eventFields: selectWitEventFields(apiPackage, options.eventTypes)
+        eventFields: selectWitEventFields(apiPackage, options.eventTypes),
     };
 }
 
@@ -110,7 +110,7 @@ export function analyzeWitUsage(resolved: ResolvedWitDocument, options: WitAnaly
  */
 export function planApiAdapterOperations(
     apiPackage: WitApiPackage,
-    usedMethods?: readonly string[]
+    usedMethods?: readonly string[],
 ): WitApiAdapterPlan[] {
     const selected = usedMethods === undefined ? undefined : new Set(usedMethods);
     const declared = new Set<string>();
@@ -119,7 +119,7 @@ export function planApiAdapterOperations(
         declared.add(entry.operationId);
         if (selected && !selected.has(entry.operationId)) continue;
         const parameters = entry.operation.parameters.map((parameter) =>
-            resolveParameter(parameter, entry.operationId)
+            resolveParameter(parameter, entry.operationId),
         );
         const resultType =
             entry.resource && entry.operation.name === 'constructor'
@@ -128,12 +128,12 @@ export function planApiAdapterOperations(
         if (
             !isSupportedWitMethod(
                 resultType,
-                parameters.map(({ resolvedType }) => resolvedType)
+                parameters.map(({ resolvedType }) => resolvedType),
             )
         ) {
             const path = entry.resource ? `${entry.resource.name}.${entry.operation.name}` : entry.operation.name;
             throw new Error(
-                `No Static Hermes adapter is generated for ${entry.apiInterface.specifier}#${path}: unsupported WIT input or result type`
+                `No Static Hermes adapter is generated for ${entry.apiInterface.specifier}#${path}: unsupported WIT input or result type`,
             );
         }
         plans.push({
@@ -143,7 +143,7 @@ export function planApiAdapterOperations(
             ...(entry.resource ? { resource: entry.resource } : {}),
             operation: entry.operation,
             parameters,
-            resultType
+            resultType,
         });
     }
     for (const operationId of selected ?? []) {
@@ -164,7 +164,7 @@ export function planApiAdapterOperations(
  */
 export function planWasiAdapterOperations(
     selectedInterfaces: readonly WitWasiInterface[],
-    usedMethods?: readonly string[]
+    usedMethods?: readonly string[],
 ): WitWasiAdapterPlan[] {
     const selected = usedMethods === undefined ? undefined : new Set(usedMethods);
     const declared = new Set<string>();
@@ -174,7 +174,7 @@ export function planWasiAdapterOperations(
             declared.add(entry.operationId);
             if (selected && !selected.has(entry.operationId)) continue;
             const parameters = entry.operation.parameters.map((parameter) =>
-                resolveParameter(parameter, entry.operationId)
+                resolveParameter(parameter, entry.operationId),
             );
             const resultType =
                 entry.resource && entry.operation.name === 'constructor'
@@ -183,7 +183,7 @@ export function planWasiAdapterOperations(
             if (
                 !isSupportedWitMethod(
                     resultType,
-                    parameters.map(({ resolvedType }) => resolvedType)
+                    parameters.map(({ resolvedType }) => resolvedType),
                 )
             ) {
                 throw new Error(`No Static Hermes JSI adapter is generated for ${entry.operationId}`);
@@ -195,7 +195,7 @@ export function planWasiAdapterOperations(
                 ...(entry.resource ? { resource: entry.resource } : {}),
                 operation: entry.operation,
                 parameters,
-                resultType
+                resultType,
             });
         }
     }
@@ -216,7 +216,7 @@ export function planWasiAdapterOperations(
  */
 export function selectWitEventFields(
     apiPackage: WitApiPackage,
-    eventTypes?: readonly string[]
+    eventTypes?: readonly string[],
 ): WitEventFieldSelection[] {
     const eventInterface = apiPackage.interfaces.find(({ name }) => name === 'event');
     const eventVariant = eventInterface?.variants.find(({ name }) => name === 'event');
@@ -227,8 +227,8 @@ export function selectWitEventFields(
         [...requestedEvents].some((requested) => eventVariant.cases.every(({ name }) => name !== requested));
     const records = new Map(
         apiPackage.interfaces.flatMap(({ records: declarations }) =>
-            declarations.map((record) => [record.name, record])
-        )
+            declarations.map((record) => [record.name, record]),
+        ),
     );
     const selected: WitEventFieldSelection[] = [];
     for (const event of eventVariant.cases) {
@@ -247,7 +247,7 @@ function allApiOperations(apiPackage: WitApiPackage): WitOperation[] {
             apiInterface,
             operation,
             operationId: `${apiInterface.name}.${operation.name}`,
-            kind: 'function' as const
+            kind: 'function' as const,
         })),
         ...apiInterface.resources.flatMap((resource) =>
             resource.functions.map((operation) => ({
@@ -260,9 +260,9 @@ function allApiOperations(apiPackage: WitApiPackage): WitOperation[] {
                         ? ('resource-constructor' as const)
                         : operation.isStatic
                           ? ('resource-static-method' as const)
-                          : ('resource-method' as const)
-            }))
-        )
+                          : ('resource-method' as const),
+            })),
+        ),
     ]);
 }
 
@@ -272,7 +272,7 @@ function allWasiOperations(interfaces: readonly WitWasiInterface[]): WitOperatio
             apiInterface,
             operation,
             operationId: `${apiInterface.specifier}#${operation.name}`,
-            kind: 'function' as const
+            kind: 'function' as const,
         })),
         ...apiInterface.resources.flatMap((resource) =>
             resource.functions.map((operation) => ({
@@ -285,9 +285,9 @@ function allWasiOperations(interfaces: readonly WitWasiInterface[]): WitOperatio
                         ? ('resource-constructor' as const)
                         : operation.isStatic
                           ? ('resource-static-method' as const)
-                          : ('resource-method' as const)
-            }))
-        )
+                          : ('resource-method' as const),
+            })),
+        ),
     ]);
 }
 
@@ -324,11 +324,11 @@ function importsFromMethodIds(methods: readonly string[]): string[] {
 
 function resolveParameter(
     parameter: WitParameter,
-    operationId: string
+    operationId: string,
 ): WitParameter & { resolvedType: ResolvedWitType } {
     return {
         ...parameter,
-        resolvedType: requireResolvedType(parameter.resolvedType, `${operationId} parameter ${parameter.name}`)
+        resolvedType: requireResolvedType(parameter.resolvedType, `${operationId} parameter ${parameter.name}`),
     };
 }
 
@@ -345,7 +345,7 @@ function resourceType(apiInterface: WitApiInterface, resource: WitResource, pack
         packageName,
         interfaceSpecifier: apiInterface.specifier,
         interfaceDependencies: apiInterface.dependencies ?? [],
-        declaredInterface: apiInterface.name
+        declaredInterface: apiInterface.name,
     };
 }
 

@@ -5,26 +5,26 @@ import {
     type ChunkLoader,
     type TerrainGenerator,
     unavailableChunkLoader,
-    unavailableTerrainGenerator
+    unavailableTerrainGenerator,
 } from './chunks.ts';
 
 describe('terrain chunk acquisition', () => {
     it.each([null, undefined])('treats %s as an absent loaded chunk', (absent) => {
         const loader: ChunkLoader = { load: () => ({ status: 'unavailable', reason: 'loading unavailable' }) };
         const generator: TerrainGenerator = {
-            generate: () => ({ status: 'unavailable', reason: 'generation unavailable' })
+            generate: () => ({ status: 'unavailable', reason: 'generation unavailable' }),
         };
 
         const result = acquireChunk<{ id: number } | null | undefined>(
             { x: 0, z: 0 },
             () => absent as { id: number } | null | undefined,
             loader,
-            generator
+            generator,
         );
 
         expect(result).toEqual({
             status: 'unavailable',
-            reason: 'loading unavailable; generation unavailable'
+            reason: 'loading unavailable; generation unavailable',
         });
         expectTypeOf(result).toEqualTypeOf<ChunkAcquisition<{ id: number }>>();
     });
@@ -32,7 +32,7 @@ describe('terrain chunk acquisition', () => {
     it.each([null, undefined])('waits when a ready loader leaves %s loaded lookup', (absent) => {
         const loader: ChunkLoader = { load: () => ({ status: 'ready' }) };
         const generator: TerrainGenerator = {
-            generate: () => ({ status: 'failed', reason: 'must not generate after load success' })
+            generate: () => ({ status: 'failed', reason: 'must not generate after load success' }),
         };
 
         expect(
@@ -40,8 +40,8 @@ describe('terrain chunk acquisition', () => {
                 { x: 1, z: 2 },
                 () => absent as { id: number } | null | undefined,
                 loader,
-                generator
-            )
+                generator,
+            ),
         ).toEqual({ status: 'pending' });
     });
 
@@ -54,8 +54,8 @@ describe('terrain chunk acquisition', () => {
                 { x: -1, z: 2 },
                 () => absent as { id: number } | null | undefined,
                 loader,
-                generator
-            )
+                generator,
+            ),
         ).toEqual({ status: 'pending' });
     });
 
@@ -74,7 +74,7 @@ describe('terrain chunk acquisition', () => {
             generate: () => {
                 generated++;
                 return { status: 'pending' };
-            }
+            },
         };
 
         expect(acquireChunk({ x: 3, z: 5 }, () => undefined, loader, generator)).toEqual({ status: 'pending' });
@@ -88,10 +88,10 @@ describe('terrain chunk acquisition', () => {
             load: () => {
                 loaded = chunk;
                 return { status: 'ready' };
-            }
+            },
         };
         const generator: TerrainGenerator = {
-            generate: () => ({ status: 'failed', reason: 'must not generate a loaded chunk' })
+            generate: () => ({ status: 'failed', reason: 'must not generate a loaded chunk' }),
         };
 
         expect(acquireChunk({ x: -3, z: 6 }, () => loaded, loader, generator)).toEqual({ status: 'ready', chunk });
@@ -105,7 +105,7 @@ describe('terrain chunk acquisition', () => {
             generate: () => {
                 loaded = chunk;
                 return { status: 'ready' };
-            }
+            },
         };
 
         expect(acquireChunk({ x: 7, z: -8 }, () => loaded, loader, generator)).toEqual({ status: 'ready', chunk });

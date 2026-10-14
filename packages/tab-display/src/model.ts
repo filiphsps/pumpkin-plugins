@@ -20,35 +20,35 @@ export type TextPart =
 
 /** Edition-specific source player data copied from short-lived WIT resources. */
 export interface PlayerSnapshot {
-    readonly uuid: string;
-    readonly name: string;
     readonly edition: 'java' | 'bedrock' | 'unknown';
     readonly javaVersion?: string;
+    readonly name: string;
     readonly ping?: number;
+    readonly uuid: string;
 }
 
 /** Plain text plus style options; resolved placeholder output is always text. */
 export interface RenderedLine {
-    readonly text: string;
-    readonly color?: string;
     readonly bold?: boolean;
+    readonly color?: string;
     readonly italic?: boolean;
-    readonly underlined?: boolean;
     readonly strikethrough?: boolean;
+    readonly text: string;
+    readonly underlined?: boolean;
 }
 
 /** Read-only status exposed to commands and diagnostics. */
 export interface TabDisplayStatus {
-    readonly enabled: boolean;
-    readonly provider: SessionState['kind'];
-    readonly players: number;
-    readonly javaPlayers: number;
+    readonly bedrock: Capability;
     readonly bedrockPlayers: number;
-    readonly pendingJobs: number;
-    readonly unresolved: readonly string[];
+    readonly enabled: boolean;
+    readonly java: Capability;
+    readonly javaPlayers: number;
     readonly javaVersions: readonly string[];
     readonly lastFailure?: string;
-    readonly java: Capability;
-    readonly bedrock: Capability;
+    readonly pendingJobs: number;
+    readonly players: number;
+    readonly provider: SessionState['kind'];
     readonly sorting: Capability;
+    readonly unresolved: readonly string[];
 }

@@ -8,7 +8,7 @@ function optionRows(prefix: string, fields: Fields): ConfigOptionInfo[] {
         key: `${prefix}.${key}`,
         type: f.type,
         ...(f.default === undefined ? {} : { default: f.format(f.default as never) }),
-        description: f.description
+        description: f.description,
     }));
 }
 
@@ -22,7 +22,7 @@ function optionRows(prefix: string, fields: Fields): ConfigOptionInfo[] {
  */
 export function describeConfig(schema: ConfigSchema, file: string, renderOptions: RenderOptions = {}): ConfigInfo {
     const options = Object.entries(schema.nodes).flatMap(([name, node]) =>
-        optionRows(node.node === 'table' ? `${name}."<${node.entryName}>"` : name, node.fields)
+        optionRows(node.node === 'table' ? `${name}."<${node.entryName}>"` : name, node.fields),
     );
     return { file, defaultContents: renderConfig(schema, defaultValues(schema), renderOptions), options };
 }

@@ -18,14 +18,14 @@ it('uses the pinned release bytes and reuses the verified cache without network 
     expect(
         createHash('sha256')
             .update(await fs.readFile(file))
-            .digest('hex')
+            .digest('hex'),
     ).toBe(PIE_RELEASE.sha256);
     expect(
         await resolvePieProvider({
             fetch: async () => {
                 throw new Error('cache must not download');
-            }
-        })
+            },
+        }),
     ).toBe(file);
     expect(server?.errors()).toEqual([]);
 });

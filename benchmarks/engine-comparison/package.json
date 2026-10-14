@@ -5,18 +5,18 @@
     "description": "Compares plugin engines on a real Pumpkin server",
     "type": "module",
     "scripts": {
-        "typecheck": "pnpm types && tsc --noEmit",
-        "types": "node ../../tools/pumpkin-api/scripts/gen-types.mjs build/types",
-        "test": "vitest run test/engine-comparison-report.test.ts test/engine-variants.test.ts test/benchmark-workloads.test.ts test/engine-variant-cache.test.ts",
         "benchmark:build": "node scripts/build-engine-comparison.ts",
-        "compare-engines": "pnpm --dir ../.. turbo run benchmark:build --filter=@pumpkin-plugins/engine-comparison && vitest run test/engine-comparison.test.ts"
+        "compare-engines": "pnpm --dir ../.. turbo run benchmark:build --filter=@pumpkin-plugins/engine-comparison && vitest run test/engine-comparison.test.ts",
+        "test": "vitest run test/engine-comparison-report.test.ts test/engine-variants.test.ts test/benchmark-workloads.test.ts test/engine-variant-cache.test.ts",
+        "typecheck": "pnpm types && tsc --noEmit",
+        "types": "node ../../tools/pumpkin-api/scripts/gen-types.mjs build/types"
     },
     "devDependencies": {
         "@bytecodealliance/jco": "catalog:",
         "@pumpkin-plugins/build": "workspace:*",
+        "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@pumpkin-plugins/static-hermes-runtime": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
-        "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@types/node": "catalog:",
         "vitest": "catalog:"
     }

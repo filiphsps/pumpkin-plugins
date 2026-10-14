@@ -13,7 +13,7 @@ function waypoint(id = waypointId, name = 'Home') {
         id,
         name,
         dimension: 'world',
-        position: { x: -4.25, y: 64.5, z: 9.75 }
+        position: { x: -4.25, y: 64.5, z: 9.75 },
     });
 }
 
@@ -29,7 +29,7 @@ function legacyWaypoint(overrides: Record<string, unknown> = {}) {
         visibility: 'private',
         allowedPlayerIds: [],
         locatorBar: { enabled: true, color: '#ABCDEF', javaStyleId: 'minecraft:default' },
-        ...overrides
+        ...overrides,
     };
 }
 
@@ -50,8 +50,8 @@ describe(WaypointStore.name, () => {
         files.writeFile(
             'waypoints.json',
             strToU8(
-                JSON.stringify({ version: 2, waypoints: [waypoint('44444444-4444-4444-8444-444444444444', 'Disk')] })
-            )
+                JSON.stringify({ version: 2, waypoints: [waypoint('44444444-4444-4444-8444-444444444444', 'Disk')] }),
+            ),
         );
 
         expect(store.reload()).toBe(true);
@@ -70,7 +70,7 @@ describe(WaypointStore.name, () => {
             const record = version === 1 ? legacyWaypoint({ id: lower }) : waypoint(lower);
             const original = JSON.stringify({
                 version,
-                waypoints: [record, { ...record, id: lower.toUpperCase(), name: 'Other' }]
+                waypoints: [record, { ...record, id: lower.toUpperCase(), name: 'Other' }],
             });
             const files = new MemoryFiles().put('waypoints.json', original);
             const invalid = new WaypointStore(files, new MemoryLogger());
@@ -90,7 +90,7 @@ describe(WaypointStore.name, () => {
             expect(active.list()).toEqual([waypoint()]);
             expect(activeFiles.text('waypoints.json')).toBe(original);
             expect(activeFiles.text('waypoints.v1.json')).toBeUndefined();
-        }
+        },
     );
 
     it.each([1, 2])('keeps a unique uppercase v%s identity mutable across reloads', (version) => {
@@ -126,7 +126,7 @@ describe(WaypointStore.name, () => {
         store.add(waypoint());
 
         expect(files.text('waypoints.json')).toBe(
-            `${JSON.stringify({ version: 2, waypoints: [waypoint()] }, null, 4)}\n`
+            `${JSON.stringify({ version: 2, waypoints: [waypoint()] }, null, 4)}\n`,
         );
     });
 
@@ -138,15 +138,15 @@ describe(WaypointStore.name, () => {
                 legacyWaypoint({
                     id: '44444444-4444-4444-8444-444444444444',
                     name: 'Public',
-                    visibility: 'public'
+                    visibility: 'public',
                 }),
                 legacyWaypoint({
                     id: '55555555-5555-4555-8555-555555555555',
                     name: 'Shared',
                     visibility: 'allowlist',
-                    allowedPlayerIds: [visitorId]
-                })
-            ]
+                    allowedPlayerIds: [visitorId],
+                }),
+            ],
         });
         const files = new MemoryFiles().put('waypoints.json', original);
         const store = new WaypointStore(files, new MemoryLogger());
@@ -159,12 +159,12 @@ describe(WaypointStore.name, () => {
                 {
                     ...waypoint(),
                     position: { x: -4, y: 64, z: 9 },
-                    access: { mode: 'restricted', grants: [{ type: 'player', playerId: ownerId }] }
+                    access: { mode: 'restricted', grants: [{ type: 'player', playerId: ownerId }] },
                 },
                 {
                     ...waypoint('44444444-4444-4444-8444-444444444444', 'Public'),
                     position: { x: -4, y: 64, z: 9 },
-                    access: { mode: 'public', grants: [] }
+                    access: { mode: 'public', grants: [] },
                 },
                 {
                     ...waypoint('55555555-5555-4555-8555-555555555555', 'Shared'),
@@ -173,11 +173,11 @@ describe(WaypointStore.name, () => {
                         mode: 'restricted',
                         grants: [
                             { type: 'player', playerId: ownerId },
-                            { type: 'player', playerId: visitorId }
-                        ]
-                    }
-                }
-            ]
+                            { type: 'player', playerId: visitorId },
+                        ],
+                    },
+                },
+            ],
         });
     });
 
@@ -205,9 +205,9 @@ describe(WaypointStore.name, () => {
                 version: 1,
                 waypoints: [
                     legacyWaypoint(),
-                    legacyWaypoint({ id: '44444444-4444-4444-8444-444444444444', name: 'home' })
-                ]
-            })
+                    legacyWaypoint({ id: '44444444-4444-4444-8444-444444444444', name: 'home' }),
+                ],
+            }),
         );
         const logger = new MemoryLogger();
         const store = new WaypointStore(files, logger);
@@ -223,8 +223,8 @@ describe(WaypointStore.name, () => {
             JSON.stringify({ version: 2, waypoints: [{ ...waypoint(), ownerId }] }),
             JSON.stringify({
                 version: 2,
-                waypoints: [waypoint(), waypoint('44444444-4444-4444-8444-444444444444', 'home')]
-            })
+                waypoints: [waypoint(), waypoint('44444444-4444-4444-8444-444444444444', 'home')],
+            }),
         ]) {
             const files = new MemoryFiles().put('waypoints.json', content);
             const store = new WaypointStore(files, new MemoryLogger());
@@ -268,7 +268,7 @@ describe(WaypointStore.name, () => {
         store.add(waypoint('44444444-4444-4444-8444-444444444444', 'Mine'));
 
         expect(store.update('44444444-4444-4444-8444-444444444444', (current) => ({ ...current, name: 'home' }))).toBe(
-            false
+            false,
         );
         expect(store.update(waypointId, (current) => ({ ...current, name: 'Base' }))).toBe(true);
         expect(store.get(waypointId)?.name).toBe('Base');

@@ -41,7 +41,7 @@ export function registerPluginWithUpdates(plugin: Plugin, info: PluginInfo, opti
                 pluginName: info.name,
                 currentVersion: metadata.version,
                 request,
-                ...(options.marketplaceUrl ? { marketplaceUrl: options.marketplaceUrl } : {})
+                ...(options.marketplaceUrl ? { marketplaceUrl: options.marketplaceUrl } : {}),
             });
             logUpdate(info.name, update);
         } catch (error) {

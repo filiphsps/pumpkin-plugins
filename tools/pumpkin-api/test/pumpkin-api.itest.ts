@@ -58,7 +58,7 @@ describe('Pumpkin API against a real server', () => {
     it('runs registered server-load and scheduled-task callbacks', async () => {
         const loadEvent = await server?.waitForLog(
             /PumpkinApiTestFixture server-load callback loadType=(startup|reload)/,
-            10_000
+            10_000,
         );
         const delayedTask = await server?.waitForLog(/PumpkinApiTestFixture delayed callback count=(\d+)/, 10_000);
         const repeatingTask = await server?.waitForLog(/PumpkinApiTestFixture repeating callback count=(\d+)/, 10_000);
@@ -81,7 +81,7 @@ describe('Pumpkin API against a real server', () => {
         const firstOutput = await server?.waitForLog(/PumpkinApiTestFixture command callback=/, 10_000, firstFromIndex);
         const firstMatch =
             /command callback=(\d+) loadEvents=(\d+) delayedTasks=(\d+) loadType=(startup|reload|unknown)/.exec(
-                firstOutput ?? ''
+                firstOutput ?? '',
             );
 
         expect(firstMatch).not.toBeNull();
@@ -95,7 +95,7 @@ describe('Pumpkin API against a real server', () => {
         const secondOutput = await server?.waitForLog(
             /PumpkinApiTestFixture command callback=/,
             10_000,
-            secondFromIndex
+            secondFromIndex,
         );
         const secondCount = /command callback=(\d+)/.exec(secondOutput ?? '')?.[1];
         expect(Number(secondCount)).toBeGreaterThan(Number(firstMatch?.[1]));

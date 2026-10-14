@@ -21,7 +21,7 @@ export class MappingWatcher {
         private readonly client: PortMapClient,
         private readonly request: PortRequest,
         private readonly onChange: (state: WatchedState) => void,
-        private readonly now: () => number
+        private readonly now: () => number,
     ) {}
 
     /** The latest state, or undefined before the first answer. */

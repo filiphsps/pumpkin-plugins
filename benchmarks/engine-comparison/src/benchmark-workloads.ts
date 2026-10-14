@@ -3,18 +3,18 @@ export type WorkloadProvenance = 'synthetic guest fixture' | 'real Pumpkin API';
 
 /** Timings and deterministic output for one measured workload. */
 export interface BenchmarkWorkload {
-    /** Stable identifier used to compare the same workload across runtimes. */
-    name: string;
     /** Human-readable description of the algorithm being measured. */
     area: string;
-    /** Whether the workload is a guest fixture or uses a real Pumpkin API call. */
-    provenance: WorkloadProvenance;
-    /** Input items or requests processed by each timed sample. */
-    operationsPerSample: number;
-    /** Elapsed time in milliseconds for each measured run, after warm-up. */
-    samplesMs: number[];
     /** Deterministic result used to confirm equivalent work across runtimes. */
     checksum: number;
+    /** Stable identifier used to compare the same workload across runtimes. */
+    name: string;
+    /** Input items or requests processed by each timed sample. */
+    operationsPerSample: number;
+    /** Whether the workload is a guest fixture or uses a real Pumpkin API call. */
+    provenance: WorkloadProvenance;
+    /** Elapsed time in milliseconds for each measured run, after warm-up. */
+    samplesMs: number[];
 }
 
 type WorkloadScenario = Pick<BenchmarkWorkload, 'name' | 'area' | 'operationsPerSample'> & {
@@ -31,7 +31,7 @@ const CONFIG_SOURCE = JSON.stringify({
     enabled: true,
     cache: { maxEntries: 512, ttlTicks: 1200 },
     channels: ['status', 'inventory', 'health'],
-    aliases: { hp: 'health', inv: 'inventory', st: 'status' }
+    aliases: { hp: 'health', inv: 'inventory', st: 'status' },
 });
 
 const STRING_PARTS = buildStringParts();
@@ -44,55 +44,55 @@ const WORKLOADS: readonly WorkloadScenario[] = [
         name: 'string-construction',
         area: 'String part construction',
         operationsPerSample: STRING_PART_COUNT,
-        run: runStringConstruction
+        run: runStringConstruction,
     },
     {
         name: 'string-join',
         area: 'Batched dense ASCII array joining',
         operationsPerSample: STRING_PART_COUNT * STRING_JOIN_REPEAT_COUNT,
-        run: runStringJoin
+        run: runStringJoin,
     },
     {
         name: 'string-radix-integer',
         area: 'Integer radix formatting',
         operationsPerSample: STRING_PART_COUNT,
-        run: runStringRadixInteger
+        run: runStringRadixInteger,
     },
     {
         name: 'string-join-unicode',
         area: 'Unicode join correctness and code-unit behavior',
         operationsPerSample: 7,
-        run: runStringJoinUnicode
+        run: runStringJoinUnicode,
     },
     {
         name: 'config-validation',
         area: 'Configuration parsing and validation',
         operationsPerSample: 1_000,
-        run: runConfigValidation
+        run: runConfigValidation,
     },
     {
         name: 'command-routing',
         area: 'Command tokenization, alias resolution and route-map lookup',
         operationsPerSample: COMMAND_OPERATION_COUNT,
-        run: runCommandRouting
+        run: runCommandRouting,
     },
     {
         name: 'command-tokenization',
         area: 'Command tokenization',
         operationsPerSample: COMMAND_OPERATION_COUNT,
-        run: runCommandTokenization
+        run: runCommandTokenization,
     },
     {
         name: 'command-route-lookup',
         area: 'Command alias and route-map lookup',
         operationsPerSample: COMMAND_OPERATION_COUNT,
-        run: runCommandRouteLookup
+        run: runCommandRouteLookup,
     },
     {
         name: 'permission-resolution',
         area: 'Permission inheritance and context lookup',
         operationsPerSample: 12_000,
-        run: runPermissionResolution
+        run: runPermissionResolution,
     },
     { name: 'player-directory', area: 'Player and home lookups', operationsPerSample: 18_000, run: runPlayerDirectory },
     { name: 'event-cache', area: 'Lifecycle cache updates', operationsPerSample: 20_000, run: runEventCache },
@@ -100,64 +100,64 @@ const WORKLOADS: readonly WorkloadScenario[] = [
         name: 'chat-formatting',
         area: 'Chat template formatting and filtering',
         operationsPerSample: 3_000,
-        run: runChatFormatting
+        run: runChatFormatting,
     },
     {
         name: 'scoreboard-rendering',
         area: 'Scoreboard text rendering',
         operationsPerSample: 12_000,
-        run: runScoreboardRendering
+        run: runScoreboardRendering,
     },
     {
         name: 'region-protection',
         area: 'Region containment and access checks',
         operationsPerSample: 20_000,
-        run: runRegionProtection
+        run: runRegionProtection,
     },
     {
         name: 'world-edit-plan',
         area: 'Block-edit plan generation',
         operationsPerSample: 55_296,
-        run: runWorldEditPlan
+        run: runWorldEditPlan,
     },
     {
         name: 'economy-transfers',
         area: 'Balance transfer processing',
         operationsPerSample: 12_000,
-        run: runEconomyTransfers
+        run: runEconomyTransfers,
     },
     {
         name: 'inventory-stacking',
         area: 'Inventory stack allocation',
         operationsPerSample: 2_500,
-        run: runInventoryStacking
+        run: runInventoryStacking,
     },
     {
         name: 'cooldown-rate-limit',
         area: 'Cooldown and rate-limit checks',
         operationsPerSample: 20_000,
-        run: runCooldownRateLimit
+        run: runCooldownRateLimit,
     },
     { name: 'tick-scheduler', area: 'Scheduled task processing', operationsPerSample: 6_000, run: runTickScheduler },
     {
         name: 'audit-history',
         area: 'Audit history filtering',
         operationsPerSample: 13_000,
-        run: runAuditHistory
+        run: runAuditHistory,
     },
     {
         name: 'player-state-json',
         area: 'Player-state JSON round trip',
         operationsPerSample: 1_200,
-        run: runPlayerStatePersistence
+        run: runPlayerStatePersistence,
     },
-    { name: 'custom-payload', area: 'Custom payload encoding', operationsPerSample: 16_384, run: runPacketEncoding }
+    { name: 'custom-payload', area: 'Custom payload encoding', operationsPerSample: 16_384, run: runPacketEncoding },
 ];
 
 /** Runs and measures every deterministic plugin-style workload. */
 export function measureSyntheticWorkloads(): BenchmarkWorkload[] {
     return WORKLOADS.map(({ name, area, operationsPerSample, run }) =>
-        measureWorkload(name, area, 'synthetic guest fixture', operationsPerSample, run)
+        measureWorkload(name, area, 'synthetic guest fixture', operationsPerSample, run),
     );
 }
 
@@ -175,7 +175,7 @@ export function measureWorkload(
     area: string,
     provenance: WorkloadProvenance,
     operationsPerSample: number,
-    run: () => number
+    run: () => number,
 ): BenchmarkWorkload {
     run();
     let checksum = 0;
@@ -251,7 +251,7 @@ function runStringJoinUnicode(): number {
         toString() {
             parts[0] = 'after';
             return 'later';
-        }
+        },
     };
 
     const joined = parts.join('·');
@@ -274,7 +274,7 @@ const RADIX_STRING_CASES: readonly [number, number, string][] = [
     [-0, 36, '0'],
     [0.5, 2, '0.1'],
     [10.5, 2, '1010.1'],
-    [Number.MAX_SAFE_INTEGER + 1, 36, '2gosa7pa2gw']
+    [Number.MAX_SAFE_INTEGER + 1, 36, '2gosa7pa2gw'],
 ];
 
 function buildStringParts(): string[] {
@@ -324,7 +324,7 @@ const COMMAND_ROUTES = new Map([
     ['teleport', { permission: 'essentials.teleport', minimumArguments: 1, maximumArguments: 2 }],
     ['balance', { permission: 'essentials.balance', minimumArguments: 0, maximumArguments: 1 }],
     ['message', { permission: 'essentials.message', minimumArguments: 2, maximumArguments: 24 }],
-    ['gamemode', { permission: 'minecraft.command.gamemode', minimumArguments: 1, maximumArguments: 2 }]
+    ['gamemode', { permission: 'minecraft.command.gamemode', minimumArguments: 1, maximumArguments: 2 }],
 ]);
 
 const COMMAND_ALIASES = new Map([
@@ -334,7 +334,7 @@ const COMMAND_ALIASES = new Map([
     ['bal', 'balance'],
     ['msg', 'message'],
     ['tell', 'message'],
-    ['gm', 'gamemode']
+    ['gm', 'gamemode'],
 ]);
 
 const COMMAND_NAMES = ['home', 'h', 'warp', 'w', 'tp', 'bal', 'msg', 'tell', 'gm', 'unknown'];
@@ -346,7 +346,7 @@ const COMMAND_LOOKUPS = COMMAND_INPUTS.map((input) => {
     return {
         requestedName: requestedName.toLowerCase(),
         argumentCount: arguments_.length,
-        argumentLength: arguments_.join('').length
+        argumentLength: arguments_.join('').length,
     };
 });
 
@@ -444,9 +444,9 @@ function tokenizeCommand(input: string): string[] {
 }
 
 interface PermissionGroup {
+    contexts: ReadonlyMap<string, boolean>;
     parent?: string;
     permissions: ReadonlyMap<string, boolean>;
-    contexts: ReadonlyMap<string, boolean>;
 }
 
 const PERMISSION_GROUPS = new Map<string, PermissionGroup>([
@@ -456,10 +456,10 @@ const PERMISSION_GROUPS = new Map<string, PermissionGroup>([
             permissions: new Map([
                 ['essentials.home', true],
                 ['essentials.balance', true],
-                ['worldguard.build', false]
+                ['worldguard.build', false],
             ]),
-            contexts: new Map()
-        }
+            contexts: new Map(),
+        },
     ],
     [
         'member',
@@ -467,10 +467,10 @@ const PERMISSION_GROUPS = new Map<string, PermissionGroup>([
             parent: 'default',
             permissions: new Map([
                 ['essentials.warp', true],
-                ['economy.pay', true]
+                ['economy.pay', true],
             ]),
-            contexts: new Map([['spawn:worldguard.build', true]])
-        }
+            contexts: new Map([['spawn:worldguard.build', true]]),
+        },
     ],
     [
         'moderator',
@@ -478,19 +478,19 @@ const PERMISSION_GROUPS = new Map<string, PermissionGroup>([
             parent: 'member',
             permissions: new Map([
                 ['essentials.teleport', true],
-                ['coreprotect.*', true]
+                ['coreprotect.*', true],
             ]),
-            contexts: new Map()
-        }
+            contexts: new Map(),
+        },
     ],
     [
         'admin',
         {
             parent: 'moderator',
             permissions: new Map([['*', true]]),
-            contexts: new Map()
-        }
-    ]
+            contexts: new Map(),
+        },
+    ],
 ]);
 
 const PERMISSION_NODES = [
@@ -503,7 +503,7 @@ const PERMISSION_NODES = [
     'worldguard.build',
     'worldguard.interact',
     'coreprotect.inspect',
-    'minecraft.command.gamemode'
+    'minecraft.command.gamemode',
 ];
 
 const PERMISSION_GROUP_NAMES = ['default', 'member', 'moderator', 'admin'];
@@ -546,11 +546,11 @@ function hasPermission(groupName: string, permission: string, world: string): bo
 }
 
 interface PlayerProfile {
-    uuid: string;
-    name: string;
-    world: string;
     balance: number;
     homes: readonly string[];
+    name: string;
+    uuid: string;
+    world: string;
 }
 
 function runPlayerDirectory(): number {
@@ -563,7 +563,7 @@ function runPlayerDirectory(): number {
             name: `Player${id}`,
             world: PERMISSION_WORLDS[id % PERMISSION_WORLDS.length],
             balance: 1_000 + ((id * 97) % 90_000),
-            homes: id % 3 === 0 ? ['home', 'farm'] : ['home']
+            homes: id % 3 === 0 ? ['home', 'farm'] : ['home'],
         };
         byUuid.set(profile.uuid, profile);
         byName.set(profile.name.toLowerCase(), profile);
@@ -576,7 +576,7 @@ function runPlayerDirectory(): number {
             lookup % 2 === 0
                 ? byName.get(`player${id}`)
                 : byUuid.get(
-                      `00000000-0000-4000-8000-${'000000000000'.slice(id.toString(16).length)}${id.toString(16)}`
+                      `00000000-0000-4000-8000-${'000000000000'.slice(id.toString(16).length)}${id.toString(16)}`,
                   );
         if (profile !== undefined) checksum += profile.balance + profile.name.length + profile.homes.length;
     }
@@ -603,7 +603,7 @@ function runEventCache(): number {
 const CHAT_TEMPLATES = [
     '&a%player%&7: Hello from %world%',
     '&b%player%&7 paid %balance% coins for a shop item',
-    '&c%player%&7 shared a fake scamlink in %world%'
+    '&c%player%&7 shared a fake scamlink in %world%',
 ];
 const CHAT_FILTERS = ['badword', 'scamlink', 'discord.gg/fake'];
 
@@ -646,14 +646,14 @@ function runScoreboardRendering(): number {
 }
 
 interface ProtectedRegion {
-    world: string;
-    minimumX: number;
+    allowPublicPlace: boolean;
     maximumX: number;
-    minimumZ: number;
     maximumZ: number;
+    minimumX: number;
+    minimumZ: number;
     ownerId: number;
     trustedPlayers: ReadonlySet<number>;
-    allowPublicPlace: boolean;
+    world: string;
 }
 
 function runRegionProtection(): number {
@@ -670,7 +670,7 @@ function runRegionProtection(): number {
                     maximumZ: -193 + row * 128,
                     ownerId: (column * 11 + row * 7 + worldIndex) % 4_096,
                     trustedPlayers: new Set([(column * 17 + row * 13) % 4_096]),
-                    allowPublicPlace: (column + row) % 5 === 0
+                    allowPublicPlace: (column + row) % 5 === 0,
                 };
                 addRegionToChunkIndex(regionsByChunk, region);
             }
@@ -712,11 +712,11 @@ function addRegionToChunkIndex(index: Map<string, ProtectedRegion[]>, region: Pr
 }
 
 interface BlockChange {
+    after: number;
+    before: number;
     x: number;
     y: number;
     z: number;
-    before: number;
-    after: number;
 }
 
 function runWorldEditPlan(): number {
@@ -771,8 +771,8 @@ function runEconomyTransfers(): number {
 }
 
 interface ItemStack {
-    itemId: string;
     count: number;
+    itemId: string;
 }
 
 function runInventoryStacking(): number {
@@ -863,11 +863,11 @@ function runTickScheduler(): number {
 }
 
 interface AuditRecord {
+    action: string;
     tick: number;
     world: string;
     x: number;
     z: number;
-    action: string;
 }
 
 function runAuditHistory(): number {
@@ -880,7 +880,7 @@ function runAuditHistory(): number {
             world: PERMISSION_WORLDS[eventId % PERMISSION_WORLDS.length],
             x: ((eventId * 31) % 2_000) - 1_000,
             z: ((eventId * 47) % 2_000) - 1_000,
-            action: eventId % 2 === 0 ? 'block-break' : 'block-place'
+            action: eventId % 2 === 0 ? 'block-break' : 'block-place',
         });
         eventsByPlayer.set(playerId, records);
     }
@@ -907,11 +907,11 @@ function runAuditHistory(): number {
 }
 
 interface StoredPlayerState {
-    uuid: string;
-    name: string;
     balanceCents: number;
     homes: { name: string; world: string; x: number; y: number; z: number }[];
+    name: string;
     preferences: { chat: boolean; privateMessages: boolean; scoreboard: boolean };
+    uuid: string;
 }
 
 function runPlayerStatePersistence(): number {
@@ -927,15 +927,15 @@ function runPlayerStatePersistence(): number {
                     world: PERMISSION_WORLDS[playerId % PERMISSION_WORLDS.length],
                     x: playerId,
                     y: 64,
-                    z: -playerId
+                    z: -playerId,
                 },
-                { name: 'farm', world: 'survival', x: playerId * 2, y: 70, z: playerId * 3 }
+                { name: 'farm', world: 'survival', x: playerId * 2, y: 70, z: playerId * 3 },
             ],
             preferences: {
                 chat: playerId % 5 !== 0,
                 privateMessages: playerId % 7 !== 0,
-                scoreboard: playerId % 3 !== 0
-            }
+                scoreboard: playerId % 3 !== 0,
+            },
         });
     }
 

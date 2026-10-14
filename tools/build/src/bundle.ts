@@ -18,30 +18,30 @@ const activeTemporaryDirectories = new Set<string>();
 
 /** Inputs to `bundlePlugin`. */
 export interface BundleOptions {
-    /** Consumer project root used for runtime toolchain caches. */
-    projectRoot?: string;
-    /** Source file to bundle. */
-    entry: string;
-    /** Where to write the `.wasm`. */
-    output: string;
-    /** The WIT the component is built against. */
-    witDir: string;
-    /** Injected as `__PLUGIN_VERSION__`. */
-    version: string;
-    /** Runtime used for the component. Defaults to Static Hermes. */
-    engine?: PluginEngine;
-    /** Static Hermes VM profile. Defaults to lean, which omits runtime `eval`. */
-    staticHermesRuntime?: StaticHermesRuntime;
-    /** Static Hermes garbage collector. Defaults to Hades. */
-    staticHermesGc?: StaticHermesGc;
-    /** Pass the bundle to Hermes's partial, unstable TypeScript parser. Static Hermes only. */
-    parseTypeScript?: boolean;
     /** Whether this is a development build. */
     developmentMode?: boolean;
-    /** Suppress runtime stdout while preserving stderr for the build command's shared formatter. */
-    quietRuntimeOutput?: boolean;
+    /** Runtime used for the component. Defaults to Static Hermes. */
+    engine?: PluginEngine;
+    /** Source file to bundle. */
+    entry: string;
     /** Receives runtime progress messages for formatting by the build command. */
     onOutput?: (message: BuildOutputMessage) => void;
+    /** Where to write the `.wasm`. */
+    output: string;
+    /** Pass the bundle to Hermes's partial, unstable TypeScript parser. Static Hermes only. */
+    parseTypeScript?: boolean;
+    /** Consumer project root used for runtime toolchain caches. */
+    projectRoot?: string;
+    /** Suppress runtime stdout while preserving stderr for the build command's shared formatter. */
+    quietRuntimeOutput?: boolean;
+    /** Static Hermes garbage collector. Defaults to Hades. */
+    staticHermesGc?: StaticHermesGc;
+    /** Static Hermes VM profile. Defaults to lean, which omits runtime `eval`. */
+    staticHermesRuntime?: StaticHermesRuntime;
+    /** Injected as `__PLUGIN_VERSION__`. */
+    version: string;
+    /** The WIT the component is built against. */
+    witDir: string;
 }
 
 /**
@@ -80,9 +80,9 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                               workspaceRoot: projectRoot,
                               witDir: options.witDir,
                               developmentMode: options.developmentMode ?? false,
-                              onWasiImport: (specifier) => resolvedWasiImports.add(specifier)
-                          })
-                      ]
+                              onWasiImport: (specifier) => resolvedWasiImports.add(specifier),
+                          }),
+                      ],
                   }
                 : {}),
             target: 'es2022',
@@ -92,17 +92,17 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
             define: {
                 __PLUGIN_VERSION__: JSON.stringify(options.version),
                 __PUMPKIN_DEV_MODE__: JSON.stringify(options.developmentMode ?? false),
-                'process.env.NODE_ENV': JSON.stringify(options.developmentMode ? 'development' : 'production')
-            }
+                'process.env.NODE_ENV': JSON.stringify(options.developmentMode ? 'development' : 'production'),
+            },
         });
         if (engine === 'static-hermes') {
             const source = fs.readFileSync(bundle, 'utf8');
             const unsupportedWasiImports = staticHermesWasiImports(buildResult.metafile).filter(
-                (specifier) => !resolvedWasiImports.has(specifier)
+                (specifier) => !resolvedWasiImports.has(specifier),
             );
             if (unsupportedWasiImports.length > 0) {
                 throw new Error(
-                    `Static Hermes JavaScript bundle imports WASI interface${unsupportedWasiImports.length === 1 ? '' : 's'} without a JSI adapter: ${unsupportedWasiImports.join(', ')}`
+                    `Static Hermes JavaScript bundle imports WASI interface${unsupportedWasiImports.length === 1 ? '' : 's'} without a JSI adapter: ${unsupportedWasiImports.join(', ')}`,
                 );
             }
             fs.writeFileSync(bundle, unwrapStaticHermesExports(source));
@@ -126,11 +126,11 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                                         apiMethods: usedWitMethods.pumpkinMethods,
                                         ...(usedWitMethods.eventTypes === undefined
                                             ? {}
-                                            : { eventTypes: usedWitMethods.eventTypes })
-                                    })
-                          }
+                                            : { eventTypes: usedWitMethods.eventTypes }),
+                                    }),
+                          },
                       }
-                    : {})
+                    : {}),
             });
             try {
                 buildStaticHermesComponent({
@@ -153,8 +153,8 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                               wasiMethods: usedWitMethods.wasiMethods,
                               ...(usedWitMethods.eventTypes === undefined
                                   ? {}
-                                  : { eventTypes: usedWitMethods.eventTypes })
-                          })
+                                  : { eventTypes: usedWitMethods.eventTypes }),
+                          }),
                 });
             } catch (error) {
                 if (!quietRuntimeOutput) throw error;
@@ -177,12 +177,12 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                         '--runtime',
                         path.join(import.meta.dirname, '../runtime/quickjs-runtime-bigint.wasm'),
                         '--output',
-                        component
+                        component,
                     ],
                     {
                         stdio: quietRuntimeOutput ? ['inherit', 'ignore', 'pipe'] : 'inherit',
-                        ...(quietRuntimeOutput ? { maxBuffer: 16 * 1024 * 1024 } : {})
-                    }
+                        ...(quietRuntimeOutput ? { maxBuffer: 16 * 1024 * 1024 } : {}),
+                    },
                 );
             } catch (error) {
                 if (!quietRuntimeOutput) throw error;
@@ -192,7 +192,7 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
         const size = fs.statSync(component).size;
         if (!options.developmentMode && size > MAX_PRODUCTION_COMPONENT_BYTES) {
             throw new Error(
-                `Production WebAssembly component is ${size} bytes; maximum is ${MAX_PRODUCTION_COMPONENT_BYTES} bytes (5 MiB)`
+                `Production WebAssembly component is ${size} bytes; maximum is ${MAX_PRODUCTION_COMPONENT_BYTES} bytes (5 MiB)`,
             );
         }
         publishComponent(component, output, temporaryDir, () => {
@@ -240,8 +240,8 @@ function staticHermesWasiImports(metafile: esbuild.Metafile | undefined): string
     const imports = Object.values(metafile?.outputs ?? {}).flatMap((output) => output.imports);
     return [
         ...new Set(
-            imports.filter((entry) => entry.external && entry.path.startsWith('wasi:')).map((entry) => entry.path)
-        )
+            imports.filter((entry) => entry.external && entry.path.startsWith('wasi:')).map((entry) => entry.path),
+        ),
     ];
 }
 
@@ -272,7 +272,7 @@ function publishComponent(
     component: string,
     output: string,
     temporaryDir: string,
-    preserveForRecovery: () => void
+    preserveForRecovery: () => void,
 ): void {
     try {
         fs.renameSync(component, output);
@@ -292,7 +292,7 @@ function publishComponent(
                 preserveForRecovery();
                 throw new AggregateError(
                     [publishError, restoreError],
-                    `could not publish or restore ${output}; previous artifact preserved at ${previous}`
+                    `could not publish or restore ${output}; previous artifact preserved at ${previous}`,
                 );
             }
             throw publishError;

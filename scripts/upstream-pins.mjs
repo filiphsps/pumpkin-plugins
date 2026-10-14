@@ -11,7 +11,7 @@ const COMMIT_PATTERN = /^[0-9a-f]{40}$/i;
 export async function discoverUpstreamPins({
     workspaceRoot = process.cwd(),
     catalogPath = DEFAULT_CATALOG,
-    lookupRef = lookupGitRef
+    lookupRef = lookupGitRef,
 }) {
     const sources = readCatalog(workspaceRoot, catalogPath);
     return Promise.all(
@@ -44,9 +44,9 @@ export async function discoverUpstreamPins({
                 needsUpdate: current !== latest,
                 compareUrl: compareUrl(repository, current, latest),
                 labels: source.labels,
-                validation: source.validation
+                validation: source.validation,
             };
-        })
+        }),
     );
 }
 
@@ -71,8 +71,8 @@ export function reconcileUpstreamPin(
         run = runCommand,
         writeFile = fs.writeFileSync,
         workspaceRoot = input.workspaceRoot ?? process.cwd(),
-        runnerTemp = input.runnerTemp ?? process.env.RUNNER_TEMP ?? tmpdir()
-    } = {}
+        runnerTemp = input.runnerTemp ?? process.env.RUNNER_TEMP ?? tmpdir(),
+    } = {},
 ) {
     validateReconciliationInput(input);
 
@@ -86,10 +86,10 @@ export function reconcileUpstreamPin(
     const addLabelArgs = input.labels.flatMap((label) => ['--add-label', label]);
 
     const pullRequest = parseJsonArray(
-        run('gh', ['pr', 'list', '--state', 'all', '--head', branch, '--json', 'number,state'])
+        run('gh', ['pr', 'list', '--state', 'all', '--head', branch, '--json', 'number,state']),
     ).find(({ state }) => state !== 'MERGED');
     const issue = parseJsonArray(
-        run('gh', ['issue', 'list', '--state', 'all', '--limit', '1000', '--json', 'number,body,state'])
+        run('gh', ['issue', 'list', '--state', 'all', '--limit', '1000', '--json', 'number,body,state']),
     ).find(({ body }) => (body ?? '').includes(marker));
 
     const closePullRequest = () => {
@@ -129,8 +129,8 @@ export function reconcileUpstreamPin(
                 '',
                 `Compare: ${input.compareUrl}`,
                 `Workflow run: ${input.githubRunUrl}`,
-                ''
-            ].join('\n')
+                '',
+            ].join('\n'),
         );
         if (issue) {
             run('gh', [
@@ -141,7 +141,7 @@ export function reconcileUpstreamPin(
                 issueTitle,
                 '--body-file',
                 issueBodyFile,
-                ...addLabelArgs
+                ...addLabelArgs,
             ]);
             reopenIssueIfNeeded();
         } else {
@@ -156,7 +156,7 @@ export function reconcileUpstreamPin(
     run('node', ['scripts/upstream-pins.mjs', 'apply', input.sourceId, input.latestCommit], { cwd: workspaceRoot });
     run('git', ['config', 'user.name', 'github-actions[bot]'], { cwd: workspaceRoot });
     run('git', ['config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com'], {
-        cwd: workspaceRoot
+        cwd: workspaceRoot,
     });
     run('git', ['add', '--', input.pinFile], { cwd: workspaceRoot });
     if (!run('git', ['diff', '--cached', '--name-only'], { cwd: workspaceRoot }).trim()) {
@@ -179,8 +179,8 @@ export function reconcileUpstreamPin(
             '',
             `Compare: ${input.compareUrl}`,
             `Validation passed in the [upstream pin workflow](${input.githubRunUrl}).`,
-            ''
-        ].join('\n')
+            '',
+        ].join('\n'),
     );
     if (pullRequest) {
         run('gh', [
@@ -191,7 +191,7 @@ export function reconcileUpstreamPin(
             prTitle,
             '--body-file',
             prBodyFile,
-            ...addLabelArgs
+            ...addLabelArgs,
         ]);
         reopenPullRequestIfNeeded();
     } else {
@@ -206,7 +206,7 @@ export function reconcileUpstreamPin(
             branch,
             '--base',
             input.baseBranch,
-            ...labelArgs
+            ...labelArgs,
         ]);
     }
     return { outcome: 'pull-request' };
@@ -226,7 +226,7 @@ export function reconciliationInputFromEnvironment(env = process.env) {
         validationResult: env.VALIDATION_RESULT,
         baseBranch: env.BASE_BRANCH,
         githubRunUrl: env.GITHUB_RUN_URL,
-        runnerTemp: env.RUNNER_TEMP
+        runnerTemp: env.RUNNER_TEMP,
     };
 }
 
@@ -264,7 +264,7 @@ function runCommand(program, args, { cwd = process.cwd() } = {}) {
     return execFileSync(program, args, {
         cwd,
         encoding: 'utf8',
-        stdio: ['inherit', 'pipe', 'inherit']
+        stdio: ['inherit', 'pipe', 'inherit'],
     });
 }
 
@@ -295,7 +295,7 @@ function readCatalog(workspaceRoot, catalogPath) {
 
 function lookupGitRef(repository, branch) {
     const result = execFileSync('git', ['ls-remote', '--exit-code', repository, `refs/heads/${branch}`], {
-        encoding: 'utf8'
+        encoding: 'utf8',
     });
     return result.trim().split(/\s+/)[0];
 }
@@ -312,7 +312,7 @@ function runValidation({ workspaceRoot, catalogPath, id }) {
     if (!source) throw new Error(`Unknown upstream pin source: ${id}`);
     execFileSync(source.validation[0], source.validation.slice(1), {
         cwd: workspaceRoot,
-        stdio: 'inherit'
+        stdio: 'inherit',
     });
 }
 

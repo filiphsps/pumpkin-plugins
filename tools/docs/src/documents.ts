@@ -9,8 +9,8 @@ export type Status = 'updated' | 'unchanged' | 'stale';
 
 /** One existing Markdown file and its generated blocks. Paths are relative to the supplied root. */
 export interface BlockDocumentSpec extends BlockOptions {
-    file: string;
     blocks: Record<string, string>;
+    file: string;
     /** Omit to use the generic generation note; use an empty string to omit the note. */
     note?: string;
 }
@@ -26,8 +26,8 @@ export type DocumentSpec = BlockDocumentSpec | TransformDocumentSpec;
 
 /** A validated document update, prepared before any generation writes. */
 export interface DocumentUpdate {
-    file: string;
     existing: string;
+    file: string;
     next: string;
 }
 
@@ -41,7 +41,7 @@ export function prepareDocument(document: DocumentSpec, root: string): DocumentU
             ? document.transform(existing)
             : applyBlocks(existing, document.blocks, file, document.note ?? DOCUMENT_NOTE, {
                   required: document.required ?? true,
-                  markers: document.markers
+                  markers: document.markers,
               });
     return { file, existing, next };
 }

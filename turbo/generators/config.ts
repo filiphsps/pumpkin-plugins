@@ -18,7 +18,7 @@ const FILES = [
     'src/commands/spec.ts',
     'src/info.ts',
     'src/plugin.ts',
-    'test/plugin.itest.ts'
+    'test/plugin.itest.ts',
 ];
 
 type Answers = { name: string; displayName: string; description: string; turbo: { paths: { root: string } } };
@@ -32,7 +32,7 @@ function registerRelease(file: string, update: (json: Record<string, unknown>, n
             const json = JSON.parse(content);
             update(json, data.name);
             return `${JSON.stringify(json, null, 4)}\n`;
-        }
+        },
     };
 }
 
@@ -65,14 +65,14 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                     if (fs.existsSync(path.join(process.cwd(), 'packages', value)))
                         return `packages/${value} already exists`;
                     return true;
-                }
+                },
             },
             {
                 type: 'input',
                 name: 'displayName',
                 message: 'Plugin name as Pumpkin shows it (PascalCase, e.g. MyPlugin):',
                 default: (answers: { name: string }) => plop.getHelper('pascalCase')(answers.name),
-                validate: (value: string) => PASCAL_CASE.test(value) || 'Use PascalCase letters and digits only'
+                validate: (value: string) => PASCAL_CASE.test(value) || 'Use PascalCase letters and digits only',
             },
             {
                 type: 'input',
@@ -81,8 +81,8 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                 validate: (value: string) => {
                     if (value.trim().length === 0) return 'A description is required';
                     return value.length <= MAX_DESCRIPTION || `Keep it under ${MAX_DESCRIPTION} characters`;
-                }
-            }
+                },
+            },
         ],
         actions: (data) => {
             const { turbo } = data as Answers;
@@ -92,7 +92,7 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                 ...FILES.map((file) => ({
                     type: 'add',
                     path: `{{ turbo.paths.root }}/packages/{{ name }}/${file}`,
-                    templateFile: `templates/plugin/${file}.hbs`
+                    templateFile: `templates/plugin/${file}.hbs`,
                 })),
                 registerRelease('release-please-config.json', (json, name) => {
                     const packages = json.packages as Record<string, unknown>;
@@ -111,14 +111,14 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                         root,
                         'pnpm',
                         ['--filter', `./packages/${name}`, 'run', 'readme'],
-                        'Generated the plugin README'
+                        'Generated the plugin README',
                     ),
                 () =>
                     run(
                         root,
                         'pnpm',
                         ['exec', 'pumpkin-plugins-docs', 'root'],
-                        'Updated the package list in README.md'
+                        'Updated the package list in README.md',
                     ),
                 () =>
                     run(
@@ -131,12 +131,12 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                             '--write',
                             `packages/${name}`,
                             'release-please-config.json',
-                            '.release-please-manifest.json'
+                            '.release-please-manifest.json',
                         ],
-                        'Formatted the new files'
-                    )
+                        'Formatted the new files',
+                    ),
             ];
-        }
+        },
     });
 
     plop.setGenerator('action', {
@@ -151,7 +151,7 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                     if (fs.existsSync(path.join(process.cwd(), 'actions', value)))
                         return `actions/${value} already exists`;
                     return true;
-                }
+                },
             },
             {
                 type: 'input',
@@ -165,7 +165,7 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                 validate: (value: string) => {
                     if (!value.trim()) return 'An action name is required';
                     return !/[\r\n]/.test(value) || 'Enter a one-line action name';
-                }
+                },
             },
             {
                 type: 'input',
@@ -174,8 +174,8 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                 validate: (value: string) => {
                     if (!value.trim()) return 'A description is required';
                     return !/[\r\n]/.test(value) || 'Enter a one-line description';
-                }
-            }
+                },
+            },
         ],
         actions: (data) => {
             const answers = data as Answers;
@@ -185,14 +185,14 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                 ...ACTION_FILES.map((file) => ({
                     type: 'add',
                     path: `{{ turbo.paths.root }}/actions/{{ name }}/${file}`,
-                    templateFile: `templates/action/${file}.hbs`
+                    templateFile: `templates/action/${file}.hbs`,
                 })),
                 registerRelease('release-please-config.json', (json, name) => {
                     const packages = json.packages as Record<string, unknown>;
                     packages[`actions/${name}`] = {
                         component: name,
                         'release-type': 'simple',
-                        'release-as': '0.0.1'
+                        'release-as': '0.0.1',
                     };
                     json.packages = Object.fromEntries(sortReleaseEntries(Object.entries(packages)));
                 }),
@@ -207,14 +207,14 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                         root,
                         'pnpm',
                         ['exec', 'pumpkin-plugins-docs', 'actions'],
-                        'Generated action README input/output tables'
+                        'Generated action README input/output tables',
                     ),
                 () =>
                     run(
                         root,
                         'pnpm',
                         ['exec', 'pumpkin-plugins-docs', 'root'],
-                        'Updated the actions table in README.md'
+                        'Updated the actions table in README.md',
                     ),
                 () =>
                     run(
@@ -227,11 +227,11 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                             '--write',
                             `actions/${name}`,
                             'release-please-config.json',
-                            '.release-please-manifest.json'
+                            '.release-please-manifest.json',
                         ],
-                        'Formatted the new action'
-                    )
+                        'Formatted the new action',
+                    ),
             ];
-        }
+        },
     });
 }

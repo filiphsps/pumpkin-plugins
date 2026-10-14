@@ -12,28 +12,28 @@ import { parseHttpUrl } from './url.ts';
 
 /** What to look for and where. */
 export interface DiscoveryOptions {
-    /** Look for UPnP gateways. */
-    upnp: boolean;
     /** Look for NAT-PMP gateways. */
     natPmp: boolean;
-    /** Where to send UPnP searches. Defaults to the SSDP multicast group; a router's own address works when multicast is blocked. */
-    ssdp?: Endpoint;
     /** The NAT-PMP gateway to use. Without it the usual router addresses of the local network are tried. */
     natPmpGateway?: Endpoint;
-    /** How long a UPnP search waits for answers, in milliseconds. */
-    searchMs?: number;
     /**
      * Turns routers down by what they are. It sees every router that gives away its make and model,
      * before anything is asked of it, and a router it gives a reason for is not used: when that
      * leaves no router, discovery throws a `RouterRefusedError`. Without it routers are not identified.
      */
     screen?: Screen;
+    /** How long a UPnP search waits for answers, in milliseconds. */
+    searchMs?: number;
+    /** Where to send UPnP searches. Defaults to the SSDP multicast group; a router's own address works when multicast is blocked. */
+    ssdp?: Endpoint;
+    /** Look for UPnP gateways. */
+    upnp: boolean;
 }
 
 /** A router that answered, and the address it has on the internet. */
 export interface Discovered {
-    gateway: Gateway;
     externalAddress: Ipv4;
+    gateway: Gateway;
     /** What is known about its make and model. */
     identity?: RouterIdentity;
 }
@@ -166,7 +166,7 @@ function* search(net: Network, to: Endpoint, windowMs: number): Steps<string[]> 
 function* discoverNatPmp(
     net: Network,
     options: DiscoveryOptions,
-    identity: RouterIdentity | undefined
+    identity: RouterIdentity | undefined,
 ): Steps<Discovered> {
     const candidates = natPmpCandidates(net, options);
     if (candidates.length === 0) throw new Error('this machine has no route to a local network');
@@ -175,7 +175,7 @@ function* discoverNatPmp(
         candidates.map(function* (to): Steps<Discovered> {
             const gateway = new NatPmpGateway(net, to.address, to.port);
             return { gateway, externalAddress: yield* gateway.externalAddress(), identity };
-        })
+        }),
     );
     const found = results.find((r) => r.ok);
     if (found?.ok) return found.value;

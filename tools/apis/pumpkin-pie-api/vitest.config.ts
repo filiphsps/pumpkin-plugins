@@ -6,12 +6,12 @@ export default defineConfig({
             provider: 'v8',
             include: ['src/**/*.ts'],
             exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
-            reporter: ['text', 'lcov']
+            reporter: ['text', 'lcov'],
         },
         projects: [
             {
                 extends: true,
-                test: { name: 'unit', include: ['src/**/*.test.ts', 'test/**/*.test.ts', 'scripts/**/*.test.ts'] }
+                test: { name: 'unit', include: ['src/**/*.test.ts', 'test/**/*.test.ts', 'scripts/**/*.test.ts'] },
             },
             {
                 extends: true,
@@ -20,9 +20,9 @@ export default defineConfig({
                     include: ['test/**/*.itest.ts'],
                     globalSetup: ['./test/global-setup.ts'],
                     testTimeout: 120000,
-                    hookTimeout: 180000
-                }
-            }
-        ]
-    }
+                    hookTimeout: 180000,
+                },
+            },
+        ],
+    },
 });

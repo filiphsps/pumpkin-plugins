@@ -12,7 +12,7 @@ describe('terrain capture', () => {
             sample: (_x, y) => {
                 reads++;
                 return { material: y === 2 ? 'air' : 'stone', skyLight: 15, blockLight: 0 };
-            }
+            },
         };
         const capture = new TerrainCapture(region, { isEmpty: (material) => material === 'air' });
 
@@ -27,8 +27,8 @@ describe('terrain capture', () => {
             materials: ['air', 'stone'],
             columns: Array.from({ length: 4 }, () => [
                 { materialId: 0, startY: 2, height: 1, skyLight: 15, blockLight: 0 },
-                { materialId: 1, startY: 0, height: 2, skyLight: 15, blockLight: 0 }
-            ])
+                { materialId: 1, startY: 0, height: 2, skyLight: 15, blockLight: 0 },
+            ]),
         });
     });
 
@@ -37,7 +37,7 @@ describe('terrain capture', () => {
         const sample = (_x: number, y: number, _z: number) => ({
             material: y > -8 ? 'air' : 'stone',
             skyLight: 15,
-            blockLight: 0
+            blockLight: 0,
         });
         const baseline = new TerrainCapture(tallRegion, { isEmpty: (material) => material === 'air' });
         baseline.step({ minY: -10, height: 20, sample }, 20);
@@ -52,9 +52,9 @@ describe('terrain capture', () => {
                     reads++;
                     return sample(x, y, z);
                 },
-                top: () => -8
+                top: () => -8,
             },
-            20
+            20,
         );
 
         expect(reads).toBeLessThan(20);
@@ -66,7 +66,7 @@ describe('terrain capture', () => {
         const source: TerrainSource = {
             minY: 0,
             height: 3,
-            sample: (_x, y) => ({ material: String(y), skyLight: 0, blockLight: 0 })
+            sample: (_x, y) => ({ material: String(y), skyLight: 0, blockLight: 0 }),
         };
         expect(() => capture.step({ ...source, height: 4 }, 1)).toThrow('height');
         expect(() => capture.step(source, 12)).toThrow('too complex');
@@ -78,16 +78,16 @@ describe('terrain capture', () => {
                 new TerrainCapture({
                     ...region,
                     originX: Number.MAX_SAFE_INTEGER,
-                    width: 2
-                })
+                    width: 2,
+                }),
         ).toThrow('Invalid terrain region');
         expect(
             () =>
                 new TerrainCapture({
                     ...region,
                     minY: Number.MAX_SAFE_INTEGER,
-                    height: 2
-                })
+                    height: 2,
+                }),
         ).toThrow('Invalid terrain region');
     });
 });

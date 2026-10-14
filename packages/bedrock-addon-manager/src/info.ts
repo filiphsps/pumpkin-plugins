@@ -12,10 +12,10 @@ export const info = {
         { name: 'fs.read.data', reason: 'Read the packs folder and the plugin config in its data folder.' },
         {
             name: 'fs.write.data',
-            reason: 'Create and update the config, and write the resource packs found in `.mcaddon` files.'
+            reason: 'Create and update the config, and write the resource packs found in `.mcaddon` files.',
         },
-        { name: 'network.tcp.bind', reason: 'Listen for pack downloads from Bedrock clients.' }
+        { name: 'network.tcp.bind', reason: 'Listen for pack downloads from Bedrock clients.' },
     ],
     commands: commandInfos(commands),
-    config: configInfo
+    config: configInfo,
 } satisfies PluginInfo<typeof PLUGIN_NAME>;

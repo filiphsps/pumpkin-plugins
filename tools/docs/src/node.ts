@@ -47,10 +47,10 @@ function routeUrl(siteUrl: URL, route: string): string {
 }
 
 interface ComponentReference {
-    file: string;
     apiRoute: string;
-    guideRoute?: string;
+    file: string;
     guideLabel: string;
+    guideRoute?: string;
 }
 
 async function packageReferences(root: string, group: 'packages' | 'tools'): Promise<ComponentReference[]> {
@@ -70,7 +70,7 @@ async function packageReferences(root: string, group: 'packages' | 'tools'): Pro
             file: readme,
             apiRoute: componentApiRoute(group, component.slug, manifest.name),
             ...(fs.existsSync(docsIndex) ? { guideRoute: `${group}/${component.slug}/docs/` } : {}),
-            guideLabel: group === 'packages' ? 'plugin guide' : 'tool guide'
+            guideLabel: group === 'packages' ? 'plugin guide' : 'tool guide',
         });
     }
     return references;
@@ -89,8 +89,8 @@ function actionReferences(root: string): ComponentReference[] {
                 ...(fs.existsSync(path.join(directory, 'docs', 'index.md'))
                     ? { guideRoute: `actions/${slug}/docs/` }
                     : {}),
-                guideLabel: 'action guide'
-            }
+                guideLabel: 'action guide',
+            },
         ];
     });
 }
@@ -99,7 +99,7 @@ async function prepareComponentReferenceUpdates(root: string, siteUrl: URL): Pro
     const references = [
         ...(await packageReferences(root, 'packages')),
         ...(await packageReferences(root, 'tools')),
-        ...actionReferences(root)
+        ...actionReferences(root),
     ];
     const updates: DocumentUpdate[] = [];
     for (const reference of references) {
@@ -109,7 +109,7 @@ async function prepareComponentReferenceUpdates(root: string, siteUrl: URL): Pro
             ? `See the [${reference.guideLabel}](${routeUrl(siteUrl, reference.guideRoute)}) and ${apiLink} on the documentation site.`
             : `See the ${apiLink} on the documentation site.`;
         updates.push(
-            prepareDocument({ file: reference.file, blocks: { reference: body }, note: REFERENCE_NOTE }, root)
+            prepareDocument({ file: reference.file, blocks: { reference: body }, note: REFERENCE_NOTE }, root),
         );
     }
     return updates;
@@ -127,7 +127,7 @@ export async function generatePluginReadme(pluginDir: string, check = false): Pr
     return generateDocuments(
         [{ file: 'README.md', blocks: renderBlocks(info), required: false, note: GENERATED_NOTE }],
         pluginDir,
-        check
+        check,
     );
 }
 
@@ -144,7 +144,7 @@ async function rows(root: string, group: 'packages' | 'tools'): Promise<PackageR
             name: info?.name ?? pkg.name,
             description: info?.description ?? pkg.description ?? '',
             license: pkg.license ?? '',
-            licenseFile: licenseFile ? path.relative(root, licenseFile).split(path.sep).join('/') : undefined
+            licenseFile: licenseFile ? path.relative(root, licenseFile).split(path.sep).join('/') : undefined,
         });
     }
     return out;
@@ -180,11 +180,11 @@ export async function generateRootReadme(root: string, check = false): Promise<S
             file: 'README.md',
             blocks: {
                 packages: block,
-                'docs-site': `Browse the [public documentation site](${siteUrl.href}) for guides, component overviews, and generated API references.`
+                'docs-site': `Browse the [public documentation site](${siteUrl.href}) for guides, component overviews, and generated API references.`,
             },
-            note: ROOT_NOTE
+            note: ROOT_NOTE,
         },
-        root
+        root,
     );
     return writeDocuments([update, ...(await prepareComponentReferenceUpdates(root, siteUrl))], check);
 }

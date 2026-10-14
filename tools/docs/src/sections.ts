@@ -18,7 +18,7 @@ export function renderSections(info: PluginInfo): Record<SectionName, string> {
         summary: info.description,
         permissions: renderPermissions(info),
         commands: renderCommands(info),
-        config: renderConfig(info)
+        config: renderConfig(info),
     };
 }
 
@@ -42,8 +42,8 @@ function renderPermissions(info: PluginInfo): string {
         '',
         table(
             ['Permission', 'Why'],
-            permissions.map((p) => [code(p.name), p.reason])
-        )
+            permissions.map((p) => [code(p.name), p.reason]),
+        ),
     ].join('\n');
 }
 
@@ -55,8 +55,8 @@ function renderCommands({ commands = [] }: PluginInfo): string {
             code(c.usage),
             c.description,
             c.permission ? code(c.permission) : 'none',
-            renderCommandPermissionDefault(c.defaultPermission)
-        ])
+            renderCommandPermissionDefault(c.defaultPermission),
+        ]),
     );
 }
 
@@ -85,9 +85,9 @@ function renderConfig({ name, config }: PluginInfo): string {
                           code(o.key),
                           o.type,
                           o.default === undefined ? 'none' : code(o.default),
-                          o.description
-                      ])
-                  )
+                          o.description,
+                      ]),
+                  ),
               ]),
         '',
         '<details>',
@@ -96,6 +96,6 @@ function renderConfig({ name, config }: PluginInfo): string {
         '```toml',
         config.defaultContents.replace(/\n+$/, ''),
         '```',
-        '</details>'
+        '</details>',
     ].join('\n');
 }

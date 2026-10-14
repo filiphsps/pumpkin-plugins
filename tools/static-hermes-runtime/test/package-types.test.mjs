@@ -19,7 +19,7 @@ it('resolves public package types in a pnpm consumer without declaring Node type
         const runtimeManifest = JSON.parse(fs.readFileSync(path.join(runtimeDirectory, 'package.json'), 'utf8'));
         execFileSync('pnpm', ['pack', '--ignore-scripts', '--pack-destination', packageDirectory], {
             cwd: runtimeDirectory,
-            stdio: 'pipe'
+            stdio: 'pipe',
         });
 
         const packageSlug = runtimeManifest.name.replace(/^@/, '').replace('/', '-');
@@ -30,8 +30,8 @@ it('resolves public package types in a pnpm consumer without declaring Node type
                 name: 'static-hermes-package-types-consumer',
                 private: true,
                 type: 'module',
-                dependencies: { [runtimeManifest.name]: `file:${tarball}` }
-            })
+                dependencies: { [runtimeManifest.name]: `file:${tarball}` },
+            }),
         );
         fs.writeFileSync(
             path.join(consumerDirectory, 'tsconfig.json'),
@@ -44,25 +44,25 @@ it('resolves public package types in a pnpm consumer without declaring Node type
                     noEmit: true,
                     skipLibCheck: true,
                     allowImportingTsExtensions: true,
-                    types: []
+                    types: [],
                 },
-                include: ['src/**/*.ts']
-            })
+                include: ['src/**/*.ts'],
+            }),
         );
         fs.writeFileSync(
             path.join(consumerDirectory, 'src/index.ts'),
-            `import { buildHermesArtifacts, setupHermesToolchainEnvironment, staticHermesImportsPlugin } from '${runtimeManifest.name}';\n\nvoid buildHermesArtifacts;\nvoid setupHermesToolchainEnvironment;\nvoid staticHermesImportsPlugin;\n`
+            `import { buildHermesArtifacts, setupHermesToolchainEnvironment, staticHermesImportsPlugin } from '${runtimeManifest.name}';\n\nvoid buildHermesArtifacts;\nvoid setupHermesToolchainEnvironment;\nvoid staticHermesImportsPlugin;\n`,
         );
 
         execFileSync('pnpm', ['install', '--offline', '--ignore-scripts'], {
             cwd: consumerDirectory,
-            stdio: 'pipe'
+            stdio: 'pipe',
         });
         expect(fs.existsSync(path.join(consumerDirectory, 'node_modules/@types/node'))).toBe(false);
         const typecheck = spawnSync(
             'pnpm',
             ['exec', 'tsc', '--project', path.join(consumerDirectory, 'tsconfig.json')],
-            { cwd: workspaceDirectory, encoding: 'utf8' }
+            { cwd: workspaceDirectory, encoding: 'utf8' },
         );
         expect(typecheck.status, `${typecheck.stdout}\n${typecheck.stderr}`).toBe(0);
         execFileSync(
@@ -70,8 +70,8 @@ it('resolves public package types in a pnpm consumer without declaring Node type
             ['--input-type=module', '--eval', `await import(${JSON.stringify(runtimeManifest.name)});`],
             {
                 cwd: consumerDirectory,
-                stdio: 'pipe'
-            }
+                stdio: 'pipe',
+            },
         );
     } finally {
         fs.rmSync(temporaryDirectory, { recursive: true, force: true });

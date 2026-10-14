@@ -20,8 +20,8 @@ describe(WaypointCatalog.name, () => {
                 id,
                 name: '  Spawn  ',
                 dimension: 'world',
-                position: { x: 1.5, y: 64.25, z: -2.75 }
-            }).status
+                position: { x: 1.5, y: 64.25, z: -2.75 },
+            }).status,
         ).toBe('created');
 
         expect(catalog.getByName('spawn')?.id).toBe(id);
@@ -30,7 +30,7 @@ describe(WaypointCatalog.name, () => {
         expect(catalog.getByName('main base')).toMatchObject({
             id,
             name: 'Main Base',
-            position: { x: 1.5, y: 64.25, z: -2.75 }
+            position: { x: 1.5, y: 64.25, z: -2.75 },
         });
     });
 
@@ -41,7 +41,7 @@ describe(WaypointCatalog.name, () => {
             id: upper,
             name: 'Disk',
             dimension: 'world',
-            position: { x: 0, y: 64, z: 0 }
+            position: { x: 0, y: 64, z: 0 },
         });
         files.put('waypoints.json', JSON.stringify({ version: 2, waypoints: [{ ...waypoint, id: upper }] }));
         expect(catalog.reload()).toBe(true);
@@ -61,8 +61,8 @@ describe(WaypointCatalog.name, () => {
                 id: '22222222-2222-4222-8222-222222222222',
                 name: 'cafe\u0301',
                 dimension: 'world',
-                position: { x: 10, y: 0, z: 0 }
-            }).status
+                position: { x: 10, y: 0, z: 0 },
+            }).status,
         ).toBe('conflict');
         expect(catalog.list().map(({ name }) => name)).toEqual(['Café']);
     });
@@ -77,8 +77,8 @@ describe(WaypointCatalog.name, () => {
                 label: 'South Gate',
                 description: 'Use the lower path',
                 visibilityRange: 80,
-                icon: 'minecraft:lodestone'
-            }).status
+                icon: 'minecraft:lodestone',
+            }).status,
         ).toBe('updated');
 
         expect(catalog.setEnabled('Portal', false).status).toBe('updated');
@@ -91,7 +91,7 @@ describe(WaypointCatalog.name, () => {
             color: '#AABBCC',
             label: 'South Gate',
             visibilityRange: 80,
-            enabled: false
+            enabled: false,
         });
     });
 
@@ -99,7 +99,7 @@ describe(WaypointCatalog.name, () => {
         const { catalog } = setup();
         expect(catalog.rename('missing', 'Other').status).toBe('not-found');
         expect(catalog.create({ id, name: '   ', dimension: 'world', position: { x: 0, y: 0, z: 0 } }).status).toBe(
-            'invalid'
+            'invalid',
         );
         catalog.create({ id, name: 'Home', dimension: 'world', position: { x: 0, y: 0, z: 0 } });
         expect(catalog.remove('HOME').status).toBe('removed');
@@ -112,7 +112,7 @@ describe(WaypointCatalog.name, () => {
             throw new Error('disk full');
         });
         expect(catalog.create({ id, name: 'Home', dimension: 'world', position: { x: 0, y: 0, z: 0 } }).status).toBe(
-            'unavailable'
+            'unavailable',
         );
         expect(catalog.list()).toEqual([]);
     });

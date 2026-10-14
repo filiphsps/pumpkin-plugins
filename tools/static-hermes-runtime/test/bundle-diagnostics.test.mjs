@@ -8,7 +8,7 @@ describe('wrapBundleForDiagnostics', () => {
 
         expect(source.indexOf('__staticHermesWrapResource')).toBeGreaterThanOrEqual(0);
         expect(source.indexOf('__staticHermesWrapResource')).toBeLessThan(
-            source.indexOf('globalThis.pluginStarted = true;')
+            source.indexOf('globalThis.pluginStarted = true;'),
         );
     });
 
@@ -57,7 +57,7 @@ describe('wrapBundleForDiagnostics', () => {
                     resource.drop();
                     read();
                 `),
-                context
+                context,
             );
         } catch (error) {
             thrown = error;

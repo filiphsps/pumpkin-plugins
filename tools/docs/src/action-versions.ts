@@ -31,7 +31,7 @@ export function generateActionVersions(root: string, check = false): Status {
                     throw new Error(`${releasePath}/README.md has no example tag starting with ${component}-v`);
                 tagPattern.lastIndex = 0;
                 return source.replace(tagPattern, (_match, prefix) => `${prefix}${version}`);
-            }
+            },
         };
     });
     return generateDocuments(documents, root, check);

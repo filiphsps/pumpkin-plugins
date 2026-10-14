@@ -36,7 +36,7 @@ function verifyPlugins() {
                 fileLabel: `${plugin['plugin-name']} ${plugin.version}`,
                 expectedName: plugin['plugin-name'],
                 expectedVersion: plugin.version,
-                index: index + 1
+                index: index + 1,
             });
         }
         setOutput('verified-count', String(plugins.length));
@@ -47,7 +47,7 @@ function verifyPlugins() {
     const result = verifyPlugin(wasmFile, {
         fileLabel: wasmFile,
         expectedName: expectedPluginName || undefined,
-        expectedVersion: expectedVersion || undefined
+        expectedVersion: expectedVersion || undefined,
     });
     setOutput('verified-count', '1');
     setOutput('plugin-name', result.metadata.plugin_name);
@@ -67,7 +67,7 @@ function readManifest(manifestFile) {
         plugins = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
     } catch (error) {
         throw new Error(
-            `Could not parse plugins manifest ${manifestFile}: ${error instanceof Error ? error.message : error}`
+            `Could not parse plugins manifest ${manifestFile}: ${error instanceof Error ? error.message : error}`,
         );
     }
     if (!Array.isArray(plugins) || plugins.length === 0) {
@@ -87,7 +87,7 @@ function readManifest(manifestFile) {
             !plugin['wasm-file'].trim()
         ) {
             throw new Error(
-                `plugins-manifest entry ${index + 1} must include non-empty string plugin-name, version, and wasm-file fields`
+                `plugins-manifest entry ${index + 1} must include non-empty string plugin-name, version, and wasm-file fields`,
             );
         }
     }
@@ -111,18 +111,18 @@ function verifyPlugin(fileName, { fileLabel, expectedName, expectedVersion, inde
     }
     if (expectedName && result.metadata.plugin_name !== expectedName) {
         throw new Error(
-            `${prefix}plugin name is ${JSON.stringify(result.metadata.plugin_name)}, expected ${JSON.stringify(expectedName)}`
+            `${prefix}plugin name is ${JSON.stringify(result.metadata.plugin_name)}, expected ${JSON.stringify(expectedName)}`,
         );
     }
     if (expectedVersion && result.metadata.version !== expectedVersion) {
         throw new Error(
-            `${prefix}version is ${JSON.stringify(result.metadata.version)}, expected ${JSON.stringify(expectedVersion)}`
+            `${prefix}version is ${JSON.stringify(result.metadata.version)}, expected ${JSON.stringify(expectedVersion)}`,
         );
     }
 
     console.log(
         `Verified ${fileLabel}: ${result.metadata.plugin_name} ${result.metadata.version} ` +
-            `(Ed25519 ${result.publicKeyHex}).`
+            `(Ed25519 ${result.publicKeyHex}).`,
     );
     return result;
 }

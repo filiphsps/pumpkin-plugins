@@ -25,14 +25,14 @@ export function injectWasiImports(pluginWit: string, interfaces: readonly string
 export interface PrepareWitOptions {
     /** The cached WIT directory selected by the API package's `wit.lock.json`. */
     apiWit: string;
-    /** Where to write the combined WIT, when there is anything to add. */
-    target: string;
     /** WASI interfaces to import. */
     interfaces: readonly string[];
-    /** The folder `ensureWasiWit` returned. Only needed when there are interfaces. */
-    wasiWit?: string;
+    /** Where to write the combined WIT, when there is anything to add. */
+    target: string;
     /** Exact WASI WIT paths from the lock, to keep stale cached files out of the component world. */
     wasiFiles?: readonly string[];
+    /** The folder `ensureWasiWit` returned. Only needed when there are interfaces. */
+    wasiWit?: string;
 }
 
 /**
@@ -57,7 +57,7 @@ export function prepareWit(options: PrepareWitOptions): string {
             () => {
                 fs.rmSync(temporary, { recursive: true, force: true });
                 fs.mkdirSync(temporary);
-            }
+            },
         );
 
         if (options.wasiFiles) {
@@ -70,7 +70,7 @@ export function prepareWit(options: PrepareWitOptions): string {
             const deps = path.join(temporary, 'deps');
             retryTransientCopy(
                 () => fs.cpSync(wasiWit, deps, { recursive: true }),
-                () => fs.rmSync(deps, { recursive: true, force: true })
+                () => fs.rmSync(deps, { recursive: true, force: true }),
             );
         }
         const pluginWit = path.join(temporary, 'plugin.wit');
@@ -114,7 +114,7 @@ export function publishWitSnapshot(source: string, target: string): void {
                 } catch (restoreError) {
                     throw new AggregateError(
                         [error, restoreError],
-                        `could not publish WIT snapshot; previous snapshot remains at ${backup}`
+                        `could not publish WIT snapshot; previous snapshot remains at ${backup}`,
                     );
                 }
             }

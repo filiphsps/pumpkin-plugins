@@ -7,7 +7,7 @@ export class BedrockTabDisplayAdapter {
     /** A numeric native player-list objective remains disabled until a Bedrock client displays it. */
     readonly objectiveCapability: Capability = {
         kind: 'unsupported',
-        reason: OBJECTIVE_UNSUPPORTED_REASON
+        reason: OBJECTIVE_UNSUPPORTED_REASON,
     };
 
     /** Does not fabricate or rewrite roster entries. */
@@ -37,6 +37,6 @@ export class BedrockTabDisplayAdapter {
 function unsupported(feature: string): ApplyResult {
     return {
         kind: 'unsupported',
-        reason: `Native Bedrock ${feature} are unsupported; the Pumpkin roster is left unchanged`
+        reason: `Native Bedrock ${feature} are unsupported; the Pumpkin roster is left unchanged`,
     };
 }

@@ -9,7 +9,7 @@ it('checks all targets without writing and validates every target before updatin
     const first = 'Intro\n<!-- docs:begin facts -->\nstale\n<!-- docs:end facts -->\nUsage\n';
     const documents = [
         { file: 'README.md', blocks: { facts: 'New facts' } },
-        { file: 'guide.md', blocks: { facts: 'Guide facts' } }
+        { file: 'guide.md', blocks: { facts: 'Guide facts' } },
     ];
     try {
         writeFileSync(join(root, 'README.md'), first);

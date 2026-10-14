@@ -4,10 +4,10 @@ import type { SESSION_TIMING } from '../src/session-timing.ts';
 import type { PIE_RELEASE } from '../test/provider.ts';
 
 interface Metadata {
-    release: { [Key in keyof typeof PIE_RELEASE]: string };
-    protocol: number;
-    limits: { [Key in keyof typeof LIMITS]: number };
     license: string;
+    limits: { [Key in keyof typeof LIMITS]: number };
+    protocol: number;
+    release: { [Key in keyof typeof PIE_RELEASE]: string };
     timing: { [Key in keyof typeof SESSION_TIMING]: number };
 }
 
@@ -28,8 +28,8 @@ ${timing.defaultPingMs} ms by default (\`pingIntervalMs\`: ${timing.minPingMs}â€
                 ['Input/output text', `${limits.text} bytes`],
                 ['Identifier, name, namespace, viewer or argument', `${limits.id} bytes`],
                 ['Lines per batch', String(limits.batch)],
-                ['Expansion TTL cap', `${limits.ttl} ms`]
-            ]
+                ['Expansion TTL cap', `${limits.ttl} ms`],
+            ],
         ),
         provenance: `Global setup downloads the exact
 [PumpkinPIE ${release.tag} release](${upstream}/releases/tag/${release.tag}), never \`latest\`,
@@ -49,13 +49,13 @@ ${table(
         ['Target Pumpkin release', code(release.pumpkinRelease)],
         ['Target Pumpkin source commit', code(release.pumpkinCommit)],
         ['Target API artifact', `${code('@pumpkin-plugins/pumpkin-api')} ${release.apiArtifact}`],
-        ['Workspace tool license', license]
-    ]
+        ['Workspace tool license', license],
+    ],
 )}
 
 The pinned provider's [protocol contract](${upstream}/blob/${release.sourceCommit}/docs/protocol.md)
 and [wire definitions](${upstream}/blob/${release.sourceCommit}/crates/pumpkin-pie/src/protocol.rs)
 document the external protocol. No Rust implementation is translated or vendored.
-Provider artifacts stay external and ignored, outside the workspace tool's production exports and shipped source files.`
+Provider artifacts stay external and ignored, outside the workspace tool's production exports and shipped source files.`,
     };
 }

@@ -48,7 +48,7 @@ describe('LogBuffer', () => {
         buffer.attach(stream);
         stream.write('something else\n');
         await expect(buffer.waitFor(/never/, options())).rejects.toThrow(
-            /Timed out after 200 ms waiting for \/never\/[\s\S]*something else/
+            /Timed out after 200 ms waiting for \/never\/[\s\S]*something else/,
         );
     });
 

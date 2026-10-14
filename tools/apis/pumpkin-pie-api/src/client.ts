@@ -15,7 +15,7 @@ import {
     type ResolvedLine,
     type ResultFor,
     UnavailableError,
-    validateLine
+    validateLine,
 } from './protocol.ts';
 
 /** Synchronous byte transport; inject plugin-kit ipcSend in a guest. */
@@ -32,7 +32,7 @@ export class PieClient {
     /** Inject the transport and share a callback guard with any expansion router. */
     constructor(
         private readonly send: SendMessage,
-        options: ClientOptions = {}
+        options: ClientOptions = {},
     ) {
         this.guard = options.guard ?? new CallbackGuard();
         this.provider = options.provider ?? PIE_PROVIDER;

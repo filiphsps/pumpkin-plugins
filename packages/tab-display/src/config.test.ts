@@ -9,7 +9,7 @@ function memoryStore(initial?: string) {
         write: (text: string) => {
             contents = text;
         },
-        value: () => contents
+        value: () => contents,
     };
 }
 
@@ -39,7 +39,7 @@ describe('tab display configuration', () => {
         if (result.kind === 'invalid')
             expect(result.issues).toContainEqual({
                 path: 'objective.enabled',
-                reason: expect.stringContaining('unsupported')
+                reason: expect.stringContaining('unsupported'),
             });
     });
 
@@ -51,7 +51,7 @@ describe('tab display configuration', () => {
         if (result.kind === 'invalid')
             expect(result.issues).toContainEqual({
                 path: 'sorting.rules',
-                reason: expect.stringContaining('not verified')
+                reason: expect.stringContaining('not verified'),
             });
     });
 
@@ -60,13 +60,13 @@ describe('tab display configuration', () => {
         config.header.lines = [{ text: 'Hi', color: 'red' }];
         config.sorting.rules = [
             { kind: 'name', direction: 'ascending' },
-            { kind: 'name', direction: 'descending' }
+            { kind: 'name', direction: 'descending' },
         ];
         const result = validateConfig(config);
         expect(result.kind).toBe('invalid');
         if (result.kind === 'invalid') {
             expect(result.issues.map(({ path }) => path)).toEqual(
-                expect.arrayContaining(['header.lines[0].color', 'sorting.rules'])
+                expect.arrayContaining(['header.lines[0].color', 'sorting.rules']),
             );
         }
     });

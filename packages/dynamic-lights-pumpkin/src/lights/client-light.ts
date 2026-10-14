@@ -7,17 +7,16 @@ export interface BlockPosition {
 
 /** The player operations needed to show and clear a client-only light block. */
 export interface LightClient {
-    /** Shows a temporary block state without changing the server world. */
-    sendBlockChange(position: BlockPosition, stateId: number): void;
-
     /** Shows the actual server block again at this position. */
     resetBlockChange(position: BlockPosition): void;
+    /** Shows a temporary block state without changing the server world. */
+    sendBlockChange(position: BlockPosition, stateId: number): void;
 }
 
 /** Finds an air cell at or just above a player's block position for a fake light. */
 export function findLightPosition(
     position: BlockPosition,
-    isAir: (position: BlockPosition) => boolean
+    isAir: (position: BlockPosition) => boolean,
 ): BlockPosition | undefined {
     for (let offset = 0; offset <= 2; offset += 1) {
         const candidate = { x: position.x, y: position.y + offset, z: position.z };
@@ -33,18 +32,18 @@ interface ClientLight {
 
 /** A light source contributing to a viewer's client block. */
 export interface PositionedLight {
-    readonly position: BlockPosition;
     readonly level: number;
+    readonly position: BlockPosition;
 }
 
 interface ViewerLights {
-    readonly sources: Map<string, readonly PositionedLight[]>;
     cells: Map<string, ClientLight>;
+    readonly sources: Map<string, readonly PositionedLight[]>;
 }
 
 /** Builds the invisible Minecraft light states used only in client packets. */
 export function clientLightStates(
-    resolveState: (blockName: string, properties: [string, string][]) => number | undefined
+    resolveState: (blockName: string, properties: [string, string][]) => number | undefined,
 ): ((level: number) => number) | undefined {
     const states = new Map<number, number>();
     for (let level = 1; level <= 15; level += 1) {
@@ -75,7 +74,7 @@ export class ClientLightTracker {
         else
             viewer.sources.set(
                 group,
-                sources.map(({ position, level }) => ({ position: { ...position }, level }))
+                sources.map(({ position, level }) => ({ position: { ...position }, level })),
             );
 
         const levels = new Map<string, PositionedLight>();

@@ -17,7 +17,7 @@ export const PUMPKIN_PERMISSIONS = [
     'sys.info',
     'sys.info.cpu',
     'sys.info.ram',
-    'sys.info.os'
+    'sys.info.os',
 ] as const;
 
 /** A permission name a plugin may request: a known one, or `sys.env.<NAME>` for a single environment variable. */

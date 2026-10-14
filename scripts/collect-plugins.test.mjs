@@ -23,8 +23,8 @@ function fixture() {
         path.join(pluginDir, 'package.json'),
         JSON.stringify({
             version: '1.2.3',
-            pumpkinPlugin: { output: 'build/example-plugin.wasm', info: 'src/info.mjs' }
-        })
+            pumpkinPlugin: { output: 'build/example-plugin.wasm', info: 'src/info.mjs' },
+        }),
     );
     fs.writeFileSync(path.join(pluginDir, 'build/example-plugin.wasm'), wasm);
     fs.writeFileSync(path.join(pluginDir, 'src/info.mjs'), 'export const info = { name: "Example Plugin" };');
@@ -53,14 +53,14 @@ describe('collect-plugins', () => {
         assert.deepEqual(fs.readFileSync(path.join(dist, 'example-plugin.wasm')), wasm);
         assert.equal(
             fs.readFileSync(path.join(dist, 'example-plugin.wasm.sha256'), 'utf8'),
-            `${createHash('sha256').update(wasm).digest('hex')}  example-plugin.wasm\n`
+            `${createHash('sha256').update(wasm).digest('hex')}  example-plugin.wasm\n`,
         );
         assert.deepEqual(JSON.parse(fs.readFileSync(manifestFile, 'utf8')), [
             {
                 'plugin-name': 'Example Plugin',
                 version: '1.2.3',
-                'wasm-file': path.join(dist, 'example-plugin.wasm')
-            }
+                'wasm-file': path.join(dist, 'example-plugin.wasm'),
+            },
         ]);
         assert.deepEqual(errors, []);
     });

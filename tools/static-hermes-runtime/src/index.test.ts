@@ -24,7 +24,7 @@ it('forwards selected build options to the packaged CLI', () => {
         wasiImports: ['wasi:filesystem/types@0.2.3'],
         wasiMethods: ['wasi:filesystem/types@0.2.3#read-via-stream'],
         apiMethods: ['logging.log'],
-        eventTypes: ['server-tick-end-event']
+        eventTypes: ['server-tick-end-event'],
     };
 
     buildStaticHermesComponent(options);
@@ -57,9 +57,9 @@ it('forwards selected build options to the packaged CLI', () => {
             '--runtime-variant',
             'full',
             '--gc-variant',
-            'malloc'
+            'malloc',
         ],
-        { stdio: ['inherit', 'ignore', 'pipe'], maxBuffer: 16 * 1024 * 1024 }
+        { stdio: ['inherit', 'ignore', 'pipe'], maxBuffer: 16 * 1024 * 1024 },
     );
 });
 
@@ -68,7 +68,7 @@ it('inherits runtime output by default for direct component builds', () => {
         bundle: 'bundle.js',
         witDir: 'wit',
         output: 'plugin.wasm',
-        developmentMode: false
+        developmentMode: false,
     });
 
     expect(mocks.execFileSync).toHaveBeenCalledWith(expect.any(String), expect.any(Array), { stdio: 'inherit' });
@@ -79,7 +79,7 @@ it('uses empty WASI imports and omits optional selections by default', () => {
         bundle: 'bundle.js',
         witDir: 'wit',
         output: 'plugin.wasm',
-        developmentMode: false
+        developmentMode: false,
     });
 
     const args = mocks.execFileSync.mock.calls[0]?.[1] as string[] | undefined;

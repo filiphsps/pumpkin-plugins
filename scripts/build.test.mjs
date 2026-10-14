@@ -11,7 +11,7 @@ import {
     hasStaticHermesBuild,
     normalizeTurboArgs,
     prepareHermesInIsolatedEnvironment,
-    runStaticHermesPreparation
+    runStaticHermesPreparation,
 } from './build.mjs';
 
 const temporaryRoots = [];
@@ -25,13 +25,13 @@ function resolvedTurboTask(task, packageName) {
             'run',
             task,
             `--filter=${packageName}`,
-            '--dry=json'
+            '--dry=json',
         ],
         {
             cwd: workspaceRoot,
             encoding: 'utf8',
-            env: { ...process.env, WASM_TOOLS: '/configured/wasm-tools' }
-        }
+            env: { ...process.env, WASM_TOOLS: '/configured/wasm-tools' },
+        },
     );
     const graph = JSON.parse(output);
     const matchingTask = graph.tasks.find(({ taskId }) => taskId === `${packageName}#${task}`);
@@ -58,7 +58,7 @@ describe('hasStaticHermesBuild', () => {
     it('detects selected Static Hermes build tasks, including the default engine', () => {
         const root = createWorkspace({
             hermes: { name: '@pumpkin-plugins/hermes', pumpkinPlugin: {} },
-            quickjs: { name: '@pumpkin-plugins/quickjs', pumpkinPlugin: { engine: 'quickjs' } }
+            quickjs: { name: '@pumpkin-plugins/quickjs', pumpkinPlugin: { engine: 'quickjs' } },
         });
 
         assert.equal(
@@ -66,18 +66,18 @@ describe('hasStaticHermesBuild', () => {
                 {
                     tasks: [
                         { package: '@pumpkin-plugins/hermes', task: 'transit' },
-                        { package: '@pumpkin-plugins/hermes', task: 'build' }
-                    ]
+                        { package: '@pumpkin-plugins/hermes', task: 'build' },
+                    ],
                 },
-                root
+                root,
             ),
-            true
+            true,
         );
     });
 
     it('leaves QuickJS-only build graphs unprepared', () => {
         const root = createWorkspace({
-            quickjs: { name: '@pumpkin-plugins/quickjs', pumpkinPlugin: { engine: 'quickjs' } }
+            quickjs: { name: '@pumpkin-plugins/quickjs', pumpkinPlugin: { engine: 'quickjs' } },
         });
 
         assert.equal(
@@ -85,12 +85,12 @@ describe('hasStaticHermesBuild', () => {
                 {
                     tasks: [
                         { package: '@pumpkin-plugins/quickjs', task: 'build' },
-                        { package: '@pumpkin-plugins/static-hermes-runtime', task: 'prepare-hermes' }
-                    ]
+                        { package: '@pumpkin-plugins/static-hermes-runtime', task: 'prepare-hermes' },
+                    ],
                 },
-                root
+                root,
             ),
-            false
+            false,
         );
     });
 
@@ -101,9 +101,9 @@ describe('hasStaticHermesBuild', () => {
             hasStaticHermesBuild(
                 { tasks: [{ package: '@pumpkin-plugins/hermes', task: 'build:parse-ts' }] },
                 root,
-                'build:parse-ts'
+                'build:parse-ts',
             ),
-            true
+            true,
         );
     });
 });
@@ -124,7 +124,7 @@ describe('parse-ts build commands', () => {
             .filter((manifestPath) => fs.existsSync(manifestPath))
             .map((manifestPath) => ({
                 path: manifestPath,
-                manifest: JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+                manifest: JSON.parse(fs.readFileSync(manifestPath, 'utf8')),
             }))
             .filter(({ manifest }) => manifest.pumpkinPlugin !== undefined);
 
@@ -132,7 +132,7 @@ describe('parse-ts build commands', () => {
             assert.equal(
                 manifest.scripts['build:parse-ts'],
                 'pumpkin-plugins-build --parse-ts',
-                `${path.relative(workspaceRoot, manifestPath)} must define build:parse-ts`
+                `${path.relative(workspaceRoot, manifestPath)} must define build:parse-ts`,
             );
         }
         assert.equal(manifests.length, 9, 'expected every plugin and both starter templates');
@@ -150,22 +150,22 @@ describe('parse-ts build commands', () => {
         assert.deepEqual(buildModule.normalizeBuildRequest?.(['--parse-ts', '--', '--filter=example']), {
             task: 'build:parse-ts',
             args: ['--filter=example'],
-            dryRun: false
+            dryRun: false,
         });
         assert.deepEqual(buildModule.normalizeBuildRequest?.(['--', '--filter=example']), {
             task: 'build',
             args: ['--filter=example'],
-            dryRun: false
+            dryRun: false,
         });
         assert.deepEqual(buildModule.normalizeBuildRequest?.(['--dry=json', '--filter=example']), {
             task: 'build',
             args: ['--filter=example', '--dry=json'],
-            dryRun: true
+            dryRun: true,
         });
         assert.deepEqual(buildModule.normalizeBuildRequest?.(['--dry', '--filter=example']), {
             task: 'build',
             args: ['--filter=example', '--dry'],
-            dryRun: true
+            dryRun: true,
         });
     });
 });
@@ -174,7 +174,7 @@ describe('normalizeTurboArgs', () => {
     it('removes the pnpm script separator before forwarding arguments to Turbo', () => {
         assert.deepEqual(normalizeTurboArgs(['--', '--dry=json', '--filter=example']), [
             '--dry=json',
-            '--filter=example'
+            '--filter=example',
         ]);
     });
 
@@ -193,7 +193,7 @@ describe('prepareHermesInIsolatedEnvironment', () => {
             setupEnvironment: async () => ({ STATIC_HERMES_CACHE_DIR: '/cache/hermes' }),
             runPrepare: async (environment) => {
                 prepareEnvironment = environment;
-            }
+            },
         });
 
         assert.deepEqual(env, { USER_SETTING: 'kept', PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED: '1' });
@@ -218,20 +218,20 @@ describe('runStaticHermesPreparation', () => {
             calls.map(({ command, args, options }) => ({
                 command,
                 args,
-                options: { cwd: options.cwd, env: options.env }
+                options: { cwd: options.cwd, env: options.env },
             })),
             [
                 {
                     command: 'pnpm',
                     args: ['--filter', '@pumpkin-plugins/static-hermes-runtime', 'build'],
-                    options: { cwd: '/workspace', env }
+                    options: { cwd: '/workspace', env },
                 },
                 {
                     command: process.execPath,
                     args: ['/workspace/tools/static-hermes-runtime/dist/cli.js', 'hermes', 'prepare'],
-                    options: { cwd: '/workspace', env }
-                }
-            ]
+                    options: { cwd: '/workspace', env },
+                },
+            ],
         );
     });
 });
@@ -243,15 +243,15 @@ describe('buildTaskEnvironment', () => {
             {
                 STATIC_HERMES_CACHE_DIR: '/workspace/.cache/hermes',
                 STATIC_HERMES_WASI_SDK_PATH: '/toolchain/wasi-sdk',
-                WIT_BINDGEN: '/toolchain/wit-bindgen'
-            }
+                WIT_BINDGEN: '/toolchain/wit-bindgen',
+            },
         );
 
         assert.deepEqual(environment, {
             USER_SETTING: 'kept',
             STATIC_HERMES_SOURCE_DIR: '/custom/source',
             STATIC_HERMES_CACHE_DIR: '/workspace/.cache/hermes',
-            PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED: '1'
+            PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED: '1',
         });
     });
 });

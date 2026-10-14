@@ -19,7 +19,7 @@ describe(HeldItemLightLevels.name, () => {
     it('uses the brighter configured source from either hand', () => {
         const levels = new HeldItemLightLevels({
             'minecraft:lantern': 15,
-            'minecraft:torch': 14
+            'minecraft:torch': 14,
         });
 
         expect(levels.levelForHands('torch', 'lantern')).toBe(15);

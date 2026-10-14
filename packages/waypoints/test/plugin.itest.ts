@@ -18,9 +18,9 @@ const legacyStore = JSON.stringify({
             ownerId: '22222222-2222-4222-8222-222222222222',
             visibility: 'public',
             allowedPlayerIds: [],
-            locatorBar: { enabled: false }
-        }
-    ]
+            locatorBar: { enabled: false },
+        },
+    ],
 });
 
 describe(info.name, () => {
@@ -30,7 +30,7 @@ describe(info.name, () => {
         server = await startPumpkin({
             name: 'waypoints',
             plugins: [builtPluginPath(process.cwd())],
-            files: { 'plugins/data/Waypoints/waypoints.json': legacyStore }
+            files: { 'plugins/data/Waypoints/waypoints.json': legacyStore },
         });
     });
     afterAll(async () => {
@@ -51,9 +51,9 @@ describe(info.name, () => {
                     position: { x: 0, y: 64, z: 0 },
                     color: '#FFFFFF',
                     enabled: true,
-                    access: { mode: 'public', grants: [] }
-                }
-            ]
+                    access: { mode: 'public', grants: [] },
+                },
+            ],
         });
         expect(server.errors()).toEqual([]);
     });
@@ -84,10 +84,10 @@ describe(info.name, () => {
                         position: { x: 1, y: 64, z: 2 },
                         color: '#FFFFFF',
                         enabled: true,
-                        access: { mode: 'public', grants: [] }
-                    }
-                ]
-            })
+                        access: { mode: 'public', grants: [] },
+                    },
+                ],
+            }),
         );
 
         const reloadFrom = server.lines.length;
@@ -99,7 +99,7 @@ describe(info.name, () => {
         const record = JSON.parse(loaded).waypoints[0];
         const duplicate = JSON.stringify({
             version: 2,
-            waypoints: [record, { ...record, id: record.id.toLowerCase(), name: 'Duplicate' }]
+            waypoints: [record, { ...record, id: record.id.toLowerCase(), name: 'Duplicate' }],
         });
         writeFileSync(join(directory, 'waypoints.json'), duplicate);
         const invalidFrom = server.lines.length;

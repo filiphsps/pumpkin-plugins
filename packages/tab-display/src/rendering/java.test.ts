@@ -11,7 +11,7 @@ const state = vi.hoisted(() => ({
         children: unknown[];
         disposed: boolean;
     }>,
-    fromJsonCalls: 0
+    fromJsonCalls: 0,
 }));
 
 vi.mock('pumpkin:plugin/text@0.1.0', () => {
@@ -106,7 +106,7 @@ function javaPlayer(id: string, version = 'v-26-3') {
             [Symbol.dispose]: () => {
                 javaDisposals += 1;
                 javaHandleDisposals += 1;
-            }
+            },
         }),
         asBedrock: () => ({ [Symbol.dispose]: () => (bedrockHandleDisposals += 1) }),
         getTabListName: () => (currentName === undefined ? undefined : TextComponent.fromJson(currentName)),
@@ -122,7 +122,7 @@ function javaPlayer(id: string, version = 'v-26-3') {
         setTabListOrder: vi.fn(),
         [Symbol.dispose]: () => {
             playerDisposals += 1;
-        }
+        },
     };
     return {
         player: player as unknown as Player,
@@ -134,7 +134,7 @@ function javaPlayer(id: string, version = 'v-26-3') {
         javaDisposals: () => javaDisposals,
         javaHandleDisposals: () => javaHandleDisposals,
         bedrockHandleDisposals: () => bedrockHandleDisposals,
-        playerDisposals: () => playerDisposals
+        playerDisposals: () => playerDisposals,
     };
 }
 
@@ -152,7 +152,7 @@ function bedrockPlayer(id: string) {
         setTabListOrder: vi.fn(),
         [Symbol.dispose]: () => {
             playerDisposals += 1;
-        }
+        },
     };
     return {
         player: player as unknown as Player,
@@ -160,7 +160,7 @@ function bedrockPlayer(id: string) {
         bedrockDisposals: () => bedrockDisposals,
         setTabListName: player.setTabListName,
         setTabListHeaderFooter: player.setTabListHeaderFooter,
-        setTabListOrder: player.setTabListOrder
+        setTabListOrder: player.setTabListOrder,
     };
 }
 
@@ -187,7 +187,7 @@ describe('Java tab display host', () => {
 
         expect(host.snapshotPlayers(10)).toEqual([
             { uuid: 'java', name: 'Player-java', edition: 'java', javaVersion: 'v-26-3', ping: 36 },
-            { uuid: 'bedrock', name: 'Player-bedrock', edition: 'bedrock', ping: 0 }
+            { uuid: 'bedrock', name: 'Player-bedrock', edition: 'bedrock', ping: 0 },
         ]);
         expect(java.javaHandleDisposals()).toBe(1);
         expect(java.playerDisposals()).toBe(0);
@@ -210,17 +210,17 @@ describe('Java tab display host', () => {
                 'java',
                 [
                     { text: 'Hello %player_name%', color: '#123456', bold: true },
-                    { text: 'Second', italic: true }
+                    { text: 'Second', italic: true },
                 ],
-                [{ text: 'Footer' }]
-            )
+                [{ text: 'Footer' }],
+            ),
         ).toEqual({ kind: 'applied' });
         expect(host.setHeaderFooter('bedrock', [], [])).toMatchObject({
             kind: 'unsupported',
-            reason: expect.stringContaining('Bedrock')
+            reason: expect.stringContaining('Bedrock'),
         });
         expect(
-            (java.player as unknown as { setTabListHeaderFooter: ReturnType<typeof vi.fn> }).setTabListHeaderFooter
+            (java.player as unknown as { setTabListHeaderFooter: ReturnType<typeof vi.fn> }).setTabListHeaderFooter,
         ).toHaveBeenCalledTimes(1);
         expect(bedrock.setTabListHeaderFooter).not.toHaveBeenCalled();
 
@@ -229,7 +229,7 @@ describe('Java tab display host', () => {
         expect(roots[0]?.children).toHaveLength(3);
         expect(roots[0]?.children[0]).toMatchObject({
             value: 'Hello %player_name%',
-            style: { color: { r: 18, g: 52, b: 86 }, bold: true }
+            style: { color: { r: 18, g: 52, b: 86 }, bold: true },
         });
         expect(roots[0]?.children[1]).toMatchObject({ value: '\n' });
         expect(roots[0]?.value).toBe('');
@@ -316,10 +316,10 @@ describe('Java tab display host', () => {
 
         expect(host.setOrder('java', 0)).toMatchObject({
             kind: 'unsupported',
-            reason: expect.stringContaining('direction')
+            reason: expect.stringContaining('direction'),
         });
         expect(
-            (player.player as unknown as { setTabListOrder: ReturnType<typeof vi.fn> }).setTabListOrder
+            (player.player as unknown as { setTabListOrder: ReturnType<typeof vi.fn> }).setTabListOrder,
         ).not.toHaveBeenCalled();
         host.endTick();
     });

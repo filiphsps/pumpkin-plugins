@@ -12,7 +12,7 @@ it('feeds literal fixtures through real client validation and transport failures
     expect(() => client.ping()).toThrow('transport failed');
     expect(transport.messages.map((message) => message.request)).toEqual([
         { op: 'get_placeholder_value', id: 'empty' },
-        { op: 'ping' }
+        { op: 'ping' },
     ]);
 });
 it('drives retry recovery without sleeps', () => {
@@ -22,7 +22,7 @@ it('drives retry recovery without sleeps', () => {
     session.tick();
     transport.enqueue({
         ok: true,
-        ping: { protocol: 0, name: 'PumpkinPIE', version: '0.2.3', placeholders: 11, expansions: 0 }
+        ping: { protocol: 0, name: 'PumpkinPIE', version: '0.2.3', placeholders: 11, expansions: 0 },
     });
     clock.advance(1000);
     session.tick();

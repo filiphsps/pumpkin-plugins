@@ -29,12 +29,18 @@
         "indentWidth": 4,
         "lineEnding": "lf",
         "lineWidth": 120,
-        "attributePosition": "auto"
+        "attributePosition": "auto",
+        "bracketSpacing": true,
+        "delimiterSpacing": false
     },
     "assist": {
         "actions": {
             "source": {
-                "organizeImports": "on"
+                "noDuplicateClasses": "on",
+                "organizeImports": "on",
+                "useSortedInterfaceMembers": "on",
+                "useSortedPackageJson": "on",
+                "useSortedProperties": "on"
             }
         }
     },
@@ -87,16 +93,42 @@
         "experimentalEmbeddedSnippetsEnabled": true,
         "formatter": {
             "quoteProperties": "asNeeded",
-            "trailingCommas": "none",
+            "trailingCommas": "all",
             "semicolons": "always",
             "arrowParentheses": "always",
             "bracketSpacing": true,
             "quoteStyle": "single"
+        },
+        "assist": {
+            "enabled": true
+        },
+        "resolver": {
+            "experimentalPnpmCatalogs": true
         }
     },
     "json": {
         "formatter": {
             "trailingCommas": "none"
+        },
+        "assist": {
+            "enabled": true
+        }
+    },
+    "html": {
+        "experimentalFullSupportEnabled": true,
+        "formatter": {
+            "enabled": true,
+            "indentStyle": "space",
+            "indentWidth": 4,
+            "lineEnding": "lf",
+            "indentScriptAndStyle": true,
+            "trailingNewline": true
+        },
+        "linter": {
+            "enabled": true
+        },
+        "assist": {
+            "enabled": true
         }
     },
     "overrides": [

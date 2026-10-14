@@ -6,7 +6,7 @@ import {
     type PortStatus,
     type Reply,
     type Request,
-    UPNPUMPKIN_PLUGIN
+    UPNPUMPKIN_PLUGIN,
 } from './protocol.ts';
 
 /**
@@ -70,7 +70,7 @@ export class PortMapClient {
         const reply = decodeReply(bytes);
         if (!reply)
             throw new UnavailableError(
-                'UPnPumpkin sent an answer this plugin does not understand (is it a different version?)'
+                'UPnPumpkin sent an answer this plugin does not understand (is it a different version?)',
             );
         if (!reply.ok) throw new RejectedError(reply.error);
         return reply;

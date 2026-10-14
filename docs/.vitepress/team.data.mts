@@ -2,8 +2,8 @@ import type { DefaultTheme, LoaderModule } from 'vitepress';
 import { loadTeamMembers } from './team-data.mjs';
 
 interface TeamMember extends DefaultTheme.TeamMember {
-    login: string;
     contributions: number;
+    login: string;
 }
 
 /** Contributor cards generated from the repository's GitHub contributor list. */
@@ -15,5 +15,5 @@ export { data };
 /** Loads human contributors at build time, keeping credentials out of the client bundle. */
 export default {
     watch: ['../../package.json'],
-    load: loadTeamMembers
+    load: loadTeamMembers,
 } satisfies LoaderModule;

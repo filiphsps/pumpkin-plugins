@@ -23,7 +23,7 @@ function setup(config?: string) {
         log,
         () => server,
         upnp.send,
-        () => clock.now
+        () => clock.now,
     );
     /** Moves the clock and ticks the way the game does: once per tick, here once per `step` milliseconds. */
     const wait = (ms: number, step = 500) => {
@@ -76,7 +76,7 @@ describe('PackManager', () => {
         files.put('packs/a.mcpack', pack(1));
         manager.start();
         expect(log.of('warn')).toEqual([
-            `web.public_url is not set, so clients are told to download packs from ${ansi.named.url('http://127.0.0.1:8123')}, which only works for players on this machine. Set it to the address players can reach.`
+            `web.public_url is not set, so clients are told to download packs from ${ansi.named.url('http://127.0.0.1:8123')}, which only works for players on this machine. Set it to the address players can reach.`,
         ]);
     });
 
@@ -105,8 +105,8 @@ describe('PackManager', () => {
                     protocol: 'tcp',
                     port: 8123,
                     externalPort: undefined,
-                    description: 'Bedrock resource packs'
-                }
+                    description: 'Bedrock resource packs',
+                },
             ]);
             expect(urls(manager)).toEqual(['http://127.0.0.1:8123/packs/a.mcpack']);
             expect(log.of('warn')).toEqual([]);
@@ -116,7 +116,7 @@ describe('PackManager', () => {
             ['public_url is set', '[web]\npublic_url = "https://packs.example.com"\n'],
             ['bind is not 0.0.0.0', '[web]\nbind = "127.0.0.1"\n'],
             ['port_forwarding is false', NO_FORWARDING],
-            ['the web server is off', '[web]\nenabled = false\n']
+            ['the web server is off', '[web]\nenabled = false\n'],
         ])('does not ask when %s', (_, config) => {
             const { upnp, manager, wait } = setup(config);
             manager.start();
@@ -133,7 +133,7 @@ describe('PackManager', () => {
             wait(1000);
             expect(urls(manager)).toEqual(['http://93.184.216.34:8123/packs/a.mcpack']);
             expect(log.of('info')).toContain(
-                `Opened port ${ansi.named.port('8123')} on the router (upnp): clients download packs from ${ansi.named.url('http://93.184.216.34:8123')}.`
+                `Opened port ${ansi.named.port('8123')} on the router (upnp): clients download packs from ${ansi.named.url('http://93.184.216.34:8123')}.`,
             );
             expect(log.of('warn')).toEqual([]);
         });
@@ -154,7 +154,7 @@ describe('PackManager', () => {
             manager.start();
             expect(urls(manager)).toEqual(['http://93.184.216.99:8123/packs/a.mcpack']);
             expect(log.of('info')).toContain(
-                `This machine has a public address, so clients download packs from ${ansi.named.url('http://93.184.216.99:8123')}.`
+                `This machine has a public address, so clients download packs from ${ansi.named.url('http://93.184.216.99:8123')}.`,
             );
         });
 
@@ -165,7 +165,7 @@ describe('PackManager', () => {
             manager.start();
             expect(urls(manager)).toEqual(['http://127.0.0.1:8123/packs/a.mcpack']);
             expect(log.of('warn')).toEqual([
-                `Could not make port ${ansi.named.port('8123')} reachable from the internet: no router answered the search. Clients are told to download packs from ${ansi.named.url('http://127.0.0.1:8123')}, which only works for players on this machine. Open the port yourself and set web.public_url, or set web.port_forwarding = false.`
+                `Could not make port ${ansi.named.port('8123')} reachable from the internet: no router answered the search. Clients are told to download packs from ${ansi.named.url('http://127.0.0.1:8123')}, which only works for players on this machine. Open the port yourself and set web.public_url, or set web.port_forwarding = false.`,
             ]);
         });
 
@@ -283,13 +283,13 @@ describe('PackManager', () => {
         files.put('packs/a.mcpack', pack(1));
         manager.start();
         expect(log.of('info')).toContain(
-            `Offering ${ansi.named.number('1')} Bedrock pack to players who join from now on (not connected to the server yet, so players are not sent them).`
+            `Offering ${ansi.named.number('1')} Bedrock pack to players who join from now on (not connected to the server yet, so players are not sent them).`,
         );
 
         files.put('packs/b.mcpack', pack(2));
         manager.reload();
         expect(log.of('info')).toContain(
-            `Offering ${ansi.named.number('2')} Bedrock packs to players who join from now on (not connected to the server yet, so players are not sent them).`
+            `Offering ${ansi.named.number('2')} Bedrock packs to players who join from now on (not connected to the server yet, so players are not sent them).`,
         );
     });
 

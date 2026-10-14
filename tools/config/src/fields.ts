@@ -9,22 +9,22 @@ export type FieldType = 'boolean' | 'integer' | 'string';
  * optional settings, which have no default.
  */
 export interface Field<T> {
-    /** Type name shown in the generated documentation. */
-    readonly type: FieldType;
-    /** What the setting does. Becomes the comment above it in the file and a row in the docs. */
-    readonly description: string;
     /** Value used when the setting is absent. `undefined` makes the setting optional. */
     readonly default: T;
-    /** What a valid value looks like, used in warnings: `must be <expected>`. */
-    readonly expected: string;
+    /** What the setting does. Becomes the comment above it in the file and a row in the docs. */
+    readonly description: string;
     /** A TOML literal shown in the commented example of an unset optional setting. */
     readonly example: string;
+    /** What a valid value looks like, used in warnings: `must be <expected>`. */
+    readonly expected: string;
+    /** Writes a value as a TOML literal. */
+    format(value: Exclude<T, undefined>): string;
     /** Path to an older setting whose value should seed this setting when it is absent. */
     readonly migrateFrom?: readonly string[];
     /** Validates a raw TOML value. */
     parse(raw: unknown): Parsed<Exclude<T, undefined>>;
-    /** Writes a value as a TOML literal. */
-    format(value: Exclude<T, undefined>): string;
+    /** Type name shown in the generated documentation. */
+    readonly type: FieldType;
 }
 
 /** The settings of a section or table entry, by key. */
@@ -32,10 +32,10 @@ export type Fields = Record<string, Field<unknown>>;
 
 /** Options shared by the config field builders. */
 export interface BaseOptions<T> {
-    /** What the setting does. */
-    description: string;
     /** Value used when the setting is absent. Leave out to make the setting optional. */
     default?: T;
+    /** What the setting does. */
+    description: string;
     /** Example value for the commented hint of an optional setting. */
     example?: T;
     /** Path to an older setting whose value should seed this setting when it is absent. */
@@ -76,7 +76,7 @@ export function bool(options: BaseOptions<boolean>): Field<boolean | undefined> 
         example: options.example ?? options.default ?? false,
         migrateFrom: options.migrateFrom,
         parse: (raw) => (typeof raw === 'boolean' ? { ok: true, value: raw } : { ok: false }),
-        format: String
+        format: String,
     });
 }
 
@@ -108,7 +108,7 @@ export function int(options: BaseOptions<number> & { min?: number; max?: number 
                 ? { ok: true, value: n }
                 : { ok: false };
         },
-        format: String
+        format: String,
     });
 }
 
@@ -116,10 +116,10 @@ export function int(options: BaseOptions<number> & { min?: number; max?: number 
 export interface StringCheck {
     /** What a valid value looks like, used in warnings. */
     expected: string;
-    /** Whether a value is acceptable. */
-    test: (value: string) => boolean;
     /** Tidies an accepted value, for example by trimming a trailing slash. */
     normalize?: (value: string) => string;
+    /** Whether a value is acceptable. */
+    test: (value: string) => boolean;
 }
 
 /** A text setting, optionally restricted by a check. */
@@ -143,6 +143,6 @@ export function str(options: BaseOptions<string> & { check?: StringCheck }): Fie
             if (typeof raw !== 'string' || (check && !check.test(raw))) return { ok: false };
             return { ok: true, value: check?.normalize ? check.normalize(raw) : raw };
         },
-        format: tomlString
+        format: tomlString,
     });
 }

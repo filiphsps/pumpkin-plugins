@@ -5,8 +5,8 @@ export type JsonRequest = (url: string, headers?: Record<string, string>) => unk
 export interface UpdateCheck {
     currentVersion: string;
     latestVersion: string | null;
-    updateAvailable: boolean;
     releaseUrl?: string;
+    updateAvailable: boolean;
 }
 
 /** Compares two semantic versions, accepting an optional leading `v`. */
@@ -25,7 +25,7 @@ export function compareVersions(current: string, latest: string): number {
 function parseVersion(version: string): [string, string, string, string[]] {
     const match =
         /^v?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(
-            version
+            version,
         );
     if (!match) throw new TypeError(`Invalid semantic version: ${version}`);
     const prerelease = match[4]?.split('.') ?? [];

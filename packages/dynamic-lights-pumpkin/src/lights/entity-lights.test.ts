@@ -10,7 +10,7 @@ describe(EntityLightTracker.name, () => {
         const client = {
             sendBlockChange: ({ x, y, z }: { x: number; y: number; z: number }, state: number) =>
                 sent.push(`${x},${y},${z}:${state}`),
-            resetBlockChange: ({ x, y, z }: { x: number; y: number; z: number }) => reset.push(`${x},${y},${z}`)
+            resetBlockChange: ({ x, y, z }: { x: number; y: number; z: number }) => reset.push(`${x},${y},${z}`),
         };
 
         tracker.sync('player', client, [{ entityId: 2, position: { x: 1, y: 2, z: 3 }, level: 8 }]);

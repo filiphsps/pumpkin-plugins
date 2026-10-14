@@ -13,7 +13,7 @@ import {
     handleGeneratePhase,
     onUnload,
     Plugin,
-    registerPlugin
+    registerPlugin,
 } from './core.ts';
 
 class TestPlugin extends Plugin {
@@ -37,12 +37,12 @@ describe('registration callback lifetime', () => {
             registerEvent(handlerId: number) {
                 eventId = handlerId;
             },
-            registerCommand() {}
+            registerCommand() {},
         } as unknown as Context;
         const command = {
             executeWithHandlerId(handlerId: number) {
                 commandId = handlerId;
-            }
+            },
         };
         const plugin = new TestPlugin();
         const eventHandler = vi.fn((_: Server, payload: unknown) => payload);
@@ -53,7 +53,7 @@ describe('registration callback lifetime', () => {
             shouldContinue: vi.fn(() => true),
             start: vi.fn(),
             tick: vi.fn(),
-            stop: vi.fn()
+            stop: vi.fn(),
         };
         const generator = vi.fn();
 
@@ -89,20 +89,20 @@ describe('registration callback lifetime', () => {
 
         handleEvent(eventId, server, event);
         expect(() => handleCommand(commandId, sender, server, [] as never)).toThrow(
-            `No handler for command ID ${commandId}`
+            `No handler for command ID ${commandId}`,
         );
         expect(() => handleCommandSuggestion(suggestionId, sender, server, request)).toThrow(
-            `No command suggestion handler registered for ID ${suggestionId}`
+            `No command suggestion handler registered for ID ${suggestionId}`,
         );
         expect(() => handleAiGoalCanStart(goalId, server, entity)).toThrow(`No AI goal registered for ID ${goalId}`);
         expect(() => handleAiGoalShouldContinue(goalId, server, entity)).toThrow(
-            `No AI goal registered for ID ${goalId}`
+            `No AI goal registered for ID ${goalId}`,
         );
         expect(() => handleAiGoalStart(goalId, server, entity)).toThrow(`No AI goal registered for ID ${goalId}`);
         expect(() => handleAiGoalTick(goalId, server, entity)).toThrow(`No AI goal registered for ID ${goalId}`);
         expect(() => handleAiGoalStop(goalId, server, entity)).toThrow(`No AI goal registered for ID ${goalId}`);
         expect(() => handleGeneratePhase(generatorId, phase, chunk)).toThrow(
-            `No generator registered for ID ${generatorId}`
+            `No generator registered for ID ${generatorId}`,
         );
 
         expect(eventHandler).toHaveBeenCalledOnce();

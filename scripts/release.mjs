@@ -33,7 +33,7 @@ const load = async () => {
         github,
         branch,
         'release-please-config.json',
-        '.release-please-manifest.json'
+        '.release-please-manifest.json',
     );
     for (const config of Object.values(manifest.repositoryConfig)) {
         config.bumpMinorPreMajor = true;
@@ -47,7 +47,7 @@ const outputs = {
     tool_paths_released: '[]',
     release_count: '0',
     prs: '[]',
-    pr_count: '0'
+    pr_count: '0',
 };
 
 function isImmutableReleaseConflict(error) {
@@ -56,7 +56,7 @@ function isImmutableReleaseConflict(error) {
         Array.isArray(error.body?.errors) &&
         error.body.errors.some(
             (problem) =>
-                problem.field === 'tag_name' && problem.message?.includes('tag_name was used by an immutable release')
+                problem.field === 'tag_name' && problem.message?.includes('tag_name was used by an immutable release'),
         )
     );
 }
@@ -92,7 +92,7 @@ if (!dryRun && !pullRequestsOnly) {
                     throw new Error(`GitHub rejected ${tagName} as a duplicate, but no existing release was found`);
                 if (release.sha !== candidate.sha) {
                     throw new Error(
-                        `GitHub release ${tagName} points to ${release.sha}, but Release Please expects ${candidate.sha}`
+                        `GitHub release ${tagName} points to ${release.sha}, but Release Please expects ${candidate.sha}`,
                     );
                 }
                 recovered.push({
@@ -103,7 +103,7 @@ if (!dryRun && !pullRequestsOnly) {
                     minor: candidate.tag.version.minor,
                     patch: candidate.tag.version.patch,
                     prNumber: pullRequest?.number,
-                    recovered: true
+                    recovered: true,
                 });
             }
 
@@ -114,7 +114,7 @@ if (!dryRun && !pullRequestsOnly) {
             console.warn(
                 `GitHub already has this release tag; reusing its metadata for the release run: ${recovered
                     .map((release) => release.tagName)
-                    .join(', ')}`
+                    .join(', ')}`,
             );
             return recovered;
         }
@@ -124,7 +124,7 @@ if (!dryRun && !pullRequestsOnly) {
         if (!release.sha) throw new Error(`Release ${release.tagName} has no target commit SHA`);
         if (release.sha === process.env.GITHUB_SHA) return true;
         console.log(
-            `Deferring ${release.tagName} from artifact fan-out: tag targets ${release.sha}, but this run built ${process.env.GITHUB_SHA}`
+            `Deferring ${release.tagName} from artifact fan-out: tag targets ${release.sha}, but this run built ${process.env.GITHUB_SHA}`,
         );
         return false;
     });
@@ -144,13 +144,13 @@ if (!dryRun && !pullRequestsOnly) {
 }
 const manifest = await load();
 manifest.plugins.push(
-    bundledChangesPlugin(github, branch, packages, manifest.releasedVersions, manifest.commitSearchDepth)
+    bundledChangesPlugin(github, branch, packages, manifest.releasedVersions, manifest.commitSearchDepth),
 );
 if (component) {
     manifest.plugins.push({
         preconfigure: async (strategies) => strategies,
         processCommits: (commits) => commits,
-        run: async (candidates) => candidates.filter((candidate) => candidate.config.component === component)
+        run: async (candidates) => candidates.filter((candidate) => candidate.config.component === component),
     });
 }
 if (dryRun) {
@@ -160,11 +160,11 @@ if (dryRun) {
             candidates.map((pr) => ({
                 title: pr.title.toString(),
                 body: pr.body.toString(),
-                branch: pr.headRefName.toString()
+                branch: pr.headRefName.toString(),
             })),
             null,
-            4
-        )
+            4,
+        ),
     );
 } else {
     const prs = (await manifest.createPullRequests()).filter(Boolean);
@@ -175,12 +175,12 @@ if (dryRun) {
             const marker = `release_${randomUUID()}`;
             appendFileSync(
                 process.env.GITHUB_OUTPUT,
-                `${name}<<${marker}\n${typeof value === 'string' ? value : JSON.stringify(value)}\n${marker}\n`
+                `${name}<<${marker}\n${typeof value === 'string' ? value : JSON.stringify(value)}\n${marker}\n`,
             );
         }
     }
     console.log(`Prepared ${prs.length} release PR(s)`);
     console.log(
-        `Release fan-out: plugin paths=${outputs.paths_released}, action paths=${outputs.action_paths_released}, tool paths=${outputs.tool_paths_released}, release PR count=${prs.length}`
+        `Release fan-out: plugin paths=${outputs.paths_released}, action paths=${outputs.action_paths_released}, tool paths=${outputs.tool_paths_released}, release PR count=${prs.length}`,
     );
 }

@@ -19,8 +19,8 @@ it('returns mutated and replacement event payloads to Pumpkin', async () => {
             JSON.stringify({
                 name: 'event-results',
                 version: '0.0.0',
-                pumpkinPlugin: { entry: 'plugin.ts', output: 'plugin.wasm', engine: 'static-hermes', wasi: [] }
-            })
+                pumpkinPlugin: { entry: 'plugin.ts', output: 'plugin.wasm', engine: 'static-hermes', wasi: [] },
+            }),
         );
         fs.writeFileSync(
             path.join(directory, 'plugin.ts'),
@@ -45,18 +45,18 @@ it('returns mutated and replacement event payloads to Pumpkin', async () => {
                 }
             }
             registerPlugin(new EventResults());
-        `
+        `,
         );
         execFileSync(process.execPath, [path.join(root, 'tools/build/dist/cli.js')], {
             cwd: directory,
             env: { ...process.env, STATIC_HERMES_CACHE_DIR: path.join(root, '.cache/hermes'), PUMPKIN_DEV_MODE: '1' },
-            stdio: 'pipe'
+            stdio: 'pipe',
         });
         server = await startPumpkin({ plugins: [path.join(directory, 'plugin.wasm')] });
         await server.waitForLog(/EventResults ready/);
         for (const [command, expectedLog] of [
             ['hermes-mutate', 'mutated event payload'],
-            ['hermes-replace', 'replaced event payload']
+            ['hermes-replace', 'replaced event payload'],
         ]) {
             const fromIndex = server.lines.length;
             server.command(command);

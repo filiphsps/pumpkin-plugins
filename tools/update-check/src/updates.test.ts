@@ -13,14 +13,14 @@ describe('compareVersions', () => {
         '1.0.0',
         '1.0.1',
         '1.1.0',
-        '2.0.0'
+        '2.0.0',
     ];
     it.each(ordered.slice(1).map((version, index) => [ordered[index], version]))(
         'orders %s before %s',
         (current, latest) => {
             expect(compareVersions(current, latest)).toBe(-1);
             expect(compareVersions(latest, current)).toBe(1);
-        }
+        },
     );
 
     it('ignores build metadata and accepts a leading v', () => {
@@ -36,6 +36,6 @@ describe('compareVersions', () => {
         (version) => {
             expect(() => compareVersions(version, '1.0.0')).toThrow('Invalid semantic version');
             expect(() => compareVersions('1.0.0', version)).toThrow('Invalid semantic version');
-        }
+        },
     );
 });

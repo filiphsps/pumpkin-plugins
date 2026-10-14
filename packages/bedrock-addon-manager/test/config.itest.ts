@@ -28,7 +28,7 @@ describe('config upgrades', () => {
     it('adds new settings, drops removed ones and keeps the admin values', async () => {
         const r = await start({
             name: 'upgrade',
-            config: (port) => `${portConfig(port)}legacy_option = true\n\n[packs]\nforce = true\n`
+            config: (port) => `${portConfig(port)}legacy_option = true\n\n[packs]\nforce = true\n`,
         });
         const line = await r.server.waitForLog(/Updated config\.toml/);
         expect(line).toMatch(/added .*web\.enabled/);

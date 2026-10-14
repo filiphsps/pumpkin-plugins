@@ -21,8 +21,8 @@ describe('types', () => {
             description: 'd',
             permissions: [
                 { name: 'fs.read.data', reason: 'a' },
-                { name: 'network.tcp.bind', reason: 'b' }
-            ]
+                { name: 'network.tcp.bind', reason: 'b' },
+            ],
         } satisfies PluginInfo<'Demo'>;
         expectTypeOf<(typeof info.permissions)[number]['name']>().toEqualTypeOf<'fs.read.data' | 'network.tcp.bind'>();
         expectTypeOf<PermissionInfo['name']>().toEqualTypeOf<PumpkinPermission>();
@@ -33,7 +33,7 @@ describe('types', () => {
             name: 'Demo',
             description: 'd',
             // @ts-expect-error a typo in the permission name
-            permissions: [{ name: 'network.tcp.bnd', reason: 'x' }]
+            permissions: [{ name: 'network.tcp.bnd', reason: 'x' }],
         };
         expect(info.name).toBe('Demo');
     });
@@ -50,7 +50,7 @@ describe('automatic update permission', () => {
         const info: PluginInfo<'Demo'> = {
             name: 'Demo',
             description: 'd',
-            permissions: [{ name: 'http.outbound', reason: 'Use an external HTTP service.' }]
+            permissions: [{ name: 'http.outbound', reason: 'Use an external HTTP service.' }],
         };
         expect(pluginPermissions(info)).toHaveLength(1);
     });

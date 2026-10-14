@@ -12,7 +12,7 @@ const benchmarkDir = path.resolve(import.meta.dirname, '..');
 it(
     'compares configured engines across component sizes, behavior, and matching workloads',
     compareEngineConfigurations,
-    Number.POSITIVE_INFINITY
+    Number.POSITIVE_INFINITY,
 );
 
 async function compareEngineConfigurations(): Promise<void> {
@@ -27,22 +27,22 @@ async function compareEngineConfigurations(): Promise<void> {
 
         const server = await startPumpkin({
             name: `runtime-benchmark-${id}`,
-            plugins: [wasmPath]
+            plugins: [wasmPath],
         });
         try {
             const readyLine = await server.waitForLog(
                 /RUNTIME_BENCHMARK_READY|Failed to (?:load|initialize) plugin/,
-                60_000
+                60_000,
             );
             expect(readyLine, `${label} did not register its benchmark command: ${readyLine}`).toContain(
-                'RUNTIME_BENCHMARK_READY'
+                'RUNTIME_BENCHMARK_READY',
             );
             const commandOutputStart = server.lines.length;
             server.command('runtime-benchmark');
             const line = await server.waitForLog(
                 /RUNTIME_BENCHMARK:|Failed to (?:load|initialize) plugin/,
                 60_000,
-                commandOutputStart
+                commandOutputStart,
             );
             const payload = line.match(/RUNTIME_BENCHMARK:(\{.*\})/);
             expect(payload, `${label} did not emit benchmark results: ${line}`).not.toBeNull();
@@ -63,9 +63,9 @@ async function compareEngineConfigurations(): Promise<void> {
         engineVariants
             .filter(
                 ({ pluginEngine, staticHermesRuntime, staticHermesGc }) =>
-                    pluginEngine === 'static-hermes' && staticHermesRuntime && staticHermesGc === 'hades'
+                    pluginEngine === 'static-hermes' && staticHermesRuntime && staticHermesGc === 'hades',
             )
-            .map(({ staticHermesRuntime }) => staticHermesRuntime)
+            .map(({ staticHermesRuntime }) => staticHermesRuntime),
     );
     for (const staticHermesRuntime of hermesRuntimeProfiles) {
         if (staticHermesRuntime) {
@@ -93,10 +93,10 @@ function validateEngineFeatures(results: EngineResult[], variants: EngineVariant
     for (const variant of variants) {
         const result = requireResult(results, variant.id);
         expect(result.runtimeSourceCompilation, `${variant.label} runtime compilation capability`).toBe(
-            variant.runtimeSourceCompilation
+            variant.runtimeSourceCompilation,
         );
         expect(result.unicodePropertyEscapes, `${variant.label} Unicode property escape capability`).toBe(
-            variant.expectedUnicodePropertyEscapes()
+            variant.expectedUnicodePropertyEscapes(),
         );
     }
 }
@@ -104,7 +104,7 @@ function validateEngineFeatures(results: EngineResult[], variants: EngineVariant
 function validateApiBehavior(results: EngineResult[], baseline: EngineResult): void {
     for (const result of results) {
         expect(result.apiBehavior, `${result.label} API behavior differs from ${baseline.label}`).toEqual(
-            baseline.apiBehavior
+            baseline.apiBehavior,
         );
     }
 
@@ -156,19 +156,19 @@ function validateReport(report: string, results: EngineResult[], baseline: Engin
                 ? 'baseline'
                 : expectedSizeDifference(result.binarySizeBytes, baseline.binarySizeBytes);
         expect(report).toContain(
-            `| ${result.label} | ${result.binarySizeBytes.toLocaleString()} bytes | ${difference} |`
+            `| ${result.label} | ${result.binarySizeBytes.toLocaleString()} bytes | ${difference} |`,
         );
     }
 
     const ratioLabels = results.filter(({ id }) => id !== baseline.id).map(({ label }) => `${baseline.label}/${label}`);
     const performanceColumns = results.map(({ label }) => `${label} median (min–max)`);
     expect(report).toContain(
-        `| Benchmark type | Scope / workload | Inputs per sample | ${performanceColumns.join(' | ')} | ${ratioLabels.join(' | ')} |`
+        `| Benchmark type | Scope / workload | Inputs per sample | ${performanceColumns.join(' | ')} | ${ratioLabels.join(' | ')} |`,
     );
 
     const workloadPrefixes = baseline.workloads.map(
         ({ name, area, provenance }) =>
-            `| ${provenance === 'real Pumpkin API' ? 'real' : 'synthetic'} | ${area} / ${name} |`
+            `| ${provenance === 'real Pumpkin API' ? 'real' : 'synthetic'} | ${area} / ${name} |`,
     );
     for (const prefix of workloadPrefixes) expect(report).toContain(prefix);
     const reportWorkloadRows = report
@@ -196,12 +196,12 @@ function averageMedian(workloads: EngineResult['workloads']): number {
 async function verifyHermesStackGuard(wasmPath: string, runtimeVariant: 'full' | 'lean'): Promise<void> {
     const server = await startPumpkin({
         name: `runtime-stack-guard-static-hermes-${runtimeVariant}`,
-        plugins: [wasmPath]
+        plugins: [wasmPath],
     });
     try {
         const line = await server.waitForLog(/STACK_GUARD:|Failed to (?:load|initialize) plugin/, 60_000);
         expect(line, 'Static Hermes must turn a recursive stack overflow into a catchable JS RangeError').toContain(
-            'STACK_GUARD:true'
+            'STACK_GUARD:true',
         );
         expect(server.errors()).toEqual([]);
     } finally {

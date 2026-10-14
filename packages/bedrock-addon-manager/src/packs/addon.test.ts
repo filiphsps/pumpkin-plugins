@@ -15,7 +15,7 @@ describe('readAddon', () => {
             'Cool RP/manifest.json': manifest(RP, ['resources']),
             'Cool RP/textures/a.png': noise(500),
             'Cool BP/manifest.json': manifest(BP, ['data']),
-            'Cool BP/entities/a.json': strToU8('{}')
+            'Cool BP/entities/a.json': strToU8('{}'),
         });
         const { packs, skipped } = readAddon(addon);
 
@@ -29,7 +29,7 @@ describe('readAddon', () => {
     it('keeps the pack contents intact when repackaging', () => {
         const texture = noise(2000, 9);
         const { packs } = readAddon(
-            zipSync({ 'RP/manifest.json': manifest(RP, ['resources']), 'RP/textures/a.png': texture })
+            zipSync({ 'RP/manifest.json': manifest(RP, ['resources']), 'RP/textures/a.png': texture }),
         );
         const inner = readAddon(packs[0].bytes.length ? zipSync({ 'x.mcpack': packs[0].bytes }) : packs[0].bytes);
         expect(inner.packs).toHaveLength(1);
@@ -54,8 +54,8 @@ describe('readAddon', () => {
         const { packs } = readAddon(
             zipSync({
                 'Hi/manifest.json': manifest(RP, ['resources']),
-                'Lo/manifest.json': manifest('44444444-4444-4444-8444-444444444444', ['resources'])
-            })
+                'Lo/manifest.json': manifest('44444444-4444-4444-8444-444444444444', ['resources']),
+            }),
         );
         expect(packs.map((p) => p.name).sort()).toEqual(['Hi', 'Lo']);
     });
@@ -64,8 +64,8 @@ describe('readAddon', () => {
         const { packs } = readAddon(
             zipSync({
                 'Outer/manifest.json': manifest(RP, ['resources']),
-                'Outer/sub/manifest.json': manifest(BP, ['resources'])
-            })
+                'Outer/sub/manifest.json': manifest(BP, ['resources']),
+            }),
         );
         expect(packs.map((p) => p.name)).toEqual(['Outer']);
     });
@@ -74,8 +74,8 @@ describe('readAddon', () => {
         const { packs, skipped } = readAddon(
             zipSync({
                 'Good/manifest.json': manifest(RP, ['resources']),
-                'Broken/manifest.json': strToU8('{ nope')
-            })
+                'Broken/manifest.json': strToU8('{ nope'),
+            }),
         );
         expect(packs.map((p) => p.name)).toEqual(['Good']);
         expect(skipped).toHaveLength(1);

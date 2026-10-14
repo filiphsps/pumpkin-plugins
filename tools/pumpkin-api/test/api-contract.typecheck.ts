@@ -7,7 +7,7 @@ import {
     type CommandSuggestionHandler,
     type EventHandler,
     Plugin,
-    type TaskHandler
+    type TaskHandler,
 } from '../src/index.ts';
 
 const eventHandler: EventHandler<{ readonly name: string }> = (_server, event) => ({ name: event.name });
@@ -22,7 +22,7 @@ const commandHandler: CommandHandler = (_sender, _server, _args) => 0;
 const suggestionHandler: CommandSuggestionHandler = (_sender, _server, request) => ({
     start: request.start,
     length: request.input.length,
-    values: [{ value: request.input }]
+    values: [{ value: request.input }],
 });
 const taskHandler: TaskHandler = (_server) => {};
 const aiGoal: AiGoal = {
@@ -30,7 +30,7 @@ const aiGoal: AiGoal = {
     shouldContinue: (_server, _entity) => true,
     start: (_server, _entity) => {},
     tick: (_server, _entity) => {},
-    stop: (_server, _entity) => {}
+    stop: (_server, _entity) => {},
 };
 const chunkGenerator: ChunkGenerator = (_phase, _chunk) => {};
 
@@ -42,7 +42,7 @@ class TypecheckPlugin extends Plugin {
             authors: [],
             description: 'compile-time API contract',
             dependencies: [],
-            permissions: []
+            permissions: [],
         };
     }
 
@@ -63,5 +63,5 @@ void [
     taskHandler,
     aiGoal,
     chunkGenerator,
-    TypecheckPlugin
+    TypecheckPlugin,
 ];

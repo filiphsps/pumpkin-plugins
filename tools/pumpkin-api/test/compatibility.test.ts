@@ -19,22 +19,22 @@ const historyFiles = fs.existsSync(historyDirectory) ? jsonFilesUnder(historyDir
 const decisions = ['retained', 'improved', 'replaced', 'removed', 'added'];
 
 interface MatrixItem {
-    name?: string;
+    decision: string;
     id?: string;
     kind?: string;
-    signature?: string;
-    decision: string;
     migration: string;
+    name?: string;
+    signature?: string;
 }
 
 interface SourceChange {
-    id: string;
     change: 'added' | 'changed' | 'removed';
-    previousSignature: string | null;
     currentSignature: string | null;
-    impact: 'additive' | 'breaking';
     decision: string;
+    id: string;
+    impact: 'additive' | 'breaking';
     migration: string;
+    previousSignature: string | null;
 }
 
 interface CompatibilityMatrix {
@@ -45,12 +45,8 @@ interface CompatibilityMatrix {
         integrity: string;
         pumpkinRelease: string | string[];
     };
-    inventory: { interfaces: number; types: number; operations: number };
-    sourceWit: { repository: string; branch: string; commit: string; subdirectory: string };
-    sourceWitSha256: string;
     defaultExport: boolean;
-    runtimeExports: MatrixItem[];
-    publicTypes: MatrixItem[];
+    deviations: unknown[];
     interfaces: Array<{
         name: string;
         decision: string;
@@ -58,8 +54,12 @@ interface CompatibilityMatrix {
         types: Array<MatrixItem & { kind: string; signature: string }>;
         operations: Array<MatrixItem & { id: string; signature: string }>;
     }>;
+    inventory: { interfaces: number; types: number; operations: number };
+    publicTypes: MatrixItem[];
+    runtimeExports: MatrixItem[];
     sourceChanges: SourceChange[];
-    deviations: unknown[];
+    sourceWit: { repository: string; branch: string; commit: string; subdirectory: string };
+    sourceWitSha256: string;
 }
 
 it('discovers at least one compatibility definition', () => {
@@ -77,7 +77,7 @@ it('uses the published schema URL in matrices and VS Code settings', () => {
     }
 
     const schema = JSON.parse(
-        fs.readFileSync(path.join(repoRoot, 'schemas/pumpkin-api-compatibility.schema.json'), 'utf8')
+        fs.readFileSync(path.join(repoRoot, 'schemas/pumpkin-api-compatibility.schema.json'), 'utf8'),
     );
     expect(schema.$id).toBe(schemaUrl);
     expect(schema.properties.$schema.const).toBe(schemaUrl);
@@ -85,14 +85,14 @@ it('uses the published schema URL in matrices and VS Code settings', () => {
     const settings = JSON.parse(fs.readFileSync(path.join(repoRoot, '.vscode/settings.json'), 'utf8'));
     expect(settings['json.schemas']).toContainEqual({
         fileMatch: ['tools/pumpkin-api/compatibility/**/*.json'],
-        url: schemaUrl
+        url: schemaUrl,
     });
 });
 
 it('rejects compatibility matrices that omit schema-required fields', () => {
     const matrixPath = path.join(compatibilityDirectory, matrixFiles[0]);
     const matrix = Object.fromEntries(
-        Object.entries(JSON.parse(fs.readFileSync(matrixPath, 'utf8'))).filter(([key]) => key !== 'inventory')
+        Object.entries(JSON.parse(fs.readFileSync(matrixPath, 'utf8'))).filter(([key]) => key !== 'inventory'),
     );
 
     expect(() => validateCompatibilityMatrix(matrix, matrixPath)).toThrow(/inventory/);
@@ -112,7 +112,7 @@ for (const file of matrixFiles) {
             package: '@pumpkinmc/pumpkin-api-ts',
             version: '0.1.1',
             archive:
-                'https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz'
+                'https://github.com/Pumpkin-MC/pumpkin-api-ts/releases/download/v0.1.1/pumpkinmc-pumpkin-api-ts-0.1.1.tgz',
         });
         expect(matrix.baseline.integrity).toMatch(/^sha512-/);
         expect(pumpkinReleases.length).toBeGreaterThan(0);
@@ -129,9 +129,9 @@ for (const file of matrixFiles) {
             ...matrix.publicTypes.map(({ name }) => `type:${name}`),
             ...matrix.interfaces.map(({ name }) => `interface:${name}`),
             ...matrix.interfaces.flatMap((apiInterface) =>
-                apiInterface.types.map(({ name }) => `type:${apiInterface.name}.${name}`)
+                apiInterface.types.map(({ name }) => `type:${apiInterface.name}.${name}`),
             ),
-            ...interfaceOperations.map(({ id }) => `operation:${id}`)
+            ...interfaceOperations.map(({ id }) => `operation:${id}`),
         ];
         expect(new Set(symbols).size).toBe(symbols.length);
 
@@ -149,8 +149,8 @@ for (const file of matrixFiles) {
                     id.length > 0 &&
                     (change === 'added' || change === 'changed' || change === 'removed') &&
                     impact === (change === 'added' ? 'additive' : 'breaking') &&
-                    everyDecisionHasMigration({ decision, migration })
-            )
+                    everyDecisionHasMigration({ decision, migration }),
+            ),
         ).toBe(true);
     });
 }
@@ -166,7 +166,7 @@ for (const file of historyFiles) {
         const expectedReleaseDirectory = pumpkinRelease.replace(/[^a-zA-Z0-9.+_-]/g, '_');
         expect(path.basename(file)).toBe(expectedFilename);
         expect(path.relative(historyDirectory, file)).toBe(
-            path.join(expectedReleaseDirectory, ...matrix.sourceWit.subdirectory.split('/'), expectedFilename)
+            path.join(expectedReleaseDirectory, ...matrix.sourceWit.subdirectory.split('/'), expectedFilename),
         );
         expect(matrix.sourceWit.repository).toBeTruthy();
         expect(matrix.sourceWit.branch).toBeTruthy();
@@ -181,7 +181,7 @@ function expectReviewed(matrix: CompatibilityMatrix) {
         ...matrix.runtimeExports,
         ...matrix.publicTypes,
         ...matrix.interfaces,
-        ...matrix.interfaces.flatMap((apiInterface) => [...apiInterface.types, ...apiInterface.operations])
+        ...matrix.interfaces.flatMap((apiInterface) => [...apiInterface.types, ...apiInterface.operations]),
     ];
     expect(items.every(({ decision, migration }) => decisions.includes(decision) && migration.length > 0)).toBe(true);
     expect(
@@ -189,8 +189,8 @@ function expectReviewed(matrix: CompatibilityMatrix) {
             ({ change, impact, decision, migration }) =>
                 impact === (change === 'added' ? 'additive' : 'breaking') &&
                 decisions.includes(decision) &&
-                migration.length > 0
-        )
+                migration.length > 0,
+        ),
     ).toBe(true);
 }
 

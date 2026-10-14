@@ -36,7 +36,7 @@ it('publishes a schema requiring the same fields as the Pumpkin WIT pin parser',
         repository: lock.repository,
         branch: lock.branch,
         commit: lock.commit,
-        subdirectory: lock.subdirectory
+        subdirectory: lock.subdirectory,
     });
 });
 
@@ -51,8 +51,8 @@ it('rejects cache roots symlinked into node_modules', () => {
         expect(() =>
             ensurePumpkinWit({
                 lockFile: path.join(apiRoot, 'wit.lock.json'),
-                cacheRoot: cacheAlias
-            })
+                cacheRoot: cacheAlias,
+            }),
         ).toThrow(/must stay outside node_modules and the pnpm store/);
     } finally {
         fs.rmSync(temporaryRoot, { recursive: true, force: true });
@@ -67,7 +67,7 @@ it('fetches a local WIT pin and reuses its verified cache without the Git source
     expect(JSON.parse(fs.readFileSync(path.join(path.dirname(witRoot), 'pin.json'), 'utf8'))).toMatchObject({
         lockDigest: createHash('sha256').update(fs.readFileSync(directory.lockFile)).digest('hex'),
         commit: directory.commit,
-        subdirectory: 'wit'
+        subdirectory: 'wit',
     });
 
     fs.rmSync(directory.repository, { recursive: true, force: true });
@@ -98,7 +98,7 @@ it('refetches legacy cache metadata without a WIT integrity manifest', () => {
     expect(ensurePumpkinWit({ lockFile: directory.lockFile, cacheRoot: directory.cacheRoot })).toBe(witRoot);
     expect(fs.readFileSync(path.join(witRoot, 'plugin.wit'), 'utf8')).toBe('package pumpkin:plugin@0.1.0;\n');
     expect(JSON.parse(fs.readFileSync(pinFile, 'utf8')).witFiles).toEqual([
-        { path: 'plugin.wit', sha256: createHash('sha256').update('package pumpkin:plugin@0.1.0;\n').digest('hex') }
+        { path: 'plugin.wit', sha256: createHash('sha256').update('package pumpkin:plugin@0.1.0;\n').digest('hex') },
     ]);
 }, 15_000);
 
@@ -131,7 +131,7 @@ it('rechecks a stale cache-lock owner after claiming stale-lock recovery', async
         builder = spawnWitWorker('builder', directory, lock, markers, hookFile);
         await waitForFile(markers.builderPausedAtClone);
         expect(JSON.parse(fs.readFileSync(path.join(lock.lockDirectory, 'owner.json'), 'utf8')).pid).toBe(
-            builder.child.pid
+            builder.child.pid,
         );
 
         fs.writeFileSync(markers.continueWaiter, 'continue');
@@ -163,7 +163,7 @@ it('recovers a stale cache lock when its recovery owner has exited', () => {
     fs.mkdirSync(reclaimDirectory);
     fs.writeFileSync(
         path.join(reclaimDirectory, 'owner.json'),
-        JSON.stringify({ pid: lock.stalePid, token: 'abandoned-recovery' })
+        JSON.stringify({ pid: lock.stalePid, token: 'abandoned-recovery' }),
     );
     vi.spyOn(Date, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_001).mockReturnValue(1_000_000);
 
@@ -186,7 +186,7 @@ it('keeps a live cache-lock recovery owner while waiting for a stale lock', () =
     now.mockReturnValueOnce(1_000).mockReturnValueOnce(1_001).mockReturnValue(1_000_000);
 
     expect(() => ensurePumpkinWit({ lockFile: directory.lockFile, cacheRoot: directory.cacheRoot })).toThrow(
-        `stale-lock recovery claim: ${reclaimDirectory}`
+        `stale-lock recovery claim: ${reclaimDirectory}`,
     );
 
     expect(fs.existsSync(lock.lockDirectory)).toBe(true);
@@ -258,7 +258,7 @@ function createLockWorkerMarkers(root: string) {
         waiterStartedClone: path.join(root, 'waiter-started-clone'),
         builderPausedAtClone: path.join(root, 'builder-paused-at-clone'),
         continueWaiter: path.join(root, 'continue-waiter'),
-        continueBuilder: path.join(root, 'continue-builder')
+        continueBuilder: path.join(root, 'continue-builder'),
     };
 }
 
@@ -330,7 +330,7 @@ if (role === 'waiter') {
 }
 
 syncBuiltinESMExports();
-`
+`,
     );
     return hookFile;
 }
@@ -340,7 +340,7 @@ function spawnWitWorker(
     directory: ReturnType<typeof createLocalWitPin>,
     lock: ReturnType<typeof createStaleCacheLock>,
     markers: ReturnType<typeof createLockWorkerMarkers>,
-    hookFile: string
+    hookFile: string,
 ): WitWorker {
     const moduleUrl = pathToFileURL(path.join(apiRoot, 'src/wit.mjs')).href;
     const source =
@@ -354,9 +354,9 @@ function spawnWitWorker(
             PUMPKIN_WIT_LOCK_FILE: directory.lockFile,
             PUMPKIN_WIT_CACHE_ROOT: directory.cacheRoot,
             PUMPKIN_WIT_STALE_PID: String(lock.stalePid),
-            PUMPKIN_WIT_WORKER_MARKERS: JSON.stringify(markers)
+            PUMPKIN_WIT_WORKER_MARKERS: JSON.stringify(markers),
         },
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
     });
     let output = '';
     child.stdout?.on('data', (chunk: Buffer) => (output += chunk.toString()));
@@ -387,7 +387,7 @@ async function waitForWorker(worker: WitWorker) {
             worker.completion,
             new Promise<never>((_, reject) => {
                 timeout = setTimeout(() => reject(new Error('WIT worker did not exit')), 10_000);
-            })
+            }),
         ]);
     } finally {
         if (timeout) clearTimeout(timeout);
@@ -403,7 +403,7 @@ async function stopWorker(worker: WitWorker) {
             worker.completion,
             new Promise<void>((resolve) => {
                 timeout = setTimeout(resolve, 1_000);
-            })
+            }),
         ]);
     } finally {
         if (timeout) clearTimeout(timeout);
@@ -424,11 +424,11 @@ function writeLocalWitLock(lockFile: string, repository: string, commit: string)
                 repository: pathToFileURL(repository).href,
                 branch: 'main',
                 commit,
-                subdirectory: 'wit'
+                subdirectory: 'wit',
             },
             null,
-            4
-        )}\n`
+            4,
+        )}\n`,
     );
 }
 

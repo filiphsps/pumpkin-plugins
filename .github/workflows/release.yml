@@ -344,9 +344,11 @@ jobs:
               env:
                   RELEASE_TAG: ${{ env.TAG }}
               run: |
-                  echo "plugin_name=$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")" >> "$GITHUB_OUTPUT"
-                  echo "version=${RELEASE_TAG##*-v}" >> "$GITHUB_OUTPUT"
-                  echo "wasm_file=dist/$(basename "$PLUGIN_DIRECTORY").wasm" >> "$GITHUB_OUTPUT"
+                  {
+                      echo "plugin_name=$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")"
+                      echo "version=${RELEASE_TAG##*-v}"
+                      echo "wasm_file=dist/$(basename "$PLUGIN_DIRECTORY").wasm"
+                  } >> "$GITHUB_OUTPUT"
 
             - name: 🔏 Sign release artifact
               uses: ./actions/sign-pumpkin-plugin
@@ -413,9 +415,11 @@ jobs:
                   PLUGIN_DIRECTORY: ${{ matrix.path }}
                   RELEASE_TAG: ${{ env.TAG }}
               run: |
-                  echo "plugin_name=$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")" >> "$GITHUB_OUTPUT"
-                  echo "version=${RELEASE_TAG##*-v}" >> "$GITHUB_OUTPUT"
-                  echo "wasm_file=dist/$(basename "$PLUGIN_DIRECTORY").wasm" >> "$GITHUB_OUTPUT"
+                  {
+                      echo "plugin_name=$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")"
+                      echo "version=${RELEASE_TAG##*-v}"
+                      echo "wasm_file=dist/$(basename "$PLUGIN_DIRECTORY").wasm"
+                  } >> "$GITHUB_OUTPUT"
 
             # The GitHub release keeps its publisher signature. Market signs each public download,
             # so send it the verified component without the publisher's signing sections.

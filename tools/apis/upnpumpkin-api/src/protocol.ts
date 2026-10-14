@@ -8,15 +8,15 @@ export const PROTOCOL_VERSION = 1;
 
 /** A port a plugin wants reachable from the internet. */
 export interface PortRequest {
-    /** Names the request within the asking plugin. UPnPumpkin keeps the plugins' keys apart. */
-    key: string;
-    protocol: 'tcp' | 'udp';
-    /** The port on this machine. */
-    port: number;
-    /** The public port to ask for. Defaults to `port`; the router may give another one. */
-    externalPort?: number;
     /** Shown in the router's list of forwarded ports. */
     description: string;
+    /** The public port to ask for. Defaults to `port`; the router may give another one. */
+    externalPort?: number;
+    /** Names the request within the asking plugin. UPnPumpkin keeps the plugins' keys apart. */
+    key: string;
+    /** The port on this machine. */
+    port: number;
+    protocol: 'tcp' | 'udp';
 }
 
 /** Whether a port is reachable yet, and where. */
@@ -36,12 +36,12 @@ export type PortStatus =
 
 /** What UPnPumpkin knows about the network. */
 export interface NetworkInfo {
-    /** This machine's address toward the internet. */
-    localAddress?: string;
-    /** The router that opens ports. */
-    gateway?: { kind: 'upnp' | 'nat-pmp'; address: string };
     /** The router's address on the internet side. */
     externalAddress?: string;
+    /** The router that opens ports. */
+    gateway?: { kind: 'upnp' | 'nat-pmp'; address: string };
+    /** This machine's address toward the internet. */
+    localAddress?: string;
 }
 
 /** A message to UPnPumpkin. */
@@ -110,8 +110,8 @@ export function decodeRequest(bytes: Uint8Array): { request: Request } | { error
                     protocol: value.protocol,
                     port: value.port,
                     externalPort: value.externalPort as number | undefined,
-                    description: value.description
-                }
+                    description: value.description,
+                },
             };
         }
         default:
@@ -131,7 +131,7 @@ export function decodeReply(bytes: Uint8Array): Reply | undefined {
         return {
             ok: true,
             status: value.status as PortStatus | undefined,
-            info: value.info as NetworkInfo | undefined
+            info: value.info as NetworkInfo | undefined,
         };
     } catch {
         return undefined;

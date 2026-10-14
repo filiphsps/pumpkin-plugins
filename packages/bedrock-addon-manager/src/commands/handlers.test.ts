@@ -28,10 +28,10 @@ describe('the /baddon commands', () => {
         expect(host.usages(root).sort()).toEqual((info.commands ?? []).map((c) => c.usage).sort());
         expect(info.commands).toEqual(commandInfos(commands));
         expect(new Set(info.commands.map((c) => c.permission))).toEqual(
-            new Set([`${COMMAND_PERMISSION}.list`, `${COMMAND_PERMISSION}.reload`])
+            new Set([`${COMMAND_PERMISSION}.list`, `${COMMAND_PERMISSION}.reload`]),
         );
         expect(info.commands.find((command) => command.usage === '/baddon list')?.defaultPermission).toEqual({
-            tag: 'allow'
+            tag: 'allow',
         });
     });
 

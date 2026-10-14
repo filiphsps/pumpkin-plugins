@@ -25,12 +25,12 @@ try {
             engine: variant.pluginEngine,
             wasi: [],
             ...(variant.staticHermesRuntime ? { staticHermesRuntime: variant.staticHermesRuntime } : {}),
-            ...(variant.staticHermesGc ? { staticHermesGc: variant.staticHermesGc } : {})
+            ...(variant.staticHermesGc ? { staticHermesGc: variant.staticHermesGc } : {}),
         });
         fs.copyFileSync(path.join(benchmarkDir, 'src/benchmark-plugin.ts'), path.join(sourceDir, 'plugin.ts'));
         fs.copyFileSync(
             path.join(benchmarkDir, 'src/benchmark-workloads.ts'),
-            path.join(sourceDir, 'benchmark-workloads.ts')
+            path.join(sourceDir, 'benchmark-workloads.ts'),
         );
 
         const wasmPath = buildPlugin(packageDir, variant.label, variant.parseTypeScript, false);
@@ -46,7 +46,7 @@ try {
             output: 'build/plugin.wasm',
             engine: 'static-hermes',
             staticHermesRuntime: runtimeVariant,
-            wasi: []
+            wasi: [],
         });
         fs.copyFileSync(stackGuardSource, path.join(sourceDir, 'plugin.ts'));
 
@@ -65,7 +65,7 @@ function createBuildPackage(packageDir: string, name: string, pumpkinPlugin: Rec
     fs.symlinkSync(apiRoot, apiLink, process.platform === 'win32' ? 'junction' : 'dir');
     fs.writeFileSync(
         path.join(packageDir, 'package.json'),
-        `${JSON.stringify({ name, version: '0.0.0', pumpkinPlugin }, null, 2)}\n`
+        `${JSON.stringify({ name, version: '0.0.0', pumpkinPlugin }, null, 2)}\n`,
     );
     fs.writeFileSync(
         path.join(packageDir, 'tsconfig.json'),
@@ -76,13 +76,13 @@ function createBuildPackage(packageDir: string, name: string, pumpkinPlugin: Rec
                     module: 'ESNext',
                     moduleResolution: 'Bundler',
                     strict: true,
-                    types: []
+                    types: [],
                 },
-                include: ['src/**/*.ts']
+                include: ['src/**/*.ts'],
             },
             null,
-            2
-        )}\n`
+            2,
+        )}\n`,
     );
 }
 
@@ -94,9 +94,9 @@ function buildPlugin(packageDir: string, label: string, parseTypeScript: boolean
         env: {
             ...process.env,
             PUMPKIN_DEV_MODE: developmentMode ? '1' : '0',
-            STATIC_HERMES_CACHE_DIR: hermesCacheDir
+            STATIC_HERMES_CACHE_DIR: hermesCacheDir,
         },
-        maxBuffer: 16 * 1024 * 1024
+        maxBuffer: 16 * 1024 * 1024,
     });
     if (buildOutput.includes('-parse-ts') !== parseTypeScript) {
         throw new Error(`${label} build selected an unexpected parser mode`);

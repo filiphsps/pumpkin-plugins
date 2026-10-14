@@ -12,7 +12,7 @@ describe('wasiInterfaces', () => {
             'filesystem/preopens',
             'io/poll',
             'io/streams',
-            'clocks/monotonic-clock'
+            'clocks/monotonic-clock',
         ]);
     });
 

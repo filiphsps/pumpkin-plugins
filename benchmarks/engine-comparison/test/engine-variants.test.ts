@@ -13,7 +13,7 @@ it('includes QuickJS and every Static Hermes profile, collector, and parser mode
         'static-hermes-lean-hades-js',
         'static-hermes-lean-hades-ts',
         'static-hermes-lean-malloc-js',
-        'static-hermes-lean-malloc-ts'
+        'static-hermes-lean-malloc-ts',
     ]);
     expect(
         variants
@@ -21,8 +21,8 @@ it('includes QuickJS and every Static Hermes profile, collector, and parser mode
             .map(({ staticHermesRuntime, staticHermesGc, parseTypeScript }) => [
                 staticHermesRuntime,
                 staticHermesGc,
-                parseTypeScript
-            ])
+                parseTypeScript,
+            ]),
     ).toEqual([
         ['full', 'hades', false],
         ['full', 'hades', true],
@@ -31,6 +31,6 @@ it('includes QuickJS and every Static Hermes profile, collector, and parser mode
         ['lean', 'hades', false],
         ['lean', 'hades', true],
         ['lean', 'malloc', false],
-        ['lean', 'malloc', true]
+        ['lean', 'malloc', true],
     ]);
 });

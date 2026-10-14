@@ -2,10 +2,10 @@ import { compareVersions, type JsonRequest, type UpdateCheck } from '../updates.
 
 /** Settings needed to check a plugin against Pumpkin Market. */
 export interface MarketUpdateOptions {
-    request: JsonRequest;
-    pluginName: string;
     currentVersion: string;
     marketplaceUrl?: string;
+    pluginName: string;
+    request: JsonRequest;
 }
 
 /** Builds the Pumpkin Market URL for one plugin version check. */
@@ -18,7 +18,7 @@ export function marketUpdateUrl(pluginName: string, currentVersion: string, mark
 /** Checks the stable version of a plugin listed on Pumpkin Market. */
 export function checkMarketUpdate(options: MarketUpdateOptions): UpdateCheck {
     const response = options.request(
-        marketUpdateUrl(options.pluginName, options.currentVersion, options.marketplaceUrl)
+        marketUpdateUrl(options.pluginName, options.currentVersion, options.marketplaceUrl),
     );
     if (typeof response !== 'object' || response === null) throw new TypeError('Invalid Market update response');
     const payload = response as { latest_version?: unknown; update_available?: unknown };
@@ -35,6 +35,6 @@ export function checkMarketUpdate(options: MarketUpdateOptions): UpdateCheck {
     return {
         currentVersion: options.currentVersion,
         latestVersion,
-        updateAvailable: latestVersion === null ? false : compareVersions(options.currentVersion, latestVersion) < 0
+        updateAvailable: latestVersion === null ? false : compareVersions(options.currentVersion, latestVersion) < 0,
     };
 }

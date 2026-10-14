@@ -16,7 +16,7 @@ function scripted(chunks: (Uint8Array | 'closed')[]): { net: FakeNetwork; writte
         read: () => queue.shift() ?? null,
         writable: () => 8,
         write: (bytes) => void written.push(...bytes),
-        close: () => void closed.push('closed')
+        close: () => void closed.push('closed'),
     };
     net.dial = (): Dial => ({ poll: () => connection, abort: () => {} });
     return { net, written, closed };
@@ -31,12 +31,12 @@ describe('httpRequest', () => {
         const { net, written } = scripted([text('HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhel'), text('lo')]);
         const response = runSteps(
             net,
-            httpRequest(net, to, { method: 'POST', path: '/p', headers: { A: 'b' }, body: 'data' })
+            httpRequest(net, to, { method: 'POST', path: '/p', headers: { A: 'b' }, body: 'data' }),
         );
         expect(response).toMatchObject({ status: 200, body: 'hello', localAddress: [192, 168, 1, 50] });
         const sent = String.fromCharCode(...written);
         expect(sent).toContain(
-            'POST /p HTTP/1.1\r\nHost: 192.168.1.1:80\r\nConnection: close\r\nA: b\r\nContent-Length: 4\r\n\r\ndata'
+            'POST /p HTTP/1.1\r\nHost: 192.168.1.1:80\r\nConnection: close\r\nA: b\r\nContent-Length: 4\r\n\r\ndata',
         );
     });
 
@@ -48,14 +48,14 @@ describe('httpRequest', () => {
     it('decodes chunked bodies, also when split across reads', () => {
         const { net } = scripted([
             text('HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhel'),
-            text('lo\r\n6\r\n world\r\n0\r\n\r\n')
+            text('lo\r\n6\r\n world\r\n0\r\n\r\n'),
         ]);
         expect(runSteps(net, httpRequest(net, to, get)).body).toBe('hello world');
     });
 
     it('accepts hexadecimal chunks with extensions', () => {
         const { net } = scripted([
-            text('HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nA;name=value\r\n0123456789\r\n0\r\n\r\n')
+            text('HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nA;name=value\r\n0123456789\r\n0\r\n\r\n'),
         ]);
         expect(runSteps(net, httpRequest(net, to, get)).body).toBe('0123456789');
     });
@@ -63,7 +63,7 @@ describe('httpRequest', () => {
     it.each(['+1', '1x', '', '20000000000000'])('rejects invalid chunk size %j and closes the connection', (token) => {
         const { net, closed } = scripted([
             text(`HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n${token}\r\nx\r\n0\r\n\r\n`),
-            'closed'
+            'closed',
         ]);
         expect(() => runSteps(net, httpRequest(net, to, get))).toThrow('invalid chunk size');
         expect(closed).toEqual(['closed']);
@@ -86,9 +86,9 @@ describe('httpRequest', () => {
                 const net = { now: () => 0, dial: () => ({ poll: () => connection }) };
                 try { httpRequest(net, { address: [192,168,1,1], port: 80 }, { method: 'GET', path: '/' }).next();
                     process.exitCode = 1;
-                } catch (error) { console.log(JSON.stringify({ message: error.message, closed })); }`
+                } catch (error) { console.log(JSON.stringify({ message: error.message, closed })); }`,
             ],
-            { encoding: 'utf8', timeout: 2000, killSignal: 'SIGKILL' }
+            { encoding: 'utf8', timeout: 2000, killSignal: 'SIGKILL' },
         );
         expect(result.error).toBeUndefined();
         expect(result.status).toBe(0);
@@ -99,14 +99,14 @@ describe('httpRequest', () => {
         const { net, closed } = scripted([
             text('HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\nx\r\n0\r\n'),
             text('Checksum: yes\r\n'),
-            text('\r\n')
+            text('\r\n'),
         ]);
         expect(runSteps(net, httpRequest(net, to, get)).body).toBe('x');
         // A malformed later trailer must not be skipped by completing at the zero-size line.
         expect(closed).toEqual(['closed']);
         const malformed = scripted([
             text('HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n'),
-            text('not-a-header\r\n\r\n')
+            text('not-a-header\r\n\r\n'),
         ]);
         expect(() => runSteps(malformed.net, httpRequest(malformed.net, to, get))).toThrow('invalid chunk trailer');
         expect(malformed.closed).toEqual(['closed']);
@@ -115,7 +115,7 @@ describe('httpRequest', () => {
     it.each(['1\r\nx!!0\r\n\r\n', '1\r\nx\r!0\r\n\r\n'])('rejects a chunk without its trailing CRLF: %j', (body) => {
         const { net, closed } = scripted([
             text(`HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n${body}`),
-            'closed'
+            'closed',
         ]);
         expect(() => runSteps(net, httpRequest(net, to, get))).toThrow('invalid chunk delimiter');
         expect(closed).toEqual(['closed']);
@@ -126,11 +126,11 @@ describe('httpRequest', () => {
         (body) => {
             const { net, closed } = scripted([
                 text(`HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n${body}`),
-                'closed'
+                'closed',
             ]);
             expect(() => runSteps(net, httpRequest(net, to, get))).toThrow('truncated chunked body');
             expect(closed).toEqual(['closed']);
-        }
+        },
     );
 
     it.each(['-1', '+1', '1x', '1.5', '', '9007199254740992'])('rejects invalid Content-Length %j', (length) => {
@@ -169,7 +169,7 @@ describe('httpRequest', () => {
             read: () => null,
             writable: () => 100,
             write: () => {},
-            close: () => void closed.push('x')
+            close: () => void closed.push('x'),
         };
         net.dial = (): Dial => ({ poll: () => connection, abort: () => {} });
         expect(() => runSteps(net, httpRequest(net, to, get, 1000))).toThrow('took too long');
@@ -186,7 +186,7 @@ describe('httpRequest', () => {
             poll: () => undefined,
             abort: () => {
                 aborted = true;
-            }
+            },
         });
         expect(() => runSteps(stuck, httpRequest(stuck, to, get, 500))).toThrow('could not connect');
         expect(aborted).toBe(true);

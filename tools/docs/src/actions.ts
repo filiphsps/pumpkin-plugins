@@ -7,9 +7,9 @@ import { code, type TableOptions, table } from './markdown.ts';
 
 /** Input metadata from a GitHub Action manifest. */
 export interface ActionInput {
+    default?: unknown;
     description?: string;
     required?: boolean | string;
-    default?: unknown;
 }
 
 /** Output metadata from a GitHub Action manifest. */
@@ -19,9 +19,9 @@ export interface ActionOutput {
 
 /** The GitHub Action fields used by documentation and reference generation. */
 export interface ActionMetadata {
-    name?: string;
     description?: string;
     inputs?: Record<string, ActionInput>;
+    name?: string;
     outputs?: Record<string, ActionOutput>;
     runs?: { main?: string };
 }
@@ -58,7 +58,7 @@ function defaultValue(value: unknown): string {
 /** Render action input/output documentation consistently for READMEs and API references. */
 export function renderActionSections(
     metadata: ActionMetadata,
-    options: TableOptions = { multiline: 'break' }
+    options: TableOptions = { multiline: 'break' },
 ): {
     inputs: string;
     outputs: string;
@@ -70,7 +70,7 @@ export function renderActionSections(
             code(name),
             input.required === true || input.required === 'true' ? 'Yes' : 'No',
             Object.hasOwn(input, 'default') ? defaultValue(input.default) : '',
-            String(input.description ?? '')
+            String(input.description ?? ''),
         ];
     });
     const outputs = entries(metadata.outputs, 'outputs').map(([name, output]) => {
@@ -82,7 +82,7 @@ export function renderActionSections(
         inputs: inputs.length
             ? table(['Input', 'Required', 'Default', 'Description'], inputs, options)
             : 'This action has no inputs.',
-        outputs: outputs.length ? table(['Output', 'Description'], outputs, options) : 'This action has no outputs.'
+        outputs: outputs.length ? table(['Output', 'Description'], outputs, options) : 'This action has no outputs.',
     };
 }
 
@@ -92,7 +92,7 @@ export function generateActionReadmes(root: string, check = false): Status {
         file: join(component.directory, 'README.md'),
         blocks: renderActionSections(readActionMetadata(component.metadataFile)),
         markers: 'action',
-        note: ''
+        note: '',
     }));
     return generateDocuments(documents, root, check);
 }

@@ -8,6 +8,7 @@
         "wix.vscode-import-cost",
         "yoavbls.pretty-ts-errors",
         "streetsidesoftware.code-spell-checker",
-        "jimeh.actionlint"
+        "jimeh.actionlint",
+        "vue.volar"
     ]
 }

@@ -17,7 +17,7 @@ interface FieldOptions {
 export function ipv4Address(options: FieldOptions & { default: string }): Field<string> {
     return str({
         ...options,
-        check: { expected: 'an IPv4 address like "0.0.0.0"', test: (v) => parseIpv4(v) !== undefined }
+        check: { expected: 'an IPv4 address like "0.0.0.0"', test: (v) => parseIpv4(v) !== undefined },
     });
 }
 
@@ -40,8 +40,8 @@ export function httpUrl(options: FieldOptions & { default?: string; allowEmpty?:
         check: {
             expected: 'an http:// or https:// URL',
             test: (v) => (v === '' ? allowEmpty === true : /^https?:\/\/[^\s/]+/.test(v)),
-            normalize: (v) => v.replace(/\/+$/, '')
-        }
+            normalize: (v) => v.replace(/\/+$/, ''),
+        },
     });
 }
 
@@ -56,7 +56,7 @@ export function relativeFolder(options: FieldOptions & { default: string }): Fie
         check: {
             expected: 'a relative folder inside the data folder',
             test: (v) => v !== '' && !v.startsWith('/') && !v.includes('\\') && !v.split('/').includes('..'),
-            normalize: (v) => v.replace(/\/+$/, '')
-        }
+            normalize: (v) => v.replace(/\/+$/, ''),
+        },
     });
 }

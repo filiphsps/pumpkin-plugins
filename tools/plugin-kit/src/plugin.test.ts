@@ -9,7 +9,7 @@ const calls = vi.hoisted(() => ({
     pluginUnload: vi.fn(),
     registerWithUpdates: vi.fn(),
     runTask: vi.fn(),
-    scheduleDelayed: vi.fn()
+    scheduleDelayed: vi.fn(),
 }));
 
 vi.mock('@pumpkin-plugins/pumpkin-api', () => ({
@@ -22,17 +22,17 @@ vi.mock('@pumpkin-plugins/pumpkin-api', () => ({
             calls.apiUnload(ctx);
         }
     },
-    handleTask: calls.apiHandleTask
+    handleTask: calls.apiHandleTask,
 }));
 
 vi.mock('@pumpkin-plugins/update-check', () => ({
-    registerPluginWithUpdates: calls.registerWithUpdates
+    registerPluginWithUpdates: calls.registerWithUpdates,
 }));
 
 vi.mock('./host.ts', () => ({
     hostLogger: { info: calls.info },
     runTask: calls.runTask,
-    scheduleDelayed: calls.scheduleDelayed
+    scheduleDelayed: calls.scheduleDelayed,
 }));
 
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
@@ -66,7 +66,7 @@ describe('PluginBase', () => {
             authors: [],
             description: 'An example plugin.',
             dependencies: [],
-            permissions: ['http.outbound']
+            permissions: ['http.outbound'],
         });
     });
 
@@ -92,7 +92,7 @@ describe('PluginBase', () => {
         expect(registerPluginWithUpdates).toHaveBeenCalledWith(
             plugin,
             info,
-            expect.objectContaining({ schedule: expect.any(Function) })
+            expect.objectContaining({ schedule: expect.any(Function) }),
         );
     });
 

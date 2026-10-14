@@ -26,7 +26,7 @@ function checkInputs(sourceDir, sdkDir) {
     requireMatch(
         git('rev-parse', 'HEAD'),
         expected.sourceCommit,
-        `Expected componentize-qjs at ${expected.sourceCommit}`
+        `Expected componentize-qjs at ${expected.sourceCommit}`,
     );
     requireMatch(hash(join(sourceDir, 'Cargo.lock')), expected.cargoLockSha256, 'Cargo.lock hash mismatch');
     // Include ignored files: .cargo/config and local source overrides are also build inputs.
@@ -43,7 +43,7 @@ function checkInputs(sourceDir, sdkDir) {
         '--binary',
         '--src-prefix=a/',
         '--dst-prefix=b/',
-        'HEAD'
+        'HEAD',
     );
     // Git writes a space on empty context lines; the checked-in patch omits it.
     const normalize = (text) => text.replace(/^ $/gm, '').trim();
@@ -55,12 +55,12 @@ function checkInputs(sourceDir, sdkDir) {
     requireMatch(
         readFileSync(join(sdkDir, 'VERSION'), 'utf8').trim(),
         expected.sdkVersion,
-        'wasi-sdk version mismatch'
+        'wasi-sdk version mismatch',
     );
     requireMatch(
         run(join(sdkDir, 'bin/clang'), ['--version']).split('\n')[0],
         expected.clangVersion,
-        'Clang version mismatch'
+        'Clang version mismatch',
     );
     const targetLib = run('rustc', ['--print', 'target-libdir', '--target', expected.target]);
     if (!existsSync(targetLib)) throw new Error(`Rust target ${expected.target} is not installed`);
@@ -125,10 +125,10 @@ try {
             const buildHostRelease = osRelease();
             writeFileSync(
                 join(output, 'provenance.json'),
-                `${JSON.stringify({ ...expected, outputSha256, buildHost, buildHostRelease }, null, 4)}\n`
+                `${JSON.stringify({ ...expected, outputSha256, buildHost, buildHostRelease }, null, 4)}\n`,
             );
             process.stdout.write(
-                `Runtime candidate output SHA-256: ${outputSha256} (${buildHost}, ${buildHostRelease})\n`
+                `Runtime candidate output SHA-256: ${outputSha256} (${buildHost}, ${buildHostRelease})\n`,
             );
         });
     program

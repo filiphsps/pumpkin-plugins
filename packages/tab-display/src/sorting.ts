@@ -1,20 +1,20 @@
 /** A copied player snapshot used for deterministic tab ordering. */
 export interface SortPlayer {
-    readonly uuid: string;
     readonly name: string;
     readonly ping?: number;
+    readonly uuid: string;
 }
 
 /** A native sort key and its direction. */
 export interface SortRule {
-    readonly kind: 'name' | 'ping';
     readonly direction: 'ascending' | 'descending';
+    readonly kind: 'name' | 'ping';
 }
 
 /** One dense ordering value to apply through Pumpkin's native player API. */
 export interface DenseOrder {
-    readonly uuid: string;
     readonly order: number;
+    readonly uuid: string;
 }
 
 /** Sorts by configured keys, then by UUID without locale-sensitive comparison. */

@@ -20,49 +20,49 @@ function fixture() {
                 module: 'ESNext',
                 moduleResolution: 'Bundler',
                 strict: true,
-                types: []
+                types: [],
             },
-            include: ['entry.ts', 'build/types/**/*.d.ts']
-        })
+            include: ['entry.ts', 'build/types/**/*.d.ts'],
+        }),
     );
     fs.writeFileSync(
         path.join(interfaces, 'pumpkin-plugin-player.d.ts'),
-        'import type { World } from "./pumpkin-plugin-world";\nexport class Player { getPosition(): [number, number, number]; getWorld(): World; asJava(): JavaPlayer | undefined; }\nexport class JavaPlayer { sendCustomPayload(channel: string, data: Uint8Array): void; }\n'
+        'import type { World } from "./pumpkin-plugin-world";\nexport class Player { getPosition(): [number, number, number]; getWorld(): World; asJava(): JavaPlayer | undefined; }\nexport class JavaPlayer { sendCustomPayload(channel: string, data: Uint8Array): void; }\n',
     );
     fs.writeFileSync(path.join(interfaces, 'pumpkin-plugin-world.d.ts'), 'export class World { getName(): string; }\n');
     fs.writeFileSync(
         path.join(interfaces, 'pumpkin-plugin-context.d.ts'),
-        'export type EventType = "tick"; export type EventPriority = "normal"; export class Context { registerEvent(id: number, type: EventType, priority: EventPriority, blocking: boolean): void; }\n'
+        'export type EventType = "tick"; export type EventPriority = "normal"; export class Context { registerEvent(id: number, type: EventType, priority: EventPriority, blocking: boolean): void; }\n',
     );
     fs.writeFileSync(
         path.join(interfaces, 'pumpkin-plugin-command.d.ts'),
-        'export class Command { constructor(names: Array<string>, description: string); executeWithHandlerId(id: number): void; }\n'
+        'export class Command { constructor(names: Array<string>, description: string); executeWithHandlerId(id: number): void; }\n',
     );
     fs.writeFileSync(
         path.join(interfaces, 'pumpkin-plugin-text.d.ts'),
-        'export class TextComponent { static fromJson(json: string): TextComponent; encode(): Uint8Array; }\n'
+        'export class TextComponent { static fromJson(json: string): TextComponent; encode(): Uint8Array; }\n',
     );
     fs.writeFileSync(
         path.join(interfaces, 'pumpkin-plugin-ipc.d.ts'),
-        'export type Result<T, E> = { tag: "ok"; val: T } | { tag: "err"; val: E }; export function sendIpcMessage(recipient: string, message: Uint8Array): Result<Uint8Array, string>;\n'
+        'export type Result<T, E> = { tag: "ok"; val: T } | { tag: "err"; val: E }; export function sendIpcMessage(recipient: string, message: Uint8Array): Result<Uint8Array, string>;\n',
     );
     fs.writeFileSync(
         path.join(interfaces, 'wasi-sockets-instance-network.d.ts'),
-        'declare module "wasi:sockets/instance-network@0.2.3" { export function instanceNetwork(): Network; export class Network { private constructor(); } }\n'
+        'declare module "wasi:sockets/instance-network@0.2.3" { export function instanceNetwork(): Network; export class Network { private constructor(); } }\n',
     );
     fs.writeFileSync(
         path.join(interfaces, 'wasi-sockets-tcp.d.ts'),
-        'declare module "wasi:sockets/tcp@0.2.3" { export class TcpSocket { private constructor(); startConnect(network: import("wasi:sockets/instance-network@0.2.3").Network): void; localAddress(): string; } }\n'
+        'declare module "wasi:sockets/tcp@0.2.3" { export class TcpSocket { private constructor(); startConnect(network: import("wasi:sockets/instance-network@0.2.3").Network): void; localAddress(): string; } }\n',
     );
     const dependency = path.join(root, 'node_modules/pumpkin-api/dist');
     fs.mkdirSync(dependency, { recursive: true });
     fs.writeFileSync(
         path.join(dependency, 'index.ts'),
-        'import type { Context } from "../../../build/types/bindings/interfaces/pumpkin-plugin-context"; import { sendIpcMessage as sendIpc } from "../../../build/types/bindings/interfaces/pumpkin-plugin-ipc"; export function installEvents(ctx: Context) { ctx.registerEvent(1, "tick", "normal", true); sendIpc("PumpkinPIE", new Uint8Array()); }\n'
+        'import type { Context } from "../../../build/types/bindings/interfaces/pumpkin-plugin-context"; import { sendIpcMessage as sendIpc } from "../../../build/types/bindings/interfaces/pumpkin-plugin-ipc"; export function installEvents(ctx: Context) { ctx.registerEvent(1, "tick", "normal", true); sendIpc("PumpkinPIE", new Uint8Array()); }\n',
     );
     fs.writeFileSync(
         path.join(root, 'entry.ts'),
-        'import { Command } from "./build/types/bindings/interfaces/pumpkin-plugin-command"; import { JavaPlayer, Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; import { TextComponent } from "./build/types/bindings/interfaces/pumpkin-plugin-text"; import { World } from "./build/types/bindings/interfaces/pumpkin-plugin-world"; import { installEvents } from "./node_modules/pumpkin-api/dist/index"; import { instanceNetwork } from "wasi:sockets/instance-network@0.2.3"; import { TcpSocket } from "wasi:sockets/tcp@0.2.3";\ndeclare const player: Player; declare const world: World; declare const java: JavaPlayer; declare const socket: TcpSocket;\nnew Command(["say"], "Send a message"); player.getPosition(); player.asJava(); world.getName(); java.sendCustomPayload("x", new Uint8Array()); TextComponent.fromJson("{}").encode(); installEvents({} as never); instanceNetwork(); socket.startConnect(instanceNetwork());\nclass Local { getPosition() {} } new Local().getPosition();\n'
+        'import { Command } from "./build/types/bindings/interfaces/pumpkin-plugin-command"; import { JavaPlayer, Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; import { TextComponent } from "./build/types/bindings/interfaces/pumpkin-plugin-text"; import { World } from "./build/types/bindings/interfaces/pumpkin-plugin-world"; import { installEvents } from "./node_modules/pumpkin-api/dist/index"; import { instanceNetwork } from "wasi:sockets/instance-network@0.2.3"; import { TcpSocket } from "wasi:sockets/tcp@0.2.3";\ndeclare const player: Player; declare const world: World; declare const java: JavaPlayer; declare const socket: TcpSocket;\nnew Command(["say"], "Send a message"); player.getPosition(); player.asJava(); world.getName(); java.sendCustomPayload("x", new Uint8Array()); TextComponent.fromJson("{}").encode(); installEvents({} as never); instanceNetwork(); socket.startConnect(instanceNetwork());\nclass Local { getPosition() {} } new Local().getPosition();\n',
     );
     return path.join(root, 'entry.ts');
 }
@@ -80,19 +80,19 @@ function isolatedWasiFixture() {
                 module: 'ESNext',
                 moduleResolution: 'Bundler',
                 strict: true,
-                types: []
+                types: [],
             },
-            include: ['entry.ts']
-        })
+            include: ['entry.ts'],
+        }),
     );
     fs.writeFileSync(
         path.join(generatedTypes, 'wasi-sockets-tcp.d.ts'),
-        'declare module "wasi:sockets/tcp@0.2.3" { export class TcpSocket { constructor(); startConnect(): void; } }\n'
+        'declare module "wasi:sockets/tcp@0.2.3" { export class TcpSocket { constructor(); startConnect(): void; } }\n',
     );
     const entry = path.join(root, 'entry.ts');
     fs.writeFileSync(
         entry,
-        'import { TcpSocket } from "wasi:sockets/tcp@0.2.3"; const socket = new TcpSocket(); socket.startConnect();\n'
+        'import { TcpSocket } from "wasi:sockets/tcp@0.2.3"; const socket = new TcpSocket(); socket.startConnect();\n',
     );
     return { entry, generatedTypes };
 }
@@ -108,7 +108,7 @@ function pluginKitFixture(): { entry: string; generatedTypes: string } {
     fs.symlinkSync(
         path.resolve(pluginKitRoot, '../docs'),
         docsPackage,
-        process.platform === 'win32' ? 'junction' : 'dir'
+        process.platform === 'win32' ? 'junction' : 'dir',
     );
     fs.writeFileSync(
         path.join(root, 'tsconfig.json'),
@@ -118,10 +118,10 @@ function pluginKitFixture(): { entry: string; generatedTypes: string } {
                 module: 'ESNext',
                 moduleResolution: 'Bundler',
                 strict: true,
-                types: []
+                types: [],
             },
-            include: ['src/register-commands.ts']
-        })
+            include: ['src/register-commands.ts'],
+        }),
     );
     const generatedTypes = path.join(root, 'types');
     const interfaces = path.join(generatedTypes, 'interfaces');
@@ -159,7 +159,7 @@ function pluginKitFixture(): { entry: string; generatedTypes: string } {
             export function scheduleDelayedTask(handlerId: number, delayTicks: bigint): number;
             export function scheduleRepeatingTask(handlerId: number, delayTicks: bigint, periodTicks: bigint): number;
             export function cancelTask(taskId: number): void;
-        }`
+        }`,
     };
     for (const [fileName, source] of Object.entries(declarations)) {
         fs.writeFileSync(path.join(interfaces, fileName), `${source}\n`);
@@ -186,13 +186,13 @@ class Plugin {
 class RuntimePlugin extends Plugin {
     subscribe(context: Context): void { this.registerEvent(context, 'tick', () => {}); }
 }
-`
+`,
         );
 
         expect(findUsedWitMethods(entry)).toEqual({
             pumpkinMethods: [],
             wasiMethods: [],
-            eventTypes: ['tick']
+            eventTypes: ['tick'],
         });
     }, 60_000);
 
@@ -211,7 +211,7 @@ class Plugin {
 class RuntimePlugin extends Plugin {
     subscribe(context: Context): void { this.registerEvent(context, 'tick', () => {}); }
 }
-`
+`,
         );
 
         expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
@@ -232,7 +232,7 @@ class Plugin {
 class RuntimePlugin extends Plugin {
     subscribe(context: Context): void { this.registerEvent(context, 'tick', () => {}); }
 }
-`
+`,
         );
 
         expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
@@ -249,7 +249,7 @@ class RuntimePlugin extends Plugin {
     subscribeAll(context: Context, eventType: EventType): void { this.registerEvent(context, eventType, () => {}); }
     subscribeUnknown(context: Context, eventType: string): void { this.registerEvent(context, eventType, () => {}); }
 }
-`
+`,
         );
 
         expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
@@ -270,7 +270,7 @@ class RuntimePlugin extends Plugin {
         context[method](1, eventType, 'normal', true);
     }
 }
-`
+`,
         );
 
         expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
@@ -288,7 +288,7 @@ class RuntimePlugin extends Plugin {
             'player.player.get-position',
             'text.text-component.encode',
             'text.text-component.from-json',
-            'world.world.get-name'
+            'world.world.get-name',
         ]);
     }, 30_000);
 
@@ -296,12 +296,12 @@ class RuntimePlugin extends Plugin {
         'player["getPosition"]();',
         'const read = player.getPosition.bind(player); read();',
         'const read = player.getPosition; read.call(player);',
-        'const { getPosition: read } = player; read.call(player);'
+        'const { getPosition: read } = player; read.call(player);',
     ])('includes resource methods referenced through %s', (usage) => {
         const entry = fixture();
         fs.writeFileSync(
             entry,
-            `import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; ${usage}`
+            `import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; ${usage}`,
         );
         expect(findUsedPumpkinWitMethods(entry)).toContain('player.player.get-position');
     });
@@ -310,12 +310,12 @@ class RuntimePlugin extends Plugin {
         const entry = fixture();
         fs.writeFileSync(
             entry,
-            'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; declare const key: keyof Player; player[key]();'
+            'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; declare const key: keyof Player; player[key]();',
         );
         expect(findUsedPumpkinWitMethods(entry)).toEqual([
             'player.player.as-java',
             'player.player.get-position',
-            'player.player.get-world'
+            'player.player.get-world',
         ]);
     });
 
@@ -323,14 +323,14 @@ class RuntimePlugin extends Plugin {
         const entry = fixture();
         fs.writeFileSync(
             entry,
-            'import * as commands from "./build/types/bindings/interfaces/pumpkin-plugin-command"; new commands.Command(["say"], "Send");'
+            'import * as commands from "./build/types/bindings/interfaces/pumpkin-plugin-command"; new commands.Command(["say"], "Send");',
         );
         expect(findUsedPumpkinWitMethods(entry)).toContain('command.command.constructor');
     });
 
     it.each([
         'import { Command } from "./build/types/bindings/interfaces/pumpkin-plugin-command"; const Create = Command; new Create(["say"], "Send");',
-        'import * as commands from "./build/types/bindings/interfaces/pumpkin-plugin-command"; const Create = commands.Command; new Create(["say"], "Send");'
+        'import * as commands from "./build/types/bindings/interfaces/pumpkin-plugin-command"; const Create = commands.Command; new Create(["say"], "Send");',
     ])('retains constructors referenced through local aliases: %s', (usage) => {
         const entry = fixture();
         fs.writeFileSync(entry, usage);
@@ -351,23 +351,23 @@ class RuntimePlugin extends Plugin {
         fs.mkdirSync(dependency, { recursive: true });
         fs.writeFileSync(
             path.join(dependency, 'index.js'),
-            'export function clone(values) { for (const value of values) { if (value.buffer) new value.constructor(value); } } export function create(registry, name) { const Constructor = registry[name]; return new Constructor(); }\n'
+            'export function clone(values) { for (const value of values) { if (value.buffer) new value.constructor(value); } } export function create(registry, name) { const Constructor = registry[name]; return new Constructor(); }\n',
         );
         fs.writeFileSync(
             entry,
-            'import { clone, create } from "./node_modules/generic-library/index.js"; import { Command } from "./build/types/bindings/interfaces/pumpkin-plugin-command"; clone([]); create({}, "codec"); create({ Command }, "Command");'
+            'import { clone, create } from "./node_modules/generic-library/index.js"; import { Command } from "./build/types/bindings/interfaces/pumpkin-plugin-command"; clone([]); create({}, "codec"); create({ Command }, "Command");',
         );
 
         expect(findUsedWitMethods(entry)).toEqual({
             pumpkinMethods: ['command.command.constructor'],
             wasiMethods: [],
-            eventTypes: []
+            eventTypes: [],
         });
     });
 
     it.each([
         'export function invoke(value, key) { return value[key](); }',
-        'export function invoke(value, key) { const method = value[key]; return method(); }'
+        'export function invoke(value, key) { const method = value[key]; return method(); }',
     ])('falls back when a runtime dependency dynamically invokes an unknown member: %s', (implementation) => {
         const entry = fixture();
         const dependency = path.join(path.dirname(entry), 'node_modules/generic-library');
@@ -375,7 +375,7 @@ class RuntimePlugin extends Plugin {
         fs.writeFileSync(path.join(dependency, 'index.js'), `${implementation}\n`);
         fs.writeFileSync(
             entry,
-            'import { invoke } from "./node_modules/generic-library/index.js"; declare const resource: any; invoke(resource, "unknown");'
+            'import { invoke } from "./node_modules/generic-library/index.js"; declare const resource: any; invoke(resource, "unknown");',
         );
 
         expect(findUsedWitMethods(entry)).toBeUndefined();
@@ -386,7 +386,7 @@ class RuntimePlugin extends Plugin {
         const excludedEntry = path.join(path.dirname(entry), 'excluded.ts');
         fs.writeFileSync(
             excludedEntry,
-            'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; player.getWorld();'
+            'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; player.getWorld();',
         );
         expect(findUsedPumpkinWitMethods(excludedEntry)).toContain('player.player.get-world');
     });
@@ -395,7 +395,7 @@ class RuntimePlugin extends Plugin {
         const entry = fixture();
         fs.writeFileSync(
             path.join(path.dirname(entry), 'helper.js'),
-            'import { sendIpcMessage } from "./build/types/bindings/interfaces/pumpkin-plugin-ipc"; export function send() { sendIpcMessage("plugin", new Uint8Array()); }'
+            'import { sendIpcMessage } from "./build/types/bindings/interfaces/pumpkin-plugin-ipc"; export function send() { sendIpcMessage("plugin", new Uint8Array()); }',
         );
         fs.writeFileSync(entry, 'import { send } from "./helper.js"; send();');
         expect(findUsedPumpkinWitMethods(entry)).toContain('ipc.send-ipc-message');
@@ -406,7 +406,7 @@ class RuntimePlugin extends Plugin {
         fs.writeFileSync(path.join(path.dirname(entry), 'helper.d.ts'), 'export function send(): void;');
         fs.writeFileSync(
             path.join(path.dirname(entry), 'helper.js'),
-            'import { sendIpcMessage } from "./build/types/bindings/interfaces/pumpkin-plugin-ipc"; export function send() { sendIpcMessage("plugin", new Uint8Array()); }'
+            'import { sendIpcMessage } from "./build/types/bindings/interfaces/pumpkin-plugin-ipc"; export function send() { sendIpcMessage("plugin", new Uint8Array()); }',
         );
         fs.writeFileSync(entry, 'import { send } from "./helper.js"; send();');
         expect(findUsedWitMethods(entry)?.pumpkinMethods).toContain('ipc.send-ipc-message');
@@ -416,11 +416,11 @@ class RuntimePlugin extends Plugin {
         const entry = fixture();
         fs.writeFileSync(
             path.join(path.dirname(entry), 'helper.js'),
-            'export function read(player) { return player.getPosition(); }'
+            'export function read(player) { return player.getPosition(); }',
         );
         fs.writeFileSync(
             entry,
-            'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; import { read } from "./helper.js"; declare const player: Player; read(player);'
+            'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; import { read } from "./helper.js"; declare const player: Player; read(player);',
         );
         expect(findUsedPumpkinWitMethods(entry)).toEqual(['player.player.get-position']);
     });
@@ -435,7 +435,7 @@ class RuntimePlugin extends Plugin {
         const entry = fixture();
         fs.writeFileSync(
             entry,
-            'import * as commands from "./build/types/bindings/interfaces/pumpkin-plugin-command"; new commands["Command"](["say"], "Send");'
+            'import * as commands from "./build/types/bindings/interfaces/pumpkin-plugin-command"; new commands["Command"](["say"], "Send");',
         );
         expect(findUsedPumpkinWitMethods(entry)).toContain('command.command.constructor');
     });
@@ -446,7 +446,7 @@ class RuntimePlugin extends Plugin {
         fs.mkdirSync(path.dirname(testEntry));
         fs.writeFileSync(
             testEntry,
-            'import type { Player } from "../build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; player.getPosition();'
+            'import type { Player } from "../build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; player.getPosition();',
         );
         expect(findUsedPumpkinWitMethods(testEntry)).toContain('player.player.get-position');
     });
@@ -455,7 +455,7 @@ class RuntimePlugin extends Plugin {
         const entry = fixture();
         fs.writeFileSync(
             entry,
-            'import { Command } from "pumpkin:plugin/command@0.1.0"; new Command(["say"], "Send");'
+            'import { Command } from "pumpkin:plugin/command@0.1.0"; new Command(["say"], "Send");',
         );
         expect(findUsedWitMethods(entry)).toBeUndefined();
     });
@@ -470,11 +470,11 @@ class RuntimePlugin extends Plugin {
         const entry = fixture();
         fs.writeFileSync(
             path.join(path.dirname(entry), 'build/types/bindings/interfaces/host-modules.d.ts'),
-            'declare module "pumpkin:plugin/*";'
+            'declare module "pumpkin:plugin/*";',
         );
         fs.writeFileSync(
             entry,
-            'import { Command } from "pumpkin:plugin/command@0.1.0"; new Command(["say"], "Send");'
+            'import { Command } from "pumpkin:plugin/command@0.1.0"; new Command(["say"], "Send");',
         );
         expect(findUsedWitMethods(entry)).toBeUndefined();
     });
@@ -483,7 +483,7 @@ class RuntimePlugin extends Plugin {
         const entry = fixture();
         fs.writeFileSync(
             entry,
-            'import type { Command } from "pumpkin:plugin/command@0.1.0"; type PluginCommand = Command;'
+            'import type { Command } from "pumpkin:plugin/command@0.1.0"; type PluginCommand = Command;',
         );
         expect(findUsedWitMethods(entry)).toEqual({ pumpkinMethods: [], wasiMethods: [], eventTypes: [] });
     });
@@ -513,7 +513,7 @@ describe('findUsedWasiWitMethods', () => {
 
         expect(methods).toEqual([
             'wasi:sockets/instance-network@0.2.3#instance-network',
-            'wasi:sockets/tcp@0.2.3#tcp-socket.start-connect'
+            'wasi:sockets/tcp@0.2.3#tcp-socket.start-connect',
         ]);
     });
 
@@ -522,7 +522,7 @@ describe('findUsedWasiWitMethods', () => {
 
         expect(findUsedWasiWitMethods(entry, generatedTypes)).toEqual([
             'wasi:sockets/tcp@0.2.3#tcp-socket.constructor',
-            'wasi:sockets/tcp@0.2.3#tcp-socket.start-connect'
+            'wasi:sockets/tcp@0.2.3#tcp-socket.start-connect',
         ]);
     });
 });

@@ -8,7 +8,7 @@ import {
     buildHermes,
     hermesBuildFingerprint,
     requiredHermesArtifacts,
-    withHermesBuildLock
+    withHermesBuildLock,
 } from './build.ts';
 import { type HermesFileSystem, type HermesProcessRunner, hermesFileSystem } from './system.ts';
 
@@ -34,7 +34,7 @@ it('fingerprints Hermes source modules deterministically and invalidates when on
 it('does not invalidate the Hermes build fingerprint when a colocated test source changes', () => {
     const { options, packageRoot } = fixture();
     const testSources = ['build.test.ts', 'build.spec.ts'].map((filename) =>
-        path.join(packageRoot, 'src/hermes', filename)
+        path.join(packageRoot, 'src/hermes', filename),
     );
     for (const testSource of testSources) fs.writeFileSync(testSource, 'export const testVersion = 1;\n');
 
@@ -65,7 +65,7 @@ it('builds missing archives, reuses a current cache, and rebuilds when settings 
     expect(cmakeCalls(calls)).toHaveLength(4);
     expect(fs.existsSync(path.join(options.cacheRoot, 'prepared-build-hades.json'))).toBe(true);
     expect(cmakeCalls(calls).find(({ args }) => args[0] === '-S' && args[3] === options.wasiBuild)?.args).toContain(
-        '-DHERMESVM_GCKIND=HADES'
+        '-DHERMESVM_GCKIND=HADES',
     );
 
     await buildHermes(options);
@@ -163,7 +163,7 @@ it('serializes separate cache roots that point at the same mutable Hermes direct
             await firstGate;
             operations.push('first:end');
         },
-        { resources: [options.source] }
+        { resources: [options.source] },
     );
     await firstEntered;
     const second = withHermesBuildLock(
@@ -171,7 +171,7 @@ it('serializes separate cache roots that point at the same mutable Hermes direct
         () => {
             operations.push('second');
         },
-        { resources: [options.source] }
+        { resources: [options.source] },
     );
     await new Promise<void>((resolve) => setImmediate(resolve));
     const operationsBeforeRelease = [...operations];
@@ -194,7 +194,7 @@ it('does not remove a replacement lock owned by another preparation', async () =
             fs.rmSync(lockPath);
             fs.writeFileSync(
                 lockPath,
-                `${JSON.stringify({ pid: process.pid, startedAt: Date.now(), token: 'replacement-owner' })}\n`
+                `${JSON.stringify({ pid: process.pid, startedAt: Date.now(), token: 'replacement-owner' })}\n`,
             );
         });
 
@@ -221,11 +221,11 @@ it('removes a partially written Hermes lock when the owner write fails', async (
                 throw Object.assign(new Error('fixture partial lock write'), { code: 'EIO' });
             }
             hermesFileSystem.writeFileSync(filename, data, writeOptions);
-        }
+        },
     };
 
     await expect(acquireHermesBuildLock(lockPath, { filesystem: failingFilesystem })).rejects.toThrow(
-        'fixture partial lock write'
+        'fixture partial lock write',
     );
 
     expect(injectedFailure).toBe(true);
@@ -261,11 +261,11 @@ it('preserves a replacement lock after a partial Hermes lock write fails', async
                 fs.writeFileSync(lockPath, replacementContents);
                 installedReplacement = true;
             }
-        }
+        },
     };
 
     await expect(acquireHermesBuildLock(lockPath, { filesystem: failingFilesystem })).rejects.toThrow(
-        'fixture partial lock write'
+        'fixture partial lock write',
     );
 
     expect(injectedFailure).toBe(true);
@@ -289,11 +289,11 @@ it('does not let concurrent stale-lock recovery delete a replacement lock', asyn
                     filesystem: raceFilesystem,
                     timeoutMs: 20,
                     wait: async (delayMs) => new Promise((resolve) => setTimeout(resolve, Math.min(delayMs, 1))),
-                    isProcessAlive: (pid) => pid === process.pid
+                    isProcessAlive: (pid) => pid === process.pid,
                 });
             }
             hermesFileSystem.rmSync(filename, removeOptions);
-        }
+        },
     };
 
     try {
@@ -301,7 +301,7 @@ it('does not let concurrent stale-lock recovery delete a replacement lock', asyn
             filesystem: raceFilesystem,
             timeoutMs: 20,
             wait: async (delayMs) => new Promise((resolve) => setTimeout(resolve, Math.min(delayMs, 1))),
-            isProcessAlive: (pid) => pid === process.pid
+            isProcessAlive: (pid) => pid === process.pid,
         });
         expect(nestedAcquisition).toBeDefined();
         await expect(nestedAcquisition).rejects.toThrow(`Timed out waiting for Hermes build lock: ${lockPath}`);
@@ -327,7 +327,7 @@ it('recovers a stale build lock when its recovery owner has exited', async () =>
     const ownerToken = await acquireHermesBuildLock(lockPath, {
         timeoutMs: 10,
         isProcessAlive: () => false,
-        wait: async (delayMs) => new Promise((resolve) => setTimeout(resolve, Math.min(delayMs, 1)))
+        wait: async (delayMs) => new Promise((resolve) => setTimeout(resolve, Math.min(delayMs, 1))),
     });
     const owner = JSON.parse(fs.readFileSync(lockPath, 'utf8')) as { token?: unknown };
 
@@ -350,8 +350,8 @@ it('keeps a live build recovery owner while waiting for a stale lock', async () 
         acquireHermesBuildLock(lockPath, {
             timeoutMs: 10,
             isProcessAlive: (pid) => pid === process.pid,
-            wait: async (delayMs) => new Promise((resolve) => setTimeout(resolve, Math.min(delayMs, 1)))
-        })
+            wait: async (delayMs) => new Promise((resolve) => setTimeout(resolve, Math.min(delayMs, 1))),
+        }),
     ).rejects.toThrow(`inspect recovery claim ${reclaimLockPath}`);
 
     expect(fs.readFileSync(lockPath, 'utf8')).toBe(staleLock);
@@ -373,7 +373,7 @@ it('builds and reuses Windows Hermes artifacts without probing MSVC as a GNU com
     expect(fs.existsSync(path.join(options.hostBuild, 'bin/shermes.exe'))).toBe(true);
     expect(fs.existsSync(path.join(options.hostBuild, 'bin/hermesc.exe'))).toBe(true);
     expect(outputCalls.some(({ command }) => command === 'cc' || command === 'c++' || command === 'cl.exe')).toBe(
-        false
+        false,
     );
 
     await buildHermes(options);
@@ -393,7 +393,7 @@ it('builds and reuses Windows Hermes artifacts without probing MSVC as a GNU com
     const fingerprintWithoutActiveMetadata = hermesBuildFingerprint(options);
     fs.writeFileSync(
         staleCompilerMetadata,
-        'set(CMAKE_C_COMPILER_ID "MSVC")\nset(CMAKE_C_COMPILER_VERSION "19.99.99999")\n'
+        'set(CMAKE_C_COMPILER_ID "MSVC")\nset(CMAKE_C_COMPILER_VERSION "19.99.99999")\n',
     );
     expect(hermesBuildFingerprint(options)).toBe(fingerprintWithoutActiveMetadata);
 
@@ -402,7 +402,7 @@ it('builds and reuses Windows Hermes artifacts without probing MSVC as a GNU com
     expect(hermesBuildFingerprint(options)).toBe(fingerprintBeforeCompilerUpdate);
     fs.writeFileSync(
         compilerMetadata,
-        'set(CMAKE_C_COMPILER_ID "MSVC")\nset(CMAKE_C_COMPILER_VERSION "19.45.35207")\n'
+        'set(CMAKE_C_COMPILER_ID "MSVC")\nset(CMAKE_C_COMPILER_VERSION "19.45.35207")\n',
     );
     expect(hermesBuildFingerprint(options)).not.toBe(fingerprintBeforeCompilerUpdate);
 
@@ -449,7 +449,7 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
         path.join(packageRoot, 'cmake'),
         path.dirname(patchFile),
         source,
-        path.join(wasiSdk, 'bin')
+        path.join(wasiSdk, 'bin'),
     ]) {
         fs.mkdirSync(directory, { recursive: true });
     }
@@ -479,7 +479,7 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
                 const compilerCache =
                     optionsPlatform === 'win32'
                         ? `${[`CMAKE_C_COMPILER:FILEPATH=${compiler}`, `CMAKE_CXX_COMPILER:FILEPATH=${compiler}`].join(
-                              '\n'
+                              '\n',
                           )}\n`
                         : '';
                 fs.writeFileSync(path.join(buildDirectory, 'CMakeCache.txt'), compilerCache);
@@ -488,14 +488,14 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
                     const compilerVersion = buildDirectory === hostBuild ? '19.44.35207' : '20.1.0';
                     for (const [cmakeDirectory, recordedVersion] of [
                         ['3.28.0', '19.99.99999'],
-                        ['4.4.4', compilerVersion]
+                        ['4.4.4', compilerVersion],
                     ]) {
                         const cmakeFiles = path.join(buildDirectory, 'CMakeFiles', cmakeDirectory);
                         fs.mkdirSync(cmakeFiles, { recursive: true });
                         for (const compilerFile of ['CMakeCCompiler.cmake', 'CMakeCXXCompiler.cmake']) {
                             fs.writeFileSync(
                                 path.join(cmakeFiles, compilerFile),
-                                `set(${compilerFile === 'CMakeCCompiler.cmake' ? 'CMAKE_C' : 'CMAKE_CXX'}_COMPILER_ID "${compilerId}")\nset(${compilerFile === 'CMakeCCompiler.cmake' ? 'CMAKE_C' : 'CMAKE_CXX'}_COMPILER_VERSION "${recordedVersion}")\n`
+                                `set(${compilerFile === 'CMakeCCompiler.cmake' ? 'CMAKE_C' : 'CMAKE_CXX'}_COMPILER_ID "${compilerId}")\nset(${compilerFile === 'CMakeCCompiler.cmake' ? 'CMAKE_C' : 'CMAKE_CXX'}_COMPILER_VERSION "${recordedVersion}")\n`,
                             );
                         }
                     }
@@ -528,7 +528,7 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
         },
         buffer() {
             return Buffer.alloc(0);
-        }
+        },
     };
 
     let optionsPlatform: NodeJS.Platform | undefined;
@@ -544,11 +544,11 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
         pin: {
             repository: 'https://github.com/facebook/hermes.git',
             branch: 'static_h',
-            commit: '820aa0d4b5fe5d3ed7900e1274211ef561081b3f'
+            commit: '820aa0d4b5fe5d3ed7900e1274211ef561081b3f',
         },
         patches: [{ name: '0001-fixture.patch', filename: patchFile, sequence: 1, affectedPaths: ['src/a.cpp'] }],
         environment: {},
-        process
+        process,
     };
     return {
         packageRoot,
@@ -558,7 +558,7 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
         setPlatform(platform) {
             optionsPlatform = platform;
             options.platform = platform;
-        }
+        },
     };
 }
 

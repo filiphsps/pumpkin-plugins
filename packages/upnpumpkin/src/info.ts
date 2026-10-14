@@ -15,11 +15,11 @@ export const info = {
         { name: 'network.udp.bind', reason: 'Receive the answers of routers to UPnP searches and NAT-PMP requests.' },
         {
             name: 'network.udp.outgoingdatagram',
-            reason: 'Search for routers (UPnP) and talk to them (NAT-PMP).'
+            reason: 'Search for routers (UPnP) and talk to them (NAT-PMP).',
         },
-        { name: 'network.tcp.connect', reason: "Send UPnP commands to the router's control URL." }
+        { name: 'network.tcp.connect', reason: "Send UPnP commands to the router's control URL." },
     ],
     commands: commandInfos(commands),
     config: configInfo,
-    blocks: { routers: renderBlockedRouters(BLOCKED_ROUTERS) }
+    blocks: { routers: renderBlockedRouters(BLOCKED_ROUTERS) },
 } satisfies PluginInfo<typeof PLUGIN_NAME>;

@@ -4,7 +4,7 @@ import {
     normalizeWaypointName,
     type Waypoint,
     type WaypointMetadataKey,
-    waypointNameKey
+    waypointNameKey,
 } from './model.ts';
 import type { WaypointStore } from './store.ts';
 
@@ -25,7 +25,7 @@ export type WaypointMetadataPatch = Partial<Pick<Waypoint, WaypointMetadataKey>>
 export class WaypointCatalog {
     constructor(
         private readonly store: WaypointStore,
-        private readonly onChange?: (waypointId: string) => void
+        private readonly onChange?: (waypointId: string) => void,
     ) {}
 
     /** Whether the canonical waypoint store can be read and written. */

@@ -7,7 +7,7 @@ it('finds both marker syntaxes with source offsets and strips only generated con
     const blocks = generatedBlocks(source);
     expect(blocks.map(({ name, markers }) => ({ name, markers }))).toEqual([
         { name: 'one', markers: 'docs' },
-        { name: 'inputs', markers: 'action' }
+        { name: 'inputs', markers: 'action' },
     ]);
     expect(blocks[0].start).toBe(6);
     expect(blocks[0].end).toBe(55);

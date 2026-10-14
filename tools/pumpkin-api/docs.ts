@@ -14,8 +14,8 @@ interface CompatibilityDefinition {
         types: number;
         operations: number;
     };
-    runtimeExports: unknown[];
     publicTypes: unknown[];
+    runtimeExports: unknown[];
 }
 
 const compatibilityDirectory = new URL('./compatibility/', import.meta.url);
@@ -40,14 +40,14 @@ const compatibilityRows = compatibilityFiles.map((file) => {
         `${definition.publicTypes.length} public TypeScript types`,
         `${definition.inventory.interfaces} WIT interfaces`,
         `${definition.inventory.types} WIT types`,
-        `${definition.inventory.operations} operations`
+        `${definition.inventory.operations} operations`,
     ].join('; ');
 
     return [
         `${code(definition.baseline.package)} ${code(`v${definition.baseline.version}`)}`,
         pumpkinReleases.map(code).join(', '),
         surface,
-        `[Item-level decisions](../compatibility/${file})`
+        `[Item-level decisions](../compatibility/${file})`,
     ];
 });
 
@@ -58,9 +58,9 @@ export const documents = [
         blocks: {
             'compatibility-matrix': table(
                 ['Source baseline', 'Pumpkin release', 'Audited API surface', 'Details'],
-                compatibilityRows
-            )
+                compatibilityRows,
+            ),
         },
-        note: '<!-- Generated from compatibility/*.json. Run `pnpm readme`. -->'
-    }
+        note: '<!-- Generated from compatibility/*.json. Run `pnpm readme`. -->',
+    },
 ] satisfies DocumentSpec[];

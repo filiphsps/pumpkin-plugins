@@ -12,7 +12,7 @@ import {
     type RenderOptions,
     section,
     str,
-    tomlString
+    tomlString,
 } from '@pumpkin-plugins/config';
 import { PLUGIN_NAME } from './name.ts';
 import type { SortRule } from './sorting.ts';
@@ -23,17 +23,17 @@ export const CONFIG_FILE = 'config.toml';
 
 /** Shared notice shown in the file and generated README. */
 export const CONFIG_RENDER_OPTIONS: RenderOptions = {
-    note: `${MANAGED_NOTE} Changes apply after \`/tabdisplay reload\` or a server restart.`
+    note: `${MANAGED_NOTE} Changes apply after \`/tabdisplay reload\` or a server restart.`,
 };
 
 /** A line template and its allowlisted text styling. */
 export interface TemplateLineConfig {
-    readonly text: string;
-    readonly color?: string;
     readonly bold?: boolean;
+    readonly color?: string;
     readonly italic?: boolean;
-    readonly underlined?: boolean;
     readonly strikethrough?: boolean;
+    readonly text: string;
+    readonly underlined?: boolean;
 }
 
 /** One configured sorting key. */
@@ -54,15 +54,15 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
                 description: 'Ticks between full display refreshes.',
                 default: 20,
                 min: 1,
-                max: 1200
+                max: 1200,
             }),
             max_players: int({
                 description: 'Maximum player snapshots processed per refresh.',
                 default: 500,
                 min: 1,
-                max: 5000
-            })
-        }
+                max: 5000,
+            }),
+        },
     }),
     placeholders: section({
         description: 'PumpkinPIE placeholder handling.',
@@ -71,25 +71,25 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
             missing_provider: str({
                 description:
                     'Text to show when PumpkinPIE is unavailable: `literal` keeps tokens, `empty` removes them.',
-                default: 'literal'
+                default: 'literal',
             }),
             unresolved: str({
                 description: 'Text to show for unresolved identifiers: `literal` keeps tokens, `empty` removes them.',
-                default: 'literal'
-            })
-        }
+                default: 'literal',
+            }),
+        },
     }),
     header: section({
         description: 'Personalized header lines. Each player sees their own placeholder context.',
         fields: {
-            lines: templateLinesField('Header lines in display order.', defaultHeader)
-        }
+            lines: templateLinesField('Header lines in display order.', defaultHeader),
+        },
     }),
     footer: section({
         description: 'Personalized footer lines. Each player sees their own placeholder context.',
         fields: {
-            lines: templateLinesField('Footer lines in display order.', defaultFooter)
-        }
+            lines: templateLinesField('Footer lines in display order.', defaultFooter),
+        },
     }),
     entry: section({
         description: 'Global real-player row formatting. Placeholder context is the listed subject.',
@@ -100,29 +100,29 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
             bold: bool({ description: 'Render the row name in bold.', default: false }),
             italic: bool({ description: 'Render the row name in italics.', default: false }),
             underlined: bool({ description: 'Underline the row name.', default: false }),
-            strikethrough: bool({ description: 'Strike through the row name.', default: false })
-        }
+            strikethrough: bool({ description: 'Strike through the row name.', default: false }),
+        },
     }),
     sorting: section({
         description: 'Global Java player-list ordering. Rules stay disabled until native client order is verified.',
-        fields: { rules: sortRulesField(defaultRules) }
+        fields: { rules: sortRulesField(defaultRules) },
     }),
     objective: section({
         description: 'Java player-list numeric objective. It is not enabled until client behavior is verified.',
         fields: {
             enabled: bool({ description: 'Show a numeric objective in the Java player list.', default: false }),
-            value: str({ description: 'Value source reserved for the verified objective adapter.', default: 'ping' })
-        }
+            value: str({ description: 'Value source reserved for the verified objective adapter.', default: 'ping' }),
+        },
     }),
     bedrock: section({
         description: 'Native Bedrock features.',
         fields: {
             objective_enabled: bool({
                 description: 'Show a numeric objective in the native Bedrock player list.',
-                default: false
-            })
-        }
-    })
+                default: false,
+            }),
+        },
+    }),
 });
 
 /** The validated shape returned by the config package. */
@@ -214,7 +214,7 @@ export function validateConfig(value: unknown): ConfigValidation {
             add(
                 issues,
                 'bedrock.objective_enabled',
-                'unsupported: the native Bedrock player-list objective is not verified'
+                'unsupported: the native Bedrock player-list objective is not verified',
             );
     }
 
@@ -224,7 +224,7 @@ export function validateConfig(value: unknown): ConfigValidation {
 
 function templateLinesField(
     description: string,
-    defaults: readonly TemplateLineConfig[]
+    defaults: readonly TemplateLineConfig[],
 ): Field<readonly TemplateLineConfig[]> {
     const format = (lines: readonly TemplateLineConfig[]) =>
         formatInlineTableArray(lines.map((line) => lineFields(line)));
@@ -238,7 +238,7 @@ function templateLinesField(
             if (!Array.isArray(raw) || !raw.every(isTemplateLine)) return { ok: false };
             return { ok: true, value: raw.map(copyTemplateLine) };
         },
-        format
+        format,
     };
 }
 
@@ -256,7 +256,7 @@ function sortRulesField(defaults: readonly ConfigSortRule[]): Field<readonly Con
             Array.isArray(raw) && raw.every(isSortRule)
                 ? { ok: true, value: raw.map((rule) => ({ ...rule })) }
                 : { ok: false },
-        format
+        format,
     };
 }
 
@@ -266,7 +266,7 @@ function formatInlineTableArray(values: readonly Record<string, unknown>[]): str
             (value) =>
                 `{ ${Object.entries(value)
                     .map(([key, item]) => `${key} = ${formatTomlValue(item)}`)
-                    .join(', ')} }`
+                    .join(', ')} }`,
         )
         .join(', ')}]`;
 }
@@ -284,7 +284,7 @@ function lineFields(line: TemplateLineConfig): Record<string, unknown> {
         ...(line.bold === undefined ? {} : { bold: line.bold }),
         ...(line.italic === undefined ? {} : { italic: line.italic }),
         ...(line.underlined === undefined ? {} : { underlined: line.underlined }),
-        ...(line.strikethrough === undefined ? {} : { strikethrough: line.strikethrough })
+        ...(line.strikethrough === undefined ? {} : { strikethrough: line.strikethrough }),
     };
 }
 
@@ -292,7 +292,7 @@ function isTemplateLine(value: unknown): value is TemplateLineConfig {
     if (!isRecord(value) || typeof value.text !== 'string') return false;
     if (
         Object.keys(value).some(
-            (key) => !['text', 'color', 'bold', 'italic', 'underlined', 'strikethrough'].includes(key)
+            (key) => !['text', 'color', 'bold', 'italic', 'underlined', 'strikethrough'].includes(key),
         )
     )
         return false;

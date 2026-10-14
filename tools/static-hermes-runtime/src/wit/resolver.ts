@@ -5,7 +5,7 @@ import type {
     WitToolsPackage,
     WitToolsTypeDefinition,
     WitToolsTypeReference,
-    WitToolsWorld
+    WitToolsWorld,
 } from './model.ts';
 import type { InterfaceDeclarationOrder } from './parser.ts';
 import type {
@@ -19,23 +19,23 @@ import type {
     WitResource,
     WitTypeAlias,
     WitVariant,
-    WitWasiInterface
+    WitWasiInterface,
 } from './types.ts';
 
 /** A resolved package with its worlds and an index of interfaces by name. */
 export interface ResolvedWitPackage extends WitApiPackage {
-    /** Resolved worlds declared by this package. */
-    worlds: WitToolsWorld[];
     /** Lookup of the package's interfaces by short name. */
     interfacesByName: Map<string, WitApiInterface>;
+    /** Resolved worlds declared by this package. */
+    worlds: WitToolsWorld[];
 }
 
 /** Normalized WIT package graph together with the wasm-tools source document. */
 export interface ResolvedWitDocument {
-    /** Resolved packages with their declared worlds and interface lookup maps. */
-    packages: ResolvedWitPackage[];
     /** Resolved interfaces in wasm-tools document order. */
     interfaces: WitApiInterface[];
+    /** Resolved packages with their declared worlds and interface lookup maps. */
+    packages: ResolvedWitPackage[];
     /** Original wasm-tools document retained for table-index lookups. */
     raw: WitToolsDocument;
 }
@@ -46,11 +46,11 @@ interface PackageIdentity {
 }
 
 interface ResolutionContext {
+    declarationOrder: ReadonlyMap<string, InterfaceDeclarationOrder>;
     document: WitToolsDocument;
     interfaces: WitToolsInterface[];
-    packageNames: PackageIdentity[];
-    declarationOrder: ReadonlyMap<string, InterfaceDeclarationOrder>;
     interfaceTypes: Map<number, Map<string, number>>;
+    packageNames: PackageIdentity[];
     typeNames: Map<number, string>;
 }
 
@@ -63,7 +63,7 @@ interface ResolutionContext {
  */
 export function resolveWitDocument(
     document: WitToolsDocument,
-    declarationOrder: ReadonlyMap<string, InterfaceDeclarationOrder> = new Map()
+    declarationOrder: ReadonlyMap<string, InterfaceDeclarationOrder> = new Map(),
 ): ResolvedWitDocument {
     const packageNames = document.packages.map(parsePackageIdentity);
     const context: ResolutionContext = {
@@ -72,9 +72,9 @@ export function resolveWitDocument(
         packageNames,
         declarationOrder,
         interfaceTypes: new Map(
-            document.interfaces.map((entry, index) => [index, new Map(Object.entries(entry.types))])
+            document.interfaces.map((entry, index) => [index, new Map(Object.entries(entry.types))]),
         ),
-        typeNames: new Map()
+        typeNames: new Map(),
     };
     for (const [interfaceIndex, iface] of document.interfaces.entries()) {
         for (const [name, typeIndex] of Object.entries(iface.types)) {
@@ -88,15 +88,15 @@ export function resolveWitDocument(
     }
 
     const resolvedInterfaces = document.interfaces.map((iface, index) =>
-        resolveInterface(context, iface, index, declarationOrder)
+        resolveInterface(context, iface, index, declarationOrder),
     );
     const packages = document.packages.map((entry, packageIndex): ResolvedWitPackage => {
         const identity = requireValue(packageNames[packageIndex], `package identity ${packageIndex}`);
         const packageInterfaces = Object.entries(entry.interfaces).map(([, interfaceIndex]) =>
-            requireValue(resolvedInterfaces[interfaceIndex], `interface ${interfaceIndex}`)
+            requireValue(resolvedInterfaces[interfaceIndex], `interface ${interfaceIndex}`),
         );
         const worlds = Object.entries(entry.worlds).map(([, worldIndex]) =>
-            requireValue(document.worlds[worldIndex], `world ${worldIndex}`)
+            requireValue(document.worlds[worldIndex], `world ${worldIndex}`),
         );
         const interfacesByName = new Map(packageInterfaces.map((iface) => [iface.name, iface]));
         return {
@@ -104,7 +104,7 @@ export function resolveWitDocument(
             version: identity.version,
             interfaces: packageInterfaces,
             worlds,
-            interfacesByName
+            interfacesByName,
         };
     });
 
@@ -139,8 +139,8 @@ export function resolvePluginApi(resolved: ResolvedWitDocument, importOrder?: re
               .filter(
                   (interfaceIndex) =>
                       !resolved.packages[resolved.raw.interfaces[interfaceIndex]?.package]?.packageName.startsWith(
-                          'wasi:'
-                      )
+                          'wasi:',
+                      ),
               );
     const visited = new Set<number>();
     const ordered: WitApiInterface[] = [];
@@ -173,7 +173,7 @@ export function resolvePluginApi(resolved: ResolvedWitDocument, importOrder?: re
 export function resolveWasiImports(
     resolved: ResolvedWitDocument,
     requestedImports?: string[],
-    importOrder?: readonly string[]
+    importOrder?: readonly string[],
 ): { imports: string[]; interfaces: WitWasiInterface[] } {
     const plugin = resolved.raw.worlds.find(({ name }) => name === 'plugin');
     if (!plugin) throw new Error('Prepared WIT document has no plugin world');
@@ -231,7 +231,7 @@ export function resolveWasiImports(
  */
 export function selectWasiFeatures(
     wasi: { interfaces: WitWasiInterface[] },
-    usedMethods: readonly string[] = []
+    usedMethods: readonly string[] = [],
 ): string[] {
     const selected = new Set(usedMethods);
     const features = new Set<string>();
@@ -248,7 +248,7 @@ function resolveInterface(
     context: ResolutionContext,
     raw: WitToolsInterface,
     interfaceIndex: number,
-    declarationOrder: ReadonlyMap<string, InterfaceDeclarationOrder>
+    declarationOrder: ReadonlyMap<string, InterfaceDeclarationOrder>,
 ): WitApiInterface {
     const identity = requireValue(context.packageNames[raw.package], `package identity ${raw.package}`);
     const specifier = makeSpecifier(identity, raw.name);
@@ -270,7 +270,7 @@ function resolveInterface(
                 typeIndex,
                 dependencyAliases,
                 dependencies,
-                dependencyTypes
+                dependencyTypes,
             );
             continue;
         }
@@ -289,7 +289,7 @@ function resolveInterface(
                         target,
                         dependencyAliases,
                         dependencies,
-                        dependencyTypes
+                        dependencyTypes,
                     );
                 }
             }
@@ -313,9 +313,9 @@ function resolveInterface(
                     return {
                         name: field.name,
                         type: formatReference(context, field.type, interfaceIndex).replace(/^%/, ''),
-                        resolvedType: type
+                        resolvedType: type,
                     };
-                })
+                }),
             });
         } else if (typeof kind === 'object' && 'variant' in kind) {
             variants.push({
@@ -325,8 +325,8 @@ function resolveInterface(
                     type: variant.type === null ? '' : formatReference(context, variant.type, interfaceIndex),
                     ...(variant.type === null
                         ? {}
-                        : { resolvedType: resolveReference(context, variant.type, interfaceIndex, new Set()) })
-                }))
+                        : { resolvedType: resolveReference(context, variant.type, interfaceIndex, new Set()) }),
+                })),
             });
         } else if (typeof kind === 'object' && 'enum' in kind) {
             enums.push({ name: declaration.name, values: kind.enum.cases.map(({ name }) => name) });
@@ -340,8 +340,8 @@ function resolveInterface(
                     resolvedType: withAliasMetadata(
                         resolveReference(context, kind.type, interfaceIndex, new Set([declaration.index])),
                         raw.name,
-                        declaration.name
-                    )
+                        declaration.name,
+                    ),
                 });
             }
         } else if (
@@ -354,8 +354,8 @@ function resolveInterface(
                 resolvedType: withAliasMetadata(
                     resolveReference(context, declaration.index, interfaceIndex, new Set()),
                     raw.name,
-                    declaration.name
-                )
+                    declaration.name,
+                ),
             });
         } else {
             throw new Error(`Unsupported resolved WIT type for ${specifier}.${declaration.name}`);
@@ -368,7 +368,7 @@ function resolveInterface(
         return items.sort(
             (left, right) =>
                 (indexes.get(left.name) ?? Number.MAX_SAFE_INTEGER) -
-                (indexes.get(right.name) ?? Number.MAX_SAFE_INTEGER)
+                (indexes.get(right.name) ?? Number.MAX_SAFE_INTEGER),
         );
     };
     const interfaceValue: WitApiInterface = {
@@ -384,7 +384,7 @@ function resolveInterface(
         flags: sortByDeclaration(flags, order?.flags),
         types: sortByDeclaration(types, order?.types),
         dependencies,
-        dependencyAliases
+        dependencyAliases,
     };
     const resourceByIndex = new Map<number, WitResource>();
     for (const resource of resources) {
@@ -406,7 +406,7 @@ function resolveInterface(
             operation,
             interfaceIndex,
             kind === 'method',
-            kind === 'constructor'
+            kind === 'constructor',
         );
         if (resource) {
             const prefix =
@@ -465,7 +465,7 @@ function resolveFunction(
     operation: WitToolsFunction,
     interfaceIndex: number,
     isMethod: boolean,
-    isConstructor: boolean
+    isConstructor: boolean,
 ): WitFunction {
     const parameters = isMethod ? operation.params.slice(1) : operation.params;
     return {
@@ -475,7 +475,7 @@ function resolveFunction(
         parameters: parameters.map(({ name, type }) => ({
             name,
             type: formatReference(context, type, interfaceIndex),
-            resolvedType: resolveReference(context, type, interfaceIndex, new Set())
+            resolvedType: resolveReference(context, type, interfaceIndex, new Set()),
         })),
         result:
             isConstructor || operation.result === null
@@ -484,7 +484,7 @@ function resolveFunction(
         resolvedResult:
             isConstructor || operation.result === null
                 ? { kind: 'unit' }
-                : resolveReference(context, operation.result, interfaceIndex, new Set())
+                : resolveReference(context, operation.result, interfaceIndex, new Set()),
     };
 }
 
@@ -511,7 +511,7 @@ function addDependencyAlias(
     target: number,
     aliases: Record<string, WitDependencyAlias>,
     dependencies: string[],
-    dependencyTypes: Record<string, string[]>
+    dependencyTypes: Record<string, string[]>,
 ): void {
     const targetDefinition = requireValue(context.document.types[target], `type ${target}`);
     const owner = ownerInterface(targetDefinition);
@@ -520,7 +520,7 @@ function addDependencyAlias(
     if (!targetInterface) throw new Error(`WIT type ${target} has missing owner interface ${owner}`);
     const targetIdentity = requireValue(
         context.packageNames[targetInterface.package],
-        `package identity ${targetInterface.package}`
+        `package identity ${targetInterface.package}`,
     );
     const dependencySpecifier = makeSpecifier(targetIdentity, targetInterface.name);
     const targetName = context.document.types[target]?.name ?? context.typeNames.get(target) ?? alias;
@@ -528,7 +528,7 @@ function addDependencyAlias(
     const sourceInterface = requireValue(context.interfaces[interfaceIndex], `interface ${interfaceIndex}`);
     const sourceIdentity = requireValue(
         context.packageNames[sourceInterface.package],
-        `package identity ${sourceInterface.package}`
+        `package identity ${sourceInterface.package}`,
     );
     const dependency =
         sourceIdentity.name.startsWith('wasi:') || sourceIdentity.name !== targetIdentity.name
@@ -547,7 +547,7 @@ function resolveReference(
     context: ResolutionContext,
     reference: WitToolsTypeReference | null,
     interfaceIndex: number,
-    visiting: Set<number>
+    visiting: Set<number>,
 ): ResolvedWitType {
     if (reference === null) return { kind: 'unit' };
     if (typeof reference === 'string') return { kind: 'primitive', name: reference };
@@ -570,7 +570,7 @@ function resolveReference(
                   packageName: ownerIdentity.name,
                   interfaceSpecifier: makeSpecifier(ownerIdentity, ownerRaw.name),
                   interfaceDependencies: [] as string[],
-                  declaredInterface: ownerRaw.name
+                  declaredInterface: ownerRaw.name,
               }
             : undefined;
 
@@ -593,7 +593,7 @@ function resolveReference(
             return {
                 ...resolved,
                 declaredInterface: resolved.declaredInterface ?? metadata.declaredInterface,
-                aliasName
+                aliasName,
             };
         }
         return resolved;
@@ -610,9 +610,9 @@ function resolveReference(
                     context,
                     field.type,
                     ownerIndex ?? interfaceIndex,
-                    new Set(visiting).add(reference)
-                )
-            }))
+                    new Set(visiting).add(reference),
+                ),
+            })),
         };
     }
     if (typeof kind === 'object' && 'variant' in kind) {
@@ -630,10 +630,10 @@ function resolveReference(
                               context,
                               entry.type,
                               ownerIndex ?? interfaceIndex,
-                              new Set(visiting).add(reference)
-                          )
-                      })
-            }))
+                              new Set(visiting).add(reference),
+                          ),
+                      }),
+            })),
         };
     }
     if (typeof kind === 'object' && ('enum' in kind || 'flags' in kind)) {
@@ -653,31 +653,31 @@ function resolveReference(
     const containingInterface = requireValue(context.interfaces[interfaceIndex], `interface ${interfaceIndex}`);
     const containingPackage = requireValue(
         context.packageNames[containingInterface.package],
-        `package identity ${containingInterface.package}`
+        `package identity ${containingInterface.package}`,
     );
     const containerMetadata = metadata ?? {
         declaredInterface: containingInterface.name,
         packageName: containingPackage.name,
-        interfaceSpecifier: makeSpecifier(containingPackage, containingInterface.name)
+        interfaceSpecifier: makeSpecifier(containingPackage, containingInterface.name),
     };
     if (typeof kind === 'object' && 'list' in kind) {
         return retainResolvedTypeAlias(
             {
                 kind: 'list',
-                item: resolveReference(context, kind.list, interfaceIndex, new Set(visiting).add(reference))
+                item: resolveReference(context, kind.list, interfaceIndex, new Set(visiting).add(reference)),
             },
             containerMetadata,
-            localName
+            localName,
         );
     }
     if (typeof kind === 'object' && 'option' in kind) {
         return retainResolvedTypeAlias(
             {
                 kind: 'option',
-                item: resolveReference(context, kind.option, interfaceIndex, new Set(visiting).add(reference))
+                item: resolveReference(context, kind.option, interfaceIndex, new Set(visiting).add(reference)),
             },
             containerMetadata,
-            localName
+            localName,
         );
     }
     if (typeof kind === 'object' && 'result' in kind) {
@@ -685,10 +685,10 @@ function resolveReference(
             {
                 kind: 'result',
                 ok: resolveReference(context, kind.result.ok, interfaceIndex, new Set(visiting).add(reference)),
-                error: resolveReference(context, kind.result.err, interfaceIndex, new Set(visiting).add(reference))
+                error: resolveReference(context, kind.result.err, interfaceIndex, new Set(visiting).add(reference)),
             },
             containerMetadata,
-            localName
+            localName,
         );
     }
     if (typeof kind === 'object' && 'tuple' in kind) {
@@ -696,11 +696,11 @@ function resolveReference(
             {
                 kind: 'tuple',
                 items: kind.tuple.types.map((item) =>
-                    resolveReference(context, item, interfaceIndex, new Set(visiting).add(reference))
-                )
+                    resolveReference(context, item, interfaceIndex, new Set(visiting).add(reference)),
+                ),
             },
             containerMetadata,
-            localName
+            localName,
         );
     }
     return { kind: 'unsupported', source: localName ?? `type ${reference}` };
@@ -710,7 +710,7 @@ function resolveNamedType(
     context: ResolutionContext,
     iface: WitApiInterface,
     source: string,
-    visiting: Set<number>
+    visiting: Set<number>,
 ): ResolvedWitType {
     if (!source) return { kind: 'unit' };
     const interfaceIndex = context.interfaces.findIndex((entry) => {
@@ -730,14 +730,14 @@ function resolveNamedType(
         if (name === 'tuple')
             return {
                 kind: 'tuple',
-                items: splitTopLevel(content).map((item) => resolveNamedType(context, iface, item, visiting))
+                items: splitTopLevel(content).map((item) => resolveNamedType(context, iface, item, visiting)),
             };
         if (name === 'result') {
             const [ok = '_', error = '_'] = splitTopLevel(content);
             return {
                 kind: 'result',
                 ok: resolveNamedType(context, iface, ok, visiting),
-                error: resolveNamedType(context, iface, error, visiting)
+                error: resolveNamedType(context, iface, error, visiting),
             };
         }
         return { kind: 'unsupported', source };
@@ -750,7 +750,7 @@ function resolveNamedType(
 function formatReference(
     context: ResolutionContext,
     reference: WitToolsTypeReference | null,
-    interfaceIndex: number
+    interfaceIndex: number,
 ): string {
     if (reference === null) return '';
     if (typeof reference === 'string') return reference;
@@ -844,7 +844,7 @@ function withAliasMetadata(type: ResolvedWitType, declaredInterface: string, ali
 function retainResolvedTypeAlias(
     type: ResolvedWitType,
     metadata: { declaredInterface?: string; packageName?: string; interfaceSpecifier?: string } | undefined,
-    localName: string | null | undefined
+    localName: string | null | undefined,
 ): ResolvedWitType {
     if (type.kind === 'unit' || type.kind === 'unsupported') return type;
     return {
@@ -852,7 +852,7 @@ function retainResolvedTypeAlias(
         ...(metadata?.declaredInterface ? { declaredInterface: metadata.declaredInterface } : {}),
         ...(localName ? { aliasName: localName } : {}),
         ...(metadata?.packageName ? { packageName: metadata.packageName } : {}),
-        ...(metadata?.interfaceSpecifier ? { interfaceSpecifier: metadata.interfaceSpecifier } : {})
+        ...(metadata?.interfaceSpecifier ? { interfaceSpecifier: metadata.interfaceSpecifier } : {}),
     };
 }
 
@@ -864,12 +864,12 @@ function ownerInterface(definition: WitToolsTypeDefinition): number | undefined 
 function findDependencyInterface(
     resolved: ResolvedWitDocument,
     source: WitApiInterface,
-    dependency: string
+    dependency: string,
 ): WitApiInterface | undefined {
     return resolved.interfaces.find(
         (candidate) =>
             candidate.specifier === dependency ||
-            (candidate.name === dependency && candidate.packageName === source.packageName)
+            (candidate.name === dependency && candidate.packageName === source.packageName),
     );
 }
 
@@ -920,7 +920,7 @@ function asWasiInterface(iface: WitApiInterface): WitWasiInterface {
         packageName: iface.packageName,
         version: iface.version,
         dependencies: iface.dependencies ?? [],
-        dependencyTypes: iface.dependencyTypes ?? {}
+        dependencyTypes: iface.dependencyTypes ?? {},
     };
 }
 

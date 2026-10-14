@@ -22,18 +22,18 @@ function fixture(height = 1) {
             sample: () => {
                 samples++;
                 return { material: 'minecraft:plains_DH-BSW_minecraft:stone', skyLight: 15, blockLight: 0 };
-            }
+            },
         },
         borderBounds: { minX: -1_000_000, maxX: 1_000_000, minZ: -1_000_000, maxZ: 1_000_000 },
         insideBorder: () => true,
-        report: (message) => reports.push(message)
+        report: (message) => reports.push(message),
     };
     const peers: ForcedLodPeers = {
         withPeer: (name, use) => {
             if (name !== peer.name) return false;
             use(peer);
             return true;
-        }
+        },
     };
     const generation = new ForcedLodGeneration(cache, logger, () => 1234);
     return { files, cache, generation, logger, peer, peers, reports, samples: () => samples };
@@ -48,7 +48,7 @@ describe('forced LOD generation', () => {
             centerX: 0,
             centerZ: 0,
             radius: 0,
-            sections: 1
+            sections: 1,
         });
         expect(f.generation.tick(f.peers)).toBe(true);
         expect(f.generation.status()).toBeUndefined();
@@ -60,7 +60,7 @@ describe('forced LOD generation', () => {
                 .of('debug')
                 .join('\n')
                 // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI color codes start with the ESC control character.
-                .replace(/\u001b\[[0-9;]*m/g, '')
+                .replace(/\u001b\[[0-9;]*m/g, ''),
         ).toContain('Built forced LOD for Alice at world section 0, 0 (origin 0, 0 blocks)');
     });
 
@@ -261,7 +261,7 @@ describe('forced LOD generation', () => {
         f.peer.terrain.prepare = () => ({ status: 'unavailable', reason: 'Chunk 0, 0 is not loaded' });
 
         expect(() => f.generation.recover(f.peer, 32, 32)).toThrow(
-            'recovery deferred until all section chunks are loaded'
+            'recovery deferred until all section chunks are loaded',
         );
 
         expect(f.cache.get('world:0:0')?.data).toEqual(suspect);

@@ -9,7 +9,7 @@ import { CONFIG_FILE, CONFIG_RENDER_OPTIONS, type Config, configSchema } from '.
 function configStore(files: DataFiles): ConfigStore {
     return {
         read: () => (files.stat(CONFIG_FILE) ? strFromU8(files.readFile(CONFIG_FILE)) : undefined),
-        write: (text) => files.writeFile(CONFIG_FILE, strToU8(text))
+        write: (text) => files.writeFile(CONFIG_FILE, strToU8(text)),
     };
 }
 
@@ -28,23 +28,23 @@ export function loadPluginConfig(files: DataFiles, log: Logger): Config {
         if (result.status === 'created') log.info(`Created ${ansi.named.name(CONFIG_FILE)} with the default settings.`);
         else if (result.status === 'kept') {
             log.warn(
-                `${ansi.named.name(CONFIG_FILE)} has invalid values, so it was left as it is. Fix them and run /baddon reload.`
+                `${ansi.named.name(CONFIG_FILE)} has invalid values, so it was left as it is. Fix them and run /baddon reload.`,
             );
         } else if (result.status === 'updated') {
             const changes = [
                 result.added.length > 0 && `added ${result.added.map((key) => ansi.named.identifier(key)).join(', ')}`,
                 result.removed.length > 0 &&
-                    `removed ${result.removed.map((key) => ansi.named.identifier(key)).join(', ')}`
+                    `removed ${result.removed.map((key) => ansi.named.identifier(key)).join(', ')}`,
             ].filter(Boolean);
             log.info(
-                `Updated ${ansi.named.name(CONFIG_FILE)}${changes.length > 0 ? `: ${changes.join('; ')}` : ' to the current format'}.`
+                `Updated ${ansi.named.name(CONFIG_FILE)}${changes.length > 0 ? `: ${changes.join('; ')}` : ' to the current format'}.`,
             );
         }
         return result.values;
     } catch (err) {
         if (!(err instanceof ConfigSyntaxError)) throw err;
         log.error(
-            `${ansi.named.name(CONFIG_FILE)} is not valid TOML (${err.message}). Using the default settings until it is fixed; the file was not changed.`
+            `${ansi.named.name(CONFIG_FILE)} is not valid TOML (${err.message}). Using the default settings until it is fixed; the file was not changed.`,
         );
         return defaultValues(configSchema);
     }

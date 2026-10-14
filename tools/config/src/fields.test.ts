@@ -44,7 +44,7 @@ describe('str', () => {
         const f = str({
             description: 'd',
             default: '',
-            check: { expected: 'lowercase', test: (v) => v === v.toLowerCase(), normalize: (v) => v.trim() }
+            check: { expected: 'lowercase', test: (v) => v === v.toLowerCase(), normalize: (v) => v.trim() },
         });
         expect(f.parse(' ok ')).toEqual({ ok: true, value: 'ok' });
         expect(f.parse('NO')).toEqual({ ok: false });

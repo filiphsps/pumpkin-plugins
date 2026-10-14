@@ -9,6 +9,6 @@ export const commands = defineCommands(PLUGIN_NAME, {
     dynamiclights: {
         description: 'Toggle dynamic lights for yourself',
         permission: COMMAND_PERMISSION,
-        defaultPermission: { tag: 'allow' }
-    }
+        defaultPermission: { tag: 'allow' },
+    },
 });

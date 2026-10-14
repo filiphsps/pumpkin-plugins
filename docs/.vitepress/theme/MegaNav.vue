@@ -1,119 +1,88 @@
 <script setup lang="ts">
-// biome-ignore lint/correctness/noUnusedImports: `withBase` is referenced by the Vue template.
-import { useData, useRoute, withBase } from 'vitepress';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+    import { useData, useRoute, withBase } from 'vitepress';
+    import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+    import type { ThemeConfigWithMegaMenus } from './types';
 
-interface MenuCard {
-    text: string;
-    description: string;
-    link: string;
-    icon?: string;
-    type?: 'link' | 'card' | 'spotlight';
-}
-
-interface MenuSection {
-    text: string;
-    items: MenuCard[];
-    gridArea?: string;
-}
-
-interface MegaMenu {
-    text: string;
-    link?: string;
-    description: string;
-    overview?: MenuCard;
-    sections: MenuSection[];
-    featured?: MenuCard;
-}
-
-interface ThemeConfigWithMegaMenus {
-    megaMenus?: MegaMenu[];
-}
-
-const root = ref<HTMLElement | null>(null);
-const openMenu = ref<string | null>(null);
-const { theme } = useData();
-const route = useRoute();
-const menus = computed(() => (theme.value as ThemeConfigWithMegaMenus).megaMenus ?? []);
-const activeMenu = computed(() => menus.value.find((menu) => menu.text === openMenu.value) ?? null);
-// biome-ignore lint/correctness/noUnusedVariables: The Vue template renders the regular category sections.
-const menuSections = computed(() =>
-    (activeMenu.value?.sections ?? [])
-        .map((section) => ({ ...section, items: section.items.filter((item) => item.type !== 'spotlight') }))
-        .filter((section) => section.items.length)
-);
-// biome-ignore lint/correctness/noUnusedVariables: The Vue template renders full-width spotlight rows.
-const spotlightItems = computed(() =>
-    (activeMenu.value?.sections ?? []).flatMap((section) => section.items.filter((item) => item.type === 'spotlight'))
-);
-
-function focusTrigger(menu: string | null = openMenu.value) {
-    const button = [...(root.value?.querySelectorAll<HTMLButtonElement>('[data-menu-trigger]') ?? [])].find(
-        (element) => element.dataset.menuTrigger === menu
+    const root = ref<HTMLElement | null>(null);
+    const openMenu = ref<string | null>(null);
+    const { theme } = useData<ThemeConfigWithMegaMenus>();
+    const route = useRoute();
+    const menus = computed(() => theme.value.megaMenus ?? []);
+    const activeMenu = computed(() => menus.value.find((menu) => menu.text === openMenu.value) ?? null);
+    const menuSections = computed(() =>
+        (activeMenu.value?.sections ?? [])
+            .map((section) => ({ ...section, items: section.items.filter((item) => item.type !== 'spotlight') }))
+            .filter((section) => section.items.length),
     );
-    button?.focus();
-}
+    const spotlightItems = computed(() =>
+        (activeMenu.value?.sections ?? []).flatMap((section) =>
+            section.items.filter((item) => item.type === 'spotlight'),
+        ),
+    );
 
-function closeMenu(restoreFocus = false) {
-    const previousMenu = openMenu.value;
-    openMenu.value = null;
-    if (restoreFocus) requestAnimationFrame(() => focusTrigger(previousMenu));
-}
-
-// biome-ignore lint/correctness/noUnusedVariables: The Vue template binds this function to menu buttons.
-function toggleMenu(menu: string) {
-    openMenu.value = openMenu.value === menu ? null : menu;
-}
-
-// biome-ignore lint/correctness/noUnusedVariables: The Vue template binds this pointer handler to menu buttons.
-function onTriggerPointerenter(menu: string, event: PointerEvent) {
-    if (event.pointerType === 'mouse') openMenu.value = menu;
-}
-
-// biome-ignore lint/correctness/noUnusedVariables: The Vue template binds this handler to the navigation root.
-function onNavPointerleave(event: PointerEvent) {
-    if (event.pointerType === 'mouse') closeMenu();
-}
-
-function onPointerDown(event: PointerEvent) {
-    if (root.value && event.target instanceof Node && !root.value.contains(event.target)) closeMenu();
-}
-
-function onDocumentKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape' && openMenu.value) {
-        event.preventDefault();
-        closeMenu(true);
+    function focusTrigger(menu: string | null = openMenu.value) {
+        const button = [...(root.value?.querySelectorAll<HTMLButtonElement>('[data-menu-trigger]') ?? [])].find(
+            (element) => element.dataset.menuTrigger === menu,
+        );
+        button?.focus();
     }
-}
 
-// biome-ignore lint/correctness/noUnusedVariables: The Vue template binds this keyboard handler to menu buttons.
-function onTriggerKeydown(event: KeyboardEvent, index: number) {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault();
-    const buttons = [...(root.value?.querySelectorAll<HTMLButtonElement>('[data-menu-trigger]') ?? [])];
-    const nextIndex =
-        event.key === 'Home'
-            ? 0
-            : event.key === 'End'
-              ? buttons.length - 1
-              : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
-    buttons[nextIndex]?.focus();
-}
+    function closeMenu(restoreFocus = false) {
+        const previousMenu = openMenu.value;
+        openMenu.value = null;
+        if (restoreFocus) requestAnimationFrame(() => focusTrigger(previousMenu));
+    }
 
-onMounted(() => {
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onDocumentKeydown);
-});
+    function toggleMenu(menu: string) {
+        openMenu.value = openMenu.value === menu ? null : menu;
+    }
 
-onBeforeUnmount(() => {
-    document.removeEventListener('pointerdown', onPointerDown);
-    document.removeEventListener('keydown', onDocumentKeydown);
-});
+    function onTriggerPointerenter(menu: string, event: PointerEvent) {
+        if (event.pointerType === 'mouse') openMenu.value = menu;
+    }
 
-watch(
-    () => route.path,
-    () => closeMenu()
-);
+    function onNavPointerleave(event: PointerEvent) {
+        if (event.pointerType === 'mouse') closeMenu();
+    }
+
+    function onPointerDown(event: PointerEvent) {
+        if (root.value && event.target instanceof Node && !root.value.contains(event.target)) closeMenu();
+    }
+
+    function onDocumentKeydown(event: KeyboardEvent) {
+        if (event.key === 'Escape' && openMenu.value) {
+            event.preventDefault();
+            closeMenu(true);
+        }
+    }
+
+    function onTriggerKeydown(event: KeyboardEvent, index: number) {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const buttons = [...(root.value?.querySelectorAll<HTMLButtonElement>('[data-menu-trigger]') ?? [])];
+        const nextIndex =
+            event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                  ? buttons.length - 1
+                  : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+        buttons[nextIndex]?.focus();
+    }
+
+    onMounted(() => {
+        document.addEventListener('pointerdown', onPointerDown);
+        document.addEventListener('keydown', onDocumentKeydown);
+    });
+
+    onBeforeUnmount(() => {
+        document.removeEventListener('pointerdown', onPointerDown);
+        document.removeEventListener('keydown', onDocumentKeydown);
+    });
+
+    watch(
+        () => route.path,
+        () => closeMenu(),
+    );
 </script>
 
 <template>
@@ -126,7 +95,15 @@ watch(
     >
         <div class="site-mega-nav__triggers">
             <template v-for="(menu, index) in menus" :key="menu.text">
-                <a v-if="menu.link" class="site-mega-nav__trigger" :href="withBase(menu.link)" @pointerenter="closeMenu()">{{ menu.text }}</a>
+                <a
+                    v-if="menu.link"
+                    class="site-mega-nav__trigger"
+                    :href="withBase(menu.link)"
+                    @pointerenter="closeMenu()"
+                    >{{
+                        menu.text
+                    }}</a
+                >
                 <button
                     v-else
                     class="site-mega-nav__trigger"
@@ -248,10 +225,18 @@ watch(
                             :class="{ 'has-icon': item.icon }"
                             :href="withBase(item.link)"
                         >
-                            <img v-if="item.icon" class="site-mega-nav__icon" :src="withBase(item.icon)" alt="" aria-hidden="true">
+                            <img
+                                v-if="item.icon"
+                                class="site-mega-nav__icon"
+                                :src="withBase(item.icon)"
+                                alt=""
+                                aria-hidden="true"
+                            >
                             <span class="site-mega-nav__link-copy">
                                 <span class="site-mega-nav__link-title">{{ item.text }}</span>
-                                <span v-if="item.description" class="site-mega-nav__link-description">{{ item.description }}</span>
+                                <span v-if="item.description" class="site-mega-nav__link-description">{{
+                                    item.description
+                                }}</span>
                             </span>
                             <span class="site-mega-nav__link-action">Open documentation</span>
                         </a>

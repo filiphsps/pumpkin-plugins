@@ -9,7 +9,7 @@ const base = createWaypoint({
     id: waypointId,
     name: 'Home',
     dimension: 'world',
-    position: { x: 1, y: 64, z: 2 }
+    position: { x: 1, y: 64, z: 2 },
 });
 
 describe('waypoint access', () => {
@@ -32,9 +32,9 @@ describe('waypoint access', () => {
                 grants: [
                     { type: 'player' as const, playerId: visitorId },
                     { type: 'permission' as const, node: 'Waypoints:build' },
-                    { type: 'group' as const, slug: 'builders' }
-                ]
-            }
+                    { type: 'group' as const, slug: 'builders' },
+                ],
+            },
         };
 
         expect(canAccessWaypoint(waypoint, { playerId: visitorId.toUpperCase(), isOperator: false })).toBe(true);
@@ -42,15 +42,15 @@ describe('waypoint access', () => {
             canAccessWaypoint(waypoint, {
                 playerId: '33333333-3333-4333-8333-333333333333',
                 isOperator: false,
-                hasPermission: () => true
-            })
+                hasPermission: () => true,
+            }),
         ).toBe(true);
         expect(
             canAccessWaypoint(waypoint, {
                 playerId: '44444444-4444-4444-8444-444444444444',
                 isOperator: false,
-                hasPermission
-            })
+                hasPermission,
+            }),
         ).toBe(true);
         expect(hasPermission).toHaveBeenCalledWith('Waypoints:build');
         expect(hasPermission).toHaveBeenCalledWith('Waypoints:group.builders');
@@ -60,7 +60,7 @@ describe('waypoint access', () => {
         const hasPermission = vi.fn(() => false);
         const waypoint = {
             ...base,
-            access: { mode: 'restricted' as const, grants: [{ type: 'permission' as const, node: 'Waypoints:use' }] }
+            access: { mode: 'restricted' as const, grants: [{ type: 'permission' as const, node: 'Waypoints:use' }] },
         };
         expect(canAccessWaypoint(waypoint, { playerId: visitorId, isOperator: false, hasPermission })).toBe(false);
         expect(hasPermission).toHaveBeenCalledWith('Waypoints:use');

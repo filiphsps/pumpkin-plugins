@@ -6,18 +6,18 @@ import type { Steps } from './task.ts';
 
 /** A request for `httpRequest`. */
 export interface HttpRequest {
+    body?: string;
+    headers?: Record<string, string>;
     method: 'GET' | 'POST';
     path: string;
-    headers?: Record<string, string>;
-    body?: string;
 }
 
 /** What came back. */
 export interface HttpResponse {
-    status: number;
     body: string;
     /** The address of this machine on the connection, which is the address the router sees. */
     localAddress: Ipv4;
+    status: number;
 }
 
 const READ_CHUNK = 4096;

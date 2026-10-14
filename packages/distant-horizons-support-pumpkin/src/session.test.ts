@@ -34,19 +34,19 @@ function fixture(measureNow = () => 1000, now = () => 1000) {
             sample: () => {
                 reads++;
                 return { material: 'minecraft:plains_DH-BSW_minecraft:stone', skyLight: 15, blockLight: 0 };
-            }
+            },
         },
         borderBounds: { minX: -1_000_000, maxX: 1_000_000, minZ: -1_000_000, maxZ: 1_000_000 },
         insideBorder: () => true,
         send: (bytes) => sent.push(bytes),
-        report: (message) => reports.push(message)
+        report: (message) => reports.push(message),
     };
     const peers = {
         withPeer: (name: string, use: (p: Peer) => void) => {
             if (name !== peer.name) return false;
             use(peer);
             return true;
-        }
+        },
     };
     const request = (tracker = 1, level = 'world', x = 0, timestamp?: number) =>
         packet(7)
@@ -78,7 +78,7 @@ function clientConfig(
         syncDistance?: number;
         syncRate?: number;
         bandwidthKbps?: number;
-    } = {}
+    } = {},
 ): Uint8Array {
     return packet(4)
         .byte(options.plan ?? 2)
@@ -112,7 +112,7 @@ function readSessionConfig(bytes: Uint8Array) {
         sync: input.bool(),
         syncDistance: input.int(),
         syncRate: input.int(),
-        bandwidthKbps: input.int()
+        bandwidthKbps: input.int(),
     };
     input.end();
     return result;
@@ -134,8 +134,8 @@ describe('DH protocol contracts', () => {
                 sync: true,
                 syncDistance: 256,
                 syncRate: 100,
-                bandwidthKbps: 500
-            })
+                bandwidthKbps: 500,
+            }),
         );
 
         expect(f.ids()).toEqual([4]);
@@ -145,7 +145,7 @@ describe('DH protocol contracts', () => {
             sync: true,
             syncDistance: 128,
             syncRate: 10,
-            bandwidthKbps: 500
+            bandwidthKbps: 500,
         });
     });
 
@@ -196,7 +196,7 @@ describe('DH protocol contracts', () => {
 
         const message = f.log.of('debug').at(-1) ?? '';
         expect(message).toBe(
-            `${ansi.named.name(PLUGIN_NAME)} Ignored DH initialization for a dimension other than the current player dimension.`
+            `${ansi.named.name(PLUGIN_NAME)} Ignored DH initialization for a dimension other than the current player dimension.`,
         );
     });
 
@@ -280,7 +280,7 @@ describe('DH protocol contracts', () => {
         let now = 0;
         const f = fixture(
             () => now,
-            () => now
+            () => now,
         );
         f.settings.cached_packets_per_tick = 1;
         f.cache.put('world:0:0', { updated: 0, data: new Uint8Array(60_000).fill(1) });
@@ -327,7 +327,7 @@ describe('DH protocol contracts', () => {
         let now = 0;
         const f = fixture(
             () => now,
-            () => now
+            () => now,
         );
         f.cache.put('world:0:0', { updated: 0, data: new Uint8Array(60_000).fill(1) });
         f.sessions.receive(f.peer, clientConfig({ bandwidthKbps: 2 }));
@@ -351,7 +351,7 @@ describe('DH protocol contracts', () => {
         let now = 0;
         const f = fixture(
             () => now,
-            () => now
+            () => now,
         );
         f.settings.refresh_seconds = 3600;
         f.cache.put('world:0:0', { updated: 0, data: new Uint8Array(60_000).fill(1) });
@@ -364,7 +364,7 @@ describe('DH protocol contracts', () => {
                 if (!peer) return false;
                 use(peer);
                 return true;
-            }
+            },
         };
         f.sessions.receive(bob, packet(3).string(bob.dimension).finish());
         f.sessions.receive(f.peer, clientConfig({ bandwidthKbps: 1 }));
@@ -430,7 +430,7 @@ describe('DH protocol contracts', () => {
         let now = 0;
         const f = fixture(
             () => now,
-            () => now
+            () => now,
         );
         f.settings.cached_packets_per_tick = 1;
         f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(60_000).fill(1) });
@@ -476,7 +476,7 @@ describe('DH protocol contracts', () => {
                 if (!peer) return false;
                 use(peer);
                 return true;
-            }
+            },
         };
         f.sessions.receive(bob, packet(3).string(bob.dimension).finish());
         f.sent.length = 0;
@@ -521,7 +521,7 @@ describe('DH sessions', () => {
         let now = 1000;
         const f = fixture(
             () => 1000,
-            () => now
+            () => now,
         );
         let attempts = 0;
         f.peer.terrain.prepare = () => {
@@ -593,7 +593,7 @@ describe('DH sessions', () => {
         let now = 1000;
         const f = fixture(
             () => 1000,
-            () => now
+            () => now,
         );
         f.settings.blocks_per_tick = 64;
         let available = true;
@@ -634,7 +634,7 @@ describe('DH sessions', () => {
             centerX: 0,
             centerZ: 0,
             radius: 0,
-            sections: 1
+            sections: 1,
         });
         f.sessions.tick(f.peers);
         expect(f.reads()).toBe(32768);
@@ -695,7 +695,7 @@ describe('DH sessions', () => {
         let now = 1000;
         const f = fixture(
             () => 1000,
-            () => now
+            () => now,
         );
         let attempts = 0;
         f.peer.terrain.prepare = () => {
@@ -719,7 +719,7 @@ describe('DH sessions', () => {
         let now = 1000;
         const f = fixture(
             () => 1000,
-            () => now
+            () => now,
         );
         f.settings.blocks_per_tick = 64;
         let attempts = 0;
@@ -747,7 +747,7 @@ describe('DH sessions', () => {
         let now = 1000;
         const f = fixture(
             () => 1000,
-            () => now
+            () => now,
         );
         let attempts = 0;
         f.peer.terrain.prepare = () =>
@@ -857,8 +857,8 @@ describe('DH sessions', () => {
             sample: (_x, y) => ({
                 material: `minecraft:plains_DH-BSW_minecraft:${y > 3 ? 'air' : 'stone'}`,
                 skyLight: 15,
-                blockLight: 0
-            })
+                blockLight: 0,
+            }),
         };
         f.sessions.receive(f.peer, f.request());
         f.sessions.receive(f.peer, f.request(2, 'world', 1));
@@ -883,7 +883,7 @@ describe('DH sessions', () => {
             sample: () => {
                 reads++;
                 return { material: 'minecraft:plains_DH-BSW_minecraft:stone', skyLight: 15, blockLight: 0 };
-            }
+            },
         };
         f.sessions.receive(f.peer, f.request());
 
@@ -930,7 +930,7 @@ describe('DH sessions', () => {
                 .of('debug')
                 .join('\n')
                 // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI color codes start with the ESC control character.
-                .replace(/\u001b\[[0-9;]*m/g, '')
+                .replace(/\u001b\[[0-9;]*m/g, ''),
         ).toContain('Sent captured LOD to Alice for world section 2, 0 (origin 128, 0 blocks)');
     });
     it('drains disk-cached transfers within the separately configured fast budget', () => {
@@ -1015,7 +1015,7 @@ describe('DH sessions', () => {
                 if (!peer) return false;
                 use(peer);
                 return true;
-            }
+            },
         };
         sessions.receive(f.peer, packet(3).string(f.peer.dimension).finish());
         sessions.receive(bob, packet(3).string(bob.dimension).finish());
@@ -1108,7 +1108,7 @@ describe('DH sessions', () => {
         expect(f.sent).toHaveLength(0);
         f.sessions.changedMany('world', [
             { x: 0, z: 0 },
-            { x: 63, z: 63 }
+            { x: 63, z: 63 },
         ]);
         f.sessions.tick(f.peers);
         expect(f.ids()).toEqual([6]);
@@ -1134,7 +1134,7 @@ describe('DH sessions', () => {
         f.sessions.changedMany('world', [
             { x: 0, z: 0 },
             { x: 63, z: 63 },
-            { x: 24, z: 32 }
+            { x: 24, z: 32 },
         ]);
 
         expect(changed).toHaveBeenCalledOnce();

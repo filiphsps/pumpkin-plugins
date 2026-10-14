@@ -24,7 +24,7 @@ export function emitPumpkinMethodDispatch(apiPackage: WitApiPackage, analysis: W
 export function emitWasiAdapterDispatch(
     interfaces: readonly WitWasiInterface[],
     analysis: WitAnalysis,
-    availableFreeFunctions?: ReadonlySet<string>
+    availableFreeFunctions?: ReadonlySet<string>,
 ): string {
     return generateWasiAdapterDispatch(interfaces, analysis, availableFreeFunctions);
 }

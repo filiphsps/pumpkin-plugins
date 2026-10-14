@@ -13,16 +13,16 @@ describe('pumpkin.toml', () => {
             config: (port) =>
                 portConfig(
                     port,
-                    '[overrides."a.mcpack"]\naddon_pack = true\nsub_pack_name = "hd"\ncontent_id = "id-1"\n'
+                    '[overrides."a.mcpack"]\naddon_pack = true\nsub_pack_name = "hd"\ncontent_id = "id-1"\n',
                 ),
             files: {
                 'packs/a.mcpack': makeMcpack(
-                    manifestJson({ uuid: SAMPLE_UUID, modules: ['resources'], capabilities: ['raytraced'] })
+                    manifestJson({ uuid: SAMPLE_UUID, modules: ['resources'], capabilities: ['raytraced'] }),
                 ),
                 'packs/b.mcpack': makeMcpack(
-                    manifestJson({ uuid: '22222222-2222-4222-8222-222222222222', version: [3, 1, 4] })
-                )
-            }
+                    manifestJson({ uuid: '22222222-2222-4222-8222-222222222222', version: [3, 1, 4] }),
+                ),
+            },
         });
         await r.server.waitForLog(/Offering 2 Bedrock packs to players/);
 
@@ -36,7 +36,7 @@ describe('pumpkin.toml', () => {
         const r = await start({
             name: 'duplicates',
             config: (port) => portConfig(port),
-            files: { 'packs/a.mcpack': makeMcpack(), 'packs/b.mcpack': makeMcpack() }
+            files: { 'packs/a.mcpack': makeMcpack(), 'packs/b.mcpack': makeMcpack() },
         });
         await r.server.waitForLog(/b\.mcpack has the same UUID as a\.mcpack; skipping it/);
         await r.server.waitForLog(/Offering 1 Bedrock pack to players/);

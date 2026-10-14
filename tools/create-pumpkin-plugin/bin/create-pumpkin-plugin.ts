@@ -15,23 +15,23 @@ type PackageManager = 'pnpm' | 'npm' | 'yarn' | 'bun';
 
 /** Command-line options used while generating a plugin project. */
 interface CreatorOptions {
-    /** Generate the TypeScript starter. */
-    ts?: boolean;
     /** Generate the JavaScript starter. */
     js?: boolean;
     /** Create files without invoking the detected package manager. */
     skipInstall?: boolean;
+    /** Generate the TypeScript starter. */
+    ts?: boolean;
 }
 
 /** Filesystem entries created while publishing a generated project. */
 interface CreatedEntry {
-    /** Path created by this invocation. */
-    path: string;
     /** Filesystem identity used to avoid removing an entry that replaced ours. */
     device: number;
     inode: number;
     /** Entry type, which determines the safe rollback operation. */
     kind: 'file' | 'directory';
+    /** Path created by this invocation. */
+    path: string;
 }
 
 /** Select a requested language or prompt on an interactive terminal.
@@ -45,7 +45,7 @@ interface CreatedEntry {
 export async function chooseLanguage(
     options: Pick<CreatorOptions, 'ts' | 'js'>,
     interactive: boolean,
-    prompt: () => Promise<Language> = promptForLanguage
+    prompt: () => Promise<Language> = promptForLanguage,
 ): Promise<Language> {
     if (options.ts && options.js) throw new Error('--ts and --js cannot be used together');
     if (options.ts) return 'typescript';
@@ -88,14 +88,14 @@ function normalizePackageManager(value: string): PackageManager {
  */
 function packageManagerInvocation(
     packageManager: PackageManager,
-    environment: NodeJS.ProcessEnv = process.env
+    environment: NodeJS.ProcessEnv = process.env,
 ): { command: string; args: string[] } {
     const executable = environment.npm_execpath ?? environment.NPM_CONFIG_EXECPATH;
     const launchers: Record<PackageManager, RegExp> = {
         pnpm: /^pnpm(?:-cli)?\.(?:cjs|mjs|js)$/,
         npm: /^npm(?:-cli)?\.(?:cjs|mjs|js)$/,
         yarn: /^yarn(?:-cli)?\.(?:cjs|mjs|js)$/,
-        bun: /^bun(?:-cli)?\.(?:cjs|mjs|js)$/
+        bun: /^bun(?:-cli)?\.(?:cjs|mjs|js)$/,
     };
     const scriptName = executable ? path.basename(executable).toLowerCase() : '';
     if (executable && launchers[packageManager].test(scriptName)) {
@@ -155,16 +155,16 @@ async function createProject(directory: string, options: CreatorOptions): Promis
     const invocation = packageManagerInvocation(packageManager);
     const installation = spawnSync(invocation.command, [...invocation.args, 'install'], {
         cwd: destination,
-        stdio: 'inherit'
+        stdio: 'inherit',
     });
     if (installation.error) {
         throw new Error(
-            `could not start ${packageManager} install: ${installation.error.message}; project kept at ${destination}`
+            `could not start ${packageManager} install: ${installation.error.message}; project kept at ${destination}`,
         );
     }
     if (installation.status !== 0) {
         throw new Error(
-            `${packageManager} install exited with status ${installation.status ?? installation.signal}; project kept at ${destination}`
+            `${packageManager} install exited with status ${installation.status ?? installation.signal}; project kept at ${destination}`,
         );
     }
     console.log(`Project directory: ${destination}`);
@@ -218,7 +218,7 @@ function publishStagedProject(stagingDirectory: string, destination: string): vo
         } catch (cleanupError) {
             throw new AggregateError(
                 [error, cleanupError],
-                `project publication failed and its owned files could not be fully removed: ${destination}`
+                `project publication failed and its owned files could not be fully removed: ${destination}`,
             );
         }
         throw error;
@@ -313,7 +313,7 @@ function removeCreatedEntries(createdEntries: CreatedEntry[]): void {
 function pinPnpmVersion(
     destination: string,
     packageManager: PackageManager | undefined,
-    environment: NodeJS.ProcessEnv
+    environment: NodeJS.ProcessEnv,
 ): void {
     if (packageManager !== 'pnpm') return;
     const userAgent = environment.npm_config_user_agent ?? environment.NPM_CONFIG_USER_AGENT ?? '';
@@ -334,7 +334,7 @@ function pinPnpmVersion(
 function validateProjectName(projectName: string): void {
     if (projectName.length > 214 || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(projectName)) {
         throw new Error(
-            'project name must use lowercase letters, numbers, and hyphens, and start and end with a letter or number'
+            'project name must use lowercase letters, numbers, and hyphens, and start and end with a letter or number',
         );
     }
 }

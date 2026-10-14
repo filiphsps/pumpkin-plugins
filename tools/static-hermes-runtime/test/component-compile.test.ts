@@ -14,7 +14,7 @@ afterEach(() => {
 
 it.each([
     { name: 'JavaScript bundle', parseTypeScript: false },
-    { name: 'TypeScript bundle', parseTypeScript: true }
+    { name: 'TypeScript bundle', parseTypeScript: true },
 ])('compiles a $name with the selected optimization profile', ({ parseTypeScript }) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-component-compile-'));
     directories.push(root);
@@ -24,7 +24,7 @@ it.each([
     const bundle = path.join(root, parseTypeScript ? 'bundle.ts' : 'bundle.js');
     const output = path.join(root, 'plugin.wasm');
     const bundleBytes = Buffer.from(
-        parseTypeScript ? 'const pluginName: string = "compile-test";\r\n' : 'registerPlugin({});\r\n'
+        parseTypeScript ? 'const pluginName: string = "compile-test";\r\n' : 'registerPlugin({});\r\n',
     );
     fs.writeFileSync(bundle, bundleBytes);
     const generated: ComponentGeneratedFiles = {
@@ -32,7 +32,7 @@ it.each([
         pluginC: path.join(generatedDirectory, 'plugin.c'),
         pluginHeader: path.join(generatedDirectory, 'plugin.h'),
         componentType: path.join(generatedDirectory, 'plugin_component_type.o'),
-        runtimeSource: path.join(temporaryDirectory, 'runtime.cpp')
+        runtimeSource: path.join(temporaryDirectory, 'runtime.cpp'),
     };
     const options: ComponentBuildOptions = {
         bundle,
@@ -41,7 +41,7 @@ it.each([
         developmentMode: false,
         wasiImports: [],
         runtimeVariant: 'full',
-        ...(parseTypeScript ? { parseTypeScript: true } : {})
+        ...(parseTypeScript ? { parseTypeScript: true } : {}),
     };
     const calls: Array<{ command: string; args: string[] }> = [];
 
@@ -55,7 +55,7 @@ it.each([
             hermesWasiBuild: path.join(root, 'hermes-wasi'),
             hermesRuntimeArchive: path.join(root, 'hermes-wasi/lib/libhermesvm_a.a'),
             hermesc: path.join(root, 'hermes-host/bin/hermesc'),
-            wasiSdk: path.join(root, 'wasi-sdk')
+            wasiSdk: path.join(root, 'wasi-sdk'),
         },
         run(command, args) {
             calls.push({ command, args });
@@ -64,14 +64,14 @@ it.each([
             const outputIndex = args.indexOf('-o');
             const outputPath = outputIndex >= 0 ? args[outputIndex + 1] : undefined;
             if (outputPath) fs.writeFileSync(outputPath, 'compiled');
-        }
+        },
     });
 
     expect(calls.map(({ command }) => path.basename(command))).toEqual([
         'hermesc',
         'wasm32-wasip2-clang',
         'wasm32-wasip2-clang++',
-        'wasm32-wasip2-clang++'
+        'wasm32-wasip2-clang++',
     ]);
     expect(calls[0]?.args).toContain('-O4');
     expect(calls[0]?.args.includes('-parse-ts')).toBe(parseTypeScript);
@@ -85,10 +85,10 @@ it.each([
     expect(compiledBundlePath).not.toBe(bundle);
     expect(path.dirname(compiledBundlePath)).toBe(temporaryDirectory);
     expect(fs.readFileSync(compiledBundlePath, 'utf8')).toContain(
-        parseTypeScript ? 'pluginName: string' : '__pumpkinPluginInitError'
+        parseTypeScript ? 'pluginName: string' : '__pumpkinPluginInitError',
     );
     expect(fs.readFileSync(bundle)).toEqual(bundleBytes);
     expect(fs.readFileSync(path.join(temporaryDirectory, 'plugin-bytecode.generated.h'), 'utf8')).toContain(
-        '0x00, 0x01, 0x02'
+        '0x00, 0x01, 0x02',
     );
 });

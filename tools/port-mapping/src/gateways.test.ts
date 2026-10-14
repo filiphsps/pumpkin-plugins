@@ -9,7 +9,7 @@ const request = {
     internalPort: 8123,
     externalPort: 8123,
     description: 'Test',
-    leaseSeconds: 3600
+    leaseSeconds: 3600,
 } as const;
 const client = [192, 168, 1, 50] as const;
 
@@ -30,7 +30,7 @@ describe('UPnP gateway', () => {
             internalPort: 8123,
             client: '192.168.1.50',
             description: 'Test',
-            leaseSeconds: 3600
+            leaseSeconds: 3600,
         });
 
         runSteps(net, gateway.deleteMapping(request));

@@ -6,37 +6,37 @@ export const PUBLIC_TOOL_PACKAGE_PATHS = Object.freeze({
     'tools/create-pumpkin-plugin': 'create-pumpkin-plugin',
     'tools/pumpkin-api': '@pumpkin-plugins/pumpkin-api',
     'tools/build': '@pumpkin-plugins/build',
-    'tools/static-hermes-runtime': '@pumpkin-plugins/static-hermes-runtime'
+    'tools/static-hermes-runtime': '@pumpkin-plugins/static-hermes-runtime',
 });
 
 const STARTER_TOOL_PACKAGE_PATHS = Object.freeze({
     '@pumpkin-plugins/pumpkin-api': 'tools/pumpkin-api',
-    '@pumpkin-plugins/build': 'tools/build'
+    '@pumpkin-plugins/build': 'tools/build',
 });
 const BUILDER_TOOL_PACKAGE_NAMES = Object.freeze([
     '@pumpkin-plugins/pumpkin-api',
-    '@pumpkin-plugins/static-hermes-runtime'
+    '@pumpkin-plugins/static-hermes-runtime',
 ]);
 const PACKED_TOOL_CONTENTS = Object.freeze({
     'tools/create-pumpkin-plugin': [
         'package/bin/create-pumpkin-plugin.ts',
         'package/dist/create-pumpkin-plugin.js',
         'package/templates/typescript/package.json',
-        'package/templates/javascript/package.json'
+        'package/templates/javascript/package.json',
     ],
     'tools/pumpkin-api': [
         'package/src/index.ts',
         'package/src/wit.mjs',
         'package/src/wit.d.mts',
-        'package/wit.lock.json'
+        'package/wit.lock.json',
     ],
     'tools/static-hermes-runtime': [
         'package/src/index.ts',
         'package/dist/index.js',
         'package/cmake/wasi-sdk-hermes-p2.cmake',
-        'package/hermes-patches/0001-wasi-p2-configure-platform.patch'
+        'package/hermes-patches/0001-wasi-p2-configure-platform.patch',
     ],
-    'tools/build': ['package/dist/cli.js', 'package/runtime/quickjs-runtime-bigint.wasm', 'package/wasi-wit.lock.json']
+    'tools/build': ['package/dist/cli.js', 'package/runtime/quickjs-runtime-bigint.wasm', 'package/wasi-wit.lock.json'],
 });
 const TEMPLATE_LANGUAGES = ['typescript', 'javascript'];
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -115,8 +115,8 @@ export function assertPackedBuilderDependencies(packageJson, versions) {
         if (packageJson.dependencies?.[packageName] !== version) {
             throw new Error(
                 `${packageName} builder dependency must resolve to packed version ${version}; received ${String(
-                    packageJson.dependencies?.[packageName]
-                )}`
+                    packageJson.dependencies?.[packageName],
+                )}`,
             );
         }
     }
@@ -138,8 +138,8 @@ export function assertStarterToolDependencies(packageJson, versions) {
         if (packageJson.dependencies?.[packageName] !== expectedRange) {
             throw new Error(
                 `${packageName} starter dependency must be ${expectedRange}; received ${String(
-                    packageJson.dependencies?.[packageName]
-                )}`
+                    packageJson.dependencies?.[packageName],
+                )}`,
             );
         }
     }
@@ -160,7 +160,7 @@ export function syncStarterToolDependencies(root) {
             }
             assertVersion(packageJson.version, `${packageName} version`);
             return [packageName, packageJson.version];
-        })
+        }),
     );
 
     let changed = false;

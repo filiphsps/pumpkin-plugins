@@ -45,8 +45,8 @@ export function createInternalRegistry(packages) {
                     JSON.stringify({
                         name: decodedPath,
                         'dist-tags': { latest: version },
-                        versions: { [version]: packageVersionMetadata(packageMetadata, request) }
-                    })
+                        versions: { [version]: packageVersionMetadata(packageMetadata, request) },
+                    }),
                 );
                 return;
             }
@@ -62,7 +62,7 @@ export function createInternalRegistry(packages) {
             const body = Buffer.from(await upstream.arrayBuffer());
             response.writeHead(upstream.status, {
                 'content-type': upstream.headers.get('content-type') ?? 'application/octet-stream',
-                'content-length': body.length
+                'content-length': body.length,
             });
             response.end(body);
         } catch {
@@ -83,7 +83,7 @@ function npmRegistryUrl(requestTarget) {
     const fragmentIndex = requestTarget.indexOf('#');
     const pathEnd = Math.min(
         queryIndex < 0 ? requestTarget.length : queryIndex,
-        fragmentIndex < 0 ? requestTarget.length : fragmentIndex
+        fragmentIndex < 0 ? requestTarget.length : fragmentIndex,
     );
 
     try {
@@ -97,7 +97,7 @@ function npmRegistryUrl(requestTarget) {
         const url = new URL(segments.map((segment) => encodeURIComponent(segment)).join('/'), npmRegistryOrigin);
         if (queryIndex >= 0 && (fragmentIndex < 0 || queryIndex < fragmentIndex)) {
             const query = new URLSearchParams(
-                requestTarget.slice(queryIndex + 1, fragmentIndex < 0 ? requestTarget.length : fragmentIndex)
+                requestTarget.slice(queryIndex + 1, fragmentIndex < 0 ? requestTarget.length : fragmentIndex),
             );
             const encodedQuery = [...query]
                 .map(([name, value]) => `${encodeURIComponent(name)}=${encodeURIComponent(value)}`)
@@ -117,8 +117,8 @@ function packageVersionMetadata({ packageJson, filename, bytes }, request) {
         dist: {
             tarball: `${registryOrigin(request)}/tarballs/${encodeURIComponent(filename)}`,
             integrity: `sha512-${createHash('sha512').update(bytes).digest('base64')}`,
-            shasum: createHash('sha1').update(bytes).digest('hex')
-        }
+            shasum: createHash('sha1').update(bytes).digest('hex'),
+        },
     };
 }
 

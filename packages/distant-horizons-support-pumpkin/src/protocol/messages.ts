@@ -15,23 +15,23 @@ export * from './constants.ts';
 export const CHANNEL = 'distant_horizons:msg';
 /** Coordinates of a DH block-detail section. */
 export interface Section {
+    detail: number;
     high: number;
     low: number;
-    detail: number;
     x: number;
     z: number;
 }
 /** Settings exchanged in a DH session configuration message. */
 export interface SessionConfiguration {
-    generationPlan: number;
-    generationDistance: number;
-    generationRate: number;
-    realTimeUpdates: boolean;
-    realTimeDistance: number;
-    syncEnabled: boolean;
-    syncDistance: number;
-    syncRate: number;
     bandwidthKbps: number;
+    generationDistance: number;
+    generationPlan: number;
+    generationRate: number;
+    realTimeDistance: number;
+    realTimeUpdates: boolean;
+    syncDistance: number;
+    syncEnabled: boolean;
+    syncRate: number;
 }
 /** Client messages accepted by the server. */
 export type Message =
@@ -91,8 +91,8 @@ export function decode(data: Uint8Array): Message {
                 syncEnabled,
                 syncDistance,
                 syncRate,
-                bandwidthKbps
-            }
+                bandwidthKbps,
+            },
         };
     } else if (id === 7) {
         const tracker = input.int();
@@ -161,7 +161,7 @@ export function transferFragment(
     buffer: number,
     lod: Uint8Array,
     offset: number,
-    maxDataBytes = TRANSFER_PACKET_BYTES
+    maxDataBytes = TRANSFER_PACKET_BYTES,
 ): Uint8Array {
     if (!Number.isSafeInteger(maxDataBytes) || maxDataBytes < 1 || maxDataBytes > TRANSFER_PACKET_BYTES) {
         throw new RangeError('Invalid DH transfer fragment size');

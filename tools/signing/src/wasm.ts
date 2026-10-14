@@ -12,16 +12,16 @@ const HEADER_LENGTH = 8;
 
 /** One section of a wasm binary. Offsets are into the original bytes. */
 export interface WasmSection {
-    /** Section id; 0 is a custom section. */
-    id: number;
-    /** Offset of the id byte. */
-    start: number;
-    /** Offset just past the last payload byte. */
-    end: number;
-    /** Custom sections only: the section name. */
-    name?: string;
     /** Custom sections only: the section data, after the name. */
     data?: Uint8Array;
+    /** Offset just past the last payload byte. */
+    end: number;
+    /** Section id; 0 is a custom section. */
+    id: number;
+    /** Custom sections only: the section name. */
+    name?: string;
+    /** Offset of the id byte. */
+    start: number;
 }
 
 /** A wasm binary split into the part that gets signed and the signing sections cut off its end. */

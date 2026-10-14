@@ -42,7 +42,7 @@ export function appendWaypointIcon(labelNbt: Uint8Array, icon: string | undefine
         ...encodeString('sprite'),
         ...encodeString(sprite),
         0,
-        0
+        0,
     ]);
 }
 

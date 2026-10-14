@@ -75,7 +75,7 @@ describe('Minecraft string formatting', () => {
             ['red', 'c'],
             ['lightPurple', 'd'],
             ['yellow', 'e'],
-            ['white', 'f']
+            ['white', 'f'],
         ];
         const nameWidth = 11;
         const lines = minecraftColorTable().split('\n');
@@ -87,7 +87,7 @@ describe('Minecraft string formatting', () => {
             colors.map(([name, code]) => {
                 const padding = ' '.repeat(nameWidth - name.length);
                 return `§${code}${name}§r${padding} | §${code}§l${name}§r`;
-            })
+            }),
         );
     });
 
@@ -108,7 +108,7 @@ describe('Minecraft string formatting', () => {
             ['red', 91],
             ['lightPurple', 95],
             ['yellow', 93],
-            ['white', 97]
+            ['white', 97],
         ] as const;
         const nameWidth = 11;
         const lines = colorTable().split('\n');
@@ -120,7 +120,7 @@ describe('Minecraft string formatting', () => {
             colors.map(([name, code]) => {
                 const padding = ' '.repeat(nameWidth - name.length);
                 return `\u001b[${code}m${name}\u001b[0m${padding} | \u001b[1;${code}m${name}\u001b[0m`;
-            })
+            }),
         );
     });
 });

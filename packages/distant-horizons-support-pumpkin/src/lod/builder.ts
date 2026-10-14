@@ -18,7 +18,7 @@ export class LodBuilder {
     constructor(
         private readonly section: Section,
         minY: number,
-        height: number
+        height: number,
     ) {
         if (section.detail !== SECTION_DETAIL || height < 1 || height > 4095) {
             throw new RangeError('Unsupported LOD dimensions');
@@ -30,12 +30,12 @@ export class LodBuilder {
                 width: SECTION_SIZE_BLOCKS,
                 depth: SECTION_SIZE_BLOCKS,
                 minY,
-                height
+                height,
             },
             {
                 isEmpty: (material) => EMPTY_DH_MATERIAL.test(material),
-                maxSegments: MAX_POINTS_PER_SECTION
-            }
+                maxSegments: MAX_POINTS_PER_SECTION,
+            },
         );
     }
 

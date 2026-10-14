@@ -7,12 +7,12 @@ describe('native Bedrock display adapter', () => {
 
         expect(adapter.objectiveCapability).toMatchObject({
             kind: 'unsupported',
-            reason: expect.stringContaining('not verified')
+            reason: expect.stringContaining('not verified'),
         });
         expect(adapter.setNumericObjective('bedrock-id', 12)).toEqual(adapter.objectiveCapability);
         expect(adapter.setEntryName('bedrock-id', { text: 'Never fabricated' })).toMatchObject({
             kind: 'unsupported',
-            reason: expect.stringContaining('roster')
+            reason: expect.stringContaining('roster'),
         });
         expect(adapter.setOrder('bedrock-id', 0).kind).toBe('unsupported');
         expect(adapter.setHeaderFooter('bedrock-id', [], []).kind).toBe('unsupported');

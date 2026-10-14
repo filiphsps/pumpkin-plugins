@@ -7,21 +7,21 @@ interface EventGenerationContext {
 }
 
 interface GeneratedEventValue {
-    setup: string[];
     expression: string;
+    setup: string[];
 }
 
 interface EventResourceAdapter {
-    kind: 'Player' | 'World' | 'Text';
     host: 'PlayerObject' | 'WorldObject' | 'TextObject';
+    kind: 'Player' | 'World' | 'Text';
 }
 
 type ScalarEventConversion = (value: string) => string;
 
 const C_RESERVED_FIELD_NAMES = new Set(
     'alignas alignof and and_eq asm atomic_cancel atomic_commit atomic_noexcept auto bitand bitor bool break case catch char char8_t char16_t char32_t class compl concept const consteval constexpr constinit const_cast continue co_await co_return co_yield decltype default delete do double dynamic_cast else enum explicit export extern false float for friend goto if inline int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static static_assert static_cast struct switch synchronized template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq'.split(
-        /\s+/
-    )
+        /\s+/,
+    ),
 );
 
 /**
@@ -34,14 +34,14 @@ const C_RESERVED_FIELD_NAMES = new Set(
  */
 export function generateWitEventDispatch(
     apiPackage: WitApiPackage,
-    selections: readonly WitEventFieldSelection[]
+    selections: readonly WitEventFieldSelection[],
 ): string {
     const eventInterface = apiPackage.interfaces.find((apiInterface) => apiInterface.name === 'event');
     const eventVariant = eventInterface?.variants.find((variant) => variant.name === 'event');
     if (!eventVariant) return '';
 
     const records = new Map<string, WitRecord>(
-        apiPackage.interfaces.flatMap((apiInterface) => apiInterface.records.map((record) => [record.name, record]))
+        apiPackage.interfaces.flatMap((apiInterface) => apiInterface.records.map((record) => [record.name, record])),
     );
     const context: EventGenerationContext = { apiPackage };
     const cases = [];
@@ -55,7 +55,7 @@ export function generateWitEventDispatch(
         const fields = record.fields
             .filter(({ name }) => selectedFields.has(name))
             .map((field) =>
-                generateEventField(field, `eventData.${cIdentifier(field.name)}`, jsName(field.name), 'data', context)
+                generateEventField(field, `eventData.${cIdentifier(field.name)}`, jsName(field.name), 'data', context),
             );
         const eventName = cIdentifier(event.name);
         cases.push(`case PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_${event.name.toUpperCase().replaceAll('-', '_')}: {
@@ -83,14 +83,14 @@ const scalarEventConversions = new Map<string, ScalarEventConversion>([
     ['s64', (value) => `BigInt::fromInt64(runtime, static_cast<int64_t>(${value}))`],
     ['f32', (value) => `Value(static_cast<double>(${value}))`],
     ['f64', (value) => `Value(${value})`],
-    ['string', (value) => `jsString(runtime, wasiStringValue(${value}))`]
+    ['string', (value) => `jsString(runtime, wasiStringValue(${value}))`],
 ]);
 
 /** Map WIT event resource types to their native host object wrappers. */
 const eventResourceAdapters = new Map<string, EventResourceAdapter>([
     ['player:player', { kind: 'Player', host: 'PlayerObject' }],
     ['world:world', { kind: 'World', host: 'WorldObject' }],
-    ['text:text-component', { kind: 'Text', host: 'TextObject' }]
+    ['text:text-component', { kind: 'Text', host: 'TextObject' }],
 ]);
 
 /** Generate native event field conversion code for resolved WIT value shapes. */
@@ -99,7 +99,7 @@ function generateEventField(
     source: string,
     path: string,
     target: string,
-    context: EventGenerationContext
+    context: EventGenerationContext,
 ): string {
     const type = requireResolvedEventType(field.resolvedType, `event field ${field.name}`);
     const value = generateRecursiveEventValue(type, source, path, context);
@@ -113,7 +113,7 @@ function generateRecursiveEventValue(
     type: ResolvedWitType,
     source: string,
     path: string,
-    context: EventGenerationContext
+    context: EventGenerationContext,
 ): GeneratedEventValue {
     const name = `eventValue${pascalCase(path)}`;
     switch (type.kind) {
@@ -126,21 +126,21 @@ function generateRecursiveEventValue(
         case 'enum': {
             const cases = type.values.map(
                 (value) =>
-                    `case ${enumValue(context.apiPackage, type, value)}: ${name} = ${JSON.stringify(value)}; break;`
+                    `case ${enumValue(context.apiPackage, type, value)}: ${name} = ${JSON.stringify(value)}; break;`,
             );
             return {
                 setup: [
                     `std::string ${name};`,
-                    `switch (${source}) { ${cases.join(' ')} default: throw JSError(runtime, ${JSON.stringify(`Unknown ${type.name} value`)}); }`
+                    `switch (${source}) { ${cases.join(' ')} default: throw JSError(runtime, ${JSON.stringify(`Unknown ${type.name} value`)}); }`,
                 ],
-                expression: `jsString(runtime, ${name})`
+                expression: `jsString(runtime, ${name})`,
             };
         }
         case 'flags': {
             const setup = [`Object ${name}(runtime);`];
             for (const flag of type.values) {
                 setup.push(
-                    `${name}.setProperty(runtime, ${JSON.stringify(jsName(flag))}, Value((${source} & ${enumValue(context.apiPackage, type, flag)}) != 0));`
+                    `${name}.setProperty(runtime, ${JSON.stringify(jsName(flag))}, Value((${source} & ${enumValue(context.apiPackage, type, flag)}) != 0));`,
                 );
             }
             return { setup, expression: `std::move(${name})` };
@@ -157,9 +157,9 @@ function generateRecursiveEventValue(
             return {
                 setup: [
                     `auto ${state} = std::make_shared<ResourceState>(${resourceState});`,
-                    `ownedResources->push_back(${state});`
+                    `ownedResources->push_back(${state});`,
                 ],
-                expression: `wrapResourceObject(runtime, ${hostObject})`
+                expression: `wrapResourceObject(runtime, ${hostObject})`,
             };
         }
         case 'borrow':
@@ -174,9 +174,9 @@ function generateRecursiveEventValue(
                     `if (${source}.is_some) {`,
                     ...item.setup.map((line) => `  ${line}`),
                     `  ${name} = Value(${item.expression});`,
-                    '}'
+                    '}',
                 ],
-                expression: `std::move(${name})`
+                expression: `std::move(${name})`,
             };
         }
         case 'list': {
@@ -184,9 +184,9 @@ function generateRecursiveEventValue(
                 return {
                     setup: [
                         `Uint8Array ${name}(runtime, ${source}.len);`,
-                        `if (${source}.len) { auto ${name}Buffer = ${name}.buffer(runtime); std::memcpy(${name}Buffer.data(runtime), ${source}.ptr, ${source}.len); }`
+                        `if (${source}.len) { auto ${name}Buffer = ${name}.buffer(runtime); std::memcpy(${name}Buffer.data(runtime), ${source}.ptr, ${source}.len); }`,
                     ],
-                    expression: `std::move(${name})`
+                    expression: `std::move(${name})`,
                 };
             }
             const index = `${name}Index`;
@@ -197,9 +197,9 @@ function generateRecursiveEventValue(
                     `for (std::size_t ${index} = 0; ${index} < ${source}.len; ++${index}) {`,
                     ...item.setup.map((line) => `  ${line}`),
                     `  ${name}.setValueAtIndex(runtime, ${index}, ${item.expression});`,
-                    '}'
+                    '}',
                 ],
-                expression: `std::move(${name})`
+                expression: `std::move(${name})`,
             };
         }
         case 'tuple': {
@@ -209,7 +209,7 @@ function generateRecursiveEventValue(
                     itemType,
                     `${source}.f${index}`,
                     `${path}.item${index}`,
-                    context
+                    context,
                 );
                 setup.push(...item.setup, `${name}.setValueAtIndex(runtime, ${index}, ${item.expression});`);
             }
@@ -224,11 +224,11 @@ function generateRecursiveEventValue(
                     fieldType,
                     `${source}.${cIdentifier(field.name)}`,
                     `${path}.${childName}`,
-                    context
+                    context,
                 );
                 setup.push(
                     ...fieldValue.setup,
-                    `${name}.setProperty(runtime, ${JSON.stringify(childName)}, ${fieldValue.expression});`
+                    `${name}.setProperty(runtime, ${JSON.stringify(childName)}, ${fieldValue.expression});`,
                 );
             }
             return { setup, expression: `std::move(${name})` };
@@ -238,14 +238,14 @@ function generateRecursiveEventValue(
             for (const variant of type.cases) {
                 const variantName = jsVariantTag(variant.name);
                 const branch = [
-                    `${name}.setProperty(runtime, "tag", jsString(runtime, ${JSON.stringify(variantName)}));`
+                    `${name}.setProperty(runtime, "tag", jsString(runtime, ${JSON.stringify(variantName)}));`,
                 ];
                 if (variant.resolvedType) {
                     const payload = generateRecursiveEventValue(
                         variant.resolvedType,
                         `${source}.val.${cFieldIdentifier(variant.name)}`,
                         `${path}.val`,
-                        context
+                        context,
                     );
                     branch.push(...payload.setup, `${name}.setProperty(runtime, "val", ${payload.expression});`);
                 }
@@ -266,7 +266,7 @@ function generateRecursiveEventValue(
                 `  ${name}.setProperty(runtime, "tag", "ok");`,
                 ...ok.setup.map((line) => `  ${line}`),
                 `  ${name}.setProperty(runtime, "val", ${ok.expression});`,
-                '}'
+                '}',
             );
             return { setup, expression: `std::move(${name})` };
         }
@@ -341,7 +341,7 @@ function cIdentifier(witName: string): string {
 /** Generate event return lowering, committing owned resources only after the payload converts. */
 export function generateWitEventResultDispatch(
     apiPackage: WitApiPackage,
-    selections: readonly WitEventFieldSelection[]
+    selections: readonly WitEventFieldSelection[],
 ): string {
     const apiInterface = apiPackage.interfaces.find(({ name }) => name === 'event');
     if (!apiInterface || selections.length === 0) return '';
@@ -355,7 +355,7 @@ export function generateWitEventResultDispatch(
         packageName: apiPackage.packageName,
         interfaceSpecifier: apiInterface.specifier,
         interfaceDependencies: [],
-        cases
+        cases,
     };
     const result = generateWitExportValue(
         apiPackage,
@@ -363,7 +363,7 @@ export function generateWitEventResultDispatch(
         type,
         'value',
         'returnedEvent',
-        'returnedResources'
+        'returnedResources',
     );
     return [
         'const auto returnedTag = utf8(rt, value.asObject(rt).getProperty(rt, "tag"));',
@@ -374,6 +374,6 @@ export function generateWitEventResultDispatch(
         'plugin_event_free(event);',
         `*ret = ${result.expression};`,
         ...(result.cleanupGuards ?? []).map((guardName) => `${guardName}.release();`),
-        'for (const auto &resource : *eventResources) resource->drop();'
+        'for (const auto &resource : *eventResources) resource->drop();',
     ].join('\n');
 }

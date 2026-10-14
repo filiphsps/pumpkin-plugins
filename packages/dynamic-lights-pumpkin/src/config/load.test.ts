@@ -32,7 +32,7 @@ describe(loadPluginConfig.name, () => {
         expect(config.entities.refresh_interval_ticks).toBe(10);
         expect(files.text('config.toml')).toBe(original);
         expect(
-            reports.some(({ level, message }) => level === 'warn' && message.includes('must be a whole number'))
+            reports.some(({ level, message }) => level === 'warn' && message.includes('must be a whole number')),
         ).toBe(true);
     });
 

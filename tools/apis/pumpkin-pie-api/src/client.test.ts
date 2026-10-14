@@ -10,7 +10,7 @@ const fixtures = [
         ['%player_name%', 'Steve'],
         '{"op":"set_placeholders","text":"%player_name%","viewer":"Steve"}',
         { ok: true, resolved: { text: 'Steve', unresolved: [] } },
-        { text: 'Steve', unresolved: [] }
+        { text: 'Steve', unresolved: [] },
     ],
     [
         'resolveBatch',
@@ -21,21 +21,21 @@ const fixtures = [
             resolved_batch: {
                 results: [
                     { text: '42ms', unresolved: [] },
-                    { text: '5 online', unresolved: [] }
-                ]
-            }
+                    { text: '5 online', unresolved: [] },
+                ],
+            },
         },
         [
             { text: '42ms', unresolved: [] },
-            { text: '5 online', unresolved: [] }
-        ]
+            { text: '5 online', unresolved: [] },
+        ],
     ],
     [
         'getValue',
         ['player_has_permission', 'Steve', 'Example:use'],
         '{"op":"get_placeholder_value","id":"player_has_permission","viewer":"Steve","argument":"Example:use"}',
         { ok: true, value: { known: false } },
-        { known: false }
+        { known: false },
     ],
     [
         'list',
@@ -44,10 +44,10 @@ const fixtures = [
         {
             ok: true,
             registered: {
-                placeholders: [{ id: 'player_name', description: 'Name', namespace: 'player', source: 'PumpkinPIE' }]
-            }
+                placeholders: [{ id: 'player_name', description: 'Name', namespace: 'player', source: 'PumpkinPIE' }],
+            },
         },
-        [{ id: 'player_name', description: 'Name', namespace: 'player', source: 'PumpkinPIE' }]
+        [{ id: 'player_name', description: 'Name', namespace: 'player', source: 'PumpkinPIE' }],
     ],
     [
         'registerExpansion',
@@ -55,17 +55,17 @@ const fixtures = [
         '{"op":"register_expansion","namespace":"ranks","placeholders":["prefix"],"cache":{"kind":"ttl","ms":90000}}',
         {
             ok: true,
-            registered_expansion: { namespace: 'ranks', placeholders: ['prefix'], cache: { kind: 'ttl', ms: 60000 } }
+            registered_expansion: { namespace: 'ranks', placeholders: ['prefix'], cache: { kind: 'ttl', ms: 60000 } },
         },
-        { namespace: 'ranks', placeholders: ['prefix'], cache: { kind: 'ttl', ms: 60000 } }
+        { namespace: 'ranks', placeholders: ['prefix'], cache: { kind: 'ttl', ms: 60000 } },
     ],
     [
         'unregisterExpansions',
         [],
         '{"op":"unregister_expansion"}',
         { ok: true, unregistered: { namespaces: ['ranks'] } },
-        ['ranks']
-    ]
+        ['ranks'],
+    ],
 ] as const;
 
 function client(reply: unknown, sent: string[] = []) {
@@ -94,12 +94,12 @@ describe('literal protocol interoperability', () => {
     it('keeps unknown separate from known empty and preserves unresolved tokens', () => {
         expect(client({ ok: true, value: { known: true, value: '' } }).getValue('empty')).toEqual({
             known: true,
-            value: ''
+            value: '',
         });
         expect(
             client({ ok: true, resolved: { text: '%unknown%', unresolved: ['unknown'] }, extra: 1 }).resolve(
-                '%unknown%'
-            )
+                '%unknown%',
+            ),
         ).toEqual({ text: '%unknown%', unresolved: ['unknown'] });
     });
     it('classifies transport, rejection and incompatible failures', () => {
@@ -107,7 +107,7 @@ describe('literal protocol interoperability', () => {
         expect(() =>
             new api.PieClient(() => {
                 throw new Error('host');
-            }).ping()
+            }).ping(),
         ).toThrow(api.UnavailableError);
         expect(() => client({ ok: false, error: 'reserved' }).ping()).toThrow(api.RejectedError);
         expect(() => client({ ...ping, ping: { ...ping.ping, protocol: 1 } }).ping()).toThrow(api.IncompatibleError);
@@ -125,7 +125,7 @@ describe('literal protocol interoperability', () => {
         new Uint8Array([0xc0, 0xaf]),
         new Uint8Array([0xed, 0xa0, 0x80]),
         new Uint8Array([0xf4, 0x90, 0x80, 0x80]),
-        new Uint8Array(1048577)
+        new Uint8Array(1048577),
     ])('rejects malformed ping %j', (reply) => {
         expect(() => client(reply).ping()).toThrow(api.ProtocolError);
     });
@@ -133,7 +133,7 @@ describe('literal protocol interoperability', () => {
         { known: false, value: '' },
         { known: true },
         { known: true, value: null },
-        { known: 'true', value: 'x' }
+        { known: 'true', value: 'x' },
     ])('rejects contradictory values %j', (value) => {
         expect(() => client({ ok: true, value }).getValue('id')).toThrow(api.ProtocolError);
     });
@@ -142,15 +142,15 @@ describe('literal protocol interoperability', () => {
             [],
             [
                 { text: 'a', unresolved: [] },
-                { text: 'b', unresolved: [] }
+                { text: 'b', unresolved: [] },
             ],
             [{ text: 'a', unresolved: [1] }],
             [{ text: 'a' }],
-            [{ text: 'é'.repeat(16385), unresolved: [] }]
-        ].map((results) => ({ results }))
+            [{ text: 'é'.repeat(16385), unresolved: [] }],
+        ].map((results) => ({ results })),
     )('discards invalid or mismatched batches %j', ({ results }) => {
         expect(() => client({ ok: true, resolved_batch: { results } }).resolveBatch([{ text: 'a' }])).toThrow(
-            api.ProtocolError
+            api.ProtocolError,
         );
     });
     it('preflights Unicode, JSON escaping, full batches and exact boundaries', () => {
@@ -166,7 +166,7 @@ describe('literal protocol interoperability', () => {
             () => c.resolve('\ud800'),
             () => c.resolveBatch([{ text: 'ok' }, { text: 'x'.repeat(32769) }]),
             () => c.resolveBatch(Array.from({ length: 8193 }, () => ({ text: '' }))),
-            () => c.resolveBatch(Array.from({ length: 6 }, () => ({ text: '\u0000'.repeat(32768) })))
+            () => c.resolveBatch(Array.from({ length: 6 }, () => ({ text: '\u0000'.repeat(32768) }))),
         ]) {
             expect(action).toThrow(api.InputError);
         }
@@ -175,8 +175,8 @@ describe('literal protocol interoperability', () => {
         expect(
             client({
                 ok: true,
-                resolved_batch: { results: empty.map(() => ({ text: '', unresolved: [] })) }
-            }).resolveBatch(empty)
+                resolved_batch: { results: empty.map(() => ({ text: '', unresolved: [] })) },
+            }).resolveBatch(empty),
         ).toHaveLength(8192);
     });
     it('partitions by bytes and count, preserving order and preflighting later lines', () => {
@@ -189,14 +189,17 @@ describe('literal protocol interoperability', () => {
                 JSON.stringify({
                     ok: true,
                     resolved_batch: {
-                        results: request.requests.map((line: { text: string }) => ({ text: line.text, unresolved: [] }))
-                    }
-                })
+                        results: request.requests.map((line: { text: string }) => ({
+                            text: line.text,
+                            unresolved: [],
+                        })),
+                    },
+                }),
             );
         });
         const lines = Array.from({ length: 35 }, (_, i) => ({ text: String(i) + 'x'.repeat(32000) }));
         expect(c.resolveMany(lines).map((line) => line.text.slice(0, 2))).toEqual(
-            lines.map((line) => line.text.slice(0, 2))
+            lines.map((line) => line.text.slice(0, 2)),
         );
         expect(sizes).toHaveLength(2);
         expect(sizes.every((size) => size <= 1048576)).toBe(true);
@@ -215,12 +218,12 @@ describe('literal protocol interoperability', () => {
                         ? {
                               ok: true,
                               resolved_batch: {
-                                  results: Array.from({ length: 8192 }, () => ({ text: '', unresolved: [] }))
-                              }
+                                  results: Array.from({ length: 8192 }, () => ({ text: '', unresolved: [] })),
+                              },
                           }
-                        : { ok: true, resolved_batch: { results: [] } }
-                )
-            )
+                        : { ok: true, resolved_batch: { results: [] } },
+                ),
+            ),
         );
         expect(() => c.resolveMany(Array.from({ length: 8193 }, () => ({ text: '' })))).toThrow(api.ProtocolError);
     });
@@ -230,8 +233,8 @@ it('accepts provider normalization, deduplication and sorting of advertised name
     expect(
         client({
             ok: true,
-            registered_expansion: { namespace: 'ranks', placeholders: ['count', 'prefix'], cache: { kind: 'never' } }
-        }).registerExpansion({ namespace: 'Ranks', placeholders: ['Prefix', 'Count', 'prefix'] })
+            registered_expansion: { namespace: 'ranks', placeholders: ['count', 'prefix'], cache: { kind: 'never' } },
+        }).registerExpansion({ namespace: 'Ranks', placeholders: ['Prefix', 'Count', 'prefix'] }),
     ).toEqual({ namespace: 'ranks', placeholders: ['count', 'prefix'], cache: { kind: 'never' } });
 });
 it('rejects malformed fields in every remaining result operation', () => {
@@ -244,7 +247,10 @@ it('rejects malformed fields in every remaining result operation', () => {
         {
             method: 'list',
             args: [],
-            reply: { ok: true, registered: { placeholders: [{ id: 'id', namespace: 'player', source: 'PumpkinPIE' }] } }
+            reply: {
+                ok: true,
+                registered: { placeholders: [{ id: 'id', namespace: 'player', source: 'PumpkinPIE' }] },
+            },
         },
         { method: 'unregisterExpansions', args: [], reply: { ok: true, unregistered: { namespaces: [1] } } },
         {
@@ -252,31 +258,31 @@ it('rejects malformed fields in every remaining result operation', () => {
             args: [{ namespace: 'ranks' }],
             reply: {
                 ok: true,
-                registered_expansion: { namespace: 'other', placeholders: [], cache: { kind: 'never' } }
-            }
+                registered_expansion: { namespace: 'other', placeholders: [], cache: { kind: 'never' } },
+            },
         },
         {
             method: 'registerExpansion',
             args: [{ namespace: 'ranks' }],
             reply: {
                 ok: true,
-                registered_expansion: { namespace: 'ranks', placeholders: [], cache: { kind: 'ttl', ms: 60001 } }
-            }
+                registered_expansion: { namespace: 'ranks', placeholders: [], cache: { kind: 'ttl', ms: 60001 } },
+            },
         },
         {
             method: 'registerExpansion',
             args: [{ namespace: 'ranks' }],
             reply: {
                 ok: true,
-                registered_expansion: { namespace: 'ranks', placeholders: [], cache: { kind: 'ttl', ms: 0.5 } }
-            }
+                registered_expansion: { namespace: 'ranks', placeholders: [], cache: { kind: 'ttl', ms: 0.5 } },
+            },
         },
         { method: 'resolve', args: ['a'], reply: { ok: true, resolved: { text: 'a', unresolved: null } } },
         {
             method: 'resolve',
             args: ['a'],
-            reply: { ok: true, resolved: { text: 'a', unresolved: [] }, value: { known: false } }
-        }
+            reply: { ok: true, resolved: { text: 'a', unresolved: [] }, value: { known: false } },
+        },
     ];
     for (const { method, args, reply } of cases) {
         const c = client(reply);
@@ -286,12 +292,12 @@ it('rejects malformed fields in every remaining result operation', () => {
 it('enforces the exact encoded message limit, including escaping overhead', () => {
     const request = {
         op: 'set_placeholders_batch',
-        requests: Array.from({ length: 32 }, () => ({ text: 'x'.repeat(32768) }))
+        requests: Array.from({ length: 32 }, () => ({ text: 'x'.repeat(32768) })),
     } as const;
     expect(() => api.encodeRequest(request)).toThrow(api.InputError);
     const exact = {
         op: 'set_placeholders_batch' as const,
-        requests: Array.from({ length: 31 }, () => ({ text: '\u0000'.repeat(5500) }))
+        requests: Array.from({ length: 31 }, () => ({ text: '\u0000'.repeat(5500) })),
     };
     // Establish exact size with ASCII padding within the final line's text limit.
     const padding = 1048576 - strToU8(JSON.stringify(exact)).length;

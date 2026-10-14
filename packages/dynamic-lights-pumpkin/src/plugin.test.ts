@@ -15,7 +15,7 @@ const state = vi.hoisted(() => ({
     files: undefined as MemoryFiles | undefined,
     events: new Map<string, (server: Server, event: unknown) => void>(),
     tasks: new Map<number, { repeating: boolean; run: (server: Server) => void }>(),
-    nextTask: 0
+    nextTask: 0,
 }));
 
 vi.mock('pumpkin:plugin/logging@0.1.0', () => ({ log: vi.fn() }));
@@ -29,14 +29,14 @@ vi.mock('@pumpkin-plugins/plugin-kit/plugin', () => ({
     registerPlugin: (plugin: LoadedPlugin) => {
         state.plugin = plugin;
     },
-    handleTask: vi.fn()
+    handleTask: vi.fn(),
 }));
 vi.mock('@pumpkin-plugins/plugin-kit/data-dir', () => ({ WasiDataDir: { open: () => state.files } }));
 vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({
     scheduleDelayed: (_delay: number, run: (server: Server) => void) => schedule(run, false),
     scheduleRepeating: (_delay: number, run: (server: Server) => void) => schedule(run, true),
     cancelTask: (id: number) => state.tasks.delete(id),
-    runCommand: vi.fn()
+    runCommand: vi.fn(),
 }));
 vi.mock('./commands/register.ts', () => ({ registerCommands: vi.fn() }));
 vi.mock('./platform/client-light-states.ts', () => ({ resolveClientLightStates: () => (level: number) => level }));
@@ -78,7 +78,7 @@ describe('DynamicLightsPumpkin host lifecycle', () => {
             env.player.item = undefined;
             env.delayed();
             expect(env.player.resets).toEqual([{ x: 0, y: 64, z: 0 }]);
-        }
+        },
     );
 
     it('ignores a delayed lookup that returns null after the player disconnects', () => {
@@ -191,11 +191,11 @@ function setup() {
         asEntity: () => ({ getNearbyEntities: () => player.entities }),
         sendBlockChange: (position: { x: number; y: number; z: number }, level: number) =>
             player.sent.push({ ...position, level }),
-        resetBlockChange: (position: { x: number; y: number; z: number }) => player.resets.push({ ...position })
+        resetBlockChange: (position: { x: number; y: number; z: number }) => player.resets.push({ ...position }),
     };
     const server = {
         getAllPlayers: () => [player],
-        getPlayerByName: () => (player.online ? player : null)
+        getPlayerByName: () => (player.online ? player : null),
     } as unknown as Server;
     const context = { getServer: () => server } as Context;
     plugin.onPluginLoad(context);
@@ -217,6 +217,6 @@ function setup() {
         },
         repeating() {
             for (const task of state.tasks.values()) if (task.repeating) task.run(server);
-        }
+        },
     };
 }

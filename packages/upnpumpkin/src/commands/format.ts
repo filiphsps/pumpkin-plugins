@@ -4,7 +4,7 @@ import {
     formatIpv4,
     type MapperInfo,
     type MappingSpec,
-    type MappingState
+    type MappingState,
 } from '@pumpkin-plugins/port-mapping';
 import { refusalMessage } from '../refusal.ts';
 
@@ -43,7 +43,7 @@ export function statusLines(info: MapperInfo, mappings: readonly MappingLine[]):
     } else if (info.gateway && info.externalAddress) {
         const model = info.identity ? ` (${describeIdentity(info.identity)})` : '';
         lines.push(
-            `Router: ${info.gateway.kind} at ${formatIpv4(info.gateway.address)}${model}, public address ${formatIpv4(info.externalAddress)}.`
+            `Router: ${info.gateway.kind} at ${formatIpv4(info.gateway.address)}${model}, public address ${formatIpv4(info.externalAddress)}.`,
         );
     } else if (info.localAddress) {
         lines.push(`No router found yet. This machine's address is ${formatIpv4(info.localAddress)}.`);

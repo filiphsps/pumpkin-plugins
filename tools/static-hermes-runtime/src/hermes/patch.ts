@@ -4,28 +4,28 @@ import { type HermesFileSystem, type HermesProcessRunner, hermesFileSystem, herm
 
 /** A numbered source patch and the paths it is allowed to modify. */
 export interface HermesPatch {
-    /** Patch filename within the configured series. */
-    name: string;
-    /** Absolute path to the patch file. */
-    filename: string;
-    /** Numeric prefix that determines application order. */
-    sequence: number;
     /** Source paths listed in the patch headers. */
     affectedPaths: string[];
+    /** Absolute path to the patch file. */
+    filename: string;
+    /** Patch filename within the configured series. */
+    name: string;
+    /** Numeric prefix that determines application order. */
+    sequence: number;
 }
 
 /** Inputs for validating and applying the configured Hermes patch series. */
 export interface ApplyHermesPatchesOptions {
-    /** Hermes source checkout to validate and patch. */
-    source: string;
-    /** Contiguous, numerically ordered patch series. */
-    patches: readonly HermesPatch[];
     /** Optional source commit required before applying the patches. */
     expectedCommit?: string;
     /** Optional filesystem implementation for tests. */
     filesystem?: HermesFileSystem;
+    /** Contiguous, numerically ordered patch series. */
+    patches: readonly HermesPatch[];
     /** Optional Git command runner for tests. */
     process?: HermesProcessRunner;
+    /** Hermes source checkout to validate and patch. */
+    source: string;
 }
 
 /**
@@ -38,7 +38,7 @@ export interface ApplyHermesPatchesOptions {
  */
 export function readHermesPatchSeries(
     patchesDirectory: string,
-    filesystem: HermesFileSystem = hermesFileSystem
+    filesystem: HermesFileSystem = hermesFileSystem,
 ): HermesPatch[] {
     const filenames = filesystem
         .readdirSync(patchesDirectory)
@@ -57,7 +57,7 @@ export function readHermesPatchSeries(
         const expected = index + 1;
         if (patch.sequence !== expected) {
             throw new Error(
-                `Hermes patch order must be contiguous; expected ${String(expected).padStart(4, '0')}, found ${patch.name}`
+                `Hermes patch order must be contiguous; expected ${String(expected).padStart(4, '0')}, found ${patch.name}`,
             );
         }
     });
@@ -96,14 +96,14 @@ export function applyHermesPatchSeries(options: ApplyHermesPatchesOptions): void
             patch,
             contents,
             applied: canApply(runner, options.source, contents, true),
-            applicable: canApply(runner, options.source, contents, false)
+            applicable: canApply(runner, options.source, contents, false),
         };
     });
     for (const { patch, contents, applied, applicable } of states) {
         if (applied) continue;
         if (!applicable) {
             throw new Error(
-                `Hermes patch does not apply to the pinned source (conflict or partial application): ${patch.filename}`
+                `Hermes patch does not apply to the pinned source (conflict or partial application): ${patch.filename}`,
             );
         }
         runner.run('git', ['-C', options.source, 'apply'], { input: contents, stdio: 'pipe' });
@@ -123,7 +123,7 @@ export function verifyHermesPatchSeriesApplied(
     source: string,
     patches: readonly HermesPatch[],
     runner: HermesProcessRunner = hermesProcess,
-    filesystem: HermesFileSystem = hermesFileSystem
+    filesystem: HermesFileSystem = hermesFileSystem,
 ): void {
     for (const patch of patches) {
         const contents = readPatchContents(filesystem, patch.filename);
@@ -144,7 +144,7 @@ export function verifyHermesPatchSeriesApplied(
 export function ensurePatchOnlyChanges(
     source: string,
     patches: readonly HermesPatch[],
-    runner: HermesProcessRunner = hermesProcess
+    runner: HermesProcessRunner = hermesProcess,
 ): void {
     const status = runner.output('git', ['-C', source, 'status', '--porcelain=v1', '-z', '--untracked-files=all']);
     if (!status) return;
@@ -153,7 +153,7 @@ export function ensurePatchOnlyChanges(
     const unexpected = changed.filter((filename) => !allowed.has(filename));
     if (unexpected.length > 0) {
         throw new Error(
-            `Hermes source has local changes outside the managed patch set: ${source} (${unexpected.join(', ')})`
+            `Hermes source has local changes outside the managed patch set: ${source} (${unexpected.join(', ')})`,
         );
     }
 }
@@ -168,7 +168,7 @@ function canApply(runner: HermesProcessRunner, source: string, contents: string,
     try {
         runner.run('git', ['-C', source, 'apply', '--check', ...(reverse ? ['--reverse'] : [])], {
             input: contents,
-            stdio: 'pipe'
+            stdio: 'pipe',
         });
         return true;
     } catch {

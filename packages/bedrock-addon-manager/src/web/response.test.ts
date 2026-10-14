@@ -18,7 +18,7 @@ function plan(request: Partial<HttpRequest> | undefined, known = 'a.mcpack') {
             const file = new FakeFile(PACK);
             files.push(file);
             return file;
-        }
+        },
     );
     return { ...result, files, lookups, text: strFromU8(result.head) };
 }
@@ -79,7 +79,7 @@ describe('planResponse', () => {
     it('handles an empty pack without trying to stream it', () => {
         const empty = planResponse(
             { method: 'GET', target: '/packs/e.mcpack', headers: {} },
-            () => new FakeFile(new Uint8Array(0))
+            () => new FakeFile(new Uint8Array(0)),
         );
         expect(strFromU8(empty.head)).toContain('Content-Length: 0\r\n');
         expect(empty.body).toBeUndefined();

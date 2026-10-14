@@ -13,7 +13,7 @@ export class TcpTransport implements Transport {
     constructor(
         private readonly socket: TcpSocket,
         private readonly input: InputStream,
-        private readonly output: OutputStream
+        private readonly output: OutputStream,
     ) {}
 
     /** {@inheritDoc web/session!Transport#read} */

@@ -11,7 +11,7 @@ const filesystemState = vi.hoisted(() => ({
     rejectRenameOverExistingFile: false,
     onRemoveLock: undefined as ((filename: string) => void) | undefined,
     failLockWrite: undefined as { lockPath: string; replacement?: string } | undefined,
-    failReadPath: undefined as string | undefined
+    failReadPath: undefined as string | undefined,
 }));
 vi.mock('node:fs', async (importOriginal) => {
     const actual = await importOriginal<typeof import('node:fs')>();
@@ -60,7 +60,7 @@ vi.mock('node:fs', async (importOriginal) => {
         rmSync: (...args: Parameters<typeof actual.rmSync>) => {
             filesystemState.onRemoveLock?.(String(args[0]));
             return actual.rmSync(...args);
-        }
+        },
     };
 });
 
@@ -68,7 +68,7 @@ const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 const FILES = { 'io/poll.wit': 'package wasi:io;', 'clocks/world.wit': 'package wasi:clocks;' };
 const lock: WasiWitLock = {
     version: '9.9.9',
-    files: Object.fromEntries(Object.entries(FILES).map(([k, v]) => [k, sha(v)]))
+    files: Object.fromEntries(Object.entries(FILES).map(([k, v]) => [k, sha(v)])),
 };
 
 const dirs: string[] = [];
@@ -116,8 +116,8 @@ describe('ensureWasiWit', () => {
                     fetchFile: async (url) => {
                         fetchCount += 1;
                         return download.fetchFile(url);
-                    }
-                })
+                    },
+                }),
             ).rejects.toThrow(/unsafe WASI WIT lock version/);
 
             expect(fetchCount).toBe(0);
@@ -141,12 +141,12 @@ describe('ensureWasiWit', () => {
                     lock: {
                         version: '9.9.9',
                         files: { [rel]: sha('package wasi:evil;') },
-                        generatedFiles: { [rel]: 'package wasi:evil;' }
+                        generatedFiles: { [rel]: 'package wasi:evil;' },
                     },
                     fetchFile: async () => {
                         throw new Error('unexpected download');
-                    }
-                })
+                    },
+                }),
             ).rejects.toThrow(/unsafe WASI WIT file path/);
 
             expect(fs.existsSync(escapedFile)).toBe(false);
@@ -169,12 +169,12 @@ describe('ensureWasiWit', () => {
                     lock: {
                         version: '9.9.9',
                         files: { [rel]: sha('package wasi:evil;') },
-                        generatedFiles: { [rel]: 'package wasi:evil;' }
+                        generatedFiles: { [rel]: 'package wasi:evil;' },
                     },
                     fetchFile: async () => {
                         throw new Error('unexpected download');
-                    }
-                })
+                    },
+                }),
             ).rejects.toThrow(/unsafe WASI WIT file path/);
 
             expect(fs.existsSync(escapedFile)).toBe(false);
@@ -194,8 +194,8 @@ describe('ensureWasiWit', () => {
                 fetchFile: async () => {
                     fetchCount += 1;
                     return new TextEncoder().encode('unexpected download');
-                }
-            })
+                },
+            }),
         ).rejects.toThrow(/unsafe WASI WIT source path/);
 
         expect(fetchCount).toBe(0);
@@ -213,8 +213,8 @@ describe('ensureWasiWit', () => {
                 fetchFile: async () => {
                     fetchCount += 1;
                     return new TextEncoder().encode('unexpected download');
-                }
-            })
+                },
+            }),
         ).rejects.toThrow(/unsafe WASI WIT generated-file path/);
 
         expect(fetchCount).toBe(0);
@@ -265,7 +265,7 @@ describe('ensureWasiWit', () => {
         now.mockReturnValueOnce(1_000).mockReturnValueOnce(1_001).mockReturnValue(1_000_000);
 
         await expect(withWasiWitFileLock(lockPath, () => undefined)).rejects.toThrow(
-            `inspect recovery claim ${reclaimLockPath}`
+            `inspect recovery claim ${reclaimLockPath}`,
         );
 
         expect(fs.readFileSync(lockPath, 'utf8')).toBe(staleOwner);
@@ -345,7 +345,7 @@ describe('ensureWasiWit', () => {
         expect(fs.readFileSync(path.join(dir, 'clocks/world.wit'), 'utf8')).toBe(FILES['clocks/world.wit']);
         expect(urls.sort()).toEqual([
             'https://raw.githubusercontent.com/WebAssembly/WASI/v9.9.9/wasip2/clocks/world.wit',
-            'https://raw.githubusercontent.com/WebAssembly/WASI/v9.9.9/wasip2/io/poll.wit'
+            'https://raw.githubusercontent.com/WebAssembly/WASI/v9.9.9/wasip2/io/poll.wit',
         ]);
     });
 
@@ -355,7 +355,7 @@ describe('ensureWasiWit', () => {
         const generatedLock = {
             version: '9.9.9',
             files: { 'http/package.wit': sha(packageWit) },
-            generatedFiles: { 'http/package.wit': packageWit }
+            generatedFiles: { 'http/package.wit': packageWit },
         } satisfies WasiWitLock;
         let fetchCount = 0;
 
@@ -365,7 +365,7 @@ describe('ensureWasiWit', () => {
             fetchFile: async () => {
                 fetchCount += 1;
                 return new TextEncoder().encode('unexpected download');
-            }
+            },
         });
 
         expect(fetchCount).toBe(0);
@@ -411,7 +411,7 @@ describe('ensureWasiWit', () => {
         filesystemState.rejectRenameOverExistingFile = true;
 
         const results = await Promise.all(
-            Array.from({ length: workerCount }, () => ensureWasiWit({ cacheDir: cache, lock, fetchFile }))
+            Array.from({ length: workerCount }, () => ensureWasiWit({ cacheDir: cache, lock, fetchFile })),
         );
 
         expect(new Set(results).size).toBe(1);
@@ -431,7 +431,7 @@ describe('ensureWasiWit', () => {
         const watchers = watched.map((folder) =>
             fs.watch(folder, (_event, filename) => {
                 if (filename?.toString().startsWith('.wasi-wit-')) stagingEvents.push(filename.toString());
-            })
+            }),
         );
         try {
             await ensureWasiWit({ cacheDir: cache, lock, fetchFile: server().fetchFile });
@@ -526,7 +526,7 @@ describe('ensureWasiWit', () => {
     it('refuses a download that does not match its pinned hash and does not cache it', async () => {
         const cache = tmp();
         await expect(
-            ensureWasiWit({ cacheDir: cache, lock, fetchFile: server({ 'io/poll.wit': 'evil' }).fetchFile })
+            ensureWasiWit({ cacheDir: cache, lock, fetchFile: server({ 'io/poll.wit': 'evil' }).fetchFile }),
         ).rejects.toThrow(/io\/poll\.wit .* has hash .*, expected /);
         expect(fs.existsSync(path.join(cache, 'wasi-wit', '9.9.9', 'io/poll.wit'))).toBe(false);
     });

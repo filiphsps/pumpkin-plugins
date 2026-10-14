@@ -21,7 +21,7 @@ function setup(options: Partial<SessionOptions> = {}) {
             files.push(file);
             return file;
         },
-        { now: () => clock.now, idleTimeoutMs: 1000, writeBudget: 1 << 20, chunkSize: 1 << 20, ...options }
+        { now: () => clock.now, idleTimeoutMs: 1000, writeBudget: 1 << 20, chunkSize: 1 << 20, ...options },
     );
     /** Ticks until the session ends or `maxTicks` pass, giving the transport `space` bytes each tick. */
     const run = (maxTicks = 1000, space = Number.POSITIVE_INFINITY) => {

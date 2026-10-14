@@ -7,11 +7,11 @@ const document = {
             name: 'plugin',
             imports: {
                 'interface-0': { interface: { id: 0 } },
-                context: { type: 0 }
+                context: { type: 0 },
             },
             exports: {},
-            package: 0
-        }
+            package: 0,
+        },
     ],
     interfaces: [
         {
@@ -23,18 +23,18 @@ const document = {
                     kind: { method: 7 },
                     params: [{ name: 'self', type: 7 }],
                     result: 4,
-                    stability: { stable: { since: '1.0.0' } }
+                    stability: { stable: { since: '1.0.0' } },
                 },
                 create: {
                     name: '[constructor]stream',
                     kind: { constructor: 7 },
                     params: [],
-                    result: 6
+                    result: 6,
                 },
-                parse: { name: 'parse', kind: 'freestanding', params: [{ name: 'bytes', type: 5 }] }
+                parse: { name: 'parse', kind: 'freestanding', params: [{ name: 'bytes', type: 5 }] },
             },
-            package: 0
-        }
+            package: 0,
+        },
     ],
     types: [
         { name: 'payload', kind: { record: { fields: [{ name: 'data', type: 5 }] } }, owner: { interface: 0 } },
@@ -44,11 +44,11 @@ const document = {
                 variant: {
                     cases: [
                         { name: 'ready', type: null },
-                        { name: 'failed', type: 4 }
-                    ]
-                }
+                        { name: 'failed', type: 4 },
+                    ],
+                },
             },
-            owner: { interface: 0 }
+            owner: { interface: 0 },
         },
         { name: 'mode', kind: { enum: { cases: [{ name: 'fast' }, { name: 'safe' }] } }, owner: { interface: 0 } },
         { name: 'options', kind: { flags: { flags: [{ name: 'read' }, { name: 'write' }] } }, owner: { interface: 0 } },
@@ -56,9 +56,9 @@ const document = {
         { name: null, kind: { list: 'u8' }, owner: null },
         { name: null, kind: { tuple: { types: [0, 5] } }, owner: null },
         { name: 'stream', kind: 'resource', owner: { interface: 0 } },
-        { name: null, kind: { handle: { borrow: 7 } }, owner: null }
+        { name: null, kind: { handle: { borrow: 7 } }, owner: null },
     ],
-    packages: [{ name: 'example:api@1.0.0', interfaces: { api: 0 }, worlds: { plugin: 0 } }]
+    packages: [{ name: 'example:api@1.0.0', interfaces: { api: 0 }, worlds: { plugin: 0 } }],
 };
 
 it('decodes resolved WIT type forms and resource operation kinds', () => {
@@ -70,7 +70,7 @@ it('decodes resolved WIT type forms and resource operation kinds', () => {
     expect(parsed.interfaces[0]?.functions.read?.kind).toEqual({ method: 7 });
     expect(parsed.interfaces[0]?.functions.create?.kind).toEqual({ constructor: 7 });
     expect(parsed.types.map((type) => (typeof type.kind === 'string' ? type.kind : Object.keys(type.kind)[0]))).toEqual(
-        ['record', 'variant', 'enum', 'flags', 'result', 'list', 'tuple', 'resource', 'handle']
+        ['record', 'variant', 'enum', 'flags', 'result', 'list', 'tuple', 'resource', 'handle'],
     );
 });
 
@@ -91,6 +91,6 @@ it('rejects an unsupported WIT type kind with its type name', () => {
     Reflect.set(firstType, 'kind', { future: 'u32' });
 
     expect(() => parseWitToolsJson(JSON.stringify(invalid))).toThrow(
-        'Unsupported WIT JSON type kind "future" for payload'
+        'Unsupported WIT JSON type kind "future" for payload',
     );
 });

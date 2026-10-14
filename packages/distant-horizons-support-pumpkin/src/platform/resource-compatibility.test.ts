@@ -5,7 +5,7 @@ import { schema } from '../config/schema.ts';
 import { withPlayer } from './peers.ts';
 
 vi.mock('pumpkin:plugin/world@0.1.0', () => ({
-    blockStateToInfo: () => ({ name: 'minecraft:stone', properties: [] })
+    blockStateToInfo: () => ({ name: 'minecraft:stone', properties: [] }),
 }));
 vi.mock('pumpkin:plugin/text@0.1.0', () => ({ TextComponent: { text: (value: string) => ({ value }) } }));
 
@@ -23,13 +23,13 @@ describe('host resource compatibility', () => {
             getTopBlockY: () => 64,
             getSkyLight: () => 15,
             getBlockLight: () => 0,
-            getChunk: () => ({})
+            getChunk: () => ({}),
         };
         const player = {
             asJava: () => java,
             getWorld: () => world,
             getName: () => 'Alex',
-            getPosition: () => [0, 64, 0]
+            getPosition: () => [0, 64, 0],
         } as unknown as Player;
         expect(
             withPlayer(player, { ...values.support, worlds: values.worlds }, (peer) => {
@@ -40,12 +40,12 @@ describe('host resource compatibility', () => {
                         width: 64,
                         depth: 64,
                         minY: -64,
-                        height: 384
-                    })
+                        height: 384,
+                    }),
                 ).toEqual({ status: 'ready' });
                 expect(peer.terrain.sample(0, 64, 0).skyLight).toBe(15);
                 peer.send(new Uint8Array([1]));
-            })
+            }),
         ).toBe(true);
         expect(java.sendCustomPayload).toHaveBeenCalledOnce();
     });

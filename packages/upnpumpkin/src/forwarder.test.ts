@@ -6,7 +6,7 @@ import {
     encodeRequest,
     type PortRequest,
     type Reply,
-    type Request
+    type Request,
 } from '@pumpkin-plugins/upnpumpkin-api';
 import { describe, expect, it } from 'vitest';
 import { CONFIG_FILE } from './config/schema.ts';
@@ -51,9 +51,9 @@ function delayRouterReply(net: FakeNetwork, action = 'DeletePortMapping') {
                         delayed ||= new TextDecoder().decode(bytes).includes(`#${action}`);
                         connection.write(bytes);
                     },
-                    read: (max) => (delayed && blocked ? null : connection.read(max))
+                    read: (max) => (delayed && blocked ? null : connection.read(max)),
                 };
-            }
+            },
         };
     };
     return () => {
@@ -98,7 +98,7 @@ describe('PortForwarder', () => {
 
     it('searches for the router again, and keeps what plugins asked for, when router settings change', () => {
         const { files, forwarder, settle, ask, keys, net } = setup(
-            '[java]\nenabled = false\n\n[bedrock]\nenabled = false\n'
+            '[java]\nenabled = false\n\n[bedrock]\nenabled = false\n',
         );
         forwarder.start();
         ask('BedrockAddonManager', ensure());
@@ -107,21 +107,21 @@ describe('PortForwarder', () => {
 
         files.put(
             CONFIG_FILE,
-            '[router]\nlease_seconds = 600\n\n[java]\nenabled = false\n\n[bedrock]\nenabled = false\n'
+            '[router]\nlease_seconds = 600\n\n[java]\nenabled = false\n\n[bedrock]\nenabled = false\n',
         );
         forwarder.reload();
         settle(() => net.sent.filter((s) => s.to.port === 1900).length > searches && keys().length === 1);
         expect(keys()).toEqual(['tcp:8123']);
         expect(ask('BedrockAddonManager', { op: 'status', key: 'web' })).toMatchObject({
             ok: true,
-            status: { kind: 'open' }
+            status: { kind: 'open' },
         });
     });
 
     it('returns from router reload without polling cleanup and waits for it before replacement creation', () => {
         const { files, forwarder, settle, keys, net, igd } = setup(
             '[bedrock]\nenabled = false\n',
-            new FakeIgd({ natPmp: false })
+            new FakeIgd({ natPmp: false }),
         );
         forwarder.start();
         settle(() => keys().length === 1);
@@ -145,7 +145,7 @@ describe('PortForwarder', () => {
     it('bounds repeated reloads while one old mapper retires and applies the final configuration', () => {
         const { files, forwarder, settle, keys, net, igd } = setup(
             '[bedrock]\nenabled = false\n',
-            new FakeIgd({ natPmp: false })
+            new FakeIgd({ natPmp: false }),
         );
         forwarder.start();
         settle(() => keys().length === 1);
@@ -156,7 +156,7 @@ describe('PortForwarder', () => {
         for (let i = 0; i < 50; i++) {
             files.put(
                 CONFIG_FILE,
-                `[router]\nlease_seconds = ${600 + i}\n[java]\nport = ${26000 + i}\n[bedrock]\nenabled = false\n`
+                `[router]\nlease_seconds = ${600 + i}\n[java]\nport = ${26000 + i}\n[bedrock]\nenabled = false\n`,
             );
             forwarder.reload();
             forwarder.tick();
@@ -174,7 +174,7 @@ describe('PortForwarder', () => {
     it('cancels stalled retirement at its tick deadline and allows the replacement to progress', () => {
         const { files, forwarder, settle, keys, net, log } = setup(
             '[bedrock]\nenabled = false\n',
-            new FakeIgd({ natPmp: false })
+            new FakeIgd({ natPmp: false }),
         );
         forwarder.start();
         settle(() => keys().length === 1);
@@ -197,7 +197,7 @@ describe('PortForwarder', () => {
     it('accounts for in-flight old creation before handing a reload to its replacement', () => {
         const { files, forwarder, settle, keys, net } = setup(
             '[bedrock]\nenabled = false\n',
-            new FakeIgd({ natPmp: false })
+            new FakeIgd({ natPmp: false }),
         );
         const resume = delayRouterReply(net, 'AddPortMapping');
         forwarder.start();
@@ -216,7 +216,7 @@ describe('PortForwarder', () => {
     it('stops a retiring mapper without starting its unpolled replacement', () => {
         const { files, forwarder, settle, keys, net, igd } = setup(
             '[bedrock]\nenabled = false\n',
-            new FakeIgd({ natPmp: false })
+            new FakeIgd({ natPmp: false }),
         );
         forwarder.start();
         settle(() => keys().length === 1);
@@ -235,7 +235,7 @@ describe('PortForwarder', () => {
     describe('requests from other plugins', () => {
         it('opens a port and reports where it is reachable', () => {
             const { forwarder, settle, ask, keys, log } = setup(
-                '[java]\nenabled = false\n\n[bedrock]\nenabled = false\n'
+                '[java]\nenabled = false\n\n[bedrock]\nenabled = false\n',
             );
             forwarder.start();
             expect(ask('BedrockAddonManager', ensure())).toEqual({ ok: true, status: { kind: 'pending' } });
@@ -243,11 +243,11 @@ describe('PortForwarder', () => {
 
             expect(ask('BedrockAddonManager', ensure())).toEqual({
                 ok: true,
-                status: { kind: 'open', via: 'upnp', address: '93.184.216.34', port: 8123 }
+                status: { kind: 'open', via: 'upnp', address: '93.184.216.34', port: 8123 },
             });
             expect(keys()).toEqual(['tcp:8123']);
             expect(log.of('info')).toContain(
-                `${ansi.named.name('BedrockAddonManager')} asked for TCP port ${ansi.named.port('8123')} to be opened (Packs).`
+                `${ansi.named.name('BedrockAddonManager')} asked for TCP port ${ansi.named.port('8123')} to be opened (Packs).`,
             );
         });
 
@@ -273,15 +273,15 @@ describe('PortForwarder', () => {
                 info: {
                     localAddress: '192.168.1.50',
                     gateway: { kind: 'upnp', address: '192.168.1.1' },
-                    externalAddress: '93.184.216.34'
-                }
+                    externalAddress: '93.184.216.34',
+                },
             });
         });
 
         it('reports a machine that is already public without opening anything', () => {
             const { forwarder, net, settle, ask } = setup(
                 '[java]\nenabled = false\n\n[bedrock]\nenabled = false\n',
-                null
+                null,
             );
             net.local = [93, 184, 216, 99];
             forwarder.start();
@@ -289,7 +289,7 @@ describe('PortForwarder', () => {
             settle(() => false, 200);
             expect(ask('X', ensure())).toEqual({
                 ok: true,
-                status: { kind: 'open', via: 'public', address: '93.184.216.99', port: 8123 }
+                status: { kind: 'open', via: 'public', address: '93.184.216.99', port: 8123 },
             });
         });
 
@@ -302,9 +302,9 @@ describe('PortForwarder', () => {
                 forwarder.handleMessage(
                     'X',
                     new TextEncoder().encode(
-                        '{"v":1,"op":"ensure","key":"a","protocol":"tcp","port":0,"description":"d"}'
-                    )
-                )
+                        '{"v":1,"op":"ensure","key":"a","protocol":"tcp","port":0,"description":"d"}',
+                    ),
+                ),
             );
             expect(port).toMatchObject({ ok: false });
         });
@@ -336,7 +336,7 @@ describe('PortForwarder', () => {
 
         it("limits each plugin without letting one plugin use another plugin's share", () => {
             const { forwarder, ask } = setup(
-                '[java]\nenabled = false\n\n[bedrock]\nenabled = false\n\n[plugins]\nmax_requests_per_plugin = 2\n'
+                '[java]\nenabled = false\n\n[bedrock]\nenabled = false\n\n[plugins]\nmax_requests_per_plugin = 2\n',
             );
             forwarder.start();
             for (let i = 1; i <= 2; i++)
@@ -344,14 +344,14 @@ describe('PortForwarder', () => {
             expect(ask('Y', ensure({ ...web, key: 'k1', port: 2000 }))).toMatchObject({ ok: true });
             expect(ask('X', ensure({ ...web, key: 'k3', port: 1003 }))).toEqual({
                 ok: false,
-                error: expect.stringContaining('at most 2 ports can be requested per plugin')
+                error: expect.stringContaining('at most 2 ports can be requested per plugin'),
             });
             expect(ask('X', ensure({ ...web, key: 'k1', port: 1001 }))).toMatchObject({ ok: true });
         });
 
         it('closes ports nobody has asked about for a while, and keeps those that are re-asked', () => {
             const { forwarder, settle, ask, keys, net, log } = setup(
-                '[java]\nenabled = false\n\n[bedrock]\nenabled = false\n'
+                '[java]\nenabled = false\n\n[bedrock]\nenabled = false\n',
             );
             forwarder.start();
             ask('Gone', ensure({ ...web, key: 'a', port: 1111 }));
@@ -383,7 +383,7 @@ describe('PortForwarder', () => {
     it('cancels unfinished shutdown cleanup at its deadline and closes the stalled transport', () => {
         const { forwarder, settle, keys, net, log } = setup(
             '[bedrock]\nenabled = false\n',
-            new FakeIgd({ natPmp: false })
+            new FakeIgd({ natPmp: false }),
         );
         forwarder.start();
         settle(() => keys().length === 1);
@@ -414,7 +414,7 @@ describe('PortForwarder', () => {
 
 describe('PortForwarder with a blocked router', () => {
     const speedport = {
-        '/html/login/index.html': { body: '<html><head><title>Speedport Konfigurationsprogramm</title></head>' }
+        '/html/login/index.html': { body: '<html><head><title>Speedport Konfigurationsprogramm</title></head>' },
     };
     const telekom = () => new FakeIgd({ upnp: false, natPmp: false, webPages: speedport });
 

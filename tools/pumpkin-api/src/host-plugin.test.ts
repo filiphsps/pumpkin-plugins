@@ -8,7 +8,7 @@ const host = vi.hoisted(() => ({
     nextTaskId: 40,
     scheduleFailure: false,
     cancelFailure: false,
-    cancelled: [] as number[]
+    cancelled: [] as number[],
 }));
 vi.mock('pumpkin:plugin/scheduler@0.1.0', () => ({
     scheduleDelayedTask(handlerId: number, delayTicks: bigint) {
@@ -26,7 +26,7 @@ vi.mock('pumpkin:plugin/scheduler@0.1.0', () => ({
     cancelTask(taskId: number) {
         if (host.cancelFailure) throw new Error('Host cancellation failed');
         host.cancelled.push(taskId);
-    }
+    },
 }));
 
 import { handleTask, onUnload, registerPlugin } from './core.ts';
@@ -54,7 +54,7 @@ describe('scheduled callback lifetime', () => {
         ['string', '1'],
         ['boolean', true],
         ['null', null],
-        ['object with a bigint coercion', { valueOf: () => 1n }]
+        ['object with a bigint coercion', { valueOf: () => 1n }],
     ])('rejects a %s tick value before calling the scheduler', (_name, value) => {
         expect(() => new TestPlugin().scheduleDelayedTask(value as never, () => {})).toThrow(RangeError);
         expect(host.scheduled).toEqual([]);
@@ -63,24 +63,24 @@ describe('scheduled callback lifetime', () => {
     it.each([
         {
             name: 'unsafe number delay',
-            schedule: (plugin: TestPlugin) => plugin.scheduleDelayedTask(Number.MAX_SAFE_INTEGER + 1, () => {})
+            schedule: (plugin: TestPlugin) => plugin.scheduleDelayedTask(Number.MAX_SAFE_INTEGER + 1, () => {}),
         },
         {
             name: 'negative bigint delay',
-            schedule: (plugin: TestPlugin) => plugin.scheduleDelayedTask(-1n, () => {})
+            schedule: (plugin: TestPlugin) => plugin.scheduleDelayedTask(-1n, () => {}),
         },
         {
             name: 'delay beyond u64',
-            schedule: (plugin: TestPlugin) => plugin.scheduleDelayedTask(1n << 64n, () => {})
+            schedule: (plugin: TestPlugin) => plugin.scheduleDelayedTask(1n << 64n, () => {}),
         },
         {
             name: 'zero repeating period',
-            schedule: (plugin: TestPlugin) => plugin.scheduleRepeatingTask(0, 0, () => {})
+            schedule: (plugin: TestPlugin) => plugin.scheduleRepeatingTask(0, 0, () => {}),
         },
         {
             name: 'repeating period beyond u64',
-            schedule: (plugin: TestPlugin) => plugin.scheduleRepeatingTask(0, 1n << 64n, () => {})
-        }
+            schedule: (plugin: TestPlugin) => plugin.scheduleRepeatingTask(0, 1n << 64n, () => {}),
+        },
     ])('rejects $name before calling the scheduler', ({ schedule }) => {
         expect(() => schedule(new TestPlugin())).toThrow(RangeError);
         expect(host.scheduled).toEqual([]);
@@ -121,7 +121,7 @@ describe('scheduled callback lifetime', () => {
         host.scheduleFailure = true;
         const plugin = new TestPlugin();
         expect(() =>
-            kind === 'delayed' ? plugin.scheduleDelayedTask(1, handler) : plugin.scheduleRepeatingTask(1, 2, handler)
+            kind === 'delayed' ? plugin.scheduleDelayedTask(1, handler) : plugin.scheduleRepeatingTask(1, 2, handler),
         ).toThrow('Host scheduling failed');
         handleTask(host.scheduled[0], server);
         expect(handler).not.toHaveBeenCalled();

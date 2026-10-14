@@ -1,14 +1,14 @@
 import type { WitAnalysis } from './analysis.ts';
 import {
     generateWitApiFunctionForResolvedOperation,
-    generateWitResourceMethodForResolvedPlan
+    generateWitResourceMethodForResolvedPlan,
 } from './native-adapters.ts';
 import type { WitApiAdapterPlan, WitApiPackage } from './types.ts';
 
 interface ResourceApiGroup {
+    functions: string[];
     interfaceName: string;
     resourceName: string;
-    functions: string[];
 }
 
 /** Generate native Pumpkin dispatch from resolved operation plans. */
@@ -27,7 +27,7 @@ export function generatePumpkinMethodDispatch(apiPackage: WitApiPackage, analysi
                 operation: plan.operation,
                 parameters: plan.parameters,
                 resultType: plan.resultType,
-                options: { resourceDrops }
+                options: { resourceDrops },
             });
             if (!adapter) throw unsupportedPlanError(plan);
             append(apiFunctions, plan.apiInterface.name, adapter);
@@ -39,7 +39,7 @@ export function generatePumpkinMethodDispatch(apiPackage: WitApiPackage, analysi
             const branch = generateWitResourceMethodForResolvedPlan(apiPackage, plan, {
                 includePackageName: false,
                 preserveArgumentCheckLine: true,
-                resourceDrops
+                resourceDrops,
             });
             if (!branch) throw unsupportedPlanError(plan);
             resourceMethods.push(branch);
@@ -63,8 +63,8 @@ export function generatePumpkinMethodDispatch(apiPackage: WitApiPackage, analysi
                 functionName: nativeOperation,
                 apiObjectName,
                 propertyName: methodName,
-                resourceDrops
-            }
+                resourceDrops,
+            },
         });
         if (!adapter) throw unsupportedPlanError(plan);
         appendResource(resourceApiFunctions, plan.apiInterface.name, resource.name, adapter);
@@ -80,7 +80,7 @@ export function generatePumpkinMethodDispatch(apiPackage: WitApiPackage, analysi
     });
     const interfaceNames = new Set([
         ...apiFunctions.keys(),
-        ...[...resourceApiFunctions.values()].map(({ interfaceName }) => interfaceName)
+        ...[...resourceApiFunctions.values()].map(({ interfaceName }) => interfaceName),
     ]);
     const functionInstallations = [...interfaceNames].map((interfaceName) => {
         const apiObject = `generated${pascalCase(interfaceName)}Api`;
@@ -95,7 +95,7 @@ export function generatePumpkinMethodDispatch(apiPackage: WitApiPackage, analysi
                     `      Object ${resourceApiObject} = ${resourceApiValue}.isObject() ? ${resourceApiValue}.asObject(runtime) : Object(runtime);`,
                     resource.functions.join('\n'),
                     `      ${apiObject}.setProperty(runtime, ${JSON.stringify(jsName(resource.resourceName))}, std::move(${resourceApiObject}));`,
-                    '    }'
+                    '    }',
                 ].join('\n');
             });
         const apiObjectValue = `${apiObject}Value`;
@@ -105,7 +105,7 @@ export function generatePumpkinMethodDispatch(apiPackage: WitApiPackage, analysi
             functions.join('\n'),
             resourceInstallations.join('\n'),
             `    host.setProperty(runtime, ${JSON.stringify(interfaceName)}, std::move(${apiObject}));`,
-            '  }'
+            '  }',
         ].join('\n');
     });
     return [
@@ -120,7 +120,7 @@ export function generatePumpkinMethodDispatch(apiPackage: WitApiPackage, analysi
         '',
         'void installGeneratedWitApiFunctions(Runtime &runtime, Object &host) {',
         `    ${functionInstallations.join('\n')}`,
-        '}'
+        '}',
     ].join('\n');
 }
 
@@ -134,7 +134,7 @@ function appendResource(
     destination: Map<string, ResourceApiGroup>,
     interfaceName: string,
     resourceName: string,
-    value: string
+    value: string,
 ): void {
     const key = `${interfaceName}.${resourceName}`;
     const group = destination.get(key) ?? { interfaceName, resourceName, functions: [] };

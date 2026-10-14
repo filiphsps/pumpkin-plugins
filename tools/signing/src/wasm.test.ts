@@ -56,7 +56,7 @@ describe('stripSignature', () => {
         const signed = appendCustomSections(minimalWasm(), [
             ['pumpkin.metadata', Buffer.from('{}')],
             ['pumpkin.signature', Buffer.from('old')],
-            ['wasm_signature', Buffer.from('{}')]
+            ['wasm_signature', Buffer.from('{}')],
         ]);
         const { clean, trailing } = stripSignature(signed);
         expect(clean.equals(minimalWasm())).toBe(true);
@@ -66,7 +66,7 @@ describe('stripSignature', () => {
     it('keeps signing sections that are followed by another section', () => {
         const wasm = appendCustomSections(minimalWasm(), [
             ['pumpkin.metadata', Buffer.from('{}')],
-            ['other', Buffer.from('x')]
+            ['other', Buffer.from('x')],
         ]);
         expect(stripSignature(wasm).clean.equals(wasm)).toBe(true);
     });

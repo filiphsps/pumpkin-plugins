@@ -9,7 +9,7 @@ describe('commands', () => {
         const r = await start({
             name: 'commands',
             config: (port) => portConfig(port),
-            files: { 'packs/a.mcpack': makeMcpack() }
+            files: { 'packs/a.mcpack': makeMcpack() },
         });
         await r.server.waitForLog(/Found 1 Bedrock pack/);
 

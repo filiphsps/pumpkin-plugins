@@ -4,5 +4,5 @@ export const SESSION_TIMING = {
     minPingMs: 1000,
     maxPingMs: 30000,
     initialRetryMs: 1000,
-    maxRetryMs: 30000
+    maxRetryMs: 30000,
 } as const;

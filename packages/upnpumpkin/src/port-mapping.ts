@@ -6,5 +6,5 @@ export type {
     Dial,
     Endpoint,
     Ipv4,
-    Network
+    Network,
 } from '@pumpkin-plugins/port-mapping';

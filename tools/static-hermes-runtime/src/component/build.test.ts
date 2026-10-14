@@ -11,11 +11,11 @@ const mocks = vi.hoisted(() => ({
     prepareHermes: vi.fn(),
     analyze: vi.fn(),
     generate: vi.fn(),
-    compile: vi.fn()
+    compile: vi.fn(),
 }));
 
 vi.mock('../hermes/toolchain-environment.ts', () => ({
-    setupHermesToolchainEnvironment: mocks.setupToolchain
+    setupHermesToolchainEnvironment: mocks.setupToolchain,
 }));
 vi.mock('../hermes/prepare.ts', () => ({ prepareHermes: mocks.prepareHermes }));
 vi.mock('./analyze.ts', () => ({ analyzeComponentWit: mocks.analyze }));
@@ -32,7 +32,7 @@ const environmentKeys = [
     'STATIC_HERMES_ENABLE_LEAN_ARCHIVE',
     'PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED',
     'WASM_TOOLS',
-    'WIT_BINDGEN'
+    'WIT_BINDGEN',
 ];
 let originalEnvironment = new Map<string, string | undefined>();
 let root = '';
@@ -73,8 +73,8 @@ describe('buildStaticHermesComponent', () => {
                 workspaceRoot: root,
                 includeWasiSdk: true,
                 includeWitBindgen: true,
-                includeWasmTools: true
-            })
+                includeWasmTools: true,
+            }),
         );
         expect(mocks.prepareHermes).toHaveBeenCalledOnce();
         expect(mocks.prepareHermes).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: root }));
@@ -83,13 +83,13 @@ describe('buildStaticHermesComponent', () => {
             expect.objectContaining({
                 options: expect.objectContaining({
                     ...options,
-                    output: expect.stringContaining(path.join(outputDirectory, '.static-hermes-'))
+                    output: expect.stringContaining(path.join(outputDirectory, '.static-hermes-')),
                 }),
                 stackSizeBytes: '262144',
                 toolchain: expect.objectContaining({
-                    hermesRuntimeArchive: path.join(root, 'wasi-build/lib/libhermesvmlean_a.a')
-                })
-            })
+                    hermesRuntimeArchive: path.join(root, 'wasi-build/lib/libhermesvmlean_a.a'),
+                }),
+            }),
         );
         expect(fs.readdirSync(outputDirectory)).toEqual(['plugin.wasm']);
     });
@@ -116,7 +116,7 @@ describe('buildStaticHermesComponent', () => {
         const options = {
             ...buildOptions(),
             output: path.join(missingOutputDirectory, 'plugin.wasm'),
-            workspaceRoot: root
+            workspaceRoot: root,
         };
         fs.rmSync(missingOutputDirectory, { recursive: true, force: true });
 
@@ -157,11 +157,11 @@ describe('buildStaticHermesComponent', () => {
 
         expect(mocks.setupToolchain.mock.calls[0]?.[0]).toMatchObject({
             workspaceRoot,
-            env: expect.objectContaining({ STATIC_HERMES_CACHE_DIR: cacheDirectory })
+            env: expect.objectContaining({ STATIC_HERMES_CACHE_DIR: cacheDirectory }),
         });
         expect(mocks.prepareHermes.mock.calls[0]?.[0]).toMatchObject({
             workspaceRoot,
-            environment: expect.objectContaining({ STATIC_HERMES_CACHE_DIR: cacheDirectory })
+            environment: expect.objectContaining({ STATIC_HERMES_CACHE_DIR: cacheDirectory }),
         });
     });
 
@@ -200,13 +200,13 @@ describe('buildStaticHermesComponent', () => {
             expect.objectContaining({
                 options: expect.objectContaining({
                     ...options,
-                    output: expect.stringContaining(path.join(outputDirectory, '.static-hermes-'))
+                    output: expect.stringContaining(path.join(outputDirectory, '.static-hermes-')),
                 }),
                 stackSizeBytes: '524288',
                 toolchain: expect.objectContaining({
-                    hermesRuntimeArchive: path.join(root, 'wasi-build/lib/libhermesvm_a.a')
-                })
-            })
+                    hermesRuntimeArchive: path.join(root, 'wasi-build/lib/libhermesvm_a.a'),
+                }),
+            }),
         );
     });
 
@@ -229,9 +229,9 @@ describe('buildStaticHermesComponent', () => {
         expect(mocks.compile).toHaveBeenCalledWith(
             expect.objectContaining({
                 toolchain: expect.objectContaining({
-                    hermesRuntimeArchive: path.join(mallocBuild, 'lib/libhermesvmlean_a.a')
-                })
-            })
+                    hermesRuntimeArchive: path.join(mallocBuild, 'lib/libhermesvmlean_a.a'),
+                }),
+            }),
         );
     });
 
@@ -249,7 +249,7 @@ describe('buildStaticHermesComponent', () => {
         process.env.STATIC_HERMES_STACK_SIZE = '131073';
 
         await expect(buildStaticHermesComponent(buildOptions())).rejects.toThrow(
-            'STATIC_HERMES_STACK_SIZE must be a multiple of 16 and between 131072 and 4294967280 bytes'
+            'STATIC_HERMES_STACK_SIZE must be a multiple of 16 and between 131072 and 4294967280 bytes',
         );
         expect(mocks.setupToolchain).not.toHaveBeenCalled();
         expect(mocks.prepareHermes).not.toHaveBeenCalled();
@@ -262,7 +262,7 @@ describe('buildStaticHermesComponent', () => {
         process.env.STATIC_HERMES_STACK_SIZE = '4294967296';
 
         await expect(buildStaticHermesComponent(buildOptions())).rejects.toThrow(
-            'STATIC_HERMES_STACK_SIZE must be a multiple of 16 and between 131072 and 4294967280 bytes'
+            'STATIC_HERMES_STACK_SIZE must be a multiple of 16 and between 131072 and 4294967280 bytes',
         );
 
         expect(mocks.setupToolchain).not.toHaveBeenCalled();
@@ -326,7 +326,7 @@ function configureToolchain(extra: Record<string, string> = {}): Record<string, 
         STATIC_HERMES_WASI_BUILD_DIR: wasiBuild,
         STATIC_HERMES_WASI_SDK_PATH: wasiSdk,
         WIT_BINDGEN: bindgen,
-        ...extra
+        ...extra,
     };
     mocks.setupToolchain.mockResolvedValue(toolchain);
     return toolchain;
@@ -343,6 +343,6 @@ function buildOptions() {
         wit,
         output: path.join(outputDirectory, 'plugin.wasm'),
         developmentMode: false,
-        wasiImports: []
+        wasiImports: [],
     };
 }

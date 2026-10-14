@@ -21,7 +21,7 @@ export function assetName(platform, arch) {
         'linux-x64': 'pumpkin-X64-Linux',
         'linux-arm64': 'pumpkin-ARM64-Linux',
         'win32-x64': 'pumpkin-X64-Windows.exe',
-        'win32-arm64': 'pumpkin-ARM64-Windows.exe'
+        'win32-arm64': 'pumpkin-ARM64-Windows.exe',
     };
     const asset = names[`${platform}-${arch}`];
     if (!asset) throw new Error(`No Pumpkin release binary for ${platform}-${arch}`);
@@ -147,8 +147,8 @@ async function getLatestRelease(fetchImpl) {
         response = await fetchImpl(RELEASES_API, {
             headers: {
                 Accept: 'application/vnd.github+json',
-                'User-Agent': 'pumpkin-plugins-dev'
-            }
+                'User-Agent': 'pumpkin-plugins-dev',
+            },
         });
     } catch (cause) {
         const error = new Error('Could not reach the latest stable Pumpkin release endpoint.', { cause });
@@ -174,8 +174,8 @@ async function getLatestNightly(fetchImpl) {
         response = await fetchImpl(NIGHTLY_API, {
             headers: {
                 Accept: 'application/vnd.github+json',
-                'User-Agent': 'pumpkin-plugins-dev'
-            }
+                'User-Agent': 'pumpkin-plugins-dev',
+            },
         });
     } catch (cause) {
         const error = new Error('Could not reach the latest Pumpkin nightly endpoint.', { cause });
@@ -190,7 +190,7 @@ async function getLatestNightly(fetchImpl) {
     const release = await response.json();
     if (!isValidNightlyRelease(release)) {
         throw new Error(
-            `GitHub returned invalid latest Pumpkin nightly metadata (${release?.tag_name ?? '(unknown)'})`
+            `GitHub returned invalid latest Pumpkin nightly metadata (${release?.tag_name ?? '(unknown)'})`,
         );
     }
     return release;
@@ -210,7 +210,7 @@ export async function resolvePumpkinBinary({
     env = process.env,
     fetchImpl = fetch,
     now = Date.now,
-    nightly = false
+    nightly = false,
 }) {
     if (env.PUMPKIN_BIN) {
         if (!fs.existsSync(env.PUMPKIN_BIN)) throw new Error(`PUMPKIN_BIN does not exist: ${env.PUMPKIN_BIN}`);
@@ -237,7 +237,7 @@ export async function resolvePumpkinBinary({
         } catch (error) {
             if (!cachedMetadata || !error.retryable) throw error;
             console.warn(
-                `Could not refresh Pumpkin release metadata (${error.message}); using cached release ${cachedMetadata.release.tag_name}.`
+                `Could not refresh Pumpkin release metadata (${error.message}); using cached release ${cachedMetadata.release.tag_name}.`,
             );
             release = cachedMetadata.release;
         }
@@ -319,7 +319,7 @@ function watchBuildOutputs(plugins, serverPluginsDir) {
         clearTimeout(timers.get(plugin.name));
         timers.set(
             plugin.name,
-            setTimeout(() => inspect(plugin), 100)
+            setTimeout(() => inspect(plugin), 100),
         );
     };
 
@@ -338,7 +338,7 @@ function watchBuildOutputs(plugins, serverPluginsDir) {
         close() {
             for (const timer of timers.values()) clearTimeout(timer);
             for (const watcher of watchers) watcher.close();
-        }
+        },
     };
 }
 
@@ -355,7 +355,7 @@ function configureHotReload(config, hotReload) {
         let pluginsEnd = lines.findIndex((line, index) => index > pluginsStart && /^\s*\[/.test(line));
         if (pluginsEnd === -1) pluginsEnd = lines.length;
         const hotReloadLine = lines.findIndex(
-            (line, index) => index > pluginsStart && index < pluginsEnd && /^\s*hot_reload\s*=/.test(line)
+            (line, index) => index > pluginsStart && index < pluginsEnd && /^\s*hot_reload\s*=/.test(line),
         );
         if (hotReloadLine === -1) {
             lines.splice(pluginsStart + 1, 0, `hot_reload = ${hotReload}`);
@@ -399,7 +399,7 @@ function spawnChild(command, args, options, spawnImpl = spawn) {
         done,
         get exited() {
             return exited;
-        }
+        },
     };
 }
 
@@ -419,11 +419,11 @@ async function stopChild(task, signal, timeoutMs) {
     const exited = await Promise.race([
         task.done.then(
             () => true,
-            () => true
+            () => true,
         ),
         new Promise((resolve) => {
             timeout = setTimeout(() => resolve(false), timeoutMs);
-        })
+        }),
     ]);
     clearTimeout(timeout);
 
@@ -444,9 +444,9 @@ export function startInitialBuild(root, spawnImpl = spawn, env = process.env, pa
             cwd: root,
             stdio: 'inherit',
             shell: process.platform === 'win32',
-            env
+            env,
         },
-        spawnImpl
+        spawnImpl,
     );
 }
 
@@ -461,7 +461,7 @@ export async function runDev({
     parseTypeScript = false,
     turboArgs = [],
     shutdownTimeoutMs = CHILD_SHUTDOWN_TIMEOUT_MS,
-    signalSource = process
+    signalSource = process,
 } = {}) {
     const plugins = listPluginBuilds(root);
     if (plugins.length === 0) throw new Error('No plugin packages with pumpkinPlugin.output were found');
@@ -503,7 +503,7 @@ export async function runDev({
 
     try {
         console.log(
-            `Building every plugin, then launching the latest ${nightly ? 'nightly build' : 'stable release'}.`
+            `Building every plugin, then launching the latest ${nightly ? 'nightly build' : 'stable release'}.`,
         );
         const initialBuild = startInitialBuild(root, spawnImpl, buildEnv, parseTypeScript, turboArgs);
         children.push(initialBuild);
@@ -528,9 +528,9 @@ export async function runDev({
                     cwd: root,
                     stdio: 'inherit',
                     shell: process.platform === 'win32',
-                    env: buildEnv
+                    env: buildEnv,
                 },
-                spawnImpl
+                spawnImpl,
             );
             children.push(turbo);
             const turboExit = turbo.done.then(({ code, signal }) => {
@@ -538,7 +538,7 @@ export async function runDev({
             });
             backgroundTasks.push(
                 turboExit.then(() => new Promise(() => {})),
-                outputs.failure
+                outputs.failure,
             );
         }
 
@@ -583,7 +583,7 @@ export function parseDevArgs(args) {
         nightly: options.nightly ?? false,
         release: options.release ?? false,
         parseTypeScript: options.parseTs ?? false,
-        turboArgs
+        turboArgs,
     };
 }
 

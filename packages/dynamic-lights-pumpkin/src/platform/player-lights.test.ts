@@ -8,14 +8,14 @@ describe('Player light resource access', () => {
         const player = {
             getPosition: () => [0, 64, 0],
             getWorld: () => ({ getId: () => 'overworld' }),
-            getItemInHand: () => null
+            getItemInHand: () => null,
         } as unknown as Player;
 
         expect(readHeldLight(player, new HeldItemLightLevels({}))).toEqual({
             worldId: 'overworld',
             position: { x: 0, y: 64, z: 0 },
             lightPosition: { x: 0, y: 64, z: 0 },
-            level: 0
+            level: 0,
         });
     });
 
@@ -28,7 +28,7 @@ describe('Player light resource access', () => {
             getItemInHand: (hand: string) => {
                 if (hand === 'right') return right;
                 throw new Error('offhand unavailable');
-            }
+            },
         } as unknown as Player;
 
         expect(() => readHeldLight(player, undefined)).toThrow('offhand unavailable');
@@ -41,7 +41,7 @@ describe('Player light resource access', () => {
             getType: () => {
                 throw new Error('entity removed');
             },
-            [Symbol.dispose]: vi.fn()
+            [Symbol.dispose]: vi.fn(),
         };
         const second = { [Symbol.dispose]: vi.fn() };
         const self = { getNearbyEntities: () => [first, second], [Symbol.dispose]: vi.fn() };

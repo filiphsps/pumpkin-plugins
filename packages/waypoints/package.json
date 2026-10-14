@@ -3,19 +3,14 @@
     "version": "0.0.4",
     "private": true,
     "description": "Server-managed waypoints with access rules and a Java 26.3 HUD",
-    "license": "MIT",
-    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
-    "contributors": [
-        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
-    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/packages/waypoints#readme",
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
         "directory": "packages/waypoints"
-    },
-    "bugs": {
-        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
     },
     "funding": [
         {
@@ -27,22 +22,27 @@
             "url": "https://paypal.me/filiph"
         }
     ],
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
     "type": "module",
     "scripts": {
         "build": "pumpkin-plugins-build",
         "build:parse-ts": "pumpkin-plugins-build --parse-ts",
-        "types": "pumpkin-plugins-build --types-only",
-        "typecheck": "pnpm types && tsc --noEmit",
+        "readme": "pumpkin-plugins-docs",
+        "readme:check": "pumpkin-plugins-docs --check",
         "test": "vitest run --project unit",
         "test:coverage": "vitest run --project unit --coverage",
         "test:integration": "vitest run --project integration",
-        "readme": "pumpkin-plugins-docs",
-        "readme:check": "pumpkin-plugins-docs --check"
+        "typecheck": "pnpm types && tsc --noEmit",
+        "types": "pumpkin-plugins-build --types-only"
     },
     "dependencies": {
-        "fflate": "catalog:",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
-        "@pumpkin-plugins/pumpkin-api": "catalog:"
+        "@pumpkin-plugins/pumpkin-api": "catalog:",
+        "fflate": "catalog:"
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",

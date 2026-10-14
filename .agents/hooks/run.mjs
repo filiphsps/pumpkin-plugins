@@ -50,7 +50,7 @@ export async function handle(request, checks = { changedFiles, runChecks }) {
             const file = input.path ?? input.filePath;
             if (typeof file !== 'string') throw new Error('Edit input needs path or filePath');
             targets = [
-                { file, change: { oldString: input.oldString, content: tool === 'write' ? input.content : undefined } }
+                { file, change: { oldString: input.oldString, content: tool === 'write' ? input.content : undefined } },
             ];
         }
         for (const { file, change } of targets) {

@@ -14,7 +14,7 @@ const COLORS = {
     red: 'c',
     lightPurple: 'd',
     yellow: 'e',
-    white: 'f'
+    white: 'f',
 } as const;
 
 const FORMATS = {
@@ -22,7 +22,7 @@ const FORMATS = {
     bold: 'l',
     strikethrough: 'm',
     underline: 'n',
-    italic: 'o'
+    italic: 'o',
 } as const;
 
 const ANSI_COLORS = {
@@ -41,7 +41,7 @@ const ANSI_COLORS = {
     red: 91,
     lightPurple: 95,
     yellow: 93,
-    white: 97
+    white: 97,
 } as const satisfies Record<keyof typeof COLORS, number>;
 
 const ANSI_FORMATS = {
@@ -49,7 +49,7 @@ const ANSI_FORMATS = {
     bold: 1,
     strikethrough: 9,
     underline: 4,
-    italic: 3
+    italic: 3,
 } as const satisfies Record<keyof typeof FORMATS, number>;
 
 const NAMED_COLORS = {
@@ -63,7 +63,7 @@ const NAMED_COLORS = {
     url: { color: 'darkAqua' },
     uuid: { color: 'yellow' },
     value: { color: 'gold' },
-    version: { color: 'green' }
+    version: { color: 'green' },
 } as const satisfies Record<string, { color: keyof typeof COLORS; format?: keyof typeof FORMATS }>;
 
 type MinecraftColor = keyof typeof COLORS;
@@ -79,9 +79,9 @@ type ColorApi = TextFormatter & { readonly named: NamedFormatters };
 type FormatterOutput = 'minecraft' | 'ansi';
 
 interface FormatterState {
-    legacyColorPrefix?: string;
     ansiColorPrefix?: string;
     formats: readonly MinecraftFormat[];
+    legacyColorPrefix?: string;
 }
 
 function createFormatter(output: FormatterOutput, state: FormatterState = { formats: [] }): TextFormatter {
@@ -108,8 +108,8 @@ function createFormatter(output: FormatterOutput, state: FormatterState = { form
                 createFormatter(output, {
                     ...state,
                     legacyColorPrefix: `§${COLORS[color]}`,
-                    ansiColorPrefix: String(ANSI_COLORS[color])
-                })
+                    ansiColorPrefix: String(ANSI_COLORS[color]),
+                }),
         });
     }
 
@@ -118,8 +118,8 @@ function createFormatter(output: FormatterOutput, state: FormatterState = { form
             get: () =>
                 createFormatter(output, {
                     ...state,
-                    formats: state.formats.includes(format) ? state.formats : [...state.formats, format]
-                })
+                    formats: state.formats.includes(format) ? state.formats : [...state.formats, format],
+                }),
         });
     }
 
@@ -132,7 +132,7 @@ function createFormatter(output: FormatterOutput, state: FormatterState = { form
             const legacyColorPrefix = `§x${hexDigits.map((digit) => `§${digit}`).join('')}`;
             const ansiColorPrefix = `38;2;${parseInt(digits.slice(0, 2), 16)};${parseInt(digits.slice(2, 4), 16)};${parseInt(digits.slice(4, 6), 16)}`;
             return createFormatter(output, { ...state, legacyColorPrefix, ansiColorPrefix });
-        }
+        },
     });
 
     return formatter;
@@ -154,12 +154,12 @@ function addNamedFormatters(formatter: ColorApi, output: FormatterOutput): void 
                     createFormatter(output, {
                         legacyColorPrefix: `§${COLORS[definition.color]}`,
                         ansiColorPrefix: String(ANSI_COLORS[definition.color]),
-                        formats
-                    })
+                        formats,
+                    }),
                 ];
-            })
+            }),
         ),
-        enumerable: true
+        enumerable: true,
     });
 }
 

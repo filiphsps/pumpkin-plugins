@@ -10,8 +10,8 @@ describe('waypoint model', () => {
                 id,
                 name: '  Cafe\u0301  ',
                 dimension: 'world',
-                position: { x: -0.125, y: 64.875, z: -16.01 }
-            })
+                position: { x: -0.125, y: 64.875, z: -16.01 },
+            }),
         ).toEqual({
             id,
             name: 'Café',
@@ -19,7 +19,7 @@ describe('waypoint model', () => {
             position: { x: -0.125, y: 64.875, z: -16.01 },
             color: '#FFFFFF',
             enabled: true,
-            access: { mode: 'restricted', grants: [] }
+            access: { mode: 'restricted', grants: [] },
         });
     });
 
@@ -32,7 +32,7 @@ describe('waypoint model', () => {
             icon: undefined,
             visibilityRange: undefined,
             enabled: true,
-            access: { mode: 'restricted', grants: [] }
+            access: { mode: 'restricted', grants: [] },
         });
         if (typeof defaults !== 'object' || defaults === null) return;
 
@@ -40,7 +40,7 @@ describe('waypoint model', () => {
             id,
             name: 'Home',
             dimension: 'world',
-            position: { x: 1, y: 2, z: 3 }
+            position: { x: 1, y: 2, z: 3 },
         });
         expect({
             label: waypoint.label,
@@ -49,7 +49,7 @@ describe('waypoint model', () => {
             icon: waypoint.icon,
             visibilityRange: waypoint.visibilityRange,
             enabled: waypoint.enabled,
-            access: waypoint.access
+            access: waypoint.access,
         }).toEqual(defaults);
     });
 
@@ -57,7 +57,7 @@ describe('waypoint model', () => {
         ['label', { label: null }],
         ['description', { description: null }],
         ['icon', { icon: null }],
-        ['visibilityRange', { visibilityRange: null }]
+        ['visibilityRange', { visibilityRange: null }],
     ])('rejects null for optional metadata field %s', (_field, metadata) => {
         expect(() =>
             createWaypoint({
@@ -65,8 +65,8 @@ describe('waypoint model', () => {
                 name: 'Home',
                 dimension: 'world',
                 position: { x: 1, y: 2, z: 3 },
-                ...metadata
-            } as unknown as NewWaypoint)
+                ...metadata,
+            } as unknown as NewWaypoint),
         ).toThrow();
     });
 
@@ -83,7 +83,7 @@ describe('waypoint model', () => {
         [{ x: Number.NaN, y: 0, z: 0 }],
         [{ x: 30_000_001, y: 0, z: 0 }],
         [{ x: 0, y: Number.POSITIVE_INFINITY, z: 0 }],
-        [{ x: 0, y: 0, z: -30_000_001 }]
+        [{ x: 0, y: 0, z: -30_000_001 }],
     ])('rejects invalid positions %j', (position) => {
         expect(() => createWaypoint({ id, name: 'Home', dimension: 'world', position })).toThrow();
     });
@@ -105,9 +105,9 @@ describe('waypoint model', () => {
                     { type: 'player', playerId: '22222222-2222-4222-8222-222222222222' },
                     { type: 'player', playerId: '22222222-2222-4222-8222-222222222222' },
                     { type: 'permission', node: 'Waypoints:group.builders' },
-                    { type: 'group', slug: 'builders' }
-                ]
-            }
+                    { type: 'group', slug: 'builders' },
+                ],
+            },
         });
 
         expect(waypoint).toMatchObject({
@@ -121,9 +121,9 @@ describe('waypoint model', () => {
                 grants: [
                     { type: 'player', playerId: '22222222-2222-4222-8222-222222222222' },
                     { type: 'permission', node: 'Waypoints:group.builders' },
-                    { type: 'group', slug: 'builders' }
-                ]
-            }
+                    { type: 'group', slug: 'builders' },
+                ],
+            },
         });
     });
 
@@ -133,7 +133,7 @@ describe('waypoint model', () => {
             name: 'Pumpkin',
             dimension: 'world',
             position: { x: 1, y: 2, z: 3 },
-            icon: 'pumpkin_pie'
+            icon: 'pumpkin_pie',
         });
 
         expect(waypoint.icon).toBe('minecraft:pumpkin_pie');
@@ -145,7 +145,7 @@ describe('waypoint model', () => {
             name: 'Mod Item',
             dimension: 'world',
             position: { x: 1, y: 2, z: 3 },
-            icon: 'example:custom_item'
+            icon: 'example:custom_item',
         });
 
         expect(waypoint.icon).toBe('example:custom_item');
@@ -158,7 +158,7 @@ describe('waypoint model', () => {
         [{ description: 'line\nbreak' }],
         [{ visibilityRange: 0 }],
         [{ visibilityRange: 30_000_001 }],
-        [{ access: { mode: 'restricted', grants: [{ type: 'player', playerId: 'not-a-uuid' }] } }]
+        [{ access: { mode: 'restricted', grants: [{ type: 'player', playerId: 'not-a-uuid' }] } }],
     ])('rejects invalid metadata %j', (metadata) => {
         expect(() =>
             createWaypoint({
@@ -166,8 +166,8 @@ describe('waypoint model', () => {
                 name: 'Home',
                 dimension: 'world',
                 position: { x: 1, y: 2, z: 3 },
-                ...metadata
-            } as NewWaypoint)
+                ...metadata,
+            } as NewWaypoint),
         ).toThrow();
     });
 });

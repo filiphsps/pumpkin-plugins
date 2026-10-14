@@ -24,7 +24,7 @@ function repo(files) {
         fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
         fs.writeFileSync(
             path.join(dir, file),
-            typeof content === 'string' ? content : `${JSON.stringify(content, null, 4)}\n`
+            typeof content === 'string' ? content : `${JSON.stringify(content, null, 4)}\n`,
         );
     }
     return dir;
@@ -33,14 +33,14 @@ function repo(files) {
 function run(script, dir, ...args) {
     const result = spawnSync('node', [path.join(scripts, script), ...args], {
         env: { ...process.env, PUMPKIN_PLUGINS_ROOT: dir },
-        encoding: 'utf8'
+        encoding: 'utf8',
     });
     return { ok: result.status === 0, out: `${result.stdout}${result.stderr}` };
 }
 
 describe('setup-static-hermes action', () => {
     const action = parse(
-        fs.readFileSync(path.join(scripts, '../.github/common/setup-static-hermes/action.yml'), 'utf8')
+        fs.readFileSync(path.join(scripts, '../.github/common/setup-static-hermes/action.yml'), 'utf8'),
     );
     const steps = action.runs.steps;
     const step = (id) => steps.find((candidate) => candidate.id === id);
@@ -72,7 +72,7 @@ describe('setup-static-hermes action', () => {
 
 describe('upstream pin workflow', () => {
     const workflow = parse(
-        fs.readFileSync(path.join(scripts, '../.github/workflows/update-upstream-pins.yml'), 'utf8')
+        fs.readFileSync(path.join(scripts, '../.github/workflows/update-upstream-pins.yml'), 'utf8'),
     );
     const releaseWorkflow = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/release.yml'), 'utf8'));
 
@@ -110,7 +110,7 @@ describe('upstream pin workflow', () => {
         assert.match(publish.if, /needs\.release\.outputs\.tool_paths_released/);
         assert.equal(
             publish.strategy.matrix.path,
-            ['$', '{{ fromJSON(needs.release.outputs.tool_paths_released) }}'].join('')
+            ['$', '{{ fromJSON(needs.release.outputs.tool_paths_released) }}'].join(''),
         );
         assert.match(publish.steps.map((step) => step.run ?? '').join('\n'), /npm publish .*--access public/);
         assert.match(publish.steps.map((step) => step.run ?? '').join('\n'), /pnpm pack/);
@@ -123,16 +123,16 @@ describe('upstream pin workflow', () => {
 const AUTHOR = 'Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)';
 const REPO = 'https://github.com/filiphsps/pumpkin-plugins';
 const metadata = (dir) => ({
+    homepage: dir === '.' ? REPO : `${REPO}/tree/master/${dir}#readme`,
+    bugs: { url: `${REPO}/issues` },
+    repository: { type: 'git', url: `git+${REPO}.git`, ...(dir === '.' ? {} : { directory: dir }) },
+    funding: [
+        { type: 'github', url: 'https://github.com/sponsors/filiphsps' },
+        { type: 'custom', url: 'https://paypal.me/filiph' },
+    ],
     license: 'MIT',
     author: AUTHOR,
     contributors: [AUTHOR],
-    homepage: dir === '.' ? REPO : `${REPO}/tree/master/${dir}#readme`,
-    repository: { type: 'git', url: `git+${REPO}.git`, ...(dir === '.' ? {} : { directory: dir }) },
-    bugs: { url: `${REPO}/issues` },
-    funding: [
-        { type: 'github', url: 'https://github.com/sponsors/filiphsps' },
-        { type: 'custom', url: 'https://paypal.me/filiph' }
-    ]
 });
 
 describe('check-docs', () => {
@@ -144,7 +144,7 @@ describe('check-docs', () => {
         'docs/guide.md': '# Guide\n\n## Getting started\n\nSee `tools/kit/src/a.ts`.\n',
         'tools/kit/package.json': { name: '@x/kit', scripts: {} },
         'tools/kit/README.md': '# @x/kit\n\nA kit.\n',
-        'tools/kit/src/a.ts': ''
+        'tools/kit/src/a.ts': '',
     };
 
     it('passes for a repo whose docs match', () => {
@@ -162,13 +162,13 @@ describe('check-docs', () => {
     it('fails for links to files or headings that do not exist, but not for links in code', () => {
         const broken = run(
             'check-docs.mjs',
-            repo({ ...good, 'docs/guide.md': '# Guide\n\n[x](missing.md) [y](README.md#nope)\n' })
+            repo({ ...good, 'docs/guide.md': '# Guide\n\n[x](missing.md) [y](README.md#nope)\n' }),
         );
         assert.match(broken.out, /links to missing\.md, which does not exist/);
         assert.match(broken.out, /links to README\.md#nope, but docs\/README\.md has no such heading/);
         const inCode = run(
             'check-docs.mjs',
-            repo({ ...good, 'docs/guide.md': '# Guide\n\n## Getting started\n\n`[x](missing.md)`\n' })
+            repo({ ...good, 'docs/guide.md': '# Guide\n\n## Getting started\n\n`[x](missing.md)`\n' }),
         );
         assert.ok(inCode.ok, inCode.out);
     });
@@ -180,8 +180,8 @@ describe('check-docs', () => {
                 ...good,
                 'AGENTS.md': '# Agents\n\n[missing](.agents/skills/missing/SKILL.md)\n',
                 '.agents/skills/example/SKILL.md':
-                    '# Skill\n\nRun `pnpm nonexistent`. See `.agents/hooks/missing.mjs`.\n'
-            })
+                    '# Skill\n\nRun `pnpm nonexistent`. See `.agents/hooks/missing.mjs`.\n',
+            }),
         );
         assert.equal(result.ok, false);
         assert.match(result.out, /AGENTS\.md links to/);
@@ -192,7 +192,7 @@ describe('check-docs', () => {
     it('fails for a path in a code span that does not exist', () => {
         const result = run(
             'check-docs.mjs',
-            repo({ ...good, 'docs/guide.md': '# Guide\n\n`tools/kit/src/gone.ts`\n' })
+            repo({ ...good, 'docs/guide.md': '# Guide\n\n`tools/kit/src/gone.ts`\n' }),
         );
         assert.match(result.out, /mentions tools\/kit\/src\/gone\.ts, which does not exist/);
     });
@@ -204,10 +204,10 @@ describe('check-docs', () => {
                 ...good,
                 'packages/waypoints/package.json': {
                     name: '@x/waypoints',
-                    pumpkinPlugin: { output: 'build/waypoints.wasm' }
+                    pumpkinPlugin: { output: 'build/waypoints.wasm' },
                 },
-                'packages/waypoints/README.md': '# @x/waypoints\n\nCopy `packages/waypoints/build/waypoints.wasm`.\n'
-            })
+                'packages/waypoints/README.md': '# @x/waypoints\n\nCopy `packages/waypoints/build/waypoints.wasm`.\n',
+            }),
         );
         assert.ok(result.ok, result.out);
     });
@@ -219,8 +219,8 @@ describe('check-docs', () => {
                 ...good,
                 'benchmarks/engine-comparison/README.md':
                     '# Engine comparison\n\nSee [the guide](../../docs/guide.md) and `benchmarks/engine-comparison/src/workload.ts`.\n',
-                'benchmarks/engine-comparison/src/workload.ts': 'export {};\n'
-            })
+                'benchmarks/engine-comparison/src/workload.ts': 'export {};\n',
+            }),
         );
         assert.ok(result.ok, result.out);
         const broken = run(
@@ -228,8 +228,8 @@ describe('check-docs', () => {
             repo({
                 ...good,
                 'benchmarks/engine-comparison/README.md':
-                    '# Engine comparison\n\n`benchmarks/engine-comparison/src/missing.ts`\n'
-            })
+                    '# Engine comparison\n\n`benchmarks/engine-comparison/src/missing.ts`\n',
+            }),
         );
         assert.match(broken.out, /mentions benchmarks\/engine-comparison\/src\/missing\.ts, which does not exist/);
     });
@@ -241,8 +241,8 @@ describe('check-docs', () => {
             'check-docs.mjs',
             repo({
                 ...good,
-                'docs/guide.md': '# Guide\n\n## Getting started\n\n```sh\npnpm install\npnpm exec foo\n```\n'
-            })
+                'docs/guide.md': '# Guide\n\n## Getting started\n\n```sh\npnpm install\npnpm exec foo\n```\n',
+            }),
         );
         assert.ok(builtin.ok, builtin.out);
     });
@@ -250,7 +250,7 @@ describe('check-docs', () => {
     it('fails for a root script that no doc mentions', () => {
         const result = run(
             'check-docs.mjs',
-            repo({ ...good, 'package.json': { name: 'root', scripts: { test: 'x', deploy: 'y' } } })
+            repo({ ...good, 'package.json': { name: 'root', scripts: { test: 'x', deploy: 'y' } } }),
         );
         assert.match(result.out, /the script "deploy"/);
     });
@@ -268,8 +268,8 @@ describe('check-docs', () => {
                 '        name: 📋 Lint',
                 '    ship:',
                 '        name: 🚀 Ship ' + '$' + '{{ x }}',
-                ''
-            ].join('\n')
+                '',
+            ].join('\n'),
         };
         const docs = { 'docs/ci-and-releases.md': '# CI\n\n| 📋 Lint | always |\n' };
         const result = run(
@@ -278,8 +278,8 @@ describe('check-docs', () => {
                 ...good,
                 ...ci,
                 ...docs,
-                'docs/README.md': '# Docs\n\n[Guide](guide.md) [CI](ci-and-releases.md)\n'
-            })
+                'docs/README.md': '# Docs\n\n[Guide](guide.md) [CI](ci-and-releases.md)\n',
+            }),
         );
         assert.match(result.out, /does not list the CI job "🚀 Ship"/);
         assert.doesNotMatch(result.out, /Lint/);
@@ -299,24 +299,25 @@ describe('package-metadata', () => {
             name: 'plug',
             version: '0.0.0',
             description: 'A plugin',
-            ...metadata('packages/plug')
+            ...metadata('packages/plug'),
         },
         'tools/lib/package.json': {
             name: 'lib',
             description: 'A library',
             ...metadata('tools/lib'),
             sideEffects: false,
+            exports: { '.': './src/index.ts' },
+            main: './src/index.ts',
             module: './src/index.ts',
             types: './src/index.ts',
-            exports: { '.': './src/index.ts' },
             files: ['src'],
-            publishConfig: { access: 'public' }
+            publishConfig: { access: 'public' },
         },
         'tools/lib/src/index.ts': '',
-        ...override
+        ...override,
     });
 
-    it('passes when everything is there', () => {
+    it("accepts package metadata in Biome's key order", () => {
         const result = run('package-metadata.mjs', repo(files()));
         assert.ok(result.ok, result.out);
     });
@@ -326,31 +327,31 @@ describe('package-metadata', () => {
             files({
                 'benchmarks/engine-comparison/package.json': {
                     name: '@pumpkin-plugins/engine-comparison',
-                    private: true
-                }
-            })
+                    private: true,
+                },
+            }),
         );
         assert.ok(run('package-metadata.mjs', privatePackage).ok);
 
         const publicPackage = repo(
-            files({ 'benchmarks/engine-comparison/package.json': { name: '@pumpkin-plugins/engine-comparison' } })
+            files({ 'benchmarks/engine-comparison/package.json': { name: '@pumpkin-plugins/engine-comparison' } }),
         );
         assert.match(
             run('package-metadata.mjs', publicPackage).out,
-            /benchmark workspace packages must set "private": true/
+            /benchmark workspace packages must set "private": true/,
         );
 
         const registered = repo({
             ...files({
                 'benchmarks/engine-comparison/package.json': {
                     name: '@pumpkin-plugins/engine-comparison',
-                    private: true
-                }
+                    private: true,
+                },
             }),
             'release-please-config.json': {
-                packages: { 'benchmarks/engine-comparison': { component: 'engine-comparison' } }
+                packages: { 'benchmarks/engine-comparison': { component: 'engine-comparison' } },
             },
-            '.release-please-manifest.json': { 'benchmarks/engine-comparison': '0.0.0' }
+            '.release-please-manifest.json': { 'benchmarks/engine-comparison': '0.0.0' },
         });
         const result = run('package-metadata.mjs', registered);
         assert.match(result.out, /private benchmark packages cannot be in release-please-config\.json/);
@@ -363,7 +364,7 @@ describe('package-metadata', () => {
             version: '0.0.0',
             description: 'A plugin',
             ...metadata('packages/plug'),
-            license: 'ISC'
+            license: 'ISC',
         };
         plug.bugs = undefined;
         const result = run('package-metadata.mjs', repo(files({ 'packages/plug/package.json': plug })));
@@ -375,12 +376,12 @@ describe('package-metadata', () => {
         const long = { name: 'plug', version: '0.0.0', description: 'x'.repeat(71), ...metadata('packages/plug') };
         assert.match(
             run('package-metadata.mjs', repo(files({ 'packages/plug/package.json': long }))).out,
-            /"description" is 71 characters/
+            /"description" is 71 characters/,
         );
         const none = { name: 'plug', version: '0.0.0', ...metadata('packages/plug') };
         assert.match(
             run('package-metadata.mjs', repo(files({ 'packages/plug/package.json': none }))).out,
-            /"description" is missing/
+            /"description" is missing/,
         );
     });
 
@@ -389,12 +390,12 @@ describe('package-metadata', () => {
             const dir = repo(
                 files({
                     [`packages/plug/${licenseFile}`]: 'GPL license',
-                    [`tools/lib/${licenseFile}`]: 'Apache license'
-                })
+                    [`tools/lib/${licenseFile}`]: 'Apache license',
+                }),
             );
             for (const [folder, license] of [
                 ['packages/plug', 'GPL-3.0-or-later'],
-                ['tools/lib', 'Apache-2.0']
+                ['tools/lib', 'Apache-2.0'],
             ]) {
                 const file = path.join(dir, folder, 'package.json');
                 const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -405,7 +406,7 @@ describe('package-metadata', () => {
             assert.ok(run('package-metadata.mjs', dir, '--fix').ok);
             assert.equal(
                 JSON.parse(fs.readFileSync(path.join(dir, 'packages/plug/package.json'))).license,
-                'GPL-3.0-or-later'
+                'GPL-3.0-or-later',
             );
             assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'tools/lib/package.json'))).license, 'Apache-2.0');
         }
@@ -416,7 +417,7 @@ describe('package-metadata', () => {
             name: 'lib',
             description: 'A library',
             ...metadata('tools/lib'),
-            exports: { '.': './src/index.ts' }
+            exports: { '.': './src/index.ts' },
         };
         const result = run('package-metadata.mjs', repo(files({ 'tools/lib/package.json': lib })));
         assert.match(result.out, /"sideEffects" should be false/);
@@ -432,7 +433,7 @@ describe('package-metadata', () => {
         const fixed = JSON.parse(fs.readFileSync(path.join(dir, 'tools/lib/package.json'), 'utf8'));
         assert.equal(fixed.license, 'MIT');
         assert.equal(fixed.sideEffects, false);
-        assert.deepEqual(Object.keys(fixed).slice(0, 3), ['name', 'license', 'author']);
+        assert.deepEqual(Object.keys(fixed).slice(0, 3), ['name', 'homepage', 'bugs']);
     });
 
     it('fails without a LICENSE file', () => {
@@ -446,19 +447,19 @@ describe('check-release-config', () => {
         'tools/build': '@pumpkin-plugins/build',
         'tools/create-pumpkin-plugin': 'create-pumpkin-plugin',
         'tools/pumpkin-api': '@pumpkin-plugins/pumpkin-api',
-        'tools/static-hermes-runtime': '@pumpkin-plugins/static-hermes-runtime'
+        'tools/static-hermes-runtime': '@pumpkin-plugins/static-hermes-runtime',
     };
     const files = ({ manifest = '0.0.0', releaseAs = '0.0.1', version = '0.0.0' } = {}) => ({
         'packages/plug/package.json': { name: 'plug', version },
         ...Object.fromEntries(
             Object.entries(publicTools).map(([directory, name]) => [
                 `${directory}/package.json`,
-                { name, version: '0.1.0' }
-            ])
+                { name, version: '0.1.0' },
+            ]),
         ),
         '.release-please-manifest.json': {
             'packages/plug': manifest,
-            ...Object.fromEntries(Object.keys(publicTools).map((directory) => [directory, '0.0.0']))
+            ...Object.fromEntries(Object.keys(publicTools).map((directory) => [directory, '0.0.0'])),
         },
         'release-please-config.json': {
             'separate-pull-requests': true,
@@ -471,15 +472,15 @@ describe('check-release-config', () => {
                 ...Object.fromEntries(
                     Object.keys(publicTools).map((directory) => [
                         directory,
-                        { component: path.basename(directory), 'release-as': '0.1.0' }
-                    ])
-                )
-            }
-        }
+                        { component: path.basename(directory), 'release-as': '0.1.0' },
+                    ]),
+                ),
+            },
+        },
     });
     const withAction = (
         base = files(),
-        { manifest = '0.0.0', releaseAs = '0.0.1', releaseType = 'simple', version = '0.0.0' } = {}
+        { manifest = '0.0.0', releaseAs = '0.0.1', releaseType = 'simple', version = '0.0.0' } = {},
     ) => ({
         ...base,
         'actions/publish-action/action.yml': 'name: Publish\n',
@@ -488,7 +489,7 @@ describe('check-release-config', () => {
         'actions/publish-action/version.txt': `${version}\n`,
         '.release-please-manifest.json': {
             ...base['.release-please-manifest.json'],
-            'actions/publish-action': manifest
+            'actions/publish-action': manifest,
         },
         'release-please-config.json': {
             ...base['release-please-config.json'],
@@ -497,10 +498,10 @@ describe('check-release-config', () => {
                 'actions/publish-action': {
                     component: 'publish-action',
                     'release-type': releaseType,
-                    ...(releaseAs ? { 'release-as': releaseAs } : {})
-                }
-            }
-        }
+                    ...(releaseAs ? { 'release-as': releaseAs } : {}),
+                },
+            },
+        },
     });
 
     it('passes for an unreleased plugin that is set to release 0.0.1', () => {
@@ -518,7 +519,7 @@ describe('check-release-config', () => {
         mismatchedVersion['tools/build/package.json'].version = '0.1.1';
         assert.match(
             run('check-release-config.mjs', repo(mismatchedVersion)).out,
-            /tools\/build\/package\.json must be/
+            /tools\/build\/package\.json must be/,
         );
     });
 
@@ -533,14 +534,14 @@ describe('check-release-config', () => {
         const paused = files();
         paused['packages/not-ready/package.json'] = { name: 'not-ready', version: '0.0.0' };
         paused['release-please-paused.json'] = {
-            'packages/not-ready': 'Not ready for its first release'
+            'packages/not-ready': 'Not ready for its first release',
         };
 
         const result = run('check-release-config.mjs', repo(paused));
         assert.ok(result.ok, result.out);
         assert.match(
             result.out,
-            /1 plugin, 0 actions, and 4 public tools: .*packages\/plug.*; 1 paused: packages\/not-ready/
+            /1 plugin, 0 actions, and 4 public tools: .*packages\/plug.*; 1 paused: packages\/not-ready/,
         );
     });
 
@@ -549,21 +550,21 @@ describe('check-release-config', () => {
         stillTracked['release-please-paused.json'] = { 'packages/plug': 'Not ready' };
         assert.match(
             run('check-release-config.mjs', repo(stillTracked)).out,
-            /packages\/plug is paused but still listed in release-please-config\.json/
+            /packages\/plug is paused but still listed in release-please-config\.json/,
         );
 
         const inManifest = files();
         inManifest['release-please-paused.json'] = { 'packages/plug': 'Not ready' };
         assert.match(
             run('check-release-config.mjs', repo(inManifest)).out,
-            /packages\/plug is paused but still listed in \.release-please-manifest\.json/
+            /packages\/plug is paused but still listed in \.release-please-manifest\.json/,
         );
 
         const noReason = files();
         noReason['release-please-paused.json'] = { 'packages/plug': ' ' };
         assert.match(
             run('check-release-config.mjs', repo(noReason)).out,
-            /packages\/plug in release-please-paused\.json needs a non-empty reason/
+            /packages\/plug in release-please-paused\.json needs a non-empty reason/,
         );
     });
 
@@ -572,7 +573,7 @@ describe('check-release-config', () => {
         assert.match(result.out, /needs "release-as": "0\.0\.1"/);
         assert.match(
             run('check-release-config.mjs', repo(files({ releaseAs: '0.1.0' }))).out,
-            /needs "release-as": "0\.0\.1"/
+            /needs "release-as": "0\.0\.1"/,
         );
     });
 
@@ -580,7 +581,7 @@ describe('check-release-config', () => {
         const released = run('check-release-config.mjs', repo(files({ manifest: '0.0.1', version: '0.0.1' })));
         assert.match(released.out, /remove "release-as"/);
         assert.ok(
-            run('check-release-config.mjs', repo(files({ manifest: '0.0.1', version: '0.0.1', releaseAs: null }))).ok
+            run('check-release-config.mjs', repo(files({ manifest: '0.0.1', version: '0.0.1', releaseAs: null }))).ok,
         );
     });
 
@@ -591,7 +592,7 @@ describe('check-release-config', () => {
         assert.match(run('check-release-config.mjs', repo(unregistered)).out, /not in release-please-config\.json/);
         assert.match(
             run('check-release-config.mjs', repo(files({ manifest: '0.0.0', version: '0.0.5' }))).out,
-            /must match/
+            /must match/,
         );
     });
 
@@ -613,13 +614,13 @@ describe('check-release-config', () => {
 
         const released = run(
             'check-release-config.mjs',
-            repo(withAction(files(), { manifest: '0.0.1', version: '0.0.1' }))
+            repo(withAction(files(), { manifest: '0.0.1', version: '0.0.1' })),
         );
         assert.match(released.out, /actions\/publish-action is released.*remove "release-as"/);
 
         const releasedWithoutPin = run(
             'check-release-config.mjs',
-            repo(withAction(files(), { manifest: '0.0.1', releaseAs: null, version: '0.0.1' }))
+            repo(withAction(files(), { manifest: '0.0.1', releaseAs: null, version: '0.0.1' })),
         );
         assert.ok(releasedWithoutPin.ok, releasedWithoutPin.out);
     });
@@ -647,7 +648,7 @@ describe('check-release-config', () => {
         withoutPatch['release-please-config.json']['bump-patch-for-minor-pre-major'] = undefined;
         assert.match(
             run('check-release-config.mjs', repo(withoutPatch)).out,
-            /needs "bump-patch-for-minor-pre-major": true/
+            /needs "bump-patch-for-minor-pre-major": true/,
         );
     });
 
@@ -656,7 +657,7 @@ describe('check-release-config', () => {
         disabled['release-please-config.json'].packages['packages/plug']['bump-minor-pre-major'] = false;
         assert.match(
             run('check-release-config.mjs', repo(disabled)).out,
-            /packages\/plug cannot set "bump-minor-pre-major": false/
+            /packages\/plug cannot set "bump-minor-pre-major": false/,
         );
     });
 });
@@ -683,7 +684,7 @@ describe('action release prerequisites', () => {
             'test',
             'docs',
             'integration',
-            'action-gate'
+            'action-gate',
         ]);
         assert.match(ci.jobs.release.if, /needs\.lint\.result == 'success'/);
         assert.match(ci.jobs.release.if, /needs\.typecheck\.result == 'success'/);
@@ -700,7 +701,7 @@ describe('action release prerequisites', () => {
             'test',
             'docs',
             'integration',
-            'action-gate'
+            'action-gate',
         ]);
         assert.deepEqual(ci.jobs['action-gate'].needs, ['changes', 'action-tests']);
         assert.equal(evaluate(ci.jobs['action-gate'].if, {}), true);
@@ -708,7 +709,7 @@ describe('action release prerequisites', () => {
 
     it('runs engine comparison through its own reusable workflow', () => {
         const comparison = parse(
-            fs.readFileSync(path.join(scripts, '../.github/workflows/engine-comparison.yml'), 'utf8')
+            fs.readFileSync(path.join(scripts, '../.github/workflows/engine-comparison.yml'), 'utf8'),
         );
         const job = ci.jobs['engine-comparison'];
         assert.ok(Object.hasOwn(comparison.on, 'workflow_call'));
@@ -734,7 +735,7 @@ describe('action release prerequisites', () => {
             test: { result: 'success' },
             docs: { result: 'success' },
             integration: { result: 'skipped' },
-            'action-gate': { result: 'success' }
+            'action-gate': { result: 'success' },
         };
         assert.equal(evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }), true);
     });
@@ -748,7 +749,7 @@ describe('action release prerequisites', () => {
         assert.equal(evaluate(ci.jobs['action-tests'].if, { needs: { changes: { outputs } } }), true);
         assert.equal(
             evaluate(ci.jobs['action-tests'].if, { needs: { changes: { outputs: { actions_to_test: '[]' } } } }),
-            false
+            false,
         );
         const expression = actions.jobs.test.strategy.matrix.action;
         const selected = [
@@ -756,11 +757,11 @@ describe('action release prerequisites', () => {
             'publish-to-pumpkin-market',
             'sign-pumpkin-plugin',
             'update-pumpkin-market-listing',
-            'verify-pumpkin-plugin'
+            'verify-pumpkin-plugin',
         ];
         assert.deepEqual(
             Array.from(evaluate(expression, { inputs: { actions: JSON.stringify(selected) }, fromJSON: JSON.parse })),
-            selected
+            selected,
         );
         assert.equal(evaluate(actions.jobs.test.if, { inputs: { actions: '[]' } }), false);
         assert.equal(evaluate(actions.jobs.test.if, { inputs: { actions: '["common"]' } }), true);
@@ -779,11 +780,11 @@ describe('action release prerequisites', () => {
                     'engine-comparison': { result: code === 'true' ? 'success' : 'skipped' },
                     test: { result: code === 'true' ? 'success' : 'skipped' },
                     integration: { result: code === 'true' ? 'success' : 'skipped' },
-                    'action-gate': { result }
+                    'action-gate': { result },
                 };
                 assert.equal(
                     evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }),
-                    result === 'success'
+                    result === 'success',
                 );
             });
         }
@@ -792,10 +793,10 @@ describe('action release prerequisites', () => {
     it('runs docs/config for version-only releases and common helper changes', () => {
         for (const [actions, actions_to_test] of [
             ['["sign-pumpkin-plugin"]', '[]'],
-            ['[]', '["common"]']
+            ['[]', '["common"]'],
         ]) {
             const needs = {
-                changes: { outputs: { code: 'false', actions, actions_to_test, generated_readmes: 'false' } }
+                changes: { outputs: { code: 'false', actions, actions_to_test, generated_readmes: 'false' } },
             };
             assert.equal(evaluate(ci.jobs.docs.if, { needs }), true);
             assert.equal(evaluate(ci.jobs.commits.if, { needs, github: { event_name: 'pull_request' } }), true);
@@ -807,7 +808,7 @@ describe('action release prerequisites', () => {
             ['false', '["sign-pumpkin-plugin"]', 'success', true],
             ['false', '[]', 'skipped', false],
             ['false', '[]', 'success', false],
-            ['true', '[]', 'success', true]
+            ['true', '[]', 'success', true],
         ]) {
             const needs = {
                 changes: { result: 'success', outputs: { code, actions: selected } },
@@ -819,7 +820,7 @@ describe('action release prerequisites', () => {
                 'engine-comparison': { result: code === 'true' ? 'success' : 'skipped' },
                 test: { result: 'success' },
                 integration: { result: 'success' },
-                'action-gate': { result: 'success' }
+                'action-gate': { result: 'success' },
             };
             assert.equal(evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }), expected);
             if (code === 'true') {
@@ -832,13 +833,13 @@ describe('action release prerequisites', () => {
                     'engine-comparison',
                     'test',
                     'docs',
-                    'integration'
+                    'integration',
                 ]) {
                     const failing = { ...needs, [required]: { ...needs[required], result: 'failure' } };
                     assert.equal(
                         evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs: failing }),
                         false,
-                        required
+                        required,
                     );
                 }
             }
@@ -858,11 +859,11 @@ describe('action release prerequisites', () => {
             ['[]', 'skipped', 'success', 0],
             ['[]', 'failure', 'success', 1],
             ['[]', 'cancelled', 'success', 1],
-            ['[]', 'skipped', 'failure', 1]
+            ['[]', 'skipped', 'failure', 1],
         ]) {
             const outcome = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
                 encoding: 'utf8',
-                env: { ...process.env, ACTIONS: matrix, TEST_RESULT: result, CHANGES_RESULT: changes }
+                env: { ...process.env, ACTIONS: matrix, TEST_RESULT: result, CHANGES_RESULT: changes },
             });
             assert.equal(outcome.status, expected, `${matrix}/${result}/${changes}: ${outcome.stderr}`);
         }

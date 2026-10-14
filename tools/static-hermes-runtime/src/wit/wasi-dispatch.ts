@@ -2,7 +2,7 @@ import type { WitAnalysis } from './analysis.ts';
 import {
     annotateWitCleanupAvailability,
     generateWitApiFunctionForResolvedOperation,
-    generateWitResourceMethodForResolvedPlan
+    generateWitResourceMethodForResolvedPlan,
 } from './native-adapters.ts';
 import type { ResolvedWitType, WitApiPackage, WitFunction, WitResource, WitWasiInterface } from './types.ts';
 
@@ -17,7 +17,7 @@ import type { ResolvedWitType, WitApiPackage, WitFunction, WitResource, WitWasiI
 export function generateWasiAdapterDispatch(
     interfaces: readonly WitWasiInterface[],
     analysis: WitAnalysis,
-    availableFreeFunctions?: ReadonlySet<string>
+    availableFreeFunctions?: ReadonlySet<string>,
 ): string {
     const adapterPlans = availableFreeFunctions
         ? annotateWitCleanupAvailability(analysis.wasiAdapters, availableFreeFunctions)
@@ -37,7 +37,7 @@ export function generateWasiAdapterDispatch(
         const apiPackage: WitApiPackage = {
             packageName: apiInterface.packageName,
             version: apiInterface.version,
-            interfaces: [...interfaces]
+            interfaces: [...interfaces],
         };
         const namespace = cIdentifier(apiInterface.packageName);
         const functionApiName = `generated${pascalCase(apiInterface.name)}Api`;
@@ -51,7 +51,7 @@ export function generateWasiAdapterDispatch(
                 apiInterface,
                 operation: plan.operation,
                 parameters: plan.parameters,
-                resultType: plan.resultType
+                resultType: plan.resultType,
             });
             if (!adapter) throw noAdapter(plan.operationId);
             apiFunctions.push(adapter);
@@ -86,8 +86,8 @@ export function generateWasiAdapterDispatch(
                         functionName: wasiOperationCFunctionName(apiPackage, apiInterface, plan.operation, resource),
                         apiObjectName: resourceApiName,
                         propertyName:
-                            plan.operation.name === 'constructor' ? 'constructor' : jsName(plan.operation.name)
-                    }
+                            plan.operation.name === 'constructor' ? 'constructor' : jsName(plan.operation.name),
+                    },
                 });
                 if (!adapter) throw noAdapter(plan.operationId);
                 resourceApiFunctions.push(adapter);
@@ -166,7 +166,7 @@ function wasiOperationCFunctionName(
     apiPackage: WitApiPackage,
     apiInterface: WitWasiInterface,
     operation: WitFunction,
-    resource?: WitResource
+    resource?: WitResource,
 ): string {
     const namespace = cIdentifier(apiPackage.packageName);
     const interfaceName = cIdentifier(apiInterface.name);

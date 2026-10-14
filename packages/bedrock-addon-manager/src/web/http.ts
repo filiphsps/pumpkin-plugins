@@ -5,10 +5,10 @@ export const MAX_REQUEST_BYTES = 8192;
 
 /** A parsed HTTP request head. The body is never read. */
 export interface HttpRequest {
-    method: string;
-    target: string;
     /** Header names are lowercased. */
     headers: Record<string, string>;
+    method: string;
+    target: string;
 }
 
 const REQUEST_LINE = /^([A-Z]+) (\S+) HTTP\/1\.[01]$/;
@@ -54,9 +54,9 @@ export function routePack(target: string): string | null {
 
 /** A range of bytes in a file, as asked for by a `Range` header. */
 export interface ByteRange {
+    end: number;
     /** Inclusive offsets. */
     start: number;
-    end: number;
 }
 
 /**
@@ -84,7 +84,7 @@ const REASONS: Record<number, string> = {
     400: 'Bad Request',
     404: 'Not Found',
     405: 'Method Not Allowed',
-    416: 'Range Not Satisfiable'
+    416: 'Range Not Satisfiable',
 };
 
 /** Status line and headers, ending with the blank line. The connection is always closed after a response. */

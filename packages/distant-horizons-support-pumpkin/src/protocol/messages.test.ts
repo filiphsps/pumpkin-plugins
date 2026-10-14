@@ -25,7 +25,7 @@ describe('Distant Horizons protocol', () => {
             tracker: -12,
             level: 'world',
             section: { x: -1, z: -1 },
-            timestamp: 123456789
+            timestamp: 123456789,
         });
     });
     it('rejects truncated, malformed, oversized, or unexpected messages', () => {
@@ -34,7 +34,7 @@ describe('Distant Horizons protocol', () => {
             packet(7).int(1).finish(),
             packet(8).finish(),
             packet(3).string('world').byte(0).finish(),
-            new Uint8Array(4097)
+            new Uint8Array(4097),
         ])
             expect(() => decode(data)).toThrow();
         expect(() => new Reader(new Uint8Array([0, 2, 192, 128])).string()).toThrow('UTF-8');
@@ -50,7 +50,7 @@ describe('Distant Horizons protocol', () => {
             syncEnabled: true,
             syncDistance: 128,
             syncRate: 50,
-            bandwidthKbps: 0
+            bandwidthKbps: 0,
         });
         expect(bytes.length).toBe(43);
         expect(decode(bytes)).toEqual({
@@ -64,8 +64,8 @@ describe('Distant Horizons protocol', () => {
                 syncEnabled: true,
                 syncDistance: 128,
                 syncRate: 50,
-                bandwidthKbps: 0
-            }
+                bandwidthKbps: 0,
+            },
         });
         const input = new Reader(bytes);
         input.short();
@@ -109,8 +109,8 @@ describe('Distant Horizons protocol', () => {
                 syncEnabled: false,
                 syncDistance: 48,
                 syncRate: 23,
-                bandwidthKbps: 500
-            }
+                bandwidthKbps: 500,
+            },
         });
     });
     it('splits data before sending its tracked response', () => {

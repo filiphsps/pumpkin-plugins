@@ -12,9 +12,9 @@ const packages = new Map([
             path: 'packages/plugin',
             manifest: {
                 dependencies: { kit: 'workspace:*' },
-                devDependencies: { '@pumpkin-plugins/build': 'workspace:*', harness: 'workspace:*' }
-            }
-        }
+                devDependencies: { '@pumpkin-plugins/build': 'workspace:*', harness: 'workspace:*' },
+            },
+        },
     ],
     ['kit', { path: 'tools/plugin-kit', manifest: { dependencies: { updates: 'workspace:*' } } }],
     ['updates', { path: 'tools/update-check', manifest: { dependencies: { kit: 'workspace:*' } } }],
@@ -25,14 +25,14 @@ const packages = new Map([
             manifest: {
                 dependencies: {
                     '@pumpkin-plugins/pumpkin-api': 'workspace:*',
-                    '@pumpkin-plugins/static-hermes-runtime': 'workspace:*'
-                }
-            }
-        }
+                    '@pumpkin-plugins/static-hermes-runtime': 'workspace:*',
+                },
+            },
+        },
     ],
     ['@pumpkin-plugins/pumpkin-api', { path: 'tools/pumpkin-api', manifest: {} }],
     ['@pumpkin-plugins/static-hermes-runtime', { path: 'tools/static-hermes-runtime', manifest: {} }],
-    ['harness', { path: 'tools/test-harness', manifest: {} }]
+    ['harness', { path: 'tools/test-harness', manifest: {} }],
 ]);
 const commit = (sha, files, message = 'fix: ship a change') => ({ sha, files, message });
 
@@ -41,7 +41,7 @@ class TestTagName {
         this.component = component;
         this.version = {
             compare: (other) => version.localeCompare(other.toString(), undefined, { numeric: true }),
-            toString: () => version
+            toString: () => version,
         };
     }
 
@@ -64,7 +64,7 @@ describe('bundled release commits', () => {
             writeFileSync(join(root, 'packages/plugin/package.json'), JSON.stringify({ name: 'plugin' }));
             assert.deepEqual(
                 [...workspacePackages(root)],
-                [['plugin', { path: 'packages/plugin', manifest: { name: 'plugin' } }]]
+                [['plugin', { path: 'packages/plugin', manifest: { name: 'plugin' } }]],
             );
         } finally {
             rmSync(root, { recursive: true, force: true });
@@ -77,7 +77,7 @@ describe('bundled release commits', () => {
             'tools/plugin-kit',
             'tools/pumpkin-api',
             'tools/static-hermes-runtime',
-            'tools/update-check'
+            'tools/update-check',
         ]);
         assert.throws(() => bundledPaths(packages, 'packages/missing'), /Unknown release package/);
     });
@@ -96,13 +96,13 @@ describe('bundled release commits', () => {
             commit('docs', ['tools/plugin-kit/README.md']),
             commit('artifact', ['packages/plugin/build/output.wasm']),
             commit('released', ['packages/plugin/package.json']),
-            commit('old', ['tools/update-check/src/http.ts'])
+            commit('old', ['tools/update-check/src/http.ts']),
         ];
         assert.deepEqual(
             releaseCommits(history, bundledPaths(packages, 'packages/plugin'), 'released', 'plugin').map(
-                (entry) => entry.sha
+                (entry) => entry.sha,
             ),
-            ['checker', 'shared', 'build', 'catalog']
+            ['checker', 'shared', 'build', 'catalog'],
         );
     });
 
@@ -113,15 +113,15 @@ describe('bundled release commits', () => {
             commit('release-as', [], 'chore(plugin): prepare release\n\nRelease-As: 1.0.0'),
             commit('recent-release', ['packages/other/package.json']),
             commit('older', ['tools/update-check/src/http.ts']),
-            commit('old-release', ['packages/plugin/package.json'])
+            commit('old-release', ['packages/plugin/package.json']),
         ];
         assert.deepEqual(
             releaseCommits(history, paths, 'recent-release', 'plugin').map((entry) => entry.sha),
-            ['new', 'release-as']
+            ['new', 'release-as'],
         );
         assert.deepEqual(
             releaseCommits(history, paths, 'old-release', 'plugin').map((entry) => entry.sha),
-            ['new', 'release-as', 'older']
+            ['new', 'release-as', 'older'],
         );
         assert.equal(releaseCommits(history, paths, undefined, 'plugin').length, 3);
     });
@@ -135,7 +135,7 @@ describe('bundled release commits', () => {
         const history = [
             commit('released-a', ['packages/a/package.json', '.release-please-manifest.json'], 'chore: release a'),
             commit('shared-fix', ['tools/plugin-kit/src/host.ts']),
-            commit('released-b', ['packages/b/package.json'], 'chore: release b')
+            commit('released-b', ['packages/b/package.json'], 'chore: release b'),
         ];
         const paths = new Set(['tools/plugin-kit']);
         assert.deepEqual(releaseCommits(history, paths, 'released-a'), []);
@@ -145,19 +145,19 @@ describe('bundled release commits', () => {
     it('supplies unfiltered shared commits to the public preconfigure hook', async () => {
         const history = [
             commit('update', ['tools/update-check/src/http.ts']),
-            commit('boundary', ['packages/plugin/package.json'])
+            commit('boundary', ['packages/plugin/package.json']),
         ];
         const github = {
             async *mergeCommitIterator() {
                 yield* history;
-            }
+            },
         };
         const plugin = bundledChangesPlugin(github, 'master', packages, { 'packages/plugin': '0.0.1' });
         const strategies = { 'packages/plugin': {} };
         const scoped = { 'packages/plugin': [] };
         assert.equal(
             await plugin.preconfigure(strategies, scoped, { 'packages/plugin': { sha: 'boundary' } }),
-            strategies
+            strategies,
         );
         assert.deepEqual(scoped['packages/plugin'], [history[0]]);
     });
@@ -168,12 +168,12 @@ describe('bundled release commits', () => {
             commit('api-change', ['tools/pumpkin-api/src/core.ts']),
             commit('runtime-change', ['tools/static-hermes-runtime/src/index.ts']),
             commit('unrelated', ['tools/plugin-kit/src/host.ts']),
-            commit('boundary', ['tools/build/package.json'])
+            commit('boundary', ['tools/build/package.json']),
         ];
         const github = {
             async *mergeCommitIterator() {
                 yield* history;
-            }
+            },
         };
         const plugin = bundledChangesPlugin(github, 'master', packages, { 'tools/build': '0.1.0' });
         const strategies = { 'tools/build': {} };
@@ -184,7 +184,7 @@ describe('bundled release commits', () => {
 
         assert.deepEqual(
             commits['tools/build'].map((entry) => entry.sha),
-            ['builder-change', 'api-change', 'runtime-change']
+            ['builder-change', 'api-change', 'runtime-change'],
         );
     });
 
@@ -193,7 +193,7 @@ describe('bundled release commits', () => {
             commit('after-release', ['packages/plugin/src/plugin.ts']),
             commit('release-0.0.4', ['packages/plugin/package.json'], 'chore(master): release plugin 0.0.4'),
             commit('published-0.0.3', ['packages/plugin/package.json'], 'chore(master): release plugin 0.0.3'),
-            commit('before-release', ['packages/plugin/src/old.ts'])
+            commit('before-release', ['packages/plugin/src/old.ts']),
         ];
         const github = {
             async *releaseIterator() {
@@ -201,7 +201,7 @@ describe('bundled release commits', () => {
             },
             async *mergeCommitIterator() {
                 yield* history;
-            }
+            },
         };
         const plugin = bundledChangesPlugin(github, 'master', packages, { 'packages/plugin': '0.0.4' });
         const strategies = { 'packages/plugin': {} };
@@ -209,8 +209,8 @@ describe('bundled release commits', () => {
         const releases = {
             'packages/plugin': {
                 tag: new TestTagName('0.0.4'),
-                sha: ''
-            }
+                sha: '',
+            },
         };
 
         await plugin.preconfigure(strategies, scoped, releases);
@@ -224,21 +224,21 @@ describe('bundled release commits', () => {
         const history = [
             commit('plugin-release-as', [], 'chore(plugin): recover release\n\nRelease-As: 0.0.5'),
             commit('unscoped-release-as', [], 'chore: recover release\n\nRelease-As: 0.0.5'),
-            commit('boundary', ['packages/plugin/package.json'])
+            commit('boundary', ['packages/plugin/package.json']),
         ];
         const github = {
             async *mergeCommitIterator() {
                 yield* history;
-            }
+            },
         };
         const plugin = bundledChangesPlugin(github, 'master', packages, {
             'packages/plugin': '0.0.4',
-            'actions/sign-pumpkin-plugin': '0.0.0'
+            'actions/sign-pumpkin-plugin': '0.0.0',
         });
         const strategies = { 'packages/plugin': {}, 'actions/sign-pumpkin-plugin': {} };
         const commits = {
             'packages/plugin': [],
-            'actions/sign-pumpkin-plugin': history.slice(0, 2)
+            'actions/sign-pumpkin-plugin': history.slice(0, 2),
         };
         const releases = { 'packages/plugin': { tag: {}, sha: 'boundary' } };
 
@@ -246,7 +246,7 @@ describe('bundled release commits', () => {
 
         assert.deepEqual(
             commits['packages/plugin'].map((entry) => entry.sha),
-            ['plugin-release-as']
+            ['plugin-release-as'],
         );
         assert.deepEqual(commits['actions/sign-pumpkin-plugin'], []);
     });
@@ -257,7 +257,7 @@ describe('bundled release commits', () => {
             async *mergeCommitIterator() {
                 fetchedHistory = true;
                 yield commit('initial', []);
-            }
+            },
         };
         const plugin = bundledChangesPlugin(github, 'master', packages, { 'actions/publish-action': '0.0.0' });
         const strategies = { 'actions/publish-action': {} };
@@ -271,7 +271,7 @@ describe('bundled release commits', () => {
         const history = [
             commit('after-addition', ['packages/plugin/src/plugin.ts']),
             commit('added', ['packages/plugin/package.json', 'packages/plugin/src/plugin.ts']),
-            ...Array.from({ length: 500 }, (_, index) => commit(`older-${index}`, ['README.md']))
+            ...Array.from({ length: 500 }, (_, index) => commit(`older-${index}`, ['README.md'])),
         ];
         const github = {
             getGitHubApi() {
@@ -285,16 +285,16 @@ describe('bundled release commits', () => {
                                 repo: 'repo',
                                 sha: 'master',
                                 path: 'packages/plugin/package.json',
-                                per_page: 100
+                                per_page: 100,
                             });
                             return [{ sha: 'manifest-update' }, { sha: 'added' }];
-                        }
-                    }
+                        },
+                    },
                 };
             },
             async *mergeCommitIterator(_branch, { maxResults }) {
                 yield* history.slice(0, maxResults);
-            }
+            },
         };
         const plugin = bundledChangesPlugin(github, 'master', packages, { 'packages/plugin': '0.0.0' });
         const commits = { 'packages/plugin': [] };
@@ -303,14 +303,14 @@ describe('bundled release commits', () => {
 
         assert.deepEqual(
             commits['packages/plugin'].map((entry) => entry.sha),
-            ['after-addition', 'added']
+            ['after-addition', 'added'],
         );
     });
 
     it('trims action notes to the previous published tag when the manifest release SHA is missing', async () => {
         const history = [
             commit('after-first-release', ['actions/publish-action/src/index.mjs']),
-            commit('first-release', ['actions/publish-action/version.txt'], 'chore: release publish-action 0.0.1')
+            commit('first-release', ['actions/publish-action/version.txt'], 'chore: release publish-action 0.0.1'),
         ];
         const github = {
             async *releaseIterator() {
@@ -318,15 +318,15 @@ describe('bundled release commits', () => {
             },
             async *mergeCommitIterator() {
                 yield* history;
-            }
+            },
         };
         const plugin = bundledChangesPlugin(github, 'master', packages, { 'actions/publish-action': '0.0.2' });
         const commits = { 'actions/publish-action': history };
         const releases = {
             'actions/publish-action': {
                 tag: new TestTagName('0.0.2', 'publish-action'),
-                sha: ''
-            }
+                sha: '',
+            },
         };
 
         await plugin.preconfigure({ 'actions/publish-action': {} }, commits, releases);
@@ -334,7 +334,7 @@ describe('bundled release commits', () => {
         assert.equal(releases['actions/publish-action'].sha, 'first-release');
         assert.deepEqual(
             commits['actions/publish-action'].map((entry) => entry.sha),
-            ['after-first-release']
+            ['after-first-release'],
         );
     });
 
@@ -347,14 +347,14 @@ describe('bundled release commits', () => {
                         rest: { repos: { listCommits: 'listCommits' } },
                         async paginate() {
                             return [{ sha: 'two' }];
-                        }
-                    }
+                        },
+                    },
                 };
             },
             async *mergeCommitIterator() {
                 yield commit('one', []);
                 yield commit('two', []);
-            }
+            },
         };
         const plugin = bundledChangesPlugin(github, 'master', packages, { 'packages/plugin': '0.0.0' }, 1);
         await assert.rejects(plugin.preconfigure({ 'packages/plugin': {} }, {}, {}), /history exceeds 1 commits/);

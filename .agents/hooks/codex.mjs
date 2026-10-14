@@ -18,8 +18,8 @@ function deny(reason) {
         hookSpecificOutput: {
             hookEventName: 'PreToolUse',
             permissionDecision: 'deny',
-            permissionDecisionReason: reason
-        }
+            permissionDecisionReason: reason,
+        },
     };
 }
 
@@ -29,12 +29,12 @@ function checkFailure(report, retrying) {
     if (retrying) {
         return {
             continue: false,
-            systemMessage: `Repository checks still fail after one continuation attempt. Preserve unrelated changes; resolve these failures or report why they remain.\n\n${details}`
+            systemMessage: `Repository checks still fail after one continuation attempt. Preserve unrelated changes; resolve these failures or report why they remain.\n\n${details}`,
         };
     }
     return {
         decision: 'block',
-        reason: `Repository checks failed. Preserve unrelated changes and fix the reported failures before finishing.\n\n${details}`
+        reason: `Repository checks failed. Preserve unrelated changes and fix the reported failures before finishing.\n\n${details}`,
     };
 }
 
@@ -55,7 +55,7 @@ export async function handleCodexHook(request, runner = handle, scope = hookScop
                 event: 'before-tool',
                 tool: portableTool(request.tool_name),
                 input: originalInput,
-                cwd: request.cwd
+                cwd: request.cwd,
             });
             if (result?.ok !== true)
                 return deny(result?.reason ?? result?.error ?? 'The repository hook refused this tool call.');
@@ -67,8 +67,8 @@ export async function handleCodexHook(request, runner = handle, scope = hookScop
                     hookSpecificOutput: {
                         hookEventName: 'PreToolUse',
                         permissionDecision: 'allow',
-                        updatedInput: result.input
-                    }
+                        updatedInput: result.input,
+                    },
                 };
             }
             return null;
@@ -93,7 +93,7 @@ export async function handleCodexHook(request, runner = handle, scope = hookScop
         if (typeof request.session_id !== 'string' || typeof request.turn_id !== 'string') {
             return checkFailure(
                 'Codex did not provide session_id and turn_id; repository checks cannot be scoped safely.',
-                retrying
+                retrying,
             );
         }
         try {

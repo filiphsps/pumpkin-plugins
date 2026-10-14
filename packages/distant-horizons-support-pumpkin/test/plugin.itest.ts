@@ -12,7 +12,7 @@ describe(info.name, () => {
     beforeAll(async () => {
         server = await startPumpkin({
             name: 'distant-horizons-support-pumpkin',
-            plugins: [builtPluginPath(process.cwd())]
+            plugins: [builtPluginPath(process.cwd())],
         });
     });
     afterAll(async () => {
@@ -35,13 +35,13 @@ describe(info.name, () => {
         const status = await server.waitForLog(
             /0 Distant Horizons client\(s\), 0 pending LOD request\(s\)/,
             5000,
-            statusFrom
+            statusFrom,
         );
         expect(status).toContain('pending LOD request(s)');
         const budget = await server.waitForLog(
             /Capture budget \d+\/8192 block samples\/tick at \d+(?:\.\d+)? reported MSPT/,
             5000,
-            statusFrom
+            statusFrom,
         );
         expect(budget).toMatch(/Capture budget \d+\/8192 block samples\/tick at \d+(?:\.\d+)? reported MSPT/);
         const cacheStatusFrom = server.lines.length;
@@ -56,7 +56,7 @@ describe(info.name, () => {
         const mapReply = await server.waitForLog(
             /Run this command as a player so the current world is known/,
             5000,
-            mapFrom
+            mapFrom,
         );
         expect(mapReply).not.toContain('Syntax error:');
         const generateFrom = server.lines.length;
@@ -64,7 +64,7 @@ describe(info.name, () => {
         const generateReply = await server.waitForLog(
             /Run this command as a Java player so the current world is known/,
             5000,
-            generateFrom
+            generateFrom,
         );
         expect(generateReply).not.toContain('Syntax error:');
         // A successful load alone does not prove that the worker's event is being dispatched.
@@ -75,7 +75,7 @@ describe(info.name, () => {
                 const line = await server.waitForLog(/worker tick\(s\)/, 1000, from);
                 expect(line).toMatch(/[1-9][0-9]* worker tick\(s\)/);
             },
-            { timeout: 5000, interval: 100 }
+            { timeout: 5000, interval: 100 },
         );
         expect(server.errors()).toEqual([]);
     });
@@ -85,8 +85,8 @@ describe(info.name, () => {
             plugins: [builtPluginPath(process.cwd())],
             files: {
                 [`plugins/data/${info.name}/config.toml`]:
-                    '[support]\nrender_distance = 256\nserver_key = "integration-test"\nblocks_per_tick = 32768\ncache_entries = 512\n'
-            }
+                    '[support]\nrender_distance = 256\nserver_key = "integration-test"\nblocks_per_tick = 32768\ncache_entries = 512\n',
+            },
         });
         try {
             await custom.waitForLog(new RegExp(`Loaded ${info.name}`));
@@ -115,8 +115,8 @@ describe(info.name, () => {
             plugins: [builtPluginPath(process.cwd())],
             files: {
                 [`plugins/data/${info.name}/config.toml`]: '[support]\nmemory_cache_entries = 0\n',
-                [`plugins/data/${info.name}/cache/${fileName}`]: content
-            }
+                [`plugins/data/${info.name}/cache/${fileName}`]: content,
+            },
         });
         try {
             await custom.waitForLog(new RegExp(`Loaded ${info.name}`));
@@ -142,8 +142,8 @@ describe(info.name, () => {
             plugins: [builtPluginPath(process.cwd())],
             files: {
                 [`plugins/data/${info.name}/config.toml`]:
-                    '[support]\nmemory_cache_entries = -9223372036854775808\ndisk_cache_entries = -9223372036854775808\n'
-            }
+                    '[support]\nmemory_cache_entries = -9223372036854775808\ndisk_cache_entries = -9223372036854775808\n',
+            },
         });
         try {
             await custom.waitForLog(new RegExp(`Loaded ${info.name}`));

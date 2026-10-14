@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => ({
     lookup: vi.fn(() => ({ name: 'minecraft:stone', properties: [] as [string, string][] })),
-    text: vi.fn((value: string) => ({ value, [Symbol.dispose]: vi.fn() }))
+    text: vi.fn((value: string) => ({ value, [Symbol.dispose]: vi.fn() })),
 }));
 vi.mock('pumpkin:plugin/world@0.1.0', () => ({ blockStateToInfo: state.lookup }));
 vi.mock('pumpkin:plugin/text@0.1.0', () => ({ TextComponent: { text: state.text } }));
@@ -23,12 +23,12 @@ describe('Pumpkin terrain adapter', () => {
         const world = {
             getName: () => 'world.1',
             getDimension: () => 'minecraft:overworld',
-            [Symbol.dispose]: vi.fn()
+            [Symbol.dispose]: vi.fn(),
         };
         const player = {
             asJava: () => java,
             getWorld: () => world,
-            getPosition: () => [0, 64, 0]
+            getPosition: () => [0, 64, 0],
         };
 
         expect(() => withPlayer(player as unknown as Player, settings, () => {})).toThrow('valid DH level key');
@@ -43,8 +43,8 @@ describe('Pumpkin terrain adapter', () => {
             name: 'minecraft:oak_log',
             properties: [
                 ['waterlogged', 'false'],
-                ['axis', 'y']
-            ]
+                ['axis', 'y'],
+            ],
         });
         const chunk = {
             getBlockStateId: vi.fn(() => {
@@ -62,7 +62,7 @@ describe('Pumpkin terrain adapter', () => {
             getBlockLight: vi.fn(() => {
                 throw new Error('Chunk unloaded');
             }),
-            [Symbol.dispose]: vi.fn()
+            [Symbol.dispose]: vi.fn(),
         };
         const border = { getCenterX: () => 0.5, getCenterZ: () => 0, getSize: () => 10, [Symbol.dispose]: vi.fn() };
         const world = {
@@ -76,7 +76,7 @@ describe('Pumpkin terrain adapter', () => {
             getSkyLight: vi.fn(() => 15),
             getBlockLight: vi.fn(() => 0),
             getChunk: vi.fn(() => chunk),
-            [Symbol.dispose]: vi.fn()
+            [Symbol.dispose]: vi.fn(),
         };
         const java = { sendCustomPayload: vi.fn(), [Symbol.dispose]: vi.fn() };
         const sendSystemMessage = vi.fn();
@@ -85,7 +85,7 @@ describe('Pumpkin terrain adapter', () => {
             getWorld: () => world,
             getName: () => 'Alice',
             getPosition: () => [0, 64, 0],
-            sendSystemMessage
+            sendSystemMessage,
         };
         expect(() =>
             withPlayer(player as unknown as Player, settings, (peer) => {
@@ -99,10 +99,10 @@ describe('Pumpkin terrain adapter', () => {
                 expect(sendSystemMessage).toHaveBeenCalledWith(component, false);
                 expect(component?.[Symbol.dispose]).toHaveBeenCalledOnce();
                 expect(peer.terrain.sample(-1, 64, -17).material).toBe(
-                    'minecraft:old_growth_pine_taiga_DH-BSW_minecraft:oak_log_STATE_{axis:y}{waterlogged:false}'
+                    'minecraft:old_growth_pine_taiga_DH-BSW_minecraft:oak_log_STATE_{axis:y}{waterlogged:false}',
                 );
                 expect(peer.terrain.sample(-1, 63, -17).material).toBe(
-                    'minecraft:old_growth_pine_taiga_DH-BSW_minecraft:oak_log_STATE_{axis:y}{waterlogged:false}'
+                    'minecraft:old_growth_pine_taiga_DH-BSW_minecraft:oak_log_STATE_{axis:y}{waterlogged:false}',
                 );
                 expect(world.getBlockStateId).toHaveBeenCalledWith({ x: -1, y: 64, z: -17 });
                 expect(world.getBiome).toHaveBeenCalledWith({ x: -1, y: 80, z: -17 });
@@ -117,7 +117,7 @@ describe('Pumpkin terrain adapter', () => {
                 expect(chunk.getBlockLight).not.toHaveBeenCalled();
                 expect(chunk.getTopBlockY).not.toHaveBeenCalled();
                 throw new Error('callback failure');
-            })
+            }),
         ).toThrow('callback failure');
         for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
     });
@@ -125,7 +125,7 @@ describe('Pumpkin terrain adapter', () => {
         const values = defaultValues(schema),
             settings = {
                 ...values.support,
-                worlds: { world: { sample_biomes_3d: true } }
+                worlds: { world: { sample_biomes_3d: true } },
             } as unknown as Settings;
         state.lookup
             .mockReturnValueOnce({ name: 'minecraft:oak_log', properties: [] })
@@ -143,14 +143,14 @@ describe('Pumpkin terrain adapter', () => {
             getTopBlockY: () => 80,
             getSkyLight,
             getBlockLight: () => 0,
-            [Symbol.dispose]: vi.fn()
+            [Symbol.dispose]: vi.fn(),
         };
         const java = { [Symbol.dispose]: vi.fn() };
         const player = {
             asJava: () => java,
             getWorld: () => world,
             getName: () => 'Alice',
-            getPosition: () => [0, 64, 0]
+            getPosition: () => [0, 64, 0],
         };
 
         withPlayer(player as unknown as Player, settings, (peer) => {
@@ -178,14 +178,14 @@ describe('Pumpkin terrain adapter', () => {
             getTopBlockY,
             getSkyLight: () => 15,
             getBlockLight: () => 0,
-            [Symbol.dispose]: vi.fn()
+            [Symbol.dispose]: vi.fn(),
         };
         const java = { [Symbol.dispose]: vi.fn() };
         const player = {
             asJava: () => java,
             getWorld: () => world,
             getName: () => 'Alice',
-            getPosition: () => [0, 64, 0]
+            getPosition: () => [0, 64, 0],
         };
 
         withPlayer(player as unknown as Player, settings, (peer) => {
@@ -204,7 +204,7 @@ describe('Pumpkin terrain adapter', () => {
         const values = defaultValues(schema),
             settings = {
                 ...values.support,
-                worlds: { world: { height: 20, sample_biomes_3d: false } }
+                worlds: { world: { height: 20, sample_biomes_3d: false } },
             } as unknown as Settings;
         state.lookup
             .mockReturnValueOnce({ name: 'minecraft:air', properties: [] })
@@ -221,21 +221,21 @@ describe('Pumpkin terrain adapter', () => {
             getTopBlockY,
             getSkyLight: () => 15,
             getBlockLight: () => 0,
-            [Symbol.dispose]: vi.fn()
+            [Symbol.dispose]: vi.fn(),
         };
         const java = { [Symbol.dispose]: vi.fn() };
         const player = {
             asJava: () => java,
             getWorld: () => world,
             getName: () => 'Alice',
-            getPosition: () => [0, 64, 0]
+            getPosition: () => [0, 64, 0],
         };
         let captured: ReturnType<TerrainCapture['result']> | undefined;
 
         withPlayer(player as unknown as Player, settings, (peer) => {
             const capture = new TerrainCapture(
                 { originX: 0, originZ: 0, width: 1, depth: 1, minY: -10, height: 20 },
-                { isEmpty: (material) => material.endsWith('_DH-BSW_minecraft:air') }
+                { isEmpty: (material) => material.endsWith('_DH-BSW_minecraft:air') },
             );
             expect(capture.step(peer.terrain, 20)).toBe(true);
             captured = capture.result();
@@ -244,7 +244,7 @@ describe('Pumpkin terrain adapter', () => {
         expect(getTopBlockY).toHaveBeenCalledOnce();
         expect(captured?.columns[0]).toEqual([
             { materialId: 0, startY: 3, height: 17, skyLight: 15, blockLight: 0 },
-            { materialId: 1, startY: 0, height: 3, skyLight: 15, blockLight: 0 }
+            { materialId: 1, startY: 0, height: 3, skyLight: 15, blockLight: 0 },
         ]);
         for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
     });
@@ -259,14 +259,14 @@ describe('Pumpkin terrain adapter', () => {
             getMinY: () => -64,
             getWorldBorder: () => border,
             getChunk,
-            [Symbol.dispose]: vi.fn()
+            [Symbol.dispose]: vi.fn(),
         };
         const java = { [Symbol.dispose]: vi.fn() };
         const player = {
             asJava: () => java,
             getWorld: () => world,
             getName: () => 'Alice',
-            getPosition: () => [0, 64, 0]
+            getPosition: () => [0, 64, 0],
         };
         expect(
             withPlayer(player as unknown as Player, { ...values.support, worlds: values.worlds }, (peer) => {
@@ -277,13 +277,13 @@ describe('Pumpkin terrain adapter', () => {
                         width: 64,
                         depth: 64,
                         minY: -64,
-                        height: 384
-                    })
+                        height: 384,
+                    }),
                 ).toMatchObject({
                     status: 'unavailable',
-                    reason: expect.stringContaining('Chunk -1, -5 is not loaded')
+                    reason: expect.stringContaining('Chunk -1, -5 is not loaded'),
                 });
-            })
+            }),
         ).toBe(true);
         expect(getChunk).toHaveBeenCalledTimes(16);
         expect(getChunk).toHaveBeenNthCalledWith(1, -4, -8);
@@ -293,7 +293,7 @@ describe('Pumpkin terrain adapter', () => {
     it.each([
         [0, 0, 0],
         [7, 1, 3],
-        [15, 3, 3]
+        [15, 3, 3],
     ])('rejects a null host chunk at lookup %i without sampling or leaking handles', (missingAt, chunkX, chunkZ) => {
         const values = defaultValues(schema),
             settings = { ...values.support, worlds: values.worlds };
@@ -311,7 +311,7 @@ describe('Pumpkin terrain adapter', () => {
             getCenterX: () => 0,
             getCenterZ: () => 0,
             getSize: () => 60_000_000,
-            [Symbol.dispose]: vi.fn()
+            [Symbol.dispose]: vi.fn(),
         };
         const world = {
             getName: () => 'world',
@@ -320,14 +320,14 @@ describe('Pumpkin terrain adapter', () => {
             getWorldBorder: () => border,
             getChunk,
             getBlockStateId,
-            [Symbol.dispose]: vi.fn()
+            [Symbol.dispose]: vi.fn(),
         };
         const java = { [Symbol.dispose]: vi.fn() };
         const player = {
             asJava: () => java,
             getWorld: () => world,
             getName: () => 'Alice',
-            getPosition: () => [0, 64, 0]
+            getPosition: () => [0, 64, 0],
         };
 
         withPlayer(player as unknown as Player, settings, (peer) => {
@@ -338,11 +338,11 @@ describe('Pumpkin terrain adapter', () => {
                     width: 64,
                     depth: 64,
                     minY: -64,
-                    height: 384
-                })
+                    height: 384,
+                }),
             ).toMatchObject({
                 status: 'unavailable',
-                reason: expect.stringContaining(`Chunk ${chunkX}, ${chunkZ} is not loaded`)
+                reason: expect.stringContaining(`Chunk ${chunkX}, ${chunkZ} is not loaded`),
             });
         });
 
@@ -365,14 +365,14 @@ describe('Pumpkin terrain adapter', () => {
             getChunk: vi.fn(() => {
                 throw new Error('server stopped');
             }),
-            [Symbol.dispose]: vi.fn()
+            [Symbol.dispose]: vi.fn(),
         };
         const java = { [Symbol.dispose]: vi.fn() };
         const player = {
             asJava: () => java,
             getWorld: () => world,
             getName: () => 'Alice',
-            getPosition: () => [0, 64, 0]
+            getPosition: () => [0, 64, 0],
         };
 
         withPlayer(player as unknown as Player, settings, (peer) => {
@@ -383,11 +383,11 @@ describe('Pumpkin terrain adapter', () => {
                     width: 1,
                     depth: 1,
                     minY: 0,
-                    height: 384
-                })
+                    height: 384,
+                }),
             ).toMatchObject({
                 status: 'unavailable',
-                reason: expect.stringContaining('Chunk 0, 0 could not be checked: Error: server stopped')
+                reason: expect.stringContaining('Chunk 0, 0 could not be checked: Error: server stopped'),
             });
         });
 
@@ -404,11 +404,11 @@ describe('Pumpkin terrain adapter', () => {
                     asJava: () => java,
                     getWorld: () => {
                         throw new Error('world unavailable');
-                    }
+                    },
                 } as unknown as Player,
                 { ...values.support, worlds: values.worlds },
-                () => {}
-            )
+                () => {},
+            ),
         ).toThrow('world unavailable');
         expect(java[Symbol.dispose]).toHaveBeenCalledOnce();
     });
@@ -421,8 +421,8 @@ describe('Pumpkin terrain adapter', () => {
                 { ...values.support, worlds: values.worlds },
                 () => {
                     throw new Error('called');
-                }
-            )
+                },
+            ),
         ).toBe(false);
         expect(getWorld).not.toHaveBeenCalled();
     });
@@ -449,14 +449,14 @@ describe('server player lookup', () => {
             getWorld: () => {
                 throw new Error('world unavailable');
             },
-            [Symbol.dispose]: vi.fn()
+            [Symbol.dispose]: vi.fn(),
         };
         const log = new MemoryLogger();
         const peers = serverPeers({ getPlayerByName: () => player } as unknown as Server, settings, log);
 
         expect(peers.withPeer('Alice', () => {})).toBe(false);
         expect(log.of('warn')).toEqual([
-            'DistantHorizonsSupportPumpkin: cannot access player terrain: Error: world unavailable'
+            'DistantHorizonsSupportPumpkin: cannot access player terrain: Error: world unavailable',
         ]);
         expect(java[Symbol.dispose]).toHaveBeenCalledOnce();
         expect(player[Symbol.dispose]).toHaveBeenCalledOnce();

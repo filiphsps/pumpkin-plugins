@@ -2,18 +2,18 @@ import { strFromU8, unzipSync } from 'fflate';
 
 /** What the plugin needs to know about a pack, read from its `manifest.json`. */
 export interface PackManifest {
-    /** Lowercase header UUID. */
-    uuid: string;
-    /** `major.minor.patch`. */
-    version: string;
-    name?: string;
-    moduleTypes: string[];
     /** The pack is part of an add-on: it has behavior or script modules, or depends on another pack. */
     addonPack: boolean;
     /** The pack has a `script` or `client_data` module. */
     hasScripts: boolean;
+    moduleTypes: string[];
+    name?: string;
     /** The manifest asks for the `raytraced` capability. */
     rtxEnabled: boolean;
+    /** Lowercase header UUID. */
+    uuid: string;
+    /** `major.minor.patch`. */
+    version: string;
 }
 
 /** A pack's manifest is missing or unusable. The message says why and is fit for the server log. */
@@ -69,7 +69,7 @@ function fromJson(json: unknown): PackManifest {
         moduleTypes,
         addonPack: dependsOnPack || moduleTypes.some((t) => ADDON_MODULES.includes(t)),
         hasScripts: moduleTypes.some((t) => SCRIPT_MODULES.includes(t)),
-        rtxEnabled: capabilities.includes('raytraced')
+        rtxEnabled: capabilities.includes('raytraced'),
     };
 }
 

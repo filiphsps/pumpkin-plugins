@@ -2,10 +2,10 @@
 export interface AdaptiveWorkBudgetOptions {
     /** Work units to allow before a cost measurement is available. */
     initialUnits: number;
-    /** Length of one server tick in milliseconds. Defaults to Minecraft's 50 ms tick. */
-    tickDurationMs?: number;
     /** Time to leave for the server and other plugins. Defaults to 5 ms. */
     reserveMs?: number;
+    /** Length of one server tick in milliseconds. Defaults to Minecraft's 50 ms tick. */
+    tickDurationMs?: number;
 }
 
 const COST_SMOOTHING = 0.25;

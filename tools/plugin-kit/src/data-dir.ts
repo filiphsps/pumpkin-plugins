@@ -48,9 +48,9 @@ export class WasiDataDir implements DataFiles {
                 modified: time
                     ? toSafeNumber(
                           time.seconds * 1_000n + BigInt(Math.floor(time.nanoseconds / 1e6)),
-                          `${path} modification time`
+                          `${path} modification time`,
                       )
-                    : 0
+                    : 0,
             };
         } catch (err) {
             const code = wasiErrorCode(err);
@@ -149,7 +149,7 @@ export class WasiDataDir implements DataFiles {
                     if (closed) return;
                     closed = true;
                     disposeWasiResource(file);
-                }
+                },
             };
         } catch (error) {
             disposeWasiResource(file);

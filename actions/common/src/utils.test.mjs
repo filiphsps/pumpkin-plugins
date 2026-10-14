@@ -11,7 +11,7 @@ const spacedKey = 'INPUT_ACTION_TEST-SPACED-NAME';
 const previousValues = new Map([
     [hyphenatedKey, process.env[hyphenatedKey]],
     [underscoreKey, process.env[underscoreKey]],
-    [spacedKey, process.env[spacedKey]]
+    [spacedKey, process.env[spacedKey]],
 ]);
 const outputDirs = [];
 const previousOutput = process.env.GITHUB_OUTPUT;

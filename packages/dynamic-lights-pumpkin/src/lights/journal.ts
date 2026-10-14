@@ -6,24 +6,24 @@ const JOURNAL_FILE = 'active-lights.json';
 
 /** A temporary light override recorded before it is applied to the world. */
 interface JournalEntry {
-    /** The key that identifies this cell in the tracker. */
-    readonly key: string;
-    /** The world containing the block. */
-    readonly worldId: string;
-    /** The block position whose light level was temporarily changed. */
-    readonly position: BlockPosition;
-    /** The block-light level to restore after recovery. */
-    readonly originalLevel: number;
     /** Every temporary level this cell may still contain. */
     readonly appliedLevels: readonly number[];
+    /** The key that identifies this cell in the tracker. */
+    readonly key: string;
+    /** The block-light level to restore after recovery. */
+    readonly originalLevel: number;
+    /** The block position whose light level was temporarily changed. */
+    readonly position: BlockPosition;
+    /** The world containing the block. */
+    readonly worldId: string;
 }
 
 /** The world operations needed to recover lights written by older plugin versions. */
 export interface LightRecoveryWorld {
-    /** Identifies this world for recovery bookkeeping. */
-    readonly id: string;
     /** Returns the current server block-light level at a position. */
     getBlockLight(position: BlockPosition): number;
+    /** Identifies this world for recovery bookkeeping. */
+    readonly id: string;
     /** Restores a server block-light level at a position. */
     setBlockLight(position: BlockPosition, level: number): void;
 }
@@ -96,7 +96,7 @@ function isPosition(value: unknown): value is BlockPosition {
             typeof coordinate === 'number' &&
             Number.isInteger(coordinate) &&
             coordinate >= -2147483648 &&
-            coordinate <= 2147483647
+            coordinate <= 2147483647,
     );
 }
 

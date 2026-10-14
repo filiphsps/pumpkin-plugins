@@ -3,19 +3,14 @@
     "version": "0.1.0",
     "private": true,
     "description": "Host helpers shared by plugins",
-    "license": "MIT",
-    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
-    "contributors": [
-        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
-    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/plugin-kit#readme",
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
         "directory": "tools/plugin-kit"
-    },
-    "bugs": {
-        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
     },
     "funding": [
         {
@@ -27,8 +22,13 @@
             "url": "https://paypal.me/filiph"
         }
     ],
-    "type": "module",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
     "sideEffects": false,
+    "type": "module",
     "exports": {
         "./commands": "./src/commands.ts",
         "./data-dir": "./src/data-dir.ts",
@@ -48,18 +48,15 @@
     "files": [
         "src"
     ],
-    "publishConfig": {
-        "access": "public"
-    },
     "scripts": {
-        "typecheck": "pumpkin-plugins-build --types-only && tsc --noEmit",
         "test": "vitest run",
-        "test:coverage": "vitest run --coverage"
+        "test:coverage": "vitest run --coverage",
+        "typecheck": "pumpkin-plugins-build --types-only && tsc --noEmit"
     },
     "dependencies": {
         "@pumpkin-plugins/docs": "workspace:*",
-        "@pumpkin-plugins/update-check": "workspace:*",
-        "@pumpkin-plugins/pumpkin-api": "catalog:"
+        "@pumpkin-plugins/pumpkin-api": "catalog:",
+        "@pumpkin-plugins/update-check": "workspace:*"
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",
@@ -67,6 +64,9 @@
         "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
+    },
+    "publishConfig": {
+        "access": "public"
     },
     "pumpkinPlugin": {
         "wasi": [

@@ -17,7 +17,7 @@ function setup(igd: FakeIgd | null = new FakeIgd(), extra: Partial<ConstructorPa
         leaseSeconds: 3600,
         log: (m) => log.push(m),
         random: () => 0.5,
-        ...extra
+        ...extra,
     });
     /** Ticks with the clock moving until the predicate holds. */
     const settle = (until: () => boolean, limitMs = 60_000) => {
@@ -46,9 +46,9 @@ function delayMappingReply(net: FakeNetwork, action = 'AddPortMapping', shouldDe
                         mapping ||= strFromU8(bytes).includes(`#${action}`);
                         connection.write(bytes);
                     },
-                    read: (max) => (mapping && blocked && shouldDelay() ? null : connection.read(max))
+                    read: (max) => (mapping && blocked && shouldDelay() ? null : connection.read(max)),
                 };
-            }
+            },
         };
     };
     return () => {
@@ -69,12 +69,12 @@ describe('PortMapper', () => {
             internalPort: 8123,
             client: '192.168.1.50',
             description: 'Packs',
-            leaseSeconds: 3600
+            leaseSeconds: 3600,
         });
         expect(mapper.info()).toMatchObject({
             localAddress: [192, 168, 1, 50],
             gateway: { kind: 'upnp', address: [192, 168, 1, 1] },
-            externalAddress: [93, 184, 216, 34]
+            externalAddress: [93, 184, 216, 34],
         });
         expect(net.leaks).toBe(0);
     });
@@ -201,7 +201,7 @@ describe('PortMapper', () => {
                     socket.send(to, data);
                 },
                 receive: () => (mapping && blocked ? undefined : socket.receive()),
-                close: () => socket.close()
+                close: () => socket.close(),
             };
         };
         mapper.request('web', spec);
@@ -301,7 +301,7 @@ describe('PortMapper', () => {
         settle(() => mapper.state('second')?.kind !== 'pending');
         expect(mapper.state('second')).toMatchObject({
             kind: 'failed',
-            reason: expect.stringContaining('already owned')
+            reason: expect.stringContaining('already owned'),
         });
         expect(igd?.mappings.get('tcp:9000')?.internalPort).toBe(8123);
         expect(igd?.actions.filter((a) => a === 'AddPortMapping')).toHaveLength(1);
@@ -319,7 +319,7 @@ describe('PortMapper', () => {
         settle(() => mapper.state('second')?.kind !== 'pending');
         expect(mapper.state('second')).toMatchObject({
             kind: 'failed',
-            reason: expect.stringContaining('already owned')
+            reason: expect.stringContaining('already owned'),
         });
         expect(igd?.mappings.get('tcp:8123')?.client).toBe('192.168.1.50');
     });
@@ -344,7 +344,7 @@ describe('PortMapper', () => {
             expect(igd?.mappings.has(`tcp:${assigned}`)).toBe(true);
             runSteps(net, mapper.releaseAll());
             expect(igd?.mappings.size).toBe(0);
-        }
+        },
     );
 
     it('renews the lease at half its length', () => {
@@ -434,7 +434,7 @@ describe('PortMapper', () => {
         settle(() => mapper.state('web')?.kind === 'failed');
         expect(mapper.state('web')).toEqual({
             kind: 'failed',
-            reason: expect.stringContaining('no router answered the search')
+            reason: expect.stringContaining('no router answered the search'),
         });
         expect(log[0]).toContain('No router could open ports');
 
@@ -471,7 +471,7 @@ describe('PortMapper', () => {
         settle(() => mapper.state('web')?.kind === 'failed');
         expect(mapper.state('web')).toEqual({
             kind: 'failed',
-            reason: expect.stringContaining('100.72.3.4, which is not public')
+            reason: expect.stringContaining('100.72.3.4, which is not public'),
         });
         expect(igd?.mappings.size).toBe(0);
     });
@@ -482,7 +482,7 @@ describe('PortMapper', () => {
         settle(() => mapper.state('web')?.kind === 'failed');
         expect(mapper.state('web')).toEqual({
             kind: 'failed',
-            reason: expect.stringContaining('would not open port 8123: Action Failed (501)')
+            reason: expect.stringContaining('would not open port 8123: Action Failed (501)'),
         });
 
         if (igd) igd.options.failMappingWith = undefined;
@@ -540,7 +540,7 @@ describe('PortMapper', () => {
 
 describe('PortMapper with a screen', () => {
     const speedport = {
-        '/html/login/index.html': { body: '<html><head><title>Speedport Konfigurationsprogramm</title>' }
+        '/html/login/index.html': { body: '<html><head><title>Speedport Konfigurationsprogramm</title>' },
     };
     const screen = (identity: RouterIdentity) =>
         identity.manufacturer?.startsWith('Telekom') ? 'Telekom routers have no UPnP' : undefined;
@@ -551,14 +551,14 @@ describe('PortMapper with a screen', () => {
         const made = setup(igd, {
             screen,
             onRefused: (r) => refusals.push(r),
-            log: (m, level) => level === 'warn' && warnings.push(m)
+            log: (m, level) => level === 'warn' && warnings.push(m),
         });
         return { ...made, refusals, warnings };
     }
 
     it('turns a router down by its web interface, fails the ports and never asks it anything', () => {
         const { net, mapper, settle, refusals, warnings } = screened(
-            new FakeIgd({ upnp: false, natPmp: false, webPages: speedport })
+            new FakeIgd({ upnp: false, natPmp: false, webPages: speedport }),
         );
         mapper.request('web', spec);
         settle(() => mapper.state('web')?.kind === 'failed');
@@ -566,10 +566,10 @@ describe('PortMapper with a screen', () => {
 
         expect(mapper.state('web')).toEqual({
             kind: 'failed',
-            reason: 'Telekom Speedport cannot be used: Telekom routers have no UPnP'
+            reason: 'Telekom Speedport cannot be used: Telekom routers have no UPnP',
         });
         expect(refusals).toEqual([
-            { identity: { manufacturer: 'Telekom', name: 'Speedport', source: 'web' }, reason: expect.any(String) }
+            { identity: { manufacturer: 'Telekom', name: 'Speedport', source: 'web' }, reason: expect.any(String) },
         ]);
         expect(mapper.info().refused?.identity.manufacturer).toBe('Telekom');
         expect(warnings).toEqual([]);
@@ -583,7 +583,7 @@ describe('PortMapper with a screen', () => {
         settle(() => mapper.state('a')?.kind === 'failed');
         expect(mapper.request('b', { ...spec, port: 1 })).toEqual({
             kind: 'failed',
-            reason: 'Telekom Speedport cannot be used: Telekom routers have no UPnP'
+            reason: 'Telekom Speedport cannot be used: Telekom routers have no UPnP',
         });
     });
 

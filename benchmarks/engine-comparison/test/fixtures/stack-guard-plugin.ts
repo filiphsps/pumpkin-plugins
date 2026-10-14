@@ -13,7 +13,7 @@ class StackGuardPlugin extends Plugin {
             authors: [],
             description: '',
             dependencies: [],
-            permissions: []
+            permissions: [],
         };
     }
 

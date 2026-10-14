@@ -7,16 +7,16 @@ import { resolveConsumerWorkspaceRoot } from './workspace-root.ts';
 
 /** Options for resolving Pumpkin and WASI package imports while bundling for Static Hermes. */
 export interface StaticHermesImportsOptions {
-    /** Consumer project directory used to find the nearest pnpm workspace root for runtime toolchain caches. */
-    workspaceRoot?: string;
-    /** Directory used to resolve the development update-check module. */
-    resolveDir: string;
-    /** Prepared WIT world used to resolve and generate Pumpkin and WASI interfaces. */
-    witDir: string;
     /** Excludes automatic update checks from development bundles. */
     developmentMode?: boolean;
     /** Called for each resolved WASI import so the component build can select its adapters. */
     onWasiImport?: (specifier: string) => void;
+    /** Directory used to resolve the development update-check module. */
+    resolveDir: string;
+    /** Prepared WIT world used to resolve and generate Pumpkin and WASI interfaces. */
+    witDir: string;
+    /** Consumer project directory used to find the nearest pnpm workspace root for runtime toolchain caches. */
+    workspaceRoot?: string;
 }
 
 /**
@@ -38,7 +38,7 @@ export function staticHermesImportsPlugin(options: StaticHermesImportsOptions): 
                 workspaceRoot: resolveConsumerWorkspaceRoot(options.workspaceRoot),
                 includeWasiSdk: false,
                 includeWitBindgen: false,
-                includeWasmTools: true
+                includeWasmTools: true,
             });
             Object.assign(process.env, toolchain);
             const importOrder = readPluginImportOrder(options.witDir);
@@ -49,11 +49,11 @@ export function staticHermesImportsPlugin(options: StaticHermesImportsOptions): 
             const pumpkinModules = new Map<string, string>(
                 pumpkinWit.interfaces.map((apiInterface) => [
                     apiInterface.specifier,
-                    emitPumpkinFacade(apiInterface, pumpkinWit.interfaces)
-                ])
+                    emitPumpkinFacade(apiInterface, pumpkinWit.interfaces),
+                ]),
             );
             const wasiModules = new Map<string, string>(
-                wasiWit.interfaces.map((apiInterface) => [apiInterface.specifier, emitWasiFacade(apiInterface)])
+                wasiWit.interfaces.map((apiInterface) => [apiInterface.specifier, emitWasiFacade(apiInterface)]),
             );
             build.onResolve({ filter: /^pumpkin:/ }, ({ path }) => {
                 if (!pumpkinModules.has(path)) {
@@ -63,7 +63,7 @@ export function staticHermesImportsPlugin(options: StaticHermesImportsOptions): 
             });
             build.onLoad({ filter: /.*/, namespace: 'pumpkin-static-hermes-api' }, ({ path }) => ({
                 loader: 'js',
-                contents: pumpkinModules.get(path)
+                contents: pumpkinModules.get(path),
             }));
 
             build.onResolve({ filter: /^wasi:/ }, ({ path }) => {
@@ -75,13 +75,13 @@ export function staticHermesImportsPlugin(options: StaticHermesImportsOptions): 
             });
             build.onLoad({ filter: /.*/, namespace: 'pumpkin-static-hermes-wasi-adapter' }, ({ path }) => ({
                 loader: 'js',
-                contents: wasiModules.get(path)
+                contents: wasiModules.get(path),
             }));
 
             if (options.developmentMode) {
                 build.onResolve({ filter: /^@pumpkin-plugins\/update-check$/ }, ({ path }) => ({
                     path,
-                    namespace: 'pumpkin-static-hermes-dev-update-check'
+                    namespace: 'pumpkin-static-hermes-dev-update-check',
                 }));
                 build.onLoad({ filter: /.*/, namespace: 'pumpkin-static-hermes-dev-update-check' }, () => ({
                     loader: 'js',
@@ -90,9 +90,9 @@ export function staticHermesImportsPlugin(options: StaticHermesImportsOptions): 
                         import { registerPlugin } from '@pumpkin-plugins/pumpkin-api';
                         /** Register a plugin without running automatic update checks. */
                         export function registerPluginWithUpdates(plugin) { registerPlugin(plugin); }
-                    `
+                    `,
                 }));
             }
-        }
+        },
     };
 }

@@ -10,12 +10,12 @@ export type CommandPermissionDefault =
 export const DEFAULT_COMMAND_PERMISSION: CommandPermissionDefault = { tag: 'op', val: 'three' };
 
 interface CommandSpecMetadata<Node extends string> {
+    /** Who may use this path by default. Omit it to inherit the nearest parent's default. */
+    defaultPermission?: CommandPermissionDefault;
     /** Shown in the README and in the game's command help. */
     description: string;
     /** Permission node for this path. Omit it to inherit the nearest parent's node. */
     permission?: Node;
-    /** Who may use this path by default. Omit it to inherit the nearest parent's default. */
-    defaultPermission?: CommandPermissionDefault;
 }
 
 type CommandBehavior<Node extends string> =
@@ -35,7 +35,7 @@ type CommandBehavior<Node extends string> =
           /** Positional argument forms; the command itself remains runnable without arguments. */
           argumentVariants: readonly [
               readonly [CommandArgumentSpec, ...CommandArgumentSpec[]],
-              ...Array<readonly [CommandArgumentSpec, ...CommandArgumentSpec[]]>
+              ...Array<readonly [CommandArgumentSpec, ...CommandArgumentSpec[]]>,
           ];
           subcommands?: never;
           arguments?: never;
@@ -87,7 +87,7 @@ export type CommandTree<Node extends string = string> = { readonly [name: string
 type AppendPath<Prefix extends string, Name extends string> = Prefix extends '' ? Name : `${Prefix} ${Name}`;
 type ArgumentUsage<Arguments extends readonly CommandArgumentSpec[]> = Arguments extends readonly [
     infer First extends CommandArgumentSpec,
-    ...infer Rest extends readonly CommandArgumentSpec[]
+    ...infer Rest extends readonly CommandArgumentSpec[],
 ]
     ? ` <${First['name']}>${ArgumentUsage<Rest>}`
     : '';
@@ -100,20 +100,20 @@ type HandlerEntries<T extends SubcommandTree, Sender, Prefix extends string = ''
           ? { [Path in AppendPath<Prefix, K>]: (sender: Sender) => readonly CommandLine[] } & {
                 [Variant in Variants[number] as `${AppendPath<Prefix, K>}${ArgumentUsage<Variant>}`]: (
                     sender: Sender,
-                    args: CommandArgumentValues<Variant>
+                    args: CommandArgumentValues<Variant>,
                 ) => readonly CommandLine[];
             }
           : T[K] extends { readonly arguments: infer Arguments extends readonly CommandArgumentSpec[] }
             ? {
                   [Path in `${AppendPath<Prefix, K>}${ArgumentUsage<Arguments>}`]: (
                       sender: Sender,
-                      args: CommandArgumentValues<Arguments>
+                      args: CommandArgumentValues<Arguments>,
                   ) => readonly CommandLine[];
               }
             : { [Path in AppendPath<Prefix, K>]: (sender: Sender) => readonly CommandLine[] };
 }[keyof T & string];
 type UnionToIntersection<Values> = (Values extends unknown ? (value: Values) => void : never) extends (
-    value: infer Intersection
+    value: infer Intersection,
 ) => void
     ? Intersection
     : never;
@@ -141,25 +141,25 @@ export type CommandHandlers<T extends CommandTree, Sender = unknown> = UnionToIn
 
 /** A runnable command, flattened out of a tree. */
 export interface FlatCommand {
-    /** The words typed after `/`. */
-    path: string[];
-    /** For example `/baddon list`. */
-    usage: string;
-    description: string;
-    /** The permission of the command it belongs to. */
-    permission: string;
-    /** Who may run the command by default. */
-    defaultPermission: CommandPermissionDefault;
     /** Required argument nodes that follow this command. */
     arguments: readonly CommandArgumentSpec[];
+    /** Who may run the command by default. */
+    defaultPermission: CommandPermissionDefault;
+    description: string;
+    /** The words typed after `/`. */
+    path: string[];
+    /** The permission of the command it belongs to. */
+    permission: string;
+    /** For example `/baddon list`. */
+    usage: string;
 }
 
 /** A command permission to register, with its inheritance links. */
 export interface CommandPermissionInfo {
-    node: string;
-    description: string;
-    defaultPermission: CommandPermissionDefault;
     children: { node: string; value: boolean }[];
+    defaultPermission: CommandPermissionDefault;
+    description: string;
+    node: string;
 }
 
 /**
@@ -171,7 +171,7 @@ export interface CommandPermissionInfo {
  */
 export function defineCommands<const Name extends string, const T extends CommandTree<`${Name}:${string}`>>(
     _pluginName: Name,
-    tree: T
+    tree: T,
 ): T {
     return tree;
 }
@@ -186,7 +186,7 @@ export function flattenCommands(tree: CommandTree): FlatCommand[] {
         spec: SubcommandSpec,
         path: string[],
         permission: string,
-        defaultPermission: CommandPermissionDefault
+        defaultPermission: CommandPermissionDefault,
     ): void => {
         if (spec.argumentVariants !== undefined) {
             if (spec.argumentVariants.length === 0) {
@@ -208,7 +208,7 @@ export function flattenCommands(tree: CommandTree): FlatCommand[] {
                 description: spec.description,
                 permission,
                 defaultPermission,
-                arguments: []
+                arguments: [],
             });
             for (const arguments_ of spec.argumentVariants) {
                 out.push({
@@ -217,7 +217,7 @@ export function flattenCommands(tree: CommandTree): FlatCommand[] {
                     description: spec.description,
                     permission,
                     defaultPermission,
-                    arguments: arguments_
+                    arguments: arguments_,
                 });
             }
             return;
@@ -228,14 +228,14 @@ export function flattenCommands(tree: CommandTree): FlatCommand[] {
             description: spec.description,
             permission,
             defaultPermission,
-            arguments: spec.arguments ?? []
+            arguments: spec.arguments ?? [],
         });
     };
     const walk = (
         subs: SubcommandTree,
         path: string[],
         permission: string,
-        defaultPermission: CommandPermissionDefault
+        defaultPermission: CommandPermissionDefault,
     ): void => {
         for (const [name, spec] of Object.entries(subs)) {
             const here = [...path, name];
@@ -320,7 +320,7 @@ export function commandPermissionInfos(tree: CommandTree): CommandPermissionInfo
         node: string,
         path: string[],
         defaultPermission: CommandPermissionDefault,
-        isGroup: boolean
+        isGroup: boolean,
     ): CommandPermissionInfo => {
         const existing = permissions.get(node);
         if (existing) {
@@ -333,7 +333,7 @@ export function commandPermissionInfos(tree: CommandTree): CommandPermissionInfo
             node,
             description: `Use the /${path.join(' ')} command${isGroup ? 's' : ''}`,
             defaultPermission,
-            children: []
+            children: [],
         };
         permissions.set(node, info);
         return info;
@@ -343,7 +343,7 @@ export function commandPermissionInfos(tree: CommandTree): CommandPermissionInfo
         specs: SubcommandTree,
         path: string[],
         parentNode: string,
-        inheritedDefault: CommandPermissionDefault
+        inheritedDefault: CommandPermissionDefault,
     ): void => {
         for (const [name, spec] of Object.entries(specs)) {
             const here = [...path, name];
@@ -382,6 +382,6 @@ export function commandInfos<Node extends string>(tree: CommandTree<Node>): Comm
         usage,
         description,
         permission: permission as Node,
-        defaultPermission
+        defaultPermission,
     }));
 }

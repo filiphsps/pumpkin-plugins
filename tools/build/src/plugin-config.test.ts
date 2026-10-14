@@ -21,7 +21,7 @@ describe('readPluginConfig', () => {
     it('reads the entry, output, capabilities and version', () => {
         const dir = packageWith({
             version: '1.2.3',
-            pumpkinPlugin: { entry: 'src/plugin.ts', output: 'build/p.wasm', wasi: ['sockets'] }
+            pumpkinPlugin: { entry: 'src/plugin.ts', output: 'build/p.wasm', wasi: ['sockets'] },
         });
         expect(readPluginConfig(dir)).toEqual({
             entry: 'src/plugin.ts',
@@ -29,7 +29,7 @@ describe('readPluginConfig', () => {
             wasi: ['sockets'],
             engine: 'static-hermes',
             staticHermesGc: 'hades',
-            version: '1.2.3'
+            version: '1.2.3',
         });
     });
 
@@ -37,8 +37,8 @@ describe('readPluginConfig', () => {
         const config = readPluginConfig(
             packageWith({
                 version: '1.2.3',
-                pumpkinPlugin: { entry: 'src\\plugin.ts', output: 'build\\plugin.wasm' }
-            })
+                pumpkinPlugin: { entry: 'src\\plugin.ts', output: 'build\\plugin.wasm' },
+            }),
         );
 
         expect(config.entry).toBe('src/plugin.ts');
@@ -59,7 +59,7 @@ describe('readPluginConfig', () => {
 
     it('supports selecting the lean Static Hermes Runtime', () => {
         const config = readPluginConfig(
-            packageWith({ version: '1.2.3', pumpkinPlugin: { engine: 'static-hermes', staticHermesRuntime: 'lean' } })
+            packageWith({ version: '1.2.3', pumpkinPlugin: { engine: 'static-hermes', staticHermesRuntime: 'lean' } }),
         );
 
         expect(config.staticHermesRuntime).toBe('lean');
@@ -67,7 +67,7 @@ describe('readPluginConfig', () => {
 
     it('supports selecting malloc instead of the default Hades garbage collector', () => {
         const config = readPluginConfig(
-            packageWith({ version: '1.2.3', pumpkinPlugin: { engine: 'static-hermes', staticHermesGc: 'malloc' } })
+            packageWith({ version: '1.2.3', pumpkinPlugin: { engine: 'static-hermes', staticHermesGc: 'malloc' } }),
         );
 
         expect(config.staticHermesGc).toBe('malloc');
@@ -75,7 +75,7 @@ describe('readPluginConfig', () => {
 
     it('uses the default engine when selecting a Static Hermes Runtime profile', () => {
         const config = readPluginConfig(
-            packageWith({ version: '1.2.3', pumpkinPlugin: { staticHermesRuntime: 'lean' } })
+            packageWith({ version: '1.2.3', pumpkinPlugin: { staticHermesRuntime: 'lean' } }),
         );
 
         expect(config.engine).toBe('static-hermes');
@@ -89,49 +89,49 @@ describe('readPluginConfig', () => {
     it('explains a missing key and an unknown capability', () => {
         expect(() => readPluginConfig(packageWith({ version: '0.0.0' }))).toThrow(BuildError);
         expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { wasi: ['network'] } }))).toThrow(
-            'unknown wasi capability "network" (known: http, filesystem, sockets, udp)'
+            'unknown wasi capability "network" (known: http, filesystem, sockets, udp)',
         );
     });
 
     it('rejects malformed package data with a build error', () => {
         expect(() => readPluginConfig(packageWith([]))).toThrow('package.json must contain an object');
         expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: [] }))).toThrow(
-            'package.json needs a "pumpkinPlugin" object'
+            'package.json needs a "pumpkinPlugin" object',
         );
         expect(() => readPluginConfig(packageWith({ version: 1, pumpkinPlugin: {} }))).toThrow(
-            'package.json needs a non-empty "version" string'
+            'package.json needs a non-empty "version" string',
         );
         expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { wasi: 'http' } }))).toThrow(
-            '"pumpkinPlugin.wasi" must be an array of capability names'
+            '"pumpkinPlugin.wasi" must be an array of capability names',
         );
         expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { engine: 'hermes' } }))).toThrow(
-            '"pumpkinPlugin.engine" must be "quickjs" or "static-hermes"'
+            '"pumpkinPlugin.engine" must be "quickjs" or "static-hermes"',
         );
         expect(() =>
             readPluginConfig(
                 packageWith({
                     version: '0.0.0',
-                    pumpkinPlugin: { engine: 'static-hermes', staticHermesRuntime: 'tiny' }
-                })
-            )
+                    pumpkinPlugin: { engine: 'static-hermes', staticHermesRuntime: 'tiny' },
+                }),
+            ),
         ).toThrow('"pumpkinPlugin.staticHermesRuntime" must be "full" or "lean"');
         expect(() =>
             readPluginConfig(
-                packageWith({ version: '0.0.0', pumpkinPlugin: { engine: 'quickjs', staticHermesRuntime: 'lean' } })
-            )
+                packageWith({ version: '0.0.0', pumpkinPlugin: { engine: 'quickjs', staticHermesRuntime: 'lean' } }),
+            ),
         ).toThrow('"pumpkinPlugin.staticHermesRuntime" requires "engine": "static-hermes"');
         expect(() =>
             readPluginConfig(
-                packageWith({ version: '0.0.0', pumpkinPlugin: { engine: 'static-hermes', staticHermesGc: 'gen-gc' } })
-            )
+                packageWith({ version: '0.0.0', pumpkinPlugin: { engine: 'static-hermes', staticHermesGc: 'gen-gc' } }),
+            ),
         ).toThrow('"pumpkinPlugin.staticHermesGc" must be "hades" or "malloc"');
         expect(() =>
             readPluginConfig(
-                packageWith({ version: '0.0.0', pumpkinPlugin: { engine: 'quickjs', staticHermesGc: 'malloc' } })
-            )
+                packageWith({ version: '0.0.0', pumpkinPlugin: { engine: 'quickjs', staticHermesGc: 'malloc' } }),
+            ),
         ).toThrow('"pumpkinPlugin.staticHermesGc" requires "engine": "static-hermes"');
         expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { wasi: [null] } }))).toThrow(
-            '"pumpkinPlugin.wasi" must contain only capability names'
+            '"pumpkinPlugin.wasi" must contain only capability names',
         );
     });
 
@@ -154,17 +154,17 @@ describe('readPluginConfig', () => {
             '../outside.ts',
             '/tmp/plugin.ts',
             'C:\\outside.ts',
-            'C:plugin.ts'
+            'C:plugin.ts',
         ]) {
             expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { entry } }))).toThrow(
-                '"pumpkinPlugin.entry"'
+                '"pumpkinPlugin.entry"',
             );
         }
         expect(() =>
-            readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { output: '../outside.wasm' } }))
+            readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { output: '../outside.wasm' } })),
         ).toThrow('"pumpkinPlugin.output"');
         expect(() =>
-            readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { output: 'package.json' } }))
+            readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { output: 'package.json' } })),
         ).toThrow('must name a .wasm file');
     });
 });
@@ -172,16 +172,16 @@ describe('readPluginConfig', () => {
 describe('requireBuildFields', () => {
     it('returns entry and output', () => {
         expect(
-            requireBuildFields({ entry: 'a', output: 'b.wasm', engine: 'quickjs', wasi: [], version: '0.0.0' })
+            requireBuildFields({ entry: 'a', output: 'b.wasm', engine: 'quickjs', wasi: [], version: '0.0.0' }),
         ).toEqual({
             entry: 'a',
-            output: 'b.wasm'
+            output: 'b.wasm',
         });
     });
 
     it('asks for both when either is missing, so libraries can still generate types', () => {
         expect(() => requireBuildFields({ entry: 'a', engine: 'quickjs', wasi: [], version: '0.0.0' })).toThrow(
-            /entry.*output/
+            /entry.*output/,
         );
         expect(() => requireBuildFields({ engine: 'quickjs', wasi: [], version: '0.0.0' })).toThrow(BuildError);
     });
@@ -193,8 +193,8 @@ describe('requireBuildFields', () => {
                 output: 'build/plugin.wasm',
                 engine: 'quickjs',
                 wasi: [],
-                version: '0'
-            })
+                version: '0',
+            }),
         ).toThrow('"pumpkinPlugin.entry"');
         expect(() =>
             requireBuildFields({
@@ -202,8 +202,8 @@ describe('requireBuildFields', () => {
                 output: 1 as never,
                 engine: 'quickjs',
                 wasi: [],
-                version: '0'
-            })
+                version: '0',
+            }),
         ).toThrow('"pumpkinPlugin.output"');
     });
 });

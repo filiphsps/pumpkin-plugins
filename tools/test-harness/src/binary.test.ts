@@ -78,7 +78,7 @@ describe('resolvePumpkinBinary', () => {
         vi.stubGlobal('fetch', fetchMock);
 
         await expect(resolvePumpkinBinary()).rejects.toThrow(
-            `checksums.sha256 for ${PUMPKIN_RELEASE} has no entry for ${asset}`
+            `checksums.sha256 for ${PUMPKIN_RELEASE} has no entry for ${asset}`,
         );
         expect(fetchMock).toHaveBeenCalledOnce();
         expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/checksums.sha256');
@@ -103,6 +103,6 @@ describe('resolvePumpkinBinary', () => {
             await expect(resolvePumpkinBinary()).rejects.toThrow(/HTTP 503/);
             expect(fetchMock).toHaveBeenCalledTimes(failedDownload === 'checksum list' ? 1 : 2);
             expect(fs.readdirSync(cache)).toEqual([]);
-        }
+        },
     );
 });

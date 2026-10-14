@@ -3,10 +3,10 @@ import type { RouterIdentity } from '@pumpkin-plugins/port-mapping';
 
 /** One model of a router, as the blocklist knows it. */
 export interface BlockedModel {
-    /** Shown in the README. */
-    name: string;
     /** Matched against the model, model number and name the router gives. */
     match: RegExp;
+    /** Shown in the README. */
+    name: string;
 }
 
 /** A make of router, or some of its models, that UPnPumpkin stays away from. */
@@ -30,8 +30,8 @@ export const BLOCKED_ROUTERS: readonly BlockedRouter[] = [
     {
         manufacturer: 'Telekom',
         match: /telekom/i,
-        reason: 'Telekom routers (Speedport) do not support UPnP or NAT-PMP'
-    }
+        reason: 'Telekom routers (Speedport) do not support UPnP or NAT-PMP',
+    },
 ];
 
 /** Where people can read which routers are blocked. */
@@ -76,7 +76,7 @@ export function renderBlockedRouters(rules: readonly BlockedRouter[] = BLOCKED_R
         rules.map((rule) => [
             rule.manufacturer,
             rule.models ? rule.models.map((m) => m.name).join(', ') : 'All models',
-            `${rule.reason}.`
-        ])
+            `${rule.reason}.`,
+        ]),
     );
 }

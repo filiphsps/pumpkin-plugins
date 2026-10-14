@@ -2,25 +2,25 @@ import type { ChunkLoader, TerrainGenerator } from './chunks.ts';
 
 /** A rectangular area expressed in absolute block coordinates. */
 export interface TerrainRegion {
+    depth: number;
+    height: number;
+    minY: number;
     originX: number;
     originZ: number;
     width: number;
-    depth: number;
-    minY: number;
-    height: number;
 }
 
 /** A sampled material and its light values. */
 export interface TerrainSample {
+    blockLight: number;
     material: string;
     skyLight: number;
-    blockLight: number;
 }
 
 /** Terrain values exposed by a host adapter during one capture step. */
 export interface TerrainSource {
-    minY: number;
     height: number;
+    minY: number;
     sample(x: number, y: number, z: number): TerrainSample;
     /** Inclusive world Y of the highest non-empty block in a column. */
     top?(x: number, z: number): number;
@@ -29,8 +29,8 @@ export interface TerrainSource {
 /** Terrain source plus the platform capabilities used to prepare missing chunks. */
 export interface TerrainAccess extends TerrainSource {
     chunkLoader: ChunkLoader;
-    terrainGenerator: TerrainGenerator;
     prepare?(region: TerrainRegion): TerrainPreparationResult;
+    terrainGenerator: TerrainGenerator;
 }
 
 /** Whether a rectangular terrain region is ready to sample. */
@@ -42,18 +42,18 @@ export type TerrainPreparationResult =
 
 /** One run of material and light values within a captured column. */
 export interface TerrainSegment {
+    blockLight: number;
+    height: number;
     materialId: number;
+    skyLight: number;
     /** Relative Y of the lowest block in this run. */
     startY: number;
-    height: number;
-    skyLight: number;
-    blockLight: number;
 }
 
 /** A completed capture with a shared material table and one segment list per column. */
 export interface TerrainCaptureResult {
-    materials: string[];
     columns: TerrainSegment[][];
+    materials: string[];
 }
 
 /** Options controlling material grouping and the retained segment limit. */
@@ -80,7 +80,7 @@ export class TerrainCapture {
 
     constructor(
         private readonly region: TerrainRegion,
-        options: TerrainCaptureOptions = {}
+        options: TerrainCaptureOptions = {},
     ) {
         const { width, depth, height } = region;
         if (
@@ -147,7 +147,7 @@ export class TerrainCapture {
                     startY: this.y - span + 1,
                     height: span,
                     skyLight: sample.skyLight,
-                    blockLight: sample.blockLight
+                    blockLight: sample.blockLight,
                 });
             }
 
@@ -171,7 +171,7 @@ export class TerrainCapture {
         if (this.column !== this.area) throw new Error('Terrain capture is incomplete');
         return {
             materials: [...this.materials],
-            columns: this.columns.map((column) => column.map((segment) => ({ ...segment })))
+            columns: this.columns.map((column) => column.map((segment) => ({ ...segment }))),
         };
     }
 }

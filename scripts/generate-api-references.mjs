@@ -6,7 +6,7 @@ import {
     githubRepositoryUrl,
     readActionMetadata,
     renderActionSections,
-    walkMarkdown
+    walkMarkdown,
 } from '@pumpkin-plugins/docs/node';
 import { Application, TSConfigReader } from 'typedoc';
 
@@ -28,7 +28,7 @@ function packages(group) {
         .map(({ slug, directory, metadataFile }) => ({
             slug,
             directory,
-            manifest: JSON.parse(fs.readFileSync(metadataFile, 'utf8'))
+            manifest: JSON.parse(fs.readFileSync(metadataFile, 'utf8')),
         }));
 }
 
@@ -43,9 +43,9 @@ async function generateTypeDoc({ entryPoints, tsconfig, out, name, exclude = [] 
             tsconfig,
             out,
             name,
-            exclude: [...(commonOptions.exclude ?? []), ...exclude]
+            exclude: [...(commonOptions.exclude ?? []), ...exclude],
         },
-        [new TSConfigReader()]
+        [new TSConfigReader()],
     );
     const project = await app.convert();
     if (!project) throw new Error(`TypeDoc could not convert ${name}`);
@@ -93,7 +93,7 @@ ${sections.outputs}
 ## Implementation reference
 
 - [JSDoc reference](code/)
-- [Action entry point source](${repoUrl}/blob/master/${implementationPath})`
+- [Action entry point source](${repoUrl}/blob/master/${implementationPath})`,
     };
 }
 
@@ -117,7 +117,7 @@ function fallbackSourcePath(relativePage) {
         const moduleParts = parts.slice(2, -1);
         const moduleSource = moduleSourcePath(path.join(repoRoot, pluginDirectory, 'src'), moduleParts, [
             '.ts',
-            '.tsx'
+            '.tsx',
         ]);
         if (moduleSource) return path.relative(repoRoot, moduleSource).split(path.sep).join('/');
         if (!moduleParts.length) {
@@ -182,30 +182,30 @@ for (const component of [...pluginPackages, ...toolPackages]) {
         tsconfig: path.join(component.directory, 'tsconfig.json'),
         out,
         name: `${component.manifest.name} API`,
-        exclude: ['**/*.test.ts', '**/*.itest.ts', '**/test/**']
+        exclude: ['**/*.test.ts', '**/*.itest.ts', '**/test/**'],
     });
 }
 
 const pluginItems = pluginPackages.map(({ slug, manifest }) => ({
     slug,
     label: manifest.name,
-    description: manifest.description ?? ''
+    description: manifest.description ?? '',
 }));
 const toolItems = toolPackages.map(({ manifest }) => ({
     slug: manifest.name,
     label: manifest.name,
-    description: manifest.description ?? ''
+    description: manifest.description ?? '',
 }));
 
 writePage(
     path.join(apiRoot, 'plugins/index.md'),
     'scripts/generate-api-references.mjs',
-    componentIndex('Plugin API reference', pluginItems, '/api/plugins')
+    componentIndex('Plugin API reference', pluginItems, '/api/plugins'),
 );
 writePage(
     path.join(apiRoot, 'tools/index.md'),
     'typedoc.json',
-    componentIndex('Tool API reference', toolItems, '/api/tools')
+    componentIndex('Tool API reference', toolItems, '/api/tools'),
 );
 
 const actions = discoverComponents(repoRoot, 'actions')
@@ -214,7 +214,7 @@ const actions = discoverComponents(repoRoot, 'actions')
         slug,
         directory,
         file: metadataFile,
-        action: readActionMetadata(metadataFile)
+        action: readActionMetadata(metadataFile),
     }));
 
 for (const { slug, directory, file, action } of actions) {
@@ -225,7 +225,7 @@ for (const { slug, directory, file, action } of actions) {
         tsconfig: path.join(repoRoot, 'tsconfig.docs.json'),
         out: path.join(out, 'code'),
         name: `${action.name ?? slug} code API`,
-        exclude: ['**/*.test.mjs', '**/test/**']
+        exclude: ['**/*.test.mjs', '**/test/**'],
     });
     const page = actionPage(slug, file, action);
     writePage(path.join(out, 'index.md'), page.sourcePath, page.content);
@@ -236,7 +236,7 @@ writePage(
     'scripts/generate-api-references.mjs',
     `# Action reference\n\n${actions
         .map(({ slug, action }) => `- [${action.name ?? slug}](/api/actions/${slug}/) — ${action.description ?? ''}`)
-        .join('\n')}`
+        .join('\n')}`,
 );
 
 const scriptsDirectory = path.join(repoRoot, 'scripts');
@@ -245,13 +245,13 @@ await generateTypeDoc({
     tsconfig: path.join(repoRoot, 'tsconfig.docs.json'),
     out: path.join(apiRoot, 'scripts'),
     name: 'Repository script API',
-    exclude: ['**/*.test.mjs']
+    exclude: ['**/*.test.mjs'],
 });
 
 writePage(
     path.join(apiRoot, 'index.md'),
     'scripts/generate-api-references.mjs',
-    '# Reference\n\nThe generated references below follow the package source, action metadata, and script JSDoc comments.\n\n- [Plugins](/api/plugins/) — plugin implementation APIs\n- [Tools](/api/tools/) — shared libraries and developer tools\n- [Actions](/api/actions/) — action inputs, outputs, and code references\n- [Scripts](/api/scripts/) — repository script APIs'
+    '# Reference\n\nThe generated references below follow the package source, action metadata, and script JSDoc comments.\n\n- [Plugins](/api/plugins/) — plugin implementation APIs\n- [Tools](/api/tools/) — shared libraries and developer tools\n- [Actions](/api/actions/) — action inputs, outputs, and code references\n- [Scripts](/api/scripts/) — repository script APIs',
 );
 
 addEditLinks();

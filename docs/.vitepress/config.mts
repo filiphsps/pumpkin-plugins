@@ -8,10 +8,11 @@ import {
     githubPagesUrl,
     githubRepositoryUrl,
     readActionMetadata,
-    walkMarkdown
+    walkMarkdown,
 } from '@pumpkin-plugins/docs/node';
 import { type DefaultTheme, defineConfig } from 'vitepress';
 import { parse as parseYaml } from 'yaml';
+import type { MegaMenu, MenuCard, MenuSection, ThemeConfigWithMegaMenus } from './theme/types.ts';
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const repository = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).repository;
@@ -32,7 +33,7 @@ function titleOf(file: string, fallback: string): string {
 const rewrites: Record<string, string> = {
     'docs/index.md': 'index.md',
     'docs/README.md': 'guides/index.md',
-    'docs/team.md': 'team.md'
+    'docs/team.md': 'team.md',
 };
 const sourcePathsByRoute = new Map(Object.entries(rewrites).map(([source, route]) => [route, source]));
 const navigationAssets = new Map<string, string>();
@@ -48,41 +49,17 @@ for (const file of walkMarkdown(path.join(repoRoot, 'docs'))) {
 }
 
 interface Component {
-    slug: string;
-    title: string;
-    description: string;
-    overview: string;
+    apiReference?: string;
     category?: string;
+    customDocs: { file: string; title: string; route: string }[];
+    description: string;
+    featured: boolean;
     icon?: string;
     menuItemType?: MenuCard['type'];
+    overview: string;
     readme?: string;
-    apiReference?: string;
-    featured: boolean;
-    customDocs: { file: string; title: string; route: string }[];
-}
-
-interface MenuCard {
-    text: string;
-    description: string;
-    link: string;
-    category?: string;
-    icon?: string;
-    type?: 'link' | 'card' | 'spotlight';
-}
-
-interface MenuSection {
-    text: string;
-    items: MenuCard[];
-    gridArea?: string;
-}
-
-interface MegaMenu {
-    text: string;
-    link?: string;
-    description: string;
-    overview?: MenuCard;
-    sections: MenuSection[];
-    featured?: MenuCard;
+    slug: string;
+    title: string;
 }
 
 function frontmatterOf(file: string): Record<string, unknown> {
@@ -199,7 +176,7 @@ function components(group: ComponentGroup): Component[] {
             return {
                 file,
                 title: titleOf(file, path.basename(file, '.md')),
-                route: `/${route.replace(/\.md$/, '')}`
+                route: `/${route.replace(/\.md$/, '')}`,
             };
         });
 
@@ -215,8 +192,8 @@ function components(group: ComponentGroup): Component[] {
                 readme: readmeRoute,
                 apiReference,
                 featured,
-                customDocs
-            }
+                customDocs,
+            },
         ];
     });
 }
@@ -226,17 +203,17 @@ const tools = components('tools');
 const actions = components('actions');
 const componentLandingIcons = new Map(
     [...plugins, ...tools, ...actions].flatMap((item) =>
-        item.icon ? [[`${item.overview.slice(1)}.md`, item.icon] as const] : []
-    )
+        item.icon ? [[`${item.overview.slice(1)}.md`, item.icon] as const] : [],
+    ),
 );
 const releaseConfig = JSON.parse(fs.readFileSync(path.join(repoRoot, 'release-please-config.json'), 'utf8'));
 const releaseTags = new Set(
-    execFileSync('git', ['tag', '--list'], { cwd: repoRoot, encoding: 'utf8' }).trim().split('\n')
+    execFileSync('git', ['tag', '--list'], { cwd: repoRoot, encoding: 'utf8' }).trim().split('\n'),
 );
 const componentVersions = new Map<string, { version: string; release?: string }>();
 for (const [group, items] of [
     ['packages', plugins],
-    ['actions', actions]
+    ['actions', actions],
 ] as const) {
     for (const item of items) {
         const directory = `${group}/${item.slug}`;
@@ -259,7 +236,7 @@ const guidePages = walkMarkdown(path.join(repoRoot, 'docs'))
     .filter(
         (file) =>
             !file.startsWith(path.join(repoRoot, 'docs/api') + path.sep) &&
-            !['README.md', 'index.md', 'team.md'].includes(path.basename(file))
+            !['README.md', 'index.md', 'team.md'].includes(path.basename(file)),
     )
     .map((file) => {
         const relative = path.relative(path.join(repoRoot, 'docs'), file).split(path.sep).join('/');
@@ -269,14 +246,14 @@ const guidePages = walkMarkdown(path.join(repoRoot, 'docs'))
             description: descriptionOf(file),
             link: `/guides/${relative.replace(/\.md$/, '')}`,
             category: categoryOf(frontmatterOf(file)),
-            type: menuItemTypeOf(frontmatterOf(file))
+            type: menuItemTypeOf(frontmatterOf(file)),
         };
     });
 
 interface LlmsEntry {
+    description?: string;
     text: string;
     url: string;
-    description?: string;
 }
 
 const githubRepository = /^https:\/\/github\.com\/([^/]+\/[^/]+)$/.exec(repoUrl)?.[1];
@@ -315,7 +292,7 @@ function componentLlmsEntries(item: Component): LlmsEntry[] {
             entries.push({
                 text: `${item.title} README`,
                 url: markdownSourceUrl(readme),
-                description: 'Additional component overview and usage details.'
+                description: 'Additional component overview and usage details.',
             });
         }
     }
@@ -325,7 +302,7 @@ function componentLlmsEntries(item: Component): LlmsEntry[] {
         entries.push({
             text: `${item.title}: ${doc.title}`,
             url: markdownSourceUrl(doc.file),
-            description: descriptionOf(doc.file)
+            description: descriptionOf(doc.file),
         });
     }
 
@@ -354,7 +331,7 @@ function generateLlmsText(): string {
     const docsIndex: LlmsEntry = {
         text: 'Documentation index',
         url: markdownSourceUrl(path.join(repoRoot, 'docs/README.md')),
-        description: 'Catalog of guides and documentation pages.'
+        description: 'Catalog of guides and documentation pages.',
     };
     const categories = [...guideGroups.entries()].sort(([left], [right]) => left.localeCompare(right));
     const gettingStarted = guideGroups.get('Getting started') ?? [];
@@ -370,16 +347,16 @@ function generateLlmsText(): string {
             ...apiNav.map(({ text, link }) => ({
                 text: `${text} reference`,
                 url: publishedPageUrl(link),
-                description: 'Generated API and action contract documentation.'
+                description: 'Generated API and action contract documentation.',
             })),
             ...[...plugins, ...tools, ...actions]
                 .filter((item) => item.apiReference)
                 .map((item) => ({
                     text: `${item.title} API reference`,
                     url: publishedPageUrl(item.apiReference as string),
-                    description: item.description
-                }))
-        ])
+                    description: item.description,
+                })),
+        ]),
     ].filter(Boolean);
     const siteLink = publishedSiteUrl ?? siteBase;
 
@@ -391,7 +368,7 @@ function generateLlmsText(): string {
         `Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source links below return Markdown from the repository; generated API links point to the [documentation site](${siteLink}). This file is generated from discovered guides, component documentation, package metadata, and API references.`,
         '',
         sections.join('\n\n'),
-        ''
+        '',
     ].join('\n');
 }
 
@@ -402,7 +379,7 @@ function card(item: Component): MenuCard {
         link: item.overview,
         ...(item.category ? { category: item.category } : {}),
         ...(item.icon ? { icon: item.icon } : {}),
-        ...(item.menuItemType ? { type: item.menuItemType } : {})
+        ...(item.menuItemType ? { type: item.menuItemType } : {}),
     };
 }
 
@@ -416,8 +393,8 @@ function componentLinks(items: Component[], api = false): MenuCard[] {
                       description: item.description,
                       link,
                       ...(item.icon ? { icon: item.icon } : {}),
-                      type: 'link'
-                  }
+                      type: 'link',
+                  },
               ]
             : [];
     });
@@ -448,14 +425,14 @@ function typedocSidebar(directory: string, depth = 0): SidebarItem[] {
     const items = JSON.parse(fs.readFileSync(sidebarPath, 'utf8')) as SidebarItem[];
     return items.map((item) => ({
         ...item,
-        ...(item.items ? { collapsed: depth > 0, items: collapseSidebar(item.items, depth + 1) } : {})
+        ...(item.items ? { collapsed: depth > 0, items: collapseSidebar(item.items, depth + 1) } : {}),
     }));
 }
 
 function collapseSidebar(items: SidebarItem[], depth: number): SidebarItem[] {
     return items.map((item) => ({
         ...item,
-        ...(item.items ? { collapsed: depth > 0, items: collapseSidebar(item.items, depth + 1) } : {})
+        ...(item.items ? { collapsed: depth > 0, items: collapseSidebar(item.items, depth + 1) } : {}),
     }));
 }
 
@@ -466,14 +443,14 @@ function componentSidebar(item: Component, siblings: Component[], groupName: str
         ...item.customDocs
             .filter((doc) => !doc.file.endsWith('/index.md') && doc.route !== item.overview)
             .map(({ title, route }) => ({ text: title, link: route })),
-        ...(item.apiReference ? [{ text: 'API reference', link: item.apiReference }] : [])
+        ...(item.apiReference ? [{ text: 'API reference', link: item.apiReference }] : []),
     ];
     const otherItems = siblings
         .filter((sibling) => sibling.slug !== item.slug)
         .map((sibling) => ({ text: sibling.title, link: sibling.overview }));
     return [
         { text: item.title, collapsed: false, items: pages },
-        ...(otherItems.length ? [{ text: `Other ${groupName}`, collapsed: true, items: otherItems }] : [])
+        ...(otherItems.length ? [{ text: `Other ${groupName}`, collapsed: true, items: otherItems }] : []),
     ];
 }
 
@@ -483,12 +460,12 @@ function documentationSidebar(item: Component, apiItems: SidebarItem[], extra: S
         ...(item.readme && item.readme !== item.overview ? [{ text: 'README', link: item.readme }] : []),
         ...item.customDocs
             .filter((doc) => !doc.file.endsWith('/index.md') && doc.route !== item.overview)
-            .map(({ title, route }) => ({ text: title, link: route }))
+            .map(({ title, route }) => ({ text: title, link: route })),
     ];
     return [
         { text: 'Component documentation', collapsed: false, items: docs },
         ...extra,
-        ...(apiItems.length ? [{ text: 'API reference', collapsed: false, items: apiItems }] : [])
+        ...(apiItems.length ? [{ text: 'API reference', collapsed: false, items: apiItems }] : []),
     ];
 }
 
@@ -496,7 +473,7 @@ const apiSidebar = [
     { text: 'Plugins', link: '/api/plugins/', items: referenceItems(plugins) },
     { text: 'Tools', link: '/api/tools/', items: referenceItems(tools) },
     { text: 'Actions', link: '/api/actions/', items: referenceItems(actions) },
-    { text: 'Scripts', link: '/api/scripts/', items: typedocSidebar(path.join(repoRoot, 'docs/api/scripts')) }
+    { text: 'Scripts', link: '/api/scripts/', items: typedocSidebar(path.join(repoRoot, 'docs/api/scripts')) },
 ];
 
 const apiNav = [
@@ -504,7 +481,7 @@ const apiNav = [
     { text: 'Plugins', link: '/api/plugins/' },
     { text: 'Tools', link: '/api/tools/' },
     { text: 'Actions', link: '/api/actions/' },
-    { text: 'Scripts', link: '/api/scripts/' }
+    { text: 'Scripts', link: '/api/scripts/' },
 ] satisfies DefaultTheme.SidebarItem[];
 
 const apiSidebars: Record<string, SidebarItem[]> = {
@@ -512,7 +489,7 @@ const apiSidebars: Record<string, SidebarItem[]> = {
     '/api/plugins/': [{ text: 'Plugins', link: '/api/plugins/', items: referenceItems(plugins) }],
     '/api/tools/': [{ text: 'Tools', link: '/api/tools/', items: referenceItems(tools) }],
     '/api/actions/': [{ text: 'Actions', link: '/api/actions/', items: referenceItems(actions) }],
-    '/api/scripts/': typedocSidebar(path.join(repoRoot, 'docs/api/scripts'))
+    '/api/scripts/': typedocSidebar(path.join(repoRoot, 'docs/api/scripts')),
 };
 
 for (const item of [...plugins, ...tools]) {
@@ -528,17 +505,17 @@ for (const item of actions) {
         { text: 'Inputs', link: `${item.apiReference}#inputs` },
         { text: 'Outputs', link: `${item.apiReference}#outputs` },
         { text: 'Implementation reference', link: `${item.apiReference}#implementation-reference` },
-        { text: 'JSDoc reference', link: codeRoute }
+        { text: 'JSDoc reference', link: codeRoute },
     ];
     apiSidebars[item.apiReference] = documentationSidebar(
         item,
         [],
-        [{ text: 'Action reference', collapsed: false, items: actionSections }]
+        [{ text: 'Action reference', collapsed: false, items: actionSections }],
     );
     apiSidebars[codeRoute] = documentationSidebar(
         item,
         typedocSidebar(path.join(repoRoot, 'docs', item.apiReference.slice(1), 'code')),
-        [{ text: 'Action contract', link: item.apiReference }]
+        [{ text: 'Action contract', link: item.apiReference }],
     );
 }
 
@@ -546,7 +523,7 @@ const scriptsSidebar = typedocSidebar(path.join(repoRoot, 'docs/api/scripts'));
 if (scriptsSidebar.length) {
     apiSidebars['/api/scripts/'] = [
         { text: 'Reference', link: '/api/', items: apiNav },
-        { text: 'Script helpers', collapsed: false, items: scriptsSidebar }
+        { text: 'Script helpers', collapsed: false, items: scriptsSidebar },
     ];
 }
 
@@ -557,26 +534,26 @@ const megaMenus: MegaMenu[] = [
         description: 'Guides and references for plugins running on Pumpkin servers.',
         sections: groupMenuItems(
             plugins.map((item) => (item === featuredPlugin ? { ...card(item), type: 'link' } : card(item))),
-            'Plugins'
+            'Plugins',
         ),
         ...(featuredPlugin
             ? { featured: { ...card(featuredPlugin), type: featuredPlugin.menuItemType ?? 'card' } }
-            : {})
+            : {}),
     },
     {
         text: 'Tools',
         description: 'Shared packages and utilities for building and maintaining plugins.',
-        sections: groupMenuItems(tools.map(card), 'Tools')
+        sections: groupMenuItems(tools.map(card), 'Tools'),
     },
     {
         text: 'Actions',
         description: 'Automate plugin publishing, signing, and Market updates with GitHub Actions.',
-        sections: groupMenuItems(actions.map(card), 'Actions')
+        sections: groupMenuItems(actions.map(card), 'Actions'),
     },
     {
         text: 'Guides',
         description: 'Practical setup help for server owners and step-by-step help for contributors.',
-        sections: groupMenuItems(guidePages, 'Guides')
+        sections: groupMenuItems(guidePages, 'Guides'),
     },
     {
         text: 'Reference',
@@ -593,12 +570,12 @@ const megaMenus: MegaMenu[] = [
                     {
                         text: 'Script helpers',
                         description: 'Exported helpers used by repository automation.',
-                        link: '/api/scripts/'
-                    }
-                ]
-            }
-        ]
-    }
+                        link: '/api/scripts/',
+                    },
+                ],
+            },
+        ],
+    },
 ];
 
 megaMenus.push({ text: 'Team', description: 'Meet the contributors.', link: '/team', sections: [] });
@@ -609,7 +586,7 @@ const mobileNav: DefaultTheme.NavItem[] = [
     { text: 'Actions', items: actions.map((item) => ({ text: item.title, link: item.overview })) },
     { text: 'Guides', items: guidePages.map(({ text, link }) => ({ text, link })) },
     { text: 'Reference', items: apiNav },
-    { text: 'Team', link: '/team' }
+    { text: 'Team', link: '/team' },
 ];
 
 const componentSidebars: Record<string, SidebarItem[]> = {};
@@ -622,13 +599,13 @@ const guideSidebar: SidebarItem[] = [
     { text: 'Plugins', collapsed: true, items: plugins.map((item) => ({ text: item.title, link: item.overview })) },
     { text: 'Tools', collapsed: true, items: tools.map((item) => ({ text: item.title, link: item.overview })) },
     { text: 'Actions', collapsed: true, items: actions.map((item) => ({ text: item.title, link: item.overview })) },
-    { text: 'API reference', link: '/api/' }
+    { text: 'API reference', link: '/api/' },
 ];
 
 const typedApiMenus = {
     plugins: referenceItems(plugins),
     tools: referenceItems(tools),
-    actions: referenceItems(actions)
+    actions: referenceItems(actions),
 };
 
 const themeConfig = {
@@ -644,20 +621,20 @@ const themeConfig = {
         '/api/tools/': [{ text: 'Tools', link: '/api/tools/', items: typedApiMenus.tools }],
         '/api/actions/': [{ text: 'Actions', link: '/api/actions/', items: typedApiMenus.actions }],
         ...componentSidebars,
-        ...apiSidebars
+        ...apiSidebars,
     },
     editLink: {
         text: 'Edit this page on GitHub',
-        pattern: ({ frontmatter }: { frontmatter: Record<string, unknown> }) => frontmatter.editLink as string
+        pattern: ({ frontmatter }: { frontmatter: Record<string, unknown> }) => frontmatter.editLink as string,
     },
     lastUpdated: { text: 'Last updated' },
     search: { provider: 'local' as const },
     socialLinks: [{ icon: 'github' as const, link: repoUrl }],
     footer: {
         message: 'pumpkin-plugins documentation',
-        copyright: 'MIT License'
-    }
-} satisfies DefaultTheme.Config & { megaMenus: MegaMenu[] };
+        copyright: 'MIT License',
+    },
+} satisfies ThemeConfigWithMegaMenus;
 
 export default defineConfig({
     srcDir: '..',
@@ -716,7 +693,7 @@ export default defineConfig({
                 inline.children.unshift(opening);
                 inline.children.push(closing);
             });
-        }
+        },
     },
     vite: {
         plugins: [
@@ -743,9 +720,9 @@ export default defineConfig({
                     for (const [fileName, file] of navigationAssets) {
                         this.emitFile({ type: 'asset', fileName, source: fs.readFileSync(file) });
                     }
-                }
-            }
-        ]
+                },
+            },
+        ],
     },
     transformPageData(pageData) {
         if (typeof pageData.frontmatter.editLink !== 'string') {
@@ -760,18 +737,18 @@ export default defineConfig({
         '.agents/**',
         '.github/**',
         '**/node_modules/**',
-        'docs/.vitepress/**'
+        'docs/.vitepress/**',
     ],
     rewrites,
     ignoreDeadLinks: [/README(?:\.md)?$/],
     head: [
         ['meta', { name: 'google-site-verification', content: 'Ac8kmcoez1w3jlR5BxcQ8mBc5f0gcZ4s40xNXad4804' }],
-        ['link', { rel: 'describedby', href: `${siteBase}llms.txt` }]
+        ['link', { rel: 'describedby', href: `${siteBase}llms.txt` }],
     ],
     title: 'pumpkin-plugins',
     description: 'Guides and references for pumpkin-plugins, actions, and developer tools.',
     cleanUrls: true,
     base: siteBase,
     lastUpdated: true,
-    themeConfig
+    themeConfig,
 });

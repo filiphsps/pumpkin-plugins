@@ -55,7 +55,7 @@ function parseSnapshot(root, output) {
 export function snapshotWorkingTree(root = ROOT) {
     const result = spawnSync('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all'], {
         cwd: root,
-        encoding: 'buffer'
+        encoding: 'buffer',
     });
     if (result.error) throw result.error;
     if (result.status !== 0) throw new Error(`git status failed: ${result.stderr.toString('utf8')}`);
@@ -100,7 +100,7 @@ function toolKey(request) {
     }
     return {
         turnDirectory: `${hash(request.session_id).slice(0, 24)}/${hash(request.turn_id).slice(0, 24)}`,
-        tool: hash(request.tool_use_id).slice(0, 24)
+        tool: hash(request.tool_use_id).slice(0, 24),
     };
 }
 
@@ -188,7 +188,7 @@ export class HookScope {
         const sessionDirectory = path.join(this.directory, hash(request.session_id).slice(0, 24));
         const checkpoint = path.join(
             sessionDirectory,
-            `checkpoint-${hash(completionIdentity(request)).slice(0, 24)}.json`
+            `checkpoint-${hash(completionIdentity(request)).slice(0, 24)}.json`,
         );
         if (passed === true || request.stop_hook_active === true || files.length === 0) {
             fs.rmSync(checkpoint, { force: true });
@@ -208,7 +208,7 @@ export class HookScope {
         const turnDirectory = path.join(
             this.directory,
             hash(request.session_id).slice(0, 24),
-            hash(request.turn_id).slice(0, 24)
+            hash(request.turn_id).slice(0, 24),
         );
         fs.rmSync(turnDirectory, { recursive: true, force: true });
     }

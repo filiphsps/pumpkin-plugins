@@ -7,7 +7,7 @@ import {
     createTextDisplayAppearancePacket,
     createTextDisplayMetadataPacket,
     createTextDisplayMovement,
-    createTextDisplaySpawnPacket
+    createTextDisplaySpawnPacket,
 } from './display-protocol.ts';
 import { appendWaypointIcon } from './icon-component.ts';
 import { placeWaypointHud } from './layout.ts';
@@ -23,17 +23,17 @@ const VISUAL_HISTORY_RESET_DISTANCE = 8;
 
 /** Per-viewer inputs required to render one private waypoint display set. */
 export interface WaypointHudViewer {
-    readonly id: string;
-    dimension: string;
-    position: WaypointPosition;
-    eyePosition: WaypointPosition;
-    yaw: number;
-    pitch: number;
-    readonly isOperator: boolean;
-    readonly hasPermission: (node: string) => boolean;
     readonly createEntityUuid: () => Uuid;
+    dimension: string;
     readonly encodeTextComponent: (textJson: string) => Uint8Array;
+    eyePosition: WaypointPosition;
+    readonly hasPermission: (node: string) => boolean;
+    readonly id: string;
+    readonly isOperator: boolean;
+    pitch: number;
+    position: WaypointPosition;
     readonly sendPacket: (packet: ClientboundPacket) => void;
+    yaw: number;
 }
 
 /** Options for the client-only Java waypoint renderer. */
@@ -42,24 +42,24 @@ export interface WaypointHudRendererOptions {
 }
 
 interface DisplayState {
-    readonly waypointId: string;
+    elevation: number;
     readonly entityId: number;
     readonly entityUuid: Uuid;
-    position: WaypointPosition;
-    elevation: number;
-    textJson: string | undefined;
-    scale: number | undefined;
-    opacity: number | undefined;
-    presentation: WaypointHudPresentation;
     icon: string | undefined;
+    opacity: number | undefined;
+    position: WaypointPosition;
+    presentation: WaypointHudPresentation;
+    scale: number | undefined;
     spawned: boolean;
+    textJson: string | undefined;
+    readonly waypointId: string;
 }
 
 interface ViewerState {
     dimension: string;
+    readonly displays: Map<string, DisplayState>;
     eyePosition: WaypointPosition;
     nextEntityId: number;
-    readonly displays: Map<string, DisplayState>;
 }
 
 /**
@@ -79,7 +79,7 @@ export class WaypointHudRenderer {
     renderViewer(viewer: WaypointHudViewer, waypoints: readonly Waypoint[]): void {
         if (
             ![viewer.eyePosition.x, viewer.eyePosition.y, viewer.eyePosition.z, viewer.yaw, viewer.pitch].every(
-                Number.isFinite
+                Number.isFinite,
             )
         )
             return;
@@ -91,7 +91,7 @@ export class WaypointHudRenderer {
             isOperator: viewer.isOperator,
             hasPermission: viewer.hasPermission,
             dimension: viewer.dimension,
-            position: viewer.position
+            position: viewer.position,
         });
         const desired = new Map<string, DesiredDisplay>();
         const stackCounts = new Map<string, number>();
@@ -110,11 +110,11 @@ export class WaypointHudRenderer {
                 {
                     x: waypoint.position.x,
                     y: waypoint.position.y + LABEL_ANCHOR_HEIGHT + stackIndex * WORLD_STACK_HEIGHT,
-                    z: waypoint.position.z
+                    z: waypoint.position.z,
                 },
                 waypointDistance,
                 previous?.elevation,
-                stackIndex
+                stackIndex,
             );
             const presentation = presentWaypointHud(viewer, placement, waypointDistance, previous?.presentation);
             desired.set(waypoint.id, {
@@ -122,7 +122,7 @@ export class WaypointHudRenderer {
                 scale: presentation.scale,
                 presentation,
                 icon: waypoint.icon,
-                textJson: createWaypointHudTextJson(waypoint, presentation.distance, presentation.detailed)
+                textJson: createWaypointHudTextJson(waypoint, presentation.distance, presentation.detailed),
             });
         }
 
@@ -174,7 +174,7 @@ export class WaypointHudRenderer {
                 dimension: viewer.dimension,
                 eyePosition: { ...viewer.eyePosition },
                 nextEntityId: FIRST_CLIENT_ENTITY_ID,
-                displays: new Map()
+                displays: new Map(),
             };
             this.viewers.set(viewer.id, state);
         } else if (state.dimension !== viewer.dimension) {
@@ -188,7 +188,7 @@ export class WaypointHudRenderer {
     private removeUndesired(
         viewer: WaypointHudViewer,
         state: ViewerState,
-        desired: ReadonlyMap<string, DesiredDisplay>
+        desired: ReadonlyMap<string, DesiredDisplay>,
     ): void {
         const removals = [...state.displays.values()].filter(({ waypointId }) => !desired.has(waypointId));
         if (removals.length === 0) return;
@@ -205,7 +205,7 @@ export class WaypointHudRenderer {
         viewer: WaypointHudViewer,
         state: ViewerState,
         waypointId: string,
-        desired: DesiredDisplay
+        desired: DesiredDisplay,
     ): void {
         let display = state.displays.get(waypointId);
         if (display === undefined) {
@@ -220,7 +220,7 @@ export class WaypointHudRenderer {
                 opacity: undefined,
                 presentation: desired.presentation,
                 icon: undefined,
-                spawned: false
+                spawned: false,
             };
             state.displays.set(waypointId, display);
         }
@@ -253,8 +253,8 @@ export class WaypointHudRenderer {
                     display.entityId,
                     componentNbt,
                     desired.scale,
-                    desired.presentation.opacity
-                )
+                    desired.presentation.opacity,
+                ),
             );
             display.textJson = desired.textJson;
             display.scale = desired.scale;
@@ -266,8 +266,8 @@ export class WaypointHudRenderer {
                     ...(display.scale === desired.scale ? {} : { scale: desired.scale }),
                     ...(display.opacity === desired.presentation.opacity
                         ? {}
-                        : { opacity: desired.presentation.opacity })
-                })
+                        : { opacity: desired.presentation.opacity }),
+                }),
             );
             display.scale = desired.scale;
             display.opacity = desired.presentation.opacity;
@@ -294,11 +294,11 @@ export class WaypointHudRenderer {
 }
 
 interface DesiredDisplay {
+    readonly elevation: number;
     readonly icon: string | undefined;
     readonly position: WaypointPosition;
-    readonly elevation: number;
-    readonly scale: number;
     readonly presentation: WaypointHudPresentation;
+    readonly scale: number;
     readonly textJson: string;
 }
 

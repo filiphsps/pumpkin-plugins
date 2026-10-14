@@ -4,7 +4,7 @@ import {
     ClientLightTracker,
     clientLightStates,
     findLightPosition,
-    type LightClient
+    type LightClient,
 } from './client-light.ts';
 
 describe(ClientLightTracker.name, () => {
@@ -18,7 +18,7 @@ describe(ClientLightTracker.name, () => {
         expect(client.changes).toEqual([
             ['fake', block(1, 64, 1), 14],
             ['reset', block(1, 64, 1)],
-            ['fake', block(2, 64, 1), 14]
+            ['fake', block(2, 64, 1), 14],
         ]);
     });
 
@@ -31,7 +31,7 @@ describe(ClientLightTracker.name, () => {
 
         expect(client.changes).toEqual([
             ['fake', block(1, 64, 1), 14],
-            ['reset', block(1, 64, 1)]
+            ['reset', block(1, 64, 1)],
         ]);
     });
 
@@ -42,7 +42,7 @@ describe(ClientLightTracker.name, () => {
         tracker.sync('Alex', client, position, 14);
         tracker.replaceSources('Alex', client, 'entities', [
             { position, level: 8 },
-            { position, level: 15 }
+            { position, level: 15 },
         ]);
         tracker.replaceSources('Alex', client, 'entities', [{ position, level: 8 }]);
         tracker.remove('Alex', client);
@@ -53,7 +53,7 @@ describe(ClientLightTracker.name, () => {
             ['fake', position, 15],
             ['fake', position, 14],
             ['fake', position, 8],
-            ['reset', position]
+            ['reset', position],
         ]);
     });
 
@@ -64,7 +64,7 @@ describe(ClientLightTracker.name, () => {
         const second = block(2, 64, 1);
         tracker.replaceSources('Alex', client, 'entities', [
             { position: first, level: 8 },
-            { position: second, level: 14 }
+            { position: second, level: 14 },
         ]);
         tracker.replaceSources('Alex', client, 'entities', [{ position: first, level: 14 }]);
 
@@ -72,7 +72,7 @@ describe(ClientLightTracker.name, () => {
             ['fake', first, 8],
             ['fake', second, 14],
             ['reset', second],
-            ['fake', first, 14]
+            ['fake', first, 14],
         ]);
     });
 
@@ -88,7 +88,7 @@ describe(ClientLightTracker.name, () => {
         expect(client.changes).toEqual([
             ['fake', position, 14],
             ['fake', position, 14],
-            ['reset', position]
+            ['reset', position],
         ]);
     });
 });

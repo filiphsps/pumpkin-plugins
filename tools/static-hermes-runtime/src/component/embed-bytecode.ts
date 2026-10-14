@@ -6,7 +6,7 @@ export function renderEmbeddedBytecode(bytecode: Uint8Array): string {
         lines.push(
             `    ${[...bytecode.subarray(index, index + 12)]
                 .map((value) => `0x${value.toString(16).padStart(2, '0')}`)
-                .join(', ')}`
+                .join(', ')}`,
         );
     }
     return /* cpp */ `#pragma once

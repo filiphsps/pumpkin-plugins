@@ -13,9 +13,9 @@ export const info = {
         { name: 'fs.read.data', reason: 'Read its light-source settings, player preferences and old recovery data.' },
         {
             name: 'fs.write.data',
-            reason: 'Write its light-source settings and player preferences, and clean up old recovery data.'
-        }
+            reason: 'Write its light-source settings and player preferences, and clean up old recovery data.',
+        },
     ],
     commands: commandInfos(commands),
-    config: configInfo
+    config: configInfo,
 } satisfies PluginInfo<typeof PLUGIN_NAME>;

@@ -18,7 +18,7 @@ describe('PackScanner', () => {
         const { packs, problems } = new PackScanner(files).scan('packs');
         expect(packs.map((p) => [p.fileName, p.manifest.uuid])).toEqual([
             ['A.MCPACK', uuid(1)],
-            ['b.mcpack', uuid(2)]
+            ['b.mcpack', uuid(2)],
         ]);
         expect(problems).toEqual([]);
     });
@@ -32,7 +32,7 @@ describe('PackScanner', () => {
         expect(packs.map((p) => p.fileName)).toEqual(['good.mcpack']);
         expect(problems).toEqual([
             'broken.mcpack: not a valid zip archive',
-            'nomanifest.mcpack: manifest.json has no header'
+            'nomanifest.mcpack: manifest.json has no header',
         ]);
     });
 
@@ -49,7 +49,7 @@ describe('PackScanner', () => {
         expect(files.reads.get('packs/b.mcpack')).toBe(1);
         expect(packs.find((p) => p.fileName === 'a.mcpack')?.manifest).toMatchObject({
             uuid: uuid(9),
-            version: '2.0.0'
+            version: '2.0.0',
         });
     });
 
@@ -60,16 +60,16 @@ describe('PackScanner', () => {
             const manifestPath = extension === 'mcpack' ? 'manifest.json' : 'RP/manifest.json';
             for (const [directory, n] of [
                 ['first', 1],
-                ['second', 2]
+                ['second', 2],
             ] as const) {
                 files.put(
                     `${directory}/same.${extension}`,
                     zipSync(
                         {
-                            [manifestPath]: strToU8(JSON.stringify(manifestJson({ uuid: uuid(n) })))
+                            [manifestPath]: strToU8(JSON.stringify(manifestJson({ uuid: uuid(n) }))),
                         },
-                        { level: 0 }
-                    )
+                        { level: 0 },
+                    ),
                 );
             }
             const stat = files.stat.bind(files);
@@ -90,7 +90,7 @@ describe('PackScanner', () => {
             const first = scanner.scan('first').packs[0];
             expect(first.path.startsWith('first/')).toBe(true);
             expect(first.manifest.uuid).toBe(uuid(1));
-        }
+        },
     );
 
     it('remembers a broken pack too, instead of reparsing it every scan', () => {
@@ -129,8 +129,8 @@ describe('PackScanner', () => {
                 addon({
                     'RP/manifest.json': manifest(1),
                     'RP/textures/a.png': noise(300),
-                    'BP/manifest.json': manifest(2, ['data'])
-                })
+                    'BP/manifest.json': manifest(2, ['data']),
+                }),
             );
             const { packs, problems } = new PackScanner(files).scan('packs');
 
@@ -143,7 +143,7 @@ describe('PackScanner', () => {
         it('names the packs of a bundle with several after the bundle and the pack', () => {
             const files = new MemoryFiles().put(
                 'packs/Pair.mcaddon',
-                addon({ 'Hi/manifest.json': manifest(1), 'Lo/manifest.json': manifest(2) })
+                addon({ 'Hi/manifest.json': manifest(1), 'Lo/manifest.json': manifest(2) }),
             );
             const { packs } = new PackScanner(files).scan('packs');
             expect(packs.map((p) => p.fileName).sort()).toEqual(['Pair - Hi.mcpack', 'Pair - Lo.mcpack']);
@@ -154,8 +154,8 @@ describe('PackScanner', () => {
                 'packs/Pair.mcaddon',
                 addon({
                     'a/RP/manifest.json': manifest(1),
-                    'b/RP/manifest.json': manifest(2)
-                })
+                    'b/RP/manifest.json': manifest(2),
+                }),
             );
             const scanner = new PackScanner(files);
             for (let scan = 0; scan < 2; scan++) {
@@ -163,7 +163,7 @@ describe('PackScanner', () => {
                 expect(packs.map((p) => p.manifest.uuid)).toEqual([uuid(1)]);
                 expect(readManifest(files.readFile(packs[0].path)).uuid).toBe(uuid(1));
                 expect(problems).toEqual([
-                    'Pair.mcaddon: Pair - RP.mcpack is already taken by Pair.mcaddon; skipping it'
+                    'Pair.mcaddon: Pair - RP.mcpack is already taken by Pair.mcaddon; skipping it',
                 ]);
             }
         });
@@ -197,7 +197,7 @@ describe('PackScanner', () => {
             expect(problems).toEqual([
                 'Broken.mcaddon: not a valid zip archive',
                 'OnlyBp.mcaddon: left out BP (data, not a resource pack)',
-                'OnlyBp.mcaddon: has no resource pack'
+                'OnlyBp.mcaddon: has no resource pack',
             ]);
         });
 

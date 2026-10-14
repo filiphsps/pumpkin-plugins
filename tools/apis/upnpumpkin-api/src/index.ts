@@ -10,6 +10,6 @@ export {
     PROTOCOL_VERSION,
     type Reply,
     type Request,
-    UPNPUMPKIN_PLUGIN
+    UPNPUMPKIN_PLUGIN,
 } from './protocol.ts';
 export { MappingWatcher, openUrl, type WatchedState } from './watcher.ts';

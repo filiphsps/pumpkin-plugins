@@ -22,7 +22,7 @@ test('accepts generated API links when the ignored API output is absent', () => 
             '.agents',
             '.github',
             'package.json',
-            'biome.json'
+            'biome.json',
         ]) {
             const source = path.join(repositoryRoot, entry);
             if (!fs.existsSync(source)) continue;
@@ -53,9 +53,9 @@ test('accepts generated API links when the ignored API output is absent', () => 
             filter: (source) => {
                 const relative = path.relative(sourceBuild, source).split(path.sep).join('/');
                 return !['build', 'coverage', 'dist', 'node_modules'].some(
-                    (directory) => relative === directory || relative.startsWith(`${directory}/`)
+                    (directory) => relative === directory || relative.startsWith(`${directory}/`),
                 );
-            }
+            },
         });
 
         const sourceDocs = path.join(repositoryRoot, 'docs');
@@ -64,13 +64,13 @@ test('accepts generated API links when the ignored API output is absent', () => 
             filter: (source) => {
                 const relative = path.relative(sourceDocs, source).split(path.sep).join('/');
                 return relative !== 'api' && !relative.startsWith('api/') && !relative.includes('/dist/');
-            }
+            },
         });
 
         const result = spawnSync(process.execPath, [path.join(repositoryRoot, 'scripts/check-docs.mjs')], {
             cwd: repositoryRoot,
             encoding: 'utf8',
-            env: { ...process.env, PUMPKIN_PLUGINS_ROOT: temporaryRoot }
+            env: { ...process.env, PUMPKIN_PLUGINS_ROOT: temporaryRoot },
         });
 
         assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);

@@ -6,17 +6,17 @@ import { TcpTransport } from './tcp-transport.ts';
 function fixture() {
     const input = {
         read: vi.fn((_max: bigint) => new Uint8Array()),
-        [Symbol.dispose]: vi.fn()
+        [Symbol.dispose]: vi.fn(),
     };
     const output = {
         checkWrite: vi.fn(() => 1024n),
         write: vi.fn(),
         flush: vi.fn(),
-        [Symbol.dispose]: vi.fn()
+        [Symbol.dispose]: vi.fn(),
     };
     const socket = {
         shutdown: vi.fn(),
-        [Symbol.dispose]: vi.fn()
+        [Symbol.dispose]: vi.fn(),
     };
     return {
         input,
@@ -25,8 +25,8 @@ function fixture() {
         transport: new TcpTransport(
             socket as unknown as TcpSocket,
             input as unknown as InputStream,
-            output as unknown as OutputStream
-        )
+            output as unknown as OutputStream,
+        ),
     };
 }
 

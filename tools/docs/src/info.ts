@@ -14,7 +14,7 @@ export type {
     CommandTree,
     FlatCommand,
     SubcommandSpec,
-    SubcommandTree
+    SubcommandTree,
 } from './commands.ts';
 export {
     CommandFailed,
@@ -25,7 +25,7 @@ export {
     commandPermissionInfos,
     defineCommands,
     errorLine,
-    flattenCommands
+    flattenCommands,
 } from './commands.ts';
 export { code, table } from './markdown.ts';
 export { isPumpkinPermission, PUMPKIN_PERMISSIONS, type PumpkinPermission } from './permissions.ts';
@@ -40,45 +40,37 @@ export interface PermissionInfo<Name extends string = PumpkinPermission> {
 
 /** A command the plugin lists in its README. Build these with `commandInfos` rather than writing them. */
 export interface CommandInfo<Node extends string = string> {
-    /** Full usage as typed in game or console, e.g. `/baddon reload`. */
-    usage: string;
+    /** Who may run the command by default. */
+    defaultPermission?: import('./commands.ts').CommandPermissionDefault;
     description: string;
     /** Permission node required to run it, if any. */
     permission?: Node;
-    /** Who may run the command by default. */
-    defaultPermission?: import('./commands.ts').CommandPermissionDefault;
+    /** Full usage as typed in game or console, e.g. `/baddon reload`. */
+    usage: string;
 }
 
 /** One setting of the plugin's config file, as a row of the README table. */
 export interface ConfigOptionInfo {
-    /** Dotted TOML key, e.g. `web.port`. */
-    key: string;
-    type: 'boolean' | 'integer' | 'string' | 'string[]' | 'table';
     /** Shown as written; omit for options without a default. */
     default?: string;
     description: string;
+    /** Dotted TOML key, e.g. `web.port`. */
+    key: string;
+    type: 'boolean' | 'integer' | 'string' | 'string[]' | 'table';
 }
 
 /** The plugin's config file, for its README. */
 export interface ConfigInfo {
-    /** File name inside the plugin's data folder. */
-    file: string;
     /** Exactly what the plugin writes on first start, so the README shows the real defaults. */
     defaultContents: string;
+    /** File name inside the plugin's data folder. */
+    file: string;
     options?: ConfigOptionInfo[];
 }
 
 /** What a plugin says about itself. One object feeds both the plugin's Pumpkin metadata and its generated README. */
 export interface PluginInfo<Name extends string = string> {
-    /** Pumpkin plugin name. Also the data folder name: `plugins/data/<name>/`. */
-    name: Name;
-    description: string;
     authors?: string[];
-    /** The Pumpkin permissions the plugin asks for. */
-    permissions?: readonly PermissionInfo[];
-    /** The commands, normally `commandInfos(commands)` of the tree that registers them. */
-    commands?: readonly CommandInfo<`${Name}:${string}`>[];
-    config?: ConfigInfo;
     /**
      * More generated README blocks, by name: the markdown goes between `<!-- docs:begin NAME -->` and
      * `<!-- docs:end NAME -->`. For content that comes from the plugin's code, such as a list of
@@ -86,12 +78,20 @@ export interface PluginInfo<Name extends string = string> {
      * names (`summary`, `permissions`, `commands`, `config`) are taken.
      */
     blocks?: Readonly<Record<string, string>>;
+    /** The commands, normally `commandInfos(commands)` of the tree that registers them. */
+    commands?: readonly CommandInfo<`${Name}:${string}`>[];
+    config?: ConfigInfo;
+    description: string;
+    /** Pumpkin plugin name. Also the data folder name: `plugins/data/<name>/`. */
+    name: Name;
+    /** The Pumpkin permissions the plugin asks for. */
+    permissions?: readonly PermissionInfo[];
 }
 
 /** Permission required by the automatic Pumpkin Market update check. */
 export const UPDATE_CHECK_PERMISSION: PermissionInfo<'http.outbound'> = {
     name: 'http.outbound',
-    reason: 'Check Pumpkin Market for plugin updates.'
+    reason: 'Check Pumpkin Market for plugin updates.',
 };
 
 /** Lists declared permissions plus the one required for the automatic update check. */
@@ -111,6 +111,6 @@ export function pluginMetadata(info: PluginInfo, version: string) {
         authors: info.authors ?? [],
         description: info.description,
         dependencies: [] as string[],
-        permissions: pluginPermissions(info).map((p) => p.name)
+        permissions: pluginPermissions(info).map((p) => p.name),
     };
 }

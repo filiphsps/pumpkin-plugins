@@ -7,7 +7,7 @@ import {
     normalizeName,
     normalizeNamespace,
     PIE_PROVIDER,
-    ReentryError
+    ReentryError,
 } from './protocol.ts';
 
 /** A synchronous, local resolver. Undefined declines; empty text is a known value. */
@@ -36,7 +36,7 @@ export class ExpansionRouter {
     /** The guard must also be passed to this plugin's clients. */
     constructor(
         readonly guard: CallbackGuard,
-        readonly provider = PIE_PROVIDER
+        readonly provider = PIE_PROVIDER,
     ) {}
     /** Claim local callback ownership and snapshot normalized handlers. */
     register(namespace: string, handlers: Readonly<Record<string, ExpansionHandler>>): readonly string[] {

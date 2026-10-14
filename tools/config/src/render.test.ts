@@ -36,7 +36,7 @@ base_url = ""
     it('writes set optional settings and existing table entries', () => {
         const values = readConfig(demo, {
             web: { enabled: true, port: 1, base_url: '', token: 'abc' },
-            overrides: { 'my.file.txt': { enabled: false, order: 2 } }
+            overrides: { 'my.file.txt': { enabled: false, order: 2 } },
         }).values;
         const out = renderConfig(demo, values);
         expect(out).toContain('token = "abc"');
@@ -47,7 +47,7 @@ base_url = ""
     it('produces TOML that reads back to the same values with no issues', () => {
         const values = readConfig(demo, {
             web: { port: 9, token: 'x' },
-            overrides: { 'a.txt': { order: 1 }, 'b.txt': { enabled: true } }
+            overrides: { 'a.txt': { order: 1 }, 'b.txt': { enabled: true } },
         }).values;
         const out = renderConfig(demo, values);
         const again = readConfig(demo, parse(out));

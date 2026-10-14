@@ -24,29 +24,29 @@ it('parses wasm-tools JSON for a WIT package and passes the resolved absolute in
                         name: 'api',
                         package: 0,
                         types: { mode: 0 },
-                        functions: {}
-                    }
+                        functions: {},
+                    },
                 ],
                 types: [
                     {
                         name: 'mode',
                         kind: { enum: { cases: [{ name: 'fast' }, { name: 'safe' }] } },
-                        owner: { interface: 0 }
-                    }
+                        owner: { interface: 0 },
+                    },
                 ],
-                packages: [{ name: 'example:api@1.0.0', interfaces: { api: 0 }, worlds: { plugin: 0 } }]
+                packages: [{ name: 'example:api@1.0.0', interfaces: { api: 0 }, worlds: { plugin: 0 } }],
             });
-        }
+        },
     });
 
     expect(document.packages.map(({ name }) => name)).toContain('example:api@1.0.0');
     expect(document.worlds.map(({ name }) => name)).toContain('plugin');
     expect(document.interfaces.map(({ name }) => name)).toContain('api');
     expect(
-        document.types.some((type) => type.name === 'mode' && typeof type.kind !== 'string' && 'enum' in type.kind)
+        document.types.some((type) => type.name === 'mode' && typeof type.kind !== 'string' && 'enum' in type.kind),
     ).toBe(true);
     expect(calls).toEqual([
-        { executable: 'wasm-tools-test', args: ['component', 'wit', path.resolve(witDir), '--json', '--all-features'] }
+        { executable: 'wasm-tools-test', args: ['component', 'wit', path.resolve(witDir), '--json', '--all-features'] },
     ]);
 });
 
@@ -58,8 +58,8 @@ it('includes wasm-tools diagnostics when WIT parsing fails', () => {
             executable: 'wasm-tools-test',
             run: () => {
                 throw Object.assign(new Error('process failed'), { stderr: 'invalid WIT syntax' });
-            }
-        })
+            },
+        }),
     ).toThrow(/wasm-tools component wit .* --json --all-features failed: invalid WIT syntax/);
 });
 
@@ -79,7 +79,7 @@ interface api {
         enums: [],
         flags: [],
         types: ['alias'],
-        escapedNames: []
+        escapedNames: [],
     });
 });
 

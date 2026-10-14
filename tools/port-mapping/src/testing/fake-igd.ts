@@ -4,34 +4,34 @@ import { NAT_PMP_PORT } from '../natpmp.ts';
 
 /** A port mapping a `FakeIgd` holds. */
 export interface FakeMapping {
-    protocol: 'tcp' | 'udp';
-    externalPort: number;
-    internalPort: number;
     client: string;
     description: string;
+    externalPort: number;
+    internalPort: number;
     leaseSeconds: number;
+    protocol: 'tcp' | 'udp';
 }
 
 /** How a `FakeIgd` behaves. */
 export interface FakeIgdOptions {
     /** The router's address on the local network. */
     address?: Ipv4;
+    /** What the UPnP device description says about the router. */
+    device?: { manufacturer?: string; modelName?: string; modelNumber?: string; friendlyName?: string };
     /** The router's address on the internet side. */
     externalAddress?: Ipv4;
+    /** Make every AddPortMapping fail with this UPnP error code. */
+    failMappingWith?: number;
     /** Port of the router's HTTP server. */
     httpPort?: number;
-    /** Answer UPnP searches and actions. */
-    upnp?: boolean;
     /** Answer NAT-PMP requests. */
     natPmp?: boolean;
     /** Refuse mappings that expire, as some routers do. */
     permanentLeasesOnly?: boolean;
     /** External ports that are already in use. */
     takenPorts?: number[];
-    /** Make every AddPortMapping fail with this UPnP error code. */
-    failMappingWith?: number;
-    /** What the UPnP device description says about the router. */
-    device?: { manufacturer?: string; modelName?: string; modelNumber?: string; friendlyName?: string };
+    /** Answer UPnP searches and actions. */
+    upnp?: boolean;
     /** Pages of the router's web interface on port 80, by path. They are served even when UPnP is off. */
     webPages?: Record<string, { status?: number; body: string }>;
 }
@@ -60,7 +60,7 @@ export class FakeIgd {
             permanentLeasesOnly: false,
             takenPorts: [],
             webPages: {},
-            ...options
+            ...options,
         };
         this.address = this.options.address;
         this.httpPort = this.options.httpPort;
@@ -87,7 +87,7 @@ export class FakeIgd {
         method: string,
         path: string,
         headers: Record<string, string>,
-        body: string
+        body: string,
     ): { status: number; body: string } {
         const page = method === 'GET' ? this.options.webPages[path] : undefined;
         if (page) return { status: page.status ?? 200, body: page.body };
@@ -106,8 +106,8 @@ export class FakeIgd {
         if (!answers) return [];
         return [
             strToU8(
-                `HTTP/1.1 200 OK\r\nCACHE-CONTROL: max-age=120\r\nST: ${target}\r\nUSN: uuid:fake::${target}\r\nLOCATION: ${this.location}\r\n\r\n`
-            )
+                `HTTP/1.1 200 OK\r\nCACHE-CONTROL: max-age=120\r\nST: ${target}\r\nUSN: uuid:fake::${target}\r\nLOCATION: ${this.location}\r\n\r\n`,
+            ),
         ];
     }
 
@@ -141,11 +141,11 @@ export class FakeIgd {
         this.actions.push(name);
         const ok = (inner = '') => ({
             status: 200,
-            body: `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:${name}Response xmlns:u="${SERVICE}">${inner}</u:${name}Response></s:Body></s:Envelope>`
+            body: `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:${name}Response xmlns:u="${SERVICE}">${inner}</u:${name}Response></s:Body></s:Envelope>`,
         });
         const fail = (code: number, text: string) => ({
             status: 500,
-            body: `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><s:Fault><faultcode>s:Client</faultcode><faultstring>UPnPError</faultstring><detail><UPnPError xmlns="urn:schemas-upnp-org:control-1-0"><errorCode>${code}</errorCode><errorDescription>${text}</errorDescription></UPnPError></detail></s:Fault></s:Body></s:Envelope>`
+            body: `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><s:Fault><faultcode>s:Client</faultcode><faultstring>UPnPError</faultstring><detail><UPnPError xmlns="urn:schemas-upnp-org:control-1-0"><errorCode>${code}</errorCode><errorDescription>${text}</errorDescription></UPnPError></detail></s:Fault></s:Body></s:Envelope>`,
         });
 
         if (name === 'GetExternalIPAddress')
@@ -163,7 +163,7 @@ export class FakeIgd {
                 internalPort: Number(arg('NewInternalPort')),
                 client: arg('NewInternalClient'),
                 description: arg('NewPortMappingDescription'),
-                leaseSeconds: lease
+                leaseSeconds: lease,
             });
             return ok();
         }
@@ -198,7 +198,7 @@ export class FakeIgd {
                 internalPort,
                 client: 'nat-pmp',
                 description: '',
-                leaseSeconds: lifetime
+                leaseSeconds: lifetime,
             });
         }
         const reply = new Uint8Array(16);

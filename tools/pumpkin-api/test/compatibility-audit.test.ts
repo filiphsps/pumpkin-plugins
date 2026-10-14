@@ -7,7 +7,7 @@ import {
     type CompatibilityMatrix,
     diffCompatibilityMatrices,
     hasSameWitRevision,
-    reconcileCompatibilityMatrix
+    reconcileCompatibilityMatrix,
 } from '../src/compatibility-audit.ts';
 
 const temporaryDirectories: string[] = [];
@@ -19,17 +19,17 @@ afterEach(() => {
 it('reports same-release WIT additions, removals, and signature changes as explicit review items', () => {
     const previous = compatibilityMatrix([
         { id: 'world.read', kind: 'function', signature: 'world.read() -> u32' },
-        { id: 'world.delete', kind: 'function', signature: 'world.delete() -> unit' }
+        { id: 'world.delete', kind: 'function', signature: 'world.delete() -> unit' },
     ]);
     const current = compatibilityMatrix([
         { id: 'world.read', kind: 'function', signature: 'world.read() -> u64' },
-        { id: 'world.create', kind: 'function', signature: 'world.create() -> unit' }
+        { id: 'world.create', kind: 'function', signature: 'world.create() -> unit' },
     ]);
     previous.interfaces[0].types = [
-        { name: 'position', kind: 'record', signature: '{"fields":[{"name":"x","type":"u32"}]}' }
+        { name: 'position', kind: 'record', signature: '{"fields":[{"name":"x","type":"u32"}]}' },
     ];
     current.interfaces[0].types = [
-        { name: 'position', kind: 'record', signature: '{"fields":[{"name":"x","type":"u64"}]}' }
+        { name: 'position', kind: 'record', signature: '{"fields":[{"name":"x","type":"u64"}]}' },
     ];
 
     const changes = diffCompatibilityMatrices(previous, current);
@@ -42,7 +42,7 @@ it('reports same-release WIT additions, removals, and signature changes as expli
             currentSignature: 'function:world.create() -> unit:[]',
             impact: 'additive',
             decision: 'review-required',
-            migration: ''
+            migration: '',
         },
         {
             id: 'operation:world.delete',
@@ -51,7 +51,7 @@ it('reports same-release WIT additions, removals, and signature changes as expli
             currentSignature: null,
             impact: 'breaking',
             decision: 'review-required',
-            migration: ''
+            migration: '',
         },
         {
             id: 'operation:world.read',
@@ -60,7 +60,7 @@ it('reports same-release WIT additions, removals, and signature changes as expli
             currentSignature: 'function:world.read() -> u64:[]',
             impact: 'breaking',
             decision: 'review-required',
-            migration: ''
+            migration: '',
         },
         {
             id: 'type:world.position',
@@ -69,8 +69,8 @@ it('reports same-release WIT additions, removals, and signature changes as expli
             currentSignature: 'record:{"fields":[{"name":"x","type":"u64"}]}',
             impact: 'breaking',
             decision: 'review-required',
-            migration: ''
-        }
+            migration: '',
+        },
     ]);
 });
 
@@ -81,12 +81,12 @@ it('preserves reviewed decisions for unchanged items and requires review for cha
             kind: 'function',
             signature: 'world.read() -> u32',
             decision: 'improved',
-            migration: 'Existing note.'
-        }
+            migration: 'Existing note.',
+        },
     ]);
     const candidate = compatibilityMatrix([
         { id: 'world.read', kind: 'function', signature: 'world.read() -> u64' },
-        { id: 'world.create', kind: 'function', signature: 'world.create() -> unit' }
+        { id: 'world.create', kind: 'function', signature: 'world.create() -> unit' },
     ]);
     const changes = diffCompatibilityMatrices(previous, candidate);
 
@@ -99,7 +99,7 @@ it('preserves reviewed decisions for unchanged items and requires review for cha
             signature: 'world.read() -> u64',
             features: [],
             decision: 'review-required',
-            migration: ''
+            migration: '',
         },
         {
             id: 'world.create',
@@ -107,15 +107,15 @@ it('preserves reviewed decisions for unchanged items and requires review for cha
             signature: 'world.create() -> unit',
             features: [],
             decision: 'review-required',
-            migration: ''
-        }
+            migration: '',
+        },
     ]);
     expect(updated.sourceChanges).toEqual(changes);
 });
 
 it('keeps reviewed revision notes when regenerating the same WIT audit', () => {
     const previous = compatibilityMatrix([
-        { id: 'world.create', kind: 'function', signature: 'world.create() -> unit' }
+        { id: 'world.create', kind: 'function', signature: 'world.create() -> unit' },
     ]);
     firstOperation(previous).migration = 'Existing note.';
     previous.sourceChanges = [
@@ -126,11 +126,11 @@ it('keeps reviewed revision notes when regenerating the same WIT audit', () => {
             currentSignature: 'function:world.create() -> unit:[]',
             impact: 'additive',
             decision: 'added',
-            migration: 'New operation; existing call sites do not change.'
-        }
+            migration: 'New operation; existing call sites do not change.',
+        },
     ];
     const candidate = compatibilityMatrix([
-        { id: 'world.create', kind: 'function', signature: 'world.create() -> unit' }
+        { id: 'world.create', kind: 'function', signature: 'world.create() -> unit' },
     ]);
 
     const updated = reconcileCompatibilityMatrix(previous, candidate, [], true);
@@ -138,7 +138,7 @@ it('keeps reviewed revision notes when regenerating the same WIT audit', () => {
     expect(updated.sourceChanges).toEqual(previous.sourceChanges);
     expect(firstOperation(updated)).toMatchObject({
         decision: 'retained',
-        migration: 'Existing note.'
+        migration: 'Existing note.',
     });
 });
 
@@ -146,7 +146,7 @@ it('treats repository, branch, subdirectory, commit, and content digest as WIT r
     const matrix = compatibilityMatrix([]);
     const samePin = {
         sourceWit: matrix.sourceWit,
-        sourceWitSha256: matrix.sourceWitSha256
+        sourceWitSha256: matrix.sourceWitSha256,
     };
 
     expect(hasSameWitRevision(matrix, samePin)).toBe(true);
@@ -156,26 +156,26 @@ it('treats repository, branch, subdirectory, commit, and content digest as WIT r
     expect(
         hasSameWitRevision(matrix, {
             ...samePin,
-            sourceWit: { ...samePin.sourceWit, repository: 'https://example.com/other.git' }
-        })
+            sourceWit: { ...samePin.sourceWit, repository: 'https://example.com/other.git' },
+        }),
     ).toBe(false);
     expect(
         hasSameWitRevision(matrix, {
             ...samePin,
-            sourceWit: { ...samePin.sourceWit, branch: 'release' }
-        })
+            sourceWit: { ...samePin.sourceWit, branch: 'release' },
+        }),
     ).toBe(false);
     expect(
         hasSameWitRevision(matrix, {
             ...samePin,
-            sourceWit: { ...samePin.sourceWit, subdirectory: 'v0.2' }
-        })
+            sourceWit: { ...samePin.sourceWit, subdirectory: 'v0.2' },
+        }),
     ).toBe(false);
     expect(
         hasSameWitRevision(matrix, {
             ...samePin,
-            sourceWit: { ...samePin.sourceWit, commit: '5d7a501943bb99f0f02a339128833f58ed37d0cc' }
-        })
+            sourceWit: { ...samePin.sourceWit, commit: '5d7a501943bb99f0f02a339128833f58ed37d0cc' },
+        }),
     ).toBe(false);
     expect(hasSameWitRevision(matrix, { ...samePin, sourceWitSha256: '2'.repeat(64) })).toBe(false);
 });
@@ -188,19 +188,19 @@ it('archives each release and WIT revision without overwriting a different audit
     const archivePath = archiveCompatibilityMatrix(directory, matrix);
 
     expect(path.relative(directory, archivePath)).toBe(
-        'history/0.2.0+26.3-26.51/v0.1/4d7a501943bb99f0f02a339128833f58ed37d0cc-111dab16b0475551f23422d5bf734b7900f3030a0f8b33cefde70af10f3ea825.json'
+        'history/0.2.0+26.3-26.51/v0.1/4d7a501943bb99f0f02a339128833f58ed37d0cc-111dab16b0475551f23422d5bf734b7900f3030a0f8b33cefde70af10f3ea825.json',
     );
     const archiveContents = fs.readFileSync(archivePath, 'utf8');
     const archivedMatrix = JSON.parse(archiveContents);
     expect(archivedMatrix.$schema).toBe(
-        'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json'
+        'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json',
     );
     expect(archivedMatrix.sourceWit.subdirectory).toBe('v0.1');
     expect(archiveCompatibilityMatrix(directory, matrix)).toBe(archivePath);
     expect(fs.readFileSync(archivePath, 'utf8')).toBe(archiveContents);
 
     expect(() => archiveCompatibilityMatrix(directory, { ...matrix, defaultExport: true })).toThrow(
-        /refusing to overwrite compatibility history/
+        /refusing to overwrite compatibility history/,
     );
 });
 
@@ -211,7 +211,7 @@ it('refuses to archive a matrix that does not match the compatibility schema', (
     temporaryDirectories.push(directory);
 
     expect(() => archiveCompatibilityMatrix(directory, invalidMatrix as unknown as CompatibilityMatrix)).toThrow(
-        /invalid Pumpkin API compatibility matrix/
+        /invalid Pumpkin API compatibility matrix/,
     );
 });
 
@@ -220,7 +220,7 @@ it('records the legacy v0.1 source directory when archiving an older matrix with
     matrix.sourceWit = {
         repository: 'https://github.com/Pumpkin-MC/pumpkin-plugin-wit',
         branch: 'master',
-        commit: '4d7a501943bb99f0f02a339128833f58ed37d0cc'
+        commit: '4d7a501943bb99f0f02a339128833f58ed37d0cc',
     } as never;
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-compatibility-history-'));
     temporaryDirectories.push(directory);
@@ -238,8 +238,8 @@ it('refuses to archive a compatibility audit that still needs review', () => {
             kind: 'function',
             signature: 'world.read() -> u32',
             decision: 'review-required',
-            migration: ''
-        }
+            migration: '',
+        },
     ]);
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-compatibility-history-'));
     temporaryDirectories.push(directory);
@@ -254,8 +254,8 @@ it('refuses to archive a compatibility audit with an unsupported decision', () =
             kind: 'function',
             signature: 'world.read() -> u32',
             decision: 'maybe',
-            migration: 'This decision is not part of the compatibility vocabulary.'
-        }
+            migration: 'This decision is not part of the compatibility vocabulary.',
+        },
     ]);
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-compatibility-history-'));
     temporaryDirectories.push(directory);
@@ -275,19 +275,19 @@ function compatibilityMatrix(operations: Record<string, string>[]): Compatibilit
             integrity:
                 'sha512-FpJjXx05AvLQGVguOnWN6wPfb0mZVfRNiWxYHgiaIYFRQoiRyhqsqemriWsBBmlUlpMqihhd4uJJLpye7rMlpQ==',
             pumpkinRelease: '0.2.0+26.3-26.51',
-            license: 'MIT OR Apache-2.0'
+            license: 'MIT OR Apache-2.0',
         },
         replacement: {
             package: '@pumpkin-plugins/pumpkin-api',
             version: '0.1.0',
             witPackage: 'pumpkin:plugin@0.1.0',
-            license: 'MIT'
+            license: 'MIT',
         },
         sourceWit: {
             repository: 'https://github.com/Pumpkin-MC/pumpkin-plugin-wit',
             branch: 'master',
             commit: '4d7a501943bb99f0f02a339128833f58ed37d0cc',
-            subdirectory: 'v0.1'
+            subdirectory: 'v0.1',
         },
         sourceWitSha256: '111dab16b0475551f23422d5bf734b7900f3030a0f8b33cefde70af10f3ea825',
         defaultExport: false,
@@ -305,12 +305,12 @@ function compatibilityMatrix(operations: Record<string, string>[]): Compatibilit
                     decision: 'retained',
                     migration: 'The operation is unchanged.',
                     features: [],
-                    ...operation
-                }))
-            }
+                    ...operation,
+                })),
+            },
         ],
         deviations: [],
-        sourceChanges: []
+        sourceChanges: [],
     };
 }
 

@@ -44,7 +44,7 @@ describe('SyncTracker', () => {
         tracker.update('ada', 5, 0.4);
 
         expect(tracker.update('ada', 5, 0.4 - EXHAUSTION_THRESHOLD)).toEqual({
-            exhaustion: 0.4 - EXHAUSTION_THRESHOLD
+            exhaustion: 0.4 - EXHAUSTION_THRESHOLD,
         });
     });
 

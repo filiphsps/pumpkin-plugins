@@ -14,8 +14,8 @@ const hasPublicAddress = Object.values(os.networkInterfaces())
             i?.family === 'IPv4' &&
             !i.internal &&
             !/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|169\.254\.)/.test(
-                i.address
-            )
+                i.address,
+            ),
     );
 
 describe.skipIf(hasPublicAddress)('port forwarding', () => {
@@ -29,7 +29,7 @@ describe.skipIf(hasPublicAddress)('port forwarding', () => {
         expect(router.igd.mappings.get('tcp:25565')).toMatchObject({
             internalPort: 25565,
             description: 'Pumpkin Java Edition',
-            leaseSeconds: 3600
+            leaseSeconds: 3600,
         });
 
         const from = server.lines.length;
@@ -53,11 +53,11 @@ describe.skipIf(hasPublicAddress)('port forwarding', () => {
     it('says so when no router answers, and keeps running', async () => {
         const server = await start(
             'no-router',
-            '[router]\nupnp_search = "127.0.0.1:9"\nnat_pmp_gateway = "127.0.0.1:9"\n'
+            '[router]\nupnp_search = "127.0.0.1:9"\nnat_pmp_gateway = "127.0.0.1:9"\n',
         );
         await server.waitForLog(
             /No router could open ports: UPnP: no router answered the search; NAT-PMP: no answer from 127\.0\.0\.1\./,
-            30_000
+            30_000,
         );
         expect(server.errors()).toEqual([]);
     });
@@ -68,7 +68,7 @@ describe.skipIf(hasPublicAddress)('port forwarding', () => {
         await server.waitForLog(/Opened TCP port 25565/);
         await fs.writeFile(
             path.join(server.pluginDataDir(PLUGIN_NAME), 'config.toml'),
-            routerConfig(router, '\nlease_seconds = 600\n[java]\nport = 25570\n[bedrock]\nenabled = false\n')
+            routerConfig(router, '\nlease_seconds = 600\n[java]\nport = 25570\n[bedrock]\nenabled = false\n'),
         );
         const from = server.lines.length;
         server.command('upnp reload');

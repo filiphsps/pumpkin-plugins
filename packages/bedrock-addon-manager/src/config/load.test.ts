@@ -30,7 +30,7 @@ describe('loadPluginConfig', () => {
         expect(config.web.port).toBe(9000);
         expect(log.of('info')).toHaveLength(1);
         expect(log.of('info')[0]).toContain(
-            `Updated ${ansi.named.name('config.toml')}: added ${ansi.named.identifier('web.enabled')}, `
+            `Updated ${ansi.named.name('config.toml')}: added ${ansi.named.identifier('web.enabled')}, `,
         );
         expect(log.of('info')[0]).toContain(`removed ${ansi.named.identifier('web.old')}.`);
     });
@@ -43,7 +43,7 @@ describe('loadPluginConfig', () => {
         expect(files.text(CONFIG_FILE)).toBe(text);
         expect(log.of('warn')).toEqual([
             `${ansi.named.name('config.toml')}: web.port must be a whole number from 1 to 65535; using 8123`,
-            `${ansi.named.name('config.toml')} has invalid values, so it was left as it is. Fix them and run /baddon reload.`
+            `${ansi.named.name('config.toml')} has invalid values, so it was left as it is. Fix them and run /baddon reload.`,
         ]);
     });
 

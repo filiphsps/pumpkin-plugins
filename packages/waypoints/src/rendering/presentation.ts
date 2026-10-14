@@ -14,17 +14,17 @@ const MAX_LABEL_CHARACTERS = 32;
 /** Transient visual state, separate from waypoint data and world placement. */
 export interface WaypointHudPresentation {
     readonly detailed: boolean;
-    readonly focusTicks: number;
     readonly distance: number;
-    readonly scale: number;
+    readonly focusTicks: number;
     readonly opacity: number;
+    readonly scale: number;
 }
 
 /** Camera inputs affect detail and perspective sizing, never the marker's position. */
 export interface WaypointHudView {
     readonly eyePosition: WaypointPosition;
-    readonly yaw: number;
     readonly pitch: number;
+    readonly yaw: number;
 }
 
 /** Chooses quiet peripheral labels, stable distance text, and arrival visibility. */
@@ -32,7 +32,7 @@ export function presentWaypointHud(
     view: WaypointHudView,
     placement: WaypointHudPlacement,
     distance: number,
-    previous: WaypointHudPresentation | undefined
+    previous: WaypointHudPresentation | undefined,
 ): WaypointHudPresentation {
     const x = placement.position.x - view.eyePosition.x;
     const y = placement.position.y - view.eyePosition.y;
@@ -57,7 +57,7 @@ export function presentWaypointHud(
             : previous.distance;
     const arrival = Math.max(
         0,
-        Math.min(1, (distance - ARRIVAL_HIDDEN_DISTANCE) / (ARRIVAL_VISIBLE_DISTANCE - ARRIVAL_HIDDEN_DISTANCE))
+        Math.min(1, (distance - ARRIVAL_HIDDEN_DISTANCE) / (ARRIVAL_VISIBLE_DISTANCE - ARRIVAL_HIDDEN_DISTANCE)),
     );
     return {
         detailed,
@@ -65,7 +65,7 @@ export function presentWaypointHud(
         distance: shownDistance,
         // Billboard planes are camera-facing, so view depth avoids enlargement near the screen corners.
         scale: Math.round(placement.scale * Math.max(MIN_VIEW_DEPTH_RATIO, cosine) * 4096) / 4096,
-        opacity: Math.round(arrival * arrival * (3 - 2 * arrival) * 15) * 17
+        opacity: Math.round(arrival * arrival * (3 - 2 * arrival) * 15) * 17,
     };
 }
 
@@ -81,7 +81,7 @@ export function createWaypointHudTextJson(waypoint: Waypoint, distanceBlocks: nu
     const extra = detailed
         ? [
               { text: label, color: waypoint.color, bold: true },
-              { text: ` (${distanceText})`, color: '#FFFFFF' }
+              { text: ` (${distanceText})`, color: '#FFFFFF' },
           ]
         : [{ text: distanceText, color: waypoint.color }];
     if (waypoint.icon === undefined) extra.push({ text: '\n◆', color: waypoint.color });

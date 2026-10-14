@@ -20,7 +20,7 @@ describe('discover', () => {
     it('asks twice, because UDP is lossy, and sends one search per target', () => {
         const net = new FakeNetwork([new FakeIgd({ upnp: false, natPmp: false })]);
         expect(() => runSteps(net, discover(net, { upnp: true, natPmp: false }))).toThrow(
-            'no router answered the search'
+            'no router answered the search',
         );
         const searches = net.sent.filter((s) => s.to.port === 1900);
         expect(searches).toHaveLength(10);
@@ -51,13 +51,13 @@ describe('discover', () => {
         net.local = [192, 168, 1, 50];
         const found = runSteps(
             net,
-            discover(net, { upnp: false, natPmp: true, natPmpGateway: { address: [10, 9, 8, 7], port: 5351 } })
+            discover(net, { upnp: false, natPmp: true, natPmpGateway: { address: [10, 9, 8, 7], port: 5351 } }),
         );
         expect(found.gateway.address).toEqual([10, 9, 8, 7]);
 
         const upnp = runSteps(
             net,
-            discover(net, { upnp: true, natPmp: false, ssdp: { address: [10, 9, 8, 7], port: 1900 } })
+            discover(net, { upnp: true, natPmp: false, ssdp: { address: [10, 9, 8, 7], port: 1900 } }),
         );
         expect(upnp.gateway.kind).toBe('upnp');
     });
@@ -65,7 +65,7 @@ describe('discover', () => {
     it('says why each protocol found nothing', () => {
         const net = new FakeNetwork([]);
         expect(() => runSteps(net, discover(net, both))).toThrow(
-            'UPnP: no router answered the search; NAT-PMP: no answer from 192.168.1.1 or 192.168.1.254'
+            'UPnP: no router answered the search; NAT-PMP: no answer from 192.168.1.1 or 192.168.1.254',
         );
     });
 
@@ -114,7 +114,7 @@ describe('discover', () => {
 
         it('passes the identity of the router it lets through on', () => {
             const net = new FakeNetwork([
-                new FakeIgd({ device: { manufacturer: 'AVM', modelName: 'FRITZ!Box 7590' } })
+                new FakeIgd({ device: { manufacturer: 'AVM', modelName: 'FRITZ!Box 7590' } }),
             ]);
             const found = runSteps(net, discover(net, { ...both, screen: refuseTelekom }));
             expect(found.identity).toMatchObject({ manufacturer: 'AVM', model: 'FRITZ!Box 7590', source: 'upnp' });
@@ -124,8 +124,8 @@ describe('discover', () => {
             const net = new FakeNetwork([
                 new FakeIgd({
                     upnp: false,
-                    webPages: { '/html/login/index.html': { body: '<title>Speedport X</title>' } }
-                })
+                    webPages: { '/html/login/index.html': { body: '<title>Speedport X</title>' } },
+                }),
             ]);
             const found = runSteps(net, discover(net, { ...both, screen: () => undefined }));
             expect(found.gateway.kind).toBe('nat-pmp');

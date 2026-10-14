@@ -17,7 +17,7 @@ function signedMetadata(json: string): Buffer {
     const key = createPrivateKey({
         key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), Buffer.from(SEED, 'hex')]),
         format: 'der',
-        type: 'pkcs8'
+        type: 'pkcs8',
     });
     const signature = sign(null, Buffer.concat([wasm, metadata]), key);
     return appendCustomSections(wasm, [
@@ -29,10 +29,10 @@ function signedMetadata(json: string): Buffer {
                     version: 1,
                     algorithm: 'Ed25519',
                     public_key_hex: publicKeyOf(SEED),
-                    signature_hex: signature.toString('hex')
-                })
-            )
-        ]
+                    signature_hex: signature.toString('hex'),
+                }),
+            ),
+        ],
     ]);
 }
 
@@ -54,7 +54,7 @@ describe('keys', () => {
         ['empty', ''],
         ['short', 'abcd'],
         ['too long', `${SEED}00`],
-        ['not hex', 'z'.repeat(64)]
+        ['not hex', 'z'.repeat(64)],
     ])('rejects a %s key', (_label, key) => {
         expect(() => signWasm(minimalWasm(), METADATA, key)).toThrow(/invalid signing key/);
         expect(() => publicKeyOf(key)).toThrow(/64 hex/);
@@ -89,7 +89,7 @@ describe('signWasm', () => {
             'is_paid',
             'user_id',
             'license_key',
-            'issued_at'
+            'issued_at',
         ]);
         expect(JSON.parse(json)).toEqual(METADATA);
     });
@@ -126,12 +126,12 @@ describe('signWasm', () => {
         const key: KeyObject = createPublicKey({
             key: Buffer.concat([SPKI_PREFIX, Buffer.from(envelope.public_key_hex, 'hex')]),
             format: 'der',
-            type: 'spki'
+            type: 'spki',
         });
         const payload = Buffer.concat([clean, metadata?.data ?? Buffer.alloc(0)]);
         expect(verify(null, payload, key, Buffer.from(envelope.signature_hex, 'hex'))).toBe(true);
         expect(
-            verify(null, Buffer.concat([payload, Buffer.from('x')]), key, Buffer.from(envelope.signature_hex, 'hex'))
+            verify(null, Buffer.concat([payload, Buffer.from('x')]), key, Buffer.from(envelope.signature_hex, 'hex')),
         ).toBe(false);
     });
 
@@ -149,7 +149,7 @@ describe('verifyWasm', () => {
             signed: true,
             valid: true,
             metadata: METADATA,
-            publicKeyHex: publicKeyOf(SEED)
+            publicKeyHex: publicKeyOf(SEED),
         });
     });
 
@@ -159,10 +159,10 @@ describe('verifyWasm', () => {
             expect(verifyWasm(signedMetadata(json))).toMatchObject({
                 signed: true,
                 valid: false,
-                error: expect.stringContaining('metadata')
+                error: expect.stringContaining('metadata'),
             });
             expect(verifyWasm(signedMetadata(json)).metadata).toBeUndefined();
-        }
+        },
     );
 
     it.each(Object.keys(METADATA).filter((key) => key !== 'license_key'))(
@@ -173,7 +173,7 @@ describe('verifyWasm', () => {
             const result = verifyWasm(signedMetadata(JSON.stringify(metadata)));
             expect(result).toMatchObject({ signed: true, valid: false, error: expect.stringContaining('metadata') });
             expect(result.metadata).toBeUndefined();
-        }
+        },
     );
 
     it.each([
@@ -186,7 +186,7 @@ describe('verifyWasm', () => {
         ['dev_id', 1.5],
         ['user_id', null],
         ['is_paid', 'false'],
-        ['license_key', false]
+        ['license_key', false],
     ])('rejects correctly signed wrong-type %s', (key, value) => {
         const result = verifyWasm(signedMetadata(JSON.stringify({ ...METADATA, [key]: value })));
         expect(result.valid).toBe(false);
@@ -201,7 +201,7 @@ describe('verifyWasm', () => {
             const result = verifyWasm(signedMetadata(json));
             expect(result.valid).toBe(false);
             expect(result.metadata).toBeUndefined();
-        }
+        },
     );
 
     it.each(['9223372036854775807', '-9223372036854775808', '-1', '0'])('accepts the host i64 ID %s', (id) => {
@@ -217,7 +217,7 @@ describe('verifyWasm', () => {
             version: '',
             dev_name: '',
             issued_at: 'opaque date',
-            extra: { plugin_id: 1.5 }
+            extra: { plugin_id: 1.5 },
         };
         metadata.license_key = undefined;
         const result = verifyWasm(signedMetadata(JSON.stringify(metadata)));
@@ -276,7 +276,7 @@ describe('verifyWasm', () => {
         const genuine = stripSignature(signed).trailing;
         const mixed = appendCustomSections(stripSignature(signed).clean, [
             ['pumpkin.metadata', trailing[0]?.data ?? Buffer.alloc(0)],
-            ['wasm_signature', genuine[1]?.data ?? Buffer.alloc(0)]
+            ['wasm_signature', genuine[1]?.data ?? Buffer.alloc(0)],
         ]);
         expect(verifyWasm(mixed)).toMatchObject({ signed: true, valid: false });
     });
@@ -295,11 +295,11 @@ describe('verifyWasm', () => {
             '[]',
             '{"version":2}',
             '{"version":1,"algorithm":"RSA"}',
-            '{"version":1,"algorithm":"Ed25519","public_key_hex":"00","signature_hex":"00"}'
+            '{"version":1,"algorithm":"Ed25519","public_key_hex":"00","signature_hex":"00"}',
         ]) {
             const bad = appendCustomSections(clean, [
                 ['pumpkin.metadata', metadata],
-                ['wasm_signature', Buffer.from(envelope)]
+                ['wasm_signature', Buffer.from(envelope)],
             ]);
             expect(verifyWasm(bad), envelope).toMatchObject({ signed: true, valid: false });
         }
@@ -313,7 +313,7 @@ describe('verifyWasm', () => {
         envelope.signature_hex = JSON.parse(Buffer.from(b.trailing[1]?.data ?? []).toString('utf8')).signature_hex;
         const swapped = appendCustomSections(a.clean, [
             ['pumpkin.metadata', a.trailing[0]?.data ?? Buffer.alloc(0)],
-            ['wasm_signature', Buffer.from(JSON.stringify(envelope))]
+            ['wasm_signature', Buffer.from(JSON.stringify(envelope))],
         ]);
         expect(verifyWasm(swapped).valid).toBe(false);
     });

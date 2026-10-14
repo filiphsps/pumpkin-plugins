@@ -9,6 +9,6 @@ it('pins string workload identifiers, operation counts, and checksums', () => {
     expect(stringWorkloads).toEqual([
         { name: 'string-join', operationsPerSample: 1_600_000, checksum: 9_519_680 },
         { name: 'string-radix-integer', operationsPerSample: 25_000, checksum: 2_414_958 },
-        { name: 'string-join-unicode', operationsPerSample: 7, checksum: 134 }
+        { name: 'string-join-unicode', operationsPerSample: 7, checksum: 134 },
     ]);
 });

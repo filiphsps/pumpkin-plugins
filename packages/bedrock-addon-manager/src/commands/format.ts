@@ -24,15 +24,15 @@ export function formatSize(bytes: number): string {
 export function listLines(entries: readonly PackEntry[]): string[] {
     if (entries.length === 0)
         return [
-            'No Bedrock packs are listed. Put .mcpack or .mcaddon files in the packs folder and run /baddon reload.'
+            'No Bedrock packs are listed. Put .mcpack or .mcaddon files in the packs folder and run /baddon reload.',
         ];
     const lines = [`Bedrock packs (${entries.length}), in the order they are listed:`];
     entries.forEach((e, i) => {
         const flags = [e.addonPack && 'add-on pack', e.hasScripts && 'scripts', e.rtxEnabled && 'ray tracing'].filter(
-            Boolean
+            Boolean,
         );
         lines.push(
-            `${i + 1}. ${e.fileName}: ${e.uuid} v${e.version}, ${formatSize(e.size)}${flags.length > 0 ? `, ${flags.join(', ')}` : ''}`
+            `${i + 1}. ${e.fileName}: ${e.uuid} v${e.version}, ${formatSize(e.size)}${flags.length > 0 ? `, ${flags.join(', ')}` : ''}`,
         );
         lines.push(`   ${e.downloadUrl}`);
     });
@@ -46,6 +46,6 @@ export function listLines(entries: readonly PackEntry[]): string[] {
  */
 export function reloadLines(count: number): string[] {
     return [
-        `Reloaded the config and rescanned the packs folder: ${count} pack${count === 1 ? '' : 's'} listed. Players who are already connected get them when they rejoin.`
+        `Reloaded the config and rescanned the packs folder: ${count} pack${count === 1 ? '' : 's'} listed. Players who are already connected get them when they rejoin.`,
     ];
 }

@@ -21,39 +21,43 @@ const REPO = 'https://github.com/filiphsps/pumpkin-plugins';
 const AUTHOR = 'Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)';
 const FUNDING = [
     { type: 'github', url: 'https://github.com/sponsors/filiphsps' },
-    { type: 'custom', url: 'https://paypal.me/filiph' }
+    { type: 'custom', url: 'https://paypal.me/filiph' },
 ];
 const MAX_DESCRIPTION = 70;
 /** Canonical package names for tools that are published under public names. */
 const EXPECTED_PUBLIC_TOOL_NAMES = PUBLIC_TOOL_PACKAGE_PATHS;
 
-/** Order of keys in a package.json, so every one reads the same. Unknown keys go after these. */
+/** Biome's order for package.json keys. Unknown keys go after these. */
 const KEY_ORDER = [
     'name',
     'version',
     'private',
     'description',
+    'keywords',
+    'homepage',
+    'bugs',
+    'repository',
+    'funding',
     'license',
     'author',
     'contributors',
-    'homepage',
-    'repository',
-    'bugs',
-    'funding',
-    'type',
     'sideEffects',
+    'type',
+    'exports',
+    'main',
     'module',
     'types',
-    'exports',
     'bin',
     'files',
-    'publishConfig',
     'scripts',
     'dependencies',
-    'peerDependencies',
     'devDependencies',
+    'peerDependencies',
+    'optionalDependencies',
+    'engines',
     'devEngines',
-    'pumpkinPlugin'
+    'publishConfig',
+    'pumpkinPlugin',
 ];
 
 /**
@@ -73,7 +77,7 @@ const TOOL_FILE_ALLOWLISTS = {
         'compatibility',
         'docs',
         'README.md',
-        'LICENSE'
+        'LICENSE',
     ],
     'tools/create-pumpkin-plugin': ['bin/create-pumpkin-plugin.ts', 'dist', 'templates', 'README.md'],
     'tools/static-hermes-runtime': [
@@ -88,8 +92,8 @@ const TOOL_FILE_ALLOWLISTS = {
         'hermes-source.lock.json',
         'toolchain-versions.json',
         'wasi-sdk.lock.json',
-        'README.md'
-    ]
+        'README.md',
+    ],
 };
 
 function hasEscapedUnicode(source) {
@@ -105,7 +109,7 @@ function hasEscapedUnicode(source) {
 const hasLocalLicense = (dir) => dir !== '.' && Boolean(localLicenseFile(path.join(root, dir)));
 const packageDirs = () => [
     '.',
-    ...['packages', 'tools'].flatMap((group) => discoverComponents(root, group).map(({ slug }) => `${group}/${slug}`))
+    ...['packages', 'tools'].flatMap((group) => discoverComponents(root, group).map(({ slug }) => `${group}/${slug}`)),
 ];
 /** Find private benchmark workspaces that need release-registration checks. */
 const benchmarkPackageDirs = () => {
@@ -127,7 +131,7 @@ function expected(dir, pkg) {
         homepage: isRoot ? REPO : `${REPO}/tree/master/${dir}#readme`,
         repository: { type: 'git', url: `git+${REPO}.git`, ...(isRoot ? {} : { directory: dir }) },
         bugs: { url: `${REPO}/issues` },
-        funding: FUNDING
+        funding: FUNDING,
     };
     const binTargets = typeof pkg.bin === 'string' ? [pkg.bin] : Object.values(pkg.bin ?? {});
     const binSourceFiles = binTargets.some((target) => target.replace(/^\.\//, '').startsWith('bin/')) ? ['bin'] : [];
@@ -137,7 +141,7 @@ function expected(dir, pkg) {
         want.sideEffects = false;
         want.files = TOOL_FILE_ALLOWLISTS[dir] ?? [
             ...(fs.existsSync(path.join(root, dir, 'src')) ? ['src'] : []),
-            ...binSourceFiles
+            ...binSourceFiles,
         ];
         want.publishConfig = { access: 'public' };
         if (typeof rootExport === 'string') {
@@ -147,7 +151,7 @@ function expected(dir, pkg) {
     } else if (dir.startsWith('tools/')) {
         want.files = TOOL_FILE_ALLOWLISTS[dir] ?? [
             ...(fs.existsSync(path.join(root, dir, 'src')) ? ['src'] : []),
-            ...binSourceFiles
+            ...binSourceFiles,
         ];
     }
     if (Object.hasOwn(EXPECTED_PUBLIC_TOOL_NAMES, dir)) want.publishConfig = { access: 'public' };
@@ -215,7 +219,7 @@ if (!fs.existsSync(path.join(root, 'LICENSE'))) problems.push('LICENSE is missin
 if (problems.length > 0) {
     console.error(`Package metadata is not as expected:\n${problems.map((p) => `  - ${p}`).join('\n')}`);
     console.error(
-        '\nRun `node scripts/package-metadata.mjs --fix` to write what can be derived, then format with `pnpm lint:fix`.'
+        '\nRun `node scripts/package-metadata.mjs --fix` to write what can be derived, then format with `pnpm lint:fix`.',
     );
     process.exit(1);
 }

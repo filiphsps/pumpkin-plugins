@@ -9,32 +9,32 @@ import type { ComponentBuildOptions } from './types.ts';
 
 /** Paths to the Hermes and WASI SDK artifacts required to compile a component. */
 export interface ComponentToolchainArtifacts {
+    /** Host executable that converts the bundle to Hermes bytecode. */
+    hermesc: string;
+    /** Selected full or lean Hermes archive for this component. */
+    hermesRuntimeArchive: string;
     /** Pinned Hermes source checkout used for its public and internal headers. */
     hermesSource: string;
     /** Hermes build directory containing WASI libraries and configuration headers. */
     hermesWasiBuild: string;
-    /** Selected full or lean Hermes archive for this component. */
-    hermesRuntimeArchive: string;
-    /** Host executable that converts the bundle to Hermes bytecode. */
-    hermesc: string;
     /** Installed WASI SDK root containing the `wasm32-wasip2` compiler. */
     wasiSdk: string;
 }
 
 /** Inputs for compiling generated bindings and bytecode into a WASI component. */
 export interface ComponentCompilationInput {
-    /** Component build settings, including source, destination, and runtime profile. */
-    options: ComponentBuildOptions;
     /** Generated bindings and runtime source produced for the resolved WIT world. */
     generated: ComponentGeneratedFiles;
-    /** Temporary directory for bytecode and native object files. */
-    temporaryDirectory: string;
-    /** Component stack size in bytes, passed to the linker. */
-    stackSizeBytes: string;
-    /** Hermes and WASI SDK locations used by the compiler and linker. */
-    toolchain: ComponentToolchainArtifacts;
+    /** Component build settings, including source, destination, and runtime profile. */
+    options: ComponentBuildOptions;
     /** Optional command runner, primarily for tests that inspect compiler invocations. */
     run?: (command: string, args: string[]) => void;
+    /** Component stack size in bytes, passed to the linker. */
+    stackSizeBytes: string;
+    /** Temporary directory for bytecode and native object files. */
+    temporaryDirectory: string;
+    /** Hermes and WASI SDK locations used by the compiler and linker. */
+    toolchain: ComponentToolchainArtifacts;
 }
 
 /**
@@ -60,7 +60,7 @@ export function compileAndLinkComponent(input: ComponentCompilationInput): void 
         path.join(toolchain.hermesSource, 'API/jsi/jsi'),
         path.join(toolchain.hermesSource, 'external/llvh/include'),
         path.join(toolchain.hermesWasiBuild, 'include'),
-        path.join(toolchain.hermesWasiBuild, 'lib/config')
+        path.join(toolchain.hermesWasiBuild, 'lib/config'),
     ];
     const hermesOptimization = options.developmentMode ? ['-Og', '-g1'] : ['-O4', '-fstrip-function-names', '-g0'];
     const nativeOptimization = options.developmentMode
@@ -74,7 +74,7 @@ export function compileAndLinkComponent(input: ComponentCompilationInput): void 
         ...hermesOptimization,
         '-emit-binary',
         `-out=${unitBytecode}`,
-        diagnosticBundle
+        diagnosticBundle,
     ]);
     fs.writeFileSync(bytecodeHeader, renderEmbeddedBytecode(fs.readFileSync(unitBytecode)));
 
@@ -91,7 +91,7 @@ export function compileAndLinkComponent(input: ComponentCompilationInput): void 
         `-I${generated.directory}`,
         '-o',
         bindingsObject,
-        generated.pluginC
+        generated.pluginC,
     ]);
     run(cxx, [
         '-c',
@@ -105,7 +105,7 @@ export function compileAndLinkComponent(input: ComponentCompilationInput): void 
         `-I${temporaryDirectory}`,
         '-o',
         shimObject,
-        generated.runtimeSource
+        generated.runtimeSource,
     ]);
     run(cxx, [
         ...nativeOptimization,
@@ -129,6 +129,6 @@ export function compileAndLinkComponent(input: ComponentCompilationInput): void 
         '-lwasi-emulated-mman',
         '-lwasi-emulated-process-clocks',
         '-lc++abi',
-        '-lunwind'
+        '-lunwind',
     ]);
 }

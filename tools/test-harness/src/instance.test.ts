@@ -56,7 +56,7 @@ console.log('Server is now running');
 process.stdin.once('data', () => process.exit(0));
 process.stdin.resume();
 `,
-        { mode: 0o755 }
+        { mode: 0o755 },
     );
     process.env.PUMPKIN_BIN = path.join(dir, 'fake-pumpkin.mjs');
     return () =>
@@ -110,11 +110,11 @@ try {
                 TMPDIR: temp,
                 PUMPKIN_BIN: binary,
                 PUMPKIN_TEST_LOG_DIR: logs,
-                PUMPKIN_KEEP_DIR: ''
+                PUMPKIN_KEEP_DIR: '',
             },
             encoding: 'utf8',
-            timeout: 6000
-        }
+            timeout: 6000,
+        },
     );
     return { result, leftovers: fs.readdirSync(temp), logs: fs.existsSync(logs) ? fs.readdirSync(logs) : [] };
 }
@@ -124,7 +124,7 @@ describe('startPumpkin', () => {
         ['EACCES', /EACCES/],
         ['interpreter', /ENOENT/],
         ['early exit', /exited before.*\n.*fixture early exit/s],
-        ['stdin', /fixture stdin failure/]
+        ['stdin', /fixture stdin failure/],
     ] as const)(
         'settles %s failures and cleans its directory without an unhandled event',
         (kind, reason) => {
@@ -136,7 +136,7 @@ describe('startPumpkin', () => {
             expect(probe.leftovers).toEqual([]);
             expect(probe.logs).toHaveLength(1);
         },
-        10_000
+        10_000,
     );
 
     it('coalesces concurrent and repeated stop calls into one shutdown', async () => {

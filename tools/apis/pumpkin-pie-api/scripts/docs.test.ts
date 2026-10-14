@@ -8,7 +8,7 @@ it('renders changed release pins and protocol limits without stale versions', ()
         protocol: 7,
         limits: { message: 9000, text: 800, id: 40, batch: 12, ttl: 2000 },
         license: 'Example-license',
-        timing: { defaultPingMs: 2500, minPingMs: 500, maxPingMs: 4000, initialRetryMs: 600, maxRetryMs: 5000 }
+        timing: { defaultPingMs: 2500, minPingMs: 500, maxPingMs: 4000, initialRetryMs: 600, maxRetryMs: 5000 },
     });
     expect(blocks.scheduling).toContain('600–5000 ms');
     expect(blocks.scheduling).toContain('2500 ms by default (`pingIntervalMs`: 500–4000 ms)');

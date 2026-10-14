@@ -32,41 +32,41 @@ export interface ResolvedLine {
 }
 /** Negotiation and diagnostic information. Counts cover built-ins and expansion namespaces. */
 export interface ProviderInfo {
-    readonly protocol: number;
-    readonly name: string;
-    readonly version: string;
-    readonly placeholders: number;
     readonly expansions: number;
+    readonly name: string;
+    readonly placeholders: number;
+    readonly protocol: number;
+    readonly version: string;
 }
 /** An advertised placeholder. */
 export interface RegisteredPlaceholder {
-    readonly id: string;
     readonly description: string;
+    readonly id: string;
     readonly namespace: string;
     readonly source: string;
 }
 /** Expansion registration; names are advertised, not an access-control list. */
 export interface ExpansionRegistration {
+    readonly cache?: Cache;
     readonly namespace: string;
     readonly placeholders?: readonly string[];
-    readonly cache?: Cache;
 }
 /** Registration echoed with the provider's applied cache policy. */
 export interface RegisteredExpansion {
+    readonly cache: Cache;
     readonly namespace: string;
     readonly placeholders: readonly string[];
-    readonly cache: Cache;
 }
 /** Single-value lookup preserves known empty strings. */
 export type PlaceholderValue = { readonly known: false } | { readonly known: true; readonly value: string };
 /** Context supplied by the provider; viewer is not authorization. */
 export interface ExpansionRequest {
-    readonly op: 'on_request';
-    readonly namespace: string;
+    readonly argument?: string;
     readonly id: string;
     readonly name: string;
+    readonly namespace: string;
+    readonly op: 'on_request';
     readonly viewer?: string;
-    readonly argument?: string;
 }
 /** All protocol 0 request operations. */
 export type Request =
@@ -85,14 +85,14 @@ export type Request =
     | ExpansionRequest;
 /** Operation-to-result association, independent of wire wrapper names. */
 export interface OperationResults {
-    ping: ProviderInfo;
+    get_placeholder_value: PlaceholderValue;
     get_registered_placeholders: readonly RegisteredPlaceholder[];
+    on_request: { readonly value?: string };
+    ping: ProviderInfo;
+    register_expansion: RegisteredExpansion;
     set_placeholders: ResolvedLine;
     set_placeholders_batch: readonly ResolvedLine[];
-    get_placeholder_value: PlaceholderValue;
-    register_expansion: RegisteredExpansion;
     unregister_expansion: readonly string[];
-    on_request: { readonly value?: string };
 }
 /** Result selected by a request's discriminant. */
 export type ResultFor<R extends Request> = OperationResults[R['op']];
@@ -105,7 +105,7 @@ const wrappers = {
     get_placeholder_value: 'value',
     register_expansion: 'registered_expansion',
     unregister_expansion: 'unregistered',
-    on_request: 'on_request'
+    on_request: 'on_request',
 } as const;
 type Failure = typeof InputError | typeof ProtocolError;
 
@@ -165,7 +165,7 @@ export function validateCache(value: unknown, ErrorType: Failure = InputError): 
     if (cache.kind === 'ttl')
         return {
             kind: 'ttl',
-            ms: integer(cache.ms, ErrorType, ErrorType === ProtocolError ? LIMITS.ttl : Number.MAX_SAFE_INTEGER)
+            ms: integer(cache.ms, ErrorType, ErrorType === ProtocolError ? LIMITS.ttl : Number.MAX_SAFE_INTEGER),
         };
     return fail(ErrorType, 'Invalid cache policy');
 }
@@ -276,7 +276,7 @@ export function decodeResult<R extends Request>(bytes: Uint8Array, request: R): 
                 name: text(body.name, LIMITS.id, ProtocolError),
                 version: text(body.version, LIMITS.id, ProtocolError),
                 placeholders: integer(body.placeholders, ProtocolError),
-                expansions: integer(body.expansions, ProtocolError)
+                expansions: integer(body.expansions, ProtocolError),
             };
             if (result.protocol !== PROTOCOL_VERSION) throw new IncompatibleError('Unsupported PumpkinPIE protocol');
             break;
@@ -301,7 +301,7 @@ export function decodeResult<R extends Request>(bytes: Uint8Array, request: R): 
                     id: text(item.id, LIMITS.id, ProtocolError),
                     description: text(item.description, LIMITS.text, ProtocolError),
                     namespace: text(item.namespace, LIMITS.id, ProtocolError),
-                    source: text(item.source, LIMITS.id, ProtocolError)
+                    source: text(item.source, LIMITS.id, ProtocolError),
                 };
             });
             break;
@@ -352,7 +352,7 @@ export function decodeCallback(bytes: Uint8Array): ExpansionRequest {
         name,
         id,
         viewer: optional(request.viewer, ProtocolError),
-        argument: optional(request.argument, ProtocolError)
+        argument: optional(request.argument, ProtocolError),
     };
 }
 /** Encode a bounded expansion reply, retaining known empty values. */

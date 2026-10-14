@@ -24,8 +24,8 @@ export function generateTypes(witDir: string, outDir: string): void {
             process.execPath,
             [jco, 'guest-types', witDir, '-n', 'plugin', '-o', generated, '--name', 'index', '--quiet'],
             {
-                stdio: 'inherit'
-            }
+                stdio: 'inherit',
+            },
         );
         publishTypes(generated, output, temporary, () => {
             preserveTemporary = true;
@@ -88,7 +88,7 @@ function publishTypes(generated: string, output: string, temporary: string, pres
             preserveForRecovery();
             throw new AggregateError(
                 [publishError, restoreError],
-                `could not publish or restore ${output}; previous declarations preserved at ${previous}`
+                `could not publish or restore ${output}; previous declarations preserved at ${previous}`,
             );
         }
         throw publishError;

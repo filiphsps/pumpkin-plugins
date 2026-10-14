@@ -14,14 +14,14 @@ import type { commands } from './spec.ts';
 
 type PrettyBytesOptions = NonNullable<Parameters<typeof prettyBytes>[1]>;
 const PRETTY_BYTES_OPTIONS: PrettyBytesOptions = {
-    nonBreakingSpace: true
+    nonBreakingSpace: true,
 };
 
 /** Builds operator handlers for session status and cache management. */
 export function commandHandlers(
     sessions: Sessions,
     cache: LodCache,
-    settings: Settings
+    settings: Settings,
 ): CommandHandlers<typeof commands, CommandSender> {
     return {
         'dhs status': () => sessions.status().split('\n').map(colorizeNumbers),
@@ -29,17 +29,17 @@ export function commandHandlers(
             const stats = cache.stats();
             return [
                 `${color.named.name('Memory cache')}: ${color.named.value(String(stats.memoryEntries))}/${formatLimit(stats.memoryLimit)} entries, ${color.named.value(prettyBytes(stats.memoryBytes, PRETTY_BYTES_OPTIONS))}`,
-                `${color.named.name('Disk cache')}: ${color.named.value(String(stats.diskEntries))}/${formatLimit(stats.diskLimit)} entries, ${color.named.value(prettyBytes(stats.diskBytes, PRETTY_BYTES_OPTIONS))}.`
+                `${color.named.name('Disk cache')}: ${color.named.value(String(stats.diskEntries))}/${formatLimit(stats.diskLimit)} entries, ${color.named.value(prettyBytes(stats.diskBytes, PRETTY_BYTES_OPTIONS))}.`,
             ];
         },
         'dhs cache clear': () => {
             const cleared = cache.clear();
             return [
-                `Cleared ${color.named.value(String(cleared.memoryEntries))} in-memory and ${color.named.value(String(cleared.diskEntries))} disk cache entries.`
+                `Cleared ${color.named.value(String(cleared.memoryEntries))} in-memory and ${color.named.value(String(cleared.diskEntries))} disk cache entries.`,
             ];
         },
         'dhs cache memory clear': () => [
-            `Cleared ${color.named.value(String(cache.clearMemory()))} in-memory cache entries.`
+            `Cleared ${color.named.value(String(cache.clearMemory()))} in-memory cache entries.`,
         ],
         'dhs cache disk clear': () => [`Cleared ${color.named.value(String(cache.clearDisk()))} disk cache entries.`],
         'dhs cache recover <x> <z>': (sender, { x, z }) => recoverCachedLod(sessions, settings, sender, x, z),
@@ -52,7 +52,7 @@ export function commandHandlers(
         'dhs generate <x> <z>': (sender, { x, z }) =>
             generateLODs(sessions, settings, sender, DEFAULT_LOD_GENERATION_RADIUS, [x, z]),
         'dhs generate <x> <z> <radius>': (sender, { x, z, radius }) =>
-            generateLODs(sessions, settings, sender, radius, [x, z])
+            generateLODs(sessions, settings, sender, radius, [x, z]),
     };
 }
 
@@ -61,7 +61,7 @@ function generateLODs(
     settings: Settings,
     sender: CommandSender,
     radius: number,
-    coordinates?: readonly [x: number, z: number]
+    coordinates?: readonly [x: number, z: number],
 ): CommandLine[] {
     if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_GENERATION_RADIUS) {
         throw new CommandFailed(`Radius must be between 0 and ${MAX_LOD_GENERATION_RADIUS} LOD sections.`);
@@ -80,7 +80,7 @@ function generateLODs(
         return [
             `Started forced LOD capture at section ${color.named.value(String(started.centerX))}, ${color.named.value(String(started.centerZ))} (radius ${color.named.value(String(radius))}; ${color.named.value(String(started.sections))} sections requested).`,
             'Already-generated LOD sections and sections outside the world border will be skipped.',
-            `Capturing at full speed with up to ${color.named.value(FORCE_BLOCK_SAMPLES_PER_TICK.toLocaleString())} block samples per tick. Progress will be reported in chat.`
+            `Capturing at full speed with up to ${color.named.value(FORCE_BLOCK_SAMPLES_PER_TICK.toLocaleString())} block samples per tick. Progress will be reported in chat.`,
         ];
     } catch (err) {
         if (err instanceof CommandFailed) throw err;
@@ -95,7 +95,7 @@ function recoverCachedLod(
     settings: Settings,
     sender: CommandSender,
     blockX: number,
-    blockZ: number
+    blockZ: number,
 ): CommandLine[] {
     if (!Number.isSafeInteger(blockX) || !Number.isSafeInteger(blockZ)) {
         throw new CommandFailed('Block coordinates must be safe integers.');
@@ -112,7 +112,7 @@ function recoverCachedLod(
         if (!recovery) throw new CommandFailed('Could not start cache recovery.');
         return [
             `Backed up ${recovery.backup.key} to ${recovery.backup.dataPath}; recorded the key in ${recovery.backup.manifestPath}.`,
-            `Started forced LOD capture at section ${color.named.value(String(recovery.start.centerX))}, ${color.named.value(String(recovery.start.centerZ))}.`
+            `Started forced LOD capture at section ${color.named.value(String(recovery.start.centerX))}, ${color.named.value(String(recovery.start.centerZ))}.`,
         ];
     } catch (err) {
         if (err instanceof CommandFailed) throw err;
@@ -126,7 +126,7 @@ function showMap(
     cache: LodCache,
     sender: CommandSender,
     radius: number,
-    coordinates?: readonly [x: number, z: number]
+    coordinates?: readonly [x: number, z: number],
 ): CommandLine[] {
     if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_MAP_RADIUS) {
         throw new CommandFailed(`Radius must be between 0 and ${MAX_LOD_MAP_RADIUS} LOD sections.`);

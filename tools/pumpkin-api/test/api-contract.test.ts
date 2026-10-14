@@ -5,7 +5,7 @@ import * as api from '../src/index.ts';
 vi.mock('pumpkin:plugin/scheduler@0.1.0', () => ({
     scheduleDelayedTask: () => 0,
     scheduleRepeatingTask: () => 0,
-    cancelTask: () => undefined
+    cancelTask: () => undefined,
 }));
 
 const expectedRuntimeExports = [
@@ -26,7 +26,7 @@ const expectedRuntimeExports = [
     'handleAiGoalStop',
     'handleGeneratePhase',
     'metadata',
-    'common'
+    'common',
 ].sort();
 
 class TestPlugin extends api.Plugin {
@@ -37,7 +37,7 @@ class TestPlugin extends api.Plugin {
             authors: ['test'],
             description: 'API contract fixture',
             dependencies: [],
-            permissions: []
+            permissions: [],
         };
     }
 }
@@ -57,7 +57,7 @@ describe('Pumpkin API v0.1.1 compatibility', () => {
         const context = {
             registerEvent: vi.fn((id: number) => {
                 eventId.value = id;
-            })
+            }),
         };
         const server = {};
         const onUnload = vi.fn();
@@ -68,15 +68,15 @@ describe('Pumpkin API v0.1.1 compatibility', () => {
             (_server, event) =>
                 ({
                     ...event,
-                    observed: true
-                }) as never
+                    observed: true,
+                }) as never,
         );
 
         api.registerPlugin(plugin);
         api.onLoad(context as never);
         const event = { val: { player: 'alex' } };
         expect(api.handleEvent(eventId.value, server as never, event as never)).toEqual({
-            val: { player: 'alex', observed: true }
+            val: { player: 'alex', observed: true },
         });
         api.onUnload(context as never);
 
@@ -90,7 +90,7 @@ describe('Pumpkin API v0.1.1 compatibility', () => {
         const command = {
             executeWithHandlerId: vi.fn((id: number) => {
                 commandId.value = id;
-            })
+            }),
         };
         const context = { registerCommand: vi.fn() };
         let receivedArgs: unknown;
@@ -101,7 +101,7 @@ describe('Pumpkin API v0.1.1 compatibility', () => {
                 receivedArgs = args;
                 return 2;
             },
-            'test.use'
+            'test.use',
         );
         const args = { getValue: vi.fn() };
         expect(api.handleCommand(commandId.value, {} as never, {} as never, args as never)).toBe(2);
@@ -110,14 +110,14 @@ describe('Pumpkin API v0.1.1 compatibility', () => {
         const suggestionId = plugin.registerCommandSuggestionHandler((_sender, _server, request) => ({
             start: request.start,
             length: request.input.length,
-            values: [{ value: request.input }]
+            values: [{ value: request.input }],
         }));
         expect(
-            api.handleCommandSuggestion(suggestionId, {} as never, {} as never, { input: 'he', start: 0 } as never)
+            api.handleCommandSuggestion(suggestionId, {} as never, {} as never, { input: 'he', start: 0 } as never),
         ).toEqual({
             start: 0,
             length: 2,
-            values: [{ value: 'he' }]
+            values: [{ value: 'he' }],
         });
         expect(command.executeWithHandlerId).toHaveBeenCalledWith(commandId.value);
         expect(context.registerCommand).toHaveBeenCalledWith(command, 'test.use');
@@ -131,7 +131,7 @@ describe('Pumpkin API v0.1.1 compatibility', () => {
             shouldContinue: () => true,
             start: () => calls.push('start'),
             tick: () => calls.push('tick'),
-            stop: () => calls.push('stop')
+            stop: () => calls.push('stop'),
         });
         const generatorId = plugin.registerChunkGenerator(() => calls.push('generate'));
 
@@ -153,13 +153,13 @@ describe('Pumpkin API v0.1.1 compatibility', () => {
         expect(api.metadata.getMetadata()).toMatchObject({ name: 'test-plugin', version: '1.0.0' });
         expect(api.handleIpcMessage('sender' as never, { body: 'ping' } as never)).toEqual({
             body: 'ping',
-            response: true
+            response: true,
         });
     });
 
     it('reports an unknown command suggestion by its requested handler ID', () => {
         expect(() => api.handleCommandSuggestion(321, {} as never, {} as never, {} as never)).toThrow(
-            'No command suggestion handler registered for ID 321'
+            'No command suggestion handler registered for ID 321',
         );
     });
 });

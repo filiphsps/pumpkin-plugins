@@ -5,7 +5,7 @@ import {
     type CommandSender,
     type CommandSuggestions,
     type ConsumedArgs,
-    type SuggestionRequest
+    type SuggestionRequest,
 } from 'pumpkin:plugin/command@0.1.0';
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { PermissionDefault } from 'pumpkin:plugin/permission@0.1.0';
@@ -18,7 +18,7 @@ import {
     CommandFailed,
     type CommandHandlers,
     type CommandTree,
-    commandPermissionInfos
+    commandPermissionInfos,
 } from '@pumpkin-plugins/docs';
 import { buildCommands, type CommandHost, type CommandSuggestionHandler } from './commands.ts';
 import { onCommand } from './host.ts';
@@ -45,9 +45,9 @@ export function registerCommands<T extends CommandTree>(
     suggestions?: {
         readonly arguments: Readonly<Partial<Record<string, CommandSuggestionHandler<CommandSender>>>>;
         readonly register: (
-            handler: (sender: CommandSender, server: Server, request: SuggestionRequest) => CommandSuggestions
+            handler: (sender: CommandSender, server: Server, request: SuggestionRequest) => CommandSuggestions,
         ) => number;
-    }
+    },
 ): void {
     const server = ctx.getServer();
     const host: CommandHost<CommandSender> = {
@@ -59,7 +59,7 @@ export function registerCommands<T extends CommandTree>(
             return suggestions.register((sender, _server, request) => ({
                 start: request.start,
                 length: request.cursor - request.start,
-                values: handler(sender, request).map((value) => ({ value, tooltip: undefined }))
+                values: handler(sender, request).map((value) => ({ value, tooltip: undefined })),
             }));
         },
         onRun: (run, arguments_) =>
@@ -81,7 +81,7 @@ export function registerCommands<T extends CommandTree>(
             // The host's error type for a command that failed. The runtime takes a thrown value as the `err` of the result.
             throw { tag: 'command-failed', val: text(message, 'error') };
         },
-        hasPermission: (sender, permission) => sender.hasPermission(server, permission)
+        hasPermission: (sender, permission) => sender.hasPermission(server, permission),
     };
 
     for (const permission of commandPermissionInfos(tree)) {
@@ -89,7 +89,7 @@ export function registerCommands<T extends CommandTree>(
             node: permission.node,
             description: permission.description,
             default: permission.defaultPermission as PermissionDefault,
-            children: permission.children
+            children: permission.children,
         });
     }
 
@@ -101,7 +101,7 @@ export function registerCommands<T extends CommandTree>(
             node: permission,
             description: 'Access registered plugin commands',
             default: { tag: 'allow' },
-            children: []
+            children: [],
         });
     };
 
@@ -109,7 +109,7 @@ export function registerCommands<T extends CommandTree>(
         host,
         tree,
         handlers,
-        suggestions?.arguments
+        suggestions?.arguments,
     )) {
         const spec = tree[name];
         const hasSubcommands = spec.subcommands && Object.keys(spec.subcommands).length > 0;
@@ -125,13 +125,13 @@ function argumentType(spec: CommandArgumentSpec) {
     if (spec.type === 'integer') {
         return {
             tag: 'integer' as const,
-            val: [spec.min, spec.max] as [number | undefined, number | undefined]
+            val: [spec.min, spec.max] as [number | undefined, number | undefined],
         };
     }
     if (spec.type === 'double') {
         return {
             tag: 'double' as const,
-            val: [spec.min, spec.max] as [number | undefined, number | undefined]
+            val: [spec.min, spec.max] as [number | undefined, number | undefined],
         };
     }
     if (spec.type === 'players') return { tag: 'players' as const };
@@ -141,7 +141,7 @@ function argumentType(spec: CommandArgumentSpec) {
 
 function decodeArguments(
     specs: readonly CommandArgumentSpec[],
-    consumed: ConsumedArgs
+    consumed: ConsumedArgs,
 ): Readonly<Record<string, CommandArgumentValue>> {
     const values: Record<string, CommandArgumentValue> = {};
     for (const spec of specs) {
@@ -189,7 +189,7 @@ function decodeArguments(
             try {
                 values[spec.name] = argument.val.map((player) => ({
                     id: uuid.toString(player.getId()),
-                    name: player.getName()
+                    name: player.getName(),
                 }));
             } finally {
                 for (const player of argument.val) disposeWasiResource(player);

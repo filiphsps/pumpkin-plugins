@@ -29,9 +29,9 @@ describe('loadConfig', () => {
                 fields: {
                     enabled: bool({ description: 'Serve over HTTP.', default: true }),
                     port: int({ description: 'Port to listen on.', default: 8123 }),
-                    legacy: str({ description: 'Going away.', default: 'old' })
-                }
-            })
+                    legacy: str({ description: 'Going away.', default: 'old' }),
+                },
+            }),
         });
         const store = new MemoryStore(renderConfig(v1, { web: { enabled: false, port: 9000, legacy: 'mine' } }));
 
@@ -41,9 +41,9 @@ describe('loadConfig', () => {
                 fields: {
                     enabled: bool({ description: 'Serve over HTTP.', default: true }),
                     port: int({ description: 'Port to listen on.', default: 8123 }),
-                    bind: str({ description: 'Address to listen on.', default: '0.0.0.0' })
-                }
-            })
+                    bind: str({ description: 'Address to listen on.', default: '0.0.0.0' }),
+                },
+            }),
         });
         const result = loadConfig(v2, store);
 
@@ -67,16 +67,16 @@ describe('loadConfig', () => {
                         description: 'In-memory limit.',
                         default: 64,
                         min: 0,
-                        migrateFrom: ['web', 'shared_limit']
+                        migrateFrom: ['web', 'shared_limit'],
                     }),
                     disk_limit: int({
                         description: 'Disk limit.',
                         default: 128,
                         min: 0,
-                        migrateFrom: ['web', 'shared_limit']
-                    })
-                }
-            })
+                        migrateFrom: ['web', 'shared_limit'],
+                    }),
+                },
+            }),
         });
         const store = new MemoryStore('[web]\nshared_limit = 0\n');
 
@@ -100,24 +100,24 @@ describe('loadConfig', () => {
                         description: 'In-memory limit.',
                         default: 64,
                         min: 0,
-                        migrateFrom: ['web', 'shared_limit']
+                        migrateFrom: ['web', 'shared_limit'],
                     }),
                     disk_limit: int({
                         description: 'Disk limit.',
                         default: 128,
                         min: 0,
-                        migrateFrom: ['web', 'shared_limit']
-                    })
-                }
-            })
+                        migrateFrom: ['web', 'shared_limit'],
+                    }),
+                },
+            }),
         });
 
         expect(loadConfig(schema, new MemoryStore('[web]\n')).values.web).toEqual({
             memory_limit: 64,
-            disk_limit: 128
+            disk_limit: 128,
         });
         expect(loadConfig(schema, new MemoryStore('[web]\nshared_limit = 12\nmemory_limit = 24\n')).values.web).toEqual(
-            { memory_limit: 24, disk_limit: 12 }
+            { memory_limit: 24, disk_limit: 12 },
         );
     });
 
@@ -130,10 +130,10 @@ describe('loadConfig', () => {
                         description: 'Limit.',
                         default: 64,
                         min: 1,
-                        migrateFrom: ['web', 'old_limit']
-                    })
-                }
-            })
+                        migrateFrom: ['web', 'old_limit'],
+                    }),
+                },
+            }),
         });
         const text = '[web]\nold_limit = 0\n';
         const store = new MemoryStore(text);
@@ -144,7 +144,7 @@ describe('loadConfig', () => {
         expect(result.values.web.limit).toBe(64);
         expect(result.warnings).toEqual([
             'web.limit must be a whole number of at least 1; using 64',
-            'unknown option web.old_limit'
+            'unknown option web.old_limit',
         ]);
         expect(store.text).toBe(text);
         expect(store.writes).toBe(0);
@@ -187,7 +187,7 @@ describe('loadConfig', () => {
         expect(result.values.web.port).toBe(8123);
         expect(result.warnings).toEqual([
             'web.port must be a whole number from 1 to 65535; using 8123',
-            'unknown option web.prot'
+            'unknown option web.prot',
         ]);
         expect(store.text).toBe(text);
         expect(store.writes).toBe(0);
@@ -198,7 +198,7 @@ describe('loadConfig', () => {
         const store = new MemoryStore(text);
         expect(() => loadConfig(demo, store)).toThrow(ConfigSyntaxError);
         expect(() => loadConfig(demo, store)).toThrow(
-            'Invalid TOML document: illegal character in key (line 1, column 5)'
+            'Invalid TOML document: illegal character in key (line 1, column 5)',
         );
         expect(store.text).toBe(text);
         expect(store.writes).toBe(0);

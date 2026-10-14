@@ -41,7 +41,7 @@ export async function buildStaticHermesComponent(options: ComponentBuildOptions)
         env: environment,
         includeWasiSdk: true,
         includeWitBindgen: true,
-        includeWasmTools: true
+        includeWasmTools: true,
     });
     Object.assign(environment, toolchain);
     const analysis = analyzeComponentWit(options);
@@ -51,14 +51,14 @@ export async function buildStaticHermesComponent(options: ComponentBuildOptions)
     const hermesHostBuild = configuredPath(
         environment,
         'STATIC_HERMES_HOST_BUILD_DIR',
-        path.join(cacheRoot, 'build-host')
+        path.join(cacheRoot, 'build-host'),
     );
     const hermesWasiBuild = hermesWasiBuildDirectory(cacheRoot, environment, gcVariant);
     const wasiSdk = configuredEnvironmentPath(environment, 'STATIC_HERMES_WASI_SDK_PATH');
     const bindgen = configuredEnvironmentPath(environment, 'WIT_BINDGEN');
     const hermesRuntimeArchive = path.join(
         hermesWasiBuild,
-        `lib/libhermesvm${runtimeVariant === 'lean' ? 'lean' : ''}_a.a`
+        `lib/libhermesvm${runtimeVariant === 'lean' ? 'lean' : ''}_a.a`,
     );
     const hermesJsiArchive = path.join(hermesWasiBuild, 'jsi/libjsi.a');
     if (
@@ -83,7 +83,7 @@ export async function buildStaticHermesComponent(options: ComponentBuildOptions)
             templatePath: path.join(runtimeRoot, 'src/component/templates/runtime-shim.template'),
             outputDirectory: temporaryDirectory,
             bindgenPath: bindgen,
-            analysis
+            analysis,
         });
         const componentOutput = path.join(temporaryDirectory, 'component.wasm');
         compileAndLinkComponent({
@@ -91,7 +91,7 @@ export async function buildStaticHermesComponent(options: ComponentBuildOptions)
             generated,
             temporaryDirectory,
             stackSizeBytes,
-            toolchain: { hermesSource, hermesWasiBuild, hermesRuntimeArchive, hermesc, wasiSdk }
+            toolchain: { hermesSource, hermesWasiBuild, hermesRuntimeArchive, hermesc, wasiSdk },
         });
         publishComponent(componentOutput, options.output, temporaryDirectory, () => {
             preserveTemporaryDirectory = true;
@@ -120,7 +120,7 @@ function configuredEnvironmentPath(environment: NodeJS.ProcessEnv, name: string)
 function requirePath(description: string, filename: string): void {
     if (!fs.existsSync(filename)) {
         throw new Error(
-            `${description} not found at ${filename}; run prepare-hermes first (see tools/static-hermes-runtime/README.md)`
+            `${description} not found at ${filename}; run prepare-hermes first (see tools/static-hermes-runtime/README.md)`,
         );
     }
 }
@@ -143,7 +143,7 @@ function validateStackSize(value: string): void {
         stackSizeBytes % 16 !== 0
     ) {
         throw new Error(
-            `STATIC_HERMES_STACK_SIZE must be a multiple of 16 and between 131072 and ${maximumStackSizeBytes} bytes`
+            `STATIC_HERMES_STACK_SIZE must be a multiple of 16 and between 131072 and ${maximumStackSizeBytes} bytes`,
         );
     }
 }
@@ -152,7 +152,7 @@ function publishComponent(
     component: string,
     output: string,
     temporaryDirectory: string,
-    preserveForRecovery: () => void
+    preserveForRecovery: () => void,
 ): void {
     try {
         fs.renameSync(component, output);
@@ -172,7 +172,7 @@ function publishComponent(
                 preserveForRecovery();
                 throw new AggregateError(
                     [publishError, restoreError],
-                    `could not publish or restore ${output}; previous artifact preserved at ${previous}`
+                    `could not publish or restore ${output}; previous artifact preserved at ${previous}`,
                 );
             }
             throw publishError;

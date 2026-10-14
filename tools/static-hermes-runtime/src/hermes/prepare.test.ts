@@ -14,37 +14,37 @@ const mocks = vi.hoisted(() => ({
     readPatches: vi.fn(),
     ensureSource: vi.fn(),
     readPin: vi.fn(),
-    refreshSource: vi.fn()
+    refreshSource: vi.fn(),
 }));
 
 vi.mock('./toolchain-environment.ts', () => ({ setupHermesToolchainEnvironment: mocks.setupToolchain }));
 vi.mock('./build.ts', () => ({
     buildHermes: mocks.buildHermes,
     buildHermesWithLockHeld: mocks.buildHermesWithLockHeld,
-    withHermesBuildLock: mocks.withBuildLock
+    withHermesBuildLock: mocks.withBuildLock,
 }));
 vi.mock('./patch.ts', () => ({
     affectedHermesPaths: mocks.affectedPaths,
     applyHermesPatchSeries: mocks.applyPatches,
-    readHermesPatchSeries: mocks.readPatches
+    readHermesPatchSeries: mocks.readPatches,
 }));
 vi.mock('./source.ts', () => ({
     ensureHermesSource: mocks.ensureSource,
     readHermesSourcePin: mocks.readPin,
-    refreshHermesSource: mocks.refreshSource
+    refreshHermesSource: mocks.refreshSource,
 }));
 
 const pin = {
     repository: 'https://github.com/facebook/hermes.git',
     branch: 'static_h',
-    commit: '820aa0d4b5fe5d3ed7900e1274211ef561081b3f'
+    commit: '820aa0d4b5fe5d3ed7900e1274211ef561081b3f',
 };
 const patches = [{ name: '0001-static.patch', filename: '/package/hermes-patches/0001-static.patch' }];
 
 beforeEach(() => {
     mocks.setupToolchain.mockReset().mockResolvedValue({
         STATIC_HERMES_CACHE_DIR: '/cache/hermes',
-        STATIC_HERMES_WASI_SDK_PATH: '/toolchain/wasi-sdk'
+        STATIC_HERMES_WASI_SDK_PATH: '/toolchain/wasi-sdk',
     });
     mocks.buildHermes.mockReset().mockResolvedValue(undefined);
     mocks.buildHermesWithLockHeld.mockReset().mockResolvedValue(undefined);
@@ -70,7 +70,7 @@ it('runs source validation, patching, and building in order', async () => {
         },
         build() {
             stages.push('build');
-        }
+        },
     });
 
     expect(stages).toEqual(['source', 'patch', 'build']);
@@ -87,8 +87,8 @@ it('stops before patching or building when source validation fails', async () =>
                 throw failure;
             },
             patch,
-            build
-        })
+            build,
+        }),
     ).rejects.toBe(failure);
     expect(patch).not.toHaveBeenCalled();
     expect(build).not.toHaveBeenCalled();
@@ -102,7 +102,7 @@ it('prepares the pinned source, applies patches, and builds with resolved cache 
     expect(mocks.setupToolchain).toHaveBeenCalledWith({
         workspaceRoot: '/workspace',
         env: environment,
-        includeWitBindgen: false
+        includeWitBindgen: false,
     });
     expect(mocks.readPin).toHaveBeenCalledWith('/package/hermes-source.lock.json');
     expect(mocks.readPatches).toHaveBeenCalledWith('/package/hermes-patches');
@@ -110,15 +110,15 @@ it('prepares the pinned source, applies patches, and builds with resolved cache 
         pin,
         source: '/cache/hermes/source',
         managedSource: true,
-        managedPaths: ['lib/Runtime.cpp']
+        managedPaths: ['lib/Runtime.cpp'],
     });
     expect(mocks.applyPatches).toHaveBeenCalledWith({
         source: '/cache/hermes/source',
         expectedCommit: pin.commit,
-        patches
+        patches,
     });
     expect(mocks.withBuildLock).toHaveBeenCalledWith('/cache/hermes', expect.any(Function), {
-        resources: ['/cache/hermes/source', '/cache/hermes/build-host', '/cache/hermes/build-wasip2']
+        resources: ['/cache/hermes/source', '/cache/hermes/build-host', '/cache/hermes/build-wasip2'],
     });
     expect(mocks.buildHermesWithLockHeld).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -131,8 +131,8 @@ it('prepares the pinned source, applies patches, and builds with resolved cache 
             toolchainFile: '/package/cmake/wasi-sdk-hermes-p2.cmake',
             pin,
             patches,
-            environment
-        })
+            environment,
+        }),
     );
 });
 
@@ -144,7 +144,7 @@ it('serializes preparations that share an overridden source across independent c
     fs.mkdirSync(sharedSource, { recursive: true });
     const { withHermesBuildLock: realBuildLock } = await vi.importActual<typeof import('./build.ts')>('./build.ts');
     mocks.withBuildLock.mockImplementation((cacheRoot, operation, options) =>
-        realBuildLock(cacheRoot, operation, options)
+        realBuildLock(cacheRoot, operation, options),
     );
     mocks.setupToolchain.mockImplementation(async () => ({ STATIC_HERMES_WASI_SDK_PATH: '/toolchain/wasi-sdk' }));
 
@@ -169,20 +169,20 @@ it('serializes preparations that share an overridden source across independent c
         STATIC_HERMES_CACHE_DIR: cacheRoot,
         STATIC_HERMES_SOURCE_DIR: sharedSource,
         STATIC_HERMES_HOST_BUILD_DIR: path.join(cacheRoot, 'host-build'),
-        STATIC_HERMES_WASI_BUILD_DIR: path.join(cacheRoot, 'wasi-build')
+        STATIC_HERMES_WASI_BUILD_DIR: path.join(cacheRoot, 'wasi-build'),
     });
 
     try {
         const first = prepareHermes({
             workspaceRoot: root,
             packageRoot: '/package',
-            environment: createEnvironment(firstCache)
+            environment: createEnvironment(firstCache),
         });
         await firstBuildEntered;
         const second = prepareHermes({
             workspaceRoot: root,
             packageRoot: '/package',
-            environment: createEnvironment(secondCache)
+            environment: createEnvironment(secondCache),
         });
         await new Promise<void>((resolve) => setImmediate(resolve));
         const startsBeforeRelease = [...buildStarts];
@@ -252,7 +252,7 @@ it('rejects build preparation when setup did not provide a WASI SDK', async () =
     mocks.setupToolchain.mockResolvedValue({ STATIC_HERMES_CACHE_DIR: '/cache/hermes' });
 
     await expect(
-        prepareHermes({ workspaceRoot: '/workspace', packageRoot: '/package', environment: {} })
+        prepareHermes({ workspaceRoot: '/workspace', packageRoot: '/package', environment: {} }),
     ).rejects.toThrow('Static Hermes WASI SDK path is not configured');
     expect(mocks.ensureSource).toHaveBeenCalledOnce();
     expect(mocks.applyPatches).toHaveBeenCalledOnce();

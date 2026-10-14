@@ -84,7 +84,7 @@ export class MemoryFiles implements DataFiles {
             },
             close: () => {
                 closed = true;
-            }
+            },
         };
     }
 }

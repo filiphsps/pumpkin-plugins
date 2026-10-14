@@ -7,22 +7,22 @@ import { deepMerge } from './util.ts';
 
 /** What goes into a test server's directory. */
 export interface ServerDirOptions {
-    /** Paths to built plugin `.wasm` files, copied into the server's `plugins/` folder. */
-    plugins?: string[];
     /** Overrides merged into the generated `pumpkin.toml` (Pumpkin fills in the rest). */
     config?: Record<string, unknown>;
     /** Files to create before startup, keyed by path relative to the server directory. */
     files?: Record<string, string | Uint8Array>;
+    /** Paths to built plugin `.wasm` files, copied into the server's `plugins/` folder. */
+    plugins?: string[];
 }
 
 /** A server directory ready to start from, and the ports its config listens on. */
 export interface ServerDir {
+    /** Port of the Bedrock edition listener. */
+    bedrockPort: number;
     /** The temporary directory the server runs in. */
     dir: string;
     /** Port of the Java edition listener. */
     javaPort: number;
-    /** Port of the Bedrock edition listener. */
-    bedrockPort: number;
 }
 
 /**
@@ -37,12 +37,12 @@ export function baseConfig(javaPort: number, bedrockPort: number): Record<string
         networking: {
             java: { address: `127.0.0.1:${javaPort}` },
             bedrock: { nethernet: { address: `127.0.0.1:${bedrockPort}` } },
-            lan_broadcast: { enabled: false }
+            lan_broadcast: { enabled: false },
         },
         telemetry: { enabled: false },
         plugins: { ask_permission_confirmation: false, hot_reload: false },
         commands: { use_tty: false },
-        logging: { color: false }
+        logging: { color: false },
     };
 }
 

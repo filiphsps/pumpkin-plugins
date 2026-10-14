@@ -1,9 +1,9 @@
 /** A generated documentation block, including its markers, in a source Markdown string. */
 export interface GeneratedBlock {
-    name: string;
-    markers: 'docs' | 'action';
-    start: number;
     end: number;
+    markers: 'docs' | 'action';
+    name: string;
+    start: number;
     text: string;
 }
 
@@ -16,7 +16,7 @@ export function generatedBlocks(source: string): GeneratedBlock[] {
         markers: match[1] ? 'docs' : 'action',
         start: match.index,
         end: match.index + match[0].length,
-        text: match[0]
+        text: match[0],
     }));
 }
 

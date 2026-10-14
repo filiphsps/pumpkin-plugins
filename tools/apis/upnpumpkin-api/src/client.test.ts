@@ -26,13 +26,13 @@ describe('PortMapClient', () => {
         expect(sent.map((s) => [s.recipient, s.request.op])).toEqual([
             ['UPnPumpkin', 'ensure'],
             ['UPnPumpkin', 'status'],
-            ['UPnPumpkin', 'release']
+            ['UPnPumpkin', 'release'],
         ]);
     });
 
     it('says unknown when the answer has no status, and returns network info', () => {
         const { client } = setup((r) =>
-            r.op === 'info' ? { ok: true, info: { localAddress: '10.0.0.2' } } : { ok: true }
+            r.op === 'info' ? { ok: true, info: { localAddress: '10.0.0.2' } } : { ok: true },
         );
         expect(client.status('x')).toEqual({ kind: 'unknown' });
         expect(client.info()).toEqual({ localAddress: '10.0.0.2' });

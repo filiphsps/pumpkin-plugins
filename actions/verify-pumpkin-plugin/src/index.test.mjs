@@ -37,14 +37,14 @@ function run(dir, inputs = {}) {
             'INPUT_EXPECTED-PUBLIC-KEY': '',
             'INPUT_PLUGIN-NAME': '',
             INPUT_VERSION: '',
-            ...inputs
+            ...inputs,
         },
-        encoding: 'utf8'
+        encoding: 'utf8',
     });
     return {
         ok: result.status === 0,
         out: `${result.stdout}${result.stderr}`,
-        outputs: fs.readFileSync(outputFile, 'utf8')
+        outputs: fs.readFileSync(outputFile, 'utf8'),
     };
 }
 
@@ -55,7 +55,7 @@ describe('verify-pumpkin-plugin action', () => {
         const result = run(dir, {
             'INPUT_EXPECTED-PUBLIC-KEY': publicKeyOf(SEED),
             'INPUT_PLUGIN-NAME': METADATA.plugin_name,
-            INPUT_VERSION: METADATA.version
+            INPUT_VERSION: METADATA.version,
         });
 
         assert.ok(result.ok, result.out);
@@ -75,14 +75,14 @@ describe('verify-pumpkin-plugin action', () => {
             path.join(dir, 'plugins.json'),
             JSON.stringify([
                 { 'plugin-name': METADATA.plugin_name, version: METADATA.version, 'wasm-file': 'plugin.wasm' },
-                { 'plugin-name': METADATA.plugin_name, version: METADATA.version, 'wasm-file': 'second.wasm' }
-            ])
+                { 'plugin-name': METADATA.plugin_name, version: METADATA.version, 'wasm-file': 'second.wasm' },
+            ]),
         );
 
         const result = run(dir, {
             'INPUT_WASM-FILE': '',
             'INPUT_PLUGINS-MANIFEST': 'plugins.json',
-            'INPUT_EXPECTED-PUBLIC-KEY': publicKeyOf(SEED)
+            'INPUT_EXPECTED-PUBLIC-KEY': publicKeyOf(SEED),
         });
 
         assert.ok(result.ok, result.out);
@@ -161,7 +161,7 @@ describe('verify-pumpkin-plugin action', () => {
         const { dir } = fixture();
         fs.writeFileSync(
             path.join(dir, 'plugins.json'),
-            JSON.stringify([{ 'plugin-name': 'OtherPlugin', version: METADATA.version, 'wasm-file': 'plugin.wasm' }])
+            JSON.stringify([{ 'plugin-name': 'OtherPlugin', version: METADATA.version, 'wasm-file': 'plugin.wasm' }]),
         );
 
         const result = run(dir, { 'INPUT_WASM-FILE': '', 'INPUT_PLUGINS-MANIFEST': 'plugins.json' });

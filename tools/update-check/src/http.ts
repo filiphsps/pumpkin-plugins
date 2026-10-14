@@ -28,7 +28,7 @@ export type SchedulePoll = (callback: () => void) => void;
 export function requestMarketJsonAsync(
     url: string,
     schedule: SchedulePoll,
-    complete: (result: MarketJsonResult) => void
+    complete: (result: MarketJsonResult) => void,
 ): void {
     const request = marketJsonRequest(url);
     let finished = false;

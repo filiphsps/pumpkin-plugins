@@ -19,7 +19,7 @@ describe('DH settings', () => {
         expect(files.text('config.toml')).toContain('cached_packets_per_tick = 64');
         files.put(
             'config.toml',
-            '[support]\nrender_distance = 256\nserver_key = "my-server"\n[worlds.custom]\nheight = 512\n'
+            '[support]\nrender_distance = 256\nserver_key = "my-server"\n[worlds.custom]\nheight = 512\n',
         );
         const settings = readSettings(files, log);
         expect(settings.render_distance).toBe(256);
@@ -89,7 +89,7 @@ describe('DH settings', () => {
             log = new MemoryLogger();
         files.put(
             'config.toml',
-            '[support]\nmemory_cache_entries = -9223372036854775808\ndisk_cache_entries = -9223372036854775808\n'
+            '[support]\nmemory_cache_entries = -9223372036854775808\ndisk_cache_entries = -9223372036854775808\n',
         );
 
         const settings = readSettings(files, log);

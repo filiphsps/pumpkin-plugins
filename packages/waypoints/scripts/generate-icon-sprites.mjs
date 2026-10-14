@@ -22,7 +22,7 @@ function textures(model, seen = new Set()) {
     const definition = JSON.parse(strFromU8(bytes));
     return {
         ...textures((definition.parent ?? '').replace(/^minecraft:/, ''), seen),
-        ...definition.textures
+        ...definition.textures,
     };
 }
 for (const file of Object.keys(assets).sort()) {
@@ -49,6 +49,6 @@ writeFileSync(
     output,
     '// Generated from Minecraft 26.3 by scripts/generate-icon-sprites.mjs.\n' +
         '/** Vanilla items whose representative sprite differs from item/{registry path}. */\n' +
-        `export const BLOCK_ICON_SPRITES: { readonly [key: string]: string } = ${JSON.stringify(sprites, null, 4)};\n`
+        `export const BLOCK_ICON_SPRITES: { readonly [key: string]: string } = ${JSON.stringify(sprites, null, 4)};\n`,
 );
 execFileSync('pnpm', ['exec', 'biome', 'format', '--write', output]);

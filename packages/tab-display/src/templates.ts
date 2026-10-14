@@ -13,10 +13,10 @@ export type TemplatePart =
 
 /** A bounded, host-independent compiled template. */
 export interface CompiledTemplate {
-    readonly source: string;
+    readonly hasPlaceholders: boolean;
     readonly parts: readonly TemplatePart[];
     readonly placeholderIds: readonly string[];
-    readonly hasPlaceholders: boolean;
+    readonly source: string;
 }
 
 /** How an unresolved token is shown. */
@@ -47,7 +47,7 @@ export function compileTemplate(source: string): CompiledTemplate {
         source,
         parts,
         placeholderIds: [...identifiers],
-        hasPlaceholders: identifiers.size > 0
+        hasPlaceholders: identifiers.size > 0,
     };
 }
 
@@ -56,7 +56,7 @@ export function renderTemplate(
     template: CompiledTemplate,
     resolution: ResolvedLine | undefined,
     fallback: PlaceholderFallback,
-    providerAvailable: boolean
+    providerAvailable: boolean,
 ): string {
     if (!template.hasPlaceholders) return template.source;
     if (!providerAvailable || resolution === undefined) {

@@ -14,26 +14,26 @@ const text = (data: Uint8Array) => new TextDecoder().decode(data);
 /** One datagram a socket has ready to read. */
 const datagram = (address: [number, number, number, number], port: number, body: string): IncomingDatagram => ({
     data: bytes(body),
-    remoteAddress: { tag: 'ipv4', val: { port, address } }
+    remoteAddress: { tag: 'ipv4', val: { port, address } },
 });
 
 interface FakeUdp {
-    socket: UdpSocket;
-    /** Calls into the incoming host stream. */
-    readonly incoming: { receive(max: bigint): IncomingDatagram[] };
-    /** The address the socket reports itself as. */
-    setLocal(address: [number, number, number, number]): void;
-    /** Make the next `finishBind` calls report `would-block`. */
-    blockBind(times: number): void;
-    /** Make binding fail. */
-    failBind(code: string): void;
     /** Make sending without `checkSend` permitted. */
     allowSend(count: number): void;
+    /** Make the next `finishBind` calls report `would-block`. */
+    blockBind(times: number): void;
+    disposed: { socket: number; incoming: number; outgoing: number };
+    /** Make binding fail. */
+    failBind(code: string): void;
+    /** Calls into the incoming host stream. */
+    readonly incoming: { receive(max: bigint): IncomingDatagram[] };
     /** The datagrams the socket hands out, one batch per call to `receive`. */
     queue(...batches: IncomingDatagram[][]): void;
     /** What was sent, as text and the address it was sent to. */
     readonly sent: { text: string; to: string | undefined }[];
-    disposed: { socket: number; incoming: number; outgoing: number };
+    /** The address the socket reports itself as. */
+    setLocal(address: [number, number, number, number]): void;
+    socket: UdpSocket;
 }
 
 /** A UDP socket that binds, streams, and remembers what it was told. */
@@ -47,7 +47,7 @@ function fakeUdp(local: [number, number, number, number] = [192, 168, 1, 50]): F
 
     const incoming = {
         receive: vi.fn((max: bigint) => (batches.length > 0 ? (batches.shift() ?? []).slice(0, Number(max)) : [])),
-        [Symbol.dispose]: vi.fn(() => disposed.incoming++)
+        [Symbol.dispose]: vi.fn(() => disposed.incoming++),
     };
     const outgoing = {
         checkSend: vi.fn(() => allowed),
@@ -56,11 +56,11 @@ function fakeUdp(local: [number, number, number, number] = [192, 168, 1, 50]): F
             for (const { data, remoteAddress } of datagrams)
                 sent.push({
                     text: text(data),
-                    to: remoteAddress?.val.address.join('.')
+                    to: remoteAddress?.val.address.join('.'),
                 });
             return BigInt(datagrams.length);
         }),
-        [Symbol.dispose]: vi.fn(() => disposed.outgoing++)
+        [Symbol.dispose]: vi.fn(() => disposed.outgoing++),
     };
     const socket = {
         startBind: vi.fn(),
@@ -73,7 +73,7 @@ function fakeUdp(local: [number, number, number, number] = [192, 168, 1, 50]): F
         }),
         stream: vi.fn(() => [incoming, outgoing]),
         localAddress: () => ({ tag: 'ipv4', val: { port: 40000, address: local } }),
-        [Symbol.dispose]: vi.fn(() => disposed.socket++)
+        [Symbol.dispose]: vi.fn(() => disposed.socket++),
     };
     return {
         socket: socket as unknown as UdpSocket,
@@ -84,14 +84,14 @@ function fakeUdp(local: [number, number, number, number] = [192, 168, 1, 50]): F
         allowSend: (count) => (allowed = BigInt(count)),
         queue: (...next) => (batches = next),
         sent,
-        disposed
+        disposed,
     };
 }
 
 interface FakeTcp {
-    socket: TcpSocket;
     /** Make the next `finishConnect` calls report `would-block`. */
     blockConnect(times: number): void;
+    disposed: { socket: number; input: number; output: number };
     /** Make connecting fail at `startConnect`. */
     failConnect(code: string): void;
     /** Make the connection break once it is made. */
@@ -99,7 +99,7 @@ interface FakeTcp {
     /** What `read` gives back, and what it throws when given an error. */
     read(bytesToGive: Uint8Array): void;
     readError(code: string): void;
-    disposed: { socket: number; input: number; output: number };
+    socket: TcpSocket;
     writable: () => number;
     written: Uint8Array | undefined;
 }
@@ -119,14 +119,14 @@ function fakeTcp(local: [number, number, number, number] = [192, 168, 1, 50]): F
             if (readFailure) throw Object.assign(new Error(readFailure), { payload: { tag: readFailure } });
             return readResult ?? new Uint8Array();
         }),
-        [Symbol.dispose]: vi.fn(() => disposed.input++)
+        [Symbol.dispose]: vi.fn(() => disposed.input++),
     };
     const output = {
         checkWrite: () => 1024n,
         write: vi.fn((data: Uint8Array) => {
             written = data;
         }),
-        [Symbol.dispose]: vi.fn(() => disposed.output++)
+        [Symbol.dispose]: vi.fn(() => disposed.output++),
     };
     const socket = {
         startConnect: vi.fn(() => {
@@ -141,7 +141,7 @@ function fakeTcp(local: [number, number, number, number] = [192, 168, 1, 50]): F
             return [input, output];
         }),
         localAddress: () => ({ tag: 'ipv4', val: { port: 50000, address: local } }),
-        [Symbol.dispose]: vi.fn(() => disposed.socket++)
+        [Symbol.dispose]: vi.fn(() => disposed.socket++),
     };
     return {
         socket: socket as unknown as TcpSocket,
@@ -154,7 +154,7 @@ function fakeTcp(local: [number, number, number, number] = [192, 168, 1, 50]): F
         writable: () => Number(output.checkWrite()),
         get written() {
             return written;
-        }
+        },
     };
 }
 
@@ -163,7 +163,7 @@ function adapter(tcp: FakeTcp, udp: FakeUdp = fakeUdp()): WasiNetwork {
     const sockets: Sockets = {
         instance: () => ({}) as never,
         tcp: () => tcp.socket,
-        udp: () => udp.socket
+        udp: () => udp.socket,
     };
     return new WasiNetwork(sockets);
 }
@@ -205,10 +205,10 @@ describe('a datagram socket', () => {
                 data: bytes('ipv6'),
                 remoteAddress: {
                     tag: 'ipv6',
-                    val: { port: 1900, flowInfo: 0, scopeId: 0, address: [0, 0, 0, 0, 0, 0, 0, 1] }
-                }
+                    val: { port: 1900, flowInfo: 0, scopeId: 0, address: [0, 0, 0, 0, 0, 0, 0, 1] },
+                },
             },
-            datagram([192, 168, 1, 1], 1900, 'valid')
+            datagram([192, 168, 1, 1], 1900, 'valid'),
         ]);
         const socket = adapter(fakeTcp(), udp).openDatagram();
         expect(socket.receive()).toEqual({ from: router, data: bytes('valid') });
@@ -222,15 +222,15 @@ describe('a datagram socket', () => {
         udp.allowSend(100);
         const reply = igd.handleDatagram(
             { address: [239, 255, 255, 250], port: 1900 },
-            bytes('M-SEARCH * HTTP/1.1\r\nST: ssdp:all\r\n\r\n')
+            bytes('M-SEARCH * HTTP/1.1\r\nST: ssdp:all\r\n\r\n'),
         )[0];
         expect(reply).toBeDefined();
         udp.queue([
             datagram([192, 168, 1, 1], 1900, 'unrelated'),
             {
                 data: reply ?? new Uint8Array(),
-                remoteAddress: { tag: 'ipv4', val: { address: [192, 168, 1, 1], port: 1900 } }
-            }
+                remoteAddress: { tag: 'ipv4', val: { address: [192, 168, 1, 1], port: 1900 } },
+            },
         ]);
         const socket = adapter(fakeTcp(), udp).openDatagram();
         fake.openDatagram = () => socket;

@@ -30,7 +30,7 @@ describe('pack discovery', () => {
         const r = await start({
             name: 'broken',
             config: (port) => portConfig(port),
-            files: { 'packs/good.mcpack': makeMcpack(), 'packs/bad.mcpack': 'not a zip' }
+            files: { 'packs/good.mcpack': makeMcpack(), 'packs/bad.mcpack': 'not a zip' },
         });
         await r.server.waitForLog(/Found 1 Bedrock pack: good\.mcpack/);
         await r.server.waitForLog(/bad\.mcpack: not a valid zip archive/);
@@ -40,12 +40,12 @@ describe('pack discovery', () => {
         const addon = zipSync({
             'RP/manifest.json': manifest(SAMPLE_UUID, ['resources']),
             'RP/textures/a.png': noise(4000, 5),
-            'BP/manifest.json': manifest('33333333-3333-4333-8333-333333333333', ['data'])
+            'BP/manifest.json': manifest('33333333-3333-4333-8333-333333333333', ['data']),
         });
         const r = await start({
             name: 'mcaddon',
             config: (port) => portConfig(port),
-            files: { 'packs/Cool Addon.mcaddon': addon }
+            files: { 'packs/Cool Addon.mcaddon': addon },
         });
         await r.server.waitForLog(/Found 1 Bedrock pack: Cool Addon\.mcpack/);
         await r.server.waitForLog(/Cool Addon\.mcaddon: left out BP \(data, not a resource pack\)/);

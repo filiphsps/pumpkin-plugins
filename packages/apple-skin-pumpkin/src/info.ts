@@ -8,5 +8,5 @@ export const info = {
     name: PLUGIN_NAME,
     description: 'AppleSkin server-side support',
     permissions: [],
-    commands: []
+    commands: [],
 } satisfies PluginInfo<typeof PLUGIN_NAME>;

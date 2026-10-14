@@ -10,7 +10,7 @@ import {
     type TerrainRegion,
     type TerrainSample,
     unavailableChunkLoader,
-    unavailableTerrainGenerator
+    unavailableTerrainGenerator,
 } from '@pumpkin-plugins/terrain';
 import type { Settings } from '../config/schema.ts';
 import { PLUGIN_NAME } from '../name.ts';
@@ -92,13 +92,13 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                                         return chunk ?? undefined;
                                     },
                                     chunkLoader,
-                                    terrainGenerator
+                                    terrainGenerator,
                                 );
                             } catch (err) {
                                 // Host world resources can become unavailable while Pumpkin is stopping.
                                 return {
                                     status: 'unavailable' as const,
-                                    reason: `Chunk ${x}, ${z} could not be checked: ${String(err)}`
+                                    reason: `Chunk ${x}, ${z} could not be checked: ${String(err)}`,
                                 };
                             }
                         })();
@@ -109,7 +109,7 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                         if (result.status === 'pending') return result;
                         return {
                             status: result.status,
-                            reason: `Chunk ${x}, ${z} is not loaded: ${result.reason}`
+                            reason: `Chunk ${x}, ${z} is not loaded: ${result.reason}`,
                         };
                     }
                 }
@@ -144,10 +144,10 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                 lastSample = {
                     material,
                     skyLight: terrainWorld.getSkyLight(lightPos),
-                    blockLight: terrainWorld.getBlockLight(lightPos)
+                    blockLight: terrainWorld.getBlockLight(lightPos),
                 };
                 return lastSample;
-            }
+            },
         };
         use({
             name: player.getName(),
@@ -168,10 +168,10 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                 minX: borderX - radius,
                 maxX: borderX + radius,
                 minZ: borderZ - radius,
-                maxZ: borderZ + radius
+                maxZ: borderZ + radius,
             },
             insideBorder: (x, z) => Math.abs(x + 0.5 - borderX) <= radius && Math.abs(z + 0.5 - borderZ) <= radius,
-            terrain
+            terrain,
         });
         return true;
     } finally {
@@ -195,6 +195,6 @@ export function serverPeers(server: Server, settings: Settings, log: Logger): Pe
             } finally {
                 disposeWasiResource(player);
             }
-        }
+        },
     };
 }

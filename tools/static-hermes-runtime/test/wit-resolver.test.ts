@@ -5,7 +5,7 @@ import { resolvePluginApi, resolveWitDocument } from '../src/wit/resolver.ts';
 const document = {
     worlds: [
         { name: 'plugin', package: 0, imports: { 'interface-0': { interface: { id: 0 } } } },
-        { name: 'unused', package: 1, imports: {} }
+        { name: 'unused', package: 1, imports: {} },
     ],
     interfaces: [
         {
@@ -20,11 +20,11 @@ const document = {
                     name: '[method]stream.read',
                     kind: { method: 2 },
                     params: [{ name: 'self', type: 3 }],
-                    result: 4
-                }
-            }
+                    result: 4,
+                },
+            },
         },
-        { name: 'types', package: 1, types: { external: 6 }, functions: {} }
+        { name: 'types', package: 1, types: { external: 6 }, functions: {} },
     ],
     types: [
         { name: 'id', kind: { type: 'u32' }, owner: { interface: 0 } },
@@ -34,12 +34,12 @@ const document = {
         { name: null, kind: { list: 'u8' }, owner: null },
         { name: null, kind: { option: 'string' }, owner: null },
         { name: 'external', kind: { record: { fields: [] } }, owner: { interface: 1 } },
-        { name: null, kind: { result: { ok: 4, err: null } }, owner: null }
+        { name: null, kind: { result: { ok: 4, err: null } }, owner: null },
     ],
     packages: [
         { name: 'example:api@1.0.0', interfaces: { api: 0 }, worlds: { plugin: 0 } },
-        { name: 'example:types@1.0.0', interfaces: { types: 1 }, worlds: { unused: 1 } }
-    ]
+        { name: 'example:types@1.0.0', interfaces: { types: 1 }, worlds: { unused: 1 } },
+    ],
 };
 
 it('resolves type aliases, imported type names, records, and resource operation kinds', () => {
@@ -53,22 +53,22 @@ it('resolves type aliases, imported type names, records, and resource operation 
         kind: 'primitive',
         name: 'u32',
         declaredInterface: 'api',
-        aliasName: 'id'
+        aliasName: 'id',
     });
     expect(api?.records[0]?.fields[0]).toMatchObject({
         name: 'id',
         type: 'id',
-        resolvedType: { kind: 'primitive', name: 'u32', aliasName: 'id' }
+        resolvedType: { kind: 'primitive', name: 'u32', aliasName: 'id' },
     });
     expect(api?.dependencies).toEqual(['example:types/types@1.0.0']);
     expect(api?.dependencyAliases?.externalAlias).toEqual({
         name: 'external',
-        specifier: 'example:types/types@1.0.0'
+        specifier: 'example:types/types@1.0.0',
     });
     expect(api?.functions[0]?.parameters[0]?.resolvedType).toMatchObject({ kind: 'record', name: 'external' });
     expect(api?.resources[0]?.functions.map(({ name, isStatic }) => [name, isStatic])).toEqual([
         ['constructor', false],
-        ['read', false]
+        ['read', false],
     ]);
     expect(api?.resources[0]?.functions[1]?.parameters).toEqual([]);
     expect(api?.resources[0]?.functions[1]?.result).toBe('list<u8>');
@@ -91,9 +91,9 @@ it('retains the owner of anonymous containers nested in imported records', () =>
         {
             name: 'imported-record',
             kind: { record: { fields: [{ name: 'items', type: 9 }] } },
-            owner: { interface: 1 }
+            owner: { interface: 1 },
         },
-        { name: null, kind: { list: 6 }, owner: null }
+        { name: null, kind: { list: 6 }, owner: null },
     );
 
     const resolved = resolveWitDocument(parseWitToolsJson(JSON.stringify(nestedTypes)));
@@ -109,10 +109,10 @@ it('retains the owner of anonymous containers nested in imported records', () =>
                     kind: 'list',
                     packageName: 'example:types',
                     declaredInterface: 'types',
-                    interfaceSpecifier: 'example:types/types@1.0.0'
-                }
-            }
-        ]
+                    interfaceSpecifier: 'example:types/types@1.0.0',
+                },
+            },
+        ],
     });
 });
 
@@ -126,7 +126,7 @@ it('retains names for direct list aliases referenced by operations', () => {
         kind: 'freestanding',
         params: [{ name: 'value', type: 8 }],
         result: null,
-        features: []
+        features: [],
     };
     withListAlias.types.push({ name: 'bytes', kind: { list: 'u8' }, owner: { interface: 0 } });
     const resolved = resolveWitDocument(parseWitToolsJson(JSON.stringify(withListAlias)));
@@ -138,7 +138,7 @@ it('retains names for direct list aliases referenced by operations', () => {
         declaredInterface: 'api',
         aliasName: 'bytes',
         packageName: 'example:api',
-        interfaceSpecifier: 'example:api/api@1.0.0'
+        interfaceSpecifier: 'example:api/api@1.0.0',
     });
 });
 
@@ -156,7 +156,7 @@ it('uses source declaration order for declarations stored in unordered JSON maps
     Object.assign(ordered.interfaces[0]?.types, { 'z-record': 8, 'a-record': 9 });
     ordered.types.push(
         { name: 'z-record', kind: { record: { fields: [] } }, owner: { interface: 0 } },
-        { name: 'a-record', kind: { record: { fields: [] } }, owner: { interface: 0 } }
+        { name: 'a-record', kind: { record: { fields: [] } }, owner: { interface: 0 } },
     );
     const resolved = resolveWitDocument(
         parseWitToolsJson(JSON.stringify(ordered)),
@@ -170,10 +170,10 @@ it('uses source declaration order for declarations stored in unordered JSON maps
                     enums: [],
                     flags: [],
                     types: ['id'],
-                    escapedNames: []
-                }
-            ]
-        ])
+                    escapedNames: [],
+                },
+            ],
+        ]),
     );
 
     expect(resolved.interfaces[0]?.records.map(({ name }) => name)).toEqual(['z-record', 'a-record', 'payload']);

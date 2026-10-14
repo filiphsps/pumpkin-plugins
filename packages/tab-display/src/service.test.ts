@@ -47,7 +47,7 @@ function validConfig(value: unknown) {
 
 const viewers: readonly PlayerSnapshot[] = [
     { uuid: 'uuid-a', name: 'Alex', edition: 'java', javaVersion: 'v-26-3', ping: 20 },
-    { uuid: 'uuid-b', name: 'Bea', edition: 'java', javaVersion: 'v-26-3', ping: 30 }
+    { uuid: 'uuid-b', name: 'Bea', edition: 'java', javaVersion: 'v-26-3', ping: 30 },
 ];
 
 describe('TabDisplayService', () => {
@@ -57,8 +57,8 @@ describe('TabDisplayService', () => {
             resolveBatch: (requests) =>
                 requests.map(({ text, viewer }) => ({
                     text: text.replaceAll('%player_name%', viewer ?? 'server'),
-                    unresolved: []
-                }))
+                    unresolved: [],
+                })),
         };
         const service = new TabDisplayService({ host, resolver, now: () => 0, config: validConfig(baseConfig()) });
         service.tick();
@@ -67,8 +67,8 @@ describe('TabDisplayService', () => {
         expect(host.names).toEqual(
             new Map([
                 ['uuid-a', 'Alex'],
-                ['uuid-b', 'Bea']
-            ])
+                ['uuid-b', 'Bea'],
+            ]),
         );
         expect(host.orders).toEqual(new Map());
         expect(service.status().javaVersions).toEqual(['v-26-3']);
@@ -78,14 +78,14 @@ describe('TabDisplayService', () => {
             edition: 'java',
             javaVersion: 'v-26-3',
             ping: 20,
-            placeholderIds: ['player_name']
+            placeholderIds: ['player_name'],
         });
     });
 
     it('does not call Java row setters for Bedrock and reports unsupported Java versions', () => {
         const host = new FakeHost([
             { uuid: 'bedrock', name: 'Bedrock', edition: 'bedrock' },
-            { uuid: 'old-java', name: 'OldJava', edition: 'java', javaVersion: 'v-1-21-2' }
+            { uuid: 'old-java', name: 'OldJava', edition: 'java', javaVersion: 'v-1-21-2' },
         ]);
         const setName = vi.spyOn(host, 'setEntryName');
         const setHeaderFooter = vi.spyOn(host, 'setHeaderFooter');
@@ -93,7 +93,7 @@ describe('TabDisplayService', () => {
             host,
             resolver: { resolveBatch: (requests) => requests.map(({ text }) => ({ text, unresolved: [] })) },
             now: () => 0,
-            config: validConfig(baseConfig())
+            config: validConfig(baseConfig()),
         });
 
         service.tick();
@@ -104,7 +104,7 @@ describe('TabDisplayService', () => {
         expect(setHeaderFooter).toHaveBeenCalledWith('old-java', expect.anything(), expect.anything());
         expect(service.status().java).toEqual({
             kind: 'unsupported',
-            reason: 'Java tab display calls are gated to v-26-3; live client behavior is unverified (connected: v-1-21-2)'
+            reason: 'Java tab display calls are gated to v-26-3; live client behavior is unverified (connected: v-1-21-2)',
         });
         expect(service.status().lastFailure).toBeUndefined();
     });
@@ -115,7 +115,7 @@ describe('TabDisplayService', () => {
             host,
             resolver: { resolveBatch: (requests) => requests.map(({ text }) => ({ text, unresolved: [] })) },
             now: () => 0,
-            config: validConfig(baseConfig())
+            config: validConfig(baseConfig()),
         });
         service.tick();
 
@@ -133,14 +133,14 @@ describe('TabDisplayService', () => {
             uuid: String(index).padStart(3, '0'),
             name: `Player${index}`,
             edition: 'java' as const,
-            ping: index
+            ping: index,
         }));
         const host = new FakeHost(many);
         const config = baseConfig();
         config.header.lines = [];
         const resolver: TabPlaceholderResolver = {
             resolveBatch: (requests) =>
-                requests.map(({ text }) => ({ text: text.replace('%player_name%', 'resolved'), unresolved: [] }))
+                requests.map(({ text }) => ({ text: text.replace('%player_name%', 'resolved'), unresolved: [] })),
         };
         const service = new TabDisplayService({ host, resolver, now: () => 0, config: validConfig(config) });
         service.tick();
@@ -157,7 +157,7 @@ describe('TabDisplayService', () => {
             host,
             resolver: { resolveBatch: (requests) => requests.map(({ text }) => ({ text, unresolved: [] })) },
             now: () => 0,
-            config: validConfig(config)
+            config: validConfig(config),
         });
 
         service.tick();
@@ -176,8 +176,8 @@ describe('TabDisplayService', () => {
         expect(host.names).toEqual(
             new Map([
                 ['uuid-a', '%player_name%'],
-                ['uuid-b', '%player_name%']
-            ])
+                ['uuid-b', '%player_name%'],
+            ]),
         );
         expect([...host.names.values()]).not.toContain('wrong');
         expect(service.status().lastFailure).toMatch(/batch/i);
@@ -194,7 +194,7 @@ describe('TabDisplayService', () => {
             resolver: { resolveBatch: (requests) => requests.map(({ text }) => ({ text, unresolved: [] })) },
             now: () => 0,
             config: validConfig(baseConfig()),
-            log: (message) => warnings.push(message)
+            log: (message) => warnings.push(message),
         });
 
         service.tick();
@@ -210,9 +210,9 @@ describe('TabDisplayService', () => {
                 if (!available) throw new Error('provider unavailable');
                 return requests.map(({ text, viewer }) => ({
                     text: text.replace('%player_name%', viewer ?? 'server'),
-                    unresolved: []
+                    unresolved: [],
                 }));
-            }
+            },
         };
         let time = 0;
         const service = new TabDisplayService({ host, resolver, now: () => time, config: validConfig(baseConfig()) });
@@ -233,7 +233,7 @@ describe('TabDisplayService', () => {
             host,
             resolver: { resolveBatch: (requests) => requests.map(({ text }) => ({ text, unresolved: [] })) },
             now: () => 0,
-            config: validConfig(config)
+            config: validConfig(config),
         });
         service.tick();
         config.general.enabled = false;

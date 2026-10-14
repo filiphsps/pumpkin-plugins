@@ -8,7 +8,7 @@ import {
     executablePath,
     findExecutable,
     hermesHostCompilerPath,
-    wasiSdkCompilerPath
+    wasiSdkCompilerPath,
 } from './toolchain-paths.ts';
 
 const mocks = vi.hoisted(() => ({ execFileSync: vi.fn() }));
@@ -31,7 +31,7 @@ it('loads the package pins and resolves only the requested workspace cache', asy
         env: {},
         includeWasiSdk: false,
         includeWitBindgen: false,
-        includeWasmTools: false
+        includeWasmTools: false,
     });
 
     expect(environment).toEqual({ STATIC_HERMES_CACHE_DIR: path.join(workspaceRoot, '.cache/hermes') });
@@ -53,8 +53,8 @@ it('rejects a configured WASI SDK that is missing the target C++ compiler', asyn
                 env: { STATIC_HERMES_WASI_SDK_PATH: sdk },
                 installWasiSdk,
                 includeWitBindgen: false,
-                includeWasmTools: false
-            })
+                includeWasmTools: false,
+            }),
         ).rejects.toThrow(`configured WASI SDK is missing bin/${cppCompiler}: ${sdk}`);
         expect(fs.existsSync(cCompiler)).toBe(true);
         expect(installWasiSdk).not.toHaveBeenCalled();
@@ -80,7 +80,7 @@ it('replaces an incomplete cached WASI SDK before installing the pinned SDK', as
             env: {},
             includeWitBindgen: false,
             includeWasmTools: false,
-            installWasiSdk
+            installWasiSdk,
         });
 
         expect(environment.STATIC_HERMES_WASI_SDK_PATH).toBe(destination);
@@ -105,19 +105,19 @@ it('shares one WASI SDK installation between concurrent toolchain setups', async
         env: {},
         includeWitBindgen: false,
         includeWasmTools: false,
-        installWasiSdk
+        installWasiSdk,
     };
 
     try {
         const environments = await Promise.all([
             setupHermesToolchainEnvironment(options),
-            setupHermesToolchainEnvironment(options)
+            setupHermesToolchainEnvironment(options),
         ]);
 
         expect(installCalls).toBe(1);
         expect(environments.map(({ STATIC_HERMES_WASI_SDK_PATH }) => STATIC_HERMES_WASI_SDK_PATH)).toEqual([
             destination,
-            destination
+            destination,
         ]);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
@@ -136,8 +136,8 @@ it('rejects a configured wit-bindgen with a version different from the pin', asy
                 workspaceRoot: root,
                 env: { WIT_BINDGEN: bindgen },
                 includeWasiSdk: false,
-                includeWasmTools: false
-            })
+                includeWasmTools: false,
+            }),
         ).rejects.toThrow('configured wit-bindgen must be wit-bindgen-cli 0.62.0: wit-bindgen-cli 0.61.0 (test)');
         expect(mocks.execFileSync).toHaveBeenCalledWith(bindgen, ['--version'], { encoding: 'utf8' });
     } finally {
@@ -155,7 +155,7 @@ it('accepts a configured wit-bindgen only when its version matches the pin', asy
             workspaceRoot: root,
             env: { WIT_BINDGEN: bindgen },
             includeWasiSdk: false,
-            includeWasmTools: false
+            includeWasmTools: false,
         });
 
         expect(environment.WIT_BINDGEN).toBe(bindgen);
@@ -175,7 +175,7 @@ it('reinstalls a cached wit-bindgen when its version differs from the cache pin'
         .mockReturnValueOnce('wit-bindgen-cli 0.61.0 (test)')
         .mockReturnValue('wit-bindgen-cli 0.62.0 (test)');
     const installWitBindgen: NonNullable<HermesToolchainSetupOptions['installWitBindgen']> = async ({
-        destination
+        destination,
     }) => {
         fs.mkdirSync(path.dirname(destination), { recursive: true });
         fs.writeFileSync(destination, '');
@@ -189,7 +189,7 @@ it('reinstalls a cached wit-bindgen when its version differs from the cache pin'
             homeDirectory: root,
             includeWasiSdk: false,
             includeWasmTools: false,
-            installWitBindgen
+            installWitBindgen,
         });
 
         expect(environment.WIT_BINDGEN).toBe(bindgen);
@@ -224,7 +224,7 @@ it('reinstalls cached wasm-tools when its version differs from the cache pin', a
             includeWasiSdk: false,
             includeWitBindgen: false,
             includeWasmTools: true,
-            installWasmTools
+            installWasmTools,
         });
 
         expect(environment.WASM_TOOLS).toBe(wasmTools);
@@ -262,7 +262,7 @@ it('reinstalls cached wasm-tools when the cached executable cannot run', async (
             includeWasiSdk: false,
             includeWitBindgen: false,
             includeWasmTools: true,
-            installWasmTools
+            installWasmTools,
         });
 
         expect(environment.WASM_TOOLS).toBe(wasmTools);
@@ -301,7 +301,7 @@ it('preserves a valid wasm-tools cache installed by a concurrent setup call', as
             includeWasiSdk: false,
             includeWitBindgen: false,
             includeWasmTools: true,
-            installWasmTools
+            installWasmTools,
         });
 
     try {
@@ -328,7 +328,7 @@ it('installs a missing cached wit-bindgen only once for concurrent setup calls',
     });
     let installCalls = 0;
     const installWitBindgen: NonNullable<HermesToolchainSetupOptions['installWitBindgen']> = async ({
-        destination
+        destination,
     }) => {
         installCalls += 1;
         await installGate;
@@ -344,7 +344,7 @@ it('installs a missing cached wit-bindgen only once for concurrent setup calls',
             homeDirectory: root,
             includeWasiSdk: false,
             includeWasmTools: false,
-            installWitBindgen
+            installWitBindgen,
         });
         const second = setupHermesToolchainEnvironment({
             workspaceRoot: root,
@@ -352,7 +352,7 @@ it('installs a missing cached wit-bindgen only once for concurrent setup calls',
             homeDirectory: root,
             includeWasiSdk: false,
             includeWasmTools: false,
-            installWitBindgen
+            installWitBindgen,
         });
 
         await new Promise((resolve) => setTimeout(resolve, 0));
@@ -372,7 +372,7 @@ it('removes a partial wit-bindgen cache and retries the next setup', async () =>
     const bindgen = path.join(root, '.cache/hermes/toolchain/wit-bindgen-0.62.0/bin/wit-bindgen');
     let installCalls = 0;
     const installWitBindgen: NonNullable<HermesToolchainSetupOptions['installWitBindgen']> = async ({
-        destination
+        destination,
     }) => {
         installCalls += 1;
         fs.mkdirSync(path.dirname(destination), { recursive: true });
@@ -389,8 +389,8 @@ it('removes a partial wit-bindgen cache and retries the next setup', async () =>
                 homeDirectory: root,
                 includeWasiSdk: false,
                 includeWasmTools: false,
-                installWitBindgen
-            })
+                installWitBindgen,
+            }),
         ).rejects.toThrow('cargo install failed');
 
         expect(fs.existsSync(bindgen)).toBe(false);
@@ -400,7 +400,7 @@ it('removes a partial wit-bindgen cache and retries the next setup', async () =>
             homeDirectory: root,
             includeWasiSdk: false,
             includeWasmTools: false,
-            installWitBindgen
+            installWitBindgen,
         });
 
         expect(environment.WIT_BINDGEN).toBe(bindgen);
@@ -424,8 +424,8 @@ it('rejects a user-installed wit-bindgen when its version differs from the pin',
                 homeDirectory: root,
                 env: {},
                 includeWasiSdk: false,
-                includeWasmTools: false
-            })
+                includeWasmTools: false,
+            }),
         ).rejects.toThrow('user-installed wit-bindgen must be wit-bindgen-cli 0.62.0: wit-bindgen-cli 0.61.0 (test)');
         expect(mocks.execFileSync).toHaveBeenCalledWith(bindgen, ['--version'], { encoding: 'utf8' });
     } finally {
@@ -453,18 +453,18 @@ it('resolves Windows WASI SDK and wit-bindgen executable names', async () => {
             arch: 'x64',
             env: {
                 STATIC_HERMES_CACHE_DIR: cache,
-                STATIC_HERMES_WASI_SDK_PATH: sdk
+                STATIC_HERMES_WASI_SDK_PATH: sdk,
             },
             includeWasmTools: false,
             installWitBindgen: async () => {
                 throw new Error('cached Windows wit-bindgen should be reused');
-            }
+            },
         });
 
         expect(environment).toMatchObject({
             STATIC_HERMES_CACHE_DIR: cache,
             STATIC_HERMES_WASI_SDK_PATH: sdk,
-            WIT_BINDGEN: bindgen
+            WIT_BINDGEN: bindgen,
         });
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
@@ -478,19 +478,19 @@ it('adds Windows executable suffixes when resolving tool paths', () => {
 
     try {
         expect(hermesHostCompilerPath(path.join(root, 'hermes-build'), 'win32')).toBe(
-            path.join(root, 'hermes-build', 'bin', 'hermesc.exe')
+            path.join(root, 'hermes-build', 'bin', 'hermesc.exe'),
         );
         expect(executablePath(path.join(root, 'hermes-build', 'bin'), 'shermes', 'win32')).toBe(
-            path.join(root, 'hermes-build', 'bin', 'shermes.exe')
+            path.join(root, 'hermes-build', 'bin', 'shermes.exe'),
         );
         expect(wasiSdkCompilerPath(root, 'wasm32-wasip2-clang', 'win32')).toBe(
-            path.join(root, 'bin', 'wasm32-wasip2-clang.exe')
+            path.join(root, 'bin', 'wasm32-wasip2-clang.exe'),
         );
         expect(wasiSdkCompilerPath(root, 'wasm32-wasip2-clang++', 'win32')).toBe(
-            path.join(root, 'bin', 'wasm32-wasip2-clang++.exe')
+            path.join(root, 'bin', 'wasm32-wasip2-clang++.exe'),
         );
         expect(configuredExecutablePath(path.join(root, 'wit-bindgen'), 'win32')).toBe(
-            path.join(root, 'wit-bindgen.exe')
+            path.join(root, 'wit-bindgen.exe'),
         );
         expect(findExecutable('cargo', { PATH: root }, 'win32')).toBe(cargo);
     } finally {

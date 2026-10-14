@@ -4,7 +4,7 @@ import {
     openUrl,
     PortMapClient,
     type SendMessage,
-    type WatchedState
+    type WatchedState,
 } from '@pumpkin-plugins/upnpumpkin-api';
 import { loadPluginConfig } from './config/load.ts';
 import type { Config } from './config/schema.ts';
@@ -60,7 +60,7 @@ export class PackManager {
         private readonly log: Logger,
         makeServer: WebServerFactory,
         send: SendMessage,
-        private readonly now: () => number = Date.now
+        private readonly now: () => number = Date.now,
     ) {
         this.index = new PackIndex(files, log);
         this.server = makeServer(this.index);
@@ -133,7 +133,7 @@ export class PackManager {
             this.ports,
             request,
             (state) => this.forwardingChanged(wanted, state),
-            this.now
+            this.now,
         );
         this.watcher.start();
     }
@@ -155,13 +155,13 @@ export class PackManager {
             this.log.info(
                 state.via === 'public'
                     ? `This machine has a public address, so clients download packs from ${ansi.named.url(url)}.`
-                    : `Opened port ${ansi.named.port(port)} on the router (${state.via}): clients download packs from ${ansi.named.url(url)}.`
+                    : `Opened port ${ansi.named.port(port)} on the router (${state.via}): clients download packs from ${ansi.named.url(url)}.`,
             );
             this.setReachableUrl(url);
         } else if (state.kind === 'failed') {
             this.setReachableUrl(undefined);
             this.log.warn(
-                `Could not make port ${ansi.named.port(port)} reachable from the internet: ${state.reason}. Clients are told to download packs from ${ansi.named.url(`http://127.0.0.1:${port}`)}, which only works for players on this machine. Open the port yourself and set web.public_url, or set web.port_forwarding = false.`
+                `Could not make port ${ansi.named.port(port)} reachable from the internet: ${state.reason}. Clients are told to download packs from ${ansi.named.url(`http://127.0.0.1:${port}`)}, which only works for players on this machine. Open the port yourself and set web.public_url, or set web.port_forwarding = false.`,
             );
         } else if (state.kind === 'unavailable') {
             this.setReachableUrl(undefined);
@@ -175,7 +175,7 @@ export class PackManager {
         this.reportedUnavailable = true;
         const port = this.forwardedPort;
         this.log.warn(
-            `web.port_forwarding is on, but the UPnPumpkin plugin does not answer, so clients are told to download packs from ${ansi.named.url(`http://127.0.0.1:${port}`)}, which only works for players on this machine. Install UPnPumpkin to open the port on your router automatically, set web.public_url to the address players can reach, or set web.port_forwarding = false.`
+            `web.port_forwarding is on, but the UPnPumpkin plugin does not answer, so clients are told to download packs from ${ansi.named.url(`http://127.0.0.1:${port}`)}, which only works for players on this machine. Install UPnPumpkin to open the port on your router automatically, set web.public_url to the address players can reach, or set web.port_forwarding = false.`,
         );
     }
 
@@ -192,7 +192,7 @@ export class PackManager {
     private announce(): void {
         const count = this.index.entries.length;
         this.log.info(
-            `Offering ${ansi.named.number(count)} Bedrock pack${count === 1 ? '' : 's'} to players who join from now on (not connected to the server yet, so players are not sent them).`
+            `Offering ${ansi.named.number(count)} Bedrock pack${count === 1 ? '' : 's'} to players who join from now on (not connected to the server yet, so players are not sent them).`,
         );
     }
 
@@ -225,7 +225,7 @@ export class PackManager {
             this.entries.some((e) => e.downloadUrl.startsWith(base.url));
         if (affected) {
             this.log.warn(
-                `web.public_url is not set, so clients are told to download packs from ${ansi.named.url(base.url)}, which only works for players on this machine. Set it to the address players can reach.`
+                `web.public_url is not set, so clients are told to download packs from ${ansi.named.url(base.url)}, which only works for players on this machine. Set it to the address players can reach.`,
             );
         }
     }

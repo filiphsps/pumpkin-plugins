@@ -1,21 +1,21 @@
 /** The repository location and immutable revision that provide the Pumpkin WIT package. */
 export interface PumpkinWitPin {
-    /** Git repository URI. */
-    repository: string;
     /** Branch recorded with the pinned commit. */
     branch: string;
     /** Full SHA-1 or SHA-256 Git object ID. */
     commit: string;
+    /** Git repository URI. */
+    repository: string;
     /** Repository-relative directory containing the selected WIT package. */
     subdirectory: string;
 }
 
 /** Inputs for resolving the API package's pinned WIT into a consumer cache. */
 export interface EnsurePumpkinWitOptions {
-    /** Path to the API package's `wit.lock.json`. */
-    lockFile: string;
     /** Cache root outside the installed API package and `node_modules`. */
     cacheRoot: string;
+    /** Path to the API package's `wit.lock.json`. */
+    lockFile: string;
 }
 
 /**

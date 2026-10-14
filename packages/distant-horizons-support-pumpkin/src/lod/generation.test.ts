@@ -4,7 +4,7 @@ import {
     iterateLodSectionsAround,
     listLodSectionsAround,
     MAX_LOD_GENERATION_RADIUS,
-    sectionKey
+    sectionKey,
 } from './generation.ts';
 
 describe('forced LOD section selection', () => {
@@ -18,7 +18,7 @@ describe('forced LOD section selection', () => {
             { x: -1, z: 1 },
             { x: 0, z: -1 },
             { x: 0, z: 0 },
-            { x: 0, z: 1 }
+            { x: 0, z: 1 },
         ]);
     });
 

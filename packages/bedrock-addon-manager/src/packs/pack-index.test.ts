@@ -27,7 +27,7 @@ describe('PackIndex', () => {
 
         expect(index.entries.map((e) => [e.fileName, e.uuid])).toEqual([['a.mcpack', uuid(1)]]);
         expect(log.of('info')).toEqual([
-            `Found ${ansi.named.number('1')} Bedrock pack: ${ansi.named.name('a.mcpack')} (${ansi.named.uuid(uuid(1))} v${ansi.named.version('1.0.0')}).`
+            `Found ${ansi.named.number('1')} Bedrock pack: ${ansi.named.name('a.mcpack')} (${ansi.named.uuid(uuid(1))} v${ansi.named.version('1.0.0')}).`,
         ]);
     });
 
@@ -35,7 +35,7 @@ describe('PackIndex', () => {
         const { log, settings, index } = setup();
         index.refresh(settings);
         expect(log.of('info')).toEqual([
-            `No packs in ${ansi.named.name('packs/')}. Put .mcpack or .mcaddon files there and run /baddon reload.`
+            `No packs in ${ansi.named.name('packs/')}. Put .mcpack or .mcaddon files there and run /baddon reload.`,
         ]);
     });
 
@@ -59,8 +59,8 @@ describe('PackIndex', () => {
             'packs/Cool.mcaddon',
             zipSync({
                 'RP/manifest.json': strToU8(JSON.stringify(manifestJson({ uuid: uuid(1) }))),
-                'RP/a.png': noise(100)
-            })
+                'RP/a.png': noise(100),
+            }),
         );
         index.refresh(settings);
         expect(index.entries.map((e) => e.fileName)).toEqual(['Cool.mcpack']);
@@ -83,7 +83,7 @@ describe('PackIndex', () => {
 
     it('opens only packs that are in the list', () => {
         const { files, settings, index } = setup({
-            overrides: { 'hidden.mcpack': { enabled: false } }
+            overrides: { 'hidden.mcpack': { enabled: false } },
         });
         files.put('packs/a.mcpack', pack(1)).put('packs/hidden.mcpack', pack(2)).put('packs/secret.txt', 'x');
         index.refresh(settings);

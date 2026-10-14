@@ -25,7 +25,7 @@ export function generateTypes(args = process.argv) {
     execFileSync(
         process.execPath,
         [jco, 'guest-types', witDir, '-n', 'plugin', '-o', outputDirectory, '--name', 'index', '--quiet'],
-        { cwd: apiRoot, stdio: 'inherit' }
+        { cwd: apiRoot, stdio: 'inherit' },
     );
 }
 

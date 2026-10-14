@@ -18,8 +18,8 @@ const uuidMocks = vi.hoisted(() => ({
     toString: vi.fn((id: { high: bigint; low: bigint }) =>
         id.high === 0x123456789abcdef0n
             ? '11111111-1111-4111-8111-111111111111'
-            : '22222222-2222-4222-8222-222222222222'
-    )
+            : '22222222-2222-4222-8222-222222222222',
+    ),
 }));
 
 vi.mock('pumpkin:plugin/uuid@0.1.0', () => uuidMocks);
@@ -39,7 +39,7 @@ vi.mock('pumpkin:plugin/text@0.1.0', () => ({
         [Symbol.dispose]() {
             uuidMocks.disposedTextComponents += 1;
         }
-    }
+    },
 }));
 
 const serviceModule = await import('./pumpkin-hud.ts').catch(() => ({}) as typeof import('./pumpkin-hud.ts'));
@@ -47,14 +47,14 @@ const WaypointHudServiceConstructor = serviceModule.WaypointHudService as
     | (new (
           server: Server,
           catalog: WaypointCatalog,
-          options?: { onError?: (viewerId: string, error: unknown) => void }
+          options?: { onError?: (viewerId: string, error: unknown) => void },
       ) => WaypointHudService)
     | undefined;
 
 function createService(
     server: Server,
     catalog: WaypointCatalog,
-    options?: { onError?: (viewerId: string, error: unknown) => void }
+    options?: { onError?: (viewerId: string, error: unknown) => void },
 ): WaypointHudService {
     if (WaypointHudServiceConstructor === undefined) throw new Error('Waypoint HUD service is unavailable.');
     return new WaypointHudServiceConstructor(server, catalog, options);
@@ -72,7 +72,7 @@ describe('WaypointHudService', () => {
         const supported = makePlayer(viewerId, 'v-26-3');
         const server = {
             getAllPlayers: () => [unsupported.player, supported.player],
-            getOpManager: () => ({ isOp: () => false, [Symbol.dispose]: vi.fn() })
+            getOpManager: () => ({ isOp: () => false, [Symbol.dispose]: vi.fn() }),
         } as unknown as Server;
         const catalog = new WaypointCatalog(new WaypointStore(new MemoryFiles(), new MemoryLogger()));
         catalog.create({
@@ -80,7 +80,7 @@ describe('WaypointHudService', () => {
             name: 'Open',
             dimension: 'overworld',
             position: { x: 0, y: 64, z: 10 },
-            access: { mode: 'public', grants: [] }
+            access: { mode: 'public', grants: [] },
         });
         const errors: unknown[] = [];
         const service = createService(server, catalog, { onError: (_id, error) => errors.push(error) });
@@ -101,7 +101,7 @@ describe('WaypointHudService', () => {
         const opManager = { isOp: vi.fn(() => false), [Symbol.dispose]: vi.fn() };
         const server = {
             getAllPlayers: () => players,
-            getOpManager: () => opManager
+            getOpManager: () => opManager,
         } as unknown as Server;
         const catalog = new WaypointCatalog(new WaypointStore(new MemoryFiles(), new MemoryLogger()));
         catalog.create({
@@ -109,7 +109,7 @@ describe('WaypointHudService', () => {
             name: 'Restricted',
             dimension: 'overworld',
             position: { x: 0, y: 64, z: 10 },
-            access: { mode: 'restricted', grants: [{ type: 'player', playerId: viewerId }] }
+            access: { mode: 'restricted', grants: [{ type: 'player', playerId: viewerId }] },
         });
         const service = createService(server, catalog);
 
@@ -119,7 +119,7 @@ describe('WaypointHudService', () => {
         expect(authorized.packets.map(({ tag }) => tag)).toEqual([
             'c-spawn-entity',
             'c-set-entity-metadata',
-            'c-remove-entities'
+            'c-remove-entities',
         ]);
         expect(unauthorized.packets).toEqual([]);
         expect(oldClient.packets).toEqual([]);
@@ -141,7 +141,7 @@ describe('WaypointHudService', () => {
         const players = [failing.player, staying.player];
         const server = {
             getAllPlayers: () => players,
-            getOpManager: () => ({ isOp: () => true, [Symbol.dispose]: vi.fn() })
+            getOpManager: () => ({ isOp: () => true, [Symbol.dispose]: vi.fn() }),
         } as unknown as Server;
         const catalog = new WaypointCatalog(new WaypointStore(new MemoryFiles(), new MemoryLogger()));
         catalog.create({
@@ -149,7 +149,7 @@ describe('WaypointHudService', () => {
             name: 'Open',
             dimension: 'overworld',
             position: { x: 0, y: 64, z: 10 },
-            access: { mode: 'public', grants: [] }
+            access: { mode: 'public', grants: [] },
         });
         const errors: string[] = [];
         const service = createService(server, catalog, { onError: (id) => errors.push(id) });
@@ -161,7 +161,7 @@ describe('WaypointHudService', () => {
         expect(staying.packets.map(({ tag }) => tag)).toEqual([
             'c-spawn-entity',
             'c-set-entity-metadata',
-            'c-remove-entities'
+            'c-remove-entities',
         ]);
     });
 
@@ -169,7 +169,7 @@ describe('WaypointHudService', () => {
         const client = makePlayer(viewerId, 'v-26-3');
         const server = {
             getAllPlayers: () => [client.player],
-            getOpManager: () => ({ isOp: () => false, [Symbol.dispose]: vi.fn() })
+            getOpManager: () => ({ isOp: () => false, [Symbol.dispose]: vi.fn() }),
         } as unknown as Server;
         const catalog = new WaypointCatalog(new WaypointStore(new MemoryFiles(), new MemoryLogger()));
         catalog.create({
@@ -177,7 +177,7 @@ describe('WaypointHudService', () => {
             name: 'North',
             dimension: 'overworld',
             position: { x: 0, y: 65.62, z: 20 },
-            access: { mode: 'public', grants: [] }
+            access: { mode: 'public', grants: [] },
         });
         const service = createService(server, catalog);
 
@@ -192,7 +192,7 @@ describe('WaypointHudService', () => {
             'c-spawn-entity',
             'c-set-entity-metadata',
             'c-update-entity-pos',
-            'c-set-entity-metadata'
+            'c-set-entity-metadata',
         ]);
         const initial = client.packets[0]?.val.position as number[];
         expect(Math.hypot(initial[0] ?? 0, (initial[1] ?? 0) - 65.62, initial[2] ?? 0)).toBeCloseTo(10.9387, 3);
@@ -207,7 +207,7 @@ describe('WaypointHudService', () => {
         const client = makePlayer(viewerId, 'v-26-3');
         const server = {
             getAllPlayers: () => [client.player],
-            getOpManager: () => ({ isOp: () => false, [Symbol.dispose]: vi.fn() })
+            getOpManager: () => ({ isOp: () => false, [Symbol.dispose]: vi.fn() }),
         } as unknown as Server;
         const catalog = new WaypointCatalog(new WaypointStore(new MemoryFiles(), new MemoryLogger()));
         catalog.create({
@@ -215,7 +215,7 @@ describe('WaypointHudService', () => {
             name: 'North',
             dimension: 'overworld',
             position: { x: 10, y: 64, z: 20 },
-            access: { mode: 'public', grants: [] }
+            access: { mode: 'public', grants: [] },
         });
         const service = createService(server, catalog);
         service.tick();
@@ -227,7 +227,7 @@ describe('WaypointHudService', () => {
         service.tick();
         expect(client.packets.filter(({ tag }) => tag === 'c-spawn-entity')).toHaveLength(1);
         expect(client.packets.some(({ tag }) => tag === 'c-update-entity-pos' || tag === 'c-remove-entities')).toBe(
-            false
+            false,
         );
     });
 });
@@ -237,7 +237,7 @@ function makePlayer(id: string, version: string, fail = false) {
     const playerUuid = id === viewerId ? exactPlayerUuid : { high: 5n, low: 6n };
     const pose = {
         position: [0, 64, 0] as readonly number[],
-        eye: [0, 65.62, 0] as readonly number[]
+        eye: [0, 65.62, 0] as readonly number[],
     };
     const java = {
         getVersion: () => version,
@@ -245,7 +245,7 @@ function makePlayer(id: string, version: string, fail = false) {
             if (fail) throw new Error('client disconnected');
             packets.push(packet);
         },
-        [Symbol.dispose]: vi.fn()
+        [Symbol.dispose]: vi.fn(),
     };
     const world = { getName: () => 'overworld', [Symbol.dispose]: vi.fn() };
     const entity = { getEyePosition: () => pose.eye, [Symbol.dispose]: vi.fn() };
@@ -262,7 +262,7 @@ function makePlayer(id: string, version: string, fail = false) {
         getPitch,
         getWorld: () => world,
         hasPermission: () => false,
-        [Symbol.dispose]: vi.fn()
+        [Symbol.dispose]: vi.fn(),
     } as unknown as Player;
     return { player, packets, java, world, entity, asEntity, getYaw, getPitch, pose };
 }

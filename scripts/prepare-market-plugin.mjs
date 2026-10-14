@@ -17,12 +17,12 @@ export function prepareMarketPlugin(wasm, expected) {
     }
     if (verification.metadata.plugin_name !== expected.pluginName) {
         throw new Error(
-            `signed release artifact plugin name ${JSON.stringify(verification.metadata.plugin_name)} does not match ${JSON.stringify(expected.pluginName)}`
+            `signed release artifact plugin name ${JSON.stringify(verification.metadata.plugin_name)} does not match ${JSON.stringify(expected.pluginName)}`,
         );
     }
     if (verification.metadata.version !== expected.version) {
         throw new Error(
-            `signed release artifact version ${JSON.stringify(verification.metadata.version)} does not match ${JSON.stringify(expected.version)}`
+            `signed release artifact version ${JSON.stringify(verification.metadata.version)} does not match ${JSON.stringify(expected.version)}`,
         );
     }
     return stripSignature(wasm).clean;

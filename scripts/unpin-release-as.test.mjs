@@ -25,7 +25,7 @@ function repo(versions, actionVersions = {}) {
         fs.mkdirSync(path.join(dir, 'packages', name), { recursive: true });
         fs.writeFileSync(
             path.join(dir, 'packages', name, 'package.json'),
-            `${JSON.stringify({ name, version }, null, 4)}\n`
+            `${JSON.stringify({ name, version }, null, 4)}\n`,
         );
     }
     for (const [name, version] of Object.entries(actionVersions)) {
@@ -41,7 +41,7 @@ function repo(versions, actionVersions = {}) {
 function run(dir) {
     const result = spawnSync('node', [path.join(scripts, 'unpin-release-as.mjs')], {
         env: { ...process.env, PUMPKIN_PLUGINS_ROOT: dir },
-        encoding: 'utf8'
+        encoding: 'utf8',
     });
     return { ok: result.status === 0, out: `${result.stdout}${result.stderr}` };
 }
@@ -61,7 +61,7 @@ describe('unpin-release-as', () => {
         assert.ok(result.ok, result.out);
         assert.deepEqual(read().packages['actions/publish-action'], {
             component: 'publish-action',
-            'release-type': 'simple'
+            'release-type': 'simple',
         });
         assert.match(result.out, /actions\/publish-action \(at 0\.0\.1\)/);
     });
@@ -73,7 +73,7 @@ describe('unpin-release-as', () => {
         assert.deepEqual(read().packages['packages/released'], { component: 'released' });
         assert.deepEqual(read().packages['packages/waiting'], {
             component: 'waiting',
-            'release-as': '0.0.1'
+            'release-as': '0.0.1',
         });
         assert.match(result.out, /No plugin is past its first release|packages\/released/);
     });
@@ -85,7 +85,7 @@ describe('unpin-release-as', () => {
         assert.deepEqual(read().packages['actions/waiting'], {
             component: 'waiting',
             'release-type': 'simple',
-            'release-as': '0.0.1'
+            'release-as': '0.0.1',
         });
     });
 
@@ -95,11 +95,11 @@ describe('unpin-release-as', () => {
         fs.mkdirSync(path.join(dir, 'tools/build'), { recursive: true });
         fs.writeFileSync(
             path.join(dir, 'tools/build/package.json'),
-            `${JSON.stringify({ name: '@pumpkin-plugins/build', version: '0.1.0' }, null, 4)}\n`
+            `${JSON.stringify({ name: '@pumpkin-plugins/build', version: '0.1.0' }, null, 4)}\n`,
         );
         fs.writeFileSync(
             path.join(dir, 'release-please-config.json'),
-            `${JSON.stringify({ packages: { 'tools/build': { component: 'build', 'release-as': '0.1.0' } } }, null, 4)}\n`
+            `${JSON.stringify({ packages: { 'tools/build': { component: 'build', 'release-as': '0.1.0' } } }, null, 4)}\n`,
         );
         const manifestPath = path.join(dir, '.release-please-manifest.json');
         fs.writeFileSync(manifestPath, `${JSON.stringify({ 'tools/build': '0.0.0' }, null, 4)}\n`);
@@ -107,14 +107,14 @@ describe('unpin-release-as', () => {
         assert.ok(run(dir).ok);
         assert.equal(
             fs.readFileSync(path.join(dir, 'release-please-config.json'), 'utf8').includes('release-as'),
-            true
+            true,
         );
 
         fs.writeFileSync(manifestPath, `${JSON.stringify({ 'tools/build': '0.1.0' }, null, 4)}\n`);
         assert.ok(run(dir).ok);
         assert.equal(
             fs.readFileSync(path.join(dir, 'release-please-config.json'), 'utf8').includes('release-as'),
-            false
+            false,
         );
     });
 
@@ -125,7 +125,7 @@ describe('unpin-release-as', () => {
         assert.equal(fs.readFileSync(path.join(dir, 'release-please-config.json'), 'utf8'), before);
         assert.deepEqual(read().packages['packages/waiting'], {
             component: 'waiting',
-            'release-as': '0.0.1'
+            'release-as': '0.0.1',
         });
     });
 

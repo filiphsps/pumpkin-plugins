@@ -11,7 +11,7 @@ import {
     assertPublicToolPackageContents,
     assertStarterToolDependencies,
     PUBLIC_TOOL_PACKAGE_PATHS,
-    parseTarEntries
+    parseTarEntries,
 } from './tool-packages.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -31,7 +31,7 @@ const packagePaths = buildCliOnly
           'tools/docs',
           'tools/update-check',
           'tools/plugin-kit',
-          'tools/create-pumpkin-plugin'
+          'tools/create-pumpkin-plugin',
       ];
 const requiredNodeVersion = 'v24.21.0';
 const requiredPnpmVersion = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8')).devEngines
@@ -62,10 +62,10 @@ try {
     const tarballDirectory = path.join(temporaryRoot, 'tarballs');
     const consumerDirectory = path.join(temporaryRoot, 'consumer');
     const storeDirectory = path.resolve(
-        process.env.PUMPKIN_EXTERNAL_CONSUMER_PNPM_STORE_DIR ?? path.join(temporaryRoot, 'pnpm-store')
+        process.env.PUMPKIN_EXTERNAL_CONSUMER_PNPM_STORE_DIR ?? path.join(temporaryRoot, 'pnpm-store'),
     );
     const cacheDirectory = path.resolve(
-        process.env.STATIC_HERMES_CACHE_DIR ?? path.join(temporaryRoot, 'cache', 'hermes')
+        process.env.STATIC_HERMES_CACHE_DIR ?? path.join(temporaryRoot, 'cache', 'hermes'),
     );
     const pnpmConfigDirectory = path.join(temporaryRoot, 'pnpm-config');
     fs.mkdirSync(tarballDirectory, { recursive: true });
@@ -81,7 +81,7 @@ try {
             [...packageManager.args, 'pack', '--pack-destination', tarballDirectory],
             packageDirectory,
             process.env,
-            ['ignore', 'ignore', 'inherit']
+            ['ignore', 'ignore', 'inherit'],
         );
         const packageJson = JSON.parse(fs.readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'));
         const tarball = fs
@@ -90,7 +90,7 @@ try {
         if (!tarball) throw new Error(`pnpm pack did not create a tarball for ${packageJson.name}`);
         const tarballPath = path.join(tarballDirectory, tarball);
         const packedPackageJson = JSON.parse(
-            execFileSync('tar', ['-xOf', tarballPath, 'package/package.json'], { encoding: 'utf8' })
+            execFileSync('tar', ['-xOf', tarballPath, 'package/package.json'], { encoding: 'utf8' }),
         );
         if (packedPackageJson.name !== packageJson.name) {
             throw new Error(`Packed package name changed from ${packageJson.name} to ${packedPackageJson.name}`);
@@ -107,12 +107,12 @@ try {
         packedPackages.set(packedPackageJson.name, {
             packageJson: packedPackageJson,
             filename: tarball,
-            bytes: fs.readFileSync(tarballPath)
+            bytes: fs.readFileSync(tarballPath),
         });
     }
 
     const packedToolVersions = Object.fromEntries(
-        [...packedPackages].map(([name, { packageJson }]) => [name, packageJson.version])
+        [...packedPackages].map(([name, { packageJson }]) => [name, packageJson.version]),
     );
     assertPackedBuilderDependencies(packedPackages.get('@pumpkin-plugins/build').packageJson, packedToolVersions);
     if (!buildCliOnly) {
@@ -124,10 +124,10 @@ try {
                     [
                         '-xOf',
                         path.join(tarballDirectory, creatorPackage.filename),
-                        `package/templates/${language}/package.json`
+                        `package/templates/${language}/package.json`,
                     ],
-                    { encoding: 'utf8' }
-                )
+                    { encoding: 'utf8' },
+                ),
             );
             assertStarterToolDependencies(templatePackageJson, packedToolVersions);
         }
@@ -146,7 +146,7 @@ try {
     fs.writeFileSync(authFilePath, '');
     fs.writeFileSync(
         path.join(pnpmConfigDirectory, 'pnpm', 'config.yaml'),
-        `storeDir: ${JSON.stringify(storeDirectory)}\nminimumReleaseAge: 0\nnpmrcAuthFile: ${JSON.stringify(authFilePath)}\n`
+        `storeDir: ${JSON.stringify(storeDirectory)}\nminimumReleaseAge: 0\nnpmrcAuthFile: ${JSON.stringify(authFilePath)}\n`,
     );
     const environment = {
         ...process.env,
@@ -154,7 +154,7 @@ try {
         XDG_CONFIG_HOME: pnpmConfigDirectory,
         pnpm_config_registry: registryUrl,
         STATIC_HERMES_CACHE_DIR: cacheDirectory,
-        CI: 'true'
+        CI: 'true',
     };
 
     const builderConsumer = path.join(temporaryRoot, 'builder-consumer');
@@ -167,16 +167,16 @@ try {
                 private: true,
                 packageManager: `pnpm@${requiredPnpmVersion}`,
                 dependencies: {
-                    '@pumpkin-plugins/build': `^${packedPackages.get('@pumpkin-plugins/build').packageJson.version}`
-                }
+                    '@pumpkin-plugins/build': `^${packedPackages.get('@pumpkin-plugins/build').packageJson.version}`,
+                },
             },
             null,
-            2
-        )}\n`
+            2,
+        )}\n`,
     );
     fs.writeFileSync(
         path.join(builderConsumer, 'pnpm-workspace.yaml'),
-        `packages:\n  - .\nhoist: false\nregistries:\n  default: ${JSON.stringify(registryUrl)}\n  "@pumpkin-plugins": ${JSON.stringify(registryUrl)}\nallowBuilds:\n  esbuild: true\nminimumReleaseAge: 0\n`
+        `packages:\n  - .\nhoist: false\nregistries:\n  default: ${JSON.stringify(registryUrl)}\n  "@pumpkin-plugins": ${JSON.stringify(registryUrl)}\nallowBuilds:\n  esbuild: true\nminimumReleaseAge: 0\n`,
     );
     await run(packageManager.command, [...packageManager.args, 'install', '--prod'], builderConsumer, environment);
     if (fs.existsSync(path.join(builderConsumer, 'node_modules', 'typescript'))) {
@@ -186,7 +186,7 @@ try {
         packageManager.command,
         [...packageManager.args, 'exec', 'pumpkin-plugins-build', '--help'],
         builderConsumer,
-        { ...environment, NODE_PATH: '' }
+        { ...environment, NODE_PATH: '' },
     );
     if (!help.includes('--types-only')) {
         throw new Error(`Packed build CLI did not print its supported commands: ${help}`);
@@ -195,7 +195,7 @@ try {
 
     if (!buildCliOnly) {
         const dependencies = Object.fromEntries(
-            [...packedPackages].map(([name, { packageJson }]) => [name, `^${packageJson.version}`])
+            [...packedPackages].map(([name, { packageJson }]) => [name, `^${packageJson.version}`]),
         );
         fs.writeFileSync(
             path.join(consumerDirectory, 'package.json'),
@@ -205,21 +205,21 @@ try {
                     version: '1.0.0',
                     private: true,
                     packageManager: `pnpm@${requiredPnpmVersion}`,
-                    dependencies
+                    dependencies,
                 },
                 null,
-                2
-            )}\n`
+                2,
+            )}\n`,
         );
         fs.writeFileSync(
             path.join(consumerDirectory, 'pnpm-workspace.yaml'),
-            `packages:\n  - .\n  - "*/"\nregistries:\n  default: ${JSON.stringify(registryUrl)}\n  "@pumpkin-plugins": ${JSON.stringify(registryUrl)}\nallowBuilds:\n  esbuild: true\nminimumReleaseAge: 0\n`
+            `packages:\n  - .\n  - "*/"\nregistries:\n  default: ${JSON.stringify(registryUrl)}\n  "@pumpkin-plugins": ${JSON.stringify(registryUrl)}\nallowBuilds:\n  esbuild: true\nminimumReleaseAge: 0\n`,
         );
         const effectiveRegistry = await capture(
             packageManager.command,
             [...packageManager.args, 'config', 'get', 'registry'],
             consumerDirectory,
-            environment
+            environment,
         );
         if (effectiveRegistry.trim() !== registryUrl) {
             throw new Error(`Temporary consumer registry is not active: ${effectiveRegistry.trim()}`);
@@ -241,13 +241,13 @@ try {
             packageManager.command,
             [...packageManager.args, 'exec', 'create-pumpkin-plugin', 'packed-bin', '--ts', '--skip-install'],
             consumerDirectory,
-            environment
+            environment,
         );
         assertStarter(path.join(consumerDirectory, 'packed-bin'), 'typescript', pnpmVersion.trim(), packedToolVersions);
 
         for (const [directory, language] of [
             ['pnpm-create-typescript', 'typescript'],
-            ['pnpm-create-javascript', 'javascript']
+            ['pnpm-create-javascript', 'javascript'],
         ]) {
             await run(
                 packageManager.command,
@@ -256,10 +256,10 @@ try {
                     'create',
                     'pumpkin-plugin',
                     directory,
-                    language === 'typescript' ? '--ts' : '--js'
+                    language === 'typescript' ? '--ts' : '--js',
                 ],
                 consumerDirectory,
-                environment
+                environment,
             );
             const starter = path.join(consumerDirectory, directory);
             assertStarter(starter, language, pnpmVersion.trim(), packedToolVersions);
@@ -333,7 +333,7 @@ function assertPumpkinApiPackageContents(tarballPath) {
     }
 
     const bundledWit = entries.find(
-        (entry) => entry === 'package/wit' || entry.startsWith('package/wit/') || entry.endsWith('.wit')
+        (entry) => entry === 'package/wit' || entry.startsWith('package/wit/') || entry.endsWith('.wit'),
     );
     if (bundledWit) throw new Error(`Packed Pumpkin API package contains vendored WIT: ${bundledWit}`);
 
@@ -369,7 +369,7 @@ function assertPumpkinWitCacheIgnored(starter, store) {
     if (!matchingDigest) throw new Error(`Cache for the API package's pinned WIT source is missing: ${witCache}`);
 
     const cachedWit = findFilesNamed(path.join(witCache, matchingDigest), 'plugin.wit').find((filename) =>
-        /\bworld\s+plugin\s*\{/.test(fs.readFileSync(filename, 'utf8'))
+        /\bworld\s+plugin\s*\{/.test(fs.readFileSync(filename, 'utf8')),
     );
     if (!cachedWit) throw new Error(`Fetched Pumpkin WIT does not contain the plugin world: ${witCache}`);
     if (isWithin(path.join(starter, 'node_modules'), cachedWit) || isWithin(store, cachedWit)) {
@@ -421,7 +421,7 @@ function capture(command, args, cwd, env = process.env) {
         child.stdout.setEncoding('utf8').on('data', (chunk) => (output += chunk));
         child.once('error', reject);
         child.once('close', (code) =>
-            code === 0 ? resolve(output) : reject(new Error(`${command} exited with ${code}`))
+            code === 0 ? resolve(output) : reject(new Error(`${command} exited with ${code}`)),
         );
     });
 }

@@ -11,10 +11,10 @@ import { parseHttpUrl, resolveUrl } from './url.ts';
 
 /** A WAN connection service of a gateway: where to send its SOAP actions. */
 export interface ControlPoint {
-    /** For example `urn:schemas-upnp-org:service:WANIPConnection:1`. */
-    serviceType: string;
     /** Absolute `http://` URL of the service's control endpoint. */
     controlUrl: string;
+    /** For example `urn:schemas-upnp-org:service:WANIPConnection:1`. */
+    serviceType: string;
 }
 
 /** An error code a gateway answered a SOAP action with. */
@@ -22,7 +22,7 @@ export class UpnpError extends Error {
     /** Creates the error from the gateway's code and text. */
     constructor(
         readonly code: number,
-        description: string
+        description: string,
     ) {
         super(`${description || 'UPnP error'} (${code})`);
     }
@@ -89,7 +89,7 @@ export function parseIdentity(xml: string): RouterIdentity | undefined {
         model: field('modelName'),
         modelNumber: field('modelNumber'),
         name: field('friendlyName'),
-        source: 'upnp'
+        source: 'upnp',
     };
     return identity.manufacturer || identity.model || identity.modelNumber || identity.name ? identity : undefined;
 }
@@ -158,7 +158,7 @@ export class UpnpGateway implements Gateway {
      */
     constructor(
         private readonly net: Network,
-        private readonly control: ControlPoint
+        private readonly control: ControlPoint,
     ) {
         const url = parseHttpUrl(control.controlUrl);
         if (!url) throw new Error(`cannot use the control URL ${control.controlUrl}`);
@@ -188,7 +188,7 @@ export class UpnpGateway implements Gateway {
                     ['NewInternalClient', formatIpv4(internalClient)],
                     ['NewEnabled', 1],
                     ['NewPortMappingDescription', request.description],
-                    ['NewLeaseDuration', lease]
+                    ['NewLeaseDuration', lease],
                 ]);
                 return { externalPort: request.externalPort, leaseSeconds: lease };
             } catch (err) {
@@ -209,7 +209,7 @@ export class UpnpGateway implements Gateway {
             yield* this.action('DeletePortMapping', [
                 ['NewRemoteHost', ''],
                 ['NewExternalPort', request.externalPort],
-                ['NewProtocol', request.protocol.toUpperCase()]
+                ['NewProtocol', request.protocol.toUpperCase()],
             ]);
         } catch (err) {
             // 714: there was no such mapping, which is what we wanted.
@@ -223,9 +223,9 @@ export class UpnpGateway implements Gateway {
             path: this.path,
             headers: {
                 'Content-Type': 'text/xml; charset="utf-8"',
-                SOAPAction: `"${this.control.serviceType}#${name}"`
+                SOAPAction: `"${this.control.serviceType}#${name}"`,
             },
-            body: soapEnvelope(this.control.serviceType, name, args)
+            body: soapEnvelope(this.control.serviceType, name, args),
         });
         if (response.status !== 200 && response.status !== 500)
             throw new Error(`the router answered ${response.status}`);

@@ -14,7 +14,7 @@ describe('DH world mutation events', () => {
             }),
             [Symbol.dispose]: vi.fn(() => {
                 disposed = true;
-            })
+            }),
         };
 
         invalidateBlockGrow(sessions, {
@@ -24,7 +24,7 @@ describe('DH world mutation events', () => {
             newBlock: 'minecraft:wheat',
             newStateId: 2,
             blockPos: { x: 64, y: 70, z: -1 },
-            cancelled: false
+            cancelled: false,
         });
 
         expect(changedMany).toHaveBeenCalledWith('world', [{ x: 64, z: -1 }]);
@@ -43,7 +43,7 @@ describe('DH world mutation events', () => {
             }),
             [Symbol.dispose]: vi.fn(() => {
                 disposed = true;
-            })
+            }),
         };
 
         invalidateBlockSpread(sessions, {
@@ -51,7 +51,7 @@ describe('DH world mutation events', () => {
             targetPos: { x: 65, y: 71, z: -1 },
             targetWorld: world as never,
             newStateId: 3,
-            cancelled: false
+            cancelled: false,
         });
 
         expect(changedMany).toHaveBeenCalledWith('world', [{ x: 65, z: -1 }]);
@@ -70,7 +70,7 @@ describe('DH world mutation events', () => {
             }),
             [Symbol.dispose]: vi.fn(() => {
                 disposed = true;
-            })
+            }),
         };
         const position = { x: 1, y: 70, z: 2 };
 
@@ -82,7 +82,7 @@ describe('DH world mutation events', () => {
                 newBlock: 'minecraft:wheat',
                 newStateId: 2,
                 blockPos: position,
-                cancelled: true
+                cancelled: true,
             });
         } else {
             invalidateBlockSpread(sessions, {
@@ -90,7 +90,7 @@ describe('DH world mutation events', () => {
                 targetPos: position,
                 targetWorld: world as never,
                 newStateId: 3,
-                cancelled: true
+                cancelled: true,
             });
         }
 

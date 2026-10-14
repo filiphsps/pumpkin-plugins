@@ -33,7 +33,7 @@ function readDisabledPlayers(files: DataFiles): Set<string> {
     try {
         const value: unknown = JSON.parse(strFromU8(files.readFile(PREFERENCES_FILE)));
         return new Set(
-            Array.isArray(value) ? value.filter((player): player is string => typeof player === 'string') : []
+            Array.isArray(value) ? value.filter((player): player is string => typeof player === 'string') : [],
         );
     } catch {
         return new Set();

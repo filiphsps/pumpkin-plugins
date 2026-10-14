@@ -35,9 +35,9 @@ const metadata = {
             name,
             ...(typeof command.permission === 'string' ? { permission: command.permission } : {}),
             description: { 'en-US': command.description },
-            display_order: index
+            display_order: index,
         };
-    })
+    }),
 };
 
 console.log(JSON.stringify(metadata, null, 2));

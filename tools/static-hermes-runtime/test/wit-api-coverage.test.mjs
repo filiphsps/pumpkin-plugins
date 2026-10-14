@@ -26,7 +26,7 @@ import {
     generateWitSimpleMethodDispatch,
     planWasiAdapterDispatch,
     readWasiWitImports,
-    readWitPackage
+    readWitPackage,
 } from './oracles/wit-api.mjs';
 
 const directories = [];
@@ -43,7 +43,7 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
     directories.push(directory);
     const apiWitDir = ensurePumpkinWit({
         lockFile: witLockFile,
-        cacheRoot: cacheDir(import.meta.dirname)
+        cacheRoot: cacheDir(import.meta.dirname),
     });
     const sourceWit = parsePumpkinWitPin(fs.readFileSync(witLockFile, 'utf8'), witLockFile);
 
@@ -55,7 +55,7 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
         target: path.join(directory, 'wit'),
         interfaces: imports,
         wasiWit,
-        wasiFiles: Object.keys(lock.files)
+        wasiFiles: Object.keys(lock.files),
     });
     const apiPackage = readWitPackage(witDir);
     const wasiPackage = readWasiWitImports(witDir);
@@ -63,8 +63,8 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
     const apiMethods = apiPackage.interfaces.flatMap((apiInterface) => [
         ...apiInterface.functions.map((operation) => `${apiInterface.name}.${operation.name}`),
         ...apiInterface.resources.flatMap((resource) =>
-            resource.functions.map((operation) => `${apiInterface.name}.${resource.name}.${operation.name}`)
-        )
+            resource.functions.map((operation) => `${apiInterface.name}.${resource.name}.${operation.name}`),
+        ),
     ]);
     const operationInventoryPath = path.join(runtimeRoot, 'test/fixtures/pumpkin-api-operation-inventory.json');
     expect(fs.existsSync(operationInventoryPath)).toBe(true);
@@ -78,15 +78,15 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
         sourceWit,
         sourceWitSha256: digestWitDirectory(apiWitDir),
         pumpkinRelease: PUMPKIN_RELEASE,
-        operationCount: apiMethods.length
+        operationCount: apiMethods.length,
     });
     const mappedOperations = operationInventory.operations.map(({ operationId }) => operationId).sort();
     expect(mappedOperations).toEqual([...apiMethods].sort());
     const wasiMethods = wasiPackage.interfaces.flatMap((apiInterface) => [
         ...apiInterface.functions.map((operation) => `${apiInterface.specifier}#${operation.name}`),
         ...apiInterface.resources.flatMap((resource) =>
-            resource.functions.map((operation) => `${apiInterface.specifier}#${resource.name}.${operation.name}`)
-        )
+            resource.functions.map((operation) => `${apiInterface.specifier}#${resource.name}.${operation.name}`),
+        ),
     ]);
 
     const pumpkinDispatch = generateWitSimpleMethodDispatch(apiPackage, '', apiMethods);
@@ -118,7 +118,7 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
             apiPackage.interfaces
                 .find((apiInterface) => apiInterface.name === 'event')
                 .records.find((record) => record.name === variant.type).fields.length,
-        0
+        0,
     );
     expect(count(eventDispatch, /case PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_/g)).toBe(eventVariant.cases.length);
     expect(count(eventDispatch, /data\.setProperty\(runtime,/g)).toBeGreaterThanOrEqual(eventFieldCount);
@@ -129,7 +129,7 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
         workspaceRoot,
         includeWasiSdk: false,
         includeWitBindgen: false,
-        includeWasmTools: true
+        includeWasmTools: true,
     });
     const wasmTools = process.env.WASM_TOOLS ?? toolchain.WASM_TOOLS;
     const declarationOrder = readInterfaceDeclarationOrder(witDir);
@@ -141,14 +141,14 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
     const typedAnalysis = analyzeWitUsage(resolved, {
         pluginImportOrder: importsInOrder,
         wasiImports: typedWasi.imports,
-        apiMethods
+        apiMethods,
     });
     const typedApiOperationCount = typedApi.interfaces.reduce(
         (total, apiInterface) =>
             total +
             apiInterface.functions.length +
             apiInterface.resources.reduce((resources, resource) => resources + resource.functions.length, 0),
-        0
+        0,
     );
     expect(document.packages).toHaveLength(6);
     expect(document.interfaces).toHaveLength(63);
@@ -172,8 +172,8 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
                       ...operation,
                       parameters: operation.parameters.map((parameter) => ({
                           ...parameter,
-                          type: 'unresolved-source-type'
-                      }))
+                          type: 'unresolved-source-type',
+                      })),
                   }
                 : operation;
         };
@@ -182,8 +182,8 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
             functions: apiInterface.functions.map((operation) => replaceSourceType(operation)),
             resources: apiInterface.resources.map((resource) => ({
                 ...resource,
-                functions: resource.functions.map((operation) => replaceSourceType(operation, resource))
-            }))
+                functions: resource.functions.map((operation) => replaceSourceType(operation, resource)),
+            })),
         };
     });
     expect(emitWasiAdapterDispatch(unresolvedSourceInterfaces, typedAnalysis)).toBe(wasiDispatch);
@@ -192,8 +192,8 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
         .flatMap((apiInterface) => [
             ...apiInterface.functions.map((operation) => ({ apiInterface, operation })),
             ...apiInterface.resources.flatMap((resource) =>
-                resource.functions.map((operation) => ({ apiInterface, operation, resource }))
-            )
+                resource.functions.map((operation) => ({ apiInterface, operation, resource })),
+            ),
         ])
         .find(({ apiInterface, operation, resource }) => {
             const operationId = `${apiInterface.name}.${resource ? `${resource.name}.` : ''}${operation.name}`;
@@ -211,8 +211,8 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
                           ...operation,
                           parameters: operation.parameters.map((parameter) => ({
                               ...parameter,
-                              type: 'unresolved-source-type'
-                          }))
+                              type: 'unresolved-source-type',
+                          })),
                       }
                     : operation;
             };
@@ -221,29 +221,29 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
                 functions: apiInterface.functions.map((operation) => replaceSourceType(operation)),
                 resources: apiInterface.resources.map((resource) => ({
                     ...resource,
-                    functions: resource.functions.map((operation) => replaceSourceType(operation, resource))
-                }))
+                    functions: resource.functions.map((operation) => replaceSourceType(operation, resource)),
+                })),
             };
-        })
+        }),
     };
     const typedPumpkinDispatch = emitPumpkinMethodDispatch(unresolvedApiTypes, typedAnalysis);
     expect(typedPumpkinDispatch).toBe(pumpkinDispatch);
 
     expect(typedApi.interfaces.map((apiInterface) => generateEsmFacade(apiInterface, typedApi.interfaces))).toEqual(
-        apiPackage.interfaces.map((apiInterface) => generateEsmFacade(apiInterface, apiPackage.interfaces))
+        apiPackage.interfaces.map((apiInterface) => generateEsmFacade(apiInterface, apiPackage.interfaces)),
     );
     expect(typedWasi.interfaces.map((apiInterface) => generateWasiEsmFacade(apiInterface))).toEqual(
-        wasiPackage.interfaces.map((apiInterface) => generateWasiEsmFacade(apiInterface))
+        wasiPackage.interfaces.map((apiInterface) => generateWasiEsmFacade(apiInterface)),
     );
     const runtimeTemplate = fs.readFileSync(
         new URL('../src/component/templates/runtime-shim.template', import.meta.url),
-        'utf8'
+        'utf8',
     );
     const apiEnumSpecs = [
         ['event', 'event-type', 'PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_'],
         ['event', 'event-priority', 'PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_'],
         ['game-rules', 'game-rule', 'PUMPKIN_PLUGIN_GAME_RULES_GAME_RULE_'],
-        ['common', 'named-color', 'PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_']
+        ['common', 'named-color', 'PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_'],
     ];
     const pluginHeader = apiEnumSpecs
         .flatMap(([interfaceName, enumName, prefix]) => {
@@ -267,7 +267,7 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
         apiPackage: typedApi,
         wasiInterfaces: typedWasi.interfaces,
         pluginHeader,
-        runtimeTemplate
+        runtimeTemplate,
     });
     execFileSync(
         process.execPath,
@@ -280,16 +280,16 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
             '--header',
             pluginHeaderPath,
             '--output',
-            legacyApiEnumPath
+            legacyApiEnumPath,
         ],
-        { stdio: 'pipe' }
+        { stdio: 'pipe' },
     );
     expect(typedOutput.apiEnumHeader).toBe(fs.readFileSync(legacyApiEnumPath, 'utf8'));
     // Keep compatibility checks for unaffected adapter sections. Event conversion intentionally
     // diverges from the frozen oracle: callbacks receive and return complete payloads.
     const generatedFreeFunctions = readGeneratedFreeFunctions(fs.readFileSync(pluginHeaderPath, 'utf8'));
     expect(typedOutput.runtimeSource).toContain(
-        emitWasiAdapterDispatch(wasiPackage.interfaces, typedAnalysis, generatedFreeFunctions)
+        emitWasiAdapterDispatch(wasiPackage.interfaces, typedAnalysis, generatedFreeFunctions),
     );
     expect(typedOutput.runtimeSource).toContain('installGeneratedWasiApiFunctions(*jsRuntime);');
     expect(typedOutput.runtimeSource).toContain(generateWitSimpleMethodDispatch(apiPackage, eventSource, apiMethods));
@@ -323,10 +323,10 @@ function allEventAccesses(apiPackage) {
     if (!eventInterface || !event) throw new Error('Pumpkin API WIT has no event variant');
 
     const records = new Map(
-        apiPackage.interfaces.flatMap((apiInterface) => apiInterface.records.map((record) => [record.name, record]))
+        apiPackage.interfaces.flatMap((apiInterface) => apiInterface.records.map((record) => [record.name, record])),
     );
     const aliases = new Map(
-        apiPackage.interfaces.flatMap((apiInterface) => apiInterface.types.map((type) => [type.name, type.type]))
+        apiPackage.interfaces.flatMap((apiInterface) => apiInterface.types.map((type) => [type.name, type.type])),
     );
     const source = [];
 

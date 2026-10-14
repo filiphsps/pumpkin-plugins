@@ -20,7 +20,7 @@ class PieExpansionFixture extends Plugin {
             authors: [],
             description: 'Plan 016 PumpkinPIE integration fixture',
             dependencies: [],
-            permissions: []
+            permissions: [],
         };
     }
 
@@ -29,7 +29,7 @@ class PieExpansionFixture extends Plugin {
         session = new PieSession({ send: ipcSend, now: () => 0 });
         session.registerExpansion('tabdisplayfixture', {
             echo: ({ viewer, argument }) => `${viewer ?? 'server'}:${argument ?? 'none'}`,
-            decline: () => undefined
+            decline: () => undefined,
         });
         this.scheduleDelayedTask(1, () => this.verifyProvider());
 
@@ -60,7 +60,7 @@ class PieExpansionFixture extends Plugin {
                 { text: 'left=%tabdisplayfixture_echo%', viewer: 'Casey' },
                 { text: 'right=%tabdisplayfixture_echo%', viewer: 'Morgan' },
                 { text: '%tabdisplayfixture_decline%', viewer: 'Casey' },
-                { text: '%missing_tabdisplay_value%', viewer: 'Casey' }
+                { text: '%missing_tabdisplay_value%', viewer: 'Casey' },
             ]);
             const argument = current.client.getValue('tabdisplayfixture_echo', 'ArgViewer', 'argument-value');
             const forged = current.router.handle(
@@ -71,9 +71,9 @@ class PieExpansionFixture extends Plugin {
                         namespace: 'tabdisplayfixture',
                         id: 'fixture',
                         name: 'echo',
-                        viewer: 'Spoofed'
-                    })
-                )
+                        viewer: 'Spoofed',
+                    }),
+                ),
             );
             const senderRejected = JSON.parse(strFromU8(forged)).ok === false;
             logging.log('info', `${fixtureName}: ${JSON.stringify({ batch, argument, senderRejected })}`);

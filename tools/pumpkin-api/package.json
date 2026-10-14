@@ -2,19 +2,14 @@
     "name": "@pumpkin-plugins/pumpkin-api",
     "version": "0.1.0",
     "description": "TypeScript API for PumpkinMC plugins",
-    "license": "MIT",
-    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
-    "contributors": [
-        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
-    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/pumpkin-api#readme",
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
         "directory": "tools/pumpkin-api"
-    },
-    "bugs": {
-        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
     },
     "funding": [
         {
@@ -26,10 +21,13 @@
             "url": "https://paypal.me/filiph"
         }
     ],
-    "type": "module",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
     "sideEffects": false,
-    "module": "./src/index.ts",
-    "types": "./src/index.ts",
+    "type": "module",
     "exports": {
         ".": "./src/index.ts",
         "./package.json": "./package.json",
@@ -38,6 +36,9 @@
             "import": "./src/wit.mjs"
         }
     },
+    "main": "./src/index.ts",
+    "module": "./src/index.ts",
+    "types": "./src/index.ts",
     "files": [
         "src/**/*.ts",
         "src/**/*.mts",
@@ -51,17 +52,14 @@
         "README.md",
         "LICENSE"
     ],
-    "publishConfig": {
-        "access": "public"
-    },
     "scripts": {
         "gen:types": "node scripts/gen-types.mjs",
-        "typecheck": "pnpm gen:types && tsc --noEmit",
-        "test": "vitest run --project unit",
-        "test:upstream": "vitest run --project upstream",
-        "test:integration": "vitest run --project integration",
         "readme": "pumpkin-plugins-docs generate docs.ts",
-        "readme:check": "pumpkin-plugins-docs generate docs.ts --check"
+        "readme:check": "pumpkin-plugins-docs generate docs.ts --check",
+        "test": "vitest run --project unit",
+        "test:integration": "vitest run --project integration",
+        "test:upstream": "vitest run --project upstream",
+        "typecheck": "pnpm gen:types && tsc --noEmit"
     },
     "devDependencies": {
         "@bytecodealliance/jco": "catalog:",
@@ -76,5 +74,7 @@
     "engines": {
         "node": ">=24.21.0"
     },
-    "main": "./src/index.ts"
+    "publishConfig": {
+        "access": "public"
+    }
 }

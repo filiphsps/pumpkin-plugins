@@ -8,30 +8,30 @@ export const PLUGIN_NAME = 'BedrockAddonManager';
 
 /** A Pumpkin server running the plugin, with the web server on a known port. */
 export interface Running {
-    server: PumpkinInstance;
-    /** Port the plugin's web server listens on. */
-    port: number;
     /** The plugin's data folder on disk. */
     data: string;
-    /** URL of a path on the plugin's web server. */
-    url(urlPath: string): string;
+    /** Port the plugin's web server listens on. */
+    port: number;
     /** Writes a file into the data folder while the server runs. */
     put(relative: string, content: Uint8Array | string): void;
     /** Reads a file from the data folder. */
     read(relative: string): string;
+    server: PumpkinInstance;
     /** Stops the server. */
     stop(): Promise<void>;
+    /** URL of a path on the plugin's web server. */
+    url(urlPath: string): string;
 }
 
 export interface StartOptions {
-    /** Label for saved server logs. */
-    name: string;
     /** Config file to seed, given the port to use. Omit to let the plugin create it. */
     config?: (port: number) => string;
-    /** Overrides merged into the server's `pumpkin.toml`. */
-    pumpkin?: Record<string, unknown>;
     /** Files to seed in the data folder, by relative path. */
     files?: Record<string, Uint8Array | string>;
+    /** Label for saved server logs. */
+    name: string;
+    /** Overrides merged into the server's `pumpkin.toml`. */
+    pumpkin?: Record<string, unknown>;
 }
 
 /** Starts a Pumpkin server with the built plugin, seeding its data folder first. */
@@ -46,7 +46,7 @@ export async function startPlugin(options: StartOptions): Promise<Running> {
         name: options.name,
         plugins: [builtPluginPath(process.cwd())],
         files,
-        config: options.pumpkin
+        config: options.pumpkin,
     });
     const data = server.pluginDataDir(PLUGIN_NAME);
     return {
@@ -60,7 +60,7 @@ export async function startPlugin(options: StartOptions): Promise<Running> {
             fs.writeFileSync(file, content);
         },
         read: (relative) => fs.readFileSync(path.join(data, relative), 'utf8'),
-        stop: () => server.stop()
+        stop: () => server.stop(),
     };
 }
 

@@ -3,19 +3,14 @@
     "version": "0.1.0",
     "private": true,
     "description": "Asks UPnPumpkin to open a port",
-    "license": "MIT",
-    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
-    "contributors": [
-        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
-    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/apis/upnpumpkin-api#readme",
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
         "directory": "tools/apis/upnpumpkin-api"
-    },
-    "bugs": {
-        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
     },
     "funding": [
         {
@@ -27,23 +22,25 @@
             "url": "https://paypal.me/filiph"
         }
     ],
-    "type": "module",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
     "sideEffects": false,
-    "module": "./src/index.ts",
-    "types": "./src/index.ts",
+    "type": "module",
     "exports": {
         ".": "./src/index.ts"
     },
+    "module": "./src/index.ts",
+    "types": "./src/index.ts",
     "files": [
         "src"
     ],
-    "publishConfig": {
-        "access": "public"
-    },
     "scripts": {
-        "typecheck": "tsc --noEmit",
         "test": "vitest run",
-        "test:coverage": "vitest run --coverage"
+        "test:coverage": "vitest run --coverage",
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "fflate": "0.8.3"
@@ -53,5 +50,8 @@
         "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
+    },
+    "publishConfig": {
+        "access": "public"
     }
 }

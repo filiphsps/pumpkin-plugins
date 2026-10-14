@@ -64,7 +64,7 @@ export class PlayerSync {
                 const sent = this.withJavaClient(player, (java) => {
                     if (joined) {
                         this.log.debug(
-                            `${tag} ${ansi.named.name(player.getName())} joined, sending their current hunger.`
+                            `${tag} ${ansi.named.name(player.getName())} joined, sending their current hunger.`,
                         );
                         this.sendRegeneration(player, key, java);
                     }
@@ -73,7 +73,7 @@ export class PlayerSync {
                 });
                 if (joined && !sent) {
                     this.log.debug(
-                        `${tag} ${ansi.named.name(player.getName())} is not on Java Edition, so there is nothing to sync.`
+                        `${tag} ${ansi.named.name(player.getName())} is not on Java Edition, so there is nothing to sync.`,
                     );
                 }
             } finally {
@@ -121,7 +121,7 @@ export class PlayerSync {
             java.sendCustomPayload(NATURAL_REGENERATION_CHANNEL, bool(rule.val));
             this.lastRegeneration.set(id, rule.val);
             this.log.debug(
-                `${tag} ${ansi.named.name(player.getName())}: natural regeneration is ${rule.val ? 'on' : 'off'} in ${ansi.named.name(world.getName())}.`
+                `${tag} ${ansi.named.name(player.getName())}: natural regeneration is ${rule.val ? 'on' : 'off'} in ${ansi.named.name(world.getName())}.`,
             );
         } finally {
             disposeWasiResource(world);

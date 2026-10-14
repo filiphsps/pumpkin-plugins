@@ -13,17 +13,17 @@ export interface LodSectionCoordinate {
 
 /** Inclusive section-coordinate rectangle used to clip a forced selection. */
 export interface LodSectionBounds {
-    minX: number;
     maxX: number;
-    minZ: number;
     maxZ: number;
+    minX: number;
+    minZ: number;
 }
 
 /** Iterates the containing section first, followed by the surrounding square in outward rings. */
 export function* iterateLodSectionsAround(
     blockX: number,
     blockZ: number,
-    radius = DEFAULT_LOD_GENERATION_RADIUS
+    radius = DEFAULT_LOD_GENERATION_RADIUS,
 ): Generator<LodSectionCoordinate> {
     if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_GENERATION_RADIUS) {
         throw new RangeError(`Radius must be between 0 and ${MAX_LOD_GENERATION_RADIUS} LOD sections.`);
@@ -38,7 +38,7 @@ export function* iterateLodSectionsAround(
         minX: centerX - radius,
         maxX: centerX + radius,
         minZ: centerZ - radius,
-        maxZ: centerZ + radius
+        maxZ: centerZ + radius,
     });
 }
 
@@ -47,7 +47,7 @@ export function* iterateLodSectionsWithin(
     blockX: number,
     blockZ: number,
     radius: number,
-    bounds: LodSectionBounds
+    bounds: LodSectionBounds,
 ): Generator<LodSectionCoordinate> {
     if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_GENERATION_RADIUS) {
         throw new RangeError(`Radius must be between 0 and ${MAX_LOD_GENERATION_RADIUS} LOD sections.`);
@@ -61,7 +61,7 @@ export function* iterateLodSectionsWithin(
         minX: Math.max(centerX - radius, bounds.minX),
         maxX: Math.min(centerX + radius, bounds.maxX),
         minZ: Math.max(centerZ - radius, bounds.minZ),
-        maxZ: Math.min(centerZ + radius, bounds.maxZ)
+        maxZ: Math.min(centerZ + radius, bounds.maxZ),
     };
     if (clipped.minX > clipped.maxX || clipped.minZ > clipped.maxZ) return;
     yield* iterateRings(centerX, centerZ, radius, clipped);
@@ -71,7 +71,7 @@ export function* iterateLodSectionsWithin(
 export function listLodSectionsAround(
     blockX: number,
     blockZ: number,
-    radius = DEFAULT_LOD_GENERATION_RADIUS
+    radius = DEFAULT_LOD_GENERATION_RADIUS,
 ): LodSectionCoordinate[] {
     return [...iterateLodSectionsAround(blockX, blockZ, radius)];
 }
@@ -85,7 +85,7 @@ function* iterateRings(
     centerX: number,
     centerZ: number,
     radius: number,
-    bounds: LodSectionBounds
+    bounds: LodSectionBounds,
 ): Generator<LodSectionCoordinate> {
     for (let ring = 0; ring <= radius; ring++) {
         const left = centerX - ring;

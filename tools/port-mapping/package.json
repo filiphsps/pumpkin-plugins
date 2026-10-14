@@ -3,19 +3,14 @@
     "version": "0.1.0",
     "private": true,
     "description": "UPnP and NAT-PMP port mapping",
-    "license": "MIT",
-    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
-    "contributors": [
-        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
-    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/port-mapping#readme",
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
         "directory": "tools/port-mapping"
-    },
-    "bugs": {
-        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
     },
     "funding": [
         {
@@ -27,26 +22,28 @@
             "url": "https://paypal.me/filiph"
         }
     ],
-    "type": "module",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
     "sideEffects": false,
-    "module": "./src/index.ts",
-    "types": "./src/index.ts",
+    "type": "module",
     "exports": {
         ".": "./src/index.ts",
         "./testing": "./src/testing/index.ts",
         "./testing/router": "./src/testing/fake-router.ts",
         "./ipv4": "./src/ipv4.ts"
     },
+    "module": "./src/index.ts",
+    "types": "./src/index.ts",
     "files": [
         "src"
     ],
-    "publishConfig": {
-        "access": "public"
-    },
     "scripts": {
-        "typecheck": "tsc --noEmit",
         "test": "vitest run",
-        "test:coverage": "vitest run --coverage"
+        "test:coverage": "vitest run --coverage",
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "fast-xml-parser": "5.11.2",
@@ -57,5 +54,8 @@
         "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
+    },
+    "publishConfig": {
+        "access": "public"
     }
 }

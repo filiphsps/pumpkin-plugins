@@ -9,7 +9,7 @@ class StarterPlugin extends Plugin {
             authors: [],
             description: 'A Pumpkin plugin.',
             dependencies: [],
-            permissions: []
+            permissions: [],
         };
     }
 }

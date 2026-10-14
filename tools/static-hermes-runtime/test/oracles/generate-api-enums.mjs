@@ -22,7 +22,7 @@ const entries = [
     ['eventTypes', 'event.wit', 'event-type', 'PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_'],
     ['eventPriorities', 'event.wit', 'event-priority', 'PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_'],
     ['gameRules', 'game-rules.wit', 'game-rule', 'PUMPKIN_PLUGIN_GAME_RULES_GAME_RULE_'],
-    ['namedColors', 'common.wit', 'named-color', 'PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_']
+    ['namedColors', 'common.wit', 'named-color', 'PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_'],
 ].map(([name, file, witEnum, cPrefix]) => {
     const requiresBundleMatch = name === 'eventTypes' || name === 'eventPriorities';
     const values = enumVariants(path.join(witDir, file), witEnum)
@@ -52,7 +52,7 @@ ${entries
     .map(
         ({ name, values }) => /* cpp */ `inline constexpr std::array<EnumEntry, ${values.length}> ${name}{{
 ${values.map(({ variant, cName }) => `  {"${variant}", ${cName}},`).join('\n')}
-}};`
+}};`,
     )
     .join('\n\n')}
 } // namespace pumpkin_static_api

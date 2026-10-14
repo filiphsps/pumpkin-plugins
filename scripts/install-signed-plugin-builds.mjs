@@ -18,7 +18,7 @@ for (const { slug, directory: packageDir, metadataFile } of discoverComponents(r
     const verification = verifyWasm(bytes);
     if (!verification.valid) {
         throw new Error(
-            `Signed plugin artifact ${artifact} failed verification: ${verification.error ?? 'invalid signature'}`
+            `Signed plugin artifact ${artifact} failed verification: ${verification.error ?? 'invalid signature'}`,
         );
     }
 

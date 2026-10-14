@@ -19,7 +19,7 @@ vi.mock('node:fs', async (importOriginal) => {
                 throw new Error('injected snapshot publish failure');
             }
             return actual.renameSync(...args);
-        }
+        },
     };
 });
 
@@ -53,7 +53,7 @@ describe('injectWasiImports', () => {
     it('adds the imports just before the first export, keeping everything else', () => {
         const out = injectWasiImports(PLUGIN_WIT, ['io/poll', 'sockets/tcp']);
         expect(out).toContain(
-            '    import wasi:io/poll@0.2.3;\n    import wasi:sockets/tcp@0.2.3;\n\n    export init-plugin'
+            '    import wasi:io/poll@0.2.3;\n    import wasi:sockets/tcp@0.2.3;\n\n    export init-plugin',
         );
         expect(out.indexOf('import wasi:io/poll')).toBeLessThan(out.indexOf('export init-plugin'));
         expect(out.startsWith('world plugin {\n    import logging;')).toBe(true);
@@ -105,7 +105,7 @@ describe('prepareWit', () => {
             target,
             wasiWit,
             wasiFiles: ['http/package.wit', 'http/types.wit'],
-            interfaces: ['http/outgoing-handler']
+            interfaces: ['http/outgoing-handler'],
         });
 
         expect(fs.readFileSync(path.join(target, 'deps/http/package.wit'), 'utf8')).toBe(packageWit);

@@ -15,7 +15,7 @@ export class PackIndex {
     /** Creates an empty index. Call `refresh` to fill it. */
     constructor(
         private readonly files: DataFiles,
-        private readonly log: Logger
+        private readonly log: Logger,
     ) {
         this.scanner = new PackScanner(files);
     }
@@ -37,7 +37,7 @@ export class PackIndex {
 
         if (built.entries.length === 0) {
             this.log.info(
-                `No packs in ${ansi.named.name(`${directory}/`)}. Put .mcpack or .mcaddon files there and run /baddon reload.`
+                `No packs in ${ansi.named.name(`${directory}/`)}. Put .mcpack or .mcaddon files there and run /baddon reload.`,
             );
             return;
         }
@@ -45,7 +45,7 @@ export class PackIndex {
             .map((e) => `${ansi.named.name(e.fileName)} (${ansi.named.uuid(e.uuid)} v${ansi.named.version(e.version)})`)
             .join(', ');
         this.log.info(
-            `Found ${ansi.named.number(built.entries.length)} Bedrock pack${built.entries.length === 1 ? '' : 's'}: ${list}.`
+            `Found ${ansi.named.number(built.entries.length)} Bedrock pack${built.entries.length === 1 ? '' : 's'}: ${list}.`,
         );
     }
 

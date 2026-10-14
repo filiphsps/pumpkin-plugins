@@ -10,7 +10,7 @@ export const SEARCH_TARGETS = [
     'urn:schemas-upnp-org:device:InternetGatewayDevice:1',
     'urn:schemas-upnp-org:service:WANIPConnection:2',
     'urn:schemas-upnp-org:service:WANIPConnection:1',
-    'urn:schemas-upnp-org:service:WANPPPConnection:1'
+    'urn:schemas-upnp-org:service:WANPPPConnection:1',
 ];
 
 /** The M-SEARCH message that asks devices of one kind to answer. */
@@ -24,8 +24,8 @@ export function searchRequest(target: string, host: Endpoint = SSDP_ADDRESS): Ui
             'MX: 2',
             `ST: ${target}`,
             '',
-            ''
-        ].join('\r\n')
+            '',
+        ].join('\r\n'),
     );
 }
 

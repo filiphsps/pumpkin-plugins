@@ -3,9 +3,9 @@ import type { AccessGrant, Waypoint } from './model.ts';
 
 /** Player and operator facts used to evaluate one waypoint's persisted ACL. */
 export interface WaypointAccessContext {
-    readonly playerId: string;
-    readonly isOperator: boolean;
     readonly hasPermission?: (node: string) => boolean;
+    readonly isOperator: boolean;
+    readonly playerId: string;
 }
 
 /** Evaluates public/restricted access and additive player, permission, and group-marker grants. */

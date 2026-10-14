@@ -5,7 +5,7 @@ import type {
     BlockPlaceEventData,
     BlockSpreadEventData,
     PlayerCustomPayloadEventData,
-    PlayerLeaveEventData
+    PlayerLeaveEventData,
 } from 'pumpkin:plugin/event@0.1.0';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
 import { hostLogger } from '@pumpkin-plugins/plugin-kit/host';
@@ -76,7 +76,7 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
             invalidateBlockSpread(sessions, event);
         });
         hostLogger.info(
-            `${PLUGIN_NAME}: serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain. Distant chunk generation is unavailable; see the plugin README TODO.`
+            `${PLUGIN_NAME}: serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain. Distant chunk generation is unavailable; see the plugin README TODO.`,
         );
     }
 }

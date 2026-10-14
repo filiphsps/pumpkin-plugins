@@ -120,7 +120,7 @@ function run(args, overrides = {}) {
                     }
                 }; } }
             };
-        `
+        `,
         );
         const calls = join(root, 'calls');
         const output = join(root, 'output');
@@ -142,9 +142,9 @@ function run(args, overrides = {}) {
                     CALLS_FILE: calls,
                     VERSIONING_FILE: versioning,
                     RELEASE_ERROR: '',
-                    ...overrides
-                }
-            }
+                    ...overrides,
+                },
+            },
         );
         return {
             ...result,
@@ -154,7 +154,7 @@ function run(args, overrides = {}) {
                 .trim()
                 .split('\n')
                 .filter(Boolean)
-                .map((entry) => JSON.parse(entry))
+                .map((entry) => JSON.parse(entry)),
         };
     } finally {
         rmSync(root, { recursive: true, force: true });
@@ -182,7 +182,7 @@ it('uses pre-major versioning for every component when creating releases and PRs
     assert.equal(result.status, 0, result.stderr);
     const policy = {
         'packages/plugin': { bumpMinorPreMajor: true, bumpPatchForMinorPreMajor: true },
-        'actions/publish-action': { bumpMinorPreMajor: true, bumpPatchForMinorPreMajor: true }
+        'actions/publish-action': { bumpMinorPreMajor: true, bumpPatchForMinorPreMajor: true },
     };
     assert.deepEqual(result.versioning, [policy, policy]);
 });
@@ -210,7 +210,7 @@ it('preserves workflow tag and multiline release-note outputs for assets and Mar
     assert.match(result.output, /pr_count<<[^\n]+\n1\n/);
     assert.match(
         result.stdout,
-        /Release fan-out: plugin paths=\["packages\/plugin"\], action paths=\["actions\/publish-action"\], tool paths=\[\], release PR count=1/
+        /Release fan-out: plugin paths=\["packages\/plugin"\], action paths=\["actions\/publish-action"\], tool paths=\[\], release PR count=1/,
     );
 });
 
@@ -221,7 +221,7 @@ it('continues release PR preparation when GitHub reports an immutable release fo
         'release',
         'remove:autorelease: pending:52',
         'add:autorelease: tagged:52',
-        'update-pr'
+        'update-pr',
     ]);
     assert.match(result.output, /paths_released<<[^\n]+\n\["packages\/plugin"\]\n/);
     assert.match(result.output, /packages\/plugin--release_created<<[^\n]+\nfalse\n/);
@@ -251,7 +251,7 @@ it('preserves other releases when one release PR already has an immutable tag', 
         'release',
         'remove:autorelease: pending:52',
         'add:autorelease: tagged:52',
-        'update-pr'
+        'update-pr',
     ]);
     assert.match(result.output, /paths_released<<[^\n]+\n\["packages\/plugin"\]\n/);
     assert.match(result.output, /packages\/plugin--tag_name<<[^\n]+\nplugin-v1\.0\.0\n/);

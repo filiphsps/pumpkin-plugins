@@ -10,15 +10,15 @@ const cliPath = path.resolve(import.meta.dirname, '../bin/create-pumpkin-plugin.
 const temporaryDirectories: string[] = [];
 
 interface GeneratedManifest {
+    dependencies: Record<string, string>;
     name: string;
     packageManager?: string;
-    scripts: Record<string, string>;
-    dependencies: Record<string, string>;
     pumpkinPlugin: {
         entry: string;
         output: string;
         wasi: unknown[];
     };
+    scripts: Record<string, string>;
 }
 
 afterEach(() => {
@@ -35,13 +35,13 @@ function runCli(args: string[], options: { cwd: string; env?: NodeJS.ProcessEnv 
     return spawnSync(process.execPath, [cliPath, ...args], {
         cwd: options.cwd,
         encoding: 'utf8',
-        env: { ...process.env, ...options.env }
+        env: { ...process.env, ...options.env },
     });
 }
 
 it.each([
     ['TypeScript', '--ts', '.ts'],
-    ['JavaScript', '--js', '.js']
+    ['JavaScript', '--js', '.js'],
 ] as const)('creates a usable %s starter without installing dependencies', (language, flag, extension) => {
     const cwd = temporaryDirectory(`create-pumpkin-plugin-${extension.slice(1)}-`);
     const projectName = `my-plugin-${extension.slice(1)}`;
@@ -56,7 +56,7 @@ it.each([
     expect(fs.existsSync(path.join(destination, 'pnpm-workspace.yaml'))).toBe(true);
     expect(fs.existsSync(path.join(destination, 'node_modules'))).toBe(false);
     expect(fs.readFileSync(path.join(destination, 'pnpm-workspace.yaml'), 'utf8')).toMatch(
-        /allowBuilds:\s*\n\s+esbuild:\s*true/
+        /allowBuilds:\s*\n\s+esbuild:\s*true/,
     );
 
     const manifest = JSON.parse(fs.readFileSync(path.join(destination, 'package.json'), 'utf8')) as GeneratedManifest;
@@ -100,7 +100,7 @@ it('pins the detected pnpm version in generated projects', () => {
     const expectedVersion = userAgent.match(/(?:^|\s)pnpm\/([^\s]+)/)?.[1];
     const result = runCli(['my-plugin', '--ts', '--skip-install'], {
         cwd,
-        env: { npm_config_user_agent: userAgent }
+        env: { npm_config_user_agent: userAgent },
     });
 
     expect(result.status).toBe(0);
@@ -178,15 +178,15 @@ fs.renameSync = function (source, candidate, ...args) {
     return renameSync(source, candidate, ...args);
 };
 syncBuiltinESMExports();
-`
+`,
     );
 
     const result = runCli(['my-plugin', '--ts', '--skip-install'], {
         cwd,
         env: {
             NODE_OPTIONS: `--import=${pathToFileURL(preloadPath).href}`,
-            CREATE_PUMPKIN_RACE_DESTINATION: destination
-        }
+            CREATE_PUMPKIN_RACE_DESTINATION: destination,
+        },
     });
 
     expect(result.stderr).toContain('RACE_HIT');
@@ -220,15 +220,15 @@ fs.openSync = function (candidate, ...args) {
     return openSync(candidate, ...args);
 };
 syncBuiltinESMExports();
-`
+`,
     );
 
     const result = runCli(['my-plugin', '--ts', '--skip-install'], {
         cwd,
         env: {
             NODE_OPTIONS: `--import=${pathToFileURL(preloadPath).href}`,
-            CREATE_PUMPKIN_COMPETING_FILE: competingFile
-        }
+            CREATE_PUMPKIN_COMPETING_FILE: competingFile,
+        },
     });
 
     expect(result.status).not.toBe(0);
@@ -256,8 +256,8 @@ it('removes the generated destination when copying a template fails', () => {
         {
             cwd,
             encoding: 'utf8',
-            env: { ...process.env }
-        }
+            env: { ...process.env },
+        },
     );
 
     expect(result.status).not.toBe(0);
@@ -270,7 +270,7 @@ it('prints the detected package manager install and build commands when skipping
     const cwd = temporaryDirectory('create-pumpkin-plugin-skip-install-');
     const result = runCli(['my-plugin', '--ts', '--skip-install'], {
         cwd,
-        env: { npm_config_user_agent: 'pnpm/12.10.1 npm/? node/v24.21.0 darwin arm64' }
+        env: { npm_config_user_agent: 'pnpm/12.10.1 npm/? node/v24.21.0 darwin arm64' },
     });
 
     expect(result.status).toBe(0);
@@ -285,7 +285,7 @@ it('does not invoke the package manager when installation is skipped', () => {
     fs.mkdirSync(fakeBin);
     fs.writeFileSync(
         path.join(fakeBin, 'pnpm'),
-        '#!/usr/bin/env node\nrequire("node:fs").writeFileSync(process.env.CREATE_PUMPKIN_MARKER, "called");\n'
+        '#!/usr/bin/env node\nrequire("node:fs").writeFileSync(process.env.CREATE_PUMPKIN_MARKER, "called");\n',
     );
     fs.chmodSync(path.join(fakeBin, 'pnpm'), 0o755);
 
@@ -295,8 +295,8 @@ it('does not invoke the package manager when installation is skipped', () => {
             PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ''}`,
             CREATE_PUMPKIN_MARKER: marker,
             npm_execpath: '',
-            npm_config_user_agent: 'pnpm/12.10.1 npm/? node/v24.21.0'
-        }
+            npm_config_user_agent: 'pnpm/12.10.1 npm/? node/v24.21.0',
+        },
     });
 
     expect(result.status).toBe(0);
@@ -313,7 +313,7 @@ it('keeps generated directory paths out of copy-paste shell commands', () => {
     const destination = path.join(parent, 'my-plugin');
     const result = runCli([destination, '--ts', '--skip-install'], {
         cwd,
-        env: { npm_config_user_agent: 'pnpm/12.10.1 npm/? node/v24.21.0 darwin arm64' }
+        env: { npm_config_user_agent: 'pnpm/12.10.1 npm/? node/v24.21.0 darwin arm64' },
     });
 
     expect(result.status).toBe(0);
@@ -322,7 +322,7 @@ it('keeps generated directory paths out of copy-paste shell commands', () => {
         result.stdout
             .split('\n')
             .filter((line) => line.includes(destination))
-            .every((line) => line.startsWith('Project directory: '))
+            .every((line) => line.startsWith('Project directory: ')),
     ).toBe(true);
     expect(result.stdout).toContain('From the project directory, run: pnpm install');
     expect(fs.existsSync(path.join(cwd, 'creator-path-injection'))).toBe(false);
@@ -336,7 +336,7 @@ it('forwards dependency installation to the package manager that launched it', (
     const fakePnpm = path.join(fakeBin, 'pnpm');
     fs.writeFileSync(
         fakePnpm,
-        '#!/usr/bin/env node\nrequire("node:fs").writeFileSync(process.env.CREATE_PUMPKIN_CAPTURE, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd() }));\n'
+        '#!/usr/bin/env node\nrequire("node:fs").writeFileSync(process.env.CREATE_PUMPKIN_CAPTURE, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd() }));\n',
     );
     fs.chmodSync(fakePnpm, 0o755);
     const result = runCli(['my-plugin', '--ts'], {
@@ -345,8 +345,8 @@ it('forwards dependency installation to the package manager that launched it', (
             PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ''}`,
             CREATE_PUMPKIN_CAPTURE: capture,
             npm_execpath: '',
-            npm_config_user_agent: 'pnpm/12.10.1 npm/? node/v24.21.0 darwin arm64'
-        }
+            npm_config_user_agent: 'pnpm/12.10.1 npm/? node/v24.21.0 darwin arm64',
+        },
     });
 
     expect(result.status).toBe(0);
@@ -365,7 +365,7 @@ it('invokes pnpm through cmd.exe when running on Windows without a JavaScript la
         platformPreload,
         `const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
 Object.defineProperty(process, 'platform', { ...descriptor, value: 'win32' });
-`
+`,
     );
 
     const environment: NodeJS.ProcessEnv = {
@@ -373,7 +373,7 @@ Object.defineProperty(process, 'platform', { ...descriptor, value: 'win32' });
         CREATE_PUMPKIN_CAPTURE: capture,
         npm_config_user_agent: 'pnpm/12.10.1 npm/? node/v24.21.0 win32 x64',
         npm_execpath: '',
-        NPM_CONFIG_EXECPATH: ''
+        NPM_CONFIG_EXECPATH: '',
     };
 
     if (process.platform === 'win32') {
@@ -384,7 +384,7 @@ Object.defineProperty(process, 'platform', { ...descriptor, value: 'win32' });
         const commandShell = path.join(cwd, 'cmd.cjs');
         fs.writeFileSync(
             commandShell,
-            '#!/usr/bin/env node\nrequire("node:fs").writeFileSync(process.env.CREATE_PUMPKIN_CAPTURE, JSON.stringify(process.argv.slice(2)));\n'
+            '#!/usr/bin/env node\nrequire("node:fs").writeFileSync(process.env.CREATE_PUMPKIN_CAPTURE, JSON.stringify(process.argv.slice(2)));\n',
         );
         fs.chmodSync(commandShell, 0o755);
         environment.ComSpec = commandShell;
@@ -408,15 +408,15 @@ it('reuses the exact JavaScript package-manager entrypoint when the launcher pro
     const packageManagerEntry = path.join(cwd, 'pnpm.cjs');
     fs.writeFileSync(
         packageManagerEntry,
-        'require("node:fs").writeFileSync(process.env.CREATE_PUMPKIN_CAPTURE, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd() }));\n'
+        'require("node:fs").writeFileSync(process.env.CREATE_PUMPKIN_CAPTURE, JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd() }));\n',
     );
     const result = runCli(['my-plugin', '--ts'], {
         cwd,
         env: {
             CREATE_PUMPKIN_CAPTURE: capture,
             npm_execpath: packageManagerEntry,
-            npm_config_user_agent: 'pnpm/12.10.1 npm/? node/v24.21.0 darwin arm64'
-        }
+            npm_config_user_agent: 'pnpm/12.10.1 npm/? node/v24.21.0 darwin arm64',
+        },
     });
 
     expect(result.status).toBe(0);

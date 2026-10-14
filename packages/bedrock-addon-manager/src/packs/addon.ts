@@ -3,12 +3,12 @@ import { ManifestError, type PackManifest, readManifest } from './manifest.ts';
 
 /** A resource pack found inside an add-on bundle, repackaged so it can be served as a `.mcpack`. */
 export interface ExtractedPack {
-    /** The pack's folder name in the bundle, or the nested `.mcpack`'s name without its extension. */
-    name: string;
     /** The pack as a `.mcpack` archive. */
     bytes: Uint8Array;
     /** The manifest read from the pack. */
     manifest: PackManifest;
+    /** The pack's folder name in the bundle, or the nested `.mcpack`'s name without its extension. */
+    name: string;
 }
 
 /** What an add-on bundle holds. */

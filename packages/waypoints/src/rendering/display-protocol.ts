@@ -56,7 +56,7 @@ export function encodeTextDisplayMetadata(componentNbt: Uint8Array, scale = 1, o
         27,
         BYTE_META_TYPE,
         TEXT_DISPLAY_SEE_THROUGH | TEXT_DISPLAY_SHADOW,
-        255
+        255,
     ]);
 }
 
@@ -73,8 +73,8 @@ export function createTextDisplaySpawnPacket(entityId: number, entityUuid: Uuid,
             pitch: 0,
             yaw: 0,
             headYaw: 0,
-            data: 0
-        }
+            data: 0,
+        },
     };
 }
 
@@ -82,7 +82,7 @@ export function createTextDisplaySpawnPacket(entityId: number, entityUuid: Uuid,
 export function createEntityRemovePacket(entityIds: readonly number[]): ClientboundPacket {
     return {
         tag: 'c-remove-entities',
-        val: { entityIds: Int32Array.from(entityIds) }
+        val: { entityIds: Int32Array.from(entityIds) },
     };
 }
 
@@ -91,18 +91,18 @@ export function createTextDisplayMetadataPacket(
     entityId: number,
     componentNbt: Uint8Array,
     scale = 1,
-    opacity = 255
+    opacity = 255,
 ): ClientboundPacket {
     return {
         tag: 'c-set-entity-metadata',
-        val: { entityId, metadata: encodeTextDisplayMetadata(componentNbt, scale, opacity) }
+        val: { entityId, metadata: encodeTextDisplayMetadata(componentNbt, scale, opacity) },
     };
 }
 
 /** Updates changed scale or opacity fields without resending text, using one-tick interpolation. */
 export function createTextDisplayAppearancePacket(
     entityId: number,
-    appearance: { readonly scale?: number; readonly opacity?: number }
+    appearance: { readonly scale?: number; readonly opacity?: number },
 ): ClientboundPacket {
     return {
         tag: 'c-set-entity-metadata',
@@ -114,9 +114,9 @@ export function createTextDisplayAppearancePacket(
                 0,
                 ...(appearance.scale === undefined ? [] : [12, VECTOR3_META_TYPE, ...encodeScale(appearance.scale)]),
                 ...(appearance.opacity === undefined ? [] : encodeOpacity(appearance.opacity)),
-                255
-            ])
-        }
+                255,
+            ]),
+        },
     };
 }
 
@@ -130,16 +130,16 @@ export interface TextDisplayMovement {
 export function createTextDisplayMovement(
     entityId: number,
     previous: Vec3,
-    position: Vec3
+    position: Vec3,
 ): TextDisplayMovement | undefined {
     const delta: [number, number, number] = [
         Math.round((position.x - previous.x) * ENTITY_DELTA_SCALE),
         Math.round((position.y - previous.y) * ENTITY_DELTA_SCALE),
-        Math.round((position.z - previous.z) * ENTITY_DELTA_SCALE)
+        Math.round((position.z - previous.z) * ENTITY_DELTA_SCALE),
     ];
     if (
         delta.some(
-            (component) => !Number.isFinite(component) || component < MIN_ENTITY_DELTA || component > MAX_ENTITY_DELTA
+            (component) => !Number.isFinite(component) || component < MIN_ENTITY_DELTA || component > MAX_ENTITY_DELTA,
         )
     ) {
         return undefined;
@@ -147,7 +147,7 @@ export function createTextDisplayMovement(
     const nextPosition = {
         x: previous.x + delta[0] / ENTITY_DELTA_SCALE,
         y: previous.y + delta[1] / ENTITY_DELTA_SCALE,
-        z: previous.z + delta[2] / ENTITY_DELTA_SCALE
+        z: previous.z + delta[2] / ENTITY_DELTA_SCALE,
     };
     if (delta.every((component) => component === 0)) return { position: nextPosition };
     return {
@@ -157,10 +157,10 @@ export function createTextDisplayMovement(
                 entityId,
                 // The pinned host casts these f64 fields directly to the protocol's i16 delta units.
                 delta,
-                onGround: true
-            }
+                onGround: true,
+            },
         },
-        position: nextPosition
+        position: nextPosition,
     };
 }
 

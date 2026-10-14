@@ -4,12 +4,12 @@ import { strToU8, zipSync } from 'fflate';
 export const SAMPLE_UUID = '627409cd-5207-46f1-b1e8-0d4492616419';
 
 export interface ManifestOptions {
+    capabilities?: string[];
+    dependencies?: string[];
+    modules?: string[];
+    name?: string;
     uuid?: string;
     version?: number[] | string;
-    name?: string;
-    modules?: string[];
-    dependencies?: string[];
-    capabilities?: string[];
 }
 
 export function manifestJson(options: ManifestOptions = {}): Record<string, unknown> {
@@ -20,17 +20,17 @@ export function manifestJson(options: ManifestOptions = {}): Record<string, unkn
             description: 'A pack for tests',
             uuid: options.uuid ?? SAMPLE_UUID,
             version: options.version ?? [1, 0, 1],
-            min_engine_version: [1, 13, 0]
+            min_engine_version: [1, 13, 0],
         },
         modules: (options.modules ?? ['resources']).map((type, i) => ({
             type,
             uuid: `00000000-0000-4000-8000-00000000000${i}`,
-            version: [1, 0, 0]
+            version: [1, 0, 0],
         })),
         ...(options.dependencies && {
-            dependencies: options.dependencies.map((uuid) => ({ uuid, version: [1, 0, 0] }))
+            dependencies: options.dependencies.map((uuid) => ({ uuid, version: [1, 0, 0] })),
         }),
-        ...(options.capabilities && { capabilities: options.capabilities })
+        ...(options.capabilities && { capabilities: options.capabilities }),
     };
 }
 
@@ -48,11 +48,11 @@ export function noise(length: number, seed = 1): Uint8Array {
 /** Builds a `.mcpack` (a zip). `manifest` may be an object or raw text, `folder` wraps the pack in a directory. */
 export function makeMcpack(
     manifest: Record<string, unknown> | string = manifestJson(),
-    options: { files?: Record<string, Uint8Array | string>; folder?: string } = {}
+    options: { files?: Record<string, Uint8Array | string>; folder?: string } = {},
 ): Uint8Array {
     const prefix = options.folder ? `${options.folder}/` : '';
     const entries: Record<string, Uint8Array> = {
-        [`${prefix}manifest.json`]: strToU8(typeof manifest === 'string' ? manifest : JSON.stringify(manifest))
+        [`${prefix}manifest.json`]: strToU8(typeof manifest === 'string' ? manifest : JSON.stringify(manifest)),
     };
     for (const [name, content] of Object.entries(options.files ?? {})) {
         entries[`${prefix}${name}`] = typeof content === 'string' ? strToU8(content) : content;

@@ -20,7 +20,7 @@ function fragment(bytes: Uint8Array) {
 describe('DH transfer cursor', () => {
     it('rejects fragment sizes above the protocol maximum', () => {
         expect(() =>
-            transferFragment(1, new Uint8Array(TRANSFER_PACKET_BYTES + 1), 0, TRANSFER_PACKET_BYTES + 1)
+            transferFragment(1, new Uint8Array(TRANSFER_PACKET_BYTES + 1), 0, TRANSFER_PACKET_BYTES + 1),
         ).toThrow('Invalid DH transfer fragment size');
     });
 
@@ -91,7 +91,7 @@ describe('DH transfer cursor', () => {
         expect(resized).toBeDefined();
         expect(fragment(resized ?? new Uint8Array())).toMatchObject({
             data: expect.any(Uint8Array),
-            first: true
+            first: true,
         });
         expect(fragment(resized ?? new Uint8Array()).data).toHaveLength(19_987);
         expect(resized).not.toBe(initial);
@@ -107,7 +107,7 @@ describe('DH transfer cursor', () => {
         let completed = false;
 
         for (const now of [
-            0, 5_000, 11_000, 17_500, 23_000, 27_000, 33_000, 41_000, 47_000, 50_000, 59_000, 61_000, 62_000, 63_000
+            0, 5_000, 11_000, 17_500, 23_000, 27_000, 33_000, 41_000, 47_000, 50_000, 59_000, 61_000, 62_000, 63_000,
         ]) {
             const next = cursor.peek();
             if (!next || !credit.canSend(next.length, now)) continue;

@@ -27,7 +27,7 @@ class RuntimeBenchmarkPlugin extends Plugin {
             authors: [],
             description: 'Compares runtimes on common Minecraft plugin workloads',
             dependencies: [],
-            permissions: []
+            permissions: [],
         };
     }
 
@@ -47,7 +47,7 @@ class RuntimeBenchmarkPlugin extends Plugin {
             node: COMMAND_PERMISSION,
             description: 'Run runtime benchmark workloads',
             default: { tag: 'allow' },
-            children: []
+            children: [],
         });
         this.permissionRegistrations++;
         this.registerCommand(
@@ -58,7 +58,7 @@ class RuntimeBenchmarkPlugin extends Plugin {
                 this.report(server);
                 return 1;
             },
-            COMMAND_PERMISSION
+            COMMAND_PERMISSION,
         );
         this.commandRegistrations++;
         logging.log('info', 'RUNTIME_BENCHMARK_READY');
@@ -93,8 +93,8 @@ class RuntimeBenchmarkPlugin extends Plugin {
                         total += players.length;
                     }
                     return total;
-                }
-            )
+                },
+            ),
         ];
 
         logging.log(
@@ -110,11 +110,11 @@ class RuntimeBenchmarkPlugin extends Plugin {
                     commandRegistrations: this.commandRegistrations,
                     commandDispatches: this.commandDispatches,
                     serverQueries,
-                    playersObserved
+                    playersObserved,
                 },
                 unicodePropertyEscapes: supportsUnicodePropertyEscapes(),
-                runtimeSourceCompilation: supportsRuntimeSourceCompilation()
-            })}`
+                runtimeSourceCompilation: supportsRuntimeSourceCompilation(),
+            })}`,
         );
     }
 }

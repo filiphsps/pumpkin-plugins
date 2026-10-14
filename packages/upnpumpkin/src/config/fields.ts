@@ -7,8 +7,8 @@ export function ipv4Endpoint(options: { description: string; default: string; ex
         ...options,
         check: {
             expected: 'an IPv4 address and port like "192.168.1.1:5351", or ""',
-            test: (v) => v === '' || parseEndpoint(v) !== undefined
-        }
+            test: (v) => v === '' || parseEndpoint(v) !== undefined,
+        },
     });
 }
 

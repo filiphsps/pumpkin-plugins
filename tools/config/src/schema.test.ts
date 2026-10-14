@@ -10,8 +10,8 @@ describe(defaultValues.name, () => {
                 entryName: 'source',
                 exampleKey: 'torch',
                 defaults: { torch: { level: 14 } },
-                fields: { level: int({ description: 'Light level.', example: 14, min: 0, max: 15 }) }
-            })
+                fields: { level: int({ description: 'Light level.', example: 14, min: 0, max: 15 }) },
+            }),
         });
 
         expect(defaultValues(schema)).toEqual({ sources: { torch: { level: 14 } } });

@@ -6,7 +6,7 @@ export const CAPABILITIES = {
     http: ['http/types', 'http/outgoing-handler'],
     filesystem: ['filesystem/types', 'filesystem/preopens'],
     sockets: ['sockets/network', 'sockets/instance-network', 'sockets/tcp', 'sockets/tcp-create-socket'],
-    udp: ['sockets/network', 'sockets/instance-network', 'sockets/udp', 'sockets/udp-create-socket']
+    udp: ['sockets/network', 'sockets/instance-network', 'sockets/udp', 'sockets/udp-create-socket'],
 } as const;
 
 /** A name accepted in `pumpkinPlugin.wasi`. */

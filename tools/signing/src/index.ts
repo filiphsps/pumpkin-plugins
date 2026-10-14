@@ -5,7 +5,7 @@ export {
     type SigningMetadata,
     signWasm,
     type VerifyResult,
-    verifyWasm
+    verifyWasm,
 } from './sign.ts';
 export {
     appendCustomSections,
@@ -16,5 +16,5 @@ export {
     SIGNING_SECTIONS,
     type StrippedWasm,
     stripSignature,
-    type WasmSection
+    type WasmSection,
 } from './wasm.ts';

@@ -5,29 +5,29 @@ import type { PackManifest } from './manifest.ts';
 export interface ScannedPack {
     /** The name the pack is served and configured under: its own file name, or one made from its `.mcaddon`. */
     fileName: string;
+    manifest: PackManifest;
+    /** Milliseconds since the epoch. */
+    modified: number;
     /** Where the `.mcpack` is, relative to the data folder. */
     path: string;
     size: number;
-    /** Milliseconds since the epoch. */
-    modified: number;
-    manifest: PackManifest;
 }
 
 /** One pack as it goes into `resource_pack.bedrock.packs`. */
 export interface PackEntry {
+    addonPack: boolean;
+    contentId?: string;
+    contentKey?: string;
+    downloadUrl: string;
     fileName: string;
+    hasScripts: boolean;
+    order: number;
     path: string;
+    rtxEnabled: boolean;
+    size: number;
+    subPackName?: string;
     uuid: string;
     version: string;
-    size: number;
-    downloadUrl: string;
-    order: number;
-    addonPack: boolean;
-    hasScripts: boolean;
-    rtxEnabled: boolean;
-    contentKey?: string;
-    subPackName?: string;
-    contentId?: string;
 }
 
 /** The result of listing packs: the entries to announce and anything worth warning about. */
@@ -81,7 +81,7 @@ export function buildEntries(scanned: ScannedPack[], config: Config, reachableUr
                 rtxEnabled: o.rtx_enabled ?? pack.manifest.rtxEnabled,
                 contentKey: o.content_key,
                 subPackName: o.sub_pack_name,
-                contentId: o.content_id
+                contentId: o.content_id,
             };
         })
         .sort((a, b) => a.order - b.order || compareNames(a.fileName, b.fileName));

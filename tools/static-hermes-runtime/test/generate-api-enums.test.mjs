@@ -17,7 +17,7 @@ function fixture(imports = '') {
     fs.writeFileSync(path.join(wit, 'plugin.wit'), `world plugin {\n${imports}\n}\n`);
     fs.writeFileSync(
         path.join(wit, 'event.wit'),
-        'enum event-type { tick, join }\nenum event-priority { normal, low }\n'
+        'enum event-type { tick, join }\nenum event-priority { normal, low }\n',
     );
     fs.writeFileSync(path.join(wit, 'game-rules.wit'), 'enum game-rule { do-daylight-cycle }\n');
     fs.writeFileSync(path.join(wit, 'common.wit'), 'enum named-color { red, green }\n');
@@ -31,8 +31,8 @@ function fixture(imports = '') {
             '#define PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_LOW 1',
             '#define PUMPKIN_PLUGIN_GAME_RULES_GAME_RULE_DO_DAYLIGHT_CYCLE 0',
             '#define PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_RED 12',
-            '#define PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_GREEN 10'
-        ].join('\n')
+            '#define PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_GREEN 10',
+        ].join('\n'),
     );
     const bundle = path.join(root, 'bundle.js');
     fs.writeFileSync(bundle, 'registerEvent("tick", "normal");');
@@ -43,7 +43,7 @@ function generate({ wit, header, bundle, output }) {
     childProcess.execFileSync(
         process.execPath,
         [generator, '--wit', wit, '--bundle', bundle, '--header', header, '--output', output],
-        { stdio: 'pipe' }
+        { stdio: 'pipe' },
     );
 }
 

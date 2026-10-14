@@ -8,7 +8,7 @@ import {
     generateWitEventDispatch,
     generateWitSimpleMethodDispatch,
     readWasiWitImports,
-    readWitPackage
+    readWitPackage,
 } from './wit-api.mjs';
 
 const program = new Command()
@@ -50,12 +50,12 @@ generatedSource = replaceMarker(generatedSource, '/* <PUMPKIN_WASI_INITIALIZATIO
 generatedSource = replaceMarker(
     generatedSource,
     '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
-    generateWitSimpleMethodDispatch(apiPackage, bundleSource, apiMethods)
+    generateWitSimpleMethodDispatch(apiPackage, bundleSource, apiMethods),
 );
 generatedSource = replaceMarker(
     generatedSource,
     '/* <PUMPKIN_WIT_EVENT_DISPATCH> */',
-    generateWitEventDispatch(apiPackage, bundleSource)
+    generateWitEventDispatch(apiPackage, bundleSource),
 );
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 const temporaryPath = `${outputPath}.${process.pid}.tmp`;

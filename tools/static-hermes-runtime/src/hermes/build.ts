@@ -9,44 +9,44 @@ import { executablePath, hermesHostCompilerPath, wasiSdkCompilerPath } from './t
 
 /** Paths, pins, patches, and injectable dependencies used to prepare Hermes artifacts. */
 export interface HermesBuildOptions {
-    /** Root of the Static Hermes runtime package. */
-    packageRoot: string;
     /** Shared Hermes cache directory for locks and the build-state record. */
     cacheRoot: string;
-    /** Pinned Hermes source checkout. */
-    source: string;
-    /** CMake build directory for the host `hermesc` compiler. */
-    hostBuild: string;
-    /** CMake build directory for WASI Hermes and JSI libraries. */
-    wasiBuild: string;
-    /** Garbage collector compiled into the WASI Hermes libraries; defaults to Hades. */
-    gcVariant?: HermesGcVariant;
-    /** WASI SDK used by the WASI C and C++ compilers. */
-    wasiSdk: string;
-    /** CMake toolchain file used for the WASI build. */
-    toolchainFile: string;
-    /** JSON file containing the expected Hermes repository, branch, and commit. */
-    pinFile: string;
-    /** Validated source pin for this build. */
-    pin: HermesSourcePin;
-    /** Ordered patch series required before compiling Hermes. */
-    patches: readonly HermesPatch[];
     /** Environment values that can affect compiler configuration. */
     environment?: NodeJS.ProcessEnv;
-    /** Host platform override used for platform-specific executable paths and compiler identity. */
-    platform?: NodeJS.Platform;
     /** Optional filesystem implementation for tests. */
     filesystem?: HermesFileSystem;
+    /** Garbage collector compiled into the WASI Hermes libraries; defaults to Hades. */
+    gcVariant?: HermesGcVariant;
+    /** CMake build directory for the host `hermesc` compiler. */
+    hostBuild: string;
+    /** Root of the Static Hermes runtime package. */
+    packageRoot: string;
+    /** Ordered patch series required before compiling Hermes. */
+    patches: readonly HermesPatch[];
+    /** Validated source pin for this build. */
+    pin: HermesSourcePin;
+    /** JSON file containing the expected Hermes repository, branch, and commit. */
+    pinFile: string;
+    /** Host platform override used for platform-specific executable paths and compiler identity. */
+    platform?: NodeJS.Platform;
     /** Optional process runner for tests. */
     process?: HermesProcessRunner;
+    /** Pinned Hermes source checkout. */
+    source: string;
+    /** CMake toolchain file used for the WASI build. */
+    toolchainFile: string;
+    /** CMake build directory for WASI Hermes and JSI libraries. */
+    wasiBuild: string;
+    /** WASI SDK used by the WASI C and C++ compilers. */
+    wasiSdk: string;
 }
 
 /** Size and modification time recorded for a prepared Hermes artifact. */
 export interface HermesArtifactState {
-    /** Artifact size in bytes. */
-    size: number;
     /** Modification time in milliseconds since the Unix epoch. */
     mtimeMs: number;
+    /** Artifact size in bytes. */
+    size: number;
 }
 
 interface BuildCacheRecord {
@@ -55,18 +55,18 @@ interface BuildCacheRecord {
 
 /** Optional mutable resources, dependencies, and timing controls for Hermes preparation locks. */
 export interface HermesBuildLockOptions {
-    /** Additional mutable Hermes directories that must share this lock with the cache root. */
-    resources?: readonly string[];
     /** Filesystem used to create, read, and remove the lock file. */
     filesystem?: HermesFileSystem;
+    /** Process-liveness check used to identify stale owners. */
+    isProcessAlive?: (pid: number) => boolean;
+    /** Clock used to enforce the timeout. */
+    now?: () => number;
+    /** Additional mutable Hermes directories that must share this lock with the cache root. */
+    resources?: readonly string[];
     /** Maximum wait for another live build to release the lock. */
     timeoutMs?: number;
     /** Delay implementation used between acquisition attempts. */
     wait?: (delayMs: number) => Promise<void>;
-    /** Clock used to enforce the timeout. */
-    now?: () => number;
-    /** Process-liveness check used to identify stale owners. */
-    isProcessAlive?: (pid: number) => boolean;
 }
 
 /**
@@ -79,7 +79,7 @@ export async function buildHermes(options: HermesBuildOptions): Promise<void> {
     const filesystem = options.filesystem ?? hermesFileSystem;
     await withHermesBuildLock(options.cacheRoot, () => buildHermesWithLockHeld(options), {
         filesystem,
-        resources: [options.source, options.hostBuild, options.wasiBuild]
+        resources: [options.source, options.hostBuild, options.wasiBuild],
     });
 }
 
@@ -131,11 +131,11 @@ export function hermesBuildFingerprint(
     requiredArtifacts = requiredHermesArtifacts(
         options.hostBuild,
         options.wasiBuild,
-        options.platform ?? process.platform
+        options.platform ?? process.platform,
     ),
     environment = options.environment ?? process.env,
     filesystem: HermesFileSystem = options.filesystem ?? hermesFileSystem,
-    runner: HermesProcessRunner = options.process ?? hermesProcess
+    runner: HermesProcessRunner = options.process ?? hermesProcess,
 ): string {
     const platform = options.platform ?? process.platform;
     const status = runner.output('git', ['-C', options.source, 'status', '--porcelain', '--untracked-files=all']);
@@ -149,10 +149,10 @@ export function hermesBuildFingerprint(
             .readdirSync(path.join(options.packageRoot, 'src/hermes'))
             .filter(
                 (filename) =>
-                    filename.endsWith('.ts') && !filename.endsWith('.test.ts') && !filename.endsWith('.spec.ts')
+                    filename.endsWith('.ts') && !filename.endsWith('.test.ts') && !filename.endsWith('.spec.ts'),
             )
             .map((filename) => path.join(options.packageRoot, 'src/hermes', filename)),
-        path.join(options.packageRoot, 'src/cli.ts')
+        path.join(options.packageRoot, 'src/cli.ts'),
     ].filter((filename) => filesystem.existsSync(filename));
     const cmakeVersion = runner.output('cmake', ['--version']);
     const inputs = {
@@ -164,24 +164,24 @@ export function hermesBuildFingerprint(
                 .update(runner.buffer('git', ['-C', options.source, 'diff', '--binary', 'HEAD']))
                 .digest('hex'),
             status,
-            untrackedFiles
+            untrackedFiles,
         },
         pin: fileDigest(options.pinFile, filesystem),
         patches: options.patches.map((patch) => [patch.name, fileDigest(patch.filename, filesystem)]),
         buildModules: moduleFiles.map((filename) => [
             path.relative(options.packageRoot, filename),
-            fileDigest(filename, filesystem)
+            fileDigest(filename, filesystem),
         ]),
         toolchainFiles: [
             options.toolchainFile,
             path.join(options.packageRoot, 'toolchain-versions.json'),
-            path.join(options.packageRoot, 'wasi-sdk.lock.json')
+            path.join(options.packageRoot, 'wasi-sdk.lock.json'),
         ].map((filename) => [path.relative(options.packageRoot, filename), fileDigest(filename, filesystem)]),
         toolchain: {
             wasiSdk: options.wasiSdk,
             wasiC: runner.output(wasiSdkCompilerPath(options.wasiSdk, 'wasm32-wasip2-clang', platform), ['--version']),
             wasiCxx: runner.output(wasiSdkCompilerPath(options.wasiSdk, 'wasm32-wasip2-clang++', platform), [
-                '--version'
+                '--version',
             ]),
             hostC: compilerIdentity(
                 options.hostBuild,
@@ -190,7 +190,7 @@ export function hermesBuildFingerprint(
                 filesystem,
                 runner,
                 platform,
-                cmakeVersion
+                cmakeVersion,
             ),
             hostCxx: compilerIdentity(
                 options.hostBuild,
@@ -199,7 +199,7 @@ export function hermesBuildFingerprint(
                 filesystem,
                 runner,
                 platform,
-                cmakeVersion
+                cmakeVersion,
             ),
             wasiHostC: compilerIdentity(
                 options.wasiBuild,
@@ -208,7 +208,7 @@ export function hermesBuildFingerprint(
                 filesystem,
                 runner,
                 platform,
-                cmakeVersion
+                cmakeVersion,
             ),
             wasiHostCxx: compilerIdentity(
                 options.wasiBuild,
@@ -217,10 +217,10 @@ export function hermesBuildFingerprint(
                 filesystem,
                 runner,
                 platform,
-                cmakeVersion
+                cmakeVersion,
             ),
             cmake: cmakeVersion,
-            ninja: runner.output('ninja', ['--version'])
+            ninja: runner.output('ninja', ['--version']),
         },
         environment: Object.fromEntries(
             [
@@ -232,10 +232,10 @@ export function hermesBuildFingerprint(
                 'LDFLAGS',
                 'SDKROOT',
                 'DEVELOPER_DIR',
-                'MACOSX_DEPLOYMENT_TARGET'
+                'MACOSX_DEPLOYMENT_TARGET',
             ]
                 .filter((name) => environment[name] !== undefined)
-                .map((name) => [name, environment[name]])
+                .map((name) => [name, environment[name]]),
         ),
         options: {
             platform,
@@ -245,13 +245,14 @@ export function hermesBuildFingerprint(
             wasiBuild: options.wasiBuild,
             gcVariant: options.gcVariant ?? 'hades',
             enableJsiExtensions: environment.STATIC_HERMES_ENABLE_JSI_EXTENSIONS === '1',
-            enableUnicodeRegexpPropertyEscapes: environment.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0'
+            enableUnicodeRegexpPropertyEscapes:
+                environment.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0',
         },
         cmakeCaches: [options.hostBuild, options.wasiBuild].map((buildDirectory) => {
             const filename = path.join(buildDirectory, 'CMakeCache.txt');
             return filesystem.existsSync(filename) ? fileDigest(filename, filesystem) : null;
         }),
-        artifacts: requiredArtifacts.map((filename) => [filename, artifactState(filename, filesystem)])
+        artifacts: requiredArtifacts.map((filename) => [filename, artifactState(filename, filesystem)]),
     };
     return createHash('sha256').update(JSON.stringify(inputs)).digest('hex');
 }
@@ -269,7 +270,7 @@ export function isHermesBuildCacheCurrent(
     fingerprint: string,
     statePath: string,
     artifacts: readonly string[],
-    filesystem: HermesFileSystem = hermesFileSystem
+    filesystem: HermesFileSystem = hermesFileSystem,
 ): boolean {
     if (
         artifacts.some((filename) => artifactState(filename, filesystem) === null) ||
@@ -297,7 +298,7 @@ export function saveHermesBuildCache(
     fingerprint: string,
     statePath: string,
     cacheRoot: string,
-    filesystem: HermesFileSystem = hermesFileSystem
+    filesystem: HermesFileSystem = hermesFileSystem,
 ): void {
     filesystem.mkdirSync(cacheRoot, { recursive: true });
     const temporary = `${statePath}.${process.pid}.tmp`;
@@ -355,7 +356,7 @@ export async function acquireHermesBuildLock(lockPath: string, options: HermesBu
             if (now() >= deadline) {
                 if (filesystem.existsSync(reclaimLockPath)) {
                     throw new Error(
-                        `Timed out waiting for Hermes build lock: ${lockPath}; inspect recovery claim ${reclaimLockPath} and remove it only after confirming no recovery is active`
+                        `Timed out waiting for Hermes build lock: ${lockPath}; inspect recovery claim ${reclaimLockPath} and remove it only after confirming no recovery is active`,
                     );
                 }
                 throw new Error(`Timed out waiting for Hermes build lock: ${lockPath}`);
@@ -369,7 +370,7 @@ function tryAcquireHermesReclaimLock(
     lockPath: string,
     now: () => number,
     isProcessAlive: (pid: number) => boolean,
-    filesystem: HermesFileSystem
+    filesystem: HermesFileSystem,
 ): string | null {
     const ownerToken = randomUUID();
     try {
@@ -392,7 +393,7 @@ function removeStaleHermesReclaimLock(
     lockPath: string,
     now: () => number,
     isProcessAlive: (pid: number) => boolean,
-    filesystem: HermesFileSystem
+    filesystem: HermesFileSystem,
 ): boolean {
     let originalFile: fs.Stats;
     try {
@@ -468,7 +469,7 @@ function writeHermesLock(lockPath: string, ownerToken: string, startedAt: number
     } catch (cleanupError) {
         throw new AggregateError(
             [failure, cleanupError],
-            `Failed to write and clean up Hermes build lock: ${lockPath}`
+            `Failed to write and clean up Hermes build lock: ${lockPath}`,
         );
     }
     throw failure;
@@ -479,7 +480,7 @@ function removeIncompleteHermesLock(
     lockPath: string,
     ownerToken: string,
     createdFile: fs.Stats,
-    filesystem: HermesFileSystem
+    filesystem: HermesFileSystem,
 ): void {
     let currentFile: fs.Stats;
     try {
@@ -533,13 +534,13 @@ function sameHermesLockFile(left: fs.Stats, right: fs.Stats): boolean {
 export async function withHermesBuildLock<T>(
     cacheRoot: string,
     operation: () => T | Promise<T>,
-    options: HermesBuildLockOptions = {}
+    options: HermesBuildLockOptions = {},
 ): Promise<T> {
     const filesystem = options.filesystem ?? hermesFileSystem;
     const canonicalCacheRoot = canonicalHermesResourcePath(cacheRoot);
     const lockPaths = [
         path.join(canonicalCacheRoot, 'prepare.lock'),
-        ...[cacheRoot, ...(options.resources ?? [])].map(hermesResourceLockPath)
+        ...[cacheRoot, ...(options.resources ?? [])].map(hermesResourceLockPath),
     ]
         .filter((lockPath, index, allLockPaths) => allLockPaths.indexOf(lockPath) === index)
         .sort();
@@ -623,7 +624,7 @@ export function staleHermesBuildLock(
     lockPath: string,
     filesystem: HermesFileSystem = hermesFileSystem,
     now: () => number = Date.now,
-    isProcessAlive: (pid: number) => boolean = processIsAlive
+    isProcessAlive: (pid: number) => boolean = processIsAlive,
 ): boolean {
     let stat: ReturnType<HermesFileSystem['statSync']>;
     try {
@@ -658,7 +659,7 @@ export function staleHermesBuildLock(
 export function requiredHermesArtifacts(
     hostBuild: string,
     wasiBuild: string,
-    platform: NodeJS.Platform = process.platform
+    platform: NodeJS.Platform = process.platform,
 ): string[] {
     return [
         path.join(hostBuild, 'ImportHostCompilers.cmake'),
@@ -666,7 +667,7 @@ export function requiredHermesArtifacts(
         hermesHostCompilerPath(hostBuild, platform),
         path.join(wasiBuild, 'lib/libhermesvm_a.a'),
         path.join(wasiBuild, 'lib/libhermesvmlean_a.a'),
-        path.join(wasiBuild, 'jsi/libjsi.a')
+        path.join(wasiBuild, 'jsi/libjsi.a'),
     ];
 }
 
@@ -674,7 +675,7 @@ function configureAndBuildHermes(
     options: HermesBuildOptions,
     environment: NodeJS.ProcessEnv,
     filesystem: HermesFileSystem,
-    runner: HermesProcessRunner
+    runner: HermesProcessRunner,
 ): void {
     const hostPlatform = options.platform ?? process.platform;
     const hostCxxReleaseFlags = hostPlatform === 'win32' ? '-Os -DNDEBUG' : '-Os -DNDEBUG -Wno-unused-template';
@@ -701,7 +702,7 @@ function configureAndBuildHermes(
         '-DHERMES_UNICODE_LITE=ON',
         '-DHERMES_ALLOW_BOOST_CONTEXT=0',
         '-DCMAKE_C_FLAGS_RELEASE=-Os -DNDEBUG',
-        `-DCMAKE_CXX_FLAGS_RELEASE=${hostCxxReleaseFlags}`
+        `-DCMAKE_CXX_FLAGS_RELEASE=${hostCxxReleaseFlags}`,
     ]);
     runner.run('cmake', ['--build', options.hostBuild, '--target', 'shermes', 'hermesc', '--parallel']);
     runner.run('cmake', [
@@ -732,7 +733,7 @@ function configureAndBuildHermes(
         '-DHERMESVM_ALLOW_JIT=0',
         '-DHERMES_UNICODE_LITE=ON',
         '-DHERMES_ALLOW_BOOST_CONTEXT=0',
-        `-DHERMESVM_GCKIND=${(options.gcVariant ?? 'hades').toUpperCase()}`
+        `-DHERMESVM_GCKIND=${(options.gcVariant ?? 'hades').toUpperCase()}`,
     ]);
     runner.run('cmake', [
         '--build',
@@ -741,7 +742,7 @@ function configureAndBuildHermes(
         'hermesvm_a',
         'hermesvmlean_a',
         'jsi',
-        '--parallel'
+        '--parallel',
     ]);
 }
 
@@ -763,7 +764,7 @@ function compilerIdentity(
     filesystem: HermesFileSystem,
     runner: HermesProcessRunner,
     platform: NodeJS.Platform,
-    cmakeVersion: string
+    cmakeVersion: string,
 ): { command: string; version: string } {
     const cache = path.join(buildDirectory, 'CMakeCache.txt');
     const cacheText = filesystem.existsSync(cache) ? filesystem.readFileSync(cache, 'utf8') : '';
@@ -793,7 +794,7 @@ function compilerMetadata(
     cacheKey: string,
     cacheText: string,
     filesystem: HermesFileSystem,
-    cmakeVersion: string
+    cmakeVersion: string,
 ): { id?: string; version?: string } {
     let id = cacheText.match(new RegExp(`^${cacheKey}_ID:[^=]+=([^\\r\\n]+)$`, 'm'))?.[1];
     let version = cacheText.match(new RegExp(`^${cacheKey}_VERSION:[^=]+=([^\\r\\n]+)$`, 'm'))?.[1];

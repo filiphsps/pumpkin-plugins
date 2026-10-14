@@ -22,11 +22,11 @@ function fixture(signedArtifact) {
     fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
     fs.writeFileSync(
         path.join(root, 'packages/example/package.json'),
-        JSON.stringify({ pumpkinPlugin: { output: 'build/example.wasm' } })
+        JSON.stringify({ pumpkinPlugin: { output: 'build/example.wasm' } }),
     );
     const original = Buffer.concat([
         Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]),
-        customSection('name', Buffer.from('fixture'))
+        customSection('name', Buffer.from('fixture')),
     ]);
     const signed = signWasm(
         original,
@@ -40,9 +40,9 @@ function fixture(signedArtifact) {
             is_paid: false,
             user_id: 0,
             license_key: null,
-            issued_at: '2026-10-06T00:00:00.000Z'
+            issued_at: '2026-10-06T00:00:00.000Z',
         },
-        seed
+        seed,
     );
     fs.writeFileSync(path.join(root, 'packages/example/build/example.wasm'), original);
     fs.writeFileSync(path.join(root, 'dist/example.wasm'), signedArtifact ? signed : original);
@@ -52,7 +52,7 @@ function fixture(signedArtifact) {
 function run(root) {
     const result = spawnSync(process.execPath, [script], {
         env: { ...process.env, PUMPKIN_PLUGINS_ROOT: root },
-        encoding: 'utf8'
+        encoding: 'utf8',
     });
     return { status: result.status, output: `${result.stdout}${result.stderr}` };
 }

@@ -13,7 +13,7 @@ function fixture() {
         read: vi.fn(() => [new Uint8Array([1, 2, 3]), true]),
         write: vi.fn((bytes: Uint8Array, _offset: bigint) => BigInt(bytes.length)),
         readDirectory: vi.fn(() => entries),
-        drop: vi.fn()
+        drop: vi.fn(),
     };
     const root = {
         openAt: vi.fn((_flags: unknown, _path: string, _open: unknown, _descriptor: unknown) => file),
@@ -22,7 +22,7 @@ function fixture() {
         unlinkFileAt: vi.fn(),
         removeDirectoryAt: vi.fn(),
         createDirectoryAt: vi.fn(),
-        drop: vi.fn()
+        drop: vi.fn(),
     };
     host.directories.mockReturnValue([[root, 'data']]);
     const dir = WasiDataDir.open();
@@ -47,7 +47,7 @@ describe('WasiDataDir', () => {
         const f = fixture();
         host.directories.mockReturnValue([
             [other, 'other'],
-            [f.root, 'data']
+            [f.root, 'data'],
         ]);
         expect(WasiDataDir.open()).toBeDefined();
         expect(other.drop).toHaveBeenCalledTimes(2);
@@ -132,7 +132,7 @@ describe('WasiDataDir', () => {
         expect(second[2]).toEqual({ create: true, exclusive: true });
         expect(file.write.mock.calls.map(([bytes, offset]) => [[...bytes], offset])).toEqual([
             [[1, 2, 3], 0n],
-            [[2, 3], 1n]
+            [[2, 3], 1n],
         ]);
         expect(file.drop).toHaveBeenCalledOnce();
         expect(root.renameAt).toHaveBeenCalledWith(second[1], root, 'config.toml');
@@ -157,7 +157,7 @@ describe('WasiDataDir', () => {
             expect(() => dir.writeFile('a', new Uint8Array([1]))).toThrow(`${stage} failed`);
             expect(file.drop).toHaveBeenCalledOnce();
             expect(root.unlinkFileAt).toHaveBeenCalledWith(root.openAt.mock.calls[0][1]);
-        }
+        },
     );
 
     it('cleans up a write that makes no progress', () => {

@@ -7,7 +7,7 @@ export class ByteCredit {
 
     constructor(
         private rateKbps: number,
-        now: number
+        now: number,
     ) {
         this.updatedAt = now;
     }

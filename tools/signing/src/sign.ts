@@ -9,48 +9,48 @@ const SIGNATURE_PATTERN = /^[0-9a-f]{128}$/;
 
 /** The metadata Pumpkin expects in the `pumpkin.metadata` section. Field order is the JSON order. */
 export interface SigningMetadata {
-    /** Marketplace the plugin comes from; empty for independent plugins. */
-    marketplace_url: string;
-    /** Marketplace plugin id; 0 for independent plugins. */
-    plugin_id: number;
-    /** The Pumpkin plugin name. */
-    plugin_name: string;
-    /** The plugin version. */
-    version: string;
     /** Marketplace developer id; 0 for independent plugins. */
     dev_id: number;
     /** The developer's name. */
     dev_name: string;
     /** Whether the plugin is paid. */
     is_paid: boolean;
-    /** Marketplace user id; 0 for independent plugins. */
-    user_id: number;
-    /** License key, or null when absent, matching the host's optional string. */
-    license_key?: string | null;
     /** Signing date text; the host accepts an opaque string. */
     issued_at: string;
+    /** License key, or null when absent, matching the host's optional string. */
+    license_key?: string | null;
+    /** Marketplace the plugin comes from; empty for independent plugins. */
+    marketplace_url: string;
+    /** Marketplace plugin id; 0 for independent plugins. */
+    plugin_id: number;
+    /** The Pumpkin plugin name. */
+    plugin_name: string;
+    /** Marketplace user id; 0 for independent plugins. */
+    user_id: number;
+    /** The plugin version. */
+    version: string;
 }
 
 /** Result of {@link verifyWasm}. */
 export interface VerifyResult {
-    /** Whether the binary carries signing sections at all. */
-    signed: boolean;
-    /** Whether the signature checks out; always false when unsigned. */
-    valid: boolean;
     /** Why the binary isn't valid. */
     error?: string;
     /** The signed metadata, when it could be read. */
     metadata?: SigningMetadata;
     /** The public key from the signature envelope, in hex. */
     publicKeyHex?: string;
+    /** Whether the binary carries signing sections at all. */
+    signed: boolean;
+    /** Whether the signature checks out; always false when unsigned. */
+    valid: boolean;
 }
 
 /** A freshly generated Ed25519 key pair, both halves as hex. */
 export interface KeyPair {
-    /** The 32-byte secret seed as 64 hex characters. Keep it private. */
-    secretKeyHex: string;
     /** The 32-byte public key as 64 hex characters. Safe to publish. */
     publicKeyHex: string;
+    /** The 32-byte secret seed as 64 hex characters. Keep it private. */
+    secretKeyHex: string;
 }
 
 function secretKey(secretKeyHex: string): KeyObject {
@@ -84,7 +84,7 @@ export function generateKeyPair(): KeyPair {
     const der = privateKey.export({ format: 'der', type: 'pkcs8' });
     return {
         secretKeyHex: der.subarray(PKCS8_PREFIX.length).toString('hex'),
-        publicKeyHex: rawPublicKey(privateKey)
+        publicKeyHex: rawPublicKey(privateKey),
     };
 }
 
@@ -110,9 +110,9 @@ export function signWasm(wasm: Uint8Array, metadata: SigningMetadata, secretKeyH
             is_paid: metadata.is_paid,
             user_id: metadata.user_id,
             license_key: metadata.license_key,
-            issued_at: metadata.issued_at
+            issued_at: metadata.issued_at,
         }),
-        'utf8'
+        'utf8',
     );
     const signature = sign(null, Buffer.concat([clean, metadataJson]), key);
     const envelope = Buffer.from(
@@ -120,13 +120,13 @@ export function signWasm(wasm: Uint8Array, metadata: SigningMetadata, secretKeyH
             version: 1,
             algorithm: 'Ed25519',
             public_key_hex: rawPublicKey(key),
-            signature_hex: signature.toString('hex')
+            signature_hex: signature.toString('hex'),
         }),
-        'utf8'
+        'utf8',
     );
     return appendCustomSections(clean, [
         [METADATA_SECTION, metadataJson],
-        [SIGNATURE_SECTION, envelope]
+        [SIGNATURE_SECTION, envelope],
     ]);
 }
 
@@ -152,7 +152,7 @@ function parseJson(data: Uint8Array, metadataIds = false): Record<string, unknow
                     }
                 }
                 return field;
-            }
+            },
         );
         return typeof value === 'object' && value !== null && !Array.isArray(value) && !invalidIds.has(value)
             ? (value as Record<string, unknown>)
@@ -163,12 +163,12 @@ function parseJson(data: Uint8Array, metadataIds = false): Record<string, unknow
 }
 
 function isSigningMetadata(
-    value: Record<string, unknown> | undefined
+    value: Record<string, unknown> | undefined,
 ): value is SigningMetadata & Record<string, unknown> {
     if (!value) return false;
     return (
         ['marketplace_url', 'plugin_name', 'version', 'dev_name', 'issued_at'].every(
-            (key) => typeof value[key] === 'string'
+            (key) => typeof value[key] === 'string',
         ) &&
         ID_FIELDS.every((key) => typeof value[key] === 'number' && Number.isInteger(value[key])) &&
         typeof value.is_paid === 'boolean' &&
@@ -217,7 +217,7 @@ export function verifyWasm(wasm: Uint8Array): VerifyResult {
     const key = createPublicKey({
         key: Buffer.concat([SPKI_PREFIX, Buffer.from(publicKeyHex, 'hex')]),
         format: 'der',
-        type: 'spki'
+        type: 'spki',
     });
     const payload = Buffer.concat([stripped.clean, metadataSection.data]);
     if (!verify(null, payload, key, Buffer.from(signatureHex, 'hex'))) {

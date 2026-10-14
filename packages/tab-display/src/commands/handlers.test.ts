@@ -9,13 +9,13 @@ describe('TabDisplay commands', () => {
         expect(flattened.map(({ usage }) => usage)).toEqual([
             '/tabdisplay status',
             '/tabdisplay reload',
-            '/tabdisplay inspect <player>'
+            '/tabdisplay inspect <player>',
         ]);
         expect(
             flattened.every(
                 ({ permission, defaultPermission }) =>
-                    permission.startsWith('TabDisplay:') && defaultPermission.tag === 'op'
-            )
+                    permission.startsWith('TabDisplay:') && defaultPermission.tag === 'op',
+            ),
         ).toBe(true);
         expect(flattened[2]?.arguments).toEqual([{ name: 'player', type: 'players' }]);
     });
@@ -26,7 +26,7 @@ describe('TabDisplay commands', () => {
             name: 'Alex',
             edition: 'java',
             javaVersion: 'v-26-3',
-            placeholderIds: ['player_name']
+            placeholderIds: ['player_name'],
         }));
         const handlers = commandHandlers({
             status: () => ({
@@ -40,15 +40,15 @@ describe('TabDisplay commands', () => {
                 unresolved: ['rank'],
                 java: { kind: 'supported' },
                 sorting: { kind: 'unsupported', reason: 'direction unverified' },
-                bedrock: { kind: 'unsupported', reason: 'native roster unchanged' }
+                bedrock: { kind: 'unsupported', reason: 'native roster unchanged' },
             }),
             reload: () => ({ kind: 'applied' }),
-            inspect
+            inspect,
         });
 
         const status = handlers['tabdisplay status']({} as never).join('\n');
         const details = handlers['tabdisplay inspect <player>']({} as never, {
-            player: [{ id: 'subject-uuid', name: 'Alex' }]
+            player: [{ id: 'subject-uuid', name: 'Alex' }],
         }).join('\n');
 
         expect(status).toContain('Java versions: v-26-3');
@@ -73,23 +73,23 @@ describe('TabDisplay commands', () => {
                 unresolved: [],
                 java: { kind: 'supported' },
                 sorting: { kind: 'unsupported', reason: 'direction unverified' },
-                bedrock: { kind: 'unsupported', reason: 'native roster unchanged' }
+                bedrock: { kind: 'unsupported', reason: 'native roster unchanged' },
             }),
             reload: () => ({ kind: 'failed', reason: 'header.lines: invalid value' }),
-            inspect: vi.fn()
+            inspect: vi.fn(),
         });
 
         expect(
             handlers['tabdisplay inspect <player>']({} as never, {
                 player: [
                     { id: 'one', name: 'One' },
-                    { id: 'two', name: 'Two' }
-                ]
-            })[0]
+                    { id: 'two', name: 'Two' },
+                ],
+            })[0],
         ).toMatchObject({ tone: 'error', text: expect.stringContaining('exactly one') });
         expect(handlers['tabdisplay reload']({} as never)[0]).toMatchObject({
             tone: 'error',
-            text: expect.stringContaining('header.lines')
+            text: expect.stringContaining('header.lines'),
         });
     });
 });

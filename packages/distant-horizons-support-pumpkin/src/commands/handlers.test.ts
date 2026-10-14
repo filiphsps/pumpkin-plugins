@@ -35,12 +35,12 @@ function setup() {
             height: 1,
             chunkLoader: unavailableChunkLoader,
             terrainGenerator: unavailableTerrainGenerator,
-            sample: () => ({ material: 'minecraft:stone', skyLight: 15, blockLight: 0 })
+            sample: () => ({ material: 'minecraft:stone', skyLight: 15, blockLight: 0 }),
         },
         borderBounds: { minX: -1_000_000, maxX: 1_000_000, minZ: -1_000_000, maxZ: 1_000_000 },
         insideBorder: () => true,
         report: () => undefined,
-        send: () => undefined
+        send: () => undefined,
     };
     platform.withPlayer.mockImplementation((_player: unknown, _settings: unknown, use: (peer: Peer) => void) => {
         if (!activePeer) return false;
@@ -51,7 +51,7 @@ function setup() {
     const [root] = buildCommands<CommandSender, typeof commands>(
         host as unknown as CommandHost<CommandSender>,
         commands,
-        commandHandlers(sessions, cache, settings)
+        commandHandlers(sessions, cache, settings),
     );
     return { cache, files, host, root: root?.node as FakeNode, sessions };
 }
@@ -75,7 +75,7 @@ describe('the /dhs commands', () => {
             'DistantHorizonsSupportPumpkin:command.dhs.generate',
             'DistantHorizonsSupportPumpkin:command.dhs.generate',
             'DistantHorizonsSupportPumpkin:command.dhs.generate',
-            'DistantHorizonsSupportPumpkin:command.dhs.generate'
+            'DistantHorizonsSupportPumpkin:command.dhs.generate',
         ]);
         expect(info.commands.map(({ usage }) => usage)).toEqual(
             expect.arrayContaining([
@@ -87,8 +87,8 @@ describe('the /dhs commands', () => {
                 '/dhs generate',
                 '/dhs generate <radius>',
                 '/dhs generate <x> <z>',
-                '/dhs generate <x> <z> <radius>'
-            ])
+                '/dhs generate <x> <z> <radius>',
+            ]),
         );
     });
 
@@ -96,7 +96,7 @@ describe('the /dhs commands', () => {
         const { host, root } = setup();
         expect(host.run(root, ['dhs', 'cache', 'status'])).toEqual([
             '§3Memory cache§r: §61§r/§6512§r entries, §6100\u00a0B§r',
-            '§3Disk cache§r: §61§r/§64096§r entries, §6127\u00a0B§r.'
+            '§3Disk cache§r: §61§r/§64096§r entries, §6127\u00a0B§r.',
         ]);
     });
 
@@ -108,7 +108,7 @@ describe('the /dhs commands', () => {
         expect(status.length).toBeGreaterThan(1);
         expect(status[0]).toContain('§60§r Distant Horizons client(s), §60§r pending LOD request(s)');
         expect(status.find((line) => line.includes('Capture budget'))).toContain(
-            'Capture budget §60§r/§68192§r block samples/tick at §60.0§r reported MSPT'
+            'Capture budget §60§r/§68192§r block samples/tick at §60.0§r reported MSPT',
         );
         expect(status.every((line) => line.length <= 120)).toBe(true);
     });
@@ -116,19 +116,19 @@ describe('the /dhs commands', () => {
     it('clears both tiers or either tier independently', () => {
         const all = setup();
         expect(all.host.run(all.root, ['dhs', 'cache', 'clear'])).toEqual([
-            'Cleared §61§r in-memory and §61§r disk cache entries.'
+            'Cleared §61§r in-memory and §61§r disk cache entries.',
         ]);
         expect(all.cache.stats()).toMatchObject({ memoryEntries: 0, diskEntries: 0 });
 
         const memory = setup();
         expect(memory.host.run(memory.root, ['dhs', 'cache', 'memory', 'clear'])).toEqual([
-            'Cleared §61§r in-memory cache entries.'
+            'Cleared §61§r in-memory cache entries.',
         ]);
         expect(memory.cache.stats()).toMatchObject({ memoryEntries: 0, diskEntries: 1 });
 
         const disk = setup();
         expect(disk.host.run(disk.root, ['dhs', 'cache', 'disk', 'clear'])).toEqual([
-            'Cleared §61§r disk cache entries.'
+            'Cleared §61§r disk cache entries.',
         ]);
         expect(disk.cache.stats()).toMatchObject({ memoryEntries: 1, diskEntries: 0 });
     });
@@ -142,7 +142,7 @@ describe('the /dhs commands', () => {
         const player = {
             getPosition: () => [32, 64, 32],
             getWorld: () => ({ getName: () => 'world', [Symbol.dispose]: () => undefined }),
-            [Symbol.dispose]: () => undefined
+            [Symbol.dispose]: () => undefined,
         };
         const sender = { lines: [], errors: [], asPlayer: () => player };
 
@@ -160,12 +160,12 @@ describe('the /dhs commands', () => {
         const player = {
             getPosition: () => [70, 64, 3],
             getWorld: () => ({ getName: () => 'overworld', [Symbol.dispose]: () => undefined }),
-            [Symbol.dispose]: () => undefined
+            [Symbol.dispose]: () => undefined,
         };
         const sender = {
             lines: [],
             errors: [],
-            asPlayer: () => player
+            asPlayer: () => player,
         };
 
         host.runAs(root, ['dhs', 'map'], {}, sender as never);
@@ -203,7 +203,7 @@ describe('the /dhs commands', () => {
         const player = {
             getPosition: () => [70, 64, 3],
             getWorld: () => ({ getName: () => 'world', [Symbol.dispose]: () => undefined }),
-            [Symbol.dispose]: () => undefined
+            [Symbol.dispose]: () => undefined,
         };
         const sender = { lines: [], errors: [], asPlayer: () => player };
 
@@ -224,7 +224,7 @@ describe('the /dhs commands', () => {
             atRadius.root,
             ['dhs', 'generate', '<x>', '<z>', '<radius>'],
             { x: 64, z: -64, radius: 2 },
-            sender as never
+            sender as never,
         );
         expect(sender.lines.at(-3)).toContain('section §61§r, §6-1§r (radius §62§r');
     });
@@ -234,7 +234,7 @@ describe('the /dhs commands', () => {
         const player = {
             getPosition: () => [0, 64, 0],
             getWorld: () => ({ getName: () => 'world', [Symbol.dispose]: () => undefined }),
-            [Symbol.dispose]: () => undefined
+            [Symbol.dispose]: () => undefined,
         };
         const sender = { lines: [], errors: [], asPlayer: () => player };
         f.host.runAs(f.root, ['dhs', 'generate'], {}, sender as never);
@@ -249,15 +249,15 @@ describe('the /dhs commands', () => {
         const player = {
             getPosition: () => [0, 64, 0],
             getWorld: () => ({ getName: () => 'overworld', [Symbol.dispose]: () => undefined }),
-            [Symbol.dispose]: () => undefined
+            [Symbol.dispose]: () => undefined,
         };
         const sender = { lines: [], errors: [], asPlayer: () => player };
 
         expect(() => host.run(root, ['dhs', 'map', '<radius>'], { radius: 16_385 }, sender as never)).toThrow(
-            'Radius must be between 0 and 16384 LOD sections.'
+            'Radius must be between 0 and 16384 LOD sections.',
         );
         expect(() => host.run(root, ['dhs', 'generate', '<radius>'], { radius: 16_385 })).toThrow(
-            'Radius must be between 0 and 16384 LOD sections.'
+            'Radius must be between 0 and 16384 LOD sections.',
         );
     });
 
@@ -268,7 +268,7 @@ describe('the /dhs commands', () => {
         expect(status).toHaveLength(7);
         expect(status[0]).toContain('0 Distant Horizons client(s), 0 pending LOD request(s)');
         expect(
-            status.some((line) => line.includes('Capture budget 0/8192 block samples/tick at 0.0 reported MSPT'))
+            status.some((line) => line.includes('Capture budget 0/8192 block samples/tick at 0.0 reported MSPT')),
         ).toBe(true);
         expect(status.every((line) => line.length <= 120)).toBe(true);
     });

@@ -11,35 +11,35 @@ describe('statusLines', () => {
                 {
                     key: 'own:java',
                     spec,
-                    state: { kind: 'open', via: 'upnp', address: [93, 184, 216, 34], port: 25565 }
+                    state: { kind: 'open', via: 'upnp', address: [93, 184, 216, 34], port: 25565 },
                 },
                 { key: 'plugin:BedrockAddonManager:web', spec: { ...spec, port: 8123 }, state: { kind: 'pending' } },
                 {
                     key: 'own:bedrock',
                     spec: { ...spec, protocol: 'udp', port: 19132 },
-                    state: { kind: 'failed', reason: 'no router answered the search' }
-                }
-            ]
+                    state: { kind: 'failed', reason: 'no router answered the search' },
+                },
+            ],
         );
         expect(lines).toEqual([
             'Router: upnp at 192.168.1.1, public address 93.184.216.34.',
             'java (TCP 25565): open at 93.184.216.34:25565 (upnp)',
             'BedrockAddonManager web (TCP 8123): looking for a router',
-            'bedrock (UDP 19132): not open: no router answered the search'
+            'bedrock (UDP 19132): not open: no router answered the search',
         ]);
     });
 
     it('says when nothing is found, with the local address when known, and when nothing was asked', () => {
         expect(statusLines({}, [])[0]).toBe('No router found yet.');
         expect(statusLines({ localAddress: [192, 168, 1, 5] }, [])[0]).toBe(
-            "No router found yet. This machine's address is 192.168.1.5."
+            "No router found yet. This machine's address is 192.168.1.5.",
         );
         expect(statusLines({}, [])[1]).toContain('No ports were asked for');
     });
 
     it('explains a port that needs no mapping', () => {
         const [, line] = statusLines({}, [
-            { key: 'own:java', spec, state: { kind: 'open', via: 'public', address: [1, 2, 3, 4], port: 25565 } }
+            { key: 'own:java', spec, state: { kind: 'open', via: 'public', address: [1, 2, 3, 4], port: 25565 } },
         ]);
         expect(line).toBe('java (TCP 25565): reachable at 1.2.3.4:25565 (this machine has a public address)');
     });
@@ -55,7 +55,7 @@ describe('reloadLines', () => {
 describe('statusLines for a blocked router', () => {
     const identity = { manufacturer: 'Telekom', name: 'Speedport', source: 'web' } as const;
     const lines = statusLines({ identity, refused: { identity, reason: 'Telekom routers do not support UPnP' } }, [
-        { key: 'own:java', spec, state: { kind: 'failed', reason: 'ignored' } }
+        { key: 'own:java', spec, state: { kind: 'failed', reason: 'ignored' } },
     ]);
 
     it('opens with the reason as an error', () => {
@@ -70,9 +70,9 @@ describe('statusLines with a router that is known', () => {
             {
                 gateway: { kind: 'upnp', address: [192, 168, 1, 1] },
                 externalAddress: [93, 184, 216, 34],
-                identity: { manufacturer: 'AVM', model: 'FRITZ!Box 7590', source: 'upnp' }
+                identity: { manufacturer: 'AVM', model: 'FRITZ!Box 7590', source: 'upnp' },
             },
-            []
+            [],
         );
         expect(line).toBe('Router: upnp at 192.168.1.1 (AVM FRITZ!Box 7590), public address 93.184.216.34.');
     });

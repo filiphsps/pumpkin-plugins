@@ -20,7 +20,7 @@ export function* udpRequest<T>(
     to: Endpoint,
     packet: Uint8Array,
     accept: (datagram: Datagram) => T | undefined,
-    timeouts: readonly number[]
+    timeouts: readonly number[],
 ): Steps<T> {
     for (const timeout of timeouts) {
         socket.send(to, packet);

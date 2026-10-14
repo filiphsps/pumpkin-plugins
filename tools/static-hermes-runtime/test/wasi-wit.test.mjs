@@ -19,7 +19,7 @@ function fixture() {
             import wasi:filesystem/preopens@0.2.3;
             import wasi:http/outgoing-handler@0.2.3;
         }
-    `
+    `,
     );
     write(
         root,
@@ -30,7 +30,7 @@ function fixture() {
             use types.{descriptor};
             get-directories: func() -> list<tuple<descriptor, string>>;
         }
-    `
+    `,
     );
     write(
         root,
@@ -43,7 +43,7 @@ function fixture() {
                 open-at: func(path: string) -> descriptor;
             }
         }
-    `
+    `,
     );
     write(root, 'deps/http/package.wit', 'package wasi:http@0.2.3;');
     write(
@@ -54,7 +54,7 @@ function fixture() {
             use types.{outgoing-request, request-options};
             handle: func(request: outgoing-request, options: option<request-options>) -> result<future-incoming-response>;
         }
-    `
+    `,
     );
     write(
         root,
@@ -66,7 +66,7 @@ function fixture() {
             resource request-options { constructor(); }
             resource future-incoming-response { subscribe: func() -> pollable; }
         }
-    `
+    `,
     );
     write(
         root,
@@ -74,7 +74,7 @@ function fixture() {
         `
         package wasi:io@0.2.3;
         interface poll { resource pollable { ready: func() -> bool; } }
-    `
+    `,
     );
     write(
         root,
@@ -82,7 +82,7 @@ function fixture() {
         `
         package wasi:clocks@0.2.3;
         interface timezone { utc-offset: func() -> s32; }
-    `
+    `,
     );
     return root;
 }
@@ -94,12 +94,12 @@ function transitiveDependencyFixture() {
     write(
         root,
         'deps/test/parent.wit',
-        'package wasi:test@0.2.3; interface parent { use wasi:io/error@0.2.3.{error}; resource wrapper { get: func() -> error; } }'
+        'package wasi:test@0.2.3; interface parent { use wasi:io/error@0.2.3.{error}; resource wrapper { get: func() -> error; } }',
     );
     write(
         root,
         'deps/io/error.wit',
-        'package wasi:io@0.2.3; interface error { resource error { to-debug-string: func() -> string; } }'
+        'package wasi:io@0.2.3; interface error { resource error { to-debug-string: func() -> string; } }',
     );
     return root;
 }
@@ -144,7 +144,7 @@ describe('WASI WIT generation', () => {
             'wasi:filesystem/preopens@0.2.3',
             'wasi:filesystem/types@0.2.3',
             'wasi:http/outgoing-handler@0.2.3',
-            'wasi:http/types@0.2.3'
+            'wasi:http/types@0.2.3',
         ]);
         expect(wit.interfaces.map((api) => api.name)).not.toContain('timezone');
     });
@@ -165,10 +165,10 @@ describe('WASI WIT generation', () => {
             drop() {
                 dropped = true;
                 valid = false;
-            }
+            },
         };
         const restoreHost = setGlobal('__pumpkinWasiFilesystemPreopens', {
-            getDirectories: () => [[descriptor, '/tmp']]
+            getDirectories: () => [[descriptor, '/tmp']],
         });
 
         try {
@@ -196,14 +196,14 @@ describe('WASI WIT generation', () => {
         const request = {};
         const restoreHost = setGlobal('__pumpkinWasiHttpTypes', {
             fields: {
-                constructor: () => fields
+                constructor: () => fields,
             },
             outgoingRequest: {
                 constructor: (headers) => {
                     calls.push({ headers });
                     return request;
-                }
-            }
+                },
+            },
         });
 
         try {
@@ -222,7 +222,7 @@ describe('WASI WIT generation', () => {
 
     it('rejects WASI imports that are not declared by the plugin world', () => {
         expect(() => readWasiWitImports(fixture(), ['wasi:sockets/tcp@0.2.3'])).toThrow(
-            'WASI interface wasi:sockets/tcp@0.2.3 is not imported by plugin WIT'
+            'WASI interface wasi:sockets/tcp@0.2.3 is not imported by plugin WIT',
         );
     });
 
@@ -233,18 +233,18 @@ describe('WASI WIT generation', () => {
             pluginPath,
             fs
                 .readFileSync(pluginPath, 'utf8')
-                .replace('import wasi:http/outgoing-handler@0.2.3;', 'import wasi:sockets/tcp-create-socket@0.2.3;')
+                .replace('import wasi:http/outgoing-handler@0.2.3;', 'import wasi:sockets/tcp-create-socket@0.2.3;'),
         );
         write(
             root,
             'deps/sockets/world.wit',
-            'package wasi:sockets@0.2.3; world imports { import network; import tcp-create-socket; }'
+            'package wasi:sockets@0.2.3; world imports { import network; import tcp-create-socket; }',
         );
         write(root, 'deps/sockets/network.wit', 'interface network { resource network; enum error-code { unknown } }');
         write(
             root,
             'deps/sockets/tcp-create-socket.wit',
-            'interface tcp-create-socket { use network.{network, error-code}; create-tcp-socket: func() -> result<network, error-code>; }'
+            'interface tcp-create-socket { use network.{network, error-code}; create-tcp-socket: func() -> result<network, error-code>; }',
         );
 
         const wit = readWasiWitImports(root);
@@ -253,10 +253,10 @@ describe('WASI WIT generation', () => {
             'wasi:filesystem/preopens@0.2.3',
             'wasi:filesystem/types@0.2.3',
             'wasi:sockets/tcp-create-socket@0.2.3',
-            'wasi:sockets/network@0.2.3'
+            'wasi:sockets/network@0.2.3',
         ]);
         expect(wit.interfaces.find((api) => api.name === 'network').resources).toEqual([
-            { name: 'network', functions: [] }
+            { name: 'network', functions: [] },
         ]);
     });
 });

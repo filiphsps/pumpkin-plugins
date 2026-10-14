@@ -37,7 +37,7 @@ class FakeConnection implements Connection {
 
     constructor(
         readonly localAddress: Ipv4,
-        private readonly router: FakeIgd
+        private readonly router: FakeIgd,
     ) {}
 
     read(): Uint8Array | null | 'closed' {
@@ -79,7 +79,7 @@ class FakeConnection implements Connection {
         const { status, body: out } = this.router.handleHttp(method, path, headers, body);
         const payload = strToU8(out);
         const head = strToU8(
-            `HTTP/1.1 ${status} X\r\nContent-Type: text/xml\r\nContent-Length: ${payload.length}\r\nConnection: close\r\n\r\n`
+            `HTTP/1.1 ${status} X\r\nContent-Type: text/xml\r\nContent-Length: ${payload.length}\r\nConnection: close\r\n\r\n`,
         );
         this.response = new Uint8Array(head.length + payload.length);
         this.response.set(head);
@@ -123,7 +123,7 @@ export class FakeNetwork implements Network {
 
     dial(to: Endpoint): Dial {
         const router = this.routers.find(
-            (r) => sameIpv4(r.address, to.address) && (r.httpPort === to.port || (to.port === 80 && r.hasWebInterface))
+            (r) => sameIpv4(r.address, to.address) && (r.httpPort === to.port || (to.port === 80 && r.hasWebInterface)),
         );
         const local = this.local ?? [127, 0, 0, 1];
         return {
@@ -133,7 +133,7 @@ export class FakeNetwork implements Network {
                 this.connections.push(connection);
                 return connection;
             },
-            abort: () => {}
+            abort: () => {},
         };
     }
 

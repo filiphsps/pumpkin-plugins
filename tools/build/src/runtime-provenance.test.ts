@@ -32,7 +32,7 @@ function fixture() {
     symlinkSync(
         resolve(import.meta.dirname, '../node_modules/commander'),
         join(copiedPackageNodeModules, 'commander'),
-        'junction'
+        'junction',
     );
     cpSync(runtime, copiedRuntime, { recursive: true });
     cpSync(join(runtime, 'quickjs-runtime-bigint.wasm'), builtArtifact);
@@ -46,13 +46,13 @@ function fixture() {
         writeFileSync(name, `#!/bin/sh\nset -eu\n${body}\n`, { mode: 0o755 });
     executable(
         join(bin, 'git'),
-        `if [ "$3" = rev-parse ] && [ "$4" = HEAD ]; then echo '${commit}'; else exec '${realGit}' "$@"; fi`
+        `if [ "$3" = rev-parse ] && [ "$4" = HEAD ]; then echo '${commit}'; else exec '${realGit}' "$@"; fi`,
     );
     executable(join(bin, 'rustc'), `if [ "$1" = --version ]; then echo '${rust}'; else echo '${dir}/target-lib'; fi`);
     mkdirSync(join(dir, 'target-lib'));
     executable(
         join(bin, 'cargo'),
-        `if [ "$1" = --version ]; then echo '${cargo}'; else printf '%s\\n' "$@" > '${dir}/cargo-args'; mkdir -p "$CARGO_TARGET_DIR/wasm32-wasip2/release"; cp '${builtArtifact}' "$CARGO_TARGET_DIR/wasm32-wasip2/release/componentize_qjs_runtime.wasm"; fi`
+        `if [ "$1" = --version ]; then echo '${cargo}'; else printf '%s\\n' "$@" > '${dir}/cargo-args'; mkdir -p "$CARGO_TARGET_DIR/wasm32-wasip2/release"; cp '${builtArtifact}' "$CARGO_TARGET_DIR/wasm32-wasip2/release/componentize_qjs_runtime.wasm"; fi`,
     );
     executable(join(sdk, 'bin/clang'), `echo '${clang}'`);
     writeFileSync(join(sdk, 'VERSION'), sdkVersion);
@@ -75,23 +75,23 @@ function fixture() {
         QJS_SOURCE_DIR: source,
         WASI_SDK_PATH: sdk,
         CARGO_TARGET_DIR: join(dir, 'target'),
-        RUNTIME_OUTPUT_DIR: output
+        RUNTIME_OUTPUT_DIR: output,
     };
     const verifyCandidate = () =>
         spawnSync(process.execPath, [join(copiedRuntime, 'provenance.mjs'), 'verify-candidate', output], {
             encoding: 'utf8',
-            timeout: 5000
+            timeout: 5000,
         });
     const verifyShipped = (path = copiedRuntime) =>
         spawnSync(process.execPath, [join(copiedRuntime, 'provenance.mjs'), 'verify', path], {
             encoding: 'utf8',
-            timeout: 5000
+            timeout: 5000,
         });
     const run = () =>
         spawnSync('sh', [join(copiedRuntime, 'build.sh')], {
             encoding: 'utf8',
             timeout: 15000,
-            env
+            env,
         });
     return {
         dir,
@@ -106,7 +106,7 @@ function fixture() {
         verifyShipped,
         env,
         git,
-        executable
+        executable,
     };
 }
 
@@ -128,7 +128,7 @@ describe('runtime provenance build', () => {
         expect(
             createHash('sha256')
                 .update(readFileSync(join(f.output, 'quickjs-runtime-bigint.wasm')))
-                .digest('hex')
+                .digest('hex'),
         ).toBe(manifest.outputSha256);
         expect(f.verifyShipped(f.output).stderr).toContain('Candidate provenance cannot verify as shipped runtime');
         expect(f.run().status).toBe(0); // Exactly the declared patch is allowed on repeat builds.
@@ -244,7 +244,7 @@ describe('runtime provenance build', () => {
         'target',
         'features',
         'rustFlags',
-        'cFlags'
+        'cFlags',
     ])('rejects candidate manifest drift in %s', (key) => {
         const f = fixture();
         expect(f.run().status).toBe(0);
@@ -278,7 +278,7 @@ describe('runtime provenance build', () => {
         const result = f.verifyCandidate();
         expect(result.status).not.toBe(0);
         expect(result.stderr).toContain(
-            key === 'buildHost' ? 'Missing runtime candidate build host' : 'Missing runtime candidate host release'
+            key === 'buildHost' ? 'Missing runtime candidate build host' : 'Missing runtime candidate host release',
         );
     });
     it('rejects candidate artifact drift', () => {

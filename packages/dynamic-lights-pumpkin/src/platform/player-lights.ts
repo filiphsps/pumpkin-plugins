@@ -28,7 +28,7 @@ export function readHeldLight(player: Player, levels: HeldItemLightLevels | unde
             worldId: world.getId(),
             position,
             lightPosition: lightPosition ?? position,
-            level: lightPosition === undefined ? 0 : level
+            level: lightPosition === undefined ? 0 : level,
         };
     } finally {
         disposeWasiResource(world);
@@ -58,7 +58,7 @@ export function readEntityLights(player: Player, levelFor: (entity: Entity) => n
 /** Snapshots nearby item IDs so a later refresh can distinguish new drops from old ones. */
 export function nearbyItemIds(player: Player): number[] {
     return withNearbyEntities(player, 2, (entities) =>
-        entities.filter((entity) => entity.getType() === 'item').map((entity) => entity.getId())
+        entities.filter((entity) => entity.getType() === 'item').map((entity) => entity.getId()),
     );
 }
 

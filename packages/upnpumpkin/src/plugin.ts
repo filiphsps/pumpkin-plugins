@@ -6,7 +6,7 @@ import { cancelTask, hostLogger, runCommand, scheduleRepeating } from '@pumpkin-
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import {
     handleCommand as apiHandleCommand,
-    handleIpcMessage as apiHandleIpcMessage
+    handleIpcMessage as apiHandleIpcMessage,
 } from '@pumpkin-plugins/pumpkin-api';
 import { registerCommands } from './commands/register.ts';
 import { PortForwarder } from './forwarder.ts';
@@ -29,7 +29,7 @@ class UPnPumpkin extends PluginBase {
         const files = WasiDataDir.open();
         if (!files) {
             hostLogger.error(
-                `${info.name} cannot reach its data folder. Grant it the fs.read.data and fs.write.data permissions and restart the server.`
+                `${info.name} cannot reach its data folder. Grant it the fs.read.data and fs.write.data permissions and restart the server.`,
             );
             return;
         }

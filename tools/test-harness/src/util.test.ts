@@ -22,7 +22,7 @@ describe('assetName', () => {
 describe('parseChecksums', () => {
     it('reads sha256sum lines', () => {
         const sums = parseChecksums(
-            `${'a'.repeat(64)}  pumpkin-X64-Linux\n${'B'.repeat(64)} *pumpkin-ARM64-macOS\nnot a line\n`
+            `${'a'.repeat(64)}  pumpkin-X64-Linux\n${'B'.repeat(64)} *pumpkin-ARM64-macOS\nnot a line\n`,
         );
         expect(sums.get('pumpkin-X64-Linux')).toBe('a'.repeat(64));
         expect(sums.get('pumpkin-ARM64-macOS')).toBe('b'.repeat(64));

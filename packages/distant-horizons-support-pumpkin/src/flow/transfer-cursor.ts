@@ -1,7 +1,7 @@
 import {
     TRANSFER_FRAGMENT_OVERHEAD_BYTES,
     TRANSFER_FRAGMENT_SAFE_WINDOW_MS,
-    TRANSFER_PACKET_BYTES
+    TRANSFER_PACKET_BYTES,
 } from '../protocol/constants.ts';
 import { transferFragment, transferResponse } from '../protocol/messages.ts';
 
@@ -13,7 +13,7 @@ export function transferFragmentDataLimit(bandwidthKbps: number): number {
     if (bandwidthKbps === 0) return TRANSFER_PACKET_BYTES;
     return Math.min(
         TRANSFER_PACKET_BYTES,
-        Math.max(1, bandwidthKbps * TRANSFER_FRAGMENT_SAFE_WINDOW_MS - TRANSFER_FRAGMENT_OVERHEAD_BYTES)
+        Math.max(1, bandwidthKbps * TRANSFER_FRAGMENT_SAFE_WINDOW_MS - TRANSFER_FRAGMENT_OVERHEAD_BYTES),
     );
 }
 
@@ -29,7 +29,7 @@ export class TransferCursor {
         private readonly tracker: number,
         private readonly buffer: number,
         private readonly data: Uint8Array,
-        bandwidthKbps = 0
+        bandwidthKbps = 0,
     ) {
         this.fragmentDataBytes = transferFragmentDataLimit(bandwidthKbps);
     }

@@ -13,11 +13,11 @@ export const demo = defineConfig('Demo', {
                 check: {
                     expected: 'an http:// or https:// URL',
                     test: (v) => v === '' || /^https?:\/\//.test(v),
-                    normalize: (v) => v.replace(/\/+$/, '')
-                }
+                    normalize: (v) => v.replace(/\/+$/, ''),
+                },
             }),
-            token: str({ description: 'Optional access token.', example: 'secret' })
-        }
+            token: str({ description: 'Optional access token.', example: 'secret' }),
+        },
     }),
     overrides: table({
         description: 'Per-file settings.',
@@ -25,9 +25,9 @@ export const demo = defineConfig('Demo', {
         exampleKey: 'a.txt',
         fields: {
             order: int({ description: 'Sort order.', example: 10 }),
-            enabled: bool({ description: 'Include the file.', example: true })
-        }
-    })
+            enabled: bool({ description: 'Include the file.', example: true }),
+        },
+    }),
 });
 
 /** An in-memory config file that records writes. */

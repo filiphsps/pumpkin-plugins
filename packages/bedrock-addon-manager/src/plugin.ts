@@ -25,7 +25,7 @@ class BedrockAddonManager extends PluginBase {
         const files = WasiDataDir.open();
         if (!files) {
             hostLogger.error(
-                `${info.name} cannot reach its data folder. Grant it the fs.read.data and fs.write.data permissions and restart the server.`
+                `${info.name} cannot reach its data folder. Grant it the fs.read.data and fs.write.data permissions and restart the server.`,
             );
             return;
         }
@@ -34,7 +34,7 @@ class BedrockAddonManager extends PluginBase {
             files,
             hostLogger,
             (index) => new TcpWebServer((name) => index.open(name), hostLogger),
-            ipcSend
+            ipcSend,
         );
         manager.start();
         this.manager = manager;

@@ -75,10 +75,10 @@ describe('PlayerSync', () => {
             later.sent.length = 0;
             sync.tick(server.host);
             expect(player.channels).toEqual(
-                channel === REGENERATION ? [REGENERATION] : [SATURATION, EXHAUSTION, REGENERATION]
+                channel === REGENERATION ? [REGENERATION] : [SATURATION, EXHAUSTION, REGENERATION],
             );
             expect(later.sent).toEqual([]);
-        }
+        },
     );
 
     it('recovers a failed regeneration join send on the next tick', () => {
@@ -101,7 +101,7 @@ describe('PlayerSync', () => {
         ['exhaustion', 2],
         ['world', 2],
         ['rule', 3],
-        ['dispose', 3]
+        ['dispose', 3],
     ] as const)('continues after a player %s failure', (failure, disposals) => {
         const { player, sync } = setup();
         const later = new FakePlayer('grace');
@@ -122,7 +122,7 @@ describe('PlayerSync', () => {
                 value: () => {
                     player.disposals++;
                     fail();
-                }
+                },
             });
         expect(() => sync.tick(new FakeServer([player, later]).host)).not.toThrow();
         expect(later.channels).toEqual([SATURATION, EXHAUSTION, REGENERATION]);
@@ -257,7 +257,7 @@ describe('PlayerSync', () => {
 
         expect(player.sent).toEqual([]);
         expect(log.of('debug')).toEqual([
-            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')} is not on Java Edition, so there is nothing to sync.`
+            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')} is not on Java Edition, so there is nothing to sync.`,
         ]);
     });
 
@@ -282,7 +282,7 @@ describe('PlayerSync', () => {
             `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')} joined, sending their current hunger.`,
             `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')}: natural regeneration is on in ${ansi.named.name('world')}.`,
             `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')}: saturation ${ansi.named.number('5')}.`,
-            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')}: exhaustion ${ansi.named.number('0.4')}.`
+            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')}: exhaustion ${ansi.named.number('0.4')}.`,
         ]);
     });
 

@@ -29,7 +29,7 @@ export const DEFAULT_SOURCES = {
     'minecraft:glow_ink_sac': { light_level: 8 },
     'minecraft:glowstone_dust': { light_level: 8 },
     'minecraft:glow_item_frame': { light_level: 8 },
-    'minecraft:magma_cream': { light_level: 8 }
+    'minecraft:magma_cream': { light_level: 8 },
 };
 
 /** Entity light sources included in the first generated configuration file. */
@@ -37,7 +37,7 @@ export const DEFAULT_ENTITY_SOURCES = {
     blaze: { light_level: 15 },
     'glow-item-frame': { light_level: 8 },
     'magma-cube': { light_level: 8 },
-    'glow-squid': { light_level: 8 }
+    'glow-squid': { light_level: 8 },
 };
 
 /** Every user-configurable dynamic-light source. */
@@ -53,25 +53,25 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
                 description: 'Light emitted while this item is held, from 0 through 15.',
                 example: 15,
                 min: 0,
-                max: 15
-            })
-        }
+                max: 15,
+            }),
+        },
     }),
     entities: section({
         description: 'Controls the optional dynamic lights shown around configured entity types.',
         fields: {
             enabled: bool({
                 description: 'Whether configured entities emit temporary client-only light.',
-                default: true
+                default: true,
             }),
             refresh_interval_ticks: int({
                 description:
                     'Ticks between nearby-entity refreshes. Higher values reduce work but make moving lights less smooth.',
                 default: 10,
                 min: 1,
-                max: 1200
-            })
-        }
+                max: 1200,
+            }),
+        },
     }),
     entity_sources: table({
         description:
@@ -84,10 +84,10 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
                 description: 'Light emitted by this entity type, from 0 through 15.',
                 example: 15,
                 min: 0,
-                max: 15
-            })
-        }
-    })
+                max: 15,
+            }),
+        },
+    }),
 });
 
 /** Settings inferred from the plugin's configuration schema. */

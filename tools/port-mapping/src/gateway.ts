@@ -9,15 +9,15 @@ export type GatewayKind = 'upnp' | 'nat-pmp';
 
 /** What to open on the router. */
 export interface MappingRequest {
-    protocol: Protocol;
-    /** The port on this machine. */
-    internalPort: number;
-    /** The port to ask for on the router's public side. The router may give another one. */
-    externalPort: number;
     /** Shown in the router's list of forwarded ports. */
     description: string;
+    /** The port to ask for on the router's public side. The router may give another one. */
+    externalPort: number;
+    /** The port on this machine. */
+    internalPort: number;
     /** How long the router keeps the mapping without a renewal. 0 asks for one that doesn't expire. */
     leaseSeconds: number;
+    protocol: Protocol;
 }
 
 /** What the router agreed to. */
@@ -32,16 +32,16 @@ export class PortInUseError extends Error {}
 
 /** A router that can open ports, reached through one protocol. */
 export interface Gateway {
-    readonly kind: GatewayKind;
-    readonly address: Ipv4;
-    /** The router's address on the internet side. */
-    externalAddress(): Steps<Ipv4>;
     /**
      * Opens or renews a port.
      * @param internalClient - This machine's address on the router's network.
      * @throws {PortInUseError} When the external port is taken.
      */
     addMapping(request: MappingRequest, internalClient: Ipv4): Steps<MappingResult>;
+    readonly address: Ipv4;
     /** Closes a port. Closing one that isn't open is not an error. */
     deleteMapping(request: MappingRequest): Steps<void>;
+    /** The router's address on the internet side. */
+    externalAddress(): Steps<Ipv4>;
+    readonly kind: GatewayKind;
 }

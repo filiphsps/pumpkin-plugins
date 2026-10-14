@@ -17,7 +17,7 @@ const REQUIRED = [
     `${EXPORT}:has(> TSTypeAliasDeclaration)`,
     `${EXPORT}:has(> TSEnumDeclaration)`,
     `${EXPORT}:has(> VariableDeclaration)`,
-    `${EXPORT} > ClassDeclaration > ClassBody > MethodDefinition[accessibility!='private'][accessibility!='protected'][kind!='constructor']`
+    `${EXPORT} > ClassDeclaration > ClassBody > MethodDefinition[accessibility!='private'][accessibility!='protected'][kind!='constructor']`,
 ];
 
 const JSDOC_RULES = {
@@ -31,23 +31,23 @@ const JSDOC_RULES = {
                 ClassDeclaration: false,
                 MethodDefinition: false,
                 ArrowFunctionExpression: false,
-                FunctionExpression: false
+                FunctionExpression: false,
             },
-            contexts: REQUIRED
-        }
+            contexts: REQUIRED,
+        },
     ],
     // A block with only tags is as bad as no block. Types come from TypeScript, so tags need no `{type}`.
     'jsdoc/require-description': ['error', { contexts: ['any'], exemptedBy: ['inheritdoc'] }],
     'jsdoc/no-types': 'error',
     'jsdoc/check-tag-names': 'error',
     // Parameters don't have to be documented, but a documented one has to exist.
-    'jsdoc/check-param-names': ['error', { disableMissingParamChecks: true, checkDestructured: false }]
+    'jsdoc/check-param-names': ['error', { disableMissingParamChecks: true, checkDestructured: false }],
 };
 
 const jsdocConfig = {
     plugins: { jsdoc },
     settings: { jsdoc: { mode: 'typescript' } },
-    rules: JSDOC_RULES
+    rules: JSDOC_RULES,
 };
 
 export default [
@@ -62,24 +62,24 @@ export default [
             '**/.turbo/**',
             '**/.cache/**',
             '**/.vitepress/cache/**',
-            'turbo/generators/templates/**'
-        ]
+            'turbo/generators/templates/**',
+        ],
     },
     {
         files: ['**/*.ts'],
         ignores: ['**/*.test.ts', '**/*.itest.ts', '**/test/**', '**/testing/**', '**/*.config.ts', '**/*.d.ts'],
         languageOptions: { parser: tseslint.parser },
-        ...jsdocConfig
+        ...jsdocConfig,
     },
     {
         files: ['tools/static-hermes-runtime/**/*.mts'],
         ignores: ['**/*.test.mts', '**/*.itest.mts', '**/test/**', '**/testing/**', '**/*.config.mts', '**/*.d.mts'],
         languageOptions: { parser: tseslint.parser },
-        ...jsdocConfig
+        ...jsdocConfig,
     },
     {
         files: ['tools/static-hermes-runtime/**/*.mjs'],
         ignores: ['**/*.test.mjs', '**/*.itest.mjs', '**/test/**', '**/testing/**', '**/*.config.mjs'],
-        ...jsdocConfig
-    }
+        ...jsdocConfig,
+    },
 ];

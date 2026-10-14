@@ -14,7 +14,7 @@ describe('web server', () => {
         const r = await start({
             name: 'serve',
             config: (port) => portConfig(port),
-            files: { 'packs/My Pack.mcpack': bigPack }
+            files: { 'packs/My Pack.mcpack': bigPack },
         });
         await r.server.waitForLog(/Serving packs on/);
 
@@ -43,8 +43,8 @@ describe('web server', () => {
             files: {
                 'packs/a.mcpack': makeMcpack(),
                 'packs/hidden.mcpack': makeMcpack(manifestJson({ uuid: '11111111-1111-4111-8111-111111111111' })),
-                'packs/notes.txt': 'secret'
-            }
+                'packs/notes.txt': 'secret',
+            },
         });
         await r.server.waitForLog(/Serving packs on/);
 
@@ -63,15 +63,15 @@ describe('web server', () => {
         const r = await start({
             name: 'parallel',
             config: (port) => portConfig(port),
-            files: { 'packs/a.mcpack': concurrentPack }
+            files: { 'packs/a.mcpack': concurrentPack },
         });
         await r.server.waitForLog(/Serving packs on/);
 
         const results = await Promise.all(
             Array.from(
                 { length: 12 },
-                async () => new Uint8Array(await (await fetch(r.url('/packs/a.mcpack'))).arrayBuffer())
-            )
+                async () => new Uint8Array(await (await fetch(r.url('/packs/a.mcpack'))).arrayBuffer()),
+            ),
         );
         for (const body of results) expect(body).toEqual(concurrentPack);
         expect(r.server.errors()).toEqual([]);

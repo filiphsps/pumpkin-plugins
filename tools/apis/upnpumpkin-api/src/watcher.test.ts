@@ -9,7 +9,7 @@ function setup() {
     let time = 0;
     const world = {
         reply: { ok: true, status: { kind: 'pending' } } as unknown as Parameters<typeof encodeReply>[0] | Error,
-        calls: [] as string[]
+        calls: [] as string[],
     };
     const client = new PortMapClient((_, bytes) => {
         world.calls.push((JSON.parse(new TextDecoder().decode(bytes)) as { op: string }).op);
@@ -21,7 +21,7 @@ function setup() {
         client,
         request,
         (s) => changes.push(s),
-        () => time
+        () => time,
     );
     const advance = (ms: number) => {
         time += ms;

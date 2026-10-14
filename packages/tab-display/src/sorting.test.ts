@@ -4,7 +4,7 @@ import { assignDenseOrders, type SortPlayer, type SortRule, sortPlayers } from '
 const players: readonly SortPlayer[] = [
     { uuid: 'b', name: 'Alex', ping: 40 },
     { uuid: 'c', name: 'Bea', ping: 10 },
-    { uuid: 'a', name: 'Alex', ping: 40 }
+    { uuid: 'a', name: 'Alex', ping: 40 },
 ];
 
 describe('tab list sorting', () => {
@@ -12,7 +12,7 @@ describe('tab list sorting', () => {
         expect(sortPlayers(players, [{ kind: 'name', direction: 'ascending' }]).map((player) => player.uuid)).toEqual([
             'a',
             'b',
-            'c'
+            'c',
         ]);
     });
 
@@ -20,13 +20,13 @@ describe('tab list sorting', () => {
         const values: readonly SortPlayer[] = [
             { uuid: 'missing', name: 'A' },
             { uuid: 'valid', name: 'Z', ping: 20 },
-            { uuid: 'invalid', name: 'B', ping: Number.NaN }
+            { uuid: 'invalid', name: 'B', ping: Number.NaN },
         ];
         for (const direction of ['ascending', 'descending'] as const) {
             expect(sortPlayers(values, [{ kind: 'ping', direction }]).map((player) => player.uuid)).toEqual([
                 'valid',
                 'invalid',
-                'missing'
+                'missing',
             ]);
         }
     });
@@ -36,7 +36,7 @@ describe('tab list sorting', () => {
         expect(assignDenseOrders(players, rules)).toEqual([
             { uuid: 'c', order: 0 },
             { uuid: 'a', order: 1 },
-            { uuid: 'b', order: 2 }
+            { uuid: 'b', order: 2 },
         ]);
     });
 
@@ -44,12 +44,12 @@ describe('tab list sorting', () => {
         const values: readonly SortPlayer[] = [
             { uuid: '1', name: 'ä' },
             { uuid: '2', name: 'z' },
-            { uuid: '3', name: 'A' }
+            { uuid: '3', name: 'A' },
         ];
         expect(sortPlayers(values, [{ kind: 'name', direction: 'ascending' }]).map((player) => player.name)).toEqual([
             'A',
             'z',
-            'ä'
+            'ä',
         ]);
     });
 });

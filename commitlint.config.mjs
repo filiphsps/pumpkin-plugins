@@ -5,6 +5,6 @@ export default {
     rules: {
         // Long URLs and stack traces in bodies are fine.
         'body-max-line-length': [0],
-        'footer-max-line-length': [0]
-    }
+        'footer-max-line-length': [0],
+    },
 };

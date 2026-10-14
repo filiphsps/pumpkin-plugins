@@ -6,7 +6,7 @@ const host = vi.hoisted(() => ({
     now: vi.fn(),
     created: [] as Array<{ name: string; drop: ReturnType<typeof vi.fn> }>,
     dropped: [] as string[],
-    fail: ''
+    fail: '',
 }));
 vi.mock('wasi:clocks/monotonic-clock@0.2.3', () => ({ now: host.now }));
 vi.mock('wasi:http/outgoing-handler@0.2.3', () => ({ handle: host.handle }));
@@ -48,7 +48,7 @@ vi.mock('wasi:http/types@0.2.3', () => {
             }
             setFirstByteTimeout() {}
             setBetweenBytesTimeout() {}
-        }
+        },
     };
 });
 
@@ -60,7 +60,7 @@ function resource(name: string) {
         name,
         drop: vi.fn(() => {
             host.dropped.push(name);
-        })
+        }),
     };
     host.created.push(result);
     return result;
@@ -77,14 +77,14 @@ function transport(chunks: Array<Uint8Array | object | null> = [strToU8('{"messa
             if (chunk === undefined) throw closed;
             if (!(chunk instanceof Uint8Array)) throw chunk;
             return chunk;
-        })
+        }),
     };
     const body = { ...resource('body'), stream: vi.fn(() => stream) };
     const response = { ...resource('response'), status: vi.fn(() => 200), consume: vi.fn(() => body) };
     const future = {
         ...resource('future'),
         subscribe: vi.fn(() => headers),
-        get: vi.fn(() => ({ tag: 'ok', val: { tag: 'ok', val: response } }))
+        get: vi.fn(() => ({ tag: 'ok', val: { tag: 'ok', val: response } })),
     };
     host.handle.mockReturnValue(future);
     return { headers, bytes, stream, body, response, future };
@@ -97,7 +97,7 @@ function asyncRequest(url = 'https://example.test/api') {
         (callback) => {
             queued.push(callback);
         },
-        complete
+        complete,
     );
     return {
         complete,
@@ -108,7 +108,7 @@ function asyncRequest(url = 'https://example.test/api') {
                 if (++count > 100) throw new Error('Request did not finish');
                 queued.shift()?.();
             }
-        }
+        },
     };
 }
 
@@ -157,10 +157,10 @@ describe('WASI HTTP requests', () => {
             const request = asyncRequest(url);
             expect(request.complete).toHaveBeenCalledWith({
                 ok: false,
-                error: expect.objectContaining({ message: expect.stringContaining('parse URL') })
+                error: expect.objectContaining({ message: expect.stringContaining('parse URL') }),
             });
             expect(host.handle).not.toHaveBeenCalled();
-        }
+        },
     );
 
     it.each(['headers', 'authority', 'timeout'])('cleans up when configuring %s fails', (stage) => {
@@ -168,7 +168,7 @@ describe('WASI HTTP requests', () => {
         const request = asyncRequest();
         expect(request.complete).toHaveBeenCalledOnce();
         expect(host.dropped).toEqual(
-            stage === 'headers' ? ['fields'] : stage === 'authority' ? ['request'] : ['options', 'request']
+            stage === 'headers' ? ['fields'] : stage === 'authority' ? ['request'] : ['options', 'request'],
         );
     });
 
@@ -179,7 +179,7 @@ describe('WASI HTTP requests', () => {
         request.drain();
         expect(request.complete).toHaveBeenCalledWith({
             ok: false,
-            error: expect.objectContaining({ message: 'WASI HTTP read response status: Market returned HTTP 503' })
+            error: expect.objectContaining({ message: 'WASI HTTP read response status: Market returned HTTP 503' }),
         });
         expect(host.dropped).toEqual(['headers-pollable', 'response', 'future']);
     });
@@ -187,14 +187,14 @@ describe('WASI HTTP requests', () => {
     it.each([
         [[strToU8('not JSON'), closed], 'parse response JSON'],
         [[new Uint8Array(65537)], 'too large'],
-        [[{ payload: { tag: 'last-operation-failed' } }], 'read response stream']
+        [[{ payload: { tag: 'last-operation-failed' } }], 'read response stream'],
     ] as const)('reports body failure %# and frees resources', (chunks, message) => {
         transport([...chunks]);
         const request = asyncRequest();
         request.drain();
         expect(request.complete).toHaveBeenCalledWith({
             ok: false,
-            error: expect.objectContaining({ message: expect.stringContaining(message) })
+            error: expect.objectContaining({ message: expect.stringContaining(message) }),
         });
         expect(host.dropped).toEqual(['headers-pollable', 'stream-pollable', 'stream', 'body', 'response', 'future']);
     });
@@ -213,7 +213,7 @@ describe('WASI HTTP requests', () => {
     it('treats a thrown host error value as end-of-body', () => {
         const t = transport([
             strToU8('{"message":"héllo"}'),
-            { message: 'WASI HTTP input stream read failed: closed' }
+            { message: 'WASI HTTP input stream read failed: closed' },
         ]);
         const request = asyncRequest();
 
@@ -227,7 +227,7 @@ describe('WASI HTTP requests', () => {
     it('treats a host exception string as end-of-body', () => {
         const t = transport([
             strToU8('{"message":"héllo"}'),
-            { toString: () => 'Error: WASI HTTP input stream read failed: closed' }
+            { toString: () => 'Error: WASI HTTP input stream read failed: closed' },
         ]);
         const request = asyncRequest();
 
@@ -260,7 +260,7 @@ describe('WASI HTTP requests', () => {
         expect(request.complete).toHaveBeenCalledOnce();
         expect(request.complete).toHaveBeenCalledWith({
             ok: false,
-            error: expect.objectContaining({ message: expect.stringContaining('timed out') })
+            error: expect.objectContaining({ message: expect.stringContaining('timed out') }),
         });
         expect(host.dropped).toEqual(['headers-pollable', 'future']);
     });
@@ -273,11 +273,11 @@ describe('WASI HTTP requests', () => {
             () => {
                 throw new Error('scheduler unavailable');
             },
-            complete
+            complete,
         );
         expect(complete).toHaveBeenCalledWith({
             ok: false,
-            error: expect.objectContaining({ message: 'scheduler unavailable' })
+            error: expect.objectContaining({ message: 'scheduler unavailable' }),
         });
         expect(host.dropped).toEqual(['headers-pollable', 'future']);
     });
@@ -293,7 +293,7 @@ describe('WASI HTTP requests', () => {
             (cb) => {
                 queued.push(cb);
             },
-            complete
+            complete,
         );
         expect(() => {
             while (queued.length) queued.shift()?.();
@@ -305,13 +305,13 @@ describe('WASI HTTP requests', () => {
         const t = transport();
         t.future.get.mockReturnValue({
             tag: 'ok',
-            val: { tag: 'err', val: { tag: 'dns-error', val: { rcode: 3 } } }
+            val: { tag: 'err', val: { tag: 'dns-error', val: { rcode: 3 } } },
         } as never);
         const request = asyncRequest();
         request.drain();
         expect(request.complete).toHaveBeenCalledWith({
             ok: false,
-            error: expect.objectContaining({ message: expect.stringContaining('dns-error') })
+            error: expect.objectContaining({ message: expect.stringContaining('dns-error') }),
         });
         expect(host.dropped).toEqual(['headers-pollable', 'future']);
     });
@@ -325,7 +325,7 @@ describe('WASI HTTP requests', () => {
         request.drain();
         expect(request.complete).toHaveBeenCalledWith({
             ok: false,
-            error: expect.objectContaining({ message: expect.stringContaining('open response stream') })
+            error: expect.objectContaining({ message: expect.stringContaining('open response stream') }),
         });
         expect(host.dropped).toEqual(['headers-pollable', 'body', 'response', 'future']);
     });
@@ -337,7 +337,7 @@ describe('WASI HTTP requests', () => {
         const request = asyncRequest();
         expect(request.complete).toHaveBeenCalledWith({
             ok: false,
-            error: expect.objectContaining({ message: expect.stringContaining('send outgoing request') })
+            error: expect.objectContaining({ message: expect.stringContaining('send outgoing request') }),
         });
         expect(host.dropped).toEqual([]);
     });
@@ -372,12 +372,12 @@ describe('WASI HTTP requests', () => {
                 if (count++) throw new Error('scheduler stopped');
                 queued.push(callback);
             },
-            complete
+            complete,
         );
         queued.shift()?.();
         expect(complete).toHaveBeenCalledWith({
             ok: false,
-            error: expect.objectContaining({ message: 'scheduler stopped' })
+            error: expect.objectContaining({ message: 'scheduler stopped' }),
         });
         expect(host.dropped).toEqual(['headers-pollable', 'stream-pollable', 'stream', 'body', 'response', 'future']);
     });

@@ -33,8 +33,8 @@ describe('market-plugin-metadata', () => {
             description: 'An example listing',
             commands: [
                 { usage: '/example', description: 'Show information', permission: 'ExamplePlugin:command.example' },
-                { usage: '/example reload', description: 'Reload the plugin' }
-            ]
+                { usage: '/example reload', description: 'Reload the plugin' },
+            ],
         });
 
         const result = run(dir);
@@ -46,17 +46,17 @@ describe('market-plugin-metadata', () => {
                     name: 'example',
                     permission: 'ExamplePlugin:command.example',
                     description: { 'en-US': 'Show information' },
-                    display_order: 0
+                    display_order: 0,
                 },
-                { name: 'example reload', description: { 'en-US': 'Reload the plugin' }, display_order: 1 }
-            ]
+                { name: 'example reload', description: { 'en-US': 'Reload the plugin' }, display_order: 1 },
+            ],
         });
     });
 
     it('adds README content without its installation or commands sections', () => {
         const dir = plugin({
             description: 'A short listing summary',
-            commands: []
+            commands: [],
         });
         fs.writeFileSync(
             path.join(dir, 'README.md'),
@@ -77,32 +77,32 @@ This command list is uploaded separately.
 ## Features
 
 Players can share named locations and control who can see each one.
-`
+`,
         );
 
         const result = run(dir);
         assert.equal(result.status, 0, result.stderr);
         assert.equal(
             JSON.parse(result.stdout).translatedDescriptions['en-US'],
-            'A short listing summary\n\n## Features\n\nPlayers can share named locations and control who can see each one.'
+            'A short listing summary\n\n## Features\n\nPlayers can share named locations and control who can see each one.',
         );
     });
 
     it('supports a custom info path and a plugin with no commands', () => {
         const dir = plugin(
             { description: 'No command listing', commands: [] },
-            { package: { pumpkinPlugin: { info: 'src/market-info.ts' } } }
+            { package: { pumpkinPlugin: { info: 'src/market-info.ts' } } },
         );
         fs.writeFileSync(
             path.join(dir, 'src', 'market-info.ts'),
-            "export default { description: 'No command listing', commands: [] };"
+            "export default { description: 'No command listing', commands: [] };",
         );
 
         const result = run(dir);
         assert.equal(result.status, 0, result.stderr);
         assert.deepEqual(JSON.parse(result.stdout), {
             translatedDescriptions: { 'en-US': 'No command listing' },
-            commands: []
+            commands: [],
         });
     });
 

@@ -19,11 +19,11 @@ const metadata = {
     is_paid: false,
     user_id: 0,
     license_key: null,
-    issued_at: '2026-10-08T00:00:00.000Z'
+    issued_at: '2026-10-08T00:00:00.000Z',
 };
 const component = Buffer.concat([
     Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x0d, 0x00, 0x01, 0x00]),
-    customSection('fixture', Buffer.from('component'))
+    customSection('fixture', Buffer.from('component')),
 ]);
 const dirs = [];
 
@@ -42,7 +42,7 @@ function fixture(wasm) {
 function run(file, pluginName = metadata.plugin_name, version = metadata.version) {
     return spawnSync(process.execPath, [script, file, pluginName, version], {
         cwd: root,
-        encoding: 'utf8'
+        encoding: 'utf8',
     });
 }
 

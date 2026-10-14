@@ -9,7 +9,7 @@ function setup() {
     return {
         cache,
         lod: (level: string, x: number, z: number) =>
-            cache.put(sectionKey(level, x, z), { updated: 1, data: new Uint8Array(64) })
+            cache.put(sectionKey(level, x, z), { updated: 1, data: new Uint8Array(64) }),
     };
 }
 

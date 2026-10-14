@@ -13,7 +13,7 @@ vi.mock('node:child_process', async (importOriginal) => {
     return { ...original, execFileSync: mocks.execFileSync };
 });
 vi.mock('../src/hermes/toolchain-environment.ts', () => ({
-    setupHermesToolchainEnvironment: mocks.setupToolchain
+    setupHermesToolchainEnvironment: mocks.setupToolchain,
 }));
 
 const runtimeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,8 +39,8 @@ it('runs the compiled CLI advertised by the package', () => {
         [path.join(runtimeRoot, packageManifest.bin['static-hermes-runtime']), '--help'],
         {
             cwd: runtimeRoot,
-            encoding: 'utf8'
-        }
+            encoding: 'utf8',
+        },
     );
 
     expect(result.status).toBe(0);
@@ -59,13 +59,13 @@ it.skipIf(process.platform === 'win32')('runs the CLI through an installed packa
     fs.symlinkSync(
         path.relative(binDirectory, path.join(packageDirectory, packageManifest.bin['static-hermes-runtime'])),
         installedBin,
-        'file'
+        'file',
     );
 
     try {
         const result = spawnSync(process.execPath, [installedBin, '--help'], {
             cwd: consumerRoot,
-            encoding: 'utf8'
+            encoding: 'utf8',
         });
 
         expect(result.status).toBe(0);
@@ -78,7 +78,7 @@ it.skipIf(process.platform === 'win32')('runs the CLI through an installed packa
 it('runs the compiled CLI through pnpm exec in the monorepo', () => {
     const result = spawnSync('pnpm', ['exec', 'static-hermes-runtime', '--help'], {
         cwd: runtimeRoot,
-        encoding: 'utf8'
+        encoding: 'utf8',
     });
 
     expect(result.status).toBe(0);
@@ -93,11 +93,11 @@ it.each([
     { args: ['hermes', 'source', '--help'], requiredOptions: ['STATIC_HERMES_SOURCE_DIR'] },
     {
         args: ['codegen', 'analyze', '--help'],
-        requiredOptions: ['--wit <dir>', '--wasi-imports <json-array>']
+        requiredOptions: ['--wit <dir>', '--wasi-imports <json-array>'],
     },
     {
         args: ['codegen', 'generate', '--help'],
-        requiredOptions: ['--wit <dir>', '--template <file>', '--header <file>', '--out-dir <dir>']
+        requiredOptions: ['--wit <dir>', '--template <file>', '--header <file>', '--out-dir <dir>'],
     },
     {
         args: ['component', 'build', '--help'],
@@ -110,9 +110,9 @@ it.each([
             '--parse-ts',
             '--event-types <json-array>',
             '--runtime-variant',
-            '--gc-variant'
-        ]
-    }
+            '--gc-variant',
+        ],
+    },
 ])('documents $args command', ({ args, requiredOptions }) => {
     const result = run(...args);
 
@@ -124,17 +124,17 @@ it.each([
 function run(...args: string[]) {
     return spawnSync(process.execPath, [cli, ...args], {
         cwd: runtimeRoot,
-        encoding: 'utf8'
+        encoding: 'utf8',
     });
 }
 
 it('deduplicates JSON string arrays and rejects malformed option values', () => {
     expect(parseJsonStringArray('["a","a","b"]', 'wasi-imports', 'module specifiers')).toEqual(['a', 'b']);
     expect(() => parseJsonStringArray('{', 'wasi-imports', 'module specifiers')).toThrow(
-        '--wasi-imports must be a JSON array'
+        '--wasi-imports must be a JSON array',
     );
     expect(() => parseJsonStringArray('["a",1]', 'wasi-imports', 'module specifiers')).toThrow(
-        'a JSON array of module specifiers'
+        'a JSON array of module specifiers',
     );
 });
 
@@ -149,17 +149,17 @@ it('forwards parsed options to the selected Commander action', async () => {
             calls.push(options);
         },
         generate: () => undefined,
-        componentBuild: () => undefined
+        componentBuild: () => undefined,
     });
     await program.parseAsync(['codegen', 'analyze', '--wit', 'wit', '--wasi-imports', '["wasi:io/poll@0.2.3"]'], {
-        from: 'user'
+        from: 'user',
     });
 
     expect(calls).toEqual([
         {
             wit: path.resolve('wit'),
-            wasiImports: ['wasi:io/poll@0.2.3']
-        }
+            wasiImports: ['wasi:io/poll@0.2.3'],
+        },
     ]);
 });
 
@@ -174,7 +174,7 @@ it('forwards generated output paths without requiring a JavaScript bundle', asyn
         generate: (options) => {
             calls.push(options);
         },
-        componentBuild: () => undefined
+        componentBuild: () => undefined,
     });
     await program.parseAsync(
         [
@@ -187,9 +187,9 @@ it('forwards generated output paths without requiring a JavaScript bundle', asyn
             '--header',
             'plugin.h',
             '--out-dir',
-            'generated'
+            'generated',
         ],
-        { from: 'user' }
+        { from: 'user' },
     );
 
     expect(calls).toEqual([
@@ -198,8 +198,8 @@ it('forwards generated output paths without requiring a JavaScript bundle', asyn
             wasiImports: [],
             template: path.resolve('runtime.cpp.in'),
             header: path.resolve('plugin.h'),
-            outDir: path.resolve('generated')
-        }
+            outDir: path.resolve('generated'),
+        },
     ]);
 });
 
@@ -214,7 +214,7 @@ it('forwards the consumer project root to the component build action', async () 
         generate: () => undefined,
         componentBuild: (options) => {
             calls.push(options);
-        }
+        },
     });
     await program.parseAsync(
         [
@@ -232,9 +232,9 @@ it('forwards the consumer project root to the component build action', async () 
             '--gc-variant',
             'malloc',
             '--event-types',
-            '["server-tick-end-event"]'
+            '["server-tick-end-event"]',
         ],
-        { from: 'user' }
+        { from: 'user' },
     );
 
     expect(calls).toEqual([
@@ -247,8 +247,8 @@ it('forwards the consumer project root to the component build action', async () 
             parseTypeScript: true,
             gcVariant: 'malloc',
             wasiImports: [],
-            eventTypes: ['server-tick-end-event']
-        }
+            eventTypes: ['server-tick-end-event'],
+        },
     ]);
 });
 
@@ -263,7 +263,7 @@ it('propagates errors from command handlers', async () => {
             throw failure;
         },
         generate: () => undefined,
-        componentBuild: () => undefined
+        componentBuild: () => undefined,
     });
 
     await expect(program.parseAsync(['codegen', 'analyze', '--wit', 'wit'], { from: 'user' })).rejects.toBe(failure);
@@ -280,7 +280,7 @@ it('rejects a missing plugin WIT file before installing wasm-tools for codegen',
     try {
         const program = createStaticHermesProgram();
         await expect(
-            program.parseAsync(['codegen', 'analyze', '--wit', witDirectory], { from: 'user' })
+            program.parseAsync(['codegen', 'analyze', '--wit', witDirectory], { from: 'user' }),
         ).rejects.toThrow('Prepared WIT package has no plugin.wit');
         expect(mocks.setupToolchain).not.toHaveBeenCalled();
     } finally {
@@ -303,7 +303,7 @@ it('rejects a codegen wasm-tools override when its pinned version is invalid', a
 
     try {
         await expect(
-            createStaticHermesProgram().parseAsync(['codegen', 'analyze', '--wit', witDirectory], { from: 'user' })
+            createStaticHermesProgram().parseAsync(['codegen', 'analyze', '--wit', witDirectory], { from: 'user' }),
         ).rejects.toBe(invalidOverride);
         expect(mocks.execFileSync).not.toHaveBeenCalled();
     } finally {
@@ -326,8 +326,8 @@ it('uses a valid configured wasm-tools override for codegen', async () => {
             worlds: [{ name: 'plugin', package: 0, imports: {} }],
             interfaces: [],
             types: [],
-            packages: [{ name: 'example:plugin@1.0.0', interfaces: {}, worlds: { plugin: 0 } }]
-        })
+            packages: [{ name: 'example:plugin@1.0.0', interfaces: {}, worlds: { plugin: 0 } }],
+        }),
     );
 
     try {
@@ -336,7 +336,7 @@ it('uses a valid configured wasm-tools override for codegen', async () => {
         expect(mocks.execFileSync).toHaveBeenCalledWith(
             '/custom/wasm-tools',
             ['component', 'wit', witDirectory, '--json', '--all-features'],
-            expect.objectContaining({ encoding: 'utf8' })
+            expect.objectContaining({ encoding: 'utf8' }),
         );
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
@@ -358,8 +358,8 @@ it('analyzes a WIT package without requiring or reading a JavaScript bundle', as
             worlds: [{ name: 'plugin', package: 0, imports: {} }],
             interfaces: [],
             types: [],
-            packages: [{ name: 'example:plugin@1.0.0', interfaces: {}, worlds: { plugin: 0 } }]
-        })
+            packages: [{ name: 'example:plugin@1.0.0', interfaces: {}, worlds: { plugin: 0 } }],
+        }),
     );
     const output = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
@@ -393,8 +393,8 @@ it('uses the consumer working directory for codegen tool setup', async () => {
             worlds: [{ name: 'plugin', package: 0, imports: {} }],
             interfaces: [],
             types: [],
-            packages: [{ name: 'example:plugin@1.0.0', interfaces: {}, worlds: { plugin: 0 } }]
-        })
+            packages: [{ name: 'example:plugin@1.0.0', interfaces: {}, worlds: { plugin: 0 } }],
+        }),
     );
 
     try {

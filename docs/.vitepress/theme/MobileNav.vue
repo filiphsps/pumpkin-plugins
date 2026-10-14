@@ -1,38 +1,10 @@
 <script setup lang="ts">
-// biome-ignore lint/correctness/noUnusedImports: `withBase` is referenced by the Vue template.
-import { useData, withBase } from 'vitepress';
-import { computed } from 'vue';
+    import { useData, withBase } from 'vitepress';
+    import { computed } from 'vue';
+    import type { ThemeConfigWithMegaMenus } from './types';
 
-interface MenuCard {
-    text: string;
-    description: string;
-    link: string;
-    icon?: string;
-    type?: 'link' | 'card' | 'spotlight';
-}
-
-interface MenuSection {
-    text: string;
-    items: MenuCard[];
-    gridArea?: string;
-}
-
-interface MegaMenu {
-    text: string;
-    link?: string;
-    description: string;
-    overview?: MenuCard;
-    sections: MenuSection[];
-    featured?: MenuCard;
-}
-
-interface ThemeConfigWithMegaMenus {
-    megaMenus?: MegaMenu[];
-}
-
-const { theme } = useData();
-// biome-ignore lint/correctness/noUnusedVariables: The Vue template renders the navigation groups.
-const menus = computed(() => (theme.value as ThemeConfigWithMegaMenus).megaMenus ?? []);
+    const { theme } = useData<ThemeConfigWithMegaMenus>();
+    const menus = computed(() => theme.value.megaMenus ?? []);
 </script>
 
 <template>
@@ -43,11 +15,7 @@ const menus = computed(() => (theme.value as ThemeConfigWithMegaMenus).megaMenus
                 <summary class="site-mobile-nav__summary">{{ menu.text }}</summary>
                 <div class="site-mobile-nav__content" :class="`site-mobile-nav__content--${menu.text.toLowerCase()}`">
                     <p class="site-mobile-nav__description">{{ menu.description }}</p>
-                    <a
-                        v-if="menu.overview"
-                        class="site-mobile-nav__overview"
-                        :href="withBase(menu.overview.link)"
-                    >
+                    <a v-if="menu.overview" class="site-mobile-nav__overview" :href="withBase(menu.overview.link)">
                         {{ menu.overview.text }}
                     </a>
                     <a
@@ -98,7 +66,10 @@ const menus = computed(() => (theme.value as ThemeConfigWithMegaMenus).megaMenus
                                 <span v-if="item.description" class="site-mobile-nav__link-description">
                                     {{ item.description }}
                                 </span>
-                                <span v-if="item.type === 'card' || item.type === 'spotlight'" class="site-mobile-nav__link-action">
+                                <span
+                                    v-if="item.type === 'card' || item.type === 'spotlight'"
+                                    class="site-mobile-nav__link-action"
+                                >
                                     Open documentation
                                 </span>
                             </span>

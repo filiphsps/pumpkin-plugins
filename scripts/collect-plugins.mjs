@@ -31,7 +31,7 @@ export async function collectPlugins({ root: repoRoot = root, dist = path.join(r
         fs.writeFileSync(path.join(dist, file), bytes);
         fs.writeFileSync(
             path.join(dist, `${file}.sha256`),
-            `${createHash('sha256').update(bytes).digest('hex')}  ${file}\n`
+            `${createHash('sha256').update(bytes).digest('hex')}  ${file}\n`,
         );
         console.log(`dist/${file} (${(bytes.length / 1024).toFixed(0)} KiB)`);
 

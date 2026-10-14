@@ -27,10 +27,10 @@ export interface WitToolsNamedType {
 
 /** A named type definition from the pinned wasm-tools JSON format. */
 export interface WitToolsTypeDefinition {
-    /** Declared type name, or `null` for an anonymous type. */
-    name: string | null;
     /** Structural definition and any referenced type indexes. */
     kind: WitToolsTypeKind;
+    /** Declared type name, or `null` for an anonymous type. */
+    name: string | null;
     /** Owning interface or world, or `null` for an unowned type. */
     owner: WitToolsTypeOwner | null;
 }
@@ -65,28 +65,28 @@ export interface WitToolsParameter {
 
 /** A resolved WIT function, including its resource operation kind. */
 export interface WitToolsFunction {
-    /** Function name, including the resource method name when applicable. */
-    name: string;
+    /** WIT feature flags required by this operation. */
+    features: string[];
     /** Whether this is a freestanding function, constructor, method, or static method. */
     kind: WitToolsFunctionKind;
+    /** Function name, including the resource method name when applicable. */
+    name: string;
     /** Ordered function parameters. */
     params: WitToolsParameter[];
     /** Result type reference, or `null` for a function with no result. */
     result: WitToolsTypeReference | null;
-    /** WIT feature flags required by this operation. */
-    features: string[];
 }
 
 /** A WIT interface in the resolved package graph. */
 export interface WitToolsInterface {
+    /** Map from operation names to their resolved declarations. */
+    functions: Record<string, WitToolsFunction>;
     /** Interface name within its package. */
     name: string;
     /** Index of the owning package in the document's package table. */
     package: number;
     /** Map from declared type names to type-table indexes. */
     types: Record<string, number>;
-    /** Map from operation names to their resolved declarations. */
-    functions: Record<string, WitToolsFunction>;
 }
 
 /** An interface or type imported into a WIT world. */
@@ -94,34 +94,34 @@ export type WitToolsWorldImport = { interface: { id: number } } | { type: number
 
 /** A resolved world and its imported names. */
 export interface WitToolsWorld {
+    /** Imported interface or type entries, keyed by their world import name. */
+    imports: Record<string, WitToolsWorldImport>;
     /** World name within its package. */
     name: string;
     /** Index of the owning package in the document's package table. */
     package: number;
-    /** Imported interface or type entries, keyed by their world import name. */
-    imports: Record<string, WitToolsWorldImport>;
 }
 
 /** Package-level names mapped to resolved interface and world indexes. */
 export interface WitToolsPackage {
-    /** Fully qualified package name and optional version, as emitted by wasm-tools. */
-    name: string;
     /** Map from interface names to interface-table indexes. */
     interfaces: Record<string, number>;
+    /** Fully qualified package name and optional version, as emitted by wasm-tools. */
+    name: string;
     /** Map from world names to world-table indexes. */
     worlds: Record<string, number>;
 }
 
 /** Fully resolved JSON document emitted by the pinned wasm-tools release. */
 export interface WitToolsDocument {
-    /** Resolved worlds, including each world's import references. */
-    worlds: WitToolsWorld[];
     /** Resolved interfaces and their operation/type indexes. */
     interfaces: WitToolsInterface[];
-    /** Shared named type definitions referenced by indexes. */
-    types: WitToolsTypeDefinition[];
     /** Package identities and their interface/world indexes. */
     packages: WitToolsPackage[];
+    /** Shared named type definitions referenced by indexes. */
+    types: WitToolsTypeDefinition[];
+    /** Resolved worlds, including each world's import references. */
+    worlds: WitToolsWorld[];
 }
 
 type JsonObject = Record<string, unknown>;
@@ -139,7 +139,7 @@ const primitives = new Set<WitPrimitive>([
     'f32',
     'f64',
     'char',
-    'string'
+    'string',
 ]);
 
 /**
@@ -161,7 +161,7 @@ export function parseWitToolsJson(source: string): WitToolsDocument {
         worlds: arrayAt(root.worlds, 'worlds').map(parseWorld),
         interfaces: arrayAt(root.interfaces, 'interfaces').map(parseInterface),
         types: arrayAt(root.types, 'types').map(parseTypeDefinition),
-        packages: arrayAt(root.packages, 'packages').map(parsePackage)
+        packages: arrayAt(root.packages, 'packages').map(parsePackage),
     };
     validateReferences(document);
     return document;
@@ -176,7 +176,7 @@ function parseWorld(value: unknown): WitToolsWorld {
         if ('interface' in entry) {
             const importedInterface = objectAt(entry.interface, `${at}.imports.${name}.interface`);
             imports[name] = {
-                interface: { id: integerAt(importedInterface.id, `${at}.imports.${name}.interface.id`) }
+                interface: { id: integerAt(importedInterface.id, `${at}.imports.${name}.interface.id`) },
             };
         } else if ('type' in entry) {
             imports[name] = { type: integerAt(entry.type, `${at}.imports.${name}.type`) };
@@ -187,7 +187,7 @@ function parseWorld(value: unknown): WitToolsWorld {
     return {
         name: stringAt(world.name, `${at}.name`),
         package: integerAt(world.package, `${at}.package`),
-        imports
+        imports,
     };
 }
 
@@ -200,7 +200,7 @@ function parseInterface(value: unknown): WitToolsInterface {
     }
     const functions: Record<string, WitToolsFunction> = {};
     for (const [functionName, rawFunction] of Object.entries(
-        objectAt(rawInterface.functions, `interface ${name}.functions`)
+        objectAt(rawInterface.functions, `interface ${name}.functions`),
     )) {
         functions[functionName] = parseFunction(rawFunction, `interface ${name}.${functionName}`);
     }
@@ -208,7 +208,7 @@ function parseInterface(value: unknown): WitToolsInterface {
         name,
         package: integerAt(rawInterface.package, `interface ${name}.package`),
         types,
-        functions
+        functions,
     };
 }
 
@@ -221,11 +221,11 @@ function parseFunction(value: unknown, at: string): WitToolsFunction {
             const entry = objectAt(parameter, `${at}.parameter`);
             return {
                 name: stringAt(entry.name, `${at}.parameter.name`),
-                type: typeReferenceAt(entry.type, `${at}.parameter.type`)
+                type: typeReferenceAt(entry.type, `${at}.parameter.type`),
             };
         }),
         result: fn.result === undefined || fn.result === null ? null : typeReferenceAt(fn.result, `${at}.result`),
-        features: parseFeatures(fn.stability, at)
+        features: parseFeatures(fn.stability, at),
     };
 }
 
@@ -254,7 +254,7 @@ function parseTypeDefinition(value: unknown): WitToolsTypeDefinition {
     return {
         name,
         kind,
-        owner: type.owner === null ? null : parseOwner(type.owner, name ?? '(anonymous type)')
+        owner: type.owner === null ? null : parseOwner(type.owner, name ?? '(anonymous type)'),
     };
 }
 
@@ -267,25 +267,25 @@ function parseTypeKind(value: unknown, name: string): WitToolsTypeKind {
     switch (key) {
         case 'record': {
             const fields = arrayAt(objectAt(kind.record, `type ${name}.record`).fields, `type ${name}.fields`).map(
-                (field) => parseNamedType(field, `type ${name}.field`)
+                (field) => parseNamedType(field, `type ${name}.field`),
             );
             return { record: { fields } };
         }
         case 'variant': {
             const cases = arrayAt(objectAt(kind.variant, `type ${name}.variant`).cases, `type ${name}.cases`).map(
-                (variant) => parseNamedType(variant, `type ${name}.case`)
+                (variant) => parseNamedType(variant, `type ${name}.case`),
             );
             return { variant: { cases } };
         }
         case 'enum':
             return {
-                enum: { cases: namedCases(objectAt(kind.enum, `type ${name}.enum`).cases, `type ${name}.enum.cases`) }
+                enum: { cases: namedCases(objectAt(kind.enum, `type ${name}.enum`).cases, `type ${name}.enum.cases`) },
             };
         case 'flags':
             return {
                 flags: {
-                    flags: namedCases(objectAt(kind.flags, `type ${name}.flags`).flags, `type ${name}.flags.flags`)
-                }
+                    flags: namedCases(objectAt(kind.flags, `type ${name}.flags`).flags, `type ${name}.flags.flags`),
+                },
             };
         case 'option':
             return { option: typeReferenceAt(kind.option, `type ${name}.option`) };
@@ -300,8 +300,8 @@ function parseTypeKind(value: unknown, name: string): WitToolsTypeKind {
                     err:
                         result.err === undefined || result.err === null
                             ? null
-                            : typeReferenceAt(result.err, `type ${name}.result.err`)
-                }
+                            : typeReferenceAt(result.err, `type ${name}.result.err`),
+                },
             };
         }
         case 'list':
@@ -310,9 +310,9 @@ function parseTypeKind(value: unknown, name: string): WitToolsTypeKind {
             return {
                 tuple: {
                     types: arrayAt(objectAt(kind.tuple, `type ${name}.tuple`).types, `type ${name}.tuple.types`).map(
-                        (item) => typeReferenceAt(item, `type ${name}.tuple item`)
-                    )
-                }
+                        (item) => typeReferenceAt(item, `type ${name}.tuple item`),
+                    ),
+                },
             };
         case 'type':
             return { type: typeReferenceAt(kind.type, `type ${name}.type`) };
@@ -332,7 +332,7 @@ function parseNamedType(value: unknown, at: string): WitToolsNamedType {
     const named = objectAt(value, at);
     return {
         name: stringAt(named.name, `${at}.name`),
-        type: named.type === null ? null : typeReferenceAt(named.type, `${at}.type`)
+        type: named.type === null ? null : typeReferenceAt(named.type, `${at}.type`),
     };
 }
 
@@ -352,7 +352,7 @@ function parsePackage(value: unknown): WitToolsPackage {
     return {
         name: stringAt(pkg.name, 'package.name'),
         interfaces: integerMapAt(pkg.interfaces, 'package.interfaces'),
-        worlds: integerMapAt(pkg.worlds, 'package.worlds')
+        worlds: integerMapAt(pkg.worlds, 'package.worlds'),
     };
 }
 
@@ -387,7 +387,7 @@ function validateReferences(document: WitToolsDocument): void {
                 assertTypeReference(
                     parameter.type,
                     document,
-                    `function ${apiInterface.name}.${name} parameter ${parameter.name}`
+                    `function ${apiInterface.name}.${name} parameter ${parameter.name}`,
                 );
             if (fn.result !== null)
                 assertTypeReference(fn.result, document, `function ${apiInterface.name}.${name} result`);

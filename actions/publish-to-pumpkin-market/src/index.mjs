@@ -55,11 +55,11 @@ async function publish() {
     const response = await marketFetch(`${marketUrl}/api/plugins/${listing.id}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
-        body: form
+        body: form,
     });
     if (!response.ok)
         throw new Error(
-            `Market update for ${listing.name} failed (${response.status}): ${safeBody(await response.text(), token)}`
+            `Market update for ${listing.name} failed (${response.status}): ${safeBody(await response.text(), token)}`,
         );
 
     setListingOutputs(listing);
@@ -84,7 +84,7 @@ async function findListingByName(name) {
     const response = await marketFetch(searchUrl);
     if (!response.ok)
         throw new Error(
-            `Could not search Market plugins (${response.status}): ${safeBody(await response.text(), token)}`
+            `Could not search Market plugins (${response.status}): ${safeBody(await response.text(), token)}`,
         );
     const listings = await response.json();
     if (!Array.isArray(listings)) throw new Error('Market plugin search response was not an array');

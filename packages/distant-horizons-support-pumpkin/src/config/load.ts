@@ -17,9 +17,9 @@ export function readSettings(files: DataFiles, log: Logger): Settings {
                 const bytes = files.readFile('config.toml');
                 return new Reader(new Writer().short(bytes.length).bytes(bytes).finish()).string();
             },
-            write: (text) => files.writeFile('config.toml', new Writer().string(text).finish().subarray(2))
+            write: (text) => files.writeFile('config.toml', new Writer().string(text).finish().subarray(2)),
         },
-        renderOptions
+        renderOptions,
     );
     for (const warning of result.warnings) log.warn(`${PLUGIN_NAME}: ${warning}`);
     return { ...result.values.support, worlds: result.values.worlds };

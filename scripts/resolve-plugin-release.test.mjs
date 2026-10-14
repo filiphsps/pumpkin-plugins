@@ -9,7 +9,7 @@ function fixture({
     packageVersion = '0.0.8',
     manifestVersion = '0.0.8',
     engine,
-    includeStaticHermesRuntime = true
+    includeStaticHermesRuntime = true,
 } = {}) {
     const root = mkdtempSync(join(tmpdir(), 'resolve-plugin-release-'));
     mkdirSync(join(root, 'packages/upnpumpkin/src'), { recursive: true });
@@ -17,23 +17,23 @@ function fixture({
         mkdirSync(join(root, 'tools/static-hermes-runtime'), { recursive: true });
         writeFileSync(
             join(root, 'tools/static-hermes-runtime/package.json'),
-            JSON.stringify({ name: '@pumpkin-plugins/static-hermes-runtime' })
+            JSON.stringify({ name: '@pumpkin-plugins/static-hermes-runtime' }),
         );
     }
     writeFileSync(
         join(root, 'release-please-config.json'),
-        JSON.stringify({ packages: { 'packages/upnpumpkin': { component: 'upnpumpkin', 'release-type': 'node' } } })
+        JSON.stringify({ packages: { 'packages/upnpumpkin': { component: 'upnpumpkin', 'release-type': 'node' } } }),
     );
     writeFileSync(
         join(root, '.release-please-manifest.json'),
-        JSON.stringify({ 'packages/upnpumpkin': manifestVersion })
+        JSON.stringify({ 'packages/upnpumpkin': manifestVersion }),
     );
     writeFileSync(
         join(root, 'packages/upnpumpkin/package.json'),
         JSON.stringify({
             version: packageVersion,
-            pumpkinPlugin: { info: 'src/info.mjs', output: 'build/upnpumpkin.wasm', engine }
-        })
+            pumpkinPlugin: { info: 'src/info.mjs', output: 'build/upnpumpkin.wasm', engine },
+        }),
     );
     writeFileSync(join(root, 'packages/upnpumpkin/src/info.mjs'), 'export const info = { name: "UPnPumpkin" };\n');
     return root;
@@ -48,7 +48,7 @@ it('resolves a plugin tag to the registered plugin, version and collected WASM p
             version: '0.0.8',
             engine: 'static-hermes',
             pluginName: 'UPnPumpkin',
-            wasmFile: 'dist/upnpumpkin.wasm'
+            wasmFile: 'dist/upnpumpkin.wasm',
         });
     } finally {
         rmSync(root, { recursive: true, force: true });
@@ -78,7 +78,7 @@ it('rejects release metadata with an unsupported plugin engine', async () => {
     try {
         await assert.rejects(
             resolvePluginRelease(root, 'upnpumpkin-v0.0.8'),
-            /declares an unsupported plugin engine: "hermes"/
+            /declares an unsupported plugin engine: "hermes"/,
         );
     } finally {
         rmSync(root, { recursive: true, force: true });

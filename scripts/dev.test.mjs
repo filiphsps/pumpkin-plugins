@@ -13,7 +13,7 @@ import {
     parseDevArgs,
     releaseAsset,
     resolvePumpkinBinary,
-    runDev
+    runDev,
 } from './dev.mjs';
 
 const tempDirs = [];
@@ -30,7 +30,7 @@ function addPluginFixture(root) {
     fs.mkdirSync(path.dirname(output), { recursive: true });
     fs.writeFileSync(
         path.join(packageDir, 'package.json'),
-        JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } })
+        JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } }),
     );
     fs.writeFileSync(output, 'built plugin');
 }
@@ -46,21 +46,21 @@ describe('parseDevArgs', () => {
             nightly: false,
             release: false,
             parseTypeScript: false,
-            turboArgs: []
+            turboArgs: [],
         });
         assert.deepEqual(parseDevArgs(['--nightly', '--no-hot-reload']), {
             hotReload: false,
             nightly: true,
             release: false,
             parseTypeScript: false,
-            turboArgs: []
+            turboArgs: [],
         });
         assert.deepEqual(parseDevArgs(['--release', '--parse-ts', '--', '--output-logs=errors-only']), {
             hotReload: true,
             nightly: false,
             release: true,
             parseTypeScript: true,
-            turboArgs: ['--output-logs=errors-only']
+            turboArgs: ['--output-logs=errors-only'],
         });
     });
 });
@@ -84,8 +84,8 @@ describe('parseChecksums', () => {
             parseChecksums(`${digest}  pumpkin-X64-Linux\n${digest} *pumpkin-X64-Windows.exe\n`),
             new Map([
                 ['pumpkin-X64-Linux', digest.toLowerCase()],
-                ['pumpkin-X64-Windows.exe', digest.toLowerCase()]
-            ])
+                ['pumpkin-X64-Windows.exe', digest.toLowerCase()],
+            ]),
         );
     });
 });
@@ -94,7 +94,7 @@ describe('releaseAsset', () => {
     it('finds assets by exact name and reports missing files', () => {
         const release = {
             tag_name: 'v1',
-            assets: [{ name: 'server', browser_download_url: 'https://example.test/server' }]
+            assets: [{ name: 'server', browser_download_url: 'https://example.test/server' }],
         };
         assert.equal(releaseAsset(release, 'server').browser_download_url, 'https://example.test/server');
         assert.throws(() => releaseAsset(release, 'nightly'), /release v1 is missing nightly/);
@@ -108,8 +108,8 @@ describe('resolvePumpkinBinary', () => {
         draft: false,
         assets: [
             { name: 'pumpkin-X64-Linux', browser_download_url: 'https://example.test/pumpkin' },
-            { name: 'checksums.sha256', browser_download_url: 'https://example.test/checksums' }
-        ]
+            { name: 'checksums.sha256', browser_download_url: 'https://example.test/checksums' },
+        ],
     };
     const nightlyRelease = {
         tag_name: 'nightly',
@@ -119,9 +119,9 @@ describe('resolvePumpkinBinary', () => {
             {
                 id: 42,
                 name: 'pumpkin-X64-Linux',
-                browser_download_url: 'https://example.test/nightly-pumpkin'
-            }
-        ]
+                browser_download_url: 'https://example.test/nightly-pumpkin',
+            },
+        ],
     };
 
     function seedReleaseCache(root, cachedRelease = release, fetchedAt = Date.now()) {
@@ -129,7 +129,7 @@ describe('resolvePumpkinBinary', () => {
         fs.mkdirSync(cacheDir, { recursive: true });
         fs.writeFileSync(
             path.join(cacheDir, 'latest-release.json'),
-            JSON.stringify({ fetchedAt, release: cachedRelease })
+            JSON.stringify({ fetchedAt, release: cachedRelease }),
         );
         const binary = path.join(cacheDir, `${cachedRelease.tag_name}-pumpkin-X64-Linux`);
         fs.writeFileSync(binary, 'cached binary');
@@ -152,9 +152,9 @@ describe('resolvePumpkinBinary', () => {
                         draft: false,
                         assets: [
                             { name: 'pumpkin-X64-Linux', browser_download_url: 'https://example.test/pumpkin' },
-                            { name: 'checksums.sha256', browser_download_url: 'https://example.test/checksums' }
-                        ]
-                    })
+                            { name: 'checksums.sha256', browser_download_url: 'https://example.test/checksums' },
+                        ],
+                    }),
                 };
             }
             if (url.endsWith('/checksums')) {
@@ -162,7 +162,7 @@ describe('resolvePumpkinBinary', () => {
             }
             return {
                 ok: true,
-                arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+                arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
             };
         };
 
@@ -172,7 +172,7 @@ describe('resolvePumpkinBinary', () => {
         assert.equal(fs.readFileSync(result.binary).toString(), bytes.toString());
         assert.equal(calls[0], 'https://api.github.com/repos/Pumpkin-MC/Pumpkin/releases/latest');
         const metadata = JSON.parse(
-            fs.readFileSync(path.join(root, '.cache', 'pumpkin', 'latest-release.json'), 'utf8')
+            fs.readFileSync(path.join(root, '.cache', 'pumpkin', 'latest-release.json'), 'utf8'),
         );
         assert.equal(metadata.release.tag_name, release.tag_name);
         assert.equal(typeof metadata.fetchedAt, 'number');
@@ -185,8 +185,8 @@ describe('resolvePumpkinBinary', () => {
         const releaseWithDigest = {
             ...nightlyRelease,
             assets: nightlyRelease.assets.map((asset) =>
-                asset.name === 'pumpkin-X64-Linux' ? { ...asset, digest: `sha256:${digest}` } : asset
-            )
+                asset.name === 'pumpkin-X64-Linux' ? { ...asset, digest: `sha256:${digest}` } : asset,
+            ),
         };
         const calls = [];
         const fetchImpl = async (url) => {
@@ -196,7 +196,7 @@ describe('resolvePumpkinBinary', () => {
             }
             return {
                 ok: true,
-                arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+                arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
             };
         };
 
@@ -206,7 +206,7 @@ describe('resolvePumpkinBinary', () => {
             arch: 'x64',
             env: {},
             fetchImpl,
-            nightly: true
+            nightly: true,
         });
 
         assert.equal(result.release, 'nightly');
@@ -214,7 +214,7 @@ describe('resolvePumpkinBinary', () => {
         assert.equal(fs.readFileSync(result.binary).toString(), bytes.toString());
         assert.equal(calls[0], 'https://api.github.com/repos/Pumpkin-MC/Pumpkin/releases/tags/nightly');
         const metadata = JSON.parse(
-            fs.readFileSync(path.join(root, '.cache', 'pumpkin', 'latest-nightly.json'), 'utf8')
+            fs.readFileSync(path.join(root, '.cache', 'pumpkin', 'latest-nightly.json'), 'utf8'),
         );
         assert.equal(metadata.release.tag_name, 'nightly');
     });
@@ -225,7 +225,7 @@ describe('resolvePumpkinBinary', () => {
         fs.mkdirSync(cacheDir, { recursive: true });
         fs.writeFileSync(
             path.join(cacheDir, 'latest-nightly.json'),
-            JSON.stringify({ fetchedAt: Date.now(), release: nightlyRelease })
+            JSON.stringify({ fetchedAt: Date.now(), release: nightlyRelease }),
         );
         fs.writeFileSync(path.join(cacheDir, 'nightly-42-pumpkin-X64-Linux'), 'old nightly binary');
         const latestBytes = Buffer.from('new nightly pumpkin binary');
@@ -236,8 +236,8 @@ describe('resolvePumpkinBinary', () => {
             assets: nightlyRelease.assets.map((asset) => ({
                 ...asset,
                 id: asset.id + 2,
-                ...(asset.name === 'pumpkin-X64-Linux' ? { digest: `sha256:${digest}` } : {})
-            }))
+                ...(asset.name === 'pumpkin-X64-Linux' ? { digest: `sha256:${digest}` } : {}),
+            })),
         };
         const fetchImpl = async (url) => {
             calls.push(url);
@@ -247,7 +247,7 @@ describe('resolvePumpkinBinary', () => {
             return {
                 ok: true,
                 arrayBuffer: async () =>
-                    latestBytes.buffer.slice(latestBytes.byteOffset, latestBytes.byteOffset + latestBytes.byteLength)
+                    latestBytes.buffer.slice(latestBytes.byteOffset, latestBytes.byteOffset + latestBytes.byteLength),
             };
         };
 
@@ -257,14 +257,14 @@ describe('resolvePumpkinBinary', () => {
             arch: 'x64',
             env: {},
             fetchImpl,
-            nightly: true
+            nightly: true,
         });
 
         assert.equal(result.binary, path.join(cacheDir, 'nightly-44-pumpkin-X64-Linux'));
         assert.equal(fs.readFileSync(result.binary).toString(), latestBytes.toString());
         assert.deepEqual(calls, [
             'https://api.github.com/repos/Pumpkin-MC/Pumpkin/releases/tags/nightly',
-            'https://example.test/nightly-pumpkin'
+            'https://example.test/nightly-pumpkin',
         ]);
     });
 
@@ -275,10 +275,10 @@ describe('resolvePumpkinBinary', () => {
                 env: {},
                 fetchImpl: async () => ({
                     ok: true,
-                    json: async () => ({ tag_name: 'nightly', prerelease: true, draft: false })
-                })
+                    json: async () => ({ tag_name: 'nightly', prerelease: true, draft: false }),
+                }),
             }),
-            /instead of a stable Pumpkin release \(nightly\)/
+            /instead of a stable Pumpkin release \(nightly\)/,
         );
     });
 
@@ -290,10 +290,10 @@ describe('resolvePumpkinBinary', () => {
                 env: {},
                 fetchImpl: async () => ({
                     ok: true,
-                    json: async () => ({ tag_name: 'stable', prerelease: false, draft: false })
-                })
+                    json: async () => ({ tag_name: 'stable', prerelease: false, draft: false }),
+                }),
             }),
-            /invalid latest stable Pumpkin release metadata/
+            /invalid latest stable Pumpkin release metadata/,
         );
         assert.equal(fs.existsSync(path.join(root, '.cache', 'pumpkin', 'latest-release.json')), false);
     });
@@ -307,7 +307,7 @@ describe('resolvePumpkinBinary', () => {
             arch: 'x64',
             env: {},
             now: () => 1_000_001,
-            fetchImpl: async () => assert.fail('fresh metadata should avoid GitHub')
+            fetchImpl: async () => assert.fail('fresh metadata should avoid GitHub'),
         });
 
         assert.equal(result.binary, binary);
@@ -327,7 +327,7 @@ describe('resolvePumpkinBinary', () => {
             fetchImpl: async (url) => {
                 calls.push(url);
                 return { ok: true, json: async () => release };
-            }
+            },
         });
 
         assert.equal(result.release, release.tag_name);
@@ -347,7 +347,7 @@ describe('resolvePumpkinBinary', () => {
             fetchImpl: async (url) => {
                 calls.push(url);
                 return { ok: true, json: async () => release };
-            }
+            },
         });
 
         assert.deepEqual(calls, ['https://api.github.com/repos/Pumpkin-MC/Pumpkin/releases/latest']);
@@ -369,8 +369,8 @@ describe('resolvePumpkinBinary', () => {
                 fetchImpl: async () => ({
                     ok: false,
                     status: 403,
-                    headers: { get: (name) => (name === 'x-ratelimit-remaining' ? '0' : null) }
-                })
+                    headers: { get: (name) => (name === 'x-ratelimit-remaining' ? '0' : null) },
+                }),
             });
             assert.equal(result.binary, binary);
             assert.match(warnings.join(' '), /using cached release/i);
@@ -393,7 +393,7 @@ describe('resolvePumpkinBinary', () => {
                 now: () => 1_000_000 + 24 * 60 * 60 * 1000,
                 fetchImpl: async () => {
                     throw new TypeError('network unavailable');
-                }
+                },
             });
             assert.equal(result.binary, binary);
         } finally {
@@ -411,9 +411,9 @@ describe('resolvePumpkinBinary', () => {
                 arch: 'x64',
                 env: { PUMPKIN_REFRESH_RELEASE: '1' },
                 now: () => 2_000_000,
-                fetchImpl: async () => ({ ok: false, status: 403, headers: { get: () => null } })
+                fetchImpl: async () => ({ ok: false, status: 403, headers: { get: () => null } }),
             }),
-            /Could not get the latest stable Pumpkin release \(HTTP 403\)/
+            /Could not get the latest stable Pumpkin release \(HTTP 403\)/,
         );
     });
 
@@ -424,9 +424,9 @@ describe('resolvePumpkinBinary', () => {
                 env: {},
                 fetchImpl: async () => {
                     throw new TypeError('network unavailable');
-                }
+                },
             }),
-            /Could not reach the latest stable Pumpkin release endpoint/
+            /Could not reach the latest stable Pumpkin release endpoint/,
         );
     });
 
@@ -437,7 +437,7 @@ describe('resolvePumpkinBinary', () => {
         const result = await resolvePumpkinBinary({
             root,
             env: { PUMPKIN_BIN: binary },
-            fetchImpl: async () => assert.fail('PUMPKIN_BIN should avoid GitHub')
+            fetchImpl: async () => assert.fail('PUMPKIN_BIN should avoid GitHub'),
         });
 
         assert.equal(result.binary, binary);
@@ -453,14 +453,14 @@ describe('listPluginBuilds', () => {
             fs.mkdirSync(dir, { recursive: true });
             fs.writeFileSync(
                 path.join(dir, 'package.json'),
-                JSON.stringify({ pumpkinPlugin: { output: `build/${name}.wasm` } })
+                JSON.stringify({ pumpkinPlugin: { output: `build/${name}.wasm` } }),
             );
         }
         fs.mkdirSync(path.join(root, 'packages', 'ordinary-folder'));
         const builds = listPluginBuilds(root);
         assert.deepEqual(
             builds.map(({ name }) => name),
-            ['a-plugin', 'z-plugin']
+            ['a-plugin', 'z-plugin'],
         );
         assert.equal(builds[0].outputPath, path.join(root, 'packages', 'a-plugin', 'build', 'a-plugin.wasm'));
     });
@@ -471,7 +471,7 @@ describe('listPluginBuilds', () => {
         fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(
             path.join(dir, 'package.json'),
-            JSON.stringify({ pumpkinPlugin: { output: '../outside.wasm' } })
+            JSON.stringify({ pumpkinPlugin: { output: '../outside.wasm' } }),
         );
         assert.throws(() => listPluginBuilds(root), /unsafe pumpkinPlugin.output/);
     });
@@ -524,7 +524,7 @@ describe('runDev', () => {
         await runDev({
             root,
             spawnImpl,
-            resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' })
+            resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' }),
         });
 
         assert.deepEqual(watcherSignals, ['SIGINT']);
@@ -570,7 +570,7 @@ describe('runDev', () => {
             spawnImpl,
             resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' }),
             signalSource,
-            shutdownTimeoutMs: 5
+            shutdownTimeoutMs: 5,
         }).then(() => {
             completed = true;
         });
@@ -581,7 +581,7 @@ describe('runDev', () => {
                 running.then(() => true),
                 new Promise((resolve) => {
                     timeout = setTimeout(() => resolve(false), 1000);
-                })
+                }),
             ]);
             clearTimeout(timeout);
             if (!finishedInTime) {
@@ -607,7 +607,7 @@ describe('runDev', () => {
         fs.mkdirSync(packageDir, { recursive: true });
         fs.writeFileSync(
             path.join(packageDir, 'package.json'),
-            JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } })
+            JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } }),
         );
         fs.mkdirSync(path.dirname(output), { recursive: true });
         fs.writeFileSync(output, 'cached build');
@@ -615,7 +615,7 @@ describe('runDev', () => {
         fs.mkdirSync(serverDir, { recursive: true });
         fs.writeFileSync(
             path.join(serverDir, 'pumpkin.toml'),
-            '[plugins]\nhot_reload = false # reset\n\n[server]\nname = "test"\n'
+            '[plugins]\nhot_reload = false # reset\n\n[server]\nname = "test"\n',
         );
         const calls = [];
         const spawnImpl = (command, args, options) => {
@@ -631,7 +631,7 @@ describe('runDev', () => {
         await runDev({
             root,
             spawnImpl,
-            resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' })
+            resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' }),
         });
 
         assert.deepEqual(calls[0].args, ['run', 'build', '--', '--ui=stream']);
@@ -643,7 +643,7 @@ describe('runDev', () => {
         assert.match(config, /\[server\]\nname = "test"/);
         assert.equal(
             fs.readFileSync(path.join(root, '.cache', 'pumpkin-dev', 'plugins', 'plugin.wasm'), 'utf8'),
-            'cached build'
+            'cached build',
         );
     });
 
@@ -668,7 +668,7 @@ describe('runDev', () => {
                 root,
                 spawnImpl,
                 release: true,
-                resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' })
+                resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' }),
             });
 
             assert.equal(calls[0].options.env.PUMPKIN_DEV_MODE, undefined);
@@ -688,7 +688,7 @@ describe('runDev', () => {
         fs.mkdirSync(path.dirname(output), { recursive: true });
         fs.writeFileSync(
             path.join(packageDir, 'package.json'),
-            JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } })
+            JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } }),
         );
         fs.writeFileSync(output, 'cached build');
         const calls = [];
@@ -713,7 +713,7 @@ describe('runDev', () => {
                 resolveBinary: async (options) => {
                     resolvedOptions = options;
                     return { binary: '/fake/pumpkin', release: 'test release' };
-                }
+                },
             });
         } finally {
             if (previousDevMode === undefined) delete process.env.PUMPKIN_DEV_MODE;
@@ -729,11 +729,11 @@ describe('runDev', () => {
         assert.equal(calls.at(-1).command, '/fake/pumpkin');
         assert.match(
             fs.readFileSync(path.join(root, '.cache', 'pumpkin-dev', 'pumpkin.toml'), 'utf8'),
-            /hot_reload = false/
+            /hot_reload = false/,
         );
         assert.equal(
             calls.some(({ args }) => args.includes('watch')),
-            false
+            false,
         );
     });
 
@@ -743,7 +743,7 @@ describe('runDev', () => {
         fs.mkdirSync(path.join(packageDir, 'build'), { recursive: true });
         fs.writeFileSync(
             path.join(packageDir, 'package.json'),
-            JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } })
+            JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } }),
         );
         const calls = [];
         const spawnImpl = (command, args) => {
@@ -758,9 +758,9 @@ describe('runDev', () => {
             runDev({
                 root,
                 spawnImpl,
-                resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' })
+                resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' }),
             }),
-            /turbo run build exited \(1\)/
+            /turbo run build exited \(1\)/,
         );
         assert.equal(calls.length, 1);
     });

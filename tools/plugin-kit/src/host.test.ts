@@ -7,7 +7,7 @@ vi.mock('pumpkin:plugin/logging@0.1.0', () => ({ log: vi.fn() }));
 vi.mock('pumpkin:plugin/scheduler@0.1.0', () => ({
     scheduleDelayedTask: host.delayed,
     scheduleRepeatingTask: host.repeating,
-    cancelTask: host.cancel
+    cancelTask: host.cancel,
 }));
 
 const server = {} as Server;
@@ -60,7 +60,7 @@ describe('host scheduling', () => {
         const { scheduleRepeating, scheduleDelayed, runTask } = await import('./host.ts');
         for (const [schedule, mock] of [
             [scheduleRepeating, host.repeating],
-            [scheduleDelayed, host.delayed]
+            [scheduleDelayed, host.delayed],
         ] as const) {
             mock.mockImplementation(() => {
                 throw new Error('host failure');
@@ -105,7 +105,7 @@ describe('host scheduling', () => {
             expect(() => scheduleRepeating(ticks, vi.fn())).toThrow(RangeError);
             expect(host.delayed).not.toHaveBeenCalled();
             expect(host.repeating).not.toHaveBeenCalled();
-        }
+        },
     );
 
     it('rejects a zero repeating period', async () => {

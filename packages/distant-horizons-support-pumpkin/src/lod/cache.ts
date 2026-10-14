@@ -8,17 +8,17 @@ export interface CachedLod {
 }
 /** Entry counts and stored bytes for both cache tiers. */
 export interface LodCacheStats {
-    memoryEntries: number;
-    memoryBytes: number;
-    memoryLimit: number;
-    diskEntries: number;
     diskBytes: number;
+    diskEntries: number;
     diskLimit: number;
+    memoryBytes: number;
+    memoryEntries: number;
+    memoryLimit: number;
 }
 /** Persisted location and key for a selected cache entry exported before repair. */
 export interface CacheRecoveryBackup {
-    key: string;
     dataPath: string;
+    key: string;
     manifestPath: string;
 }
 /** Persistent bounded cache; corrupt entries are discarded and rebuilt when terrain is available. */
@@ -30,7 +30,7 @@ export class LodCache {
     constructor(
         private readonly files: DataFiles,
         private readonly memoryLimit: number,
-        private readonly diskLimit: number
+        private readonly diskLimit: number,
     ) {
         files.createDirectory('cache');
         for (const entry of this.scanDiskFiles()) this.indexDiskFile(entry.name, entry.modified, entry.size);
@@ -137,7 +137,7 @@ export class LodCache {
             memoryLimit: this.memoryLimit,
             diskEntries: this.diskIndex.size,
             diskBytes: this.diskBytes,
-            diskLimit: this.diskLimit
+            diskLimit: this.diskLimit,
         };
     }
     /** Drops every in-memory entry and returns how many were removed. */
@@ -189,7 +189,7 @@ export class LodCache {
             .map((entry) => ({
                 name: entry.name,
                 modified: entry.info?.modified ?? 0,
-                size: entry.info?.size ?? 0
+                size: entry.info?.size ?? 0,
             }));
     }
     private pruneDisk(): void {

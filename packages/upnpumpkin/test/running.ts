@@ -7,8 +7,8 @@ export const PLUGIN_NAME = 'UPnPumpkin';
 
 /** A Pumpkin server running the plugin, and the fake router it talks to. */
 export interface Running {
-    server: PumpkinInstance;
     router: FakeRouter;
+    server: PumpkinInstance;
 }
 
 /**
@@ -34,11 +34,11 @@ export function upnpServers() {
             const server = await startPumpkin({
                 name,
                 plugins: [builtPluginPath(process.cwd())],
-                files: { [`plugins/data/${PLUGIN_NAME}/config.toml`]: config }
+                files: { [`plugins/data/${PLUGIN_NAME}/config.toml`]: config },
             });
             servers.push(server);
             return server;
-        }
+        },
     };
 }
 

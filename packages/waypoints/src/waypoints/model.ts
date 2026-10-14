@@ -23,38 +23,38 @@ export type AccessGrant =
 
 /** Access policy for a shared server waypoint. */
 export interface WaypointAccess {
-    readonly mode: 'restricted' | 'public';
     readonly grants: readonly AccessGrant[];
+    readonly mode: 'restricted' | 'public';
 }
 
 /** Canonical server-owned waypoint record. Presentation state is intentionally not persisted here. */
 export interface Waypoint {
-    readonly id: string;
-    readonly name: string;
-    readonly dimension: string;
-    readonly position: WaypointPosition;
-    readonly label?: string;
-    readonly description?: string;
-    readonly color: string;
-    readonly icon?: string;
-    readonly visibilityRange?: number;
-    readonly enabled: boolean;
     readonly access: WaypointAccess;
+    readonly color: string;
+    readonly description?: string;
+    readonly dimension: string;
+    readonly enabled: boolean;
+    readonly icon?: string;
+    readonly id: string;
+    readonly label?: string;
+    readonly name: string;
+    readonly position: WaypointPosition;
+    readonly visibilityRange?: number;
 }
 
 /** Input required to create a waypoint; defaults are applied to optional metadata and access. */
 export interface NewWaypoint {
-    readonly id: string;
-    readonly name: string;
-    readonly dimension: string;
-    readonly position: WaypointPosition;
-    readonly label?: string;
-    readonly description?: string;
-    readonly color?: string;
-    readonly icon?: string;
-    readonly visibilityRange?: number;
-    readonly enabled?: boolean;
     readonly access?: WaypointAccess;
+    readonly color?: string;
+    readonly description?: string;
+    readonly dimension: string;
+    readonly enabled?: boolean;
+    readonly icon?: string;
+    readonly id: string;
+    readonly label?: string;
+    readonly name: string;
+    readonly position: WaypointPosition;
+    readonly visibilityRange?: number;
 }
 
 /** Runtime defaults for waypoint metadata, shared by creation and operator reset commands. */
@@ -65,7 +65,7 @@ export const WAYPOINT_METADATA_DEFAULTS = {
     icon: undefined,
     visibilityRange: undefined,
     enabled: true,
-    access: { mode: 'restricted', grants: [] }
+    access: { mode: 'restricted', grants: [] },
 } as const satisfies Partial<
     Pick<Waypoint, 'label' | 'description' | 'color' | 'icon' | 'visibilityRange' | 'enabled' | 'access'>
 >;
@@ -110,10 +110,10 @@ export function createWaypoint(input: NewWaypoint): Waypoint {
     const label = normalizeText(input.label === undefined ? WAYPOINT_METADATA_DEFAULTS.label : input.label, 'label');
     const description = normalizeText(
         input.description === undefined ? WAYPOINT_METADATA_DEFAULTS.description : input.description,
-        'description'
+        'description',
     );
     const visibilityRange = normalizeVisibilityRange(
-        input.visibilityRange === undefined ? WAYPOINT_METADATA_DEFAULTS.visibilityRange : input.visibilityRange
+        input.visibilityRange === undefined ? WAYPOINT_METADATA_DEFAULTS.visibilityRange : input.visibilityRange,
     );
     if (input.enabled !== undefined && typeof input.enabled !== 'boolean') {
         throw new TypeError('Waypoint enabled state must be boolean.');
@@ -130,7 +130,7 @@ export function createWaypoint(input: NewWaypoint): Waypoint {
         ...(icon === undefined ? {} : { icon }),
         ...(visibilityRange === undefined ? {} : { visibilityRange }),
         enabled: input.enabled ?? WAYPOINT_METADATA_DEFAULTS.enabled,
-        access
+        access,
     };
     if (!isWaypoint(waypoint)) throw new TypeError('Waypoint data is invalid.');
     return waypoint;
@@ -178,7 +178,7 @@ export function cloneWaypoint(waypoint: Waypoint): Waypoint {
     return {
         ...waypoint,
         position: { ...waypoint.position },
-        access: { mode: waypoint.access.mode, grants: waypoint.access.grants.map((grant) => ({ ...grant })) }
+        access: { mode: waypoint.access.mode, grants: waypoint.access.grants.map((grant) => ({ ...grant })) },
     };
 }
 
@@ -311,5 +311,5 @@ const waypointKeys = [
     'icon',
     'visibilityRange',
     'enabled',
-    'access'
+    'access',
 ] as const;

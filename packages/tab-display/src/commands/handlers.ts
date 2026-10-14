@@ -6,18 +6,18 @@ import type { commands } from './spec.ts';
 
 /** Safe diagnostic fields for one online player. */
 export interface PlayerInspection {
-    readonly uuid: string;
-    readonly name: string;
     readonly edition: string;
     readonly javaVersion?: string;
+    readonly name: string;
     readonly placeholderIds: readonly string[];
+    readonly uuid: string;
 }
 
 /** Command-facing operations, kept independent from WIT resources and file handles. */
 export interface TabDisplayCommandRuntime {
-    status(): TabDisplayStatus;
-    reload(): { readonly kind: 'applied' } | { readonly kind: 'failed'; readonly reason: string };
     inspect(uuid: string): PlayerInspection | undefined;
+    reload(): { readonly kind: 'applied' } | { readonly kind: 'failed'; readonly reason: string };
+    status(): TabDisplayStatus;
 }
 
 /** Builds the three documented operator command handlers. */
@@ -30,7 +30,7 @@ export function commandHandlers(runtime: TabDisplayCommandRuntime): CommandHandl
                 ? ['TabDisplay configuration reloaded.']
                 : [errorLine(`TabDisplay reload failed: ${result.reason}`)];
         },
-        'tabdisplay inspect <player>': (_sender, { player }) => formatInspection(runtime.inspect, player)
+        'tabdisplay inspect <player>': (_sender, { player }) => formatInspection(runtime.inspect, player),
     };
 }
 
@@ -44,13 +44,13 @@ function formatStatus(status: TabDisplayStatus): readonly string[] {
         `Native sorting: ${formatCapability(status.sorting)}`,
         `Bedrock: ${formatCapability(status.bedrock)}`,
         `Unresolved placeholder IDs: ${status.unresolved.length > 0 ? status.unresolved.join(', ') : 'none'}`,
-        ...(status.lastFailure === undefined ? [] : [`Last failure: ${status.lastFailure}`])
+        ...(status.lastFailure === undefined ? [] : [`Last failure: ${status.lastFailure}`]),
     ];
 }
 
 function formatInspection(
     inspect: (uuid: string) => PlayerInspection | undefined,
-    players: readonly CommandPlayerReference[]
+    players: readonly CommandPlayerReference[],
 ): readonly (string | { readonly text: string; readonly tone: 'error' })[] {
     if (players.length !== 1) return [errorLine('Inspect exactly one online player.')];
     const selected = players[0];
@@ -63,7 +63,7 @@ function formatInspection(
         `Edition: ${data.edition}`,
         ...(data.javaVersion === undefined ? [] : [`Java version: ${data.javaVersion}`]),
         `Placeholder IDs: ${data.placeholderIds.length > 0 ? data.placeholderIds.join(', ') : 'none'}`,
-        'Resolved placeholder values are not shown.'
+        'Resolved placeholder values are not shown.',
     ];
 }
 

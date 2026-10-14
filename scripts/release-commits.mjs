@@ -33,7 +33,7 @@ export function bundledPaths(packages, pluginPath) {
 function shippedFile(file, paths) {
     if (
         /\.md$|(?:^|\/)(?:test|testing|__tests__)\/|^(?:packages|tools)\/[^/]+\/(?:build|dist|node_modules)\/|\.(?:test|itest)\.[cm]?[jt]s$/.test(
-            file
+            file,
         )
     )
         return false;
@@ -105,7 +105,7 @@ async function firstPackageCommitSha(github, branch, path) {
         repo: api.repository.repo,
         sha: branch,
         path: `${path}/package.json`,
-        per_page: 100
+        per_page: 100,
     });
     const firstCommit = commits.at(-1);
     if (!firstCommit?.sha) throw new Error(`Cannot find the package introduction commit for ${path}`);
@@ -120,7 +120,7 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
             for (const path of actionPaths) {
                 const component = path.split('/').at(-1);
                 commitsByPath[path] = (commitsByPath[path] ?? []).filter((commit) =>
-                    releaseAsTargetsComponent(commit, component)
+                    releaseAsTargetsComponent(commit, component),
                 );
             }
             const pluginPaths = Object.keys(strategies).filter((path) => path.startsWith('packages/'));
@@ -139,7 +139,7 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
                     const previousRelease = await previousPublishedRelease(github, release?.tag);
                     if (!previousRelease?.sha) {
                         throw new Error(
-                            `Cannot find a published release before ${release?.tag ?? releasedVersions[path]} for ${path}`
+                            `Cannot find a published release before ${release?.tag ?? releasedVersions[path]} for ${path}`,
                         );
                     }
                     releasesByPath[path] = previousRelease;
@@ -149,7 +149,7 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
             // Fetch unfiltered history for plugin dependency commits and action release boundaries.
             for await (const commit of github.mergeCommitIterator(branch, {
                 backfillFiles: true,
-                maxResults: maxCommits + 1
+                maxResults: maxCommits + 1,
             })) {
                 if (commits.length === maxCommits)
                     throw new Error(`Release history exceeds ${maxCommits} commits; increase commit-search-depth`);
@@ -162,7 +162,7 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
                     commits,
                     bundledPaths(packages, path),
                     releasesByPath[path]?.sha,
-                    path.split('/').at(-1)
+                    path.split('/').at(-1),
                 );
             }
             for (const path of actionPaths) {
@@ -174,6 +174,6 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
             return strategies;
         },
         processCommits: (commits) => commits,
-        run: async (candidates) => candidates
+        run: async (candidates) => candidates,
     };
 }

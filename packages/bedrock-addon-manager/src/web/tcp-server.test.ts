@@ -22,13 +22,13 @@ function client() {
             if (bytes.length > Number(max)) inbound.unshift(bytes.subarray(Number(max)));
             return bytes.subarray(0, Number(max));
         }),
-        [Symbol.dispose]: () => disposed.input++
+        [Symbol.dispose]: () => disposed.input++,
     };
     const output = {
         checkWrite: vi.fn(() => 1n << 20n),
         write: vi.fn((bytes: Uint8Array) => written.push(bytes.length)),
         flush: vi.fn(),
-        [Symbol.dispose]: () => disposed.output++
+        [Symbol.dispose]: () => disposed.output++,
     };
     return {
         socket,
@@ -37,7 +37,7 @@ function client() {
         disposed,
         input,
         output,
-        resources: [socket, input, output] as unknown as ReturnType<TcpSocket['accept']>
+        resources: [socket, input, output] as unknown as ReturnType<TcpSocket['accept']>,
     };
 }
 
@@ -54,7 +54,7 @@ function setup(open: PackLookup = () => undefined, defaultClock = false) {
             if (!next) throw { payload: 'would-block' };
             return next;
         }),
-        [Symbol.dispose]: vi.fn()
+        [Symbol.dispose]: vi.fn(),
     };
     host.create.mockReturnValue(listener);
     const clock = { now: 0 };
@@ -76,7 +76,7 @@ function metrics(t: ReturnType<typeof setup>, clients: ReturnType<typeof client>
                 n +
                 c.written.reduce((a, b) => a + b, 0) +
                 c.input.read.mock.results.reduce((a, r) => a + (r.type === 'return' ? r.value.length : 0), 0),
-            0
+            0,
         ),
         operations:
             t.listener.accept.mock.calls.length +
@@ -90,8 +90,8 @@ function metrics(t: ReturnType<typeof setup>, clients: ReturnType<typeof client>
                     c.output.write.mock.calls.length +
                     c.output.flush.mock.calls.length +
                     c.socket.shutdown.mock.calls.length,
-                0
-            )
+                0,
+            ),
     };
 }
 
@@ -198,7 +198,7 @@ describe('TcpWebServer', () => {
         t.server.tick();
         expect(t.pending).toEqual([]);
         expect(clients.every((c) => c.disposed.socket === 1 && c.disposed.input === 1 && c.disposed.output === 1)).toBe(
-            true
+            true,
         );
         expect(t.lookup).not.toHaveBeenCalled();
         expect(replacement.disposed.socket).toBe(0);

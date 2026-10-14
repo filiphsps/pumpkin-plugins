@@ -9,7 +9,7 @@ const workloads: BenchmarkWorkload[] = [
         provenance: 'synthetic guest fixture',
         operationsPerSample: 3,
         samplesMs: [2, 4, 6],
-        checksum: 11
+        checksum: 11,
     },
     {
         name: 'host-call-v3',
@@ -17,15 +17,15 @@ const workloads: BenchmarkWorkload[] = [
         provenance: 'real Pumpkin API',
         operationsPerSample: 2,
         samplesMs: [6, 8, 10],
-        checksum: 0
-    }
+        checksum: 0,
+    },
 ];
 
 it('formats arbitrary workload metadata and averages every workload median', () => {
     const engines = [
         engine('baseline', 'Baseline', 1_000, [0, 0]),
         engine('variant-b', 'Variant B', 1_500, [1, 2]),
-        engine('variant-c', 'Variant C', 750, [2, 4])
+        engine('variant-c', 'Variant C', 750, [2, 4]),
     ];
     engines[2]?.workloads.reverse();
 
@@ -39,7 +39,7 @@ it('formats arbitrary workload metadata and averages every workload median', () 
     expect(report).toContain('| Average benchmark median (ms) | 6.00 | 7.50 | 9.00 |');
     expect(report.trimEnd().endsWith('| Average benchmark median (ms) | 6.00 | 7.50 | 9.00 |')).toBe(true);
     expect(
-        report.split('\n').filter((line) => line.startsWith('| synthetic |') || line.startsWith('| real |'))
+        report.split('\n').filter((line) => line.startsWith('| synthetic |') || line.startsWith('| real |')),
     ).toHaveLength(workloads.length);
 });
 
@@ -47,7 +47,7 @@ it('formats a console report with aligned tables and dynamic workload labels', (
     const engines = [
         engine('baseline', 'Baseline', 1_000, [0, 0]),
         engine('variant-b', 'Variant B', 1_500, [1, 2]),
-        engine('variant-c', 'Variant C', 750, [2, 4])
+        engine('variant-c', 'Variant C', 750, [2, 4]),
     ];
 
     const report = formatConsoleReport(engines, 'baseline');
@@ -80,13 +80,13 @@ function engine(id: string, label: string, binarySizeBytes: number, offsets: num
             commandRegistrations: 1,
             commandDispatches: 1,
             serverQueries: 1,
-            playersObserved: 0
+            playersObserved: 0,
         },
         runtimeSourceCompilation: true,
         unicodePropertyEscapes: true,
         workloads: workloads.map((workload, index) => ({
             ...workload,
-            samplesMs: workload.samplesMs.map((sample) => sample + (offsets[index] ?? 0))
-        }))
+            samplesMs: workload.samplesMs.map((sample) => sample + (offsets[index] ?? 0)),
+        })),
     };
 }

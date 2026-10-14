@@ -2,8 +2,8 @@ interface WasiResourceLike {
     readonly __isValid?: boolean;
     readonly __staticHermesDisposed?: boolean;
     readonly __staticHermesResource?: { readonly __isValid?: boolean };
-    [Symbol.dispose]?: () => void;
     drop?: () => void;
+    [Symbol.dispose]?: () => void;
 }
 
 /** Explicitly releases a WASI resource still owned by this plugin. */

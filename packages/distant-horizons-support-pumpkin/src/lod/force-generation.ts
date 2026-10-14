@@ -11,7 +11,7 @@ import {
     type LodSectionBounds,
     type LodSectionCoordinate,
     MAX_LOD_GENERATION_RADIUS,
-    sectionKey
+    sectionKey,
 } from './generation.ts';
 import { lodLocation } from './location.ts';
 
@@ -22,13 +22,13 @@ export const FORCE_BLOCK_SAMPLES_PER_TICK = 32_768;
 
 /** Terrain and reporting access valid only for the duration of a peer callback. */
 export interface ForcedLodPeer {
-    name: string;
-    level: string;
-    terrain: TerrainAccess;
     /** Inclusive block-center bounds of the world border. */
     borderBounds: { minX: number; maxX: number; minZ: number; maxZ: number };
     insideBorder(x: number, z: number): boolean;
+    level: string;
+    name: string;
     report(message: string): void;
+    terrain: TerrainAccess;
 }
 
 /** Obtains a fresh player and world handle for a forced-capture tick. */
@@ -45,29 +45,29 @@ export interface ForcedLodStart {
 }
 /** One selected cached section exported safely before an operator recovery job. */
 export interface ForcedLodRecovery {
-    start: ForcedLodStart;
     backup: CacheRecoveryBackup;
+    start: ForcedLodStart;
 }
 
 interface ForcedSection {
-    coordinate: LodSectionCoordinate;
-    key: string;
-    invalidated: boolean;
     builder?: LodBuilder;
+    coordinate: LodSectionCoordinate;
+    invalidated: boolean;
+    key: string;
 }
 
 interface ForcedJob extends ForcedLodStart {
-    owner: string;
-    level: string;
-    coordinates: Generator<LodSectionCoordinate>;
-    inBorderSections: number;
-    scanned: number;
-    current?: ForcedSection;
-    skippedOutsideBorder: number;
-    skippedAlreadyGenerated: number;
     built: number;
-    skipped: number;
+    coordinates: Generator<LodSectionCoordinate>;
+    current?: ForcedSection;
+    inBorderSections: number;
     lastReportedStep: number;
+    level: string;
+    owner: string;
+    scanned: number;
+    skipped: number;
+    skippedAlreadyGenerated: number;
+    skippedOutsideBorder: number;
 }
 
 const MAX_SECTIONS_CHECKED_PER_TICK = 64;
@@ -79,7 +79,7 @@ export class ForcedLodGeneration {
     constructor(
         private readonly cache: LodCache,
         private readonly log: Logger,
-        private readonly now = Date.now
+        private readonly now = Date.now,
     ) {}
 
     /** Starts one bounded, cache-refreshing job around the selected block position. */
@@ -116,7 +116,7 @@ export class ForcedLodGeneration {
         if (prepared?.status !== 'ready') {
             const reason = prepared && 'reason' in prepared ? ` ${prepared.reason}` : '';
             throw new Error(
-                `Cache recovery deferred until all section chunks are loaded; the selected cache entry is preserved.${reason}`
+                `Cache recovery deferred until all section chunks are loaded; the selected cache entry is preserved.${reason}`,
             );
         }
 
@@ -130,7 +130,7 @@ export class ForcedLodGeneration {
         blockX: number,
         blockZ: number,
         radius: number,
-        selection: { bounds: LodSectionBounds; inBorderSections: number }
+        selection: { bounds: LodSectionBounds; inBorderSections: number },
     ): ForcedLodStart {
         const sections = (radius * 2 + 1) ** 2;
         const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
@@ -150,7 +150,7 @@ export class ForcedLodGeneration {
             skippedAlreadyGenerated: 0,
             built: 0,
             skipped: 0,
-            lastReportedStep: 0
+            lastReportedStep: 0,
         };
         this.log.info(`Started forced LOD capture for ${peer.name}: ${sections} requested sections in ${peer.level}.`);
         return { centerX, centerZ, radius, sections };
@@ -199,7 +199,7 @@ export class ForcedLodGeneration {
         ) {
             target.invalidated = true;
             this.log.debug(
-                `${logTag} Invalidated forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(level, target.coordinate.x, target.coordinate.z)} after a block change.`
+                `${logTag} Invalidated forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(level, target.coordinate.x, target.coordinate.z)} after a block change.`,
             );
         }
     }
@@ -237,7 +237,7 @@ export class ForcedLodGeneration {
             }
             if (target.invalidated) {
                 this.log.debug(
-                    `${logTag} Skipped invalidated forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)}.`
+                    `${logTag} Skipped invalidated forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)}.`,
                 );
                 job.skipped++;
                 job.current = undefined;
@@ -270,7 +270,7 @@ export class ForcedLodGeneration {
                 const data = target.builder.finish(this.now());
                 this.cache.put(target.key, { updated: this.now(), data });
                 this.log.debug(
-                    `${logTag} Built forced LOD for ${ansi.named.name(peer.name)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)} (${ansi.named.number(data.length)} bytes).`
+                    `${logTag} Built forced LOD for ${ansi.named.name(peer.name)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)} (${ansi.named.number(data.length)} bytes).`,
                 );
                 job.built++;
                 job.current = undefined;
@@ -293,7 +293,7 @@ export class ForcedLodGeneration {
             width: SECTION_SIZE_BLOCKS,
             depth: SECTION_SIZE_BLOCKS,
             minY: terrain.minY,
-            height: terrain.height
+            height: terrain.height,
         };
     }
 
@@ -303,7 +303,7 @@ export class ForcedLodGeneration {
         job.current = undefined;
         if (target) {
             this.log.debug(
-                `${logTag} Skipped forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)}: ${reason}.`
+                `${logTag} Skipped forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)}: ${reason}.`,
             );
         }
     }
@@ -316,7 +316,7 @@ export class ForcedLodGeneration {
         job.lastReportedStep = step;
         this.sendReport(
             peer,
-            `Forced LOD capture ${step * 10}% (${this.completed(job)}/${job.sections} sections complete).`
+            `Forced LOD capture ${step * 10}% (${this.completed(job)}/${job.sections} sections complete).`,
         );
     }
 
@@ -331,7 +331,7 @@ export class ForcedLodGeneration {
             if (message) {
                 this.sendReport(peer, message);
                 this.log.info(
-                    `${message} World ${job.level}, center ${job.centerX}, ${job.centerZ}, radius ${job.radius}.`
+                    `${message} World ${job.level}, center ${job.centerX}, ${job.centerZ}, radius ${job.radius}.`,
                 );
                 this.job = undefined;
                 return;
@@ -356,7 +356,7 @@ export class ForcedLodGeneration {
         peer: ForcedLodPeer,
         blockX: number,
         blockZ: number,
-        radius: number
+        radius: number,
     ): { bounds: LodSectionBounds; inBorderSections: number } {
         const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
         const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
@@ -364,12 +364,12 @@ export class ForcedLodGeneration {
         const minX = Math.max(centerX - radius, Math.ceil((bounds.minX - 0.5) / SECTION_SIZE_BLOCKS));
         const maxX = Math.min(
             centerX + radius,
-            Math.floor((bounds.maxX - SECTION_SIZE_BLOCKS + 0.5) / SECTION_SIZE_BLOCKS)
+            Math.floor((bounds.maxX - SECTION_SIZE_BLOCKS + 0.5) / SECTION_SIZE_BLOCKS),
         );
         const minZ = Math.max(centerZ - radius, Math.ceil((bounds.minZ - 0.5) / SECTION_SIZE_BLOCKS));
         const maxZ = Math.min(
             centerZ + radius,
-            Math.floor((bounds.maxZ - SECTION_SIZE_BLOCKS + 0.5) / SECTION_SIZE_BLOCKS)
+            Math.floor((bounds.maxZ - SECTION_SIZE_BLOCKS + 0.5) / SECTION_SIZE_BLOCKS),
         );
         if (minX > maxX || minZ > maxZ) throw new Error('No requested LOD sections are inside the world border.');
 
@@ -403,7 +403,7 @@ function section(coordinate: LodSectionCoordinate): Section {
         z: coordinate.z,
         detail: SECTION_DETAIL,
         high: ((z << 4) | (x >>> 24)) >>> 0,
-        low: ((x << 8) | SECTION_DETAIL) >>> 0
+        low: ((x << 8) | SECTION_DETAIL) >>> 0,
     };
 }
 
@@ -415,7 +415,7 @@ function measureTerrain(source: TerrainSource): { source: TerrainSource; samples
         sample: (x, y, z) => {
             samples++;
             return source.sample(x, y, z);
-        }
+        },
     };
     if (source.top) measured.top = source.top.bind(source);
     return { source: measured, samples: () => samples };

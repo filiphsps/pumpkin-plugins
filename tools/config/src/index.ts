@@ -10,14 +10,14 @@ export {
     type Parsed,
     type StringCheck,
     str,
-    tomlString
+    tomlString,
 } from './fields.ts';
 export {
     type ConfigStore,
     ConfigSyntaxError,
     type LoadResult,
     type LoadStatus,
-    loadConfig
+    loadConfig,
 } from './load.ts';
 export { type Issue, type IssueKind, type ReadResult, readConfig } from './read.ts';
 export { commentLines, MANAGED_NOTE, type RenderOptions, renderConfig } from './render.ts';
@@ -34,5 +34,5 @@ export {
     section,
     type TableNode,
     type TableValues,
-    table
+    table,
 } from './schema.ts';

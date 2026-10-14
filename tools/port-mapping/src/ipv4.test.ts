@@ -25,7 +25,7 @@ describe('isPublicIpv4', () => {
             '0.0.0.0',
             '224.0.0.1',
             '255.255.255.255',
-            '192.0.2.1'
+            '192.0.2.1',
         ])
             expect(isPublicIpv4(parseIpv4(text) as never), text).toBe(false);
     });
@@ -38,7 +38,7 @@ describe('isPublicIpv4', () => {
             '172.32.0.1',
             '100.63.0.1',
             '100.128.0.1',
-            '192.169.0.1'
+            '192.169.0.1',
         ])
             expect(isPublicIpv4(parseIpv4(text) as never), text).toBe(true);
     });

@@ -15,10 +15,10 @@ export interface WebServer {
      * @throws {Error} With a message fit for the server log when the address can't be used.
      */
     start(settings: WebServerSettings): void;
-    /** Accepts new connections and moves the running downloads forward. Call once per game tick. */
-    tick(): void;
     /** Stops listening and drops every connection. Safe to call when not started. */
     stop(): void;
+    /** Accepts new connections and moves the running downloads forward. Call once per game tick. */
+    tick(): void;
 }
 
 export type { Ipv4 };

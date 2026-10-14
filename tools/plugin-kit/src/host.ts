@@ -10,14 +10,14 @@ export const hostLogger: Logger = {
     debug: (message) => logging.log('debug', message),
     info: (message) => logging.log('info', message),
     warn: (message) => logging.log('warn', message),
-    error: (message) => logging.log('error', message)
+    error: (message) => logging.log('error', message),
 };
 
 // Keep scheduler callbacks in a separate registry because the base `Plugin` class keeps its handler
 // maps private. These handler IDs are u32 values and stay in a range above the IDs it allocates.
 interface ScheduledHandler {
-    run: (server: Server) => void;
     repeating: boolean;
+    run: (server: Server) => void;
     taskId?: number;
 }
 

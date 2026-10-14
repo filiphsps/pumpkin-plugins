@@ -4,7 +4,7 @@ import type {
     CommandSender,
     CommandSuggestions,
     ConsumedArgs,
-    SuggestionRequest
+    SuggestionRequest,
 } from 'pumpkin:plugin/command@0.1.0';
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { Event, EventPriority, EventType } from 'pumpkin:plugin/event@0.1.0';
@@ -35,7 +35,7 @@ export type CommandHandler = (sender: CommandSender, server: Server, args: Consu
 export type CommandSuggestionHandler = (
     sender: CommandSender,
     server: Server,
-    request: SuggestionRequest
+    request: SuggestionRequest,
 ) => CommandSuggestions;
 
 /** Handles one scheduled task invocation. */
@@ -49,10 +49,10 @@ export interface AiGoal {
     shouldContinue: (server: Server, entity: Entity) => boolean;
     /** Start the goal. */
     start: (server: Server, entity: Entity) => void;
-    /** Advance the goal by one server tick. */
-    tick: (server: Server, entity: Entity) => void;
     /** Stop the goal. */
     stop: (server: Server, entity: Entity) => void;
+    /** Advance the goal by one server tick. */
+    tick: (server: Server, entity: Entity) => void;
 }
 
 /** Generates one chunk for a requested world-generation phase. */
@@ -108,7 +108,7 @@ export abstract class Plugin {
         eventType: T,
         handler: EventHandler<EventPayload<T>>,
         priority: EventPriority = 'normal',
-        blocking = true
+        blocking = true,
     ): void {
         const handlerId = getNextHandlerId();
         eventHandlers.set(handlerId, (server, event) => handler(server, event as EventPayload<T>));
@@ -218,7 +218,7 @@ export function handleCommandSuggestion(
     handlerId: number,
     sender: CommandSender,
     server: Server,
-    request: SuggestionRequest
+    request: SuggestionRequest,
 ): CommandSuggestions {
     const handler = commandSuggestionHandlers.get(handlerId);
     if (handler) return handler(sender, server, request);
@@ -305,10 +305,10 @@ export const metadata = {
                 authors: [],
                 description: 'No metadata',
                 dependencies: [],
-                permissions: []
+                permissions: [],
             }
         );
-    }
+    },
 };
 
 /** Namespace retained for compatibility with the v0.1.1 package. */

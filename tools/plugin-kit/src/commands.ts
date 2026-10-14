@@ -8,7 +8,7 @@ import {
     type CommandPath,
     type CommandTree,
     flattenCommands,
-    type SubcommandTree
+    type SubcommandTree,
 } from '@pumpkin-plugins/docs';
 
 /** Command resources from the pinned WIT API used while building a tree. */
@@ -19,10 +19,10 @@ export type CommandArgumentNodeLike = CommandNode;
 
 /** The input context Pumpkin provides when a client requests argument suggestions. */
 export interface CommandSuggestionRequest {
-    readonly input: string;
     readonly cursor: number;
-    readonly start: number;
+    readonly input: string;
     readonly remaining: string;
+    readonly start: number;
 }
 
 /** Returns candidate strings for one argument node. */
@@ -30,35 +30,35 @@ export type CommandSuggestionHandler<Sender> = (sender: Sender, request: Command
 
 /** What building commands needs from the host. `registerCommands` implements it with Pumpkin's command classes. */
 export interface CommandHost<Sender> {
-    /** Creates the root of a command: the word typed after `/`. */
-    root(name: string, description: string): Command;
-    /** Creates a fixed word below a node. */
-    literal(name: string): CommandNode;
     /** Creates a typed argument below a node. */
     argument(spec: CommandArgumentSpec): CommandArgumentNodeLike;
-    /** Registers a dynamic suggestion callback and returns its host handler ID. */
-    onSuggest(handler: CommandSuggestionHandler<Sender>): number;
-    /** Registers what runs when a command is used, and returns its id. */
-    onRun(
-        run: (sender: Sender, args: Readonly<Record<string, CommandArgumentValue>>) => void,
-        arguments_: readonly CommandArgumentSpec[]
-    ): number;
-    /** Sends a line back to whoever ran the command. An `error` line is shown in red. */
-    reply(sender: Sender, line: string, tone?: 'error'): void;
     /** Makes the running command fail with a message, the way the server reports a failed command. Never returns. */
     fail(text: string): never;
     /** Checks whether a sender has a command permission. */
     hasPermission(sender: Sender, permission: string): boolean;
+    /** Creates a fixed word below a node. */
+    literal(name: string): CommandNode;
+    /** Registers what runs when a command is used, and returns its id. */
+    onRun(
+        run: (sender: Sender, args: Readonly<Record<string, CommandArgumentValue>>) => void,
+        arguments_: readonly CommandArgumentSpec[],
+    ): number;
+    /** Registers a dynamic suggestion callback and returns its host handler ID. */
+    onSuggest(handler: CommandSuggestionHandler<Sender>): number;
+    /** Sends a line back to whoever ran the command. An `error` line is shown in red. */
+    reply(sender: Sender, line: string, tone?: 'error'): void;
+    /** Creates the root of a command: the word typed after `/`. */
+    root(name: string, description: string): Command;
 }
 
 /** A command ready to be registered with the server. */
 export interface BuiltCommand {
-    name: string;
     description: string;
-    /** The permission node needed to run it. */
-    permission: string;
+    name: string;
     /** Its root node. */
     node: Command;
+    /** The permission node needed to run it. */
+    permission: string;
 }
 
 /**
@@ -74,7 +74,7 @@ export function buildCommands<Sender, T extends CommandTree>(
     host: CommandHost<Sender>,
     tree: T,
     handlers: CommandHandlers<T, Sender>,
-    suggestions: Readonly<Partial<Record<string, CommandSuggestionHandler<Sender>>>> = {}
+    suggestions: Readonly<Partial<Record<string, CommandSuggestionHandler<Sender>>>> = {},
 ): BuiltCommand[] {
     const lookup = handlers as unknown as Record<
         string,
@@ -82,7 +82,7 @@ export function buildCommands<Sender, T extends CommandTree>(
     >;
 
     const handlerFor = (
-        key: string
+        key: string,
     ): ((sender: Sender, args: Readonly<Record<string, CommandArgumentValue>>) => readonly CommandLine[]) => {
         const handler = lookup[key];
         if (!Object.hasOwn(lookup, key) || typeof handler !== 'function') {
@@ -114,7 +114,7 @@ export function buildCommands<Sender, T extends CommandTree>(
         path: string[],
         permission: string,
         checkPermission: boolean,
-        arguments_: readonly CommandArgumentSpec[]
+        arguments_: readonly CommandArgumentSpec[],
     ): void => {
         const key = handlerPath(path, arguments_) as CommandPath<T>;
         const handler = handlerFor(key);
@@ -151,7 +151,7 @@ export function buildCommands<Sender, T extends CommandTree>(
                     here,
                     herePermission,
                     true,
-                    createArgumentBranches(spec.argumentVariants, here)
+                    createArgumentBranches(spec.argumentVariants, here),
                 );
             } else attach(child, here, herePermission, true, spec.arguments ?? []);
             node.then(child);
@@ -164,7 +164,7 @@ export function buildCommands<Sender, T extends CommandTree>(
         permission: string,
         checkPermission: boolean,
         branches: readonly ArgumentBranch[],
-        prefix: readonly CommandArgumentSpec[] = []
+        prefix: readonly CommandArgumentSpec[] = [],
     ): void => {
         for (const branch of branches) {
             const child = argument(branch.spec);
@@ -180,7 +180,7 @@ export function buildCommands<Sender, T extends CommandTree>(
         path: string[],
         permission: string,
         checkPermission: boolean,
-        arguments_: readonly CommandArgumentSpec[] = []
+        arguments_: readonly CommandArgumentSpec[] = [],
     ): void => {
         if (arguments_.length === 0) {
             register(node, path, permission, checkPermission, arguments_);
@@ -211,7 +211,7 @@ export function buildCommands<Sender, T extends CommandTree>(
                 [name],
                 spec.permission,
                 false,
-                createArgumentBranches(spec.argumentVariants, [name])
+                createArgumentBranches(spec.argumentVariants, [name]),
             );
         } else attach(node, [name], spec.permission, false, spec.arguments ?? []);
         return { name, description: spec.description, permission: spec.permission, node };
@@ -219,9 +219,9 @@ export function buildCommands<Sender, T extends CommandTree>(
 }
 
 interface ArgumentBranch {
+    children: Map<string, ArgumentBranch>;
     spec: CommandArgumentSpec;
     terminal: boolean;
-    children: Map<string, ArgumentBranch>;
 }
 
 function validateArgumentVariantPrefixes(tree: CommandTree): void {
@@ -237,7 +237,7 @@ function validateArgumentVariantPrefixes(tree: CommandTree): void {
 
 function createArgumentBranches(
     variants: readonly (readonly CommandArgumentSpec[])[],
-    path: readonly string[]
+    path: readonly string[],
 ): ArgumentBranch[] {
     const roots = new Map<string, ArgumentBranch>();
     for (const variant of variants) {

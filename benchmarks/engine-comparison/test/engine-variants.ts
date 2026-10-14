@@ -2,37 +2,37 @@ import * as path from 'node:path';
 
 /** Settings for one real-server engine comparison build. */
 export interface EngineVariant {
+    /** Expected Unicode property escape support for this build environment. */
+    expectedUnicodePropertyEscapes: () => boolean;
     /** Stable identifier used for temporary package and result names. */
     id: string;
     /** Human-readable runtime, collector, and parser label. */
     label: string;
-    /** Runtime selected by the plugin build configuration. */
-    pluginEngine: 'quickjs' | 'static-hermes';
-    /** Static Hermes runtime profile, when applicable. */
-    staticHermesRuntime?: 'full' | 'lean';
-    /** Static Hermes garbage collector, when applicable. */
-    staticHermesGc?: 'hades' | 'malloc';
     /** Whether the build sends the bundle to Hermes's TypeScript parser. */
     parseTypeScript: boolean;
+    /** Runtime selected by the plugin build configuration. */
+    pluginEngine: 'quickjs' | 'static-hermes';
     /** Whether the runtime profile supports source compilation. */
     runtimeSourceCompilation: boolean;
-    /** Expected Unicode property escape support for this build environment. */
-    expectedUnicodePropertyEscapes: () => boolean;
+    /** Static Hermes garbage collector, when applicable. */
+    staticHermesGc?: 'hades' | 'malloc';
+    /** Static Hermes runtime profile, when applicable. */
+    staticHermesRuntime?: 'full' | 'lean';
 }
 
 const staticHermesProfiles = [
     { id: 'full', supportsRuntimeSourceCompilation: true },
-    { id: 'lean', supportsRuntimeSourceCompilation: false }
+    { id: 'lean', supportsRuntimeSourceCompilation: false },
 ] as const;
 
 const staticHermesCollectors = [
     { id: 'hades', label: 'Hades' },
-    { id: 'malloc', label: 'malloc' }
+    { id: 'malloc', label: 'malloc' },
 ] as const;
 
 const parserModes = [
     { id: 'js', label: 'JS parser', parseTypeScript: false },
-    { id: 'ts', label: 'TS parser', parseTypeScript: true }
+    { id: 'ts', label: 'TS parser', parseTypeScript: true },
 ] as const;
 
 /** Returns the stable Turbo output path assigned to an engine configuration. */
@@ -53,9 +53,9 @@ export function createEngineVariants(): EngineVariant[] {
                 parseTypeScript: parser.parseTypeScript,
                 runtimeSourceCompilation: profile.supportsRuntimeSourceCompilation,
                 expectedUnicodePropertyEscapes: () =>
-                    process.env.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0'
-            }))
-        )
+                    process.env.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0',
+            })),
+        ),
     );
 
     return [
@@ -65,8 +65,8 @@ export function createEngineVariants(): EngineVariant[] {
             pluginEngine: 'quickjs',
             parseTypeScript: false,
             runtimeSourceCompilation: true,
-            expectedUnicodePropertyEscapes: () => true
+            expectedUnicodePropertyEscapes: () => true,
         },
-        ...staticHermesVariants
+        ...staticHermesVariants,
     ];
 }

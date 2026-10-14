@@ -2,26 +2,26 @@ import { table } from './markdown.ts';
 
 /** One row of the package tables in the root README. */
 export interface PackageRow {
-    /** Folder relative to the repo root, such as `packages/my-plugin`. */
-    dir: string;
-    /** Name shown as the link text. */
-    name: string;
     /** One-line description. */
     description: string;
+    /** Folder relative to the repo root, such as `packages/my-plugin`. */
+    dir: string;
     /** License identifier from package.json. */
     license: string;
     /** Package-specific license file relative to the repo root, when present. */
     licenseFile?: string;
+    /** Name shown as the link text. */
+    name: string;
 }
 
 /** One row of the action table in the root README. */
 export interface ActionRow {
+    /** One-line description. */
+    description: string;
     /** Folder relative to the repo root, such as `actions/my-action`. */
     dir: string;
     /** Name shown as the link text. */
     name: string;
-    /** One-line description. */
-    description: string;
 }
 
 /** Comment placed at the top of the generated catalog block in the root README. */
@@ -42,7 +42,7 @@ export function renderPackagesBlock(plugins: PackageRow[], tools: PackageRow[], 
             .map((p) => [
                 `[${p.name}](${p.dir})`,
                 p.description,
-                p.licenseFile ? `[${p.license}](${p.licenseFile})` : p.license
+                p.licenseFile ? `[${p.license}](${p.licenseFile})` : p.license,
             ]);
     const sections: string[] = [];
     if (actions.length) {
@@ -54,9 +54,9 @@ export function renderPackagesBlock(plugins: PackageRow[], tools: PackageRow[], 
                     ['Action', 'Description'],
                     [...actions]
                         .sort((a, b) => a.dir.localeCompare(b.dir))
-                        .map((action) => [`[${action.name}](${action.dir})`, action.description])
-                )
-            ].join('\n')
+                        .map((action) => [`[${action.name}](${action.dir})`, action.description]),
+                ),
+            ].join('\n'),
         );
     }
     sections.push(
@@ -67,8 +67,8 @@ export function renderPackagesBlock(plugins: PackageRow[], tools: PackageRow[], 
             '',
             '**Tools**',
             '',
-            table(['Package', 'Description', 'License'], packageRows(tools))
-        ].join('\n')
+            table(['Package', 'Description', 'License'], packageRows(tools)),
+        ].join('\n'),
     );
     return sections.join('\n\n');
 }

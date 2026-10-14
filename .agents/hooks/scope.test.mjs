@@ -28,13 +28,13 @@ describe('Codex hook scope', () => {
             turn_id: 'turn-a',
             tool_use_id: 'tool-a',
             tool_name: 'apply_patch',
-            tool_input: { command: '*** Begin Patch\n*** Update File: packages/p/src/current.ts\n*** End Patch' }
+            tool_input: { command: '*** Begin Patch\n*** Update File: packages/p/src/current.ts\n*** End Patch' },
         };
 
         scope.beforeTool(request);
         current = new Map([
             ['other-agent.ts', 'changed by a concurrent agent'],
-            ['packages/p/src/current.ts', 'changed']
+            ['packages/p/src/current.ts', 'changed'],
         ]);
         scope.afterTool(request);
 
@@ -52,7 +52,7 @@ describe('Codex hook scope', () => {
             turn_id: 'turn-a',
             tool_use_id: 'tool-a',
             tool_name: 'Bash',
-            tool_input: { command: 'pnpm test:scripts' }
+            tool_input: { command: 'pnpm test:scripts' },
         };
 
         scope.beforeTool(request);
@@ -71,13 +71,13 @@ describe('Codex hook scope', () => {
             turn_id: 'turn-a',
             tool_use_id: 'tool-a',
             tool_name: 'Bash',
-            tool_input: { command: 'cat > packages/p/src/current.ts' }
+            tool_input: { command: 'cat > packages/p/src/current.ts' },
         };
 
         scope.beforeTool(request);
         current = new Map([
             ['other-session.ts', 'changed concurrently'],
-            ['packages/p/src/current.ts', 'written by this command']
+            ['packages/p/src/current.ts', 'written by this command'],
         ]);
         scope.afterTool(request);
 
@@ -93,7 +93,7 @@ describe('Codex hook scope', () => {
             turn_id: 'turn-a',
             tool_use_id: 'tool-a',
             tool_name: 'Edit',
-            tool_input: { path: 'packages/p/src/shared.ts' }
+            tool_input: { path: 'packages/p/src/shared.ts' },
         };
 
         scope.beforeTool(request);
@@ -110,24 +110,24 @@ describe('Codex hook scope', () => {
             hook_event_name: 'Stop',
             session_id: 'session-a',
             turn_id: 'root-turn',
-            stop_hook_active: false
+            stop_hook_active: false,
         };
         const subagentStop = {
             hook_event_name: 'SubagentStop',
             session_id: 'session-a',
             turn_id: 'agent-turn',
             agent_id: 'agent-a',
-            stop_hook_active: false
+            stop_hook_active: false,
         };
 
         scope.finish(rootStop, ['packages/p/src/root.ts'], false);
         scope.finish(subagentStop, ['tools/config/src/agent.ts'], false);
 
         assert.deepEqual(scope.files('session-a', 'root-retry', { retrying: true, identity: 'root' }), [
-            'packages/p/src/root.ts'
+            'packages/p/src/root.ts',
         ]);
         assert.deepEqual(scope.files('session-a', 'agent-retry', { retrying: true, identity: 'subagent:agent-a' }), [
-            'tools/config/src/agent.ts'
+            'tools/config/src/agent.ts',
         ]);
 
         scope.finish({ ...rootStop, turn_id: 'root-retry', stop_hook_active: true }, ['packages/p/src/root.ts'], true);
@@ -151,7 +151,7 @@ describe('Codex hook scope', () => {
             'commit',
             '--quiet',
             '-m',
-            'initial'
+            'initial',
         ]);
 
         fs.writeFileSync(path.join(directory, 'tracked.ts'), 'updated');

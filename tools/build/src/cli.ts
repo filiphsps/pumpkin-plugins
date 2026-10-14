@@ -66,7 +66,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
                     interfaces,
                     wasiWit,
                     wasiFiles,
-                    target: path.join(temporaryWitRoot, 'wit')
+                    target: path.join(temporaryWitRoot, 'wit'),
                 });
             }
             generateTypes(witDir, path.join(buildDir, 'types', 'bindings'));
@@ -86,7 +86,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
             interfaces,
             wasiWit,
             wasiFiles,
-            target: temporaryWitRoot === undefined ? path.join(buildDir, 'wit') : path.join(temporaryWitRoot, 'wit')
+            target: temporaryWitRoot === undefined ? path.join(buildDir, 'wit') : path.join(temporaryWitRoot, 'wit'),
         });
         const witSnapshot = path.join(buildDir, 'wit');
         await withWasiWitFileLock(path.join(buildDir, '.wit-publish.lock'), () => {
@@ -108,7 +108,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
             engine,
             ...(staticHermesRuntime === undefined ? {} : { runtimeVariant: staticHermesRuntime }),
             ...(staticHermesGc === undefined ? {} : { gcVariant: staticHermesGc }),
-            ...(parseTs ? { parseTypeScript: true } : {})
+            ...(parseTs ? { parseTypeScript: true } : {}),
         });
         const size = await bundlePlugin({
             projectRoot: pluginDir,
@@ -122,7 +122,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
             ...(staticHermesRuntime === undefined ? {} : { staticHermesRuntime }),
             ...(staticHermesGc === undefined ? {} : { staticHermesGc }),
             ...(parseTs ? { parseTypeScript: true } : {}),
-            developmentMode: process.env.PUMPKIN_DEV_MODE === '1'
+            developmentMode: process.env.PUMPKIN_DEV_MODE === '1',
         });
         printBuildOutput({ type: 'built', output, sizeBytes: size });
     } finally {
@@ -143,7 +143,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
 export function resolveApiWit(
     pluginDir: string,
     resolvePackageJson: (pluginDir: string, packageSpecifier: string) => string = (root, packageSpecifier) =>
-        createRequire(path.join(root, 'package.json')).resolve(packageSpecifier)
+        createRequire(path.join(root, 'package.json')).resolve(packageSpecifier),
 ): string {
     let packageJson: string;
     try {
@@ -166,7 +166,7 @@ export function resolveApiWit(
         packageJson = resolvedPackageJson;
     } catch {
         throw new BuildError(
-            'cannot resolve @pumpkin-plugins/pumpkin-api or its declared package alias from this plugin; add it to the plugin dependencies and run your package manager install'
+            'cannot resolve @pumpkin-plugins/pumpkin-api or its declared package alias from this plugin; add it to the plugin dependencies and run your package manager install',
         );
     }
 
@@ -176,7 +176,7 @@ export function resolveApiWit(
         return ensurePumpkinWit({ lockFile, cacheRoot: cacheDir(pluginDir) });
     } catch (error) {
         throw new BuildError(
-            `could not resolve pinned WIT for @pumpkin-plugins/pumpkin-api: ${error instanceof Error ? error.message : String(error)}`
+            `could not resolve pinned WIT for @pumpkin-plugins/pumpkin-api: ${error instanceof Error ? error.message : String(error)}`,
         );
     }
 }

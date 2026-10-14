@@ -17,7 +17,7 @@ function scanned(fileName: string, n: number, extra: Parameters<typeof manifestJ
 const withOverrides = (overrides: Config['overrides'], web: Partial<Config['web']> = {}): Config => ({
     ...DEFAULT,
     web: { ...DEFAULT.web, ...web },
-    overrides
+    overrides,
 });
 
 describe('buildEntries', () => {
@@ -38,8 +38,8 @@ describe('buildEntries', () => {
                 rtxEnabled: false,
                 contentKey: undefined,
                 subPackName: undefined,
-                contentId: undefined
-            }
+                contentId: undefined,
+            },
         ]);
     });
 
@@ -50,19 +50,19 @@ describe('buildEntries', () => {
             'z.mcpack',
             'b.mcpack',
             'C.mcpack',
-            'a.mcpack'
+            'a.mcpack',
         ]);
     });
 
     it('uses public_url for downloads and lets an override replace the whole url', () => {
         const config = withOverrides(
             { 'b.mcpack': { download_url: 'https://cdn.example.com/b.mcpack' } },
-            { public_url: 'https://packs.example.com' }
+            { public_url: 'https://packs.example.com' },
         );
         const entries = buildEntries([scanned('a.mcpack', 1), scanned('b.mcpack', 2)], config).entries;
         expect(entries.map((e) => e.downloadUrl)).toEqual([
             'https://packs.example.com/packs/a.mcpack',
-            'https://cdn.example.com/b.mcpack'
+            'https://cdn.example.com/b.mcpack',
         ]);
     });
 
@@ -74,8 +74,8 @@ describe('buildEntries', () => {
                 rtx_enabled: true,
                 content_key: 'key',
                 sub_pack_name: 'hd',
-                content_id: 'id'
-            }
+                content_id: 'id',
+            },
         });
         const [entry] = buildEntries([scanned('a.mcpack', 1)], config).entries;
         expect(entry).toMatchObject({
@@ -84,7 +84,7 @@ describe('buildEntries', () => {
             rtxEnabled: true,
             contentKey: 'key',
             subPackName: 'hd',
-            contentId: 'id'
+            contentId: 'id',
         });
     });
 
@@ -92,7 +92,7 @@ describe('buildEntries', () => {
         const pack = scanned('a.mcpack', 1, { modules: ['script'] });
         const [entry] = buildEntries(
             [pack],
-            withOverrides({ 'a.mcpack': { addon_pack: false, has_scripts: false } })
+            withOverrides({ 'a.mcpack': { addon_pack: false, has_scripts: false } }),
         ).entries;
         expect(entry).toMatchObject({ addonPack: false, hasScripts: false });
     });
@@ -100,7 +100,7 @@ describe('buildEntries', () => {
     it('leaves out disabled packs', () => {
         const config = withOverrides({ 'a.mcpack': { enabled: false } });
         expect(
-            buildEntries([scanned('a.mcpack', 1), scanned('b.mcpack', 2)], config).entries.map((e) => e.fileName)
+            buildEntries([scanned('a.mcpack', 1), scanned('b.mcpack', 2)], config).entries.map((e) => e.fileName),
         ).toEqual(['b.mcpack']);
     });
 
@@ -113,7 +113,7 @@ describe('buildEntries', () => {
     it('warns about overrides that match nothing', () => {
         const config = withOverrides({ 'gone.mcpack': { order: 1 } });
         expect(buildEntries([scanned('a.mcpack', 1)], config).warnings).toEqual([
-            'overrides."gone.mcpack" matches no pack in the packs folder'
+            'overrides."gone.mcpack" matches no pack in the packs folder',
         ]);
     });
 });
@@ -122,11 +122,11 @@ describe('urls', () => {
     it('falls back to loopback on the web port and says so', () => {
         expect(publicBaseUrl(withOverrides({}, { port: 9000 }))).toEqual({
             url: 'http://127.0.0.1:9000',
-            isDefault: true
+            isDefault: true,
         });
         expect(publicBaseUrl(withOverrides({}, { public_url: 'https://x.test' }))).toEqual({
             url: 'https://x.test',
-            isDefault: false
+            isDefault: false,
         });
     });
 

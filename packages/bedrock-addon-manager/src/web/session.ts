@@ -5,28 +5,28 @@ export type { PackFile, PackLookup } from './response.ts';
 
 /** A connection as the session sees it. Everything is non-blocking. */
 export interface Transport {
+    /** Closes immediately, dropping unsent data. */
+    abort(): void;
+    /** Called every tick once everything is written. Returns true once the connection is closed. */
+    finish(): boolean;
     /** Up to `max` bytes, `null` when nothing has arrived yet, `'closed'` when the peer is gone. */
     read(max: number): Uint8Array | null | 'closed';
     /** How many bytes can be written right now. */
     writable(): number;
     /** Queues bytes for sending. At most `writable()` bytes at a time. */
     write(bytes: Uint8Array): void;
-    /** Called every tick once everything is written. Returns true once the connection is closed. */
-    finish(): boolean;
-    /** Closes immediately, dropping unsent data. */
-    abort(): void;
 }
 
 /** Limits that keep one connection from hurting the server. */
 export interface SessionOptions {
-    /** The current time in milliseconds. */
-    now: () => number;
-    /** A connection that makes no progress for this long is dropped. */
-    idleTimeoutMs: number;
-    /** Most bytes sent per tick, so one big download can't stall the server tick. */
-    writeBudget: number;
     /** Most bytes read from the pack file at once. */
     chunkSize: number;
+    /** A connection that makes no progress for this long is dropped. */
+    idleTimeoutMs: number;
+    /** The current time in milliseconds. */
+    now: () => number;
+    /** Most bytes sent per tick, so one big download can't stall the server tick. */
+    writeBudget: number;
 }
 
 /** One server tick's remaining quota, shared by every active session. */
@@ -53,7 +53,7 @@ export class HttpSession {
     constructor(
         private readonly transport: Transport,
         private readonly lookup: PackLookup,
-        private readonly options: SessionOptions
+        private readonly options: SessionOptions,
     ) {
         this.lastProgress = options.now();
         this.headDeadline = this.lastProgress + options.idleTimeoutMs;

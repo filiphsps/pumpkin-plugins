@@ -40,7 +40,7 @@ export function ensurePumpkinWit({ lockFile, cacheRoot }) {
         cachedWit,
         lockDigest,
         pin.commit,
-        pin.subdirectory
+        pin.subdirectory,
     );
     if (!releaseLock) return cachedWit;
 
@@ -71,7 +71,7 @@ export function ensurePumpkinWit({ lockFile, cacheRoot }) {
             fs.cpSync(sourceWit, stagedWit, { recursive: true });
             fs.writeFileSync(
                 path.join(stagingDirectory, 'pin.json'),
-                `${JSON.stringify({ lockDigest, ...pin, witFiles: getWitFileManifest(stagedWit) }, null, 4)}\n`
+                `${JSON.stringify({ lockDigest, ...pin, witFiles: getWitFileManifest(stagedWit) }, null, 4)}\n`,
             );
             fs.rmSync(checkout, { recursive: true, force: true });
 
@@ -87,7 +87,7 @@ export function ensurePumpkinWit({ lockFile, cacheRoot }) {
     } catch (error) {
         throw new Error(
             `could not fetch Pumpkin WIT from ${pin.repository} at ${pin.commit} for ${lockFile}: ${errorMessage(error)}. The first build after a lock change needs Git and network access.`,
-            { cause: error }
+            { cause: error },
         );
     } finally {
         releaseLock();
@@ -136,7 +136,7 @@ export function parsePumpkinWitPin(source, lockFile) {
         repository,
         branch: record.branch,
         commit: record.commit.toLowerCase(),
-        subdirectory: record.subdirectory
+        subdirectory: record.subdirectory,
     };
 }
 
@@ -213,7 +213,7 @@ function getWitFileManifest(directory) {
             } else if (entry.isFile() && entry.name.endsWith('.wit')) {
                 witFiles.push({
                     path: path.relative(directory, entryPath).split(path.sep).join('/'),
-                    sha256: createHash('sha256').update(fs.readFileSync(entryPath)).digest('hex')
+                    sha256: createHash('sha256').update(fs.readFileSync(entryPath)).digest('hex'),
                 });
             }
         }
@@ -243,7 +243,7 @@ function matchesWitFileManifest(manifest, actualWitFiles) {
 
     expectedWitFiles.sort(compareWitFilePaths);
     return actualWitFiles.every(
-        (file, index) => file.path === expectedWitFiles[index].path && file.sha256 === expectedWitFiles[index].sha256
+        (file, index) => file.path === expectedWitFiles[index].path && file.sha256 === expectedWitFiles[index].sha256,
     );
 }
 
@@ -289,7 +289,7 @@ function acquireCacheLock(cacheParent, cacheDirectory, cachedWit, lockDigest, co
     }
 
     throw new Error(
-        `timed out waiting for the Pumpkin WIT cache lock: ${lockDirectory}; stale-lock recovery claim: ${reclaimDirectory}`
+        `timed out waiting for the Pumpkin WIT cache lock: ${lockDirectory}; stale-lock recovery claim: ${reclaimDirectory}`,
     );
 }
 

@@ -11,11 +11,11 @@ describe('configSchema', () => {
                 nat_pmp: true,
                 lease_seconds: 3600,
                 upnp_search: '239.255.255.250:1900',
-                nat_pmp_gateway: ''
+                nat_pmp_gateway: '',
             },
             java: { enabled: true, port: 25565 },
             bedrock: { enabled: true, port: 19132 },
-            plugins: { allow_requests: true, max_requests_per_plugin: 16 }
+            plugins: { allow_requests: true, max_requests_per_plugin: 16 },
         });
     });
 });

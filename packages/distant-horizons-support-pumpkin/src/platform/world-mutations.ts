@@ -19,7 +19,7 @@ function invalidateMutation(
     sessions: MutationSessions,
     world: MutationWorld,
     positions: readonly MutationPosition[],
-    cancelled: boolean
+    cancelled: boolean,
 ): void {
     // The event is returned to Pumpkin with this world handle; ownership transfers back to the host.
     if (!cancelled) sessions.changedMany(world.getName(), positions);

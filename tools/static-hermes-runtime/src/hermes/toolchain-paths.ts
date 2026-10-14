@@ -47,7 +47,7 @@ export function configuredExecutablePath(filename: string, platform: NodeJS.Plat
 export function wasiSdkCompilerPath(
     sdkRoot: string,
     compiler: 'wasm32-wasip2-clang' | 'wasm32-wasip2-clang++',
-    platform: NodeJS.Platform = process.platform
+    platform: NodeJS.Platform = process.platform,
 ): string {
     return executablePath(path.join(sdkRoot, 'bin'), compiler, platform);
 }
@@ -63,7 +63,7 @@ export function wasiSdkCompilerPath(
 export function findExecutable(
     name: string,
     environment: NodeJS.ProcessEnv = process.env,
-    platform: NodeJS.Platform = process.platform
+    platform: NodeJS.Platform = process.platform,
 ): string | undefined {
     const names = platform === 'win32' && path.extname(name) === '' ? [`${name}.exe`, name] : [name];
     for (const directory of (environment.PATH ?? '').split(path.delimiter)) {

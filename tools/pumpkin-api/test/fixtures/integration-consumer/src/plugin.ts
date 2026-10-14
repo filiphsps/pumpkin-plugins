@@ -20,7 +20,7 @@ class ApiIntegrationFixture extends Plugin {
             authors: [],
             description: 'Exercises the Pumpkin API against a real server.',
             dependencies: [],
-            permissions: []
+            permissions: [],
         };
     }
 
@@ -53,7 +53,7 @@ class ApiIntegrationFixture extends Plugin {
             logging.log(
                 'info',
                 `PumpkinApiTestFixture cancellation delayed=${this.cancelledTaskCount} ` +
-                    `repeating=${this.selfCancelledTaskCount}`
+                    `repeating=${this.selfCancelledTaskCount}`,
             );
         });
 
@@ -63,7 +63,7 @@ class ApiIntegrationFixture extends Plugin {
             logging.log(
                 'info',
                 `PumpkinApiTestFixture command callback=${this.commandCount} loadEvents=${this.loadEventCount} ` +
-                    `delayedTasks=${this.delayedTaskCount} loadType=${this.lastLoadType}`
+                    `delayedTasks=${this.delayedTaskCount} loadType=${this.lastLoadType}`,
             );
             return 1;
         });

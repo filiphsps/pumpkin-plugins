@@ -10,7 +10,7 @@ const args = process.argv.slice(2);
 const turboArgs = ['run', 'watch'].includes(args[0]) ? withDefaultTurboFlags(args) : args;
 const result = spawnSync(process.execPath, [turboCli, ...turboArgs], {
     cwd: process.cwd(),
-    stdio: 'inherit'
+    stdio: 'inherit',
 });
 
 if (result.error) throw result.error;

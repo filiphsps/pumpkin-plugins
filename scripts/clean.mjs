@@ -11,7 +11,7 @@ const BASE_DIRS = [
     '.turbo/cache',
     'build',
     'coverage',
-    'dist'
+    'dist',
 ];
 
 /** Remove generated build outputs and the Turbo task cache from a workspace. */
@@ -31,7 +31,7 @@ export function cleanWorkspace(root = workspaceRoot) {
     }
 
     const filteredDirectories = directories.filter(
-        (item) => !item.includes(join(root, '.cache')) && item.includes(root)
+        (item) => !item.includes(join(root, '.cache')) && item.includes(root),
     );
     for (const directory of filteredDirectories) rmSync(directory, { recursive: true, force: true });
 }

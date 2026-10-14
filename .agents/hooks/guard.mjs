@@ -10,10 +10,10 @@ const AT_COMMAND = String.raw`(?:^|&&|\|\||[;|(]|\n)\s*`;
 const SHELL_RULES = [
     {
         pattern: new RegExp(
-            `${AT_COMMAND}(?:npm\\s+(?:install|i|ci|add|uninstall|remove|rm|update|up|run|run-script|exec|test|start|link)\\b|npx\\s|yarn\\b|bunx\\s|bun\\s+(?:install|add|remove|x|run)\\b)`
+            `${AT_COMMAND}(?:npm\\s+(?:install|i|ci|add|uninstall|remove|rm|update|up|run|run-script|exec|test|start|link)\\b|npx\\s|yarn\\b|bunx\\s|bun\\s+(?:install|add|remove|x|run)\\b)`,
         ),
-        reason: 'This repo uses pnpm. Use `pnpm add`, `pnpm exec <bin>` for local binaries or `pnpm dlx <pkg>` instead.'
-    }
+        reason: 'This repo uses pnpm. Use `pnpm add`, `pnpm exec <bin>` for local binaries or `pnpm dlx <pkg>` instead.',
+    },
 ];
 
 /**
@@ -29,12 +29,12 @@ export function checkShell(command) {
 const PROTECTED_PATHS = [
     {
         pattern: /(^|\/)pnpm-lock\.yaml$/,
-        reason: 'pnpm writes the lockfile. Change dependencies with `pnpm add`, `pnpm remove` or `pnpm install`.'
+        reason: 'pnpm writes the lockfile. Change dependencies with `pnpm add`, `pnpm remove` or `pnpm install`.',
     },
     {
         pattern: /(^|\/)CHANGELOG\.md$|^\.release-please-manifest\.json$/,
-        reason: 'release-please owns this file. New plugins are registered by `pnpm gen`.'
-    }
+        reason: 'release-please owns this file. New plugins are registered by `pnpm gen`.',
+    },
 ];
 
 const GENERATED_DOCUMENT =
@@ -87,6 +87,6 @@ export function checkEdit(file, change, read) {
  */
 export function patchedFiles(patch) {
     return [...patch.matchAll(/^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$/gm)].map((m) =>
-        (m[1] ?? '').trim()
+        (m[1] ?? '').trim(),
     );
 }

@@ -25,11 +25,11 @@ describe('production tree shaking', () => {
         const output = path.join(dir, 'plugin.wasm');
         fs.writeFileSync(
             dependency,
-            "export const usedValue = 'PUMPKIN_USED_SENTINEL';\nexport const unusedValue = 'PUMPKIN_UNUSED_SENTINEL';\n"
+            "export const usedValue = 'PUMPKIN_USED_SENTINEL';\nexport const unusedValue = 'PUMPKIN_UNUSED_SENTINEL';\n",
         );
         fs.writeFileSync(
             entry,
-            "import { usedValue } from './dependency.ts';\nif (process.env.NODE_ENV !== 'production') throw new Error('PUMPKIN_DEV_ONLY_SENTINEL');\nexport const value = usedValue;\n"
+            "import { usedValue } from './dependency.ts';\nif (process.env.NODE_ENV !== 'production') throw new Error('PUMPKIN_DEV_ONLY_SENTINEL');\nexport const value = usedValue;\n",
         );
 
         let bundledSource = '';

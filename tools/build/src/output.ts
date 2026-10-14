@@ -44,7 +44,7 @@ export function formatBuildOutput(message: BuildOutputMessage): string {
     }
 
     const runtime = ansi.named.name(
-        runtimeLabel(message.engine, message.runtimeVariant, message.gcVariant, message.parseTypeScript ?? false)
+        runtimeLabel(message.engine, message.runtimeVariant, message.gcVariant, message.parseTypeScript ?? false),
     );
     if (message.type === 'bundle') return `[build] Bundling ${ansi.named.name(message.entry)} with ${runtime}...`;
 
@@ -56,7 +56,7 @@ export function formatBuildOutput(message: BuildOutputMessage): string {
         formatSelectionOption('--wasi-imports', message.selections.wasiImports, 'no imports'),
         formatSelectionOption('--wasi-methods', message.selections.wasiMethods, 'all imported WASI operations'),
         formatSelectionOption('--api-methods', message.selections.apiMethods, 'all imported Pumpkin API operations'),
-        formatSelectionOption('--event-types', message.selections.eventTypes, 'all event variants')
+        formatSelectionOption('--event-types', message.selections.eventTypes, 'all event variants'),
     ].join('\n');
 }
 
@@ -71,11 +71,11 @@ function runtimeLabel(
     engine: PluginEngine,
     runtimeVariant: StaticHermesRuntime | undefined,
     gcVariant: StaticHermesGc | undefined,
-    parseTypeScript: boolean
+    parseTypeScript: boolean,
 ): string {
     if (engine === 'quickjs') return 'QuickJS';
     const options = [runtimeVariant, gcVariant ?? 'hades', ...(parseTypeScript ? ['-parse-ts'] : [])].filter(
-        (option): option is string => option !== undefined
+        (option): option is string => option !== undefined,
     );
     return `Static Hermes${options.length === 0 ? '' : ` (${options.join(', ')})`}`;
 }

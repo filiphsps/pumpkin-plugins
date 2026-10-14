@@ -23,7 +23,7 @@ it('normalizes Windows SDK paths before CMake propagates them to try_compile', (
         fs.writeFileSync(probe, `include("${toolchainFile}")\nmessage(STATUS "WASI_SDK_PREFIX=\${WASI_SDK_PREFIX}")\n`);
 
         const result = spawnSync('cmake', ['-DWASI_SDK_PREFIX=C:\\Users\\runner\\wasi-sdk', '-P', probe], {
-            encoding: 'utf8'
+            encoding: 'utf8',
         });
         const output = `${result.stdout}\n${result.stderr}`;
 
@@ -37,7 +37,7 @@ it('normalizes Windows SDK paths before CMake propagates them to try_compile', (
 it('extends Hermes OS compatibility sources without replacing existing platforms', () => {
     const patch = fs.readFileSync(
         path.join(runtimeDir, 'hermes-patches/0001-wasi-p2-configure-platform.patch'),
-        'utf8'
+        'utf8',
     );
     const supportSources = patch
         .slice(patch.indexOf('diff --git a/lib/Support/CMakeLists.txt '))
@@ -60,7 +60,7 @@ it('keeps LLVH Unix and Windows implementations independent when adding WASI', (
 it('does not apply Windows host defines to WASI Hermes builds', () => {
     const patch = fs.readFileSync(
         path.join(runtimeDir, 'hermes-patches/0001-wasi-p2-configure-platform.patch'),
-        'utf8'
+        'utf8',
     );
 
     expect(patch).toContain('+if (WIN32 AND NOT CMAKE_TOOLCHAIN_FILE MATCHES "wasi-sdk-hermes-p2.cmake")');
@@ -72,10 +72,10 @@ it('does not apply Windows host defines to WASI Hermes builds', () => {
 it('returns an explicit unsupported error when WASI footprint is unavailable', () => {
     const patch = fs.readFileSync(
         path.join(runtimeDir, 'hermes-patches/0004-wasi-p2-runtime-compatibility.patch'),
-        'utf8'
+        'utf8',
     );
     const vmFootprint = patch.match(
-        /^\+llvh::ErrorOr<size_t> vm_footprint\(char \*start, char \*end\) \{\n(?:^\+.*\n)*?^\+\}/m
+        /^\+llvh::ErrorOr<size_t> vm_footprint\(char \*start, char \*end\) \{\n(?:^\+.*\n)*?^\+\}/m,
     )?.[0];
 
     expect(vmFootprint).toContain('std::errc::operation_not_supported');
@@ -85,10 +85,10 @@ it('returns an explicit unsupported error when WASI footprint is unavailable', (
 it('rounds WASI aligned allocation sizes up to the requested alignment', () => {
     const patch = fs.readFileSync(
         path.join(runtimeDir, 'hermes-patches/0004-wasi-p2-runtime-compatibility.patch'),
-        'utf8'
+        'utf8',
     );
     const allocation = patch.match(
-        /^\+vm_allocate_aligned\(size_t sz, size_t alignment, void \* \/\* hint \*\/\) \{\n(?:^\+.*\n)*?^\+\}/m
+        /^\+vm_allocate_aligned\(size_t sz, size_t alignment, void \* \/\* hint \*\/\) \{\n(?:^\+.*\n)*?^\+\}/m,
     )?.[0];
 
     expect(allocation).toContain('std::numeric_limits<size_t>::max() - (alignment - 1)');
@@ -106,7 +106,7 @@ it('reuses shared LLVH Unix helpers instead of copying them into the WASI tree',
         .join('\n');
 
     expect(patch).not.toMatch(
-        /^diff --git a\/external\/llvh\/lib\/Support\/Wasi\/(?:Host\.inc|Path\.inc|Process\.inc|Unix\.h) /m
+        /^diff --git a\/external\/llvh\/lib\/Support\/Wasi\/(?:Host\.inc|Path\.inc|Process\.inc|Unix\.h) /m,
     );
 });
 
@@ -150,7 +150,7 @@ case "$args" in
     ;;
   *) exit 0 ;;
 esac
-`
+`,
         );
         fs.chmodSync(fakeGit, 0o755);
         const fakeCmake = path.join(fakeBin, 'cmake');
@@ -174,7 +174,7 @@ if [ "$1" = "--build" ]; then
   fi
 fi
 exit 0
-`
+`,
         );
         fs.chmodSync(fakeCmake, 0o755);
 
@@ -187,7 +187,7 @@ exit 0
             STATIC_HERMES_WASI_BUILD_DIR: path.join(temporaryDir, 'build-wasip2'),
             STATIC_HERMES_WASI_SDK_PATH: wasiSdk,
             STATIC_HERMES_TEST_PATCHED_0004: path.join(temporaryDir, 'patch-0004-applied'),
-            STATIC_HERMES_FAKE_CMAKE_LOG: cmakeLog
+            STATIC_HERMES_FAKE_CMAKE_LOG: cmakeLog,
         };
         const [result, concurrent] = await Promise.all([runPrepare(environment), runPrepare(environment)]);
 
@@ -199,10 +199,10 @@ exit 0
         expect(fs.readFileSync(cmakeLog, 'utf8')).toContain('--target shermes hermesc --parallel');
         expect(fs.readFileSync(cmakeLog, 'utf8')).toContain('--target hermesvm_a hermesvmlean_a jsi --parallel');
         expect(fs.readFileSync(cmakeLog, 'utf8')).toContain(
-            '-DCMAKE_CXX_FLAGS_RELEASE=-Os -DNDEBUG -Wno-unused-template'
+            '-DCMAKE_CXX_FLAGS_RELEASE=-Os -DNDEBUG -Wno-unused-template',
         );
         expect(fs.readFileSync(cmakeLog, 'utf8')).toContain(
-            '-DCMAKE_CXX_FLAGS_MINSIZEREL=-Oz -DNDEBUG -ffunction-sections -fdata-sections -Wno-unused-template'
+            '-DCMAKE_CXX_FLAGS_MINSIZEREL=-Oz -DNDEBUG -ffunction-sections -fdata-sections -Wno-unused-template',
         );
 
         const firstBuildCount = fs
@@ -218,7 +218,7 @@ exit 0
             fs
                 .readFileSync(cmakeLog, 'utf8')
                 .split('\n')
-                .filter((line) => line.startsWith('--build '))
+                .filter((line) => line.startsWith('--build ')),
         ).toHaveLength(firstBuildCount);
 
         const changedSettings = await runPrepare({ ...environment, STATIC_HERMES_ENABLE_JSI_EXTENSIONS: '1' });
@@ -229,7 +229,7 @@ exit 0
             fs
                 .readFileSync(cmakeLog, 'utf8')
                 .split('\n')
-                .filter((line) => line.startsWith('--build '))
+                .filter((line) => line.startsWith('--build ')),
         ).toHaveLength(firstBuildCount * 2);
     } finally {
         fs.rmSync(temporaryDir, { recursive: true, force: true });
@@ -301,7 +301,7 @@ case "$args" in
     ;;
   *) exit 0 ;;
 esac
-`
+`,
         );
         fs.chmodSync(fakeGit, 0o755);
         const fakeCmake = path.join(fakeBin, 'cmake');
@@ -322,8 +322,8 @@ esac
                 STATIC_HERMES_WASI_SDK_PATH: wasiSdk,
                 STATIC_HERMES_TEST_PATCHED_0004: path.join(temporaryDir, 'patch-0004-applied'),
                 STATIC_HERMES_TEST_FRESH_SOURCE: path.join(temporaryDir, 'fresh-source'),
-                STATIC_HERMES_FAKE_CMAKE_LOG: cmakeLog
-            }
+                STATIC_HERMES_FAKE_CMAKE_LOG: cmakeLog,
+            },
         });
 
         expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
@@ -373,7 +373,7 @@ case "$args" in
   *" apply --check "*) exit 0 ;;
   *) exit 0 ;;
 esac
-`
+`,
         );
         fs.chmodSync(fakeGit, 0o755);
         const fakeCmake = path.join(fakeBin, 'cmake');
@@ -382,7 +382,7 @@ esac
             `#!/bin/sh
 if [ "$1" = "--version" ]; then printf 'cmake version 3.test\\n'; fi
 exit 0
-`
+`,
         );
         fs.chmodSync(fakeCmake, 0o755);
 
@@ -393,8 +393,8 @@ exit 0
                 ...process.env,
                 PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ''}`,
                 STATIC_HERMES_CACHE_DIR: cache,
-                STATIC_HERMES_WASI_SDK_PATH: wasiSdk
-            }
+                STATIC_HERMES_WASI_SDK_PATH: wasiSdk,
+            },
         });
 
         expect(result.status, result.stderr).toBe(0);

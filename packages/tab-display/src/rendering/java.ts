@@ -24,8 +24,8 @@ interface ActivePlayer {
 }
 
 interface NameOwnership {
-    readonly originalJson: string | undefined;
     lastAppliedJson: string;
+    readonly originalJson: string | undefined;
 }
 
 /** WIT-backed Java display adapter with per-tick resource ownership. */
@@ -124,7 +124,7 @@ export class JavaTabDisplayHost implements TabDisplayHost {
             active.player.setTabListName(component);
             this.nameOwnership.set(uuidValue, {
                 originalJson: owner === undefined ? currentJson : owner.originalJson,
-                lastAppliedJson: nextJson
+                lastAppliedJson: nextJson,
             });
             return { kind: 'applied' };
         } catch {
@@ -249,7 +249,7 @@ export class JavaTabDisplayHost implements TabDisplayHost {
         for (const uuidValue of new Set([
             ...this.nameOwnership.keys(),
             ...this.headerOwnership,
-            ...this.orderOwnership
+            ...this.orderOwnership,
         ])) {
             if (current.has(uuidValue)) continue;
             this.dropOwnership(uuidValue);
@@ -299,7 +299,7 @@ function javaDisplaySupport(snapshot: PlayerSnapshot): ApplyResult {
     if (snapshot.javaVersion !== JAVA_DISPLAY_VERSION) {
         return {
             kind: 'unsupported',
-            reason: `Java tab display calls are gated to ${JAVA_DISPLAY_VERSION}; live client behavior is unverified`
+            reason: `Java tab display calls are gated to ${JAVA_DISPLAY_VERSION}; live client behavior is unverified`,
         };
     }
     return { kind: 'applied' };
@@ -308,7 +308,7 @@ function javaDisplaySupport(snapshot: PlayerSnapshot): ApplyResult {
 function bedrockUnsupported(feature: string): ApplyResult {
     return {
         kind: 'unsupported',
-        reason: `Native Bedrock ${feature} are not supported; Pumpkin's roster stays unchanged`
+        reason: `Native Bedrock ${feature} are not supported; Pumpkin's roster stays unchanged`,
     };
 }
 
@@ -367,6 +367,6 @@ function toRgb(color: string): RgbColor {
     return {
         r: Number.parseInt(color.slice(1, 3), 16),
         g: Number.parseInt(color.slice(3, 5), 16),
-        b: Number.parseInt(color.slice(5, 7), 16)
+        b: Number.parseInt(color.slice(5, 7), 16),
     };
 }

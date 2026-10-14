@@ -2,11 +2,11 @@ import type { Field, Fields } from './fields.ts';
 
 /** A fixed group of settings, written as one `[name]` table. */
 export interface SectionNode<F extends Fields = Fields> {
-    readonly node: 'section';
     /** What the group is for. */
     readonly description: string;
     /** The settings in the group. */
     readonly fields: F;
+    readonly node: 'section';
 }
 
 /**
@@ -14,17 +14,17 @@ export interface SectionNode<F extends Fields = Fields> {
  * Entries are written as `[name."entry"]` tables and are user data: they are kept as they are.
  */
 export interface TableNode<F extends Fields = Fields> {
-    readonly node: 'table';
+    /** Entries written into a fresh configuration file. Users may remove them afterwards. */
+    readonly defaults?: TableValues<F>;
     /** What the entries are for. */
     readonly description: string;
     /** What an entry is named after in the documentation, such as `file` for `overrides."<file>"`. */
     readonly entryName: string;
     /** An entry name used in the commented example. */
     readonly exampleKey: string;
-    /** Entries written into a fresh configuration file. Users may remove them afterwards. */
-    readonly defaults?: TableValues<F>;
     /** The settings every entry may have. They are all optional. */
     readonly fields: F;
+    readonly node: 'table';
 }
 
 /** A top-level part of the config file. */
@@ -32,10 +32,10 @@ export type ConfigNode = SectionNode | TableNode;
 
 /** Describes a plugin's config file. Build one with `defineConfig`. */
 export interface ConfigSchema<N extends Record<string, ConfigNode> = Record<string, ConfigNode>> {
-    /** Name shown in the file's header comment. */
-    readonly title: string;
     /** The top-level tables, by name. */
     readonly nodes: N;
+    /** Name shown in the file's header comment. */
+    readonly title: string;
 }
 
 /**

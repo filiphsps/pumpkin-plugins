@@ -13,7 +13,7 @@ import type {
     WitApiPackage,
     WitFunction,
     WitWasiAdapterPlan,
-    WitWasiInterface
+    WitWasiInterface,
 } from './types.ts';
 import { generateWasiAdapterDispatch } from './wasi-dispatch.ts';
 
@@ -30,7 +30,7 @@ it('validates signed and unsigned WIT integer inputs without changing float conv
         { name: 's16', cType: 'int16_t' },
         { name: 'u16', cType: 'uint16_t' },
         { name: 's32', cType: 'int32_t' },
-        { name: 'u32', cType: 'uint32_t' }
+        { name: 'u32', cType: 'uint32_t' },
     ];
 
     for (const { name, cType } of cases) {
@@ -45,7 +45,7 @@ it('validates signed and unsigned WIT integer inputs without changing float conv
 it('rejects out-of-range and fractional WIT integer inputs while accepting valid boundaries', () => {
     const templatePath = path.resolve(
         path.dirname(fileURLToPath(import.meta.url)),
-        '../../src/component/templates/runtime-shim.template'
+        '../../src/component/templates/runtime-shim.template',
     );
     const template = fs.readFileSync(templatePath, 'utf8');
     const helper = extractCppFunction(template, 'template <typename Integer>\nInteger wasiInputInteger(');
@@ -121,24 +121,24 @@ it('guards owned input and output WIT values before conversion can throw', () =>
         flags: [],
         types: [],
         dependencies: [],
-        dependencyTypes: {}
+        dependencyTypes: {},
     };
     const apiPackage: WitApiPackage = {
         packageName: 'wasi:test',
         version: '0.2.3',
-        interfaces: [apiInterface]
+        interfaces: [apiInterface],
     };
     const listOfStrings: ResolvedWitType = {
         kind: 'list',
         item: { kind: 'primitive', name: 'string' },
         packageName: 'wasi:test',
-        interfaceSpecifier
+        interfaceSpecifier,
     };
     const operation: WitFunction = {
         name: 'echo',
         isStatic: false,
         parameters: [{ name: 'names', type: 'list<string>' }],
-        result: 'string'
+        result: 'string',
     };
 
     const generated = generateWitApiFunctionForResolvedOperation({
@@ -146,7 +146,7 @@ it('guards owned input and output WIT values before conversion can throw', () =>
         apiInterface,
         operation,
         parameters: [{ name: 'names', type: 'list<string>', resolvedType: listOfStrings }],
-        resultType: { kind: 'primitive', name: 'string' }
+        resultType: { kind: 'primitive', name: 'string' },
     });
 
     if (generated === undefined) throw new Error('Expected an adapter for the supported WIT operation');
@@ -178,7 +178,7 @@ function generateIntegerInputAdapter(typeName: string): string {
         name: 'accept',
         isStatic: false,
         parameters: [{ name: 'value', type: typeName }],
-        result: ''
+        result: '',
     };
     const apiInterface: WitWasiInterface = {
         packageName: 'wasi:test',
@@ -193,19 +193,19 @@ function generateIntegerInputAdapter(typeName: string): string {
         flags: [],
         types: [],
         dependencies: [],
-        dependencyTypes: {}
+        dependencyTypes: {},
     };
     const apiPackage: WitApiPackage = {
         packageName: 'wasi:test',
         version: '0.2.3',
-        interfaces: [apiInterface]
+        interfaces: [apiInterface],
     };
     const generated = generateWitApiFunctionForResolvedOperation({
         apiPackage,
         apiInterface,
         operation,
         parameters: [{ name: 'value', type: typeName, resolvedType: { kind: 'primitive', name: typeName } }],
-        resultType: { kind: 'unit' }
+        resultType: { kind: 'unit' },
     });
     if (!generated) throw new Error(`Expected a generated adapter for WIT ${typeName}`);
     return generated;
@@ -242,10 +242,10 @@ it('uses the owning interface name for imported named WIT types', () => {
         isStatic: false,
         parameters: [
             { name: 'timestamp', type: 'datetime' },
-            { name: 'error', type: 'io-error' }
+            { name: 'error', type: 'io-error' },
         ],
         result: '',
-        resolvedResult: { kind: 'unit' }
+        resolvedResult: { kind: 'unit' },
     };
     const interfaceDefinition: WitWasiInterface = {
         packageName: 'wasi:filesystem',
@@ -260,7 +260,7 @@ it('uses the owning interface name for imported named WIT types', () => {
         flags: [],
         types: [],
         dependencies: [],
-        dependencyTypes: {}
+        dependencyTypes: {},
     };
     const datetime = {
         kind: 'record' as const,
@@ -273,8 +273,8 @@ it('uses the owning interface name for imported named WIT types', () => {
         aliasName: 'datetime',
         fields: [
             { name: 'seconds', type: 'u64', resolvedType: { kind: 'primitive' as const, name: 'u64' } },
-            { name: 'nanoseconds', type: 'u32', resolvedType: { kind: 'primitive' as const, name: 'u32' } }
-        ]
+            { name: 'nanoseconds', type: 'u32', resolvedType: { kind: 'primitive' as const, name: 'u32' } },
+        ],
     };
     const plan: WitWasiAdapterPlan = {
         operationId: `${interfaceSpecifier}#set-timestamp`,
@@ -296,12 +296,12 @@ it('uses the owning interface name for imported named WIT types', () => {
                         interfaceSpecifier: 'wasi:io/error@0.2.3',
                         interfaceDependencies: [],
                         declaredInterface: 'types',
-                        aliasName: 'io-error'
-                    }
-                }
-            }
+                        aliasName: 'io-error',
+                    },
+                },
+            },
         ],
-        resultType: { kind: 'unit' }
+        resultType: { kind: 'unit' },
     };
     const analysis: WitAnalysis = {
         apiInterfaces: [],
@@ -313,7 +313,7 @@ it('uses the owning interface name for imported named WIT types', () => {
         wasiMethods: [plan.operationId],
         wasiFeatures: [],
         wasiAdapters: [plan],
-        eventFields: []
+        eventFields: [],
     };
 
     const generated = generateWasiAdapterDispatch([interfaceDefinition], analysis);
@@ -336,8 +336,8 @@ it('recursively frees variant payload records without standalone wit-bindgen cle
         fields: fields.map(({ name: fieldName, type }) => ({
             name: fieldName,
             type: 'option',
-            resolvedType: type
-        }))
+            resolvedType: type,
+        })),
     });
     const errorCode: ResolvedWitType = {
         kind: 'variant',
@@ -352,15 +352,15 @@ it('recursively frees variant payload records without standalone wit-bindgen cle
                 name: 'DNS-error',
                 type: 'dns-error-payload',
                 resolvedType: payloadRecord('dns-error-payload', [
-                    { name: 'rcode', type: { kind: 'option', item: { kind: 'primitive', name: 'string' } } }
-                ])
+                    { name: 'rcode', type: { kind: 'option', item: { kind: 'primitive', name: 'string' } } },
+                ]),
             },
             {
                 name: 'TLS-alert-received',
                 type: 'tls-alert-received-payload',
                 resolvedType: payloadRecord('tls-alert-received-payload', [
-                    { name: 'alert-message', type: { kind: 'option', item: { kind: 'primitive', name: 'string' } } }
-                ])
+                    { name: 'alert-message', type: { kind: 'option', item: { kind: 'primitive', name: 'string' } } },
+                ]),
             },
             {
                 name: 'HTTP-request-header-size',
@@ -368,11 +368,11 @@ it('recursively frees variant payload records without standalone wit-bindgen cle
                 resolvedType: {
                     kind: 'option',
                     item: payloadRecord('field-size-payload', [
-                        { name: 'field-name', type: { kind: 'option', item: { kind: 'primitive', name: 'string' } } }
-                    ])
-                }
-            }
-        ]
+                        { name: 'field-name', type: { kind: 'option', item: { kind: 'primitive', name: 'string' } } },
+                    ]),
+                },
+            },
+        ],
     };
     const apiInterface: WitWasiInterface = {
         packageName: 'wasi:http',
@@ -387,14 +387,14 @@ it('recursively frees variant payload records without standalone wit-bindgen cle
         flags: [],
         types: [],
         dependencies: [],
-        dependencyTypes: {}
+        dependencyTypes: {},
     };
     const operation: WitFunction = {
         name: 'accept-error',
         isStatic: false,
         parameters: [{ name: 'error', type: 'error-code' }],
         result: '',
-        resolvedResult: { kind: 'unit' }
+        resolvedResult: { kind: 'unit' },
     };
     apiInterface.functions = [operation];
     const plan: WitWasiAdapterPlan = {
@@ -403,7 +403,7 @@ it('recursively frees variant payload records without standalone wit-bindgen cle
         apiInterface,
         operation,
         parameters: [{ name: 'error', type: 'error-code', resolvedType: errorCode }],
-        resultType: { kind: 'unit' }
+        resultType: { kind: 'unit' },
     };
     const analysis: WitAnalysis = {
         apiInterfaces: [],
@@ -415,7 +415,7 @@ it('recursively frees variant payload records without standalone wit-bindgen cle
         wasiMethods: [plan.operationId],
         wasiFeatures: [],
         wasiAdapters: [plan],
-        eventFields: []
+        eventFields: [],
     };
     const apiInterfaceFixture = (name: string, enums: WitApiInterface['enums']): WitApiInterface => ({
         packageName: 'pumpkin:api',
@@ -430,7 +430,7 @@ it('recursively frees variant payload records without standalone wit-bindgen cle
         flags: [],
         types: [],
         dependencies: [],
-        dependencyTypes: {}
+        dependencyTypes: {},
     });
     const apiPackage: WitApiPackage = {
         packageName: 'pumpkin:api',
@@ -438,11 +438,11 @@ it('recursively frees variant payload records without standalone wit-bindgen cle
         interfaces: [
             apiInterfaceFixture('event', [
                 { name: 'event-type', values: ['join'] },
-                { name: 'event-priority', values: ['normal'] }
+                { name: 'event-priority', values: ['normal'] },
             ]),
             apiInterfaceFixture('game-rules', [{ name: 'game-rule', values: ['keep-inventory'] }]),
-            apiInterfaceFixture('common', [{ name: 'named-color', values: ['white'] }])
-        ]
+            apiInterfaceFixture('common', [{ name: 'named-color', values: ['white'] }]),
+        ],
     };
     const pluginHeader = [
         '#define PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_JOIN 1',
@@ -451,7 +451,7 @@ it('recursively frees variant payload records without standalone wit-bindgen cle
         '#define PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_WHITE 4',
         'void plugin_option_string_free(plugin_option_string_t *value);',
         'void wasi_http_types_error_code_free(wasi_http_types_error_code_t *value);',
-        'void wasi_http_types_option_field_size_payload_free(wasi_http_types_option_field_size_payload_t *value);'
+        'void wasi_http_types_option_field_size_payload_free(wasi_http_types_option_field_size_payload_t *value);',
     ].join('\n');
     const generated = generateWitOutputs({
         analysis,
@@ -462,8 +462,8 @@ it('recursively frees variant payload records without standalone wit-bindgen cle
             '/* <PUMPKIN_WASI_RUNTIME> */',
             '/* <PUMPKIN_WASI_INITIALIZATION> */',
             '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
-            '/* <PUMPKIN_WIT_EVENT_DISPATCH> */'
-        ].join('\n')
+            '/* <PUMPKIN_WIT_EVENT_DISPATCH> */',
+        ].join('\n'),
     }).runtimeSource;
 
     expect(generated).toContain('wasi_http_types_error_code_free(&argument0);');

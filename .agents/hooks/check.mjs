@@ -22,7 +22,7 @@ const SHARED = [
     /^tsconfig\.base\.json$/,
     /^turbo\.json$/,
     /^turbo\/generators\//,
-    /^pnpm-lock\.yaml$/
+    /^pnpm-lock\.yaml$/,
 ];
 
 const LINT_CONFIG = /^(biome\.json|eslint\.config\.mjs)$/;
@@ -30,7 +30,7 @@ const LINT_CONFIG = /^(biome\.json|eslint\.config\.mjs)$/;
 /** Paths that contain generated output, without confusing tools/build with an output folder. */
 export function isGeneratedPath(file) {
     return /^(dist|build|\.cache|\.turbo)\/|^(?:packages\/[^/]+|tools\/(?:[^/]+\/)?[^/]+)\/(build|dist)\/|(^|\/)(node_modules|\.cache|\.turbo|coverage)\//.test(
-        file
+        file,
     );
 }
 
@@ -69,7 +69,7 @@ export function planChecks(files, exists = defaultExists, packageName = defaultP
     } else if (present.length > 0) {
         steps.push({
             name: 'Biome',
-            args: ['exec', 'biome', 'check', '--no-errors-on-unmatched', '--files-ignore-unknown=true', ...present]
+            args: ['exec', 'biome', 'check', '--no-errors-on-unmatched', '--files-ignore-unknown=true', ...present],
         });
         const ts = present.filter((f) => /\.[cm]?ts$/.test(f));
         if (ts.length > 0) steps.push({ name: 'JSDoc', args: ['exec', 'eslint', '--no-warn-ignored', ...ts] });
@@ -98,8 +98,8 @@ export function planChecks(files, exists = defaultExists, packageName = defaultP
                 'typecheck',
                 'test',
                 '--output-logs=errors-only',
-                ...(everything ? [] : [...filters].sort().map((f) => `--filter=${f}`))
-            ]
+                ...(everything ? [] : [...filters].sort().map((f) => `--filter=${f}`)),
+            ],
         });
     }
 
@@ -170,7 +170,7 @@ function trim(output, head = 150, tail = 50) {
     const lines = output.trimEnd().split('\n');
     if (lines.length <= head + tail) return lines.join('\n');
     return [...lines.slice(0, head), `... ${lines.length - head - tail} lines cut ...`, ...lines.slice(-tail)].join(
-        '\n'
+        '\n',
     );
 }
 
@@ -184,7 +184,7 @@ export function formatFailures(failures) {
     return failures
         .map(
             ({ step, output }) =>
-                `### ${step.name} failed: \`pnpm ${step.args.join(' ')}\`\n\n\`\`\`\n${output}\n\`\`\``
+                `### ${step.name} failed: \`pnpm ${step.args.join(' ')}\`\n\n\`\`\`\n${output}\n\`\`\``,
         )
         .join('\n\n');
 }
@@ -195,7 +195,7 @@ function exec(command, args, signal) {
             cwd: ROOT,
             env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
             signal,
-            timeout: 10 * 60 * 1000
+            timeout: 10 * 60 * 1000,
         });
         let output = '';
         child.stdout.on('data', (chunk) => {

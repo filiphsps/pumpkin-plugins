@@ -9,7 +9,7 @@ import {
     ensureHermesSource,
     parseHermesSourcePin,
     readHermesSourcePin,
-    refreshHermesSource
+    refreshHermesSource,
 } from '../src/hermes/source.ts';
 import { type HermesProcessRunner, hermesProcess } from '../src/hermes/system.ts';
 
@@ -17,7 +17,7 @@ const directories: string[] = [];
 const pin = {
     repository: 'https://github.com/facebook/hermes.git',
     branch: 'static_h',
-    commit: '820aa0d4b5fe5d3ed7900e1274211ef561081b3f'
+    commit: '820aa0d4b5fe5d3ed7900e1274211ef561081b3f',
 };
 
 afterEach(() => {
@@ -64,7 +64,7 @@ it('clones and validates the pinned checkout through an injectable Git runner', 
         },
         buffer() {
             return Buffer.alloc(0);
-        }
+        },
     };
 
     expect(ensureHermesSource({ pin, source, managedSource: true, managedPaths: [], process: runner })).toBe(source);
@@ -104,7 +104,7 @@ it('preserves LF source files when global Git config enables CRLF checkouts', ()
         },
         buffer(command, args) {
             return hermesProcess.buffer(command, args, { env: checkoutEnvironment });
-        }
+        },
     };
 
     ensureHermesSource({
@@ -112,7 +112,7 @@ it('preserves LF source files when global Git config enables CRLF checkouts', ()
         source,
         managedSource: true,
         managedPaths: [],
-        process: runner
+        process: runner,
     });
 
     expect(fs.readFileSync(path.join(source, 'cmake', 'Hermes.cmake'), 'utf8')).toBe('set(LLVM_ON_UNIX 1)\n');
@@ -154,11 +154,11 @@ it('retries an initial Hermes clone after a failed fetch', () => {
         },
         buffer() {
             return Buffer.alloc(0);
-        }
+        },
     };
 
     expect(() => ensureHermesSource({ pin, source, managedSource: true, managedPaths: [], process: runner })).toThrow(
-        'network interrupted'
+        'network interrupted',
     );
     expect(fs.readdirSync(root)).toEqual([]);
     expect(ensureHermesSource({ pin, source, managedSource: true, managedPaths: [], process: runner })).toBe(source);
@@ -197,7 +197,7 @@ it('applies each ordered patch once and skips patches already applied', () => {
         },
         buffer() {
             return Buffer.alloc(0);
-        }
+        },
     };
     applyHermesPatchSeries({ source: directory, patches, process: runner });
     applyHermesPatchSeries({ source: directory, patches, process: runner });
@@ -220,7 +220,7 @@ it('applies long-path CRLF patches from stdin on Windows', () => {
         'node_modules',
         '@pumpkin-plugins',
         'static-hermes-runtime',
-        'hermes-patches'
+        'hermes-patches',
     );
     fs.mkdirSync(source, { recursive: true });
     fs.mkdirSync(patchesDirectory, { recursive: true });
@@ -249,7 +249,7 @@ it('applies long-path CRLF patches from stdin on Windows', () => {
         },
         buffer(command, args, options) {
             return hermesProcess.buffer(command, args, options);
-        }
+        },
     };
 
     expect(() => applyHermesPatchSeries({ source, patches, process: runner })).not.toThrow();
@@ -271,18 +271,18 @@ it('rejects unrelated edits and patch conflicts with actionable paths', () => {
         },
         buffer() {
             return Buffer.alloc(0);
-        }
+        },
     };
 
     expect(() => applyHermesPatchSeries({ source: directory, patches, process: conflictRunner })).toThrow(
-        /outside the managed patch set.*unrelated.txt/
+        /outside the managed patch set.*unrelated.txt/,
     );
     const cleanRunner = {
         ...conflictRunner,
-        output: (_command: string, args: readonly string[]) => (isPorcelainStatusCommand(args) ? '' : 'git-dir')
+        output: (_command: string, args: readonly string[]) => (isPorcelainStatusCommand(args) ? '' : 'git-dir'),
     };
     expect(() => applyHermesPatchSeries({ source: directory, patches, process: cleanRunner })).toThrow(
-        /does not apply to the pinned source.*0001-first.patch/
+        /does not apply to the pinned source.*0001-first.patch/,
     );
 });
 
@@ -305,11 +305,11 @@ it('rejects refreshing a managed rename whose destination is outside the patch s
         },
         buffer() {
             return Buffer.alloc(0);
-        }
+        },
     };
 
     expect(() =>
-        refreshHermesSource({ pin, source, managedSource: true, managedPaths: ['managed.txt'], process: runner })
+        refreshHermesSource({ pin, source, managedSource: true, managedPaths: ['managed.txt'], process: runner }),
     ).toThrow(/outside the managed patch set.*unrelated\.txt/);
     expect(rebuildStarted).toBe(false);
 });
@@ -330,7 +330,7 @@ it('rejects patch application when a patch-owned rename targets an unrelated pat
         },
         buffer() {
             return Buffer.alloc(0);
-        }
+        },
     };
 
     expect(() =>
@@ -341,11 +341,11 @@ it('rejects patch application when a patch-owned rename targets an unrelated pat
                     name: '0001-managed.patch',
                     filename: '/patches/0001-managed.patch',
                     sequence: 1,
-                    affectedPaths: ['managed.txt']
-                }
+                    affectedPaths: ['managed.txt'],
+                },
             ],
-            process: runner
-        })
+            process: runner,
+        }),
     ).toThrow(/outside the managed patch set.*unrelated\.txt/);
     expect(patchCheckStarted).toBe(false);
 });
@@ -366,7 +366,7 @@ it('rejects patch application when a patch-owned copy targets an unrelated path'
         },
         buffer() {
             return Buffer.alloc(0);
-        }
+        },
     };
 
     expect(() =>
@@ -377,11 +377,11 @@ it('rejects patch application when a patch-owned copy targets an unrelated path'
                     name: '0001-managed.patch',
                     filename: '/patches/0001-managed.patch',
                     sequence: 1,
-                    affectedPaths: ['managed.txt']
-                }
+                    affectedPaths: ['managed.txt'],
+                },
             ],
-            process: runner
-        })
+            process: runner,
+        }),
     ).toThrow(/outside the managed patch set.*unrelated-copy\.txt/);
 });
 
@@ -415,8 +415,8 @@ it('removes stale build locks, waits for live owners, and times out cleanly', as
             now: () => time,
             wait: async (delay) => {
                 time += delay;
-            }
-        })
+            },
+        }),
     ).rejects.toThrow(`Timed out waiting for Hermes build lock: ${liveLock}`);
 });
 
@@ -429,7 +429,7 @@ function temporaryDirectory(): string {
 function writePatch(directory: string, name: string, filename: string): void {
     fs.writeFileSync(
         path.join(directory, name),
-        `diff --git a/${filename} b/${filename}\n--- a/${filename}\n+++ b/${filename}\n@@ -1 +1 @@\n-old\n+new\n`
+        `diff --git a/${filename} b/${filename}\n--- a/${filename}\n+++ b/${filename}\n@@ -1 +1 @@\n-old\n+new\n`,
     );
 }
 

@@ -8,16 +8,16 @@ const rules: BlockedRouter[] = [
         match: /globex/i,
         models: [
             { name: 'GX-100', match: /^GX-100$/i },
-            { name: 'GX-2xx', match: /^GX-2\d\d$/i }
+            { name: 'GX-2xx', match: /^GX-2\d\d$/i },
         ],
-        reason: 'Globex GX routers reboot when a port is opened'
-    }
+        reason: 'Globex GX routers reboot when a port is opened',
+    },
 ];
 
 describe('findBlocked', () => {
     it('blocks every model of a make that is blocked as a whole', () => {
         expect(findBlocked({ manufacturer: 'ACME Corp', model: 'Anything', source: 'upnp' }, rules)?.reason).toBe(
-            'Acme routers have no UPnP'
+            'Acme routers have no UPnP',
         );
         expect(findBlocked({ manufacturer: 'Acme', source: 'web' }, rules)).toBe(rules[0]);
     });
@@ -37,7 +37,7 @@ describe('findBlocked', () => {
     it('never matches a router that does not say who made it, or another make', () => {
         expect(findBlocked({ model: 'Acme X', source: 'upnp' }, rules)).toBeUndefined();
         expect(
-            findBlocked({ manufacturer: 'AVM Berlin', model: 'FRITZ!Box 7590', source: 'upnp' }, rules)
+            findBlocked({ manufacturer: 'AVM Berlin', model: 'FRITZ!Box 7590', source: 'upnp' }, rules),
         ).toBeUndefined();
     });
 });
@@ -46,7 +46,7 @@ describe('the real blocklist', () => {
     it('blocks Telekom, however its routers say it', () => {
         expect(blockedReason({ manufacturer: 'Telekom', name: 'Speedport', source: 'web' })).toContain('Telekom');
         expect(
-            blockedReason({ manufacturer: 'Deutsche Telekom AG', model: 'Speedport Smart 4', source: 'upnp' })
+            blockedReason({ manufacturer: 'Deutsche Telekom AG', model: 'Speedport Smart 4', source: 'upnp' }),
         ).toBeDefined();
     });
 
@@ -67,8 +67,8 @@ describe('renderBlockedRouters', () => {
                 '| Make | Models | Why |',
                 '| --- | --- | --- |',
                 '| Acme | All models | Acme routers have no UPnP. |',
-                '| Globex | GX-100, GX-2xx | Globex GX routers reboot when a port is opened. |'
-            ].join('\n')
+                '| Globex | GX-100, GX-2xx | Globex GX routers reboot when a port is opened. |',
+            ].join('\n'),
         );
     });
 

@@ -15,7 +15,7 @@ const RESULT_TEXT: Record<number, string> = {
     2: 'the router refused (port mapping is not enabled for this machine)',
     3: 'the router has no connection to the internet',
     4: 'the router is out of mappings',
-    5: 'the router does not support this request'
+    5: 'the router does not support this request',
 };
 
 /** The request that asks for the router's external address. */
@@ -28,7 +28,7 @@ export function mappingRequest(
     protocol: 'tcp' | 'udp',
     internalPort: number,
     externalPort: number,
-    lifetime: number
+    lifetime: number,
 ): Uint8Array {
     const bytes = new Uint8Array(12);
     const view = new DataView(bytes.buffer);
@@ -58,7 +58,7 @@ export function parseExternalAddress(data: Uint8Array): Ipv4 | undefined {
 export function parseMapping(
     data: Uint8Array,
     protocol: 'tcp' | 'udp',
-    internalPort: number
+    internalPort: number,
 ): { externalPort: number; lifetime: number } | undefined {
     if (data.length !== 16 || data[0] !== 0 || data[1] !== 128 + (protocol === 'udp' ? 1 : 2)) return undefined;
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
@@ -81,7 +81,7 @@ export class NatPmpGateway implements Gateway {
     constructor(
         private readonly net: Network,
         readonly address: Ipv4,
-        port = NAT_PMP_PORT
+        port = NAT_PMP_PORT,
     ) {
         this.to = { address, port };
     }
@@ -97,7 +97,7 @@ export class NatPmpGateway implements Gateway {
         // NAT-PMP has no permanent mappings; a lifetime of 0 means "delete".
         const lifetime = leaseSeconds > 0 ? leaseSeconds : 7200;
         const got = yield* this.ask(mappingRequest(protocol, internalPort, externalPort, lifetime), (d) =>
-            parseMapping(d.data, protocol, internalPort)
+            parseMapping(d.data, protocol, internalPort),
         );
         return { externalPort: got.externalPort, leaseSeconds: got.lifetime };
     }
@@ -106,7 +106,7 @@ export class NatPmpGateway implements Gateway {
     *deleteMapping(request: MappingRequest): Steps<void> {
         const { protocol, internalPort } = request;
         yield* this.ask(mappingRequest(protocol, internalPort, 0, 0), (d) =>
-            parseMapping(d.data, protocol, internalPort)
+            parseMapping(d.data, protocol, internalPort),
         );
     }
 

@@ -9,12 +9,12 @@ describe('future display contracts', () => {
             adapter.setPerViewerRow({
                 viewerUuid: 'viewer',
                 subjectUuid: 'subject',
-                displayName: { text: 'Name' }
-            })
+                displayName: { text: 'Name' },
+            }),
         ).toMatchObject({ kind: 'unsupported', reason: expect.stringContaining('typed') });
         expect(adapter.setLayout({ viewerUuid: 'viewer', section: 'header', rows: [] })).toMatchObject({
             kind: 'unsupported',
-            reason: expect.stringContaining('ownership')
+            reason: expect.stringContaining('ownership'),
         });
     });
 

@@ -28,7 +28,7 @@ async function updateListing() {
     const response = await marketFetch(`${marketUrl}/api/plugins/${listing.id}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
-        body: form
+        body: form,
     });
     if (!response.ok) {
         const body = await response.text();
@@ -137,7 +137,7 @@ function readMetadata() {
             'keywords',
             'translatedDescriptions',
             'isEarlyAccess',
-            'commands'
+            'commands',
         ];
         const missing = required.filter((field) => !Object.hasOwn(metadata, field));
         if (missing.length) throw new Error(`Full metadata is missing fields: ${missing.join(', ')}`);
@@ -252,7 +252,7 @@ async function readListing(response) {
         return await response.json();
     } catch (error) {
         throw new Error(
-            `Market listing lookup returned invalid JSON: ${error instanceof Error ? error.message : error}`
+            `Market listing lookup returned invalid JSON: ${error instanceof Error ? error.message : error}`,
         );
     }
 }

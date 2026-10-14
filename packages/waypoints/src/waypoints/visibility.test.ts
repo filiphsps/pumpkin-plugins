@@ -8,7 +8,7 @@ const first = createWaypoint({
     dimension: 'world',
     position: { x: 3, y: 4, z: 0 },
     visibilityRange: 5,
-    access: { mode: 'public', grants: [] }
+    access: { mode: 'public', grants: [] },
 });
 const second = createWaypoint({
     id: '22222222-2222-4222-8222-222222222222',
@@ -16,7 +16,7 @@ const second = createWaypoint({
     dimension: 'world',
     position: { x: 3, y: 4, z: 1 },
     visibilityRange: 5,
-    access: { mode: 'public', grants: [] }
+    access: { mode: 'public', grants: [] },
 });
 
 describe('waypoint viewer projection', () => {
@@ -27,14 +27,14 @@ describe('waypoint viewer projection', () => {
             id: '55555555-5555-4555-8555-555555555555',
             name: 'Secret',
             dimension: 'world',
-            position: { x: 0, y: 0, z: 0 }
+            position: { x: 0, y: 0, z: 0 },
         });
 
         const visible = projectWaypointsForViewer([first, second, disabled, otherDimension, restricted], {
             playerId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             isOperator: false,
             dimension: 'world',
-            position: { x: 0, y: 0, z: 0 }
+            position: { x: 0, y: 0, z: 0 },
         });
 
         expect(visible.map(({ name }) => name)).toEqual(['Near']);
@@ -45,7 +45,7 @@ describe('waypoint viewer projection', () => {
             playerId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             isOperator: false,
             dimension: 'world',
-            position: { x: 0, y: 0, z: 0 }
+            position: { x: 0, y: 0, z: 0 },
         });
         expect(visible).toEqual([first]);
     });
@@ -56,15 +56,15 @@ describe('waypoint viewer projection', () => {
             name: 'Unlimited',
             dimension: 'world',
             position: { x: 10_000, y: 0, z: 0 },
-            access: { mode: 'public', grants: [] }
+            access: { mode: 'public', grants: [] },
         });
         expect(
             projectWaypointsForViewer([unlimited], {
                 playerId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
                 isOperator: false,
                 dimension: 'world',
-                position: { x: 0, y: 0, z: 0 }
-            })
+                position: { x: 0, y: 0, z: 0 },
+            }),
         ).toEqual([unlimited]);
     });
 });

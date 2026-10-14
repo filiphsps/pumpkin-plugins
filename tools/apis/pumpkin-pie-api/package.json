@@ -3,19 +3,14 @@
     "version": "0.1.0",
     "private": true,
     "description": "Validated PumpkinPIE client, expansions and provider lifecycle",
-    "license": "MIT",
-    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
-    "contributors": [
-        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
-    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/apis/pumpkin-pie-api#readme",
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
         "directory": "tools/apis/pumpkin-pie-api"
-    },
-    "bugs": {
-        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
     },
     "funding": [
         {
@@ -27,27 +22,29 @@
             "url": "https://paypal.me/filiph"
         }
     ],
-    "type": "module",
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
     "sideEffects": false,
-    "module": "./src/index.ts",
-    "types": "./src/index.ts",
+    "type": "module",
     "exports": {
         ".": "./src/index.ts",
         "./testing": "./src/testing/index.ts"
     },
+    "module": "./src/index.ts",
+    "types": "./src/index.ts",
     "files": [
         "src"
     ],
-    "publishConfig": {
-        "access": "public"
-    },
     "scripts": {
-        "typecheck": "tsc --noEmit",
+        "readme": "pumpkin-plugins-docs generate docs.ts",
+        "readme:check": "pumpkin-plugins-docs generate docs.ts --check",
         "test": "vitest run --project unit",
         "test:coverage": "vitest run --project unit --coverage",
         "test:integration": "vitest run --project integration",
-        "readme": "pumpkin-plugins-docs generate docs.ts",
-        "readme:check": "pumpkin-plugins-docs generate docs.ts --check"
+        "typecheck": "tsc --noEmit"
     },
     "dependencies": {
         "fflate": "catalog:"
@@ -59,5 +56,8 @@
         "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
+    },
+    "publishConfig": {
+        "access": "public"
     }
 }

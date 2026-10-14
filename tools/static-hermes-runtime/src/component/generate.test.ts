@@ -24,8 +24,8 @@ it('runs wit-bindgen with selected features and writes generated runtime outputs
             '/* <PUMPKIN_WASI_RUNTIME> */',
             '/* <PUMPKIN_WASI_INITIALIZATION> */',
             '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
-            '/* <PUMPKIN_WIT_EVENT_DISPATCH> */'
-        ].join('\n')
+            '/* <PUMPKIN_WIT_EVENT_DISPATCH> */',
+        ].join('\n'),
     );
     const calls: Array<{ command: string; args: string[] }> = [];
 
@@ -42,7 +42,7 @@ it('runs wit-bindgen with selected features and writes generated runtime outputs
             if (!output) throw new Error('wit-bindgen output directory is missing');
             fs.writeFileSync(path.join(output, 'plugin.c'), '/* generated C */');
             fs.writeFileSync(path.join(output, 'plugin.h'), '/* generated header */');
-        }
+        },
     });
 
     expect(calls).toEqual([
@@ -56,16 +56,16 @@ it('runs wit-bindgen with selected features and writes generated runtime outputs
                 '--features',
                 'filesystem,sockets',
                 '--out-dir',
-                path.join(outputDirectory, 'wit')
-            ]
-        }
+                path.join(outputDirectory, 'wit'),
+            ],
+        },
     ]);
     expect(generated).toEqual({
         directory: path.join(outputDirectory, 'wit'),
         pluginC: path.join(outputDirectory, 'wit/plugin.c'),
         pluginHeader: path.join(outputDirectory, 'wit/plugin.h'),
         componentType: path.join(outputDirectory, 'wit/plugin_component_type.o'),
-        runtimeSource: path.join(outputDirectory, 'runtime.cpp')
+        runtimeSource: path.join(outputDirectory, 'runtime.cpp'),
     });
     expect(fs.readFileSync(generated.runtimeSource, 'utf8')).toContain('installGeneratedWasiApiFunctions(*jsRuntime);');
     expect(fs.readFileSync(generated.runtimeSource, 'utf8')).not.toContain('<PUMPKIN_');
@@ -81,7 +81,7 @@ it('omits the feature option when no WASI features are selected', () => {
     const templatePath = path.join(root, 'runtime.template.cpp');
     fs.writeFileSync(
         templatePath,
-        '/* <PUMPKIN_WASI_RUNTIME> */\n/* <PUMPKIN_WASI_INITIALIZATION> */\n/* <PUMPKIN_WIT_SIMPLE_METHODS> */\n/* <PUMPKIN_WIT_EVENT_DISPATCH> */'
+        '/* <PUMPKIN_WASI_RUNTIME> */\n/* <PUMPKIN_WASI_INITIALIZATION> */\n/* <PUMPKIN_WIT_SIMPLE_METHODS> */\n/* <PUMPKIN_WIT_EVENT_DISPATCH> */',
     );
     const run = vi.fn((_command: string, args: string[]) => {
         const outputIndex = args.indexOf('--out-dir');
@@ -98,7 +98,7 @@ it('omits the feature option when no WASI features are selected', () => {
         outputDirectory: path.join(root, 'generated'),
         bindgenPath: '/toolchain/wit-bindgen',
         analysis: emptyAnalysis([]),
-        run
+        run,
     });
 
     expect(run.mock.calls[0]?.[1]).not.toContain('--features');
@@ -120,8 +120,8 @@ it('does not write runtime outputs if wit-bindgen fails', () => {
             analysis: emptyAnalysis([]),
             run() {
                 throw new Error('wit-bindgen failed');
-            }
-        })
+            },
+        }),
     ).toThrow('wit-bindgen failed');
     expect(fs.existsSync(path.join(outputDirectory, 'runtime.cpp'))).toBe(false);
 });
@@ -133,11 +133,11 @@ function emptyAnalysis(wasiFeatures: string[]): ComponentWitAnalysis {
         interfaces: [
             apiInterface('event', [
                 { name: 'event-type', values: [] },
-                { name: 'event-priority', values: [] }
+                { name: 'event-priority', values: [] },
             ]),
             apiInterface('game-rules', [{ name: 'game-rule', values: [] }]),
-            apiInterface('common', [{ name: 'named-color', values: [] }])
-        ]
+            apiInterface('common', [{ name: 'named-color', values: [] }]),
+        ],
     };
     return {
         apiPackage,
@@ -151,8 +151,8 @@ function emptyAnalysis(wasiFeatures: string[]): ComponentWitAnalysis {
             wasiMethods: [],
             wasiFeatures,
             wasiAdapters: [],
-            eventFields: []
-        }
+            eventFields: [],
+        },
     };
 }
 
@@ -166,7 +166,7 @@ function apiInterface(name: string, enums: WitApiInterface['enums']): WitApiInte
         variants: [],
         enums,
         flags: [],
-        types: []
+        types: [],
     };
 }
 
@@ -176,7 +176,7 @@ it('keeps enum lookup entries for computed event tags and priorities', () => {
     if (!eventInterface) throw new Error('event fixture is missing');
     eventInterface.enums = [
         { name: 'event-type', values: ['join'] },
-        { name: 'event-priority', values: ['normal'] }
+        { name: 'event-priority', values: ['normal'] },
     ];
     const output = generateWitOutputs({
         ...input,
@@ -187,11 +187,11 @@ it('keeps enum lookup entries for computed event tags and priorities', () => {
             '/* <PUMPKIN_WASI_RUNTIME> */',
             '/* <PUMPKIN_WASI_INITIALIZATION> */',
             '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
-            '/* <PUMPKIN_WIT_EVENT_DISPATCH> */'
-        ].join('\n')
+            '/* <PUMPKIN_WIT_EVENT_DISPATCH> */',
+        ].join('\n'),
     });
     const lookup = new Map(
-        [...output.apiEnumHeader.matchAll(/\{"([^"}]+)", ([A-Z_]+)\}/g)].map(([, name, constant]) => [name, constant])
+        [...output.apiEnumHeader.matchAll(/\{"([^"}]+)", ([A-Z_]+)\}/g)].map(([, name, constant]) => [name, constant]),
     );
     expect(lookup.get(['jo', 'in'].join(''))).toBe('PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_JOIN');
     expect(lookup.get(['nor', 'mal'].join(''))).toBe('PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_NORMAL');

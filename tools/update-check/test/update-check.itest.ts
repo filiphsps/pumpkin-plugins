@@ -5,7 +5,7 @@ describe('update-check in Pumpkin', () => {
     it('bundles and runs the Market checker from a real plugin', async () => {
         const server = await startPumpkin({
             plugins: [builtPluginPath(process.cwd())],
-            config: { plugins: { allowed_permissions: ['http.outbound'] } }
+            config: { plugins: { allowed_permissions: ['http.outbound'] } },
         });
         try {
             await server.waitForLog(/Loaded UpdateCheckFixture/, 10_000);

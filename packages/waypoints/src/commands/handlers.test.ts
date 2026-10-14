@@ -8,7 +8,7 @@ import { WaypointStore } from '../waypoints/store.ts';
 import { commandHandlers, onlinePlayerNameSuggestions, waypointNameSuggestions } from './handlers.ts';
 
 vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({
-    hostLogger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    hostLogger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 const playerId = '22222222-2222-4222-8222-222222222222';
@@ -27,7 +27,7 @@ function setup(isOperator = false, pendingItemIconInput?: string) {
         getWorld: () => world,
         teleport: vi.fn(),
         hasPermission: vi.fn(() => true),
-        [Symbol.dispose]: vi.fn()
+        [Symbol.dispose]: vi.fn(),
     } as unknown as Player;
     const getAllPlayers = vi.fn(() => [player]);
     const opManager = { isOp: vi.fn(() => isOperator), [Symbol.dispose]: vi.fn() };
@@ -35,7 +35,7 @@ function setup(isOperator = false, pendingItemIconInput?: string) {
         getOpManager: () => opManager,
         getWorldByName: vi.fn((name: string) => (name === 'world' ? world : undefined)),
         getAllPlayers,
-        getPlayerByName: vi.fn()
+        getPlayerByName: vi.fn(),
     } as unknown as Server;
     const sender = { asPlayer: () => player, hasPermission: vi.fn(() => true) } as unknown as CommandSender;
     const runtime = {
@@ -45,7 +45,7 @@ function setup(isOperator = false, pendingItemIconInput?: string) {
         uuidToString: () => playerId,
         uuidFromString: () => ({ high: 1n, low: 2n }) as never,
         consumePendingItemIconInput: () => pendingItemIconInput,
-        validateItemIcon: () => true
+        validateItemIcon: () => true,
     };
     const handlers = commandHandlers(runtime);
     return { catalog, files, getAllPlayers, handlers, opManager, player, runtime, sender, server, world };
@@ -59,14 +59,14 @@ describe('/wp handlers', () => {
             name: 'Market Place',
             dimension: 'world',
             position: { x: 0, y: 64, z: 0 },
-            access: { mode: 'public', grants: [] }
+            access: { mode: 'public', grants: [] },
         });
         catalog.create({
             id: '33333333-3333-4333-8333-333333333333',
             name: 'Meadow',
             dimension: 'world',
             position: { x: 0, y: 64, z: 0 },
-            access: { mode: 'restricted', grants: [{ type: 'player', playerId }] }
+            access: { mode: 'restricted', grants: [{ type: 'player', playerId }] },
         });
         catalog.create({
             id: '44444444-4444-4444-8444-444444444444',
@@ -75,8 +75,8 @@ describe('/wp handlers', () => {
             position: { x: 0, y: 64, z: 0 },
             access: {
                 mode: 'restricted',
-                grants: [{ type: 'player', playerId: '55555555-5555-4555-8555-555555555555' }]
-            }
+                grants: [{ type: 'player', playerId: '55555555-5555-4555-8555-555555555555' }],
+            },
         });
         catalog.create({
             id: '66666666-6666-4666-8666-666666666666',
@@ -84,7 +84,7 @@ describe('/wp handlers', () => {
             dimension: 'world',
             position: { x: 0, y: 64, z: 0 },
             enabled: false,
-            access: { mode: 'public', grants: [] }
+            access: { mode: 'public', grants: [] },
         });
 
         expect(
@@ -92,16 +92,16 @@ describe('/wp handlers', () => {
                 input: '/wp tp m',
                 cursor: 8,
                 start: 7,
-                remaining: 'm'
-            })
+                remaining: 'm',
+            }),
         ).toEqual(['"Market Place"', 'Meadow']);
         expect(
             waypointNameSuggestions(runtime)(sender, {
                 input: '/wp reset color m',
                 cursor: 17,
                 start: 16,
-                remaining: 'm'
-            })
+                remaining: 'm',
+            }),
         ).toEqual(['"Market Place"', 'Meadow']);
     });
 
@@ -112,7 +112,7 @@ describe('/wp handlers', () => {
 
         const metadataDefaults = Reflect.get(
             await import('../waypoints/model.ts'),
-            'WAYPOINT_METADATA_DEFAULTS'
+            'WAYPOINT_METADATA_DEFAULTS',
         ) as unknown;
         expect(metadataDefaults).toEqual(expect.any(Object));
         if (typeof metadataDefaults !== 'object' || metadataDefaults === null) return;
@@ -120,16 +120,16 @@ describe('/wp handlers', () => {
         const { sender } = setup(true);
         const suggest = suggestionFactory as (
             sender: CommandSender,
-            request: { input: string; cursor: number; start: number; remaining: string }
+            request: { input: string; cursor: number; start: number; remaining: string },
         ) => readonly string[];
         const expectedProperties = Object.keys(metadataDefaults)
             .map((property) => property.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`))
             .sort();
         expect(suggest(sender, { input: '/wp reset ', cursor: 10, start: 10, remaining: '' })).toEqual(
-            expectedProperties
+            expectedProperties,
         );
         expect(suggest(sender, { input: '/wp reset v', cursor: 11, start: 10, remaining: 'v' })).toEqual([
-            'visibility-range'
+            'visibility-range',
         ]);
     });
 
@@ -144,8 +144,8 @@ describe('/wp handlers', () => {
                 input: '/wp access grant player Spawn Al',
                 cursor: 32,
                 start: 30,
-                remaining: 'Al'
-            })
+                remaining: 'Al',
+            }),
         ).toEqual(['Alex', 'Alice']);
         expect(alex[Symbol.dispose]).toHaveBeenCalledOnce();
         expect(alice[Symbol.dispose]).toHaveBeenCalledOnce();
@@ -158,7 +158,7 @@ describe('/wp handlers', () => {
         )['wp create <name>'];
 
         expect(run(sender, { name: 'Spawn' })).toEqual([
-            { text: 'Only server operators can manage waypoints.', tone: 'error' }
+            { text: 'Only server operators can manage waypoints.', tone: 'error' },
         ]);
         expect(opManager.isOp).toHaveBeenCalledWith(player.getId());
         expect(player.hasPermission).not.toHaveBeenCalled();
@@ -194,7 +194,7 @@ describe('/wp handlers', () => {
             dimension: 'world',
             position: { x: 12.375, y: 64.5, z: -8.25 },
             enabled: true,
-            access: { mode: 'restricted', grants: [] }
+            access: { mode: 'restricted', grants: [] },
         });
         expect(world[Symbol.dispose]).toHaveBeenCalledOnce();
         expect(player[Symbol.dispose]).toHaveBeenCalledOnce();
@@ -206,10 +206,10 @@ describe('/wp handlers', () => {
         const run = handlers as unknown as Record<string, (sender: CommandSender, args?: object) => readonly unknown[]>;
 
         expect(run['wp set label <name> <label>']?.(sender, { name: 'Bert', label: 'Taylor' })).toEqual([
-            'Updated label for Bert.'
+            'Updated label for Bert.',
         ]);
         expect(run['wp set color <name> <hex>']?.(sender, { name: 'Bert', hex: '00ff00' })).toEqual([
-            'Updated color for Bert.'
+            'Updated color for Bert.',
         ]);
         expect(catalog.getByName('Bert')).toMatchObject({ name: 'Bert', label: 'Taylor', color: '#00FF00' });
         expect(catalog.getByName('Taylor')).toBeUndefined();
@@ -225,7 +225,7 @@ describe('/wp handlers', () => {
         >;
 
         expect(run['wp reset <property> <name>']?.(sender, { property: 'color', name: 'Bert' })).toEqual([
-            'Reset color for Bert.'
+            'Reset color for Bert.',
         ]);
         expect(catalog.getByName('Bert')?.color).toBe('#FFFFFF');
     });
@@ -237,7 +237,7 @@ describe('/wp handlers', () => {
             name: 'Bert',
             dimension: 'world',
             position: { x: 0, y: 64, z: 0 },
-            visibilityRange: 32
+            visibilityRange: 32,
         });
         const run = handlers as unknown as Record<
             string,
@@ -245,14 +245,14 @@ describe('/wp handlers', () => {
         >;
 
         expect(run['wp reset <property> <name>']?.(sender, { property: 'visibility-range', name: 'Bert' })).toEqual([
-            'Reset visibility-range for Bert.'
+            'Reset visibility-range for Bert.',
         ]);
         expect(catalog.getByName('Bert')?.visibilityRange).toBeUndefined();
     });
 
     it.each([
         ['minecraft:golden_apple', 'minecraft:golden_apple'],
-        ['golden_apple', 'minecraft:golden_apple']
+        ['golden_apple', 'minecraft:golden_apple'],
     ])('stores item identifier %s as %s', (item, expectedIcon) => {
         const { catalog, handlers, sender } = setup(true);
         catalog.create({ id: waypointId, name: 'Bert', dimension: 'world', position: { x: 0, y: 64, z: 0 } });
@@ -268,7 +268,7 @@ describe('/wp handlers', () => {
         const run = handlers as unknown as Record<string, (sender: CommandSender, args?: object) => readonly unknown[]>;
 
         expect(run['wp set icon <name> <item>']?.(sender, { name: 'Pumpkin', item: '' })).toEqual([
-            'Updated icon for Pumpkin.'
+            'Updated icon for Pumpkin.',
         ]);
         expect(catalog.getByName('Pumpkin')?.icon).toBe('minecraft:pumpkin_pie');
     });
@@ -281,14 +281,14 @@ describe('/wp handlers', () => {
             name: 'Public',
             dimension: 'world',
             position: { x: 4, y: 65, z: -3 },
-            access: { mode: 'public', grants: [] }
+            access: { mode: 'public', grants: [] },
         });
         catalog.create({
             id: '44444444-4444-4444-8444-444444444444',
             name: 'Closed',
             dimension: 'world',
             position: { x: 0, y: 64, z: 0 },
-            access: { mode: 'public', grants: [] }
+            access: { mode: 'public', grants: [] },
         });
         catalog.setEnabled('Closed', false);
         const run = handlers as unknown as Record<string, (sender: CommandSender, args?: object) => readonly unknown[]>;
@@ -309,7 +309,7 @@ describe('/wp handlers', () => {
             name: 'Market',
             dimension: 'world',
             position: { x: 10.25, y: 71.5, z: -4.75 },
-            access: { mode: 'public', grants: [] }
+            access: { mode: 'public', grants: [] },
         });
         const run = (
             handlers as unknown as Record<string, (sender: CommandSender, args: object) => readonly unknown[]>

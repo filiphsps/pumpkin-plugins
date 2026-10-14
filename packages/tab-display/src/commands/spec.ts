@@ -13,19 +13,19 @@ export const commands = defineCommands(PLUGIN_NAME, {
             status: {
                 description: 'Show provider state and display capabilities',
                 permission: `${PLUGIN_NAME}:command.status`,
-                defaultPermission: operatorOnly
+                defaultPermission: operatorOnly,
             },
             reload: {
                 description: 'Validate and atomically reload config.toml',
                 permission: `${PLUGIN_NAME}:command.reload`,
-                defaultPermission: operatorOnly
+                defaultPermission: operatorOnly,
             },
             inspect: {
                 description: 'Inspect safe context for one online player',
                 permission: `${PLUGIN_NAME}:command.inspect`,
                 defaultPermission: operatorOnly,
-                arguments: [{ name: 'player', type: 'players' }]
-            }
-        }
-    }
+                arguments: [{ name: 'player', type: 'players' }],
+            },
+        },
+    },
 });

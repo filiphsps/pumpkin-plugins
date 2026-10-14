@@ -12,7 +12,7 @@ export const PIE_RELEASE = {
     license: 'GPL-3.0-only',
     pumpkinRelease: '0.2.0+26.3-26.51',
     pumpkinCommit: '204a94ed895f041a845630d5a23c094705a0704e',
-    apiArtifact: 'v0.1.1'
+    apiArtifact: 'v0.1.1',
 } as const;
 
 export interface ProviderOptions {
@@ -55,6 +55,6 @@ function verify(bytes: Uint8Array): void {
     const actual = createHash('sha256').update(bytes).digest('hex');
     if (actual !== PIE_RELEASE.sha256)
         throw new Error(
-            `PumpkinPIE ${PIE_RELEASE.tag} SHA-256 mismatch: expected ${PIE_RELEASE.sha256}, got ${actual}`
+            `PumpkinPIE ${PIE_RELEASE.tag} SHA-256 mismatch: expected ${PIE_RELEASE.sha256}, got ${actual}`,
         );
 }

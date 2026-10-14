@@ -41,7 +41,7 @@ function signRelease() {
             const fileName = plugin['wasm-file'];
             if (typeof name !== 'string' || typeof pluginVersion !== 'string' || typeof fileName !== 'string') {
                 throw new Error(
-                    `plugins-manifest entry ${index + 1} must include string plugin-name, version, and wasm-file fields`
+                    `plugins-manifest entry ${index + 1} must include string plugin-name, version, and wasm-file fields`,
                 );
             }
             signPlugin(name, pluginVersion, fileName);
@@ -80,14 +80,14 @@ function signPlugin(name, pluginVersion, fileName) {
             is_paid: false,
             user_id: 0,
             license_key: null,
-            issued_at: new Date().toISOString()
+            issued_at: new Date().toISOString(),
         },
-        signingKey
+        signingKey,
     );
     const verification = verifyWasm(signed);
     if (!verification.valid || verification.publicKeyHex !== publicKey) {
         throw new Error(
-            `Signed ${name} ${pluginVersion} failed signature verification: ${verification.error ?? 'unexpected public key'}`
+            `Signed ${name} ${pluginVersion} failed signature verification: ${verification.error ?? 'unexpected public key'}`,
         );
     }
 

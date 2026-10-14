@@ -6,13 +6,13 @@ const reviewedDecisions = new Set(['retained', 'improved', 'replaced', 'removed'
 
 /** A WIT declaration whose compatibility decision still needs review. */
 export interface CompatibilityChange {
-    id: string;
     change: 'added' | 'changed' | 'removed';
-    previousSignature: string | null;
     currentSignature: string | null;
-    impact: 'additive' | 'breaking';
     decision: string;
+    id: string;
+    impact: 'additive' | 'breaking';
     migration: string;
+    previousSignature: string | null;
 }
 
 /** The compatibility data needed to compare and preserve one WIT audit. */
@@ -26,43 +26,43 @@ export interface CompatibilityMatrix {
         pumpkinRelease: string | string[];
         license: string;
     };
+    defaultExport: boolean;
+    deviations: Array<{ item: string; decision: string; rationale: string; migration: string }>;
+    interfaces: CompatibilityInterface[];
+    inventory: { interfaces: number; types: number; operations: number };
+    publicTypes: CompatibilityItem[];
     replacement: { package: string; version: string; witPackage: string; license: string };
+    runtimeExports: CompatibilityItem[];
+    sourceChanges: CompatibilityChange[];
     sourceWit: { repository: string; branch: string; commit: string; subdirectory?: string };
     sourceWitSha256: string;
-    defaultExport: boolean;
-    runtimeExports: CompatibilityItem[];
-    publicTypes: CompatibilityItem[];
-    inventory: { interfaces: number; types: number; operations: number };
-    interfaces: CompatibilityInterface[];
-    deviations: Array<{ item: string; decision: string; rationale: string; migration: string }>;
-    sourceChanges: CompatibilityChange[];
     [key: string]: unknown;
 }
 
 /** A named item with an explicit compatibility decision. */
 export interface CompatibilityItem {
-    name?: string;
+    decision?: string;
     id?: string;
     kind?: string;
+    migration?: string;
+    name?: string;
     signature?: string;
     specifier?: string;
-    decision?: string;
-    migration?: string;
     [key: string]: unknown;
 }
 
 /** A WIT interface and its declarations in a compatibility matrix. */
 export interface CompatibilityInterface extends CompatibilityItem {
     name: string;
+    operations?: CompatibilityItem[];
     specifier?: string;
     types?: CompatibilityItem[];
-    operations?: CompatibilityItem[];
 }
 
 /** Compare the complete lock provenance and fetched WIT digest for two revisions. */
 export function hasSameWitRevision(
     previous: CompatibilityMatrix | undefined,
-    current: Pick<CompatibilityMatrix, 'sourceWit' | 'sourceWitSha256'>
+    current: Pick<CompatibilityMatrix, 'sourceWit' | 'sourceWitSha256'>,
 ): boolean {
     if (!previous) return false;
 
@@ -78,7 +78,7 @@ export function hasSameWitRevision(
 /** Find upstream WIT declarations added, changed, or removed between two audits. */
 export function diffCompatibilityMatrices(
     previous: CompatibilityMatrix,
-    current: CompatibilityMatrix
+    current: CompatibilityMatrix,
 ): CompatibilityChange[] {
     const previousItems = collectWitItems(previous);
     const currentItems = collectWitItems(current);
@@ -97,7 +97,7 @@ export function diffCompatibilityMatrices(
             currentSignature: currentItem?.signature ?? null,
             impact: change === 'added' ? 'additive' : 'breaking',
             decision: 'review-required',
-            migration: ''
+            migration: '',
         });
     }
 
@@ -109,7 +109,7 @@ export function reconcileCompatibilityMatrix(
     previous: CompatibilityMatrix | undefined,
     candidate: CompatibilityMatrix,
     changes: CompatibilityChange[],
-    sameRevision: boolean
+    sameRevision: boolean,
 ): CompatibilityMatrix {
     const result = structuredClone(candidate);
     const previousItems = previous ? collectMatrixItems(previous) : new Map<string, CompatibilityItem>();
@@ -145,10 +145,10 @@ export function reconcileCompatibilityMatrix(
 /** Archive a compatibility matrix under its Pumpkin release and immutable WIT revision. */
 export function archiveCompatibilityMatrix(compatibilityDirectory: string, matrix: CompatibilityMatrix): string {
     const unresolvedItem = [...collectMatrixItems(matrix)].find(
-        ([, item]) => !item.decision || !reviewedDecisions.has(item.decision) || !item.migration
+        ([, item]) => !item.decision || !reviewedDecisions.has(item.decision) || !item.migration,
     );
     const unresolvedChange = matrix.sourceChanges?.find(
-        ({ decision, migration }) => !reviewedDecisions.has(decision) || !migration
+        ({ decision, migration }) => !reviewedDecisions.has(decision) || !migration,
     );
     if (unresolvedItem || unresolvedChange) {
         const itemId = unresolvedItem?.[0] ?? unresolvedChange?.id;
@@ -175,7 +175,7 @@ export function archiveCompatibilityMatrix(compatibilityDirectory: string, matri
     const archivedMatrix = {
         ...matrix,
         $schema: COMPATIBILITY_SCHEMA_URL,
-        sourceWit: { ...matrix.sourceWit, subdirectory }
+        sourceWit: { ...matrix.sourceWit, subdirectory },
     };
     validateCompatibilityMatrix(archivedMatrix, archivePath);
     const serialized = `${JSON.stringify(archivedMatrix, null, 4)}\n`;
@@ -199,12 +199,12 @@ function collectWitItems(matrix: CompatibilityMatrix) {
         items.set(`interface:${apiInterface.name}`, { signature: apiInterface.specifier ?? '' });
         for (const type of apiInterface.types ?? []) {
             items.set(`type:${apiInterface.name}.${type.name}`, {
-                signature: `${type.kind ?? ''}:${type.signature ?? ''}`
+                signature: `${type.kind ?? ''}:${type.signature ?? ''}`,
             });
         }
         for (const operation of apiInterface.operations ?? []) {
             items.set(`operation:${qualifyOperationId(apiInterface.name, operation.id ?? '')}`, {
-                signature: `${operation.kind ?? ''}:${operation.signature ?? ''}:${JSON.stringify(operation.features ?? [])}`
+                signature: `${operation.kind ?? ''}:${operation.signature ?? ''}:${JSON.stringify(operation.features ?? [])}`,
             });
         }
     }

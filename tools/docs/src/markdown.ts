@@ -20,7 +20,7 @@ export function cell(text: string, options: TableOptions = {}): string {
 export function table(
     header: readonly string[],
     rows: readonly (readonly string[])[],
-    options: TableOptions = {}
+    options: TableOptions = {},
 ): string {
     const row = (values: readonly string[]) => `| ${values.map((value) => cell(value, options)).join(' | ')} |`;
     return [row(header), row(header.map(() => '---')), ...rows.map(row)].join('\n');

@@ -136,7 +136,7 @@ describe('WaypointHudRenderer', () => {
         const second = waypoint({
             id: '55555555-5555-4555-8555-555555555555',
             name: 'Flowers',
-            icon: 'minecraft:poppy'
+            icon: 'minecraft:poppy',
         });
         renderer.renderViewer(client.viewer, [first, second]);
         const metadata = client.packets.filter((packet) => packet.tag === 'c-set-entity-metadata');
@@ -162,10 +162,10 @@ describe('WaypointHudRenderer', () => {
         const denied = makeViewer(deniedId);
 
         renderer.renderViewer(allowed.viewer, [
-            waypoint({ access: { mode: 'restricted', grants: [{ type: 'player', playerId: allowedId }] } })
+            waypoint({ access: { mode: 'restricted', grants: [{ type: 'player', playerId: allowedId }] } }),
         ]);
         renderer.renderViewer(denied.viewer, [
-            waypoint({ access: { mode: 'restricted', grants: [{ type: 'player', playerId: allowedId }] } })
+            waypoint({ access: { mode: 'restricted', grants: [{ type: 'player', playerId: allowedId }] } }),
         ]);
 
         expect(allowed.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
@@ -178,7 +178,7 @@ describe('WaypointHudRenderer', () => {
         const operator = { ...client.viewer, isOperator: true };
 
         renderer.renderViewer(operator, [
-            waypoint({ access: { mode: 'restricted', grants: [{ type: 'player', playerId: allowedId }] } })
+            waypoint({ access: { mode: 'restricted', grants: [{ type: 'player', playerId: allowedId }] } }),
         ]);
 
         expect(client.packets.map(({ tag }) => tag)).toEqual(['c-spawn-entity', 'c-set-entity-metadata']);
@@ -238,7 +238,7 @@ describe('WaypointHudRenderer', () => {
         renderer.renderViewer(client.viewer, [destination]);
         const position = readDisplayPosition(client);
         expect(Math.abs(position.y - 66.42 - initialHeight) / Math.hypot(position.y - 66.42, position.z)).toBeLessThan(
-            0.002
+            0.002,
         );
         expect(position.y).toBeGreaterThan(66.4);
         expect(Math.hypot(position.x, position.y - 66.42, position.z)).toBeGreaterThan(16);
@@ -266,7 +266,7 @@ describe('WaypointHudRenderer', () => {
         renderer.renderViewer(ordinary.viewer, [ordinaryWaypoint]);
         renderer.renderViewer(elevated.viewer, [elevatedWaypoint]);
         expect(Math.abs(elevation(elevated) - elevatedStart)).toBeGreaterThan(
-            Math.abs(elevation(ordinary) - ordinaryStart) * 2
+            Math.abs(elevation(ordinary) - ordinaryStart) * 2,
         );
         for (let tick = 0; tick < 200; tick += 1) renderer.renderViewer(elevated.viewer, [elevatedWaypoint]);
         expect(elevation(elevated)).toBeCloseTo(Math.atan2(29.38, 30), 3);
@@ -373,7 +373,7 @@ describe('WaypointHudRenderer', () => {
         expect(client.packets.map(({ tag }) => tag)).toEqual([
             'c-remove-entities',
             'c-spawn-entity',
-            'c-set-entity-metadata'
+            'c-set-entity-metadata',
         ]);
         expect(readDisplayPosition(client).z).toBeGreaterThan(38.45);
         expect(readDisplayPosition(client).z).toBeLessThan(38.47);
@@ -386,8 +386,8 @@ describe('WaypointHudRenderer', () => {
             extra: [
                 { text: 'North Gate', color: '#12ABEF', bold: true },
                 { text: ' (13m)', color: '#FFFFFF' },
-                { text: '\n◆', color: '#12ABEF' }
-            ]
+                { text: '\n◆', color: '#12ABEF' },
+            ],
         });
     });
 
@@ -412,7 +412,7 @@ describe('WaypointHudRenderer', () => {
         const client = makeViewer(ownerId);
         renderer.renderViewer(client.viewer, [
             waypoint({ position: { x: 1, y: 64, z: 10 } }),
-            waypoint({ id: '55555555-5555-4555-8555-555555555555', name: 'Harbor', position: { x: -1, y: 64, z: 12 } })
+            waypoint({ id: '55555555-5555-4555-8555-555555555555', name: 'Harbor', position: { x: -1, y: 64, z: 12 } }),
         ]);
 
         const ids = client.packets
@@ -426,7 +426,7 @@ describe('WaypointHudRenderer', () => {
         const second = waypoint({
             id: '55555555-5555-4555-8555-555555555555',
             name: 'Harbor',
-            position: { x: 0, y: 64, z: 0 }
+            position: { x: 0, y: 64, z: 0 },
         });
         const left = makeViewer(ownerId);
         const right = makeViewer(ownerId);
@@ -456,7 +456,7 @@ describe('WaypointHudRenderer', () => {
         expect(client.packets.map(({ tag }) => tag)).toEqual([
             'c-spawn-entity',
             'c-set-entity-metadata',
-            'c-remove-entities'
+            'c-remove-entities',
         ]);
         const removePacket = client.packets.at(-1);
         if (removePacket === undefined) throw new Error('Expected an entity removal packet.');
@@ -494,7 +494,7 @@ describe('WaypointHudRenderer', () => {
         expect(staying.packets.map(({ tag }) => tag)).toEqual([
             'c-spawn-entity',
             'c-set-entity-metadata',
-            'c-remove-entities'
+            'c-remove-entities',
         ]);
     });
 });
@@ -506,13 +506,13 @@ function waypoint(overrides: Partial<Waypoint> = {}): Waypoint {
         dimension: 'overworld',
         position: { x: 0, y: 64, z: 10 },
         access: { mode: 'public', grants: [] },
-        ...overrides
+        ...overrides,
     });
 }
 
 function makeViewer(
     id: string,
-    fail = false
+    fail = false,
 ): {
     readonly viewer: WaypointHudViewer;
     readonly packets: ClientboundPacket[];
@@ -538,7 +538,7 @@ function makeViewer(
         sendPacket: (packet) => {
             if (fail) throw new Error('packet sink failed');
             packets.push(packet);
-        }
+        },
     };
     return { viewer, packets, textJsons };
 }
@@ -582,7 +582,7 @@ function readDisplayPosition(client: ReturnType<typeof makeViewer>): { x: number
             position = [
                 (position[0] ?? 0) + (delta[0] ?? 0) / 4096,
                 (position[1] ?? 0) + (delta[1] ?? 0) / 4096,
-                (position[2] ?? 0) + (delta[2] ?? 0) / 4096
+                (position[2] ?? 0) + (delta[2] ?? 0) / 4096,
             ];
         }
     }

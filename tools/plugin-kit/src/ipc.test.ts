@@ -48,7 +48,7 @@ describe('ipcSend', () => {
         (answer) => {
             host.send.mockReturnValue(answer);
             expect(() => ipcSend('OtherPlugin', new Uint8Array())).toThrow('OtherPlugin did not answer');
-        }
+        },
     );
 
     it('preserves host failures', () => {

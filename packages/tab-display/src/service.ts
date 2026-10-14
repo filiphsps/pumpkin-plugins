@@ -7,7 +7,7 @@ import {
     JAVA_DISPLAY_VERSION,
     type PlayerSnapshot,
     type RenderedLine,
-    type TabDisplayStatus
+    type TabDisplayStatus,
 } from './model.ts';
 import { assignDenseOrders } from './sorting.ts';
 import { type CompiledTemplate, compileTemplate, renderTemplate } from './templates.ts';
@@ -20,32 +20,32 @@ export interface PlaceholderRequest {
 
 /** Host-independent subset of the shared PumpkinPIE client used by the scheduler. */
 export interface TabPlaceholderResolver {
-    readonly state?: SessionState;
     resolveBatch(requests: readonly PlaceholderRequest[]): readonly ResolvedLine[];
+    readonly state?: SessionState;
 }
 
 /** Host calls required by the pure service; adapters copy and dispose WASI resources themselves. */
 export interface TabDisplayHost {
-    /** Copies bounded player primitives from the host. */
-    snapshotPlayers(limit: number): readonly PlayerSnapshot[];
-    /** Applies a global subject row name. Undefined clears the custom name. */
-    setEntryName(uuid: string, value: RenderedLine | undefined): ApplyResult;
-    /** Applies one dense native player-list order. */
-    setOrder(uuid: string, order: number): ApplyResult;
-    /** Applies a personalized viewer header and footer. */
-    setHeaderFooter(uuid: string, header: readonly RenderedLine[], footer: readonly RenderedLine[]): ApplyResult;
     /** Restores only fields currently owned by this plugin. */
     resetOwned(uuid: string): void;
+    /** Applies a global subject row name. Undefined clears the custom name. */
+    setEntryName(uuid: string, value: RenderedLine | undefined): ApplyResult;
+    /** Applies a personalized viewer header and footer. */
+    setHeaderFooter(uuid: string, header: readonly RenderedLine[], footer: readonly RenderedLine[]): ApplyResult;
+    /** Applies one dense native player-list order. */
+    setOrder(uuid: string, order: number): ApplyResult;
+    /** Copies bounded player primitives from the host. */
+    snapshotPlayers(limit: number): readonly PlayerSnapshot[];
 }
 
 /** Dependencies of the host-independent display service. */
 export interface TabDisplayServiceOptions {
-    readonly host: TabDisplayHost;
-    readonly resolver: TabPlaceholderResolver;
-    readonly now: () => number;
     readonly config: TabDisplayConfig;
-    readonly sortingCapability?: Capability;
+    readonly host: TabDisplayHost;
     readonly log?: (message: string) => void;
+    readonly now: () => number;
+    readonly resolver: TabPlaceholderResolver;
+    readonly sortingCapability?: Capability;
 }
 
 /** Maximum placeholder jobs resolved on a single game tick. */
@@ -54,15 +54,15 @@ export const MAX_JOBS_PER_TICK = 256;
 export const STALE_FRAME_MS = 30_000;
 
 interface RenderTarget {
-    readonly template: CompiledTemplate;
     readonly style: Omit<RenderedLine, 'text'>;
+    readonly template: CompiledTemplate;
 }
 
 interface PreparedPlayer {
-    readonly snapshot: PlayerSnapshot;
     readonly entry?: RenderTarget;
-    readonly header: readonly RenderTarget[];
     readonly footer: readonly RenderTarget[];
+    readonly header: readonly RenderTarget[];
+    readonly snapshot: PlayerSnapshot;
 }
 
 interface PlaceholderJob {
@@ -71,10 +71,10 @@ interface PlaceholderJob {
 }
 
 interface PendingGeneration {
-    readonly players: readonly PreparedPlayer[];
-    readonly jobs: readonly PlaceholderJob[];
-    readonly results: Map<string, ResolvedLine>;
     cursor: number;
+    readonly jobs: readonly PlaceholderJob[];
+    readonly players: readonly PreparedPlayer[];
+    readonly results: Map<string, ResolvedLine>;
 }
 
 /** Bounded, changed-only display reconciliation with a host-free test boundary. */
@@ -118,7 +118,7 @@ export class TabDisplayService {
         const sources = [
             ...(snapshot.edition === 'java' && this.config.entry.enabled ? [this.config.entry.text] : []),
             ...(snapshot.edition === 'java' ? this.config.header.lines.map(({ text }) => text) : []),
-            ...(snapshot.edition === 'java' ? this.config.footer.lines.map(({ text }) => text) : [])
+            ...(snapshot.edition === 'java' ? this.config.footer.lines.map(({ text }) => text) : []),
         ];
         const placeholderIds = [...new Set(sources.flatMap((source) => compileTemplate(source).placeholderIds))].sort();
         return { ...copySnapshot(snapshot), placeholderIds };
@@ -188,14 +188,14 @@ export class TabDisplayService {
         const javaPlayers = this.latestPlayers.filter(({ edition }) => edition === 'java').length;
         const bedrockPlayers = this.latestPlayers.filter(({ edition }) => edition === 'bedrock').length;
         const javaVersions = [
-            ...new Set(this.latestPlayers.flatMap(({ javaVersion }) => (javaVersion ? [javaVersion] : [])))
+            ...new Set(this.latestPlayers.flatMap(({ javaVersion }) => (javaVersion ? [javaVersion] : []))),
         ].sort();
         const unsupportedJavaVersions = [
             ...new Set(
                 this.latestPlayers
                     .filter(({ edition, javaVersion }) => edition === 'java' && javaVersion !== JAVA_DISPLAY_VERSION)
-                    .map(({ javaVersion }) => javaVersion ?? 'unknown')
-            )
+                    .map(({ javaVersion }) => javaVersion ?? 'unknown'),
+            ),
         ].sort();
         return {
             enabled: this.config.general.enabled,
@@ -211,17 +211,17 @@ export class TabDisplayService {
                 unsupportedJavaVersions.length > 0
                     ? {
                           kind: 'unsupported',
-                          reason: `Java tab display calls are gated to ${JAVA_DISPLAY_VERSION}; live client behavior is unverified (connected: ${unsupportedJavaVersions.join(', ')})`
+                          reason: `Java tab display calls are gated to ${JAVA_DISPLAY_VERSION}; live client behavior is unverified (connected: ${unsupportedJavaVersions.join(', ')})`,
                       }
                     : { kind: 'supported' },
             bedrock: {
                 kind: 'unsupported',
-                reason: 'TabDisplay leaves the native Bedrock player list unchanged.'
+                reason: 'TabDisplay leaves the native Bedrock player list unchanged.',
             },
             sorting: this.options.sortingCapability ?? {
                 kind: 'unsupported',
-                reason: 'Native Java tab order direction is not verified on a client.'
-            }
+                reason: 'Native Java tab order direction is not verified on a client.',
+            },
         };
     }
 
@@ -236,12 +236,12 @@ export class TabDisplayService {
                           bold: this.config.entry.bold,
                           italic: this.config.entry.italic,
                           underlined: this.config.entry.underlined,
-                          strikethrough: this.config.entry.strikethrough
-                      })
+                          strikethrough: this.config.entry.strikethrough,
+                      }),
                   }
                 : {}),
             header: snapshot.edition === 'java' ? this.config.header.lines.map(makeTarget) : [],
-            footer: snapshot.edition === 'java' ? this.config.footer.lines.map(makeTarget) : []
+            footer: snapshot.edition === 'java' ? this.config.footer.lines.map(makeTarget) : [],
         }));
 
         const jobs = new Map<string, PlaceholderJob>();
@@ -251,7 +251,7 @@ export class TabDisplayService {
                 const key = jobKey(player.snapshot, target.template.source);
                 jobs.set(key, {
                     key,
-                    request: { text: target.template.source, viewer: player.snapshot.name }
+                    request: { text: target.template.source, viewer: player.snapshot.name },
                 });
             }
         }
@@ -307,14 +307,14 @@ export class TabDisplayService {
                         : fallback(this.config.placeholders.missing_provider);
                     return {
                         text: renderTemplate(target.template, resolution, policy, providerAvailable),
-                        ...target.style
+                        ...target.style,
                     };
                 };
                 return {
                     snapshot: player.snapshot,
                     entry: player.entry === undefined ? undefined : render(player.entry),
                     header: player.header.map(render),
-                    footer: player.footer.map(render)
+                    footer: player.footer.map(render),
                 };
             });
             if (providerAvailable) this.lastSuccessfulAt = now;
@@ -342,7 +342,7 @@ export class TabDisplayService {
                 snapshot: player.snapshot,
                 entry: player.entry === undefined ? undefined : renderTemplateFallback(player.entry, this.config),
                 header: player.header.map((target) => renderTemplateFallback(target, this.config)),
-                footer: player.footer.map((target) => renderTemplateFallback(target, this.config))
+                footer: player.footer.map((target) => renderTemplateFallback(target, this.config)),
             }));
             this.applyGeneration(generation.players, rendered);
         } catch {
@@ -357,14 +357,14 @@ export class TabDisplayService {
             readonly entry: RenderedLine | undefined;
             readonly header: readonly RenderedLine[];
             readonly footer: readonly RenderedLine[];
-        }[]
+        }[],
     ): void {
         const snapshots = prepared.map(({ snapshot }) => snapshot);
         const orderByUuid =
             this.config.sorting.rules.length === 0
                 ? new Map<string, number>()
                 : new Map(
-                      assignDenseOrders(snapshots, this.config.sorting.rules).map(({ uuid, order }) => [uuid, order])
+                      assignDenseOrders(snapshots, this.config.sorting.rules).map(({ uuid, order }) => [uuid, order]),
                   );
 
         for (const item of rendered) {
@@ -460,7 +460,7 @@ function makeTarget(config: TemplateLineConfig): RenderTarget {
         ...(bold === undefined ? {} : { bold }),
         ...(italic === undefined ? {} : { italic }),
         ...(underlined === undefined ? {} : { underlined }),
-        ...(strikethrough === undefined ? {} : { strikethrough })
+        ...(strikethrough === undefined ? {} : { strikethrough }),
     };
     return { template: compileTemplate(text), style };
 }
@@ -505,7 +505,7 @@ function copySnapshot(snapshot: PlayerSnapshot): PlayerSnapshot {
         name: snapshot.name,
         edition: snapshot.edition,
         ...(snapshot.javaVersion === undefined ? {} : { javaVersion: snapshot.javaVersion }),
-        ...(snapshot.ping === undefined ? {} : { ping: snapshot.ping })
+        ...(snapshot.ping === undefined ? {} : { ping: snapshot.ping }),
     };
 }
 

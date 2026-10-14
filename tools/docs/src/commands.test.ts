@@ -7,7 +7,7 @@ import {
     commandInfos,
     commandPermissionInfos,
     defineCommands,
-    flattenCommands
+    flattenCommands,
 } from './commands.ts';
 
 const dynamicCommandTree = (tree: unknown): CommandTree => tree as CommandTree;
@@ -20,11 +20,11 @@ const commands = defineCommands('Demo', {
             list: { description: 'List things' },
             pack: {
                 description: 'Pack tools',
-                subcommands: { add: { description: 'Add one' }, drop: { description: 'Drop one' } }
-            }
-        }
+                subcommands: { add: { description: 'Add one' }, drop: { description: 'Drop one' } },
+            },
+        },
     },
-    ping: { description: 'Answer', permission: 'Demo:command.ping' }
+    ping: { description: 'Answer', permission: 'Demo:command.ping' },
 });
 
 describe('flattenCommands', () => {
@@ -36,7 +36,7 @@ describe('flattenCommands', () => {
                 description: 'List things',
                 permission: 'Demo:command.demo',
                 defaultPermission: { tag: 'op', val: 'three' },
-                arguments: []
+                arguments: [],
             },
             {
                 path: ['demo', 'pack', 'add'],
@@ -44,7 +44,7 @@ describe('flattenCommands', () => {
                 description: 'Add one',
                 permission: 'Demo:command.demo',
                 defaultPermission: { tag: 'op', val: 'three' },
-                arguments: []
+                arguments: [],
             },
             {
                 path: ['demo', 'pack', 'drop'],
@@ -52,7 +52,7 @@ describe('flattenCommands', () => {
                 description: 'Drop one',
                 permission: 'Demo:command.demo',
                 defaultPermission: { tag: 'op', val: 'three' },
-                arguments: []
+                arguments: [],
             },
             {
                 path: ['ping'],
@@ -60,8 +60,8 @@ describe('flattenCommands', () => {
                 description: 'Answer',
                 permission: 'Demo:command.ping',
                 defaultPermission: { tag: 'op', val: 'three' },
-                arguments: []
-            }
+                arguments: [],
+            },
         ]);
     });
 
@@ -72,7 +72,7 @@ describe('flattenCommands', () => {
 
     it('treats empty subcommands as a command of its own', () => {
         expect(
-            flattenCommands({ x: { description: 'd', permission: 'X:x', subcommands: {} } }).map((c) => c.usage)
+            flattenCommands({ x: { description: 'd', permission: 'X:x', subcommands: {} } }).map((c) => c.usage),
         ).toEqual(['/x']);
     });
 });
@@ -80,20 +80,20 @@ describe('flattenCommands', () => {
 describe('commandInfos', () => {
     it('gives the README rows', () => {
         expect(
-            commandInfos({ a: { description: 'd', permission: 'X:a', subcommands: { b: { description: 'e' } } } })
+            commandInfos({ a: { description: 'd', permission: 'X:a', subcommands: { b: { description: 'e' } } } }),
         ).toEqual([
             {
                 usage: '/a b',
                 description: 'e',
                 permission: 'X:a',
-                defaultPermission: { tag: 'op', val: 'three' }
-            }
+                defaultPermission: { tag: 'op', val: 'three' },
+            },
         ]);
         expect(commandInfos(commands).at(-1)).toEqual({
             usage: '/ping',
             description: 'Answer',
             permission: 'Demo:command.ping',
-            defaultPermission: { tag: 'op', val: 'three' }
+            defaultPermission: { tag: 'op', val: 'three' },
         });
     });
 
@@ -106,7 +106,7 @@ describe('commandInfos', () => {
                     list: {
                         description: 'List things',
                         permission: 'Demo:command.demo.list',
-                        defaultPermission: { tag: 'allow' }
+                        defaultPermission: { tag: 'allow' },
                     },
                     cache: {
                         description: 'Manage cache',
@@ -115,12 +115,12 @@ describe('commandInfos', () => {
                             inspect: { description: 'Inspect cache without a separate permission' },
                             clear: {
                                 description: 'Clear cache',
-                                permission: 'Demo:command.demo.cache.clear'
-                            }
-                        }
-                    }
-                }
-            }
+                                permission: 'Demo:command.demo.cache.clear',
+                            },
+                        },
+                    },
+                },
+            },
         });
 
         expect(commandInfos(tree)).toEqual([
@@ -128,20 +128,20 @@ describe('commandInfos', () => {
                 usage: '/demo list',
                 description: 'List things',
                 permission: 'Demo:command.demo.list',
-                defaultPermission: { tag: 'allow' }
+                defaultPermission: { tag: 'allow' },
             },
             {
                 usage: '/demo cache inspect',
                 description: 'Inspect cache without a separate permission',
                 permission: 'Demo:command.demo.cache',
-                defaultPermission: { tag: 'op', val: 'three' }
+                defaultPermission: { tag: 'op', val: 'three' },
             },
             {
                 usage: '/demo cache clear',
                 description: 'Clear cache',
                 permission: 'Demo:command.demo.cache.clear',
-                defaultPermission: { tag: 'op', val: 'three' }
-            }
+                defaultPermission: { tag: 'op', val: 'three' },
+            },
         ]);
         expect(commandPermissionInfos(tree)).toEqual([
             {
@@ -150,27 +150,27 @@ describe('commandInfos', () => {
                 defaultPermission: { tag: 'op', val: 'three' },
                 children: [
                     { node: 'Demo:command.demo.list', value: true },
-                    { node: 'Demo:command.demo.cache', value: true }
-                ]
+                    { node: 'Demo:command.demo.cache', value: true },
+                ],
             },
             {
                 node: 'Demo:command.demo.list',
                 description: 'Use the /demo list command',
                 defaultPermission: { tag: 'allow' },
-                children: []
+                children: [],
             },
             {
                 node: 'Demo:command.demo.cache',
                 description: 'Use the /demo cache commands',
                 defaultPermission: { tag: 'op', val: 'three' },
-                children: [{ node: 'Demo:command.demo.cache.clear', value: true }]
+                children: [{ node: 'Demo:command.demo.cache.clear', value: true }],
             },
             {
                 node: 'Demo:command.demo.cache.clear',
                 description: 'Use the /demo cache clear command',
                 defaultPermission: { tag: 'op', val: 'three' },
-                children: []
-            }
+                children: [],
+            },
         ]);
     });
 
@@ -181,9 +181,9 @@ describe('commandInfos', () => {
                 permission: 'Demo:command.demo',
                 subcommands: {
                     first: { description: 'First', permission: 'Demo:command.demo.shared' },
-                    second: { description: 'Second', permission: 'Demo:command.demo.shared' }
-                }
-            }
+                    second: { description: 'Second', permission: 'Demo:command.demo.shared' },
+                },
+            },
         });
 
         const permissions = commandPermissionInfos(tree);
@@ -196,17 +196,17 @@ describe('commandInfos', () => {
             first: {
                 description: 'First',
                 permission: 'Demo:command.shared',
-                defaultPermission: { tag: 'allow' }
+                defaultPermission: { tag: 'allow' },
             },
             second: {
                 description: 'Second',
                 permission: 'Demo:command.shared',
-                defaultPermission: { tag: 'deny' }
-            }
+                defaultPermission: { tag: 'deny' },
+            },
         });
 
         expect(() => commandPermissionInfos(tree)).toThrow(
-            'conflicting defaults for command permission Demo:command.shared'
+            'conflicting defaults for command permission Demo:command.shared',
         );
     });
 });
@@ -222,7 +222,7 @@ describe('types', () => {
             'demo list': handler,
             'demo pack add': handler,
             'demo pack drop': handler,
-            ping: handler
+            ping: handler,
         };
         expect(Object.keys(complete)).toHaveLength(4);
 
@@ -245,10 +245,10 @@ describe('types', () => {
                     nested: {
                         description: 'd',
                         // @ts-expect-error nested permission nodes must use the same plugin prefix
-                        permission: 'Other:command.demo.nested'
-                    }
-                }
-            }
+                        permission: 'Other:command.demo.nested',
+                    },
+                },
+            },
         });
     });
 
@@ -265,15 +265,15 @@ describe('types', () => {
                             { name: 'z', type: 'integer', min: -30_000_000, max: 30_000_000 },
                             { name: 'world', type: 'string', mode: 'single-word' },
                             { name: 'label', type: 'string', mode: 'quotable' },
-                            { name: 'tail', type: 'string', mode: 'greedy' }
-                        ]
-                    }
-                }
-            }
+                            { name: 'tail', type: 'string', mode: 'greedy' },
+                        ],
+                    },
+                },
+            },
         });
 
         expect(flattenCommands(withArguments).map(({ usage }) => usage)).toEqual([
-            '/map at <x> <z> <world> <label> <tail>'
+            '/map at <x> <z> <world> <label> <tail>',
         ]);
         expect(commandInfos(withArguments)[0]?.usage).toBe('/map at <x> <z> <world> <label> <tail>');
 
@@ -285,7 +285,7 @@ describe('types', () => {
                 // @ts-expect-error x is numeric, not text
                 const invalid: string = args.x;
                 return [invalid, String(inferred), String(xIsNumber), labelIsString];
-            }
+            },
         };
         expect(Object.keys(typed)).toEqual(['map at <x> <z> <world> <label> <tail>']);
     });
@@ -295,8 +295,8 @@ describe('types', () => {
             icon: {
                 description: 'Set an item icon',
                 permission: 'Demo:command.icon',
-                arguments: [{ name: 'item', type: 'item' }]
-            }
+                arguments: [{ name: 'item', type: 'item' }],
+            },
         });
         const typed: CommandHandlers<typeof itemCommand> = {
             'icon <item>': (_sender, args) => {
@@ -304,7 +304,7 @@ describe('types', () => {
                 // @ts-expect-error item argument values are strings, not numbers
                 const invalid: number = args.item;
                 return [itemId, String(invalid)];
-            }
+            },
         };
 
         expect(flattenCommands(itemCommand).map(({ usage }) => usage)).toEqual(['/icon <item>']);
@@ -318,9 +318,9 @@ describe('types', () => {
                 permission: 'Demo:command.teleport',
                 arguments: [
                     { name: 'x', type: 'double', min: -30_000_000, max: 30_000_000 },
-                    { name: 'targets', type: 'players' }
-                ]
-            }
+                    { name: 'targets', type: 'players' },
+                ],
+            },
         });
 
         expect(flattenCommands(typedCommands).map(({ usage }) => usage)).toEqual(['/teleport <x> <targets>']);
@@ -331,7 +331,7 @@ describe('types', () => {
                 // @ts-expect-error player selector values are plain references, not WASI resources
                 const invalid: { dispose(): void }[] = args.targets;
                 return [String(x), String(targets.length), String(invalid)];
-            }
+            },
         };
         expect(Object.keys(typed)).toEqual(['teleport <x> <targets>']);
     });
@@ -345,35 +345,35 @@ describe('types', () => {
                     [{ name: 'radius', type: 'integer', min: 0, max: 16 }],
                     [
                         { name: 'x', type: 'integer' },
-                        { name: 'z', type: 'integer' }
+                        { name: 'z', type: 'integer' },
                     ],
                     [
                         { name: 'x', type: 'integer' },
                         { name: 'z', type: 'integer' },
-                        { name: 'radius', type: 'integer', min: 0, max: 16 }
-                    ]
-                ]
-            }
+                        { name: 'radius', type: 'integer', min: 0, max: 16 },
+                    ],
+                ],
+            },
         });
 
         expect(flattenCommands(overloaded).map(({ usage }) => usage)).toEqual([
             '/locate',
             '/locate <radius>',
             '/locate <x> <z>',
-            '/locate <x> <z> <radius>'
+            '/locate <x> <z> <radius>',
         ]);
         expect(commandInfos(overloaded).map(({ usage }) => usage)).toEqual([
             '/locate',
             '/locate <radius>',
             '/locate <x> <z>',
-            '/locate <x> <z> <radius>'
+            '/locate <x> <z> <radius>',
         ]);
 
         const typed: CommandHandlers<typeof overloaded> = {
             locate: () => ['default'],
             'locate <radius>': (_sender, args) => [String(args.radius)],
             'locate <x> <z>': (_sender, args) => [String(args.x + args.z)],
-            'locate <x> <z> <radius>': (_sender, args) => [String(args.x + args.z + args.radius)]
+            'locate <x> <z> <radius>': (_sender, args) => [String(args.x + args.z + args.radius)],
         };
         expect(Object.keys(typed)).toHaveLength(4);
     });
@@ -385,8 +385,8 @@ describe('types', () => {
                 description: 'Locate',
                 permission: 'Demo:command.locate',
                 arguments: [{ name: 'x', type: 'integer' }],
-                argumentVariants: [[{ name: 'z', type: 'integer' }]]
-            }
+                argumentVariants: [[{ name: 'z', type: 'integer' }]],
+            },
         });
 
         defineCommands('Demo', {
@@ -395,13 +395,13 @@ describe('types', () => {
                 description: 'Locate',
                 permission: 'Demo:command.locate',
                 argumentVariants: [[{ name: 'x', type: 'integer' }]],
-                subcommands: { nearby: { description: 'Nearby' } }
-            }
+                subcommands: { nearby: { description: 'Nearby' } },
+            },
         });
 
         defineCommands('Demo', {
             // @ts-expect-error every variant must have at least one argument
-            locate: { description: 'Locate', permission: 'Demo:command.locate', argumentVariants: [[]] }
+            locate: { description: 'Locate', permission: 'Demo:command.locate', argumentVariants: [[]] },
         });
     });
 });
@@ -412,7 +412,7 @@ describe('argument usage', () => {
             '/demo list',
             '/demo pack add',
             '/demo pack drop',
-            '/ping'
+            '/ping',
         ]);
     });
 
@@ -422,9 +422,9 @@ describe('argument usage', () => {
                 locate: {
                     description: 'Locate',
                     permission: 'Demo:command.locate',
-                    arguments: [{ name: 'x', type: 'integer', min: 2_147_483_648 }]
-                }
-            })
+                    arguments: [{ name: 'x', type: 'integer', min: 2_147_483_648 }],
+                },
+            }),
         ).toThrow('Integer bounds for x must fit a signed 32-bit value.');
         expect(() =>
             flattenCommands({
@@ -433,10 +433,10 @@ describe('argument usage', () => {
                     permission: 'Demo:command.talk',
                     arguments: [
                         { name: 'message', type: 'string', mode: 'greedy' },
-                        { name: 'suffix', type: 'integer' }
-                    ]
-                }
-            })
+                        { name: 'suffix', type: 'integer' },
+                    ],
+                },
+            }),
         ).toThrow('Greedy string argument message must be the final argument.');
     });
 
@@ -446,18 +446,18 @@ describe('argument usage', () => {
                 locate: {
                     description: 'Locate',
                     permission: 'Demo:command.locate',
-                    arguments: [{ name: 'x', type: 'double', min: Number.NaN }]
-                }
-            })
+                    arguments: [{ name: 'x', type: 'double', min: Number.NaN }],
+                },
+            }),
         ).toThrow('Double bounds for x must be finite numbers.');
         expect(() =>
             flattenCommands({
                 locate: {
                     description: 'Locate',
                     permission: 'Demo:command.locate',
-                    arguments: [{ name: 'x', type: 'double', min: 10, max: -10 }]
-                }
-            })
+                    arguments: [{ name: 'x', type: 'double', min: 10, max: -10 }],
+                },
+            }),
         ).toThrow('Minimum bound exceeds maximum bound for x.');
     });
 
@@ -468,10 +468,10 @@ describe('argument usage', () => {
                     locate: {
                         description: 'Locate',
                         permission: 'Demo:command.locate',
-                        argumentVariants: []
-                    }
-                })
-            )
+                        argumentVariants: [],
+                    },
+                }),
+            ),
         ).toThrow('Command /locate must declare at least one argument variant.');
         expect(() =>
             flattenCommands(
@@ -480,10 +480,10 @@ describe('argument usage', () => {
                         description: 'Locate',
                         permission: 'Demo:command.locate',
                         arguments: [{ name: 'x', type: 'integer' }],
-                        argumentVariants: [[{ name: 'z', type: 'integer' }]]
-                    }
-                })
-            )
+                        argumentVariants: [[{ name: 'z', type: 'integer' }]],
+                    },
+                }),
+            ),
         ).toThrow('Command /locate cannot declare both arguments and argument variants.');
     });
 
@@ -495,10 +495,10 @@ describe('argument usage', () => {
                         description: 'Locate',
                         permission: 'Demo:command.locate',
                         arguments: [{ name: 'radius', type: 'integer' }],
-                        subcommands: { nearby: { description: 'Nearby' } }
-                    }
-                })
-            )
+                        subcommands: { nearby: { description: 'Nearby' } },
+                    },
+                }),
+            ),
         ).toThrow('Command /locate cannot combine arguments with subcommands.');
     });
 });

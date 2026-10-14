@@ -21,7 +21,7 @@ function input(overrides = {}) {
         githubRunUrl: 'https://github.com/filiphsps/pumpkin-plugins/actions/runs/123',
         runnerTemp: '/tmp',
         workspaceRoot: '/repo',
-        ...overrides
+        ...overrides,
     };
 }
 
@@ -49,9 +49,9 @@ it('closes obsolete PRs and issues and removes their update branch', () => {
         pullRequests: [{ number: 12, state: 'OPEN' }],
         issues: [
             { number: 33, state: 'OPEN', body: null },
-            { number: 34, state: 'OPEN', body: pinMarker }
+            { number: 34, state: 'OPEN', body: pinMarker },
         ],
-        remoteBranch: `${'c'.repeat(40)}\trefs/heads/${pinBranch}\n`
+        remoteBranch: `${'c'.repeat(40)}\trefs/heads/${pinBranch}\n`,
     });
 
     upstreamPins.reconcileUpstreamPin(input({ needsUpdate: false }), state);
@@ -65,7 +65,7 @@ it('turns a failed validation into an issue with labels and the compare link', (
     const state = runner({
         pullRequests: [{ number: 12, state: 'OPEN' }],
         issues: [{ number: 34, state: 'OPEN', body: pinMarker }],
-        remoteBranch: `${'c'.repeat(40)}\trefs/heads/${pinBranch}\n`
+        remoteBranch: `${'c'.repeat(40)}\trefs/heads/${pinBranch}\n`,
     });
 
     upstreamPins.reconcileUpstreamPin(input({ validationResult: 'failure' }), state);
@@ -86,9 +86,9 @@ it('turns a failed validation into an issue with labels and the compare link', (
             '--add-label',
             'area: runtime',
             '--add-label',
-            'runtime: static-hermes'
+            'runtime: static-hermes',
         ]),
-        true
+        true,
     );
     const body = state.writtenFiles.get('/tmp/upstream-pin-static-hermes-issue.md');
     assert.match(body, /<!-- upstream-pin:static-hermes -->/);
@@ -101,7 +101,7 @@ it('creates or reopens an update PR after successful validation using the releas
         pullRequests: [{ number: 56, state: 'CLOSED' }],
         issues: [{ number: 78, state: 'OPEN', body: pinMarker }],
         remoteBranch: `${'d'.repeat(40)}\trefs/heads/${pinBranch}\n`,
-        stagedFiles: `${pinPath}\n`
+        stagedFiles: `${pinPath}\n`,
     });
 
     upstreamPins.reconcileUpstreamPin(input(), state);
@@ -110,16 +110,16 @@ it('creates or reopens an update PR after successful validation using the releas
     assert.equal(hasCall(state.calls, 'git', ['config', 'user.name', 'github-actions[bot]']), true);
     assert.equal(
         hasCall(state.calls, 'git', ['config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com']),
-        true
+        true,
     );
     assert.equal(
         hasCall(state.calls, 'git', [
             'push',
             `--force-with-lease=refs/heads/${pinBranch}:${'d'.repeat(40)}`,
             'origin',
-            pinBranch
+            pinBranch,
         ]),
-        true
+        true,
     );
     assert.equal(
         hasCall(state.calls, 'gh', [
@@ -135,9 +135,9 @@ it('creates or reopens an update PR after successful validation using the releas
             '--add-label',
             'area: runtime',
             '--add-label',
-            'runtime: static-hermes'
+            'runtime: static-hermes',
         ]),
-        true
+        true,
     );
     assert.equal(hasCall(state.calls, 'gh', ['pr', 'reopen', '56']), true);
     const body = state.writtenFiles.get('/tmp/upstream-pin-static-hermes.md');

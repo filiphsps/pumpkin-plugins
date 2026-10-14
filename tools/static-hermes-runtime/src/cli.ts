@@ -15,42 +15,42 @@ import { resolveConsumerWorkspaceRoot } from './workspace-root.ts';
 
 /** WIT inputs and selections shared by the analyze and generate commands. */
 export interface CodegenSelectionOptions {
-    /** Directory containing the prepared plugin WIT world. */
-    wit: string;
+    /** Optional Pumpkin API operation identifiers; omission includes every declared operation. */
+    apiMethods?: string[];
     /** WASI interface specifiers explicitly selected for adapter generation. */
     wasiImports: string[];
     /** Optional fully qualified WASI operation identifiers to include. */
     wasiMethods?: string[];
-    /** Optional Pumpkin API operation identifiers; omission includes every declared operation. */
-    apiMethods?: string[];
+    /** Directory containing the prepared plugin WIT world. */
+    wit: string;
 }
 
 /** Additional file paths needed to generate runtime sources. */
 export interface CodegenGenerateOptions extends CodegenSelectionOptions {
-    /** C++ runtime template containing the generator marker comments. */
-    template: string;
     /** Generated plugin header used to determine required enum declarations. */
     header: string;
     /** Destination directory for generated runtime source and enum header. */
     outDir: string;
+    /** C++ runtime template containing the generator marker comments. */
+    template: string;
 }
 
 /** Injectable command handlers for tests and CLI composition. */
 export interface StaticHermesCliDependencies {
-    /** Ensure the pinned Hermes source checkout exists. */
-    hermesSource(): Promise<void> | void;
-    /** Apply the configured Hermes patch series. */
-    hermesPatch(): Promise<void> | void;
-    /** Build or reuse the host compiler and WASI Hermes archives. */
-    hermesBuild(): Promise<void> | void;
-    /** Run source, patch, and build preparation in sequence. */
-    hermesPrepare(): Promise<void> | void;
     /** Handle the `codegen analyze` command. */
     analyze(options: CodegenSelectionOptions): Promise<void> | void;
-    /** Handle the `codegen generate` command. */
-    generate(options: CodegenGenerateOptions): Promise<void> | void;
     /** Handle the `component build` command. */
     componentBuild(options: ComponentBuildOptions): Promise<void> | void;
+    /** Handle the `codegen generate` command. */
+    generate(options: CodegenGenerateOptions): Promise<void> | void;
+    /** Build or reuse the host compiler and WASI Hermes archives. */
+    hermesBuild(): Promise<void> | void;
+    /** Apply the configured Hermes patch series. */
+    hermesPatch(): Promise<void> | void;
+    /** Run source, patch, and build preparation in sequence. */
+    hermesPrepare(): Promise<void> | void;
+    /** Ensure the pinned Hermes source checkout exists. */
+    hermesSource(): Promise<void> | void;
 }
 
 /**
@@ -129,7 +129,7 @@ export function createStaticHermesProgram(dependencies: StaticHermesCliDependenc
 export function parseJsonStringArray(
     json: string | undefined,
     optionName: string,
-    itemDescription: string
+    itemDescription: string,
 ): string[] | undefined {
     if (json === undefined) return undefined;
     let value: unknown;
@@ -137,7 +137,7 @@ export function parseJsonStringArray(
         value = JSON.parse(json) as unknown;
     } catch (error) {
         throw new Error(
-            `--${optionName} must be a JSON array (${error instanceof Error ? error.message : String(error)})`
+            `--${optionName} must be a JSON array (${error instanceof Error ? error.message : String(error)})`,
         );
     }
     if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
@@ -158,7 +158,7 @@ function parseCodegenSelection(options: {
         wit: path.resolve(options.wit),
         wasiImports: parseJsonStringArray(options.wasiImports, 'wasi-imports', 'module specifiers') ?? [],
         ...(wasiMethods === undefined ? {} : { wasiMethods }),
-        ...(apiMethods === undefined ? {} : { apiMethods })
+        ...(apiMethods === undefined ? {} : { apiMethods }),
     };
 }
 
@@ -175,7 +175,7 @@ function parseCodegenGenerate(options: {
         ...parseCodegenSelection(options),
         template: path.resolve(options.template),
         header: path.resolve(options.header),
-        outDir: path.resolve(options.outDir)
+        outDir: path.resolve(options.outDir),
     };
 }
 
@@ -210,7 +210,7 @@ function parseComponentBuild(options: {
         ...(apiMethods === undefined ? {} : { apiMethods }),
         ...(eventTypes === undefined ? {} : { eventTypes }),
         ...(options.runtimeVariant === undefined ? {} : { runtimeVariant: options.runtimeVariant }),
-        ...(options.gcVariant === undefined ? {} : { gcVariant: options.gcVariant })
+        ...(options.gcVariant === undefined ? {} : { gcVariant: options.gcVariant }),
     };
 }
 
@@ -226,11 +226,11 @@ async function runAnalysis(options: CodegenSelectionOptions): Promise<void> {
                 wasiMethods: analysis.wasiMethods,
                 wasiFeatures: analysis.wasiFeatures,
                 wasiAdapters: analysis.wasiAdapters.map(({ operationId, kind }) => ({ operationId, kind })),
-                eventFields: analysis.eventFields
+                eventFields: analysis.eventFields,
             },
             null,
-            2
-        )
+            2,
+        ),
     );
 }
 
@@ -245,7 +245,7 @@ async function analyzeCodegen(options: CodegenSelectionOptions) {
         pluginImportOrder: imports,
         wasiImports: options.wasiImports,
         ...(options.wasiMethods === undefined ? {} : { wasiMethods: options.wasiMethods }),
-        ...(options.apiMethods === undefined ? {} : { apiMethods: options.apiMethods })
+        ...(options.apiMethods === undefined ? {} : { apiMethods: options.apiMethods }),
     });
     return { analysis, apiPackage };
 }
@@ -255,14 +255,14 @@ async function runGeneration(options: CodegenGenerateOptions): Promise<void> {
         wit: options.wit,
         wasiImports: options.wasiImports,
         ...(options.wasiMethods === undefined ? {} : { wasiMethods: options.wasiMethods }),
-        ...(options.apiMethods === undefined ? {} : { apiMethods: options.apiMethods })
+        ...(options.apiMethods === undefined ? {} : { apiMethods: options.apiMethods }),
     });
     const output = generateWitOutputs({
         analysis,
         apiPackage,
         wasiInterfaces: analysis.resolvedWasiInterfaces,
         pluginHeader: fs.readFileSync(options.header, 'utf8'),
-        runtimeTemplate: fs.readFileSync(options.template, 'utf8')
+        runtimeTemplate: fs.readFileSync(options.template, 'utf8'),
     });
     writeWitGeneration(options.outDir, output);
 }
@@ -277,7 +277,7 @@ async function ensureWasmTools(): Promise<void> {
         workspaceRoot: resolveConsumerWorkspaceRoot(),
         includeWasiSdk: false,
         includeWitBindgen: false,
-        includeWasmTools: true
+        includeWasmTools: true,
     };
     if (process.env.WASM_TOOLS) {
         Object.assign(process.env, await setupHermesToolchainEnvironment(setupOptions));
@@ -299,7 +299,7 @@ function defaultDependencies(): StaticHermesCliDependencies {
         hermesPrepare: () => prepareHermes(),
         analyze: runAnalysis,
         generate: runGeneration,
-        componentBuild: runComponentBuild
+        componentBuild: runComponentBuild,
     };
 }
 

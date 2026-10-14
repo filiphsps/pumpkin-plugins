@@ -12,7 +12,7 @@ export class FakeNode implements Command, CommandNode {
     /** Creates a node for the word `name`. */
     constructor(
         readonly name: string,
-        readonly argument?: CommandArgumentSpec
+        readonly argument?: CommandArgumentSpec,
     ) {}
 
     // biome-ignore lint/suspicious/noThenProperty: mirrors the host's command classes, which have `then`.
@@ -53,9 +53,9 @@ export class FakeNode implements Command, CommandNode {
 
 /** A sender that records the lines sent to it, and which of them were shown as errors. */
 export interface FakeSender {
-    lines: string[];
-    errors: string[];
     asPlayer(): undefined;
+    errors: string[];
+    lines: string[];
 }
 
 /** What `FakeCommandHost.fail` throws: the message a failed command would show. */
@@ -93,7 +93,7 @@ export class FakeCommandHost implements CommandHost<FakeSender> {
 
     onRun(
         run: (sender: FakeSender, args: Readonly<Record<string, CommandArgumentValue>>) => void,
-        _arguments: readonly CommandArgumentSpec[]
+        _arguments: readonly CommandArgumentSpec[],
     ): number {
         const id = this.handlers.size + 1;
         this.handlers.set(id, run);
@@ -128,7 +128,7 @@ export class FakeCommandHost implements CommandHost<FakeSender> {
         root: FakeNode,
         path: string[],
         args: Readonly<Record<string, CommandArgumentValue>> = {},
-        sender?: FakeSender
+        sender?: FakeSender,
     ): string[] {
         return this.runAs(root, path, args, sender).lines;
     }
@@ -141,7 +141,7 @@ export class FakeCommandHost implements CommandHost<FakeSender> {
         root: FakeNode,
         path: string[],
         args: Readonly<Record<string, CommandArgumentValue>> = {},
-        suppliedSender?: FakeSender
+        suppliedSender?: FakeSender,
     ): FakeSender {
         let node: FakeNode | undefined = path[0] === root.name ? root : undefined;
         for (const word of path.slice(1)) node = node?.children.find((child) => child.name === word);

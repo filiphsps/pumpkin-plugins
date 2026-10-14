@@ -16,7 +16,7 @@ export const commands = defineCommands(PLUGIN_NAME, {
         subcommands: {
             status: {
                 description: 'Show connected DH clients and pending requests',
-                permission: `${COMMAND_PERMISSION}.status`
+                permission: `${COMMAND_PERMISSION}.status`,
             },
             cache: {
                 description: 'Manage cached LOD terrain',
@@ -24,11 +24,11 @@ export const commands = defineCommands(PLUGIN_NAME, {
                 subcommands: {
                     status: {
                         description: 'Show memory and disk cache usage',
-                        permission: `${COMMAND_PERMISSION}.cache.status`
+                        permission: `${COMMAND_PERMISSION}.cache.status`,
                     },
                     clear: {
                         description: 'Clear both cache tiers',
-                        permission: `${COMMAND_PERMISSION}.cache.clear`
+                        permission: `${COMMAND_PERMISSION}.cache.clear`,
                     },
                     memory: {
                         description: 'Manage the in-memory cache',
@@ -36,9 +36,9 @@ export const commands = defineCommands(PLUGIN_NAME, {
                         subcommands: {
                             clear: {
                                 description: 'Clear the in-memory cache',
-                                permission: `${COMMAND_PERMISSION}.cache.memory.clear`
-                            }
-                        }
+                                permission: `${COMMAND_PERMISSION}.cache.memory.clear`,
+                            },
+                        },
                     },
                     disk: {
                         description: 'Manage the disk cache',
@@ -46,9 +46,9 @@ export const commands = defineCommands(PLUGIN_NAME, {
                         subcommands: {
                             clear: {
                                 description: 'Clear the disk cache',
-                                permission: `${COMMAND_PERMISSION}.cache.disk.clear`
-                            }
-                        }
+                                permission: `${COMMAND_PERMISSION}.cache.disk.clear`,
+                            },
+                        },
                     },
                     recover: {
                         description:
@@ -56,10 +56,10 @@ export const commands = defineCommands(PLUGIN_NAME, {
                         permission: `${COMMAND_PERMISSION}.cache.recover`,
                         arguments: [
                             { name: 'x', type: 'integer' },
-                            { name: 'z', type: 'integer' }
-                        ]
-                    }
-                }
+                            { name: 'z', type: 'integer' },
+                        ],
+                    },
+                },
             },
             map: {
                 description: `Show cached LOD sections at your position or block coordinates (default radius 4; maximum ${mapRadiusLimit} sections)`,
@@ -68,14 +68,14 @@ export const commands = defineCommands(PLUGIN_NAME, {
                     [{ name: 'radius', type: 'integer', min: 0, max: MAX_LOD_MAP_RADIUS }],
                     [
                         { name: 'x', type: 'integer' },
-                        { name: 'z', type: 'integer' }
+                        { name: 'z', type: 'integer' },
                     ],
                     [
                         { name: 'x', type: 'integer' },
                         { name: 'z', type: 'integer' },
-                        { name: 'radius', type: 'integer', min: 0, max: MAX_LOD_MAP_RADIUS }
-                    ]
-                ]
+                        { name: 'radius', type: 'integer', min: 0, max: MAX_LOD_MAP_RADIUS },
+                    ],
+                ],
             },
             generate: {
                 description: `Force-build LOD sections at your position or block coordinates (default radius 0; maximum ${generationRadiusLimit} sections)`,
@@ -84,15 +84,15 @@ export const commands = defineCommands(PLUGIN_NAME, {
                     [{ name: 'radius', type: 'integer', min: 0, max: MAX_LOD_GENERATION_RADIUS }],
                     [
                         { name: 'x', type: 'integer' },
-                        { name: 'z', type: 'integer' }
+                        { name: 'z', type: 'integer' },
                     ],
                     [
                         { name: 'x', type: 'integer' },
                         { name: 'z', type: 'integer' },
-                        { name: 'radius', type: 'integer', min: 0, max: MAX_LOD_GENERATION_RADIUS }
-                    ]
-                ]
-            }
-        }
-    }
+                        { name: 'radius', type: 'integer', min: 0, max: MAX_LOD_GENERATION_RADIUS },
+                    ],
+                ],
+            },
+        },
+    },
 });

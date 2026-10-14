@@ -1,7 +1,7 @@
 const DEFAULT_TURBO_FLAGS = [
     ['--output-logs', '--output-logs=new-only'],
     ['--log-order', '--log-order=grouped'],
-    ['--log-prefix', '--log-prefix=task']
+    ['--log-prefix', '--log-prefix=task'],
 ];
 
 /** Add default Turbo flags unless the caller supplied those options.
@@ -15,7 +15,7 @@ export function withDefaultTurboFlags(args) {
         turboArgs.flatMap((arg) => {
             const option = DEFAULT_TURBO_FLAGS.find(([name]) => arg === name || arg.startsWith(`${name}=`));
             return option ? [option[0]] : [];
-        })
+        }),
     );
     const defaults = DEFAULT_TURBO_FLAGS.filter(([name]) => !callerOptions.has(name)).map(([, flag]) => flag);
 

@@ -48,7 +48,7 @@ export abstract class PluginBase extends Plugin {
 /** Registers a plugin and enables its automatic Pumpkin Market update check. */
 export function registerPlugin(plugin: PluginBase): void {
     registerPluginWithUpdates(plugin, plugin.info, {
-        schedule: (callback) => scheduleDelayed(1, () => callback())
+        schedule: (callback) => scheduleDelayed(1, () => callback()),
     });
 }
 

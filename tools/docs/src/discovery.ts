@@ -6,9 +6,9 @@ export type ComponentGroup = 'packages' | 'tools' | 'actions';
 
 /** A discovered component; callers decide whether they need source files, READMEs or other metadata. */
 export interface SourceComponent {
-    slug: string;
     directory: string;
     metadataFile: string;
+    slug: string;
 }
 
 /** Discover sorted component folders by metadata, including grouped tool packages. */
@@ -56,7 +56,7 @@ export function walkMarkdown(directory: string, options: { exclude?: readonly st
 export function localLicenseFile(directory: string): string | undefined {
     if (!existsSync(directory)) return undefined;
     const file = readdirSync(directory, { withFileTypes: true }).find(
-        (entry) => entry.isFile() && /^license(?:\.md|\.txt)?$/i.test(entry.name)
+        (entry) => entry.isFile() && /^license(?:\.md|\.txt)?$/i.test(entry.name),
     );
     return file ? join(directory, file.name) : undefined;
 }

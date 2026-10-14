@@ -16,9 +16,9 @@ describe('LOD builder', () => {
                     material:
                         y === -62 ? 'minecraft:plains_DH-BSW_minecraft:air' : 'minecraft:plains_DH-BSW_minecraft:stone',
                     skyLight: y === -62 ? 15 : 4,
-                    blockLight: 2
+                    blockLight: 2,
                 };
-            }
+            },
         };
         const builder = new LodBuilder(section, -64, 3);
         expect(builder.step(terrain, 7)).toBe(false);
@@ -62,7 +62,7 @@ describe('LOD builder', () => {
             return {
                 material: `minecraft:plains_DH-BSW_minecraft:${y > -62 ? 'air' : 'stone'}`,
                 skyLight: 15,
-                blockLight: 0
+                blockLight: 0,
             };
         };
         baseline.step({ minY: -64, height: 384, sample }, 4096 * 384);
@@ -85,10 +85,10 @@ describe('LOD builder', () => {
                 {
                     minY: 0,
                     height: 3,
-                    sample: (_x, y) => ({ material: y === 1 ? 'air' : 'stone', skyLight: 0, blockLight: 0 })
+                    sample: (_x, y) => ({ material: y === 1 ? 'air' : 'stone', skyLight: 0, blockLight: 0 }),
                 },
-                12288
-            )
+                12288,
+            ),
         ).toBe(true);
         const input = new Reader(builder.finish(1));
         input.words();
@@ -104,7 +104,7 @@ describe('LOD builder', () => {
         const terrain = {
             minY: 0,
             height: 33,
-            sample: (_x: number, y: number) => ({ material: y % 2 ? 'stone' : 'air', skyLight: 0, blockLight: 0 })
+            sample: (_x: number, y: number) => ({ material: y % 2 ? 'stone' : 'air', skyLight: 0, blockLight: 0 }),
         };
         expect(() => builder.step(terrain, 4096 * 33)).toThrow('too complex');
     });
@@ -117,10 +117,10 @@ describe('LOD builder', () => {
                     height: 4,
                     sample: () => {
                         throw new Error('unloaded');
-                    }
+                    },
                 },
-                1
-            )
+                1,
+            ),
         ).toThrow('height');
         expect(() =>
             b.step(
@@ -129,10 +129,10 @@ describe('LOD builder', () => {
                     height: 3,
                     sample: () => {
                         throw new Error('unloaded');
-                    }
+                    },
                 },
-                1
-            )
+                1,
+            ),
         ).toThrow('unloaded');
         expect(() => new LodBuilder({ ...section, detail: 7 }, 0, 3)).toThrow('dimensions');
     });

@@ -22,14 +22,14 @@ afterEach(() => {
 it('allows scheduler task cancellation during unload and blocks other host calls', async () => {
     const scheduler = apiInterface('scheduler', 'pumpkin:plugin/scheduler@0.1.0', [
         operation('cancel-task'),
-        operation('schedule-task')
+        operation('schedule-task'),
     ]);
     const module = (await importFacade(generateEsmFacade(scheduler))) as unknown as SchedulerFacade;
     globalState.__pumpkinHost = {
         scheduler: {
             cancelTask: (id: number) => `cancelled:${id}`,
-            scheduleTask: () => 'scheduled'
-        }
+            scheduleTask: () => 'scheduled',
+        },
     };
     globalState.__staticHermesPluginUnloading = true;
 
@@ -49,11 +49,11 @@ it('wraps WASI resource lifetimes and turns native error markers into JavaScript
         },
         drop() {
             this.__isValid = false;
-        }
+        },
     };
     globalState.__pumpkinWasiFilesystemTypes = {
         lookup: () => ({ __staticHermesWasiError: { tag: 'not-found' } }),
-        file: { constructor: () => nativeResource }
+        file: { constructor: () => nativeResource },
     };
 
     const file = new module.File();
@@ -82,11 +82,11 @@ interface SchedulerFacade {
 }
 
 interface WasiFacade {
-    lookup(): unknown;
     File: new () => {
         read(value: string): string;
         [Symbol.dispose](): void;
     };
+    lookup(): unknown;
 }
 
 function apiInterface(name: string, specifier: string, functions: WitFunction[]): WitApiInterface {
@@ -102,7 +102,7 @@ function apiInterface(name: string, specifier: string, functions: WitFunction[])
         enums: [],
         flags: [],
         types: [],
-        dependencies: []
+        dependencies: [],
     };
 }
 
@@ -116,9 +116,9 @@ function wasiApiInterface(): WitWasiInterface {
         resources: [
             {
                 name: 'file',
-                functions: [operation('constructor'), operation('read')]
-            }
-        ]
+                functions: [operation('constructor'), operation('read')],
+            },
+        ],
     };
 }
 

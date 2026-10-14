@@ -16,6 +16,6 @@ export function commandHandlers(forwarder: PortForwarder): CommandHandlers<typeo
             const { refusal } = forwarder;
             if (refusal) throw new CommandFailed(refusalMessage(refusal));
             return reloadLines(forwarder.snapshot.mappings.length);
-        }
+        },
     };
 }

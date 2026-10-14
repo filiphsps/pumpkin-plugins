@@ -18,7 +18,7 @@ describe('markdown helpers', () => {
 
 it('escapes table headers and preserves requested multiline cells', () => {
     expect(table(['A|B'], [['first\r\nsecond']], { multiline: 'break' })).toBe(
-        '| A\\|B |\n| --- |\n| first<br>second |'
+        '| A\\|B |\n| --- |\n| first<br>second |',
     );
     expect(code('`value`')).toBe('`` `value` ``');
     expect(code(' a ')).toBe('`  a  `');

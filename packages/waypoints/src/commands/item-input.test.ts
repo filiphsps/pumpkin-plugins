@@ -5,7 +5,7 @@ describe('item icon command input', () => {
     it.each([
         ['wp set icon Pumpkin minecraft:pumpkin_pie', 'minecraft:pumpkin_pie'],
         ['/wp set icon Pumpkin pumpkin_pie', 'pumpkin_pie'],
-        ['wp set icon "Bert the Great" minecraft:golden_apple', 'minecraft:golden_apple']
+        ['wp set icon "Bert the Great" minecraft:golden_apple', 'minecraft:golden_apple'],
     ])('extracts the item identifier from %j', (command, expected) => {
         expect(itemIconInputFromCommand(command)).toBe(expected);
     });
@@ -14,6 +14,6 @@ describe('item icon command input', () => {
         'ignores unrelated or incomplete command input %j',
         (command) => {
             expect(itemIconInputFromCommand(command)).toBeUndefined();
-        }
+        },
     );
 });

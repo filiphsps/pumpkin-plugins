@@ -11,7 +11,7 @@ const blocks = renderDocs({
     protocol: PROTOCOL_VERSION,
     limits: LIMITS,
     license: manifest.license,
-    timing: SESSION_TIMING
+    timing: SESSION_TIMING,
 });
 const note =
     '<!-- Generated from protocol/session constants, test/provider.ts and package.json. Run `pnpm readme`. -->';
@@ -19,5 +19,5 @@ const note =
 /** Component document blocks derived from the protocol and integration fixture metadata. */
 export const documents = [
     { file: 'README.md', blocks: { overview: blocks.overview }, note },
-    { file: 'docs/index.md', blocks, note }
+    { file: 'docs/index.md', blocks, note },
 ] satisfies DocumentSpec[];

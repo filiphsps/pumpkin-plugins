@@ -4,5 +4,5 @@ export {
     onCommand,
     runCommand,
     runTask,
-    scheduleRepeating
+    scheduleRepeating,
 } from '@pumpkin-plugins/plugin-kit/host';

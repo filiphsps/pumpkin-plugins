@@ -15,14 +15,14 @@ it('releases repeated world acquisitions in the bundled Static Hermes Runtime', 
     const apiRoot = path.dirname(require.resolve('@pumpkin-plugins/pumpkin-api/package.json'));
     const apiWitDir = ensurePumpkinWit({
         lockFile: path.join(apiRoot, 'wit.lock.json'),
-        cacheRoot: cacheDir(import.meta.dirname)
+        cacheRoot: cacheDir(import.meta.dirname),
     });
     const entry = path.join(directory, 'probe.ts');
     const output = path.join(directory, 'probe.wasm');
     // Let WIT analysis prune unused host adapters in this isolated fixture.
     fs.writeFileSync(
         path.join(directory, 'tsconfig.json'),
-        JSON.stringify({ extends: path.resolve(import.meta.dirname, '../../../tsconfig.base.json'), files: [entry] })
+        JSON.stringify({ extends: path.resolve(import.meta.dirname, '../../../tsconfig.base.json'), files: [entry] }),
     );
     const disposer = path.resolve('../../tools/plugin-kit/src/wasi-resource.ts');
     fs.writeFileSync(
@@ -80,14 +80,14 @@ export {
     metadata,
     common
 } from ${JSON.stringify(api)};
-`
+`,
     );
     try {
         await bundlePlugin({
             entry,
             output,
             witDir: apiWitDir,
-            version: '0.0.0'
+            version: '0.0.0',
         });
         const server = await startPumpkin({ name: 'resource-lifetime', plugins: [output] });
         try {

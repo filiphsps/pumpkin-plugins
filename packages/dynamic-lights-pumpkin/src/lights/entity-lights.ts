@@ -4,10 +4,10 @@ import type { BlockPosition, ClientLightTracker, LightClient } from './client-li
 export interface VisibleEntityLight {
     /** Stable identifier for the source entity. */
     readonly entityId: number;
-    /** Position of the fake client-only light block. */
-    readonly position: BlockPosition;
     /** Minecraft light level, from 1 through 15. */
     readonly level: number;
+    /** Position of the fake client-only light block. */
+    readonly position: BlockPosition;
 }
 
 /** Maintains client-only lights for configured entities near each player. */

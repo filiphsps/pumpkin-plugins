@@ -9,16 +9,16 @@ const tree = defineCommands('Demo', {
         permission: 'Demo:command.demo',
         subcommands: {
             list: { description: 'List things' },
-            pack: { description: 'Pack tools', subcommands: { add: { description: 'Add one' } } }
-        }
+            pack: { description: 'Pack tools', subcommands: { add: { description: 'Add one' } } },
+        },
     },
-    ping: { description: 'Answer', permission: 'Demo:command.ping' }
+    ping: { description: 'Answer', permission: 'Demo:command.ping' },
 });
 
 const handlers = {
     'demo list': () => ['a', 'b'],
     'demo pack add': () => ['added'],
-    ping: () => ['pong']
+    ping: () => ['pong'],
 };
 
 describe('buildCommands', () => {
@@ -36,7 +36,7 @@ describe('buildCommands', () => {
         const built = buildCommands(new FakeCommandHost(), tree, handlers);
         expect(built.map(({ name, description, permission }) => ({ name, description, permission }))).toEqual([
             { name: 'demo', description: 'Manage the demo', permission: 'Demo:command.demo' },
-            { name: 'ping', description: 'Answer', permission: 'Demo:command.ping' }
+            { name: 'ping', description: 'Answer', permission: 'Demo:command.ping' },
         ]);
     });
 
@@ -46,7 +46,7 @@ describe('buildCommands', () => {
         expect(registered.sort()).toEqual(
             commandInfos(tree)
                 .map((c) => c.usage)
-                .sort()
+                .sort(),
         );
     });
 
@@ -61,11 +61,11 @@ describe('buildCommands', () => {
                         description: 'Manage cache',
                         permission: 'Demo:command.demo.cache',
                         subcommands: {
-                            clear: { description: 'Clear', permission: 'Demo:command.demo.cache.clear' }
-                        }
-                    }
-                }
-            }
+                            clear: { description: 'Clear', permission: 'Demo:command.demo.cache.clear' },
+                        },
+                    },
+                },
+            },
         });
         const host = new FakeCommandHost();
         const [built] = buildCommands(host, tree, { 'demo list': () => [], 'demo cache clear': () => [] });
@@ -75,7 +75,7 @@ describe('buildCommands', () => {
         host.run(root, ['demo', 'cache', 'clear']);
         expect(hasPermission.mock.calls.map(([, permission]) => permission)).toEqual([
             'Demo:command.demo.list',
-            'Demo:command.demo.cache.clear'
+            'Demo:command.demo.cache.clear',
         ]);
 
         hasPermission.mockReturnValue(false);
@@ -98,7 +98,7 @@ describe('buildCommands', () => {
             ping: (sender) => {
                 received = sender;
                 return ['pong'];
-            }
+            },
         }).map((command) => command.node as FakeNode);
 
         const sender = host.runAs(ping as FakeNode, ['ping']);
@@ -109,7 +109,7 @@ describe('buildCommands', () => {
         const host = new FakeCommandHost();
         const [, ping] = buildCommands(host, tree, {
             ...handlers,
-            ping: () => ['fine', errorLine('broken')]
+            ping: () => ['fine', errorLine('broken')],
         }).map((c) => c.node as FakeNode);
         const sender = host.runAs(ping as FakeNode, ['ping']);
         expect(sender.lines).toEqual(['fine', 'broken']);
@@ -125,7 +125,7 @@ describe('buildCommands', () => {
             },
             'demo list': () => {
                 throw new Error('bug');
-            }
+            },
         };
         const [demo, ping] = buildCommands(host, tree, failing).map((c) => c.node as FakeNode);
         expect(() => host.run(ping as FakeNode, ['ping'])).toThrow(FakeCommandFailure);
@@ -149,7 +149,7 @@ describe('buildCommands', () => {
         const root = vi.spyOn(host, 'root');
         const onRun = vi.spyOn(host, 'onRun');
         expect(() => buildCommands(host, tree, { 'demo list': handlers['demo list'] } as typeof handlers)).toThrow(
-            'no handler for /demo pack add'
+            'no handler for /demo pack add',
         );
         expect(root).not.toHaveBeenCalled();
         expect(onRun).not.toHaveBeenCalled();
@@ -157,7 +157,7 @@ describe('buildCommands', () => {
 
     it('does not mistake an inherited property for a registered handler', () => {
         const spec = defineCommands('Demo', {
-            toString: { description: 'Example', permission: 'Demo:command.example' }
+            toString: { description: 'Example', permission: 'Demo:command.example' },
         });
         expect(() => buildCommands(new FakeCommandHost(), spec, {} as never)).toThrow('no handler for /toString');
     });
@@ -179,11 +179,11 @@ describe('buildCommands', () => {
                         description: 'Look up coordinates',
                         arguments: [
                             { name: 'x', type: 'integer', min: -30_000_000, max: 30_000_000 },
-                            { name: 'z', type: 'integer', min: -30_000_000, max: 30_000_000 }
-                        ]
-                    }
-                }
-            }
+                            { name: 'z', type: 'integer', min: -30_000_000, max: 30_000_000 },
+                        ],
+                    },
+                },
+            },
         });
         const host = new FakeCommandHost();
         let received: unknown;
@@ -191,7 +191,7 @@ describe('buildCommands', () => {
             'locate at <x> <z>': (_sender, args) => {
                 received = args;
                 return [`${args.x},${args.z}`];
-            }
+            },
         });
 
         expect(host.usages(root?.node as FakeNode)).toEqual(['/locate at <x> <z>']);
@@ -204,7 +204,7 @@ describe('buildCommands', () => {
             name: 'z',
             type: 'integer',
             min: -30_000_000,
-            max: 30_000_000
+            max: 30_000_000,
         });
     });
 
@@ -216,27 +216,27 @@ describe('buildCommands', () => {
                 subcommands: {
                     info: {
                         description: 'Show information',
-                        arguments: [{ name: 'name', type: 'string', mode: 'quotable' }]
+                        arguments: [{ name: 'name', type: 'string', mode: 'quotable' }],
                     },
                     delete: {
                         description: 'Delete a location',
-                        arguments: [{ name: 'name', type: 'string', mode: 'quotable' }]
-                    }
-                }
-            }
+                        arguments: [{ name: 'name', type: 'string', mode: 'quotable' }],
+                    },
+                },
+            },
         });
         const host = new FakeCommandHost();
         const request: CommandSuggestionRequest = {
             input: '/locate info M',
             cursor: 15,
             start: 13,
-            remaining: 'M'
+            remaining: 'M',
         };
         const [root] = buildCommands(
             host,
             argumentTree,
             { 'locate info <name>': () => [], 'locate delete <name>': () => [] },
-            { name: (_sender, current) => (current.remaining === 'M' ? ['Market'] : ['Market', 'Mine']) }
+            { name: (_sender, current) => (current.remaining === 'M' ? ['Market'] : ['Market', 'Mine']) },
         );
 
         expect(host.suggest(root?.node as FakeNode, ['locate', 'info', '<name>'], request)).toEqual(['Market']);
@@ -253,22 +253,22 @@ describe('buildCommands', () => {
                     [{ name: 'radius', type: 'integer', min: 0, max: 16 }],
                     [
                         { name: 'x', type: 'integer' },
-                        { name: 'z', type: 'integer' }
+                        { name: 'z', type: 'integer' },
                     ],
                     [
                         { name: 'x', type: 'integer' },
                         { name: 'z', type: 'integer' },
-                        { name: 'radius', type: 'integer', min: 0, max: 16 }
-                    ]
-                ]
-            }
+                        { name: 'radius', type: 'integer', min: 0, max: 16 },
+                    ],
+                ],
+            },
         });
         const host = new FakeCommandHost();
         const [root] = buildCommands(host, argumentTree, {
             locate: () => ['default'],
             'locate <radius>': (_sender, { radius }) => [`radius:${radius}`],
             'locate <x> <z>': (_sender, { x, z }) => [`position:${x},${z}`],
-            'locate <x> <z> <radius>': (_sender, { x, z, radius }) => [`position:${x},${z};radius:${radius}`]
+            'locate <x> <z> <radius>': (_sender, { x, z, radius }) => [`position:${x},${z};radius:${radius}`],
         });
         const node = root?.node as FakeNode;
 
@@ -276,13 +276,13 @@ describe('buildCommands', () => {
             '/locate',
             '/locate <radius>',
             '/locate <x> <z>',
-            '/locate <x> <z> <radius>'
+            '/locate <x> <z> <radius>',
         ]);
         expect(host.run(node, ['locate'])).toEqual(['default']);
         expect(host.run(node, ['locate', '<radius>'], { radius: 5 })).toEqual(['radius:5']);
         expect(host.run(node, ['locate', '<x>', '<z>'], { x: -8, z: 13 })).toEqual(['position:-8,13']);
         expect(host.run(node, ['locate', '<x>', '<z>', '<radius>'], { x: -8, z: 13, radius: 4 })).toEqual([
-            'position:-8,13;radius:4'
+            'position:-8,13;radius:4',
         ]);
 
         expect(node.children).toHaveLength(2);
@@ -298,15 +298,15 @@ describe('buildCommands', () => {
                 argumentVariants: [
                     [
                         { name: 'position', type: 'integer' },
-                        { name: 'z', type: 'integer' }
+                        { name: 'z', type: 'integer' },
                     ],
                     [
                         { name: 'position', type: 'string', mode: 'single-word' },
                         { name: 'z', type: 'integer' },
-                        { name: 'radius', type: 'integer' }
-                    ]
-                ]
-            }
+                        { name: 'radius', type: 'integer' },
+                    ],
+                ],
+            },
         });
         const host = new FakeCommandHost();
         const root = vi.spyOn(host, 'root');
@@ -315,8 +315,8 @@ describe('buildCommands', () => {
             buildCommands(host, invalidTree, {
                 locate: () => [],
                 'locate <position> <z>': () => [],
-                'locate <position> <z> <radius>': () => []
-            })
+                'locate <position> <z> <radius>': () => [],
+            }),
         ).toThrow('Conflicting argument definitions for <position> on /locate.');
         expect(root).not.toHaveBeenCalled();
     });
@@ -330,16 +330,16 @@ describe('buildCommands', () => {
                     [{ name: 'x', type: 'double', min: -30_000_000, max: 30_000_000 }],
                     [
                         { name: 'x', type: 'double', min: -30_000_000, max: 30_000_000 },
-                        { name: 'targets', type: 'players' }
-                    ]
-                ]
-            }
+                        { name: 'targets', type: 'players' },
+                    ],
+                ],
+            },
         });
         const host = new FakeCommandHost();
         const [root] = buildCommands(host, typedTree, {
             locate: () => ['default'],
             'locate <x>': (_sender, { x }) => [String(x)],
-            'locate <x> <targets>': (_sender, { x, targets }) => [`${x}:${targets.length}`]
+            'locate <x> <targets>': (_sender, { x, targets }) => [`${x}:${targets.length}`],
         });
 
         expect(host.usages(root?.node as FakeNode)).toEqual(['/locate', '/locate <x>', '/locate <x> <targets>']);
@@ -352,15 +352,15 @@ describe('buildCommands', () => {
                 permission: 'Demo:command.talk',
                 arguments: [
                     { name: 'message', type: 'string', mode: 'greedy' },
-                    { name: 'suffix', type: 'integer' }
-                ]
-            }
+                    { name: 'suffix', type: 'integer' },
+                ],
+            },
         });
         const host = new FakeCommandHost();
         const root = vi.spyOn(host, 'root');
 
         expect(() => buildCommands(host, invalidTree, { 'talk <message> <suffix>': () => [] })).toThrow(
-            'Greedy string argument message must be the final argument.'
+            'Greedy string argument message must be the final argument.',
         );
         expect(root).not.toHaveBeenCalled();
     });

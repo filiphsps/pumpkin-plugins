@@ -25,21 +25,21 @@ describe('port forwarding through UPnPumpkin', () => {
                 'plugins/data/BedrockAddonManager/packs/a.mcpack': makeMcpack(),
                 'plugins/data/UPnPumpkin/config.toml': routerConfig(
                     router,
-                    '\n[java]\nenabled = false\n\n[bedrock]\nenabled = false\n'
-                )
-            }
+                    '\n[java]\nenabled = false\n\n[bedrock]\nenabled = false\n',
+                ),
+            },
         });
         cleanup.push(() => server.stop());
 
         await server.waitForLog(
             new RegExp(
-                `Opened port ${port} on the router \\(upnp\\): clients download packs from http://93\\.184\\.216\\.34:${port}\\.`
+                `Opened port ${port} on the router \\(upnp\\): clients download packs from http://93\\.184\\.216\\.34:${port}\\.`,
             ),
-            60_000
+            60_000,
         );
         expect(router.igd.mappings.get(`tcp:${port}`)).toMatchObject({
             internalPort: port,
-            description: 'Bedrock resource packs'
+            description: 'Bedrock resource packs',
         });
 
         const from = server.lines.length;

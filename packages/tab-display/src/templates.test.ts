@@ -5,7 +5,7 @@ describe('tab templates', () => {
     it('keeps placeholder output literal and does not recursively resolve it', () => {
         const template = compileTemplate('Hi %player_name%!');
         expect(renderTemplate(template, { text: 'Hi %server_online%!', unresolved: [] }, 'literal', true)).toBe(
-            'Hi %server_online%!'
+            'Hi %server_online%!',
         );
     });
 

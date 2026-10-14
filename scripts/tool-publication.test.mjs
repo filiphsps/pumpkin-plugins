@@ -10,7 +10,7 @@ import {
     assertPublicToolPackageContents,
     assertStarterToolDependencies,
     parseTarEntries,
-    syncStarterToolDependencies
+    syncStarterToolDependencies,
 } from './tool-packages.mjs';
 
 const temporaryDirectories = [];
@@ -27,7 +27,7 @@ describe('public tool release fanout', () => {
                 { path: 'tools/build' },
                 { path: 'tools/pumpkin-api' },
                 { path: 'tools/static-hermes-runtime' },
-                { path: 'tools/create-pumpkin-plugin' }
+                { path: 'tools/create-pumpkin-plugin' },
             ]),
             {
                 pluginPaths: ['packages/waypoints'],
@@ -36,9 +36,9 @@ describe('public tool release fanout', () => {
                     'tools/build',
                     'tools/pumpkin-api',
                     'tools/static-hermes-runtime',
-                    'tools/create-pumpkin-plugin'
-                ]
-            }
+                    'tools/create-pumpkin-plugin',
+                ],
+            },
         );
     });
 });
@@ -49,21 +49,21 @@ describe('public tool package metadata', () => {
             name: '@pumpkin-plugins/build',
             version: '0.1.0',
             engines: { node: '>=24.21.0' },
-            publishConfig: { access: 'public' }
+            publishConfig: { access: 'public' },
         };
 
         assert.doesNotThrow(() => assertPublicToolPackage(metadata, '@pumpkin-plugins/build'));
         assert.throws(
             () => assertPublicToolPackage({ ...metadata, private: true }, '@pumpkin-plugins/build'),
-            /must not be private/
+            /must not be private/,
         );
         assert.throws(
             () => assertPublicToolPackage({ ...metadata, publishConfig: undefined }, '@pumpkin-plugins/build'),
-            /publishConfig.access must be public/
+            /publishConfig.access must be public/,
         );
         assert.throws(
             () => assertPublicToolPackage({ ...metadata, engines: undefined }, '@pumpkin-plugins/build'),
-            /engines.node must be >=24\.21\.0/
+            /engines.node must be >=24\.21\.0/,
         );
     });
 });
@@ -72,7 +72,7 @@ describe('packed public tool contents', () => {
     it('parses tar listings with Windows line endings', () => {
         assert.deepEqual(parseTarEntries('package/package.json\r\npackage/src/index.ts\r\n'), [
             'package/package.json',
-            'package/src/index.ts'
+            'package/src/index.ts',
         ]);
     });
 
@@ -83,15 +83,15 @@ describe('packed public tool contents', () => {
             'package/src/wit.mjs',
             'package/src/wit.d.mts',
             'package/wit.lock.json',
-            'package/src/index.test.ts'
+            'package/src/index.test.ts',
         ];
 
         assert.throws(() => assertPublicToolPackageContents(entries, 'tools/pumpkin-api'), /development test source/);
         assert.doesNotThrow(() =>
             assertPublicToolPackageContents(
                 entries.filter((entry) => !entry.endsWith('.test.ts')),
-                'tools/pumpkin-api'
-            )
+                'tools/pumpkin-api',
+            ),
         );
     });
 
@@ -101,18 +101,18 @@ describe('packed public tool contents', () => {
             'package/dist/index.js',
             'package/cmake/wasi-sdk-hermes-p2.cmake',
             'package/hermes-patches/0001-wasi-p2-configure-platform.patch',
-            'package/src/component/build.test.ts'
+            'package/src/component/build.test.ts',
         ];
 
         assert.throws(
             () => assertPublicToolPackageContents(entries, 'tools/static-hermes-runtime'),
-            /development test source/
+            /development test source/,
         );
         assert.doesNotThrow(() =>
             assertPublicToolPackageContents(
                 entries.filter((entry) => !entry.endsWith('.test.ts')),
-                'tools/static-hermes-runtime'
-            )
+                'tools/static-hermes-runtime',
+            ),
         );
     });
 
@@ -121,18 +121,18 @@ describe('packed public tool contents', () => {
             'package/dist/cli.js',
             'package/runtime/quickjs-runtime-bigint.wasm',
             'package/wasi-wit.lock.json',
-            'package/src/cli.ts'
+            'package/src/cli.ts',
         ];
 
         assert.throws(
             () => assertPublicToolPackageContents(entries, 'tools/build'),
-            /CLI-only package contains source/
+            /CLI-only package contains source/,
         );
         assert.doesNotThrow(() =>
             assertPublicToolPackageContents(
                 entries.filter((entry) => !entry.startsWith('package/src/')),
-                'tools/build'
-            )
+                'tools/build',
+            ),
         );
     });
 
@@ -142,18 +142,18 @@ describe('packed public tool contents', () => {
             'package/dist/create-pumpkin-plugin.js',
             'package/templates/typescript/package.json',
             'package/templates/javascript/package.json',
-            'package/bin/create-pumpkin-plugin.test.ts'
+            'package/bin/create-pumpkin-plugin.test.ts',
         ];
 
         assert.throws(
             () => assertPublicToolPackageContents(entries, 'tools/create-pumpkin-plugin'),
-            /development test source/
+            /development test source/,
         );
         assert.doesNotThrow(() =>
             assertPublicToolPackageContents(
                 entries.filter((entry) => !entry.endsWith('.test.ts')),
-                'tools/create-pumpkin-plugin'
-            )
+                'tools/create-pumpkin-plugin',
+            ),
         );
     });
 });
@@ -164,7 +164,7 @@ describe('starter tool dependency versions', () => {
         temporaryDirectories.push(root);
         for (const [directory, name, version] of [
             ['tools/pumpkin-api', '@pumpkin-plugins/pumpkin-api', '0.2.0'],
-            ['tools/build', '@pumpkin-plugins/build', '0.3.4']
+            ['tools/build', '@pumpkin-plugins/build', '0.3.4'],
         ]) {
             mkdirSync(join(root, directory), { recursive: true });
             writeFileSync(join(root, directory, 'package.json'), JSON.stringify({ name, version }));
@@ -179,20 +179,20 @@ describe('starter tool dependency versions', () => {
                 JSON.stringify({
                     dependencies: {
                         '@pumpkin-plugins/pumpkin-api': '^0.1.0',
-                        '@pumpkin-plugins/build': '^0.1.0'
-                    }
-                })
+                        '@pumpkin-plugins/build': '^0.1.0',
+                    },
+                }),
             );
         }
 
         assert.equal(syncStarterToolDependencies(root), true);
         for (const language of templateDirectories) {
             const packageJson = JSON.parse(
-                readFileSync(join(root, 'tools/create-pumpkin-plugin/templates', language, 'package.json'), 'utf8')
+                readFileSync(join(root, 'tools/create-pumpkin-plugin/templates', language, 'package.json'), 'utf8'),
             );
             assertStarterToolDependencies(packageJson, {
                 '@pumpkin-plugins/pumpkin-api': '0.2.0',
-                '@pumpkin-plugins/build': '0.3.4'
+                '@pumpkin-plugins/build': '0.3.4',
             });
         }
     });
@@ -201,17 +201,17 @@ describe('starter tool dependency versions', () => {
         const packageJson = {
             dependencies: {
                 '@pumpkin-plugins/pumpkin-api': '^0.1.0',
-                '@pumpkin-plugins/build': '^0.1.0'
-            }
+                '@pumpkin-plugins/build': '^0.1.0',
+            },
         };
 
         assert.throws(
             () =>
                 assertStarterToolDependencies(packageJson, {
                     '@pumpkin-plugins/pumpkin-api': '0.2.0',
-                    '@pumpkin-plugins/build': '0.3.4'
+                    '@pumpkin-plugins/build': '0.3.4',
                 }),
-            /must be \^0\.2\.0/
+            /must be \^0\.2\.0/,
         );
     });
 });
@@ -221,23 +221,23 @@ describe('packed builder tool dependencies', () => {
         const builder = {
             dependencies: {
                 '@pumpkin-plugins/pumpkin-api': '0.2.0',
-                '@pumpkin-plugins/static-hermes-runtime': '0.4.1'
-            }
+                '@pumpkin-plugins/static-hermes-runtime': '0.4.1',
+            },
         };
 
         assert.doesNotThrow(() =>
             assertPackedBuilderDependencies(builder, {
                 '@pumpkin-plugins/pumpkin-api': '0.2.0',
-                '@pumpkin-plugins/static-hermes-runtime': '0.4.1'
-            })
+                '@pumpkin-plugins/static-hermes-runtime': '0.4.1',
+            }),
         );
         assert.throws(
             () =>
                 assertPackedBuilderDependencies(builder, {
                     '@pumpkin-plugins/pumpkin-api': '0.3.0',
-                    '@pumpkin-plugins/static-hermes-runtime': '0.4.1'
+                    '@pumpkin-plugins/static-hermes-runtime': '0.4.1',
                 }),
-            /must resolve to packed version 0\.3\.0/
+            /must resolve to packed version 0\.3\.0/,
         );
     });
 });

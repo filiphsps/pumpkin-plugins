@@ -19,7 +19,7 @@ async function cache() {
 it('refuses an HTTP failure without leaving a provider artifact behind', async () => {
     const cacheDir = await cache();
     await expect(
-        resolvePieProvider({ cacheDir, fetch: async () => new Response('missing', { status: 404 }) })
+        resolvePieProvider({ cacheDir, fetch: async () => new Response('missing', { status: 404 }) }),
     ).rejects.toThrow('HTTP 404');
     expect(await fs.readdir(cacheDir)).toEqual([]);
 });
@@ -32,8 +32,8 @@ it('refuses downloaded bytes that do not match the pinned artifact hash', async 
             fetch: async (input) => {
                 urls.push(String(input));
                 return new Response('untrusted wasm');
-            }
-        })
+            },
+        }),
     ).rejects.toThrow('SHA-256 mismatch');
     expect(urls).toEqual(['https://github.com/Rennex07/PumpkinPIE/releases/download/v0.2.3/pumpkin_pie_plugin.wasm']);
     expect(await fs.readdir(cacheDir)).toEqual([]);
@@ -47,12 +47,12 @@ it('revalidates cached artifacts and never silently trusts corrupt bytes', async
             cacheDir,
             fetch: async () => {
                 throw new Error('must not fetch');
-            }
-        })
+            },
+        }),
     ).rejects.toThrow('SHA-256 mismatch');
     expect(
         createHash('sha256')
             .update(await fs.readFile(target))
-            .digest('hex')
+            .digest('hex'),
     ).not.toBe(PIE_RELEASE.sha256);
 });

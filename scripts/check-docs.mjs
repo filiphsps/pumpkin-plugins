@@ -14,7 +14,7 @@ const problems = [];
 const packageDirs = (group) => discoverComponents(root, group).map(({ slug }) => `${group}/${slug}`);
 const markdownFiles = (dir) =>
     walkMarkdown(path.join(root, dir), { exclude: [path.join(root, 'docs/api')] }).map((file) =>
-        path.relative(root, file).split(path.sep).join('/')
+        path.relative(root, file).split(path.sep).join('/'),
     );
 
 const packages = [...packageDirs('packages'), ...packageDirs('tools')];
@@ -32,7 +32,7 @@ const generatedPackageOutputs = new Set(
             const target = path.posix.normalize(path.posix.join(dir, output));
             return target.startsWith(`${dir}/`) ? [target] : [];
         });
-    })
+    }),
 );
 const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
 /** Include the private engine-comparison package when checking documentation links and paths. */
@@ -49,7 +49,7 @@ const docs = [
     ...benchmarkDocs,
     ...markdownFiles('.github'),
     ...(exists('AGENTS.md') ? ['AGENTS.md'] : []),
-    ...markdownFiles('.agents')
+    ...markdownFiles('.agents'),
 ];
 
 // 1. Every package has a README that names it.
@@ -152,7 +152,7 @@ for (const file of docs) {
 const rootScripts = Object.keys(JSON.parse(read('package.json')).scripts ?? {});
 const scripts = new Set([
     ...rootScripts,
-    ...packages.flatMap((p) => Object.keys(JSON.parse(read(p, 'package.json')).scripts ?? {}))
+    ...packages.flatMap((p) => Object.keys(JSON.parse(read(p, 'package.json')).scripts ?? {})),
 ]);
 const PNPM_BUILTINS = new Set([
     'install',
@@ -171,7 +171,7 @@ const PNPM_BUILTINS = new Set([
     'peers',
     'approve-builds',
     'licenses',
-    'run'
+    'run',
 ]);
 for (const file of docs) {
     for (const match of code(read(file)).matchAll(/\bpnpm\s+(run\s+)?([a-z][\w:-]*)/g)) {

@@ -5,7 +5,7 @@ import {
     FakeCommandHost,
     type FakeNode,
     MemoryFiles,
-    MemoryLogger
+    MemoryLogger,
 } from '@pumpkin-plugins/plugin-kit/testing';
 import { FakeIgd, FakeNetwork } from '@pumpkin-plugins/port-mapping/testing';
 import { describe, expect, it } from 'vitest';
@@ -29,7 +29,7 @@ describe('the /upnp commands', () => {
         expect(host.usages(root).sort()).toEqual((info.commands ?? []).map((c) => c.usage).sort());
         expect(info.commands).toEqual(commandInfos(commands));
         expect(new Set(info.commands.map((c) => c.permission))).toEqual(
-            new Set([`${COMMAND_PERMISSION}.status`, `${COMMAND_PERMISSION}.reload`])
+            new Set([`${COMMAND_PERMISSION}.status`, `${COMMAND_PERMISSION}.reload`]),
         );
     });
 
@@ -51,7 +51,7 @@ describe('the /upnp commands', () => {
             new FakeIgd({
                 upnp: false,
                 natPmp: false,
-                webPages: { '/html/login/index.html': { body: '<title>Speedport Konfigurationsprogramm</title>' } }
+                webPages: { '/html/login/index.html': { body: '<title>Speedport Konfigurationsprogramm</title>' } },
             });
         const identified = (env: ReturnType<typeof setup>) => {
             for (

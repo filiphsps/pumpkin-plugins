@@ -15,7 +15,7 @@ it('assigns each engine configuration a stable, separate cached component path',
         path.join(benchmarkDir, 'build', 'engine-comparison', 'static-hermes-lean-hades-js.wasm'),
         path.join(benchmarkDir, 'build', 'engine-comparison', 'static-hermes-lean-hades-ts.wasm'),
         path.join(benchmarkDir, 'build', 'engine-comparison', 'static-hermes-lean-malloc-js.wasm'),
-        path.join(benchmarkDir, 'build', 'engine-comparison', 'static-hermes-lean-malloc-ts.wasm')
+        path.join(benchmarkDir, 'build', 'engine-comparison', 'static-hermes-lean-malloc-ts.wasm'),
     ]);
     expect(new Set(buildOutputs).size).toBe(9);
 });

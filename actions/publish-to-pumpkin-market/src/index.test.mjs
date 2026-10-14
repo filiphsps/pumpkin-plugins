@@ -38,7 +38,7 @@ function inputs(extra = {}) {
         'INPUT_PLUGIN-NAME': 'Published plugin',
         INPUT_VERSION: '1.2.3',
         'INPUT_WASM-FILE': 'plugin.wasm',
-        ...extra
+        ...extra,
     };
 }
 
@@ -46,8 +46,8 @@ function readOutputs(file) {
     return Object.fromEntries(
         [...fs.readFileSync(file, 'utf8').matchAll(/^([a-z-]+)<<([^\n]+)\n([\s\S]*?)\n\2$/gm)].map((match) => [
             match[1],
-            match[3]
-        ])
+            match[3],
+        ]),
     );
 }
 
@@ -73,7 +73,7 @@ function uploadedFile(body, contentType, filename) {
     assert.notEqual(end, -1, 'file part should end at the multipart boundary');
     return {
         headers: body.subarray(headerStart, start - 4).toString('utf8'),
-        bytes: body.subarray(start, end)
+        bytes: body.subarray(start, end),
     };
 }
 
@@ -83,14 +83,14 @@ describe('publish-to-market action', () => {
         const noSelector = await run(dir, {
             INPUT_VERSION: '1.2.3',
             'INPUT_WASM-FILE': 'plugin.wasm',
-            'INPUT_API-TOKEN': 'test-token'
+            'INPUT_API-TOKEN': 'test-token',
         });
         assert.equal(noSelector.status, 1);
         assert.match(noSelector.stderr, /Set exactly one of plugin-name or plugin-id/);
 
         const bothSelectors = await run(
             dir,
-            inputs({ 'INPUT_PLUGIN-ID': 'public-test-id', 'INPUT_API-TOKEN': 'test-token' })
+            inputs({ 'INPUT_PLUGIN-ID': 'public-test-id', 'INPUT_API-TOKEN': 'test-token' }),
         );
         assert.equal(bothSelectors.status, 1);
         assert.match(bothSelectors.stderr, /Set exactly one of plugin-name or plugin-id/);
@@ -145,8 +145,8 @@ describe('publish-to-market action', () => {
                     'INPUT_API-TOKEN': 'test-token',
                     'INPUT_API-URL': market.url,
                     INPUT_WARN: 'true',
-                    GITHUB_OUTPUT: outputFile
-                })
+                    GITHUB_OUTPUT: outputFile,
+                }),
             );
             assert.equal(result.status, 0, result.stderr);
             assert.match(result.stdout, /::warning .*no Market listing named/);
@@ -189,15 +189,15 @@ describe('publish-to-market action', () => {
                     'INPUT_API-TOKEN': 'test-token',
                     'INPUT_API-URL': market.url,
                     INPUT_WARN: 'true',
-                    GITHUB_OUTPUT: outputFile
-                })
+                    GITHUB_OUTPUT: outputFile,
+                }),
             );
             assert.equal(result.status, 0, result.stderr);
             assert.match(result.stdout, /::warning .*has not been published yet/);
             assert.deepEqual(readOutputs(outputFile), {
                 'listing-id': '42',
                 'listing-name': 'Published plugin',
-                status: 'skipped'
+                status: 'skipped',
             });
         } finally {
             market.instance.close();
@@ -235,8 +235,8 @@ describe('publish-to-market action', () => {
                     INPUT_TRACK: 'beta',
                     'INPUT_RELEASE-NOTES': '## Fixed\n\n- Kept the ports open.',
                     GITHUB_STEP_SUMMARY: summaryFile,
-                    GITHUB_OUTPUT: outputFile
-                })
+                    GITHUB_OUTPUT: outputFile,
+                }),
             );
             assert.equal(result.status, 0, result.stderr);
             assert.equal(requests[0].method, 'GET');
@@ -251,7 +251,7 @@ describe('publish-to-market action', () => {
             assert.deepEqual(wasmPart.bytes, fs.readFileSync(path.join(dir, 'plugin.wasm')));
             assert.match(
                 requests[2].body,
-                /name="metadata"\r\n\r\n{"version":"1.2.3","track":"beta","releaseNotes":"## Fixed\\n\\n- Kept the ports open\."}/
+                /name="metadata"\r\n\r\n{"version":"1.2.3","track":"beta","releaseNotes":"## Fixed\\n\\n- Kept the ports open\."}/,
             );
             assert.equal(fs.existsSync(summaryFile), true, 'successful publishing should write a CI summary');
             assert.match(result.stdout, /Published Published plugin 1\.2\.3 to Market listing 42/);
@@ -259,7 +259,7 @@ describe('publish-to-market action', () => {
                 'listing-id': '42',
                 'listing-name': 'Published plugin',
                 status: 'success',
-                'published-version': '1.2.3'
+                'published-version': '1.2.3',
             });
         } finally {
             market.instance.close();
@@ -314,8 +314,8 @@ describe('publish-to-market action', () => {
                         'INPUT_API-URL': market.url,
                         INPUT_WARN: 'true',
                         GITHUB_OUTPUT: outputFile,
-                        GITHUB_STEP_SUMMARY: summaryFile
-                    })
+                        GITHUB_STEP_SUMMARY: summaryFile,
+                    }),
                 );
                 const summary = fs.existsSync(summaryFile) ? fs.readFileSync(summaryFile, 'utf8') : '';
                 assert.equal(result.status, 1);
@@ -358,8 +358,8 @@ describe('publish-to-market action', () => {
                         'INPUT_API-TOKEN': 'test-token',
                         'INPUT_API-URL': market.url,
                         INPUT_WARN: 'true',
-                        GITHUB_OUTPUT: outputFile
-                    })
+                        GITHUB_OUTPUT: outputFile,
+                    }),
                 );
                 assert.equal(result.status, 1, result.stdout);
                 assert.match(result.stderr, new RegExp(`Could not look up Market plugin.*${status}`));
@@ -379,7 +379,7 @@ describe('publish-to-market action', () => {
         '[]',
         '{"id":42,"name":true,"version":"1"}',
         '{"id":"42","name":"Plugin","version":"1"}',
-        '{"id":42,"name":"Plugin","version":{}}'
+        '{"id":42,"name":"Plugin","version":{}}',
     ]) {
         it(`rejects an invalid successful ID response: ${body}`, async () => {
             const requests = [];
@@ -398,8 +398,8 @@ describe('publish-to-market action', () => {
                         'INPUT_API-TOKEN': 'test-token',
                         'INPUT_API-URL': market.url,
                         INPUT_WARN: 'true',
-                        GITHUB_OUTPUT: outputFile
-                    })
+                        GITHUB_OUTPUT: outputFile,
+                    }),
                 );
                 assert.equal(result.status, 1, result.stdout);
                 assert.match(result.stderr, /Market plugin lookup response.*(?:JSON|listing)/);
@@ -431,8 +431,8 @@ describe('publish-to-market action', () => {
                         'INPUT_API-TOKEN': 'test-token',
                         'INPUT_API-URL': market.url,
                         INPUT_WARN: warn,
-                        GITHUB_OUTPUT: outputFile
-                    })
+                        GITHUB_OUTPUT: outputFile,
+                    }),
                 );
                 assert.equal(result.status, warn === 'true' ? 0 : 1, result.stderr);
                 assert.equal(requests, 1);
@@ -456,8 +456,8 @@ describe('publish-to-market action', () => {
                             id: 42,
                             public_id: 'public-test-id',
                             name: 'Canonical Plugin',
-                            version: '1.0.0'
-                        })
+                            version: '1.0.0',
+                        }),
                     );
                 } else {
                     let body = '';
@@ -478,7 +478,7 @@ describe('publish-to-market action', () => {
                     'INPUT_WASM-FILE': 'plugin.wasm',
                     'INPUT_API-TOKEN': 'test-token',
                     'INPUT_API-URL': market.url,
-                    GITHUB_OUTPUT: outputFile
+                    GITHUB_OUTPUT: outputFile,
                 });
 
                 assert.equal(result.status, 0, result.stderr);
@@ -489,7 +489,7 @@ describe('publish-to-market action', () => {
                     'listing-id': '42',
                     'listing-name': 'Canonical Plugin',
                     status: 'success',
-                    'published-version': '1.2.3'
+                    'published-version': '1.2.3',
                 });
             } finally {
                 market.instance.close();

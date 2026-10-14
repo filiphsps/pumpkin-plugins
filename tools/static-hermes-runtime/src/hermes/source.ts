@@ -4,28 +4,28 @@ import { type HermesFileSystem, type HermesProcessRunner, hermesFileSystem, herm
 
 /** Repository, branch, and commit that identify the pinned Hermes source. */
 export interface HermesSourcePin {
-    /** Public HTTPS Git repository URL. */
-    repository: string;
     /** Pinned upstream branch name recorded with the commit. */
     branch: string;
     /** Exact 40-character commit SHA used for checkout and build validation. */
     commit: string;
+    /** Public HTTPS Git repository URL. */
+    repository: string;
 }
 
 /** Source paths and injectable filesystem/process dependencies for Hermes checkout management. */
 export interface EnsureHermesSourceOptions {
-    /** Validated repository and commit to check out. */
-    pin: HermesSourcePin;
-    /** Hermes source checkout path. */
-    source: string;
-    /** Whether this path is managed by the runtime's shared cache and can be rebuilt. */
-    managedSource: boolean;
-    /** Paths that the configured patch series is allowed to modify. */
-    managedPaths: readonly string[];
     /** Optional filesystem implementation for tests. */
     filesystem?: HermesFileSystem;
+    /** Paths that the configured patch series is allowed to modify. */
+    managedPaths: readonly string[];
+    /** Whether this path is managed by the runtime's shared cache and can be rebuilt. */
+    managedSource: boolean;
+    /** Validated repository and commit to check out. */
+    pin: HermesSourcePin;
     /** Optional Git command runner for tests. */
     process?: HermesProcessRunner;
+    /** Hermes source checkout path. */
+    source: string;
 }
 
 /**
@@ -66,7 +66,7 @@ export function parseHermesSourcePin(value: unknown): HermesSourcePin {
  */
 export function readHermesSourcePin(
     filename: string,
-    filesystem: HermesFileSystem = hermesFileSystem
+    filesystem: HermesFileSystem = hermesFileSystem,
 ): HermesSourcePin {
     if (!filesystem.existsSync(filename)) throw new Error(`Hermes source pin not found at ${filename}`);
     let value: unknown;
@@ -74,7 +74,7 @@ export function readHermesSourcePin(
         value = JSON.parse(filesystem.readFileSync(filename, 'utf8')) as unknown;
     } catch (error) {
         throw new Error(
-            `Hermes source pin is invalid JSON at ${filename}: ${error instanceof Error ? error.message : String(error)}`
+            `Hermes source pin is invalid JSON at ${filename}: ${error instanceof Error ? error.message : String(error)}`,
         );
     }
     return parseHermesSourcePin(value);
@@ -101,7 +101,7 @@ export function ensureHermesSource(options: EnsureHermesSourceOptions): string {
     }
     if (!options.managedSource) {
         throw new Error(
-            `Hermes source is ${actualCommit}, expected pinned commit ${options.pin.commit}: ${options.source}`
+            `Hermes source is ${actualCommit}, expected pinned commit ${options.pin.commit}: ${options.source}`,
         );
     }
     verifyManagedChanges(options.source, options.managedPaths, process);
@@ -125,7 +125,7 @@ export function refreshHermesSource(options: EnsureHermesSourceOptions): string 
     const actualCommit = process.output('git', ['-C', options.source, 'rev-parse', 'HEAD']);
     if (actualCommit !== options.pin.commit) {
         throw new Error(
-            `Hermes source is ${actualCommit}, expected pinned commit ${options.pin.commit}: ${options.source}`
+            `Hermes source is ${actualCommit}, expected pinned commit ${options.pin.commit}: ${options.source}`,
         );
     }
     verifyManagedChanges(options.source, options.managedPaths, process);
@@ -138,7 +138,7 @@ function clonePinnedSource(
     pin: HermesSourcePin,
     destination: string,
     filesystem: HermesFileSystem,
-    process: HermesProcessRunner
+    process: HermesProcessRunner,
 ): void {
     filesystem.mkdirSync(path.dirname(destination), { recursive: true });
     process.run('git', ['clone', '--filter=blob:none', '--no-checkout', pin.repository, destination]);
@@ -151,7 +151,7 @@ function clonePinnedSource(
 function installPinnedSource(
     options: EnsureHermesSourceOptions,
     filesystem: HermesFileSystem,
-    runner: HermesProcessRunner
+    runner: HermesProcessRunner,
 ): void {
     const installing = `${options.source}.install-${process.pid}-${Date.now()}`;
     try {
@@ -166,7 +166,7 @@ function installPinnedSource(
 function rebuildPinnedSource(
     options: EnsureHermesSourceOptions,
     filesystem: HermesFileSystem,
-    runner: HermesProcessRunner
+    runner: HermesProcessRunner,
 ): void {
     const rebuilding = `${options.source}.rebuild-${process.pid}-${Date.now()}`;
     const previous = `${options.source}.stale-${process.pid}-${Date.now()}`;
@@ -200,7 +200,7 @@ function verifyManagedChanges(source: string, managedPaths: readonly string[], p
     const unexpected = changedPaths.filter((filename) => !allowed.has(filename));
     if (unexpected.length > 0) {
         throw new Error(
-            `Hermes source has local changes outside the managed patch set: ${source} (${unexpected.join(', ')})`
+            `Hermes source has local changes outside the managed patch set: ${source} (${unexpected.join(', ')})`,
         );
     }
 }

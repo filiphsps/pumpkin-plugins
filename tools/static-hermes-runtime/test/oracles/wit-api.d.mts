@@ -6,7 +6,7 @@ import type {
     WitFunction,
     WitParameter,
     WitWasiAdapterPlan,
-    WitWasiInterface
+    WitWasiInterface,
 } from '../src/wit/types.ts';
 
 /** WIT models shared by the facade and adapter generators. */
@@ -21,13 +21,13 @@ export function generateWitSimpleMethodDispatch(
     apiPackage: WitApiPackage,
     bundleSource?: string,
     apiMethods?: string[],
-    apiAdapters?: WitApiAdapterPlan[]
+    apiAdapters?: WitApiAdapterPlan[],
 ): string;
 /** Generate C dispatch that adapts selected WASI operations to the component runtime. */
 export function generateWasiAdapterDispatch(
     selectedInterfaces: WitWasiInterface[],
     allInterfaces?: WitWasiInterface[],
-    usedMethods?: string[]
+    usedMethods?: string[],
 ): string;
 /** Generate C event dispatch for the event types used by the bundle. */
 export function generateWitEventDispatch(apiPackage: WitApiPackage, bundleSource?: string): string;
@@ -48,5 +48,5 @@ export function generateWitApiFunctionForResolvedOperation(input: {
 /** Generate the host-function branch for one resolved WASI resource method plan. */
 export function generateWitResourceMethodForResolvedPlan(
     apiPackage: WitApiPackage,
-    plan: WitWasiAdapterPlan
+    plan: WitWasiAdapterPlan,
 ): string | undefined;

@@ -13,7 +13,7 @@ describe('checkShell', () => {
             'yarn add x',
             'bunx tsc',
             'cd packages/upnpumpkin && npm i',
-            'pnpm build; npx biome check'
+            'pnpm build; npx biome check',
         ]) {
             assert.match(checkShell(command) ?? '', /pnpm/, command);
         }
@@ -24,7 +24,7 @@ describe('checkShell', () => {
             'pnpm add -D x',
             'pnpm exec vitest run',
             'npm view turbo version',
-            'echo "npx is banned"'
+            'echo "npx is banned"',
         ]) {
             assert.equal(checkShell(command), undefined, command);
         }
@@ -41,7 +41,7 @@ describe('checkEdit', () => {
         '| Command | |',
         '<!-- docs:end commands -->',
         '',
-        'Hand-written outro.'
+        'Hand-written outro.',
     ].join('\n');
     const read = (file) => (file === 'packages/p/README.md' ? readme : undefined);
 
@@ -56,7 +56,7 @@ describe('checkEdit', () => {
             'tools/config/node_modules/x/index.js',
             'packages/p/CHANGELOG.md',
             'tools/config/CHANGELOG.md',
-            '.release-please-manifest.json'
+            '.release-please-manifest.json',
         ]) {
             assert.ok(checkEdit(file, {}, read), file);
         }
@@ -69,7 +69,7 @@ describe('checkEdit', () => {
         assert.match(checkEdit('packages/p/README.md', { oldString: '| Command | |' }, read) ?? '', /pnpm readme/);
         assert.match(
             checkEdit('packages/p/README.md', { oldString: 'intro.\n\n<!-- docs:begin' }, read) ?? '',
-            /pnpm readme/
+            /pnpm readme/,
         );
         assert.equal(checkEdit('packages/p/README.md', { oldString: 'Hand-written outro.' }, read), undefined);
     });
@@ -94,7 +94,7 @@ describe('checkEdit', () => {
             '@@',
             '*** Add File: packages/p/src/b.ts',
             '*** Delete File: pnpm-lock.yaml',
-            '*** End Patch'
+            '*** End Patch',
         ].join('\n');
         assert.deepEqual(patchedFiles(patch), ['packages/p/src/a.ts', 'packages/p/src/b.ts', 'pnpm-lock.yaml']);
     });
@@ -106,7 +106,7 @@ describe('quietTurbo', () => {
         assert.equal(quietTurbo('pnpm run typecheck'), 'pnpm run typecheck --output-logs=errors-only');
         assert.equal(
             quietTurbo('pnpm exec turbo run test:integration --filter=...@pumpkin-plugins/upnpumpkin'),
-            'pnpm exec turbo run test:integration --filter=...@pumpkin-plugins/upnpumpkin --output-logs=errors-only'
+            'pnpm exec turbo run test:integration --filter=...@pumpkin-plugins/upnpumpkin --output-logs=errors-only',
         );
     });
 
@@ -119,7 +119,7 @@ describe('quietTurbo', () => {
             'pnpm test && pnpm lint',
             'pnpm test -- --project unit',
             'pnpm testing',
-            'pnpm exec vitest run'
+            'pnpm exec vitest run',
         ]) {
             assert.equal(quietTurbo(command), command, command);
         }
@@ -131,7 +131,7 @@ describe('planChecks', () => {
         'packages/upnpumpkin': '@pumpkin-plugins/upnpumpkin',
         'tools/config': '@pumpkin-plugins/config',
         'tools/build': '@pumpkin-plugins/build',
-        'tools/apis/upnpumpkin-api': '@pumpkin-plugins/upnpumpkin-api'
+        'tools/apis/upnpumpkin-api': '@pumpkin-plugins/upnpumpkin-api',
     };
     const plan = (files, exists = () => true) => planChecks(files, exists, (dir) => names[dir]);
     const turbo = (steps) => steps.find((s) => s.name === 'Typecheck and unit tests')?.args;
@@ -142,7 +142,7 @@ describe('planChecks', () => {
         assert.equal(biome?.args.includes('--write'), false);
         assert.deepEqual(biome?.args.slice(-2), [
             'packages/upnpumpkin/src/forwarder.ts',
-            'packages/upnpumpkin/README.md'
+            'packages/upnpumpkin/README.md',
         ]);
         const jsdoc = steps.find((s) => s.name === 'JSDoc');
         assert.equal(jsdoc?.args.includes('--fix'), false);
@@ -150,7 +150,7 @@ describe('planChecks', () => {
         assert.ok(turbo(steps)?.includes('--filter=...@pumpkin-plugins/upnpumpkin'));
         assert.deepEqual(
             steps.slice(-2).map((s) => s.name),
-            ['Repo checks', 'Generated READMEs']
+            ['Repo checks', 'Generated READMEs'],
         );
     });
 
@@ -161,8 +161,8 @@ describe('planChecks', () => {
     it('checks grouped tools and ignores their build output', () => {
         assert.ok(
             turbo(plan(['tools/apis/upnpumpkin-api/src/index.ts']))?.includes(
-                '--filter=...@pumpkin-plugins/upnpumpkin-api'
-            )
+                '--filter=...@pumpkin-plugins/upnpumpkin-api',
+            ),
         );
         assert.deepEqual(plan(['tools/apis/upnpumpkin-api/build/generated.d.ts']), []);
     });
@@ -172,7 +172,7 @@ describe('planChecks', () => {
         assert.ok(args);
         assert.equal(
             args.some((a) => a.startsWith('--filter')),
-            false
+            false,
         );
     });
 
@@ -181,7 +181,7 @@ describe('planChecks', () => {
         assert.ok(plan(['.agents/hooks/guard.mjs']).some((s) => s.name === 'Script tests'));
         assert.equal(
             plan(['docs/testing.md']).some((s) => s.name === 'Script tests'),
-            false
+            false,
         );
     });
 
@@ -189,7 +189,7 @@ describe('planChecks', () => {
         const steps = plan(['packages/upnpumpkin/src/gone.ts'], () => false);
         assert.equal(
             steps.some((s) => s.name === 'Biome'),
-            false
+            false,
         );
         assert.ok(turbo(steps));
         assert.deepEqual(plan(['packages/upnpumpkin/build/x.wasm', 'dist/x.wasm']), []);
@@ -211,7 +211,7 @@ describe('check scope regressions', () => {
             assert.ok(turbo(steps));
             assert.equal(
                 turbo(steps).some((arg) => arg.startsWith('--filter=')),
-                false
+                false,
             );
         }
     });
@@ -228,13 +228,13 @@ describe('check scope regressions', () => {
         assert.equal(steps[0].args.filter((f) => f === 'tools/config/src/load.ts').length, 1);
         assert.equal(
             steps.some((step) => step.args.includes('--fix') || step.args.includes('--write')),
-            false
+            false,
         );
     });
 
     it('does not report an aborted run as passing', async () => {
         await assert.rejects(runChecks([{ name: 'Must not run', args: ['test'] }], { signal: AbortSignal.abort() }), {
-            name: 'AbortError'
+            name: 'AbortError',
         });
     });
 });
@@ -243,15 +243,15 @@ describe('parseStatus', () => {
     it('preserves both packages in staged and unstaged renames, including unusual filenames', () => {
         assert.deepEqual(
             parseStatus(
-                'R  tools/new/a.ts\0tools/old/a.ts\0 R packages/new/b.ts\0packages/old/b.ts\0?? file with space\nand newline.ts\0'
+                'R  tools/new/a.ts\0tools/old/a.ts\0 R packages/new/b.ts\0packages/old/b.ts\0?? file with space\nand newline.ts\0',
             ),
             [
                 'tools/new/a.ts',
                 'tools/old/a.ts',
                 'packages/new/b.ts',
                 'packages/old/b.ts',
-                'file with space\nand newline.ts'
-            ]
+                'file with space\nand newline.ts',
+            ],
         );
     });
 
@@ -260,7 +260,7 @@ describe('parseStatus', () => {
             'a.ts',
             'gone.ts',
             'new.ts',
-            'copy.ts'
+            'copy.ts',
         ]);
         assert.deepEqual(parseStatus(''), []);
     });
@@ -273,6 +273,6 @@ it('protects generated action sections and custom guide blocks', () => {
     assert.match(checkEdit('tools/example/docs/index.md', { oldString: 'Limits' }, () => guide) ?? '', /pnpm readme/);
     assert.equal(
         checkEdit('tools/example/docs/index.md', { oldString: 'Written prose' }, () => `Written prose\n${guide}`),
-        undefined
+        undefined,
     );
 });

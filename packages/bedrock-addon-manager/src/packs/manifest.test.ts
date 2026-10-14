@@ -12,7 +12,7 @@ describe('readManifest', () => {
             moduleTypes: ['resources'],
             addonPack: false,
             hasScripts: false,
-            rtxEnabled: false
+            rtxEnabled: false,
         });
     });
 
@@ -27,7 +27,7 @@ describe('readManifest', () => {
 
         const both = zipSync({
             'inner/deep/manifest.json': strToU8(JSON.stringify(manifestJson({ version: [9, 9, 9] }))),
-            'inner/manifest.json': strToU8(JSON.stringify(manifestJson({ version: [1, 2, 3] })))
+            'inner/manifest.json': strToU8(JSON.stringify(manifestJson({ version: [1, 2, 3] }))),
         });
         expect(readManifest(both).version).toBe('1.2.3');
     });
@@ -55,7 +55,7 @@ describe('readManifest', () => {
         expect(flags({ modules: ['client_data'] })).toEqual([true, true]);
         expect(flags({ modules: ['resources'], dependencies: ['11111111-1111-4111-8111-111111111111'] })).toEqual([
             true,
-            false
+            false,
         ]);
     });
 
@@ -86,7 +86,7 @@ describe('readManifest', () => {
         expect(error(makeMcpack('{"modules": []}'))).toBe('manifest.json has no header');
         expect(error(makeMcpack(manifestJson({ uuid: 'not-a-uuid' })))).toBe('header.uuid is missing or not a UUID');
         expect(error(makeMcpack(manifestJson({ version: [1, 0] })))).toBe(
-            'header.version must be [major, minor, patch]'
+            'header.version must be [major, minor, patch]',
         );
     });
 });

@@ -9,7 +9,7 @@ export class FakeTransport {
     /** Queue a literal JSON fixture, raw malformed bytes, or a transport failure. */
     enqueue(reply: unknown): void {
         this.replies.push(
-            reply instanceof Error || reply instanceof Uint8Array ? reply : strToU8(JSON.stringify(reply))
+            reply instanceof Error || reply instanceof Uint8Array ? reply : strToU8(JSON.stringify(reply)),
         );
     }
     /** Injectable transport; fails if no fixture remains. */

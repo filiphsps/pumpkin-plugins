@@ -23,13 +23,13 @@ describe('failed callback registration', () => {
             registerEvent(handlerId: number) {
                 eventId = handlerId;
                 throw new Error('Host rejected event');
-            }
+            },
         } as unknown as Context;
         const handler = vi.fn(() => ({ handled: true }));
         const plugin = new TestPlugin();
 
         expect(() => plugin.registerEvent(context, 'player-join-event' as never, handler as never)).toThrow(
-            'Host rejected event'
+            'Host rejected event',
         );
         expect(eventId).not.toBe(-1);
 
@@ -43,19 +43,19 @@ describe('failed callback registration', () => {
         const command = {
             executeWithHandlerId(handlerId: number) {
                 commandId = handlerId;
-            }
+            },
         } as unknown as Command;
         const context = {
             registerCommand() {
                 throw new Error('Host rejected command');
-            }
+            },
         } as unknown as Context;
         const handler = vi.fn(() => 7);
 
         expect(() => new TestPlugin().registerCommand(context, command, handler)).toThrow('Host rejected command');
         expect(commandId).not.toBe(-1);
         expect(() => handleCommand(commandId, {} as never, server, [] as never)).toThrow(
-            `No handler for command ID ${commandId}`
+            `No handler for command ID ${commandId}`,
         );
         expect(handler).not.toHaveBeenCalled();
     });
@@ -66,17 +66,17 @@ describe('failed callback registration', () => {
             executeWithHandlerId(handlerId: number) {
                 commandId = handlerId;
                 throw new Error('Command rejected handler ID');
-            }
+            },
         } as unknown as Command;
         const context = { registerCommand: vi.fn() } as unknown as Context;
         const handler = vi.fn(() => 7);
 
         expect(() => new TestPlugin().registerCommand(context, command, handler)).toThrow(
-            'Command rejected handler ID'
+            'Command rejected handler ID',
         );
         expect(commandId).not.toBe(-1);
         expect(() => handleCommand(commandId, {} as never, server, [] as never)).toThrow(
-            `No handler for command ID ${commandId}`
+            `No handler for command ID ${commandId}`,
         );
         expect(handler).not.toHaveBeenCalled();
         expect(context.registerCommand).not.toHaveBeenCalled();

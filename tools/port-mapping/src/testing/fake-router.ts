@@ -5,12 +5,12 @@ import { FakeIgd, type FakeIgdOptions } from './fake-igd.ts';
 
 /** A router on localhost: the in-memory `FakeIgd` behind real UDP and HTTP sockets. */
 export interface FakeRouter {
+    close(): Promise<void>;
     igd: FakeIgd;
-    /** `address:port` for `router.upnp_search`. */
-    ssdp: string;
     /** `address:port` for `router.nat_pmp_gateway`. */
     natPmp: string;
-    close(): Promise<void>;
+    /** `address:port` for `router.upnp_search`. */
+    ssdp: string;
 }
 
 const LOOPBACK = [127, 0, 0, 1] as const;
@@ -38,7 +38,7 @@ export async function startFakeRouter(options: FakeIgdOptions = {}): Promise<Fak
                 request.method ?? 'GET',
                 request.url ?? '/',
                 headers,
-                Buffer.concat(chunks).toString()
+                Buffer.concat(chunks).toString(),
             );
             response.writeHead(answer?.status ?? 500, { 'Content-Type': 'text/xml' });
             response.end(answer?.body ?? '');
@@ -59,7 +59,7 @@ export async function startFakeRouter(options: FakeIgdOptions = {}): Promise<Fak
             natPmp.close();
             server.closeAllConnections();
             await new Promise<void>((resolve) => server.close(() => resolve()));
-        }
+        },
     };
 }
 

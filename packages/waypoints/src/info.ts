@@ -12,7 +12,7 @@ export const info = {
     description: 'Server-managed waypoints with access rules and a Java 26.3 HUD',
     permissions: [
         { name: 'fs.read.data', reason: 'Read the waypoint store from the plugin data folder.' },
-        { name: 'fs.write.data', reason: 'Persist waypoint changes in the plugin data folder.' }
+        { name: 'fs.write.data', reason: 'Persist waypoint changes in the plugin data folder.' },
     ],
-    commands: commandInfos(commands)
+    commands: commandInfos(commands),
 } satisfies PluginInfo<typeof PLUGIN_NAME>;

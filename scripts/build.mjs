@@ -30,7 +30,7 @@ export function hasStaticHermesBuild(graph, root = workspaceRoot, taskName = 'bu
 
     return graph.tasks.some(
         ({ package: packageName, task }) =>
-            task === taskName && engines.has(packageName) && engines.get(packageName) !== 'quickjs'
+            task === taskName && engines.has(packageName) && engines.get(packageName) !== 'quickjs',
     );
 }
 
@@ -62,7 +62,7 @@ export function normalizeBuildRequest(args) {
     return {
         task: parseTs ? 'build:parse-ts' : 'build',
         args: forwardedArgs,
-        dryRun: dry !== undefined
+        dryRun: dry !== undefined,
     };
 }
 
@@ -79,12 +79,12 @@ export function runStaticHermesPreparation(root, env, spawn = spawnSync) {
         cwd: root,
         env,
         stdio: 'inherit',
-        shell: process.platform === 'win32'
+        shell: process.platform === 'win32',
     });
     if (build.error) throw build.error;
     if (build.status !== 0) {
         throw new Error(
-            `Static Hermes runtime CLI build exited with ${build.signal ?? build.status ?? 'unknown status'}`
+            `Static Hermes runtime CLI build exited with ${build.signal ?? build.status ?? 'unknown status'}`,
         );
     }
 
@@ -92,7 +92,7 @@ export function runStaticHermesPreparation(root, env, spawn = spawnSync) {
     const result = spawn(process.execPath, [staticHermesCli, 'hermes', 'prepare'], {
         cwd: root,
         env,
-        stdio: 'inherit'
+        stdio: 'inherit',
     });
     if (result.error) throw result.error;
     if (result.status !== 0) {
@@ -108,16 +108,16 @@ export async function prepareHermesInIsolatedEnvironment({
     workspaceRoot: root = workspaceRoot,
     env = process.env,
     setupEnvironment,
-    runPrepare = (prepareEnvironment) => runStaticHermesPreparation(root, prepareEnvironment)
+    runPrepare = (prepareEnvironment) => runStaticHermesPreparation(root, prepareEnvironment),
 }) {
     const prepareEnvironment = Object.fromEntries(
-        Object.entries(env).filter(([name]) => name !== alreadyPreparedVariable)
+        Object.entries(env).filter(([name]) => name !== alreadyPreparedVariable),
     );
     await prepareStaticHermesBuild({
         workspaceRoot: root,
         env: prepareEnvironment,
         setupEnvironment,
-        prepare: () => runPrepare(prepareEnvironment)
+        prepare: () => runPrepare(prepareEnvironment),
     });
     return prepareEnvironment;
 }
@@ -170,7 +170,7 @@ function runTurbo(task, args, { captureOutput = false, env = process.env } = {})
         cwd: workspaceRoot,
         env,
         encoding: 'utf8',
-        stdio: captureOutput ? ['inherit', 'pipe', 'inherit'] : 'inherit'
+        stdio: captureOutput ? ['inherit', 'pipe', 'inherit'] : 'inherit',
     });
     if (result.error) throw result.error;
     return result;

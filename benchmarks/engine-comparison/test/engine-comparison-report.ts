@@ -1,9 +1,6 @@
 import type { BenchmarkWorkload, WorkloadProvenance } from '../src/benchmark-workloads.ts';
 
 export interface EngineResult {
-    id: string;
-    label: string;
-    binarySizeBytes: number;
     apiBehavior: {
         eventRegistrations: number;
         eventDispatches: number;
@@ -15,6 +12,9 @@ export interface EngineResult {
         serverQueries: number;
         playersObserved: number;
     };
+    binarySizeBytes: number;
+    id: string;
+    label: string;
     runtimeSourceCompilation: boolean;
     unicodePropertyEscapes: boolean;
     workloads: BenchmarkWorkload[];
@@ -40,7 +40,7 @@ export function formatReport(engines: readonly EngineResult[], baselineId: strin
         }),
         '',
         `| Benchmark type | Scope / workload | Inputs per sample | ${performanceColumns.join(' | ')} | ${ratioEngines.map(({ label }) => `${baseline.label}/${label}`).join(' | ')} |`,
-        `| --- | --- | ---: | ${engines.map(() => '---:').join(' | ')} | ${ratioEngines.map(() => '---:').join(' | ')} |`
+        `| --- | --- | ---: | ${engines.map(() => '---:').join(' | ')} | ${ratioEngines.map(() => '---:').join(' | ')} |`,
     ];
 
     for (const baselineWorkload of baseline.workloads) {
@@ -60,19 +60,19 @@ export function formatReport(engines: readonly EngineResult[], baselineId: strin
         const type = provenanceLabel(baselineWorkload.provenance);
         const description = escapeTableCell(`${baselineWorkload.area} / ${baselineWorkload.name}`);
         lines.push(
-            `| ${type} | ${description} | ${baselineWorkload.operationsPerSample.toLocaleString()} | ${timingCells.join(' | ')} | ${ratioCells.join(' | ')} |`
+            `| ${type} | ${description} | ${baselineWorkload.operationsPerSample.toLocaleString()} | ${timingCells.join(' | ')} | ${ratioCells.join(' | ')} |`,
         );
     }
 
     const sampleCounts = [...new Set(baseline.workloads.map(({ samplesMs }) => samplesMs.length))].sort(
-        (left, right) => left - right
+        (left, right) => left - right,
     );
     const sampleDescription =
         sampleCounts.length === 1
             ? `${sampleCounts[0]} measured samples per workload`
             : `measured sample counts vary by workload (${sampleCounts.join(', ')})`;
     const syntheticCount = baseline.workloads.filter(
-        ({ provenance }) => provenance === 'synthetic guest fixture'
+        ({ provenance }) => provenance === 'synthetic guest fixture',
     ).length;
     const realWorkloads = baseline.workloads.filter(({ provenance }) => provenance === 'real Pumpkin API');
     const behavior = Object.entries(baseline.apiBehavior)
@@ -85,13 +85,13 @@ export function formatReport(engines: readonly EngineResult[], baselineId: strin
         `Each workload has one warm-up and ${sampleDescription}. Timings are informational and have no pass thresholds.`,
         ...(syntheticCount > 0
             ? [
-                  'Synthetic rows use deterministic guest fixtures; they do not run the named plugins or Pumpkin’s host command router.'
+                  'Synthetic rows use deterministic guest fixtures; they do not run the named plugins or Pumpkin’s host command router.',
               ]
             : []),
         ...(realWorkloads.length > 0
             ? [
                   `Real Pumpkin API workloads: ${realWorkloads.map(({ area, operationsPerSample }) => `${area} (${operationsPerSample.toLocaleString()} inputs per sample)`).join('; ')}.`,
-                  'The comparison server has no connected players; player-oriented guest workloads use deterministic fixtures.'
+                  'The comparison server has no connected players; player-oriented guest workloads use deterministic fixtures.',
               ]
             : []),
         `Pumpkin API behavior on ${baseline.label}: ${behavior}.`,
@@ -99,7 +99,7 @@ export function formatReport(engines: readonly EngineResult[], baselineId: strin
             .filter(({ runtimeSourceCompilation }) => !runtimeSourceCompilation)
             .map(
                 ({ label }) =>
-                    `${label} omits runtime source compilation, so \`eval\` and \`Function(string)\` are unavailable.`
+                    `${label} omits runtime source compilation, so \`eval\` and \`Function(string)\` are unavailable.`,
             ),
         '',
         '### Average performance across all benchmarks',
@@ -107,7 +107,7 @@ export function formatReport(engines: readonly EngineResult[], baselineId: strin
         '',
         `| Metric | ${engines.map(({ label }) => escapeTableCell(label)).join(' | ')} |`,
         `| --- | ${engines.map(() => '---:').join(' | ')} |`,
-        `| Average benchmark median (ms) | ${averageCells.join(' | ')} |`
+        `| Average benchmark median (ms) | ${averageCells.join(' | ')} |`,
     );
 
     return lines.join('\n');
@@ -127,11 +127,11 @@ export function formatConsoleReport(engines: readonly EngineResult[], baselineId
                 `${engine.binarySizeBytes.toLocaleString()} bytes`,
                 engine.id === baselineId
                     ? 'baseline'
-                    : formatSizeDifference(engine.binarySizeBytes, baseline.binarySizeBytes)
-            ])
+                    : formatSizeDifference(engine.binarySizeBytes, baseline.binarySizeBytes),
+            ]),
         ),
         '',
-        'Per-workload performance (median and min–max in ms; baseline/engine ratio above 1 means faster than baseline)'
+        'Per-workload performance (median and min–max in ms; baseline/engine ratio above 1 means faster than baseline)',
     ];
 
     for (const baselineWorkload of baseline.workloads) {
@@ -146,19 +146,19 @@ export function formatConsoleReport(engines: readonly EngineResult[], baselineId
         lines.push(
             '',
             `${provenanceLabel(baselineWorkload.provenance)} | ${baselineWorkload.area} / ${baselineWorkload.name} | ${baselineWorkload.operationsPerSample.toLocaleString()} inputs/sample`,
-            formatConsoleTable(['Engine', 'Median (ms)', 'Min–max (ms)', 'Baseline/engine'], workloadRows)
+            formatConsoleTable(['Engine', 'Median (ms)', 'Min–max (ms)', 'Baseline/engine'], workloadRows),
         );
     }
 
     const sampleCounts = [...new Set(baseline.workloads.map(({ samplesMs }) => samplesMs.length))].sort(
-        (left, right) => left - right
+        (left, right) => left - right,
     );
     const sampleDescription =
         sampleCounts.length === 1
             ? `${sampleCounts[0]} measured samples per workload`
             : `measured sample counts vary by workload (${sampleCounts.join(', ')})`;
     const syntheticCount = baseline.workloads.filter(
-        ({ provenance }) => provenance === 'synthetic guest fixture'
+        ({ provenance }) => provenance === 'synthetic guest fixture',
     ).length;
     const realWorkloads = baseline.workloads.filter(({ provenance }) => provenance === 'real Pumpkin API');
     const behavior = Object.entries(baseline.apiBehavior)
@@ -167,8 +167,8 @@ export function formatConsoleReport(engines: readonly EngineResult[], baselineId
     const averageRows = [
         [
             'Average benchmark median (ms)',
-            ...engines.map((engine) => averageBenchmarkMedian(engine.workloads).toFixed(2))
-        ]
+            ...engines.map((engine) => averageBenchmarkMedian(engine.workloads).toFixed(2)),
+        ],
     ];
 
     lines.push(
@@ -179,13 +179,13 @@ export function formatConsoleReport(engines: readonly EngineResult[], baselineId
         `Each workload has one warm-up and ${sampleDescription}. Timings are informational and have no pass thresholds.`,
         ...(syntheticCount > 0
             ? [
-                  'Synthetic rows use deterministic guest fixtures; they do not run the named plugins or Pumpkin’s host command router.'
+                  'Synthetic rows use deterministic guest fixtures; they do not run the named plugins or Pumpkin’s host command router.',
               ]
             : []),
         ...(realWorkloads.length > 0
             ? [
                   `Real Pumpkin API workloads: ${realWorkloads.map(({ area, operationsPerSample }) => `${area} (${operationsPerSample.toLocaleString()} inputs per sample)`).join('; ')}.`,
-                  'The comparison server has no connected players; player-oriented guest workloads use deterministic fixtures.'
+                  'The comparison server has no connected players; player-oriented guest workloads use deterministic fixtures.',
               ]
             : []),
         `Pumpkin API behavior on ${baseline.label}: ${behavior}.`,
@@ -193,8 +193,8 @@ export function formatConsoleReport(engines: readonly EngineResult[], baselineId
             .filter(({ runtimeSourceCompilation }) => !runtimeSourceCompilation)
             .map(
                 ({ label }) =>
-                    `${label} omits runtime source compilation, so eval and Function(string) are unavailable.`
-            )
+                    `${label} omits runtime source compilation, so eval and Function(string) are unavailable.`,
+            ),
     );
 
     return lines.join('\n');
@@ -202,7 +202,7 @@ export function formatConsoleReport(engines: readonly EngineResult[], baselineId
 
 function validateComparison(
     engines: readonly EngineResult[],
-    baselineId: string
+    baselineId: string,
 ): { baseline: EngineResult; workloadMaps: Map<string, Map<string, BenchmarkWorkload>> } {
     const baseline = engines.find(({ id }) => id === baselineId);
     if (!baseline) throw new Error(`Unknown benchmark baseline: ${baselineId}`);

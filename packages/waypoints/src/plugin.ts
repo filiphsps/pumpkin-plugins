@@ -5,7 +5,7 @@ import type {
     PlayerCommandSendEventData,
     PlayerJoinEventData,
     PlayerLeaveEventData,
-    ServerCommandEventData
+    ServerCommandEventData,
 } from 'pumpkin:plugin/event@0.1.0';
 import { ItemStack } from 'pumpkin:plugin/item-stack@0.1.0';
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
@@ -21,7 +21,7 @@ import {
     commandHandlers,
     onlinePlayerNameSuggestions,
     resetPropertySuggestions,
-    waypointNameSuggestions
+    waypointNameSuggestions,
 } from './commands/handlers.ts';
 import { itemIconInputFromCommand } from './commands/item-input.ts';
 import { commands } from './commands/spec.ts';
@@ -57,12 +57,12 @@ class Waypoints extends PluginBase {
         this.files = files;
         const store = new WaypointStore(files, {
             error: (message) => logging.log('error', `${info.name}: ${message}`),
-            warn: (message) => logging.log('warn', `${info.name}: ${message}`)
+            warn: (message) => logging.log('warn', `${info.name}: ${message}`),
         });
         const catalog = new WaypointCatalog(store);
         const hud = new WaypointHudService(server, catalog, {
             onError: (viewerId, error) =>
-                logging.log('warn', `${info.name}: waypoint HUD update failed for ${viewerId}: ${String(error)}`)
+                logging.log('warn', `${info.name}: waypoint HUD update failed for ${viewerId}: ${String(error)}`),
         });
         this.hud = hud;
         // Pumpkin disables scheduled plugin tasks before shutting down the WASM store.
@@ -116,15 +116,15 @@ class Waypoints extends PluginBase {
                 } finally {
                     disposeWasiResource(stack);
                 }
-            }
+            },
         };
         registerCommands(ctx, commands, commandHandlers(commandRuntime), {
             arguments: {
                 name: waypointNameSuggestions(commandRuntime),
                 player: onlinePlayerNameSuggestions(commandRuntime),
-                property: resetPropertySuggestions
+                property: resetPropertySuggestions,
             },
-            register: (handler) => this.registerCommandSuggestionHandler(handler)
+            register: (handler) => this.registerCommandSuggestionHandler(handler),
         });
     }
 
