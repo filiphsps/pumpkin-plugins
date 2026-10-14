@@ -1,0 +1,485 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Merge repository-specific guidance with the organization's CodeRabbit defaults.
+inheritance: true
+early_access: true
+tone_instructions: >-
+    Be concise, technical, and direct. Report actionable issues introduced by the PR, supported by
+    concrete evidence. Explain impact and recommend a fix. Avoid speculation, conversational filler,
+    repetition, and style feedback already covered by CI.
+reviews:
+    profile: assertive
+    request_changes_workflow: true
+    allow_author_approval: false
+    high_level_summary_instructions: >-
+        Be concise and concrete. Summarize user-visible behavior and compatibility changes; for
+        shared tooling, identify affected consumers. Avoid filler and restating the file list.
+    high_level_summary_in_walkthrough: true
+    auto_title_instructions: >-
+        Use a Conventional Commit title in the form `type(scope): imperative summary`. Choose a
+        Conventional Commit type (`build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
+        `revert`, `style`, or `test`) and scope it to the affected plugin, tool, action, or area.
+        Mark breaking changes as `type(scope)!: summary`. Keep the summary specific, lowercase,
+        under 72 characters, and without a trailing period. Avoid a generic `repo` scope when a
+        component scope fits.
+    review_status: true
+    review_details: false
+    fail_commit_status: true
+    collapse_walkthrough: false
+    changed_files_summary: false
+    sequence_diagrams: false
+    estimate_code_review_effort: false
+    assess_linked_issues: true
+    related_issues: true
+    related_prs: true
+    suggested_labels: true
+    # Keep label names aligned with the repository's GitHub label set.
+    labeling_instructions:
+        - label: "area: actions"
+          instructions: Changes to reusable GitHub Actions under actions/.
+        - label: "area: ci"
+          instructions: Changes to GitHub Actions workflows or CI configuration.
+        - label: "area: docs"
+          instructions: Documentation, guides, or generated references are a primary part of the change.
+        - label: "area: extension"
+          instructions: Changes to a Visual Studio Code extension or its tooling.
+        - label: "area: plugins"
+          instructions: Changes to one or more plugins under packages/.
+        - label: "area: runtime"
+          instructions: Changes to Pumpkin API/WIT, WASI, WebAssembly, or runtime compatibility.
+        - label: "area: tooling"
+          instructions: Changes to shared tools, scripts, generators, or repository tooling.
+        - label: "autorelease: pending"
+          instructions: Do not suggest; release automation manages this label.
+        - label: "autorelease: tagged"
+          instructions: Do not suggest; release automation manages this label.
+        - label: bug
+          instructions: >-
+              Apply to changes that fix incorrect or broken behavior; pair with the most specific
+              bug subtype when one applies.
+        - label: "bug: build/release"
+          instructions: Compilation, packaging, signing, or release artifact failures; pair with bug.
+        - label: "bug: compatibility"
+          instructions: Breaks a supported Pumpkin, API, platform, or plugin version; pair with bug.
+        - label: "bug: configuration"
+          instructions: Plugin configuration is rejected, ignored, or applied incorrectly; pair with bug.
+        - label: "bug: crash"
+          instructions: The plugin or server crashes, or the plugin fails to load or start; pair with bug.
+        - label: "bug: data loss"
+          instructions: User or server data is lost, corrupted, or not persisted; pair with bug.
+        - label: "bug: incorrect behavior"
+          instructions: Output or behavior is incorrect; pair with bug.
+        - label: "bug: performance"
+          instructions: Excessive lag, CPU or memory use, or slow response; pair with bug.
+        - label: "bug: regression"
+          instructions: Behavior that worked before is broken in a later change; pair with bug.
+        - label: "bug: security"
+          instructions: A vulnerability, unsafe access, or integrity weakness; pair with bug.
+        - label: dependencies
+          instructions: Dependency additions, upgrades, removals, or workspace catalog changes.
+        - label: documentation
+          instructions: "Use for documentation-focused PRs; pair with area: docs when appropriate."
+        - label: duplicate
+          instructions: Do not suggest for PRs; this is an issue-triage label.
+        - label: enhancement
+          instructions: Adds a user-facing feature or capability.
+        - label: good first issue
+          instructions: Do not suggest for PRs; this is an issue-intake label.
+        - label: help wanted
+          instructions: Do not suggest for PRs; this is an issue-intake label.
+        - label: invalid
+          instructions: Do not suggest for PRs; this is an issue-disposition label.
+        - label: maintenance
+          instructions: Internal upkeep or refactoring without a user-facing feature or bug fix.
+        - label: "plugin: Distant Horizons Support"
+          instructions: Changes specifically related to packages/distant-horizons-support-pumpkin/.
+        - label: "priority: critical"
+          instructions: >-
+              Use only for a demonstrated severe issue blocking core use or a release; do not infer
+              urgency from the diff alone.
+        - label: "priority: high"
+          instructions: Use only when clear urgency or substantial user impact is established.
+        - label: "priority: low"
+          instructions:
+              Use only when low priority is explicitly established; do not infer it for routine
+              changes.
+        - label: "priority: medium"
+          instructions: Use only when a normal-priority issue or milestone is explicitly established.
+        - label: question
+          instructions: Do not suggest for PRs; this is an issue-intake label.
+        - label: "runtime: quickjs"
+          instructions: Apply when the change specifically concerns QuickJS behavior or compatibility.
+        - label: "runtime: static-hermes"
+          instructions: Apply when the change specifically concerns Static Hermes behavior or compatibility.
+        - label: slop
+          instructions: Managed by slop_detection; do not suggest from style or wording alone.
+        - label: "status: blocked"
+          instructions: Use only when the PR is explicitly blocked by an unresolved decision or dependency.
+        - label: "status: needs info"
+          instructions: Use only when the PR explicitly needs information from its author or reporter.
+        - label: "status: needs triage"
+          instructions: Use only when the PR is explicitly awaiting owner, classification, or priority.
+        - label: wontfix
+          instructions: Do not suggest for PRs; this is an issue-disposition label.
+    mutually_exclusive_groups:
+        # Choose one priority and one release stage when either label family applies.
+        runtime:
+            - "runtime: quickjs"
+            - "runtime: static-hermes"
+        status:
+            - "status: blocked"
+            - "status: needs info"
+            - "status: needs triage"
+        priority:
+            - "priority: critical"
+            - "priority: high"
+            - "priority: medium"
+            - "priority: low"
+    # Keep suggestions reviewable; maintainers apply labels manually.
+    auto_apply_labels: false
+    suggested_reviewers: false
+    auto_assign_reviewers: false
+    enable_prompt_for_ai_agents: false
+    in_progress_fortune: false
+    poem: false
+    # Ignore generated build output and local caches; review their source files instead.
+    path_filters:
+        - "!**/.cache/**"
+        - "!**/.turbo/**"
+        - "!**/node_modules/**"
+        - "!**/coverage/**"
+        - "!**/dist/**"
+        - "!**/*.wasm"
+    path_instructions:
+        - path: .github/common/**
+          instructions: >-
+              Review local composite actions as executable CI code. Check input validation, token
+              and permission scope, expression and shell injection, artifact trust, pinned
+              dependencies, and failure propagation.
+        - path: .github/workflows/**
+          instructions: >-
+              Check permissions, expression and shell injection risks, untrusted PR events, secret
+              exposure, concurrency, job dependencies, and artifact handoffs. This repository
+              intentionally uses pinned toolchains and CI workflows; report an actual security or
+              correctness problem rather than generic preferences.
+        - path: actions/**
+          instructions: >-
+              Check handling of untrusted action inputs, shell injection, token scope, error
+              propagation, artifact provenance, and signature verification. Do not treat a rebuilt
+              artifact as byte-identical to the originally signed or released artifact. Check
+              whether changed inputs/outputs affect users.
+        - path: benchmarks/**
+          instructions: >-
+              Treat benchmark results as workload-specific. Check that engine configurations and
+              inputs are comparable; don't infer general performance wins from a single run. Keep
+              workloads, checksums, and report claims aligned.
+        - path: docs/**
+          instructions: >-
+              Check claims against source, pinned versions, and CI behavior. Verify links and the
+              documentation index. Generated README content should come from its owning generator;
+              don't recommend hand-editing generated sections.
+        - path: extensions/**
+          instructions: >-
+              Check compatibility with the declared VS Code engine and API range, activation,
+              contributed commands and settings, workspace trust, tests, build output, and VSIX
+              packaging. Follow the extension CI workflow.
+        - path: packages/**
+          instructions: >-
+              Review observable behavior under the pinned Pumpkin/WIT API, not assumptions about
+              Node.js or browsers. Check player permissions, platform capability gates, cleanup of
+              listeners/tasks, host-resource lifetime, configuration persistence, and
+              invalid/untrusted input. WIT u64/s64 values are bigint; flag lossy conversions or
+              incompatible argument types. New behavior and bug fixes should have appropriate unit
+              tests and, when host behavior is involved, real-server integration tests. Flag
+              concrete regressions only.
+        - path: scripts/**
+          instructions: >-
+              Check input validation, subprocess arguments, quoting, temporary-file and cache
+              cleanup, error propagation, and affected script tests. For release scripts, check that
+              GitHub mutations and artifact handling match the documented dry-run and release
+              behavior.
+        - path: tools/pumpkin-api/**
+          instructions: >-
+              Check the pinned upstream WIT source, generated guest declarations, API/WIT ABI, and
+              the Pumpkin release used by the test harness as one compatibility contract. Keep
+              package and WIT ABI versions distinct, and update the compatibility inventory and
+              guidance when that contract changes.
+        - path: tools/static-hermes-runtime/**
+          instructions: >-
+              Check the pinned Hermes revision, toolchain pins, WIT ABI, and WASI compatibility. For
+              native code directly using Hermes GC internals, follow
+              .agents/skills/hermes-gc-safe-coding/SKILL.md: root live GC values across safepoints,
+              validate CallResult before use, and respect handle lifetimes. Do not apply
+              Hermes-internal rooting rules to TypeScript values or ordinary JSI wrappers. Check
+              both Static Hermes behavior and QuickJS compatibility where shared interfaces change.
+        - path: tools/**
+          instructions: >-
+              Changes to shared libraries can affect several plugins and packed external consumers.
+              Check exported API contracts, transitive callers, package metadata, and downstream
+              compatibility. Generated WIT types and READMEs must be updated through their owning
+              generators, not edited by hand.
+    slop_detection:
+        label: slop
+        include_all_authors: false
+    auto_review:
+        enabled: true
+        auto_incremental_review: true
+        drafts: true
+        # Zero keeps reviews enabled for every update to an open pull request.
+        auto_pause_after_reviewed_commits: 0
+        # Skip work-in-progress and release-generated pull request titles.
+        ignore_title_keywords:
+            - WIP
+            - "WIP:"
+            - "DRAFT:"
+            - DO NOT MERGE
+            - "chore(master): release"
+    finishing_touches:
+        unit_tests:
+            enabled: false
+        docstrings:
+            enabled: false
+        simplify:
+            enabled: false
+    # Keep repository-specific checks advisory until their signal is proven.
+    pre_merge_checks:
+        docstrings:
+            mode: off
+        title:
+            mode: off
+        custom_checks:
+            - name: External compatibility
+              mode: warning
+              instructions: >-
+                  Apply only when the diff changes an externally observable contract: plugin
+                  commands, permissions, configuration or persistence, exported package APIs,
+                  WIT/WASI interfaces, runtime compatibility, GitHub Action inputs or outputs, or
+                  release artifacts. Identify the previous and new behavior, affected callers or
+                  consumers, and whether the change is intentional and documented. Pass as not
+                  applicable when no contract changes. Report only changes supported by the diff and
+                  repository docs.
+            - name: Pumpkin API and server ABI alignment
+              mode: warning
+              instructions: >-
+                  Apply when the diff changes tools/pumpkin-api/wit.lock.json,
+                  tools/pumpkin-api/package.json, generated guest declarations, the test server pin
+                  in tools/test-harness/src/pumpkin-version.ts, or the API catalog entry in
+                  pnpm-workspace.yaml. When the host API or WIT changes, verify that the WIT ABI
+                  matches the intended Pumpkin release and update the affected pin, compatibility
+                  inventory, and guidance. Do not require an ABI or server pin change for a
+                  TypeScript-facade-only change. Use docs/plugin-api/abi-and-runtime.md: the npm
+                  package version, WIT ABI, and Pumpkin server version are distinct values. Pass as
+                  not applicable when these contracts are untouched; report only a mismatch
+                  supported by repository evidence.
+            - name: Generated docs match their sources
+              mode: warning
+              instructions: >-
+                  Apply when the diff changes plugin metadata or configuration, action inputs or
+                  outputs, extension package metadata, or another source that feeds generated README
+                  content or documentation catalogs. Verify the generated Markdown and catalog
+                  entries match their source and generated blocks were not edited by hand. Pass as
+                  not applicable when no generated documentation source or output is affected.
+            - name: Shared dependencies use the workspace catalog
+              mode: warning
+              instructions: >-
+                  Apply when package manifests or pnpm-workspace.yaml dependency entries change.
+                  Verify dependency versions are pinned and dependencies shared by multiple
+                  workspace packages use catalog references in pnpm-workspace.yaml. Do not require a
+                  catalog entry for a dependency used by only one package. Pass as not applicable
+                  when dependency declarations are untouched.
+    # Enable analyzers used by this TS/WASI monorepo; leave unrelated language tools disabled.
+    tools:
+        actionlint:
+            enabled: true
+        ast-grep:
+            enabled: false
+        biome:
+            enabled: true
+        blinter:
+            enabled: false
+        brakeman:
+            enabled: false
+        buf:
+            enabled: false
+        checkmake:
+            enabled: false
+        checkov:
+            enabled: false
+        circleci:
+            enabled: false
+        clang:
+            enabled: true
+        clippy:
+            enabled: false
+        cppcheck:
+            enabled: true
+        detekt:
+            enabled: false
+        dotenvLint:
+            enabled: false
+        emberTemplateLint:
+            enabled: false
+        eslint:
+            enabled: true
+        fbinfer:
+            enabled: false
+        flake8:
+            enabled: false
+        fortitudeLint:
+            enabled: false
+        github-checks:
+            enabled: true
+        gitleaks:
+            enabled: true
+        golangci-lint:
+            enabled: false
+        hadolint:
+            enabled: false
+        htmlhint:
+            enabled: false
+        languagetool:
+            enabled: false
+        luacheck:
+            enabled: false
+        markdownlint:
+            enabled: false
+        oasdiff:
+            enabled: false
+        opengrep:
+            enabled: true
+        osvScanner:
+            enabled: true
+        oxc:
+            enabled: false
+        phpcs:
+            enabled: false
+        phpmd:
+            enabled: false
+        phpstan:
+            enabled: false
+        pmd:
+            enabled: false
+        presidio:
+            enabled: false
+        prismaLint:
+            enabled: false
+        psscriptanalyzer:
+            enabled: false
+        pylint:
+            enabled: false
+        reactDoctor:
+            enabled: false
+        regal:
+            enabled: false
+        rubocop:
+            enabled: false
+        ruff:
+            enabled: false
+        semgrep:
+            enabled: false
+        shellcheck:
+            enabled: true
+        shopifyThemeCheck:
+            enabled: false
+        skillspector:
+            enabled: true
+        smartyLint:
+            enabled: false
+        sqlfluff:
+            enabled: false
+        squawk:
+            enabled: false
+        stylelint:
+            enabled: false
+        swiftlint:
+            enabled: false
+        tflint:
+            enabled: false
+        trivy:
+            enabled: false
+        trufflehog:
+            enabled: false
+        vale:
+            enabled: false
+        verilator:
+            enabled: false
+        yamllint:
+            enabled: false
+        zizmor:
+            enabled: true
+chat:
+    # Only reply when CodeRabbit is explicitly mentioned.
+    auto_reply: false
+    art: false
+    allow_non_org_members: true
+    integrations:
+        jira:
+            usage: disabled
+        linear:
+            usage: disabled
+knowledge_base:
+    code_guidelines:
+        filePatterns:
+            - CONTRIBUTING.md
+            - files: docs/code-style.md
+              applyTo: "**/*"
+            - files: docs/building.md
+              applyTo: packages/**,tools/**,benchmarks/**
+            - files: docs/testing.md
+              applyTo: packages/**,tools/**,benchmarks/**
+            - files: docs/plugin-api/abi-and-runtime.md
+              applyTo: packages/**,tools/**
+            - files: docs/plugin-info-and-readmes.md
+              applyTo: packages/**,actions/**,extensions/**
+            - files: docs/plugin-config.md
+              applyTo: packages/**
+            - files: docs/benchmarking.md
+              applyTo: benchmarks/**
+            - files: docs/creating-an-action.md
+              applyTo: actions/**
+            - files: docs/creating-an-extension.md
+              applyTo: extensions/**
+            - files: docs/port-forwarding.md
+              applyTo: packages/upnpumpkin/**,tools/port-mapping/**,tools/apis/upnpumpkin-api/**
+    # Keep upstream context focused on source contracts this repository consumes.
+    linked_repositories:
+        - repository: Pumpkin-MC/Pumpkin
+          instructions: >-
+              Upstream server implementation and plugin host behavior. Consult when compatibility
+              with the pinned server matters.
+        - repository: Pumpkin-MC/pumpkin-api-ts
+          instructions: >-
+              Legacy TypeScript plugin API used as the compatibility baseline and migration source.
+              Consult when reviewing API compatibility or migration.
+        - repository: Pumpkin-MC/pumpkin-plugin-wit
+          instructions: >-
+              Canonical upstream WIT source pinned by tools/pumpkin-api/wit.lock.json. Consult when
+              reviewing WIT, generated guest declarations, or ABI changes.
+        - repository: Pumpkin-MC/Market-Frontend
+          instructions: >-
+              Pumpkin Market frontend API client and plugin listing models. Consult when changes
+              affect Market endpoints, listing metadata, or client compatibility.
+        - repository: Pumpkin-MC/ppm
+          instructions: >-
+              Pumpkin Package Manager Market API client and response models. Consult when changes
+              affect Market endpoints or response compatibility.
+    learnings:
+        scope: local
+    issues:
+        scope: local
+    pull_requests:
+        scope: local
+    jira:
+        usage: disabled
+    linear:
+        usage: disabled
+    mcp:
+        usage: disabled
+    automatic_linking_mode: auto
+issue_enrichment:
+    planning:
+        auto_planning:
+            enabled: false
+    auto_enrich:
+        enabled: true
+    labeling:
+        auto_apply_labels: false
