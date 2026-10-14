@@ -435,6 +435,27 @@ describe('npm first-release bootstrap', () => {
         assert.equal(result.status, 'published');
     });
 
+    it('runs npm CLI commands outside the workspace so devEngines cannot block them', async () => {
+        const fixture = makeFixture();
+        fixture.adapters.npm = undefined;
+        const commands = [];
+        fixture.adapters.runCommand = (command, args, options) => {
+            assert.equal(command, 'npm');
+            assert.equal(options?.cwd, os.tmpdir());
+            commands.push(args[0]);
+            if (args[0] === 'whoami') return { status: 0, stdout: 'test-maintainer\n', stderr: '' };
+            if (args[0] === 'profile') return { status: 0, stdout: 'two-factor auth: auth-only\n', stderr: '' };
+            if (args[0] === 'org') return { status: 0, stdout: '{"test-maintainer":"developer"}', stderr: '' };
+            if (args[0] === 'publish') return { status: 0, stdout: '', stderr: '' };
+            return { status: 1, stdout: '', stderr: 'unexpected npm command' };
+        };
+
+        const result = await bootstrapFixture(fixture);
+
+        assert.equal(result.status, 'published');
+        assert.deepEqual(commands, ['whoami', 'profile', 'org', 'publish']);
+    });
+
     it('rejects an existing package owner mismatch even when the account is a write collaborator', async () => {
         const fixture = makeFixture({ registry: { getPackage: () => ({ kind: 'found', name: API }) } });
         fixture.adapters.npm = undefined;

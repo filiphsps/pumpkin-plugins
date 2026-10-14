@@ -460,7 +460,7 @@ function readTarJson(run, tarball, member) {
 function createRegistryAdapter(run) {
     return {
         async getPackage(packageName) {
-            const result = run('npm', ['view', packageName, '--json', `--registry=${REGISTRY_URL}`]);
+            const result = runNpmCommand(run, ['view', packageName, '--json', `--registry=${REGISTRY_URL}`]);
             if (isNpmNotFound(result)) return { kind: 'missing' };
             assertCommandSucceeded(result, `npm view ${packageName}`);
             let metadata;
@@ -474,7 +474,7 @@ function createRegistryAdapter(run) {
             return { kind: 'found', name: metadata.name };
         },
         async getVersion(packageName, version) {
-            const result = run('npm', [
+            const result = runNpmCommand(run, [
                 'view',
                 `${packageName}@${version}`,
                 'dist.integrity',
@@ -496,13 +496,17 @@ function createRegistryAdapter(run) {
     };
 }
 
+function runNpmCommand(run, args, options = {}) {
+    return run('npm', args, { ...options, cwd: options.cwd ?? os.tmpdir() });
+}
+
 function createNpmAdapter(run) {
     return {
         async preflight({ packageName, packageExists, expectedOwner, confirmWriteAccess }) {
             if (typeof expectedOwner !== 'string' || !expectedOwner || confirmWriteAccess !== true) {
                 throw new Error('expected npm owner and write-access confirmation are required');
             }
-            const whoami = run('npm', ['whoami', `--registry=${REGISTRY_URL}`]);
+            const whoami = runNpmCommand(run, ['whoami', `--registry=${REGISTRY_URL}`]);
             assertCommandSucceeded(whoami, 'npm whoami');
             const username = whoami.stdout.trim();
             if (!username) throw new Error('npm whoami returned no authenticated username');
@@ -510,14 +514,14 @@ function createNpmAdapter(run) {
                 throw new Error(`authenticated npm account ${username} does not match expected owner ${expectedOwner}`);
             }
 
-            const profile = run('npm', ['profile', 'get', `--registry=${REGISTRY_URL}`]);
+            const profile = runNpmCommand(run, ['profile', 'get', `--registry=${REGISTRY_URL}`]);
             assertCommandSucceeded(profile, 'npm profile get');
             if (!/two-factor auth:\s*auth-(?:only|and-writes)\b/i.test(profile.stdout)) {
                 throw new Error('npm account must have account-level 2FA enabled');
             }
 
             if (packageExists) {
-                const owners = run('npm', ['owner', 'ls', packageName, `--registry=${REGISTRY_URL}`]);
+                const owners = runNpmCommand(run, ['owner', 'ls', packageName, `--registry=${REGISTRY_URL}`]);
                 assertCommandSucceeded(owners, `npm owner ls ${packageName}`);
                 const ownerNames = parseNpmOwnerNames(owners.stdout);
                 if (!ownerNames.includes(expectedOwner)) {
@@ -533,7 +537,14 @@ function createNpmAdapter(run) {
 
             if (packageName.startsWith('@')) {
                 const scope = packageName.slice(1, packageName.indexOf('/'));
-                const membership = run('npm', ['org', 'ls', scope, username, '--json', `--registry=${REGISTRY_URL}`]);
+                const membership = runNpmCommand(run, [
+                    'org',
+                    'ls',
+                    scope,
+                    username,
+                    '--json',
+                    `--registry=${REGISTRY_URL}`,
+                ]);
                 assertCommandSucceeded(membership, `npm org ls ${scope} ${username}`);
                 if (!hasOrganizationMembership(membership.stdout, username)) {
                     throw new Error(`could not confirm ${username} belongs to npm organization @${scope}`);
@@ -554,7 +565,7 @@ function createNpmAdapter(run) {
             };
         },
         async publish(tarball, publishArguments) {
-            const result = run('npm', ['publish', tarball, ...publishArguments, `--registry=${REGISTRY_URL}`], {
+            const result = runNpmCommand(run, ['publish', tarball, ...publishArguments, `--registry=${REGISTRY_URL}`], {
                 stdio: 'inherit',
             });
             assertCommandSucceeded(result, `npm publish ${path.basename(tarball)}`);
