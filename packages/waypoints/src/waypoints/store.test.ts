@@ -130,6 +130,32 @@ describe(WaypointStore.name, () => {
         );
     });
 
+    it('migrates legacy locator color and retains adapter settings in the byte-identical backup', () => {
+        const original = JSON.stringify({
+            version: 1,
+            waypoints: [
+                legacyWaypoint({
+                    locatorBar: {
+                        enabled: false,
+                        color: '#2468AC',
+                        javaStyleId: 'minecraft:default',
+                        bedrockTexture: 'waypoints/home',
+                    },
+                }),
+            ],
+        });
+        const files = new MemoryFiles().put('waypoints.json', original);
+        const store = new WaypointStore(files, new MemoryLogger());
+
+        expect(store.isAvailable).toBe(true);
+        expect(store.get(waypointId)).toMatchObject({ color: '#2468AC', enabled: true });
+        const migrated = JSON.parse(files.text('waypoints.json') ?? 'null').waypoints[0];
+        expect(migrated).not.toHaveProperty('locatorBar');
+        expect(migrated).not.toHaveProperty('javaStyleId');
+        expect(migrated).not.toHaveProperty('bedrockTexture');
+        expect(files.text('waypoints.v1.json')).toBe(original);
+    });
+
     it('writes a v1 backup before migrating all legacy access modes', () => {
         const original = JSON.stringify({
             version: 1,
@@ -159,16 +185,19 @@ describe(WaypointStore.name, () => {
                 {
                     ...waypoint(),
                     position: { x: -4, y: 64, z: 9 },
+                    color: '#ABCDEF',
                     access: { mode: 'restricted', grants: [{ type: 'player', playerId: ownerId }] },
                 },
                 {
                     ...waypoint('44444444-4444-4444-8444-444444444444', 'Public'),
                     position: { x: -4, y: 64, z: 9 },
+                    color: '#ABCDEF',
                     access: { mode: 'public', grants: [] },
                 },
                 {
                     ...waypoint('55555555-5555-4555-8555-555555555555', 'Shared'),
                     position: { x: -4, y: 64, z: 9 },
+                    color: '#ABCDEF',
                     access: {
                         mode: 'restricted',
                         grants: [

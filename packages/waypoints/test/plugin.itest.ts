@@ -18,7 +18,12 @@ const legacyStore = JSON.stringify({
             ownerId: '22222222-2222-4222-8222-222222222222',
             visibility: 'public',
             allowedPlayerIds: [],
-            locatorBar: { enabled: false },
+            locatorBar: {
+                enabled: false,
+                color: '#2468AC',
+                javaStyleId: 'minecraft:default',
+                bedrockTexture: 'waypoints/spawn',
+            },
         },
     ],
 });
@@ -49,7 +54,7 @@ describe(info.name, () => {
                     name: 'Spawn',
                     dimension: 'world',
                     position: { x: 0, y: 64, z: 0 },
-                    color: '#FFFFFF',
+                    color: '#2468AC',
                     enabled: true,
                     access: { mode: 'public', grants: [] },
                 },
