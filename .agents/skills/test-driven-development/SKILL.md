@@ -34,15 +34,16 @@ Thinking "skip TDD just this once"? Stop. That's rationalization.
 NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
 ```
 
-Write code before the test? Delete it. Start over.
+For new work, write a regression test and verify that it fails for the expected reason before
+implementing the change.
 
-**No exceptions:**
-- Don't keep it as "reference"
-- Don't "adapt" it while writing tests
-- Don't look at it
-- Delete means delete
+**If implementation came first:** Stop before making further production changes. Preserve pre-existing,
+shared, and user-authored work. Discard only your own uncommitted changes when they are clearly
+disposable and safe to remove, then return to RED. Otherwise, preserve them and run the test against
+the pre-change implementation in an isolated baseline. Never alter protected work to manufacture a
+failure.
 
-Implement fresh from tests. Period.
+Once RED is verified, implement only what is needed to pass the test.
 
 ## Red-Green-Refactor
 
@@ -227,17 +228,17 @@ When writing or changing any test, read [writing-good-tests.md](writing-good-tes
 | "I'll test after" | Tests written after pass immediately — which proves nothing. They may test the wrong thing, test the implementation instead of the behavior, or miss the edge case you forgot. You never watched it fail, so you never proved it can catch the bug. Test-first forces that failure. |
 | "Tests after achieve same goals (spirit not ritual)" | Tests-after answer "what does this do?"; tests-first answer "what should this do?" Tests written after are biased by the code you already wrote — you verify the cases you remembered, not the ones you'd have discovered. Coverage without proof the tests work. |
 | "Already manually tested" | Manual testing is ad-hoc: no record of what you covered, no way to re-run it when the code changes, easy to forget cases under pressure. "Worked when I tried it" ≠ comprehensive. Automated tests run the same way every time. |
-| "Deleting X hours is wasteful" | Sunk cost fallacy — that time is already spent either way. The real choice: rewrite with TDD (high confidence) vs. keep it and bolt tests on after (low confidence, likely bugs). Keeping code you can't trust is the waste. |
-| "Keep as reference, write tests first" | You'll adapt it. That's testing after. Delete means delete. |
-| "Need to explore first" | Fine. Throw away exploration, start with TDD. |
+| "Deleting X hours is wasteful" | If your own uncommitted implementation is safe to discard, restart from a verified failing test. Preserve shared or user work; otherwise verify the test against pre-change behavior in an isolated baseline. |
+| "Keep as reference, write tests first" | Use the safe recovery rule above when implementation came first; don't treat existing code as proof that the test would catch the bug. |
+| "Need to explore first" | Fine. Keep exploratory changes separate and disposable, then verify RED before implementing the behavior. |
 | "Test hard = design unclear" | Listen to test. Hard to test = hard to use. |
 | "TDD will slow me down" | TDD IS the pragmatic path: catches bugs before commit, prevents regressions, lets you refactor without fear. "Pragmatic" shortcuts mean debugging in production — slower, not faster. |
 | "Manual test faster" | Manual doesn't prove edge cases. You'll re-test every change. |
 | "Existing code has no tests" | You're improving it. Add tests for existing code. |
 
-## Red Flags - STOP and Start Over
+## Red Flags - Stop and Re-establish RED
 
-- Code before test
+- Your implementation before its test
 - Test after implementation
 - Test passes immediately
 - Can't explain why test failed
@@ -247,11 +248,11 @@ When writing or changing any test, read [writing-good-tests.md](writing-good-tes
 - "Tests after achieve the same purpose"
 - "It's about spirit not ritual"
 - "Keep as reference" or "adapt existing code"
-- "Already spent X hours, deleting is wasteful"
+- "Already spent X hours, restarting is wasteful"
 - "TDD is dogmatic, I'm being pragmatic"
 - "This is different because..."
 
-**All of these mean: Delete code. Start over with TDD.**
+**These mean: Pause and establish a trustworthy RED step using the safe recovery rule above. Preserve existing, shared, and user-authored work.**
 
 ## Example: Bug Fix
 
@@ -303,7 +304,7 @@ Before marking work complete:
 - [ ] Tests use real code (mocks only if unavoidable)
 - [ ] Edge cases and errors covered
 
-Can't check all boxes? You skipped TDD. Start over.
+If a box cannot be checked, don't claim strict TDD. Use the safe recovery rule above and report any limit.
 
 ## When Stuck
 
@@ -323,8 +324,8 @@ Never fix bugs without a test.
 ## Final Rule
 
 ```
-Production code → test exists and failed first
-Otherwise → not TDD
+New production code → test failed first for the expected reason
+Existing implementation → preserve it and verify the regression against pre-change behavior
 ```
 
-No exceptions without your human partner's permission.
+If you cannot verify test-first safely, keep existing work intact and report that limitation.

@@ -62,7 +62,7 @@ type ExtractParams<T> = T extends { params: infer P } ? P : never;
 type ExtractBody<T> = T extends { body: infer B } ? B : never;
 type ExtractResponse<T> = T extends { response: infer R } ? R : never;
 
-class APIClient<Config extends Record<string, Record<HTTPMethod, any>>> {
+class APIClient<Config extends Record<string, Partial<Record<HTTPMethod, unknown>>>> {
   async request<Path extends keyof Config, Method extends keyof Config[Path]>(
     path: Path,
     method: Method,
@@ -121,8 +121,8 @@ type IsComplete<T, S> =
       : true
     : false;
 
-class Builder<T, S extends BuilderState<T> = {}> {
-  private state: S = {} as S;
+class Builder<T, S extends Partial<BuilderState<T>> = {}> {
+  private state: BuilderState<T> = {} as BuilderState<T>;
 
   set<K extends keyof T>(key: K, value: T[K]): Builder<T, S & Record<K, T[K]>> {
     this.state[key] = value;
