@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
+import { pathToFileURL } from 'node:url';
 import {
     assetName,
     copyPluginBuild,
@@ -16,6 +18,8 @@ import {
     runDev,
 } from './dev.mjs';
 
+const configRequire = createRequire(new URL('../tools/config/package.json', import.meta.url));
+const { parse: parseToml } = await import(pathToFileURL(configRequire.resolve('smol-toml')));
 const tempDirs = [];
 
 function tempDir() {
@@ -33,6 +37,30 @@ function addPluginFixture(root) {
         JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } }),
     );
     fs.writeFileSync(output, 'built plugin');
+}
+
+async function configureDevServer(config) {
+    const root = tempDir();
+    addPluginFixture(root);
+    const serverDir = path.join(root, '.cache', 'pumpkin-dev');
+    fs.mkdirSync(serverDir, { recursive: true });
+    fs.writeFileSync(path.join(serverDir, 'pumpkin.toml'), config);
+    const spawnImpl = (command, args) => {
+        const child = new EventEmitter();
+        child.kill = (signal) => process.nextTick(() => child.emit('exit', null, signal));
+        if (args.includes('run') || command === '/fake/pumpkin') {
+            process.nextTick(() => child.emit('exit', 0, null));
+        }
+        return child;
+    };
+
+    await runDev({
+        root,
+        spawnImpl,
+        resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' }),
+    });
+
+    return fs.readFileSync(path.join(serverDir, 'pumpkin.toml'), 'utf8');
 }
 
 afterEach(() => {
@@ -498,6 +526,20 @@ describe('copyPluginBuild', () => {
 });
 
 describe('runDev', () => {
+    it('updates a quoted hot-reload key without adding a duplicate', async () => {
+        const config = await configureDevServer('[plugins]\n"hot_reload" = false # keep\n');
+
+        assert.equal(parseToml(config).plugins.hot_reload, true);
+        assert.match(config, /hot_reload = true # keep/);
+    });
+
+    it('updates a quoted plugins table without adding a duplicate', async () => {
+        const config = await configureDevServer('["plugins"]\nhot_reload = false # keep\n');
+
+        assert.equal(parseToml(config).plugins.hot_reload, true);
+        assert.match(config, /hot_reload = true # keep/);
+    });
+
     it('waits for build watchers to exit after asking them to shut down gracefully', async () => {
         const root = tempDir();
         addPluginFixture(root);
