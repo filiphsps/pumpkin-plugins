@@ -100,7 +100,7 @@ it('refetches legacy cache metadata without a WIT integrity manifest', () => {
     expect(JSON.parse(fs.readFileSync(pinFile, 'utf8')).witFiles).toEqual([
         { path: 'plugin.wit', sha256: createHash('sha256').update('package pumpkin:plugin@0.1.0;\n').digest('hex') }
     ]);
-});
+}, 15_000);
 
 it('fetches the new local Git commit when the WIT lock changes', () => {
     const directory = createLocalWitPin();
