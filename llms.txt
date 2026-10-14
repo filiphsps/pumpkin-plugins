@@ -1,4 +1,4 @@
-# Pumpkin Plugins
+# `pumpkin-plugins`
 
 > TypeScript plugins, shared tools, and GitHub Actions for Pumpkin Minecraft servers.
 
@@ -11,6 +11,18 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Creating an action](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-action.md): This runs the action Turborepo generator in turbo/generators/.
 - [Documentation site](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/documentation-site.md): The VitePress site combines the hand-written guides in docs/, component READMEs, component-level guides, and generated API references.
 
+## Guides
+
+- [Benchmarking QuickJS and Static Hermes](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/benchmarking.md): This guide explains what the engine comparison measures, how to read its report, and what conclusions its results support.
+
+## Plugin API
+
+- [ABI and runtime support](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/abi-and-runtime.md): The npm package version identifies the TypeScript facade release.
+- [API evolution and migration](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/api-evolution-and-migration.md): The v0.1.1 @pumpkinmc/pumpkin-api-ts API is the compatibility baseline.
+- [Host API areas](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/host-api.md): The pinned pumpkin:plugin@0.1.0 WIT package groups host operations into interfaces for commands, events, server access, worlds, entities, inventory, networking, scheduling, IPC…
+- [Lifecycle and registration](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/lifecycle-and-registration.md): Extend Plugin, provide metadata(), implement onLoad(context) for startup registration, and optionally implement onUnload(context) to save state and release resources.
+- [Setup and build](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/setup-and-build.md): Standalone plugin projects use @pumpkin-plugins/pumpkin-api for the runtime facade and @pumpkin-plugins/build for the pumpkin-plugins-build command.
+
 ## Plugin development
 
 - [Building](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/building.md): pumpkin-plugins-build (tools/build) turns a plugin into a .wasm component.
@@ -18,11 +30,12 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Plugin config](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-config.md): Plugins that need settings use @pumpkin-plugins/config (tools/config).
 - [Plugin info and READMEs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-info-and-readmes.md): Each plugin describes itself in one small module that exports info.
 - [Testing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/testing.md): Each plugin has two vitest projects, set up by definePluginVitestConfig() from @pumpkin-plugins/test-harness/vitest.
+- [Turborepo commands](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/turborepo.md): Run direct Turbo tasks through the root pnpm turbo command.
 
 ## Repository maintenance
 
 - [Agent tooling](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agent-tooling.md): The repo keeps agent instructions, skills and executable checks separate.
-- [CI and releases](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/ci-and-releases.md): Plugin and action checks are in .github/workflows/ci.yml; release orchestration is in the reusable .github/workflows/release.yml, called after the CI gates pass.
+- [CI and releases](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/ci-and-releases.md): Plugin, action and public tool checks are in .github/workflows/ci.yml; the external-consumer matrix is in the reusable .github/workflows/external-consumer.yml.
 
 ## Server operations
 
@@ -55,10 +68,15 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 
 ## Shared tools
 
+- [PumpkinPIE API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/apis/pumpkin-pie-api/docs/index.md): Validated PumpkinPIE client, expansions and provider lifecycle
+- [PumpkinPIE API README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/apis/pumpkin-pie-api/README.md): Additional component overview and usage details.
+- [UPnPumpkin plugin API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/apis/upnpumpkin-api/docs/index.md): Asks UPnPumpkin to open a port
+- [UPnPumpkin plugin API README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/apis/upnpumpkin-api/README.md): Additional component overview and usage details.
 - [Plugin build tool](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/build/docs/index.md): Shared build tool for the plugins
 - [Plugin build tool README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/build/README.md): Additional component overview and usage details.
 - [Plugin configuration library](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/config/docs/index.md): Schema-driven TOML config for plugins
 - [Plugin configuration library README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/config/README.md): Additional component overview and usage details.
+- [create-pumpkin-plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/create-pumpkin-plugin/README.md): Create a minimal Pumpkin plugin project
 - [Documentation generator](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/docs/docs/index.md): Generates component READMEs, doc links, and repository catalogs
 - [Documentation generator README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/docs/README.md): Additional component overview and usage details.
 - [Minecraft colors](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/minecraft-colors/docs/index.md): Chalk-like Minecraft text formatting for plugins
@@ -67,13 +85,13 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Plugin kit README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/plugin-kit/README.md): Additional component overview and usage details.
 - [Port mapping library](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/port-mapping/docs/index.md): UPnP and NAT-PMP port mapping
 - [Port mapping library README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/port-mapping/README.md): Additional component overview and usage details.
-- [PumpkinPIE API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-pie-api/docs/index.md): Validated PumpkinPIE client, expansions and provider lifecycle
-- [PumpkinPIE API README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-pie-api/README.md): Additional component overview and usage details.
+- [Pumpkin Plugin API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/docs/index.md): TypeScript API for PumpkinMC plugins
+- [Pumpkin Plugin API README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/README.md): Additional component overview and usage details.
+- [Pumpkin Plugin API: Migrate From `@pumpkinmc/pumpkin-api-ts`](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/docs/migration.md): This guide moves a plugin from an audited API baseline to @pumpkin-plugins/pumpkin-api and its pumpkin-plugins-build command.
 - [Pumpkin plugin signing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/docs/index.md): Ed25519 signing for plugin builds
 - [Pumpkin plugin signing README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/README.md): Additional component overview and usage details.
-- [Static Hermes Runtime](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/index.md): Static Hermes runtime shim for Pumpkin plugin components
+- [Static Hermes Runtime](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/index.md): Static Hermes Runtime shim for Pumpkin plugin components
 - [Static Hermes Runtime README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/README.md): Additional component overview and usage details.
-- [Static Hermes Runtime: Benchmarking QuickJS and Static Hermes](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/benchmarking.md): This guide explains what the engine comparison measures, how to read its report, and what conclusions its results support.
 - [Static Hermes Runtime: WASI in Static Hermes](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/wasi.md): Static Hermes plugins run as WebAssembly components.
 - [Terrain capture](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/docs/index.md): Shared terrain capture and access contracts
 - [Terrain capture README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/README.md): Additional component overview and usage details.
@@ -81,15 +99,13 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [Pumpkin test harness README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/test-harness/README.md): Additional component overview and usage details.
 - [Pumpkin Market update checks](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/update-check/docs/index.md): Check plugin versions against Pumpkin Market
 - [Pumpkin Market update checks README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/update-check/README.md): Additional component overview and usage details.
-- [UPnPumpkin plugin API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/upnpumpkin-api/docs/index.md): Asks UPnPumpkin to open a port
-- [UPnPumpkin plugin API README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/upnpumpkin-api/README.md): Additional component overview and usage details.
 
 ## GitHub Actions
 
 - [Publish a plugin to Pumpkin Market](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/publish-to-pumpkin-market/docs/index.md): Upload a released Pumpkin plugin WebAssembly file to its existing Market listing
 - [Publish a plugin to Pumpkin Market README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/publish-to-pumpkin-market/README.md): Additional component overview and usage details.
-- [Sign Pumpkin plugins](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/sign-pumpkin-plugin/docs/index.md): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
-- [Sign Pumpkin plugins README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/sign-pumpkin-plugin/README.md): Additional component overview and usage details.
+- [Sign PumpkinMC Plugins](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/sign-pumpkin-plugin/docs/index.md): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
+- [Sign PumpkinMC Plugins README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/sign-pumpkin-plugin/README.md): Additional component overview and usage details.
 - [Update a Pumpkin Market listing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/update-pumpkin-market-listing/docs/index.md): Update Pumpkin Market listing metadata from a JSON file or direct inputs
 - [Update a Pumpkin Market listing README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/update-pumpkin-market-listing/README.md): Additional component overview and usage details.
 - [Verify Pumpkin plugin signatures](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/verify-pumpkin-plugin/docs/index.md): Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks
@@ -109,20 +125,21 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [TabDisplay API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/tab-display/): Customizes Java tab displays with native Bedrock capability gates
 - [UPnPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/upnpumpkin/): Opens router ports for Pumpkin with UPnP and NAT-PMP
 - [Waypoints API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/waypoints/): Server-managed waypoints with access rules and a Java 26.3 HUD
+- [PumpkinPIE API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/pumpkin-pie-api/): Validated PumpkinPIE client, expansions and provider lifecycle
+- [UPnPumpkin plugin API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/upnpumpkin-api/): Asks UPnPumpkin to open a port
 - [Plugin build tool API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/build/): Shared build tool for the plugins
 - [Plugin configuration library API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/config/): Schema-driven TOML config for plugins
 - [Documentation generator API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/docs/): Generates component READMEs, doc links, and repository catalogs
 - [Minecraft colors API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/minecraft-colors/): Chalk-like Minecraft text formatting for plugins
 - [Plugin kit API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/plugin-kit/): Host helpers shared by plugins
 - [Port mapping library API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/port-mapping/): UPnP and NAT-PMP port mapping
-- [PumpkinPIE API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/pumpkin-pie-api/): Validated PumpkinPIE client, expansions and provider lifecycle
+- [Pumpkin Plugin API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/pumpkin-api/): TypeScript API for PumpkinMC plugins
 - [Pumpkin plugin signing API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/signing/): Ed25519 signing for plugin builds
-- [Static Hermes Runtime API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/static-hermes-runtime/): Static Hermes runtime shim for Pumpkin plugin components
+- [Static Hermes Runtime API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/static-hermes-runtime/): Static Hermes Runtime shim for Pumpkin plugin components
 - [Terrain capture API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/terrain/): Shared terrain capture and access contracts
 - [Pumpkin test harness API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/test-harness/): Runs plugins on a real Pumpkin in vitest
 - [Pumpkin Market update checks API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/update-check/): Check plugin versions against Pumpkin Market
-- [UPnPumpkin plugin API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/upnpumpkin-api/): Asks UPnPumpkin to open a port
 - [Publish a plugin to Pumpkin Market API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/publish-to-pumpkin-market/): Upload a released Pumpkin plugin WebAssembly file to its existing Market listing
-- [Sign Pumpkin plugins API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/sign-pumpkin-plugin/): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
+- [Sign PumpkinMC Plugins API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/sign-pumpkin-plugin/): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
 - [Update a Pumpkin Market listing API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/update-pumpkin-market-listing/): Update Pumpkin Market listing metadata from a JSON file or direct inputs
 - [Verify Pumpkin plugin signatures API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/verify-pumpkin-plugin/): Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks
