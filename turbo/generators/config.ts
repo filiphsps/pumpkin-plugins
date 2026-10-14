@@ -96,6 +96,7 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                 message: `One-line description (at most ${MAX_DESCRIPTION} characters; the README can say more):`,
                 validate: (value: string) => {
                     if (value.trim().length === 0) return 'A description is required';
+                    if (/[\r\n]/.test(value)) return 'Enter a one-line description';
                     return value.length <= MAX_DESCRIPTION || `Keep it under ${MAX_DESCRIPTION} characters`;
                 },
             },
