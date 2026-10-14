@@ -73,6 +73,11 @@
             "text": "Use conventional commit message format."
         }
     ],
+    "[markdown]": {
+        "editor.wordWrap": "wordWrapColumn",
+        "editor.wordWrapColumn": 80,
+        "editor.rulers": [80]
+    },
     "js/ts.experimental.useTsgo": true,
     "js/ts.suggest.jsdoc.enabled": true,
     "js/ts.suggestionActions.enabled": true,
