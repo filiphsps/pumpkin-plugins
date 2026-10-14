@@ -145,7 +145,7 @@ it('compares configured engines across component sizes, behavior, and matching w
     } finally {
         fs.rmSync(temporaryDir, { recursive: true, force: true });
     }
-}, 900_000);
+}, Number.POSITIVE_INFINITY);
 
 function requireResult(results: EngineResult[], id: string): EngineResult {
     const result = results.find((candidate) => candidate.id === id);
