@@ -4,74 +4,45 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { getNpmRegistryIntegrity, publishToolPackages } from './publish-tool-packages.mjs';
-import { PUBLIC_TOOL_PACKAGE_PATHS, PUBLIC_TOOL_RELEASE_ORDER } from './utils/tool-packages.mjs';
+import { nodeEngineRange } from './utils/tool-packages.mjs';
 
 const roots = [];
-const versions = {
-    'tools/pumpkin-api': '1.2.3',
-    'tools/static-hermes-runtime': '1.3.4',
-    'tools/build': '2.3.4',
-    'tools/create-pumpkin-plugin': '3.4.5',
-    'tools/codemod': '4.5.6',
-    'tools/cspell-dict-minecraft': '5.6.7',
-    'tools/docs': '6.6.7',
-    'tools/plugin-kit': '6.7.8',
-    'tools/config': '7.8.9',
-    'tools/update-check': '8.9.10',
-    'tools/minecraft-colors': '9.10.11',
-    'tools/apis/pumpkin-pie-api': '10.11.12',
+const API_PATH = 'tools/api';
+const API_NAME = '@example/api';
+const RUNTIME_PATH = 'tools/runtime';
+const RUNTIME_NAME = '@example/runtime';
+const BUILD_PATH = 'tools/build';
+const BUILD_NAME = '@example/build';
+const STARTER_PATH = 'tools/starter';
+const STARTER_NAME = '@example/starter';
+const toolManifests = {
+    [API_PATH]: { name: API_NAME, version: '1.2.3' },
+    [RUNTIME_PATH]: { name: RUNTIME_NAME, version: '1.3.4' },
+    [BUILD_PATH]: {
+        name: BUILD_NAME,
+        version: '2.3.4',
+        dependencies: { [API_NAME]: '1.2.3', [RUNTIME_NAME]: '1.3.4' },
+    },
+    'tools/docs': { name: '@example/docs', version: '6.6.7' },
+    'tools/config': { name: '@example/config', version: '7.8.9', dependencies: { '@example/docs': '6.6.7' } },
+    'tools/update': {
+        name: '@example/update',
+        version: '8.9.10',
+        dependencies: { '@example/docs': '6.6.7', [API_NAME]: '1.2.3' },
+    },
+    'tools/kit': {
+        name: '@example/kit',
+        version: '9.10.11',
+        dependencies: { '@example/docs': '6.6.7', [API_NAME]: '1.2.3', '@example/update': '8.9.10' },
+    },
+    [STARTER_PATH]: { name: STARTER_NAME, version: '3.4.5' },
 };
-const expectedEntries = {
-    'tools/create-pumpkin-plugin': [
-        'package/bin/create-pumpkin-plugin.ts',
-        'package/dist/create-pumpkin-plugin.js',
-        'package/templates/typescript/package.json',
-        'package/templates/javascript/package.json',
-    ],
-    'tools/pumpkin-api': [
-        'package/src/index.ts',
-        'package/src/wit.mjs',
-        'package/src/wit.d.mts',
-        'package/wit.lock.json',
-    ],
-    'tools/static-hermes-runtime': [
-        'package/src/index.ts',
-        'package/dist/index.js',
-        'package/cmake/wasi-sdk-hermes-p2.cmake',
-        'package/hermes-patches/0001-wasi-p2-configure-platform.patch',
-    ],
-    'tools/build': ['package/dist/cli.js', 'package/runtime/quickjs-runtime-bigint.wasm', 'package/wasi-wit.lock.json'],
-    'tools/codemod': [
-        'package/dist/bin/pumpkin-codemod.js',
-        'package/dist/src/index.js',
-        'package/dist/src/index.d.ts',
-        'package/README.md',
-        'package/docs/using-codemods.md',
-        'package/docs/authoring-codemods.md',
-    ],
-    'tools/cspell-dict-minecraft': [
-        'package/cspell-ext.json',
-        'package/minecraft.txt',
-        'package/README.md',
-        'package/LICENSE',
-    ],
-    'tools/docs': [
-        'package/src/info.ts',
-        'package/src/markdown.ts',
-        'package/src/node.ts',
-        'package/bin/pumpkin-plugins-docs.mjs',
-    ],
-    'tools/plugin-kit': [
-        'package/src/commands.ts',
-        'package/src/host.ts',
-        'package/src/plugin.ts',
-        'package/src/register-commands.ts',
-    ],
-    'tools/config': ['package/src/index.ts'],
-    'tools/update-check': ['package/src/index.ts'],
-    'tools/minecraft-colors': ['package/src/index.ts'],
-    'tools/apis/pumpkin-pie-api': ['package/src/index.ts'],
-};
+const versions = Object.fromEntries(
+    Object.entries(toolManifests).map(([packagePath, manifest]) => [packagePath, manifest.version]),
+);
+const toolNames = Object.fromEntries(
+    Object.entries(toolManifests).map(([packagePath, manifest]) => [packagePath, manifest.name]),
+);
 
 afterEach(() => {
     for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
@@ -80,36 +51,27 @@ afterEach(() => {
 function createRoot() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-tool-packages-'));
     roots.push(root);
-    for (const [packagePath, packageName] of Object.entries(PUBLIC_TOOL_PACKAGE_PATHS)) {
+    fs.writeFileSync(path.join(root, '.node-version'), '24.21.0\n');
+    for (const [packagePath, sourceManifest] of Object.entries(toolManifests)) {
         const packageJson = {
-            name: packageName,
-            version: versions[packagePath],
-            private: false,
+            ...sourceManifest,
             publishConfig: { access: 'public' },
-            engines: { node: '>=24.21.0' },
+            engines: { node: nodeEngineRange(root) },
         };
-        if (packagePath === 'tools/build') {
-            packageJson.dependencies = {
-                '@pumpkin-plugins/pumpkin-api': versions['tools/pumpkin-api'],
-                '@pumpkin-plugins/static-hermes-runtime': versions['tools/static-hermes-runtime'],
-            };
-        } else if (packagePath === 'tools/config') {
-            packageJson.dependencies = { '@pumpkin-plugins/docs': versions['tools/docs'] };
-        } else if (packagePath === 'tools/update-check') {
-            packageJson.dependencies = {
-                '@pumpkin-plugins/docs': versions['tools/docs'],
-                '@pumpkin-plugins/pumpkin-api': versions['tools/pumpkin-api'],
-            };
-        } else if (packagePath === 'tools/plugin-kit') {
-            packageJson.dependencies = {
-                '@pumpkin-plugins/docs': versions['tools/docs'],
-                '@pumpkin-plugins/pumpkin-api': versions['tools/pumpkin-api'],
-                '@pumpkin-plugins/update-check': versions['tools/update-check'],
-            };
-        }
         const file = path.join(root, packagePath, 'package.json');
         fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file, `${JSON.stringify(packageJson, null, 4)}\n`);
+    }
+    for (const language of ['typed', 'plain']) {
+        const directory = path.join(root, STARTER_PATH, 'templates', language);
+        fs.mkdirSync(directory, { recursive: true });
+        fs.writeFileSync(
+            path.join(directory, 'package.json'),
+            JSON.stringify({
+                name: `${language}-fixture`,
+                dependencies: { [API_NAME]: '^1.2.3', [BUILD_NAME]: '^2.3.4' },
+            }),
+        );
     }
     return root;
 }
@@ -125,20 +87,19 @@ function createReleaseMetadata(selectedPaths, overrides = {}) {
 
 function packForRoot(root, packagePath, overrides = {}) {
     const source = JSON.parse(fs.readFileSync(path.join(root, packagePath, 'package.json'), 'utf8'));
-    const starterTemplatePackageJsons =
-        packagePath === 'tools/create-pumpkin-plugin'
-            ? ['typescript', 'javascript'].map(() => ({
-                  dependencies: {
-                      '@pumpkin-plugins/pumpkin-api': `^${versions['tools/pumpkin-api']}`,
-                      '@pumpkin-plugins/build': `^${versions['tools/build']}`,
-                  },
-              }))
+    const embeddedPackageJsons =
+        packagePath === STARTER_PATH
+            ? ['typed', 'plain'].map((language) =>
+                  JSON.parse(
+                      fs.readFileSync(path.join(root, STARTER_PATH, 'templates', language, 'package.json'), 'utf8'),
+                  ),
+              )
             : [];
     return {
         tarballPath: `/fake/${packagePath.replaceAll('/', '-')}.tgz`,
         packageJson: { ...source, ...overrides.packageJson },
-        entries: overrides.entries ?? expectedEntries[packagePath],
-        starterTemplatePackageJsons: overrides.starterTemplatePackageJsons ?? starterTemplatePackageJsons,
+        entries: overrides.entries ?? ['package/package.json'],
+        embeddedPackageJsons: overrides.embeddedPackageJsons ?? embeddedPackageJsons,
         integrity: overrides.integrity ?? `sha512-${Buffer.from(packagePath).toString('base64')}`,
     };
 }
@@ -152,8 +113,8 @@ function createPackAdapter(root, order = []) {
 
 describe('publishToolPackages', () => {
     it('returns missing only for an exact-version 404 after confirming the npm package exists', async () => {
-        const packageName = '@pumpkin-plugins/pumpkin-api';
-        const packageUrl = 'https://registry.npmjs.org/%40pumpkin-plugins%2Fpumpkin-api';
+        const packageName = API_NAME;
+        const packageUrl = 'https://registry.npmjs.org/%40example%2Fapi';
         const versionUrl = `${packageUrl}/1.2.3`;
         const packageExists = {
             status: 200,
@@ -221,15 +182,15 @@ describe('publishToolPackages', () => {
         });
         await assert.rejects(
             getNpmRegistryIntegrity(packageName, '1.2.3', mismatchedVersion.fetch),
-            /registry response identifies .* rather than @pumpkin-plugins\/pumpkin-api@1\.2\.3/,
+            /registry response identifies .* rather than @example\/api@1\.2\.3/,
         );
     });
 
-    it('packs and publishes released paths in canonical order', async () => {
+    it('packs and publishes selected tools after their declared prerequisites', async () => {
         const root = createRoot();
         const packedPaths = [];
         const publishedPaths = [];
-        const selectedPaths = [...PUBLIC_TOOL_RELEASE_ORDER].reverse();
+        const selectedPaths = [BUILD_PATH, RUNTIME_PATH, API_PATH];
 
         await publishToolPackages({
             root,
@@ -241,8 +202,10 @@ describe('publishToolPackages', () => {
             log: () => {},
         });
 
-        assert.deepEqual(packedPaths, PUBLIC_TOOL_RELEASE_ORDER);
-        assert.deepEqual(publishedPaths, PUBLIC_TOOL_RELEASE_ORDER);
+        assert.deepEqual(new Set(packedPaths), new Set(selectedPaths));
+        assert.deepEqual(publishedPaths, packedPaths);
+        assert.ok(packedPaths.indexOf(API_PATH) < packedPaths.indexOf(BUILD_PATH));
+        assert.ok(packedPaths.indexOf(RUNTIME_PATH) < packedPaths.indexOf(BUILD_PATH));
     });
 
     it('rejects a Release Please tag with a component that does not match its path', async () => {
@@ -252,9 +215,9 @@ describe('publishToolPackages', () => {
         await assert.rejects(
             publishToolPackages({
                 root,
-                selectedPaths: ['tools/pumpkin-api'],
-                releaseMetadata: createReleaseMetadata(['tools/pumpkin-api'], {
-                    'tools/pumpkin-api': 'build-v1.2.3',
+                selectedPaths: [API_PATH],
+                releaseMetadata: createReleaseMetadata([API_PATH], {
+                    [API_PATH]: 'build-v1.2.3',
                 }),
                 packPackage: async () => {
                     packed = true;
@@ -263,34 +226,34 @@ describe('publishToolPackages', () => {
                 publishPackage: async () => {},
                 log: () => {},
             }),
-            /tools\/pumpkin-api.*build-v1\.2\.3.*component/i,
+            /tools\/api.*build-v1\.2\.3.*component/i,
         );
         assert.equal(packed, false);
     });
 
     it('rejects a Release Please tag version that differs from the source manifest', async () => {
         const root = createRoot();
-        const selectedPaths = ['tools/pumpkin-api'];
+        const selectedPaths = [API_PATH];
 
         await assert.rejects(
             publishToolPackages({
                 root,
                 selectedPaths,
                 releaseMetadata: createReleaseMetadata(selectedPaths, {
-                    'tools/pumpkin-api': 'pumpkin-api-v9.9.9',
+                    [API_PATH]: 'api-v9.9.9',
                 }),
                 packPackage: createPackAdapter(root),
                 getRegistryIntegrity: async () => null,
                 publishPackage: async () => {},
                 log: () => {},
             }),
-            /@pumpkin-plugins\/pumpkin-api@9\.9\.9.*source manifest version 1\.2\.3/,
+            /@example\/api@9\.9\.9.*source manifest version 1\.2\.3/,
         );
     });
 
     it('rejects a packed manifest version that differs from the verified release tag', async () => {
         const root = createRoot();
-        const selectedPaths = ['tools/pumpkin-api'];
+        const selectedPaths = [API_PATH];
         let published = false;
 
         await assert.rejects(
@@ -306,15 +269,18 @@ describe('publishToolPackages', () => {
                 },
                 log: () => {},
             }),
-            /@pumpkin-plugins\/pumpkin-api@1\.2\.3.*packed manifest version 1\.2\.2/,
+            /@example\/api@1\.2\.3.*packed manifest version 1\.2\.2/,
         );
         assert.equal(published, false);
     });
 
     it('requires builder and creator prerequisites at their exact packed versions', async () => {
         const root = createRoot();
-        const selectedPaths = ['tools/build'];
+        const selectedPaths = [BUILD_PATH];
         const requested = [];
+        const expectedPrerequisites = Object.entries(toolManifests[BUILD_PATH].dependencies).map(
+            ([packageName, version]) => `${packageName}@${version}`,
+        );
 
         await assert.rejects(
             publishToolPackages({
@@ -324,33 +290,24 @@ describe('publishToolPackages', () => {
                 packPackage: createPackAdapter(root),
                 getRegistryIntegrity: async (packageName, version) => {
                     requested.push(`${packageName}@${version}`);
-                    return packageName === '@pumpkin-plugins/pumpkin-api' ? 'sha512-api' : null;
+                    return packageName === API_NAME ? 'sha512-api' : null;
                 },
                 publishPackage: async () => {},
                 log: () => {},
             }),
-            /@pumpkin-plugins\/static-hermes-runtime@1\.3\.4.*required by @pumpkin-plugins\/build@2\.3\.4.*not found/i,
+            /@example\/runtime@1\.3\.4.*required by @example\/build@2\.3\.4.*not found/i,
         );
 
-        assert.deepEqual(requested, [
-            '@pumpkin-plugins/pumpkin-api@1.2.3',
-            '@pumpkin-plugins/static-hermes-runtime@1.3.4',
-        ]);
+        assert.deepEqual(requested, expectedPrerequisites);
     });
 
-    it('requires docs before each public consumer that imports its API', async () => {
-        const cases = [
-            { packagePath: 'tools/config', prerequisitePaths: ['tools/docs'] },
-            { packagePath: 'tools/update-check', prerequisitePaths: ['tools/docs', 'tools/pumpkin-api'] },
-            {
-                packagePath: 'tools/plugin-kit',
-                prerequisitePaths: ['tools/docs', 'tools/pumpkin-api', 'tools/update-check'],
-            },
-        ];
-
-        for (const { packagePath, prerequisitePaths } of cases) {
+    it('checks each consumer against its declared public dependencies', async () => {
+        for (const packagePath of ['tools/config', 'tools/update', 'tools/kit']) {
             const root = createRoot();
             const requested = [];
+            const expectedPrerequisites = Object.entries(toolManifests[packagePath].dependencies).map(
+                ([packageName, version]) => `${packageName}@${version}`,
+            );
 
             await publishToolPackages({
                 root,
@@ -358,7 +315,7 @@ describe('publishToolPackages', () => {
                 releaseMetadata: createReleaseMetadata([packagePath]),
                 packPackage: createPackAdapter(root),
                 getRegistryIntegrity: async (packageName, version) => {
-                    if (packageName === PUBLIC_TOOL_PACKAGE_PATHS[packagePath]) return null;
+                    if (packageName === toolNames[packagePath]) return null;
                     requested.push(`${packageName}@${version}`);
                     return 'sha512-present';
                 },
@@ -366,18 +323,13 @@ describe('publishToolPackages', () => {
                 log: () => {},
             });
 
-            assert.deepEqual(
-                requested,
-                prerequisitePaths.map(
-                    (dependencyPath) => `${PUBLIC_TOOL_PACKAGE_PATHS[dependencyPath]}@${versions[dependencyPath]}`,
-                ),
-            );
+            assert.deepEqual(requested, expectedPrerequisites);
         }
     });
 
-    it('requires exact API and builder versions from both packed creator templates', async () => {
+    it('checks each embedded project manifest before publishing its package', async () => {
         const root = createRoot();
-        const selectedPaths = ['tools/create-pumpkin-plugin'];
+        const selectedPaths = [STARTER_PATH];
         const requested = [];
 
         await assert.rejects(
@@ -387,17 +339,17 @@ describe('publishToolPackages', () => {
                 releaseMetadata: createReleaseMetadata(selectedPaths),
                 packPackage: async (packagePath) =>
                     packForRoot(root, packagePath, {
-                        starterTemplatePackageJsons: [
+                        embeddedPackageJsons: [
                             {
                                 dependencies: {
-                                    '@pumpkin-plugins/pumpkin-api': '^1.2.3',
-                                    '@pumpkin-plugins/build': '^2.3.4',
+                                    [API_NAME]: '^1.2.3',
+                                    [BUILD_NAME]: '^2.3.4',
                                 },
                             },
                             {
                                 dependencies: {
-                                    '@pumpkin-plugins/pumpkin-api': '^1.2.2',
-                                    '@pumpkin-plugins/build': '^2.3.4',
+                                    [API_NAME]: '^1.2.2',
+                                    [BUILD_NAME]: '^2.3.4',
                                 },
                             },
                         ],
@@ -409,14 +361,14 @@ describe('publishToolPackages', () => {
                 publishPackage: async () => {},
                 log: () => {},
             }),
-            /starter dependency must be \^1\.2\.3.*received \^1\.2\.2/,
+            /template dependency must be \^1\.2\.3.*received \^1\.2\.2/,
         );
         assert.deepEqual(requested, []);
     });
 
     it('publishes only after a definitive exact-version not-found result', async () => {
         const root = createRoot();
-        const selectedPaths = ['tools/pumpkin-api'];
+        const selectedPaths = [API_PATH];
         const lookups = [];
         const published = [];
 
@@ -433,13 +385,13 @@ describe('publishToolPackages', () => {
             log: () => {},
         });
 
-        assert.deepEqual(lookups, ['@pumpkin-plugins/pumpkin-api@1.2.3']);
-        assert.deepEqual(published, ['@pumpkin-plugins/pumpkin-api@1.2.3']);
+        assert.deepEqual(lookups, [`${API_NAME}@1.2.3`]);
+        assert.deepEqual(published, [`${API_NAME}@1.2.3`]);
     });
 
     it('does not publish after an authorization, network, or registry error', async () => {
         const root = createRoot();
-        const selectedPaths = ['tools/pumpkin-api'];
+        const selectedPaths = [API_PATH];
         let published = false;
 
         await assert.rejects(
@@ -456,15 +408,15 @@ describe('publishToolPackages', () => {
                 },
                 log: () => {},
             }),
-            /@pumpkin-plugins\/pumpkin-api@1\.2\.3.*HTTP 429 Too Many Requests/,
+            /@example\/api@1\.2\.3.*HTTP 429 Too Many Requests/,
         );
         assert.equal(published, false);
     });
 
     it('accepts a same-version retry only when registry SRI matches the packed tarball', async () => {
         const root = createRoot();
-        const selectedPaths = ['tools/pumpkin-api'];
-        const expectedIntegrity = `sha512-${Buffer.from('tools/pumpkin-api').toString('base64')}`;
+        const selectedPaths = [API_PATH];
+        const expectedIntegrity = `sha512-${Buffer.from(API_PATH).toString('base64')}`;
         let published = false;
 
         await publishToolPackages({
@@ -483,7 +435,7 @@ describe('publishToolPackages', () => {
 
     it('fails when a same-version registry SRI differs from the packed tarball', async () => {
         const root = createRoot();
-        const selectedPaths = ['tools/pumpkin-api'];
+        const selectedPaths = [API_PATH];
         let published = false;
 
         await assert.rejects(
@@ -498,7 +450,7 @@ describe('publishToolPackages', () => {
                 },
                 log: () => {},
             }),
-            /@pumpkin-plugins\/pumpkin-api@1\.2\.3.*integrity mismatch/,
+            /@example\/api@1\.2\.3.*integrity mismatch/,
         );
         assert.equal(published, false);
     });
@@ -507,7 +459,7 @@ describe('publishToolPackages', () => {
         const root = createRoot();
         let packed = false;
 
-        for (const selectedPaths of [['tools/not-public'], ['tools/pumpkin-api', 'tools/pumpkin-api']]) {
+        for (const selectedPaths of [['tools/not-public'], [API_PATH, API_PATH]]) {
             await assert.rejects(
                 publishToolPackages({
                     root,

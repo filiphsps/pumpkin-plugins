@@ -53,23 +53,18 @@ describe('registerPublicTool', () => {
         assert.equal(readFileSync(join(root, '.release-please-manifest.json'), 'utf8'), manifestBefore);
     });
 
-    it('requires the canonical package name for a registered tool path', () => {
-        const root = repository('tools/codemod', '@other/codemod');
-        const configPath = join(root, 'release-please-config.json');
-        const manifestPath = join(root, '.release-please-manifest.json');
-        const configBefore = readFileSync(configPath, 'utf8');
-        const manifestBefore = readFileSync(manifestPath, 'utf8');
+    it('uses the package manifest as the source of the npm package name', () => {
+        const root = repository('tools/codemod', '@example/codemod');
 
-        assert.throws(
-            () => registerPublicTool(root, 'tools/codemod'),
-            /must have package name @pumpkin-plugins\/codemod/,
-        );
-        assert.equal(readFileSync(configPath, 'utf8'), configBefore);
-        assert.equal(readFileSync(manifestPath, 'utf8'), manifestBefore);
+        registerPublicTool(root, 'tools/codemod');
+
+        assert.deepEqual(JSON.parse(readFileSync(join(root, 'release-please-config.json'), 'utf8')).packages, {
+            'tools/codemod': { component: 'codemod', 'release-as': '0.1.0' },
+        });
     });
 
-    it('requires new public tools to use the Pumpkin Plugins scope', () => {
-        const root = repository('tools/example', '@pumpkin-plugins/example');
+    it('registers a new public tool with its manifest-declared name', () => {
+        const root = repository('tools/example', '@example/custom-tool');
 
         registerPublicTool(root, 'tools/example');
 

@@ -3,7 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
-import { PUBLIC_TOOL_PACKAGE_PATHS } from './utils/tool-packages.mjs';
+import { discoverPublicToolPackages } from './utils/tool-packages.mjs';
 
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
 const read = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
@@ -37,7 +37,7 @@ for (const [dir, reason] of pausedEntries) {
 const plugins = discoveredPlugins.filter((dir) => !pausedPlugins.has(dir));
 const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
 const extensions = discoverComponents(root, 'extensions').map(({ slug }) => `extensions/${slug}`);
-const tools = Object.keys(PUBLIC_TOOL_PACKAGE_PATHS);
+const tools = discoverPublicToolPackages(root).map(({ path: packagePath }) => packagePath);
 for (const dir of actions) {
     for (const file of ['README.md', 'CHANGELOG.md', 'version.txt']) {
         if (!fs.existsSync(path.join(root, dir, file))) problems.push(`${dir}/${file} is missing`);

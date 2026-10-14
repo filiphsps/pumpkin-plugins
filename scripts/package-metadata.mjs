@@ -1,13 +1,10 @@
-// Checks that the root package, every plugin in packages/ and every tool in tools/ carries the
-// metadata npm and GitHub show (license, author, homepage, repository, bugs, funding, a short
-// description) and, for libraries, the fields bundlers read (sideEffects, module, types, files,
-// publishConfig). `--fix` writes everything that can be derived, so only the descriptions are
-// written by hand. See "Package metadata" in docs/code-style.md.
+// Checks workspace-derived package metadata and fixes values that have a single source of truth.
+// See "Package metadata" in docs/code-style.md.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { discoverComponents, localLicenseFile } from '@pumpkin-plugins/docs/node';
 import { Command } from 'commander';
-import { PUBLIC_TOOL_PACKAGE_PATHS } from './utils/tool-packages.mjs';
+import { nodeEngineRange } from './utils/tool-packages.mjs';
 
 const program = new Command()
     .name('package-metadata')
@@ -17,111 +14,7 @@ const program = new Command()
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
 const fix = program.opts().fix ?? false;
 
-const REPO = 'https://github.com/filiphsps/pumpkin-plugins';
-const AUTHOR = 'Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)';
-const FUNDING = [
-    { type: 'github', url: 'https://github.com/sponsors/filiphsps' },
-    { type: 'custom', url: 'https://paypal.me/filiph' },
-];
 const MAX_DESCRIPTION = 70;
-const PUBLIC_TOOL_NODE_ENGINE = '>=24.21.0';
-/** Canonical package names for tools that are published under public names. */
-const EXPECTED_PUBLIC_TOOL_NAMES = PUBLIC_TOOL_PACKAGE_PATHS;
-
-/** Biome's order for package.json keys. Unknown keys go after these. */
-const KEY_ORDER = [
-    'name',
-    'displayName',
-    'version',
-    'private',
-    'description',
-    'categories',
-    'keywords',
-    'homepage',
-    'bugs',
-    'repository',
-    'funding',
-    'license',
-    'author',
-    'contributors',
-    'publisher',
-    'sideEffects',
-    'type',
-    'exports',
-    'main',
-    'module',
-    'types',
-    'bin',
-    'files',
-    'scripts',
-    'contributes',
-    'activationEvents',
-    'dependencies',
-    'devDependencies',
-    'extensionDependencies',
-    'peerDependencies',
-    'optionalDependencies',
-    'engines',
-    'devEngines',
-    'publishConfig',
-    'pumpkinPlugin',
-    'pumpkinBundleDependencies',
-];
-
-/**
- * Intentional publication allowlists for the public toolchain packages.
- * These packages use globs and exclusions to keep development sources out of their tarballs.
- */
-const TOOL_FILE_ALLOWLISTS = {
-    'tools/build': ['dist', 'runtime', 'wasi-wit.lock.json'],
-    'tools/pumpkin-api': [
-        'src/**/*.ts',
-        'src/**/*.mts',
-        'src/**/*.mjs',
-        '!src/**/*.test.ts',
-        '!src/**/*.spec.ts',
-        'schemas',
-        'wit.lock.json',
-        'compatibility',
-        'docs',
-        'README.md',
-        'LICENSE',
-    ],
-    'tools/create-pumpkin-plugin': ['bin/create-pumpkin-plugin.ts', 'dist', 'templates', 'README.md'],
-    'tools/codemod': ['dist', 'README.md', 'docs', 'LICENSE'],
-    'tools/cspell-dict-minecraft': ['cspell-ext.json', 'minecraft.txt', 'README.md', 'LICENSE'],
-    'tools/docs': ['src/**/*.ts', '!src/**/*.test.ts', '!src/**/*.spec.ts', 'bin/**/*.mjs', 'README.md'],
-    'tools/plugin-kit': ['src/**/*.ts', '!src/**/*.test.ts', '!src/**/*.spec.ts'],
-    'tools/config': ['src/**/*.ts', '!src/**/*.test.ts', '!src/**/*.spec.ts'],
-    'tools/update-check': ['src/**/*.ts', '!src/**/*.test.ts', '!src/**/*.spec.ts'],
-    'tools/minecraft-colors': ['src/**/*.ts', '!src/**/*.test.ts', '!src/**/*.spec.ts'],
-    'tools/apis/pumpkin-pie-api': ['src/**/*.ts', '!src/**/*.test.ts', '!src/**/*.spec.ts'],
-    'tools/static-hermes-runtime': [
-        'src/**/*.ts',
-        '!src/**/*.test.ts',
-        '!src/**/*.spec.ts',
-        'src/**/*.template',
-        'dist',
-        'cmake',
-        'hermes-patches',
-        'schemas',
-        'hermes-source.lock.json',
-        'toolchain-versions.json',
-        'wasi-sdk.lock.json',
-        'README.md',
-    ],
-};
-
-function hasEscapedUnicode(source) {
-    // Scan JSON string tokens, consuming escaped backslashes so literal "\\u..." stays valid.
-    for (const [token] of source.matchAll(/"(?:[^"\\]|\\.)*"/g)) {
-        for (const unicodeEscape of token.matchAll(/\\(?:u([0-9a-fA-F]{4})|.)/g)) {
-            if (unicodeEscape[1] && Number.parseInt(unicodeEscape[1], 16) >= 0x80) return true;
-        }
-    }
-    return false;
-}
-
 const hasLocalLicense = (dir) => dir !== '.' && Boolean(localLicenseFile(path.join(root, dir)));
 const packageDirs = () => [
     '.',
@@ -139,62 +32,43 @@ const benchmarkPackageDirs = () => {
         .map((entry) => `benchmarks/${entry.name}`);
 };
 
-/** What the package.json of `dir` should say, apart from the description. */
+/** What the package.json of `dir` can derive from the workspace and its own exports. */
 function expected(dir, pkg) {
     const isRoot = dir === '.';
+    const rootPackage = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+    const repository = rootPackage.repository;
+    const repositoryUrl = typeof repository === 'string' ? repository : repository?.url;
+    if (typeof repositoryUrl !== 'string') throw new Error('root package.json must declare repository.url');
+    const webRepositoryUrl = repositoryUrl.replace(/^git\+/, '').replace(/\.git$/, '');
     const want = {
         license: hasLocalLicense(dir) && typeof pkg.license === 'string' && pkg.license.trim() ? pkg.license : 'MIT',
-        author: AUTHOR,
-        contributors: [AUTHOR],
-        homepage: isRoot ? REPO : `${REPO}/tree/master/${dir}#readme`,
-        repository: { type: 'git', url: `git+${REPO}.git`, ...(isRoot ? {} : { directory: dir }) },
-        bugs: { url: `${REPO}/issues` },
-        funding: FUNDING,
+        homepage: isRoot ? webRepositoryUrl : `${webRepositoryUrl}/tree/master/${dir}#readme`,
+        repository: isRoot
+            ? repository
+            : { ...(typeof repository === 'string' ? { url: repository } : repository), directory: dir },
+        bugs: rootPackage.bugs,
     };
-    const binTargets = typeof pkg.bin === 'string' ? [pkg.bin] : Object.values(pkg.bin ?? {});
-    const binSourceFiles = binTargets.some((target) => target.replace(/^\.\//, '').startsWith('bin/')) ? ['bin'] : [];
     // A library is a tool that others import: it has a root export, as opposed to a plugin or a CLI.
     const rootExport = pkg.exports?.['.'];
     if (dir.startsWith('tools/') && pkg.exports) {
         want.sideEffects = false;
-        want.files = TOOL_FILE_ALLOWLISTS[dir] ?? [
-            ...(fs.existsSync(path.join(root, dir, 'src')) ? ['src'] : []),
-            ...binSourceFiles,
-        ];
-        want.publishConfig = { access: 'public' };
         if (typeof rootExport === 'string') {
             want.module = rootExport;
             want.types = rootExport;
         }
-    } else if (dir.startsWith('tools/')) {
-        want.files = TOOL_FILE_ALLOWLISTS[dir] ?? [
-            ...(fs.existsSync(path.join(root, dir, 'src')) ? ['src'] : []),
-            ...binSourceFiles,
-        ];
     }
-    if (Object.hasOwn(EXPECTED_PUBLIC_TOOL_NAMES, dir)) {
-        want.engines = { node: PUBLIC_TOOL_NODE_ENGINE };
-        want.publishConfig = { access: 'public' };
+    if (dir.startsWith('tools/') && pkg.private !== true && pkg.publishConfig?.access === 'public') {
+        want.engines = { node: nodeEngineRange(root) };
     }
     return want;
 }
 
-const ordered = (pkg) => {
-    const keys = [...KEY_ORDER.filter((k) => k in pkg), ...Object.keys(pkg).filter((k) => !KEY_ORDER.includes(k))];
-    return Object.fromEntries(keys.map((k) => [k, pkg[k]]));
-};
-
 const problems = [];
 for (const dir of packageDirs()) {
     const file = path.join(dir, 'package.json');
-    const source = fs.readFileSync(path.join(root, file), 'utf8');
-    const pkg = JSON.parse(source);
+    const pkg = JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
     const want = expected(dir, pkg);
     const issues = [];
-    const expectedName = EXPECTED_PUBLIC_TOOL_NAMES[dir];
-    if (expectedName && pkg.name !== expectedName) issues.push(`"name" must remain ${JSON.stringify(expectedName)}`);
-    if (expectedName && pkg.private === true) issues.push('public npm tools must not set "private": true');
-    if (hasEscapedUnicode(source)) issues.push('non-ASCII characters must use literal UTF-8, not Unicode escapes');
 
     for (const [key, value] of Object.entries(want)) {
         if (JSON.stringify(pkg[key]) !== JSON.stringify(value))
@@ -204,16 +78,15 @@ for (const dir of packageDirs()) {
     else if (pkg.description.length > MAX_DESCRIPTION) {
         issues.push(`"description" is ${pkg.description.length} characters; keep it under ${MAX_DESCRIPTION}`);
     }
-    if (issues.length === 0 && JSON.stringify(Object.keys(pkg)) === JSON.stringify(Object.keys(ordered(pkg)))) continue;
+    if (issues.length === 0) continue;
 
     if (fix) {
-        fs.writeFileSync(path.join(root, file), `${JSON.stringify(ordered({ ...pkg, ...want }), null, 4)}\n`);
+        fs.writeFileSync(path.join(root, file), `${JSON.stringify({ ...pkg, ...want }, null, 4)}\n`);
         console.log(`updated ${file}`);
         // The description can't be derived, so a bad one still fails after fixing.
         for (const issue of issues.filter((i) => i.startsWith('"description"'))) problems.push(`${file}: ${issue}`);
     } else {
         for (const issue of issues) problems.push(`${file}: ${issue}`);
-        if (issues.length === 0) problems.push(`${file}: keys are not in the standard order`);
     }
 }
 

@@ -34,9 +34,9 @@ pnpm gen --args my-plugin MyPlugin "Does a thing"
    source modules.
 2. Registers the plugin for releases: an entry in `release-please-config.json` (with
    `"release-as": "0.0.1"`) and one in `.release-please-manifest.json`, with the plugin starting at
-   version `0.0.0`, so that its first release is `0.0.1`. The `package.json` comes with the license,
-   author, repository and funding metadata every package has. CI fails if a plugin isn't registered
-   or its metadata is incomplete (`pnpm check`). See
+   version `0.0.0`, so that its first release is `0.0.1`. The `package.json` comes with derived
+   license and repository metadata. CI checks those fields, the description and release registration
+   (`pnpm check`). See
    [Registering a plugin for releases](ci-and-releases.md#registering-a-plugin-for-releases).
 3. Runs `pnpm install`, fills in the plugin's README from its `info.ts`, generates its docs-site
    reference links from repository metadata, and adds the plugin to the root README.

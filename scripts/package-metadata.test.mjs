@@ -12,8 +12,16 @@ function fixture(t) {
     fs.mkdirSync(path.join(root, 'packages'));
     fs.mkdirSync(path.join(root, 'tools'));
     fs.writeFileSync(path.join(root, 'LICENSE'), 'MIT');
+    fs.writeFileSync(path.join(root, '.node-version'), '24.21.0\n');
     const file = path.join(root, 'package.json');
-    fs.writeFileSync(file, JSON.stringify({ name: 'fixture', description: 'Test metadata' }));
+    fs.writeFileSync(
+        file,
+        JSON.stringify({
+            name: 'fixture',
+            description: 'Test metadata',
+            repository: { type: 'git', url: 'git+https://example.test/team/fixture.git' },
+        }),
+    );
     const run = (...args) =>
         spawnSync(process.execPath, [script, ...args], {
             env: { ...process.env, PUMPKIN_PLUGINS_ROOT: root },
@@ -22,134 +30,72 @@ function fixture(t) {
     assert.equal(run('--fix').status, 0);
     return { root, file, run };
 }
-test('rejects escaped author and contributor names and fixes them to literal UTF-8', (t) => {
-    const { file, run } = fixture(t);
-    const original = fs.readFileSync(file, 'utf8');
-    for (const unicodeEscape of ['\\u00f6', '\\u00F6']) {
-        fs.writeFileSync(file, original.replaceAll('ö', unicodeEscape));
-        const result = run();
-        assert.equal(result.status, 1);
-        assert.match(result.stderr, /package\.json:.*literal UTF-8/);
-        assert.equal(run('--fix').status, 0);
-        assert.equal(fs.readFileSync(file, 'utf8'), original);
-        assert.equal(run().status, 0);
-    }
-});
-test('permits literal backslash sequences and necessary JSON control escapes', (t) => {
+test('does not enforce or rewrite author and funding metadata', (t) => {
     const { file, run } = fixture(t);
     const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
-    pkg.example = 'literal \\u00f6\n\t';
+    pkg.author = 'Maintained by the community';
+    pkg.funding = 'https://example.test/fund';
     fs.writeFileSync(file, `${JSON.stringify(pkg, null, 4)}\n`);
+
     assert.equal(run().status, 0);
+    assert.equal(run('--fix').status, 0);
+
+    const fixed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.equal(fixed.author, 'Maintained by the community');
+    assert.equal(fixed.funding, 'https://example.test/fund');
 });
 
-test('does not package a source bin directory when the CLI is compiled under dist', (t) => {
+test('keeps the root repository field in its existing npm-supported form', (t) => {
+    const { file, run } = fixture(t);
+    const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+    pkg.repository = 'https://example.test/team/fixture';
+    fs.writeFileSync(file, `${JSON.stringify(pkg, null, 4)}\n`);
+
+    assert.equal(run().status, 0);
+    assert.equal(run('--fix').status, 0);
+    assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).repository, 'https://example.test/team/fixture');
+});
+
+test('uses the workspace Node pin for every public tool package', (t) => {
     const { root, run } = fixture(t);
-    const runtime = path.join(root, 'tools/static-hermes-runtime');
-    fs.mkdirSync(runtime, { recursive: true });
-    fs.mkdirSync(path.join(runtime, 'src'));
-    const manifest = path.join(runtime, 'package.json');
+    const packageDirectory = path.join(root, 'tools/example');
+    const manifest = path.join(packageDirectory, 'package.json');
+    fs.mkdirSync(packageDirectory, { recursive: true });
     fs.writeFileSync(
         manifest,
         JSON.stringify({
-            name: '@pumpkin-plugins/static-hermes-runtime',
-            description: 'Static Hermes runtime',
-            exports: { '.': './src/index.ts' },
-            bin: { 'static-hermes-runtime': 'dist/cli.js' },
+            name: 'example-tool',
+            version: '1.0.0',
+            description: 'A tool discovered from its manifest',
+            publishConfig: { access: 'public' },
+        }),
+    );
+    fs.writeFileSync(path.join(root, '.node-version'), '26.4.0\n');
+
+    assert.equal(run('--fix').status, 0);
+
+    const fixed = JSON.parse(fs.readFileSync(manifest, 'utf8'));
+    assert.deepEqual(fixed.engines, { node: '>=26.4.0' });
+    assert.equal(run().status, 0);
+});
+
+test('preserves package-specific publication contents when metadata is fixed', (t) => {
+    const { root, run } = fixture(t);
+    const manifest = path.join(root, 'tools/example/package.json');
+    fs.mkdirSync(path.dirname(manifest), { recursive: true });
+    const files = ['dist', 'templates/custom'];
+    fs.writeFileSync(
+        manifest,
+        JSON.stringify({
+            name: '@example/tool',
+            version: '1.0.0',
+            description: 'A public tool',
+            publishConfig: { access: 'public' },
+            files,
         }),
     );
 
     assert.equal(run('--fix').status, 0);
-
-    const files = JSON.parse(fs.readFileSync(manifest, 'utf8')).files;
-    assert.deepEqual(files, [
-        'src/**/*.ts',
-        '!src/**/*.test.ts',
-        '!src/**/*.spec.ts',
-        'src/**/*.template',
-        'dist',
-        'cmake',
-        'hermes-patches',
-        'schemas',
-        'hermes-source.lock.json',
-        'toolchain-versions.json',
-        'wasi-sdk.lock.json',
-        'README.md',
-    ]);
-});
-
-test('preserves each published tool package file allowlist when metadata is fixed', (t) => {
-    const { root, run } = fixture(t);
-    const packages = {
-        'tools/build': {
-            name: '@pumpkin-plugins/build',
-            description: 'Build Pumpkin plugins',
-            bin: { 'pumpkin-plugins-build': 'dist/cli.js' },
-            files: ['dist', 'runtime', 'wasi-wit.lock.json'],
-        },
-        'tools/pumpkin-api': {
-            name: '@pumpkin-plugins/pumpkin-api',
-            description: 'Pumpkin plugin TypeScript API',
-            exports: { '.': './src/index.ts' },
-            files: [
-                'src/**/*.ts',
-                'src/**/*.mts',
-                'src/**/*.mjs',
-                '!src/**/*.test.ts',
-                '!src/**/*.spec.ts',
-                'schemas',
-                'wit.lock.json',
-                'compatibility',
-                'docs',
-                'README.md',
-                'LICENSE',
-            ],
-        },
-        'tools/create-pumpkin-plugin': {
-            name: 'create-pumpkin-plugin',
-            description: 'Create a minimal Pumpkin plugin project',
-            bin: { 'create-pumpkin-plugin': 'dist/create-pumpkin-plugin.js' },
-            files: ['bin/create-pumpkin-plugin.ts', 'dist', 'templates', 'README.md'],
-        },
-        'tools/codemod': {
-            name: '@pumpkin-plugins/codemod',
-            description: 'Codemod runner for Pumpkin plugins',
-            exports: { '.': { types: './dist/src/index.d.ts', import: './dist/src/index.js' } },
-            bin: { 'pumpkin-codemod': 'dist/bin/pumpkin-codemod.js' },
-            files: ['dist', 'README.md', 'docs', 'LICENSE'],
-        },
-        'tools/static-hermes-runtime': {
-            name: '@pumpkin-plugins/static-hermes-runtime',
-            description: 'Static Hermes Runtime shim for plugin components',
-            exports: { '.': './src/index.ts' },
-            bin: { 'static-hermes-runtime': 'dist/cli.js' },
-            files: [
-                'src/**/*.ts',
-                '!src/**/*.test.ts',
-                '!src/**/*.spec.ts',
-                'src/**/*.template',
-                'dist',
-                'cmake',
-                'hermes-patches',
-                'schemas',
-                'hermes-source.lock.json',
-                'toolchain-versions.json',
-                'wasi-sdk.lock.json',
-                'README.md',
-            ],
-        },
-    };
-
-    for (const [directory, manifest] of Object.entries(packages)) {
-        const packageDirectory = path.join(root, directory);
-        fs.mkdirSync(path.join(packageDirectory, 'src'), { recursive: true });
-        fs.writeFileSync(path.join(packageDirectory, 'package.json'), JSON.stringify(manifest));
-    }
-
-    assert.equal(run('--fix').status, 0);
-    for (const [directory, expectedFiles] of Object.entries(packages)) {
-        const manifest = JSON.parse(fs.readFileSync(path.join(root, directory, 'package.json'), 'utf8'));
-        assert.deepEqual(manifest.files, expectedFiles.files, `${directory} files allowlist`);
-    }
+    assert.deepEqual(JSON.parse(fs.readFileSync(manifest, 'utf8')).files, files);
     assert.equal(run().status, 0);
 });

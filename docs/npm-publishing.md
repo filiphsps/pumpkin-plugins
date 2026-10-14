@@ -5,9 +5,9 @@ navigation:
 
 # Publishing public npm tools
 
-The public npm package set and dependency order are defined in
-[`tool-packages.mjs`](../scripts/utils/tool-packages.mjs). Use that source for the current names,
-workspace paths, and release order; this guide does not duplicate the list.
+Public npm tools are discovered from package manifests under `tools/` that declare
+`publishConfig.access: "public"` and are not private. Their package manifests and packed project
+templates declare the dependencies that determine release order.
 
 For initial setup, publish metadata-only placeholders at `0.0.0`. Release Please produces and the
 GitHub Actions release workflow publishes the first functional release for each package.
@@ -15,7 +15,7 @@ GitHub Actions release workflow publishes the first functional release for each 
 ## Seed package names
 
 npm requires a package to exist before a trusted publisher can be configured. Publish one
-`0.0.0` placeholder for every package in the canonical list before setting up trusted publishing.
+`0.0.0` placeholder for each public tool before setting up trusted publishing.
 Each placeholder contains only `package.json` and a README that says the package is non-functional.
 It must not contain runtime code, commands, or package dependencies.
 
@@ -37,8 +37,8 @@ npm versions are immutable.
 ## Publish functional releases
 
 Release Please creates the first functional release PR for each registered tool. The configured
-first functional version is `0.1.0`. Merge release PRs in the canonical order from
-[`tool-packages.mjs`](../scripts/utils/tool-packages.mjs), so each consumer's required public
+first functional version is `0.1.0`. The publish job orders selected tools from their declared
+production dependencies and packed project templates, so each consumer's required public
 dependencies are available before its publish job runs.
 
 The `ci.yml` caller invokes the reusable release workflow after CI gates pass. Its `publish-tools`

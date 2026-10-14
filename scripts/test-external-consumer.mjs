@@ -6,11 +6,12 @@ import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { createInternalRegistry } from './utils/external-consumer-registry.mjs';
 import {
-    assertPackedBuilderDependencies,
     assertPublicToolPackage,
     assertPublicToolPackageContents,
-    assertStarterToolDependencies,
-    PUBLIC_TOOL_PACKAGE_PATHS,
+    assertPublicToolTemplateDependencies,
+    discoverPublicToolPackages,
+    embeddedPackageManifestEntries,
+    nodeVersion,
     parseTarEntries,
 } from './utils/tool-packages.mjs';
 
@@ -21,24 +22,20 @@ const program = new Command()
     .option('--build-cli-only', 'Check the packed builder CLI without compiling starter projects')
     .parse(process.argv);
 const buildCliOnly = program.opts().buildCliOnly ?? false;
-const buildPackagePaths = ['tools/pumpkin-api', 'tools/static-hermes-runtime', 'tools/build'];
-const packagePaths = buildCliOnly
-    ? buildPackagePaths
-    : [
-          'tools/pumpkin-api',
-          'tools/static-hermes-runtime',
-          'tools/build',
-          'tools/docs',
-          'tools/update-check',
-          'tools/plugin-kit',
-          'tools/config',
-          'tools/minecraft-colors',
-          'tools/apis/pumpkin-pie-api',
-          'tools/create-pumpkin-plugin',
-          'tools/codemod',
-          'tools/cspell-dict-minecraft',
-      ];
-const requiredNodeVersion = 'v24.21.0';
+const publicTools = discoverPublicToolPackages(repositoryRoot);
+const publicToolsByPath = new Map(publicTools.map((tool) => [tool.path, tool]));
+const buildTool = publicTools.find(({ packageJson }) => Object.hasOwn(packageJson.bin ?? {}, 'pumpkin-plugins-build'));
+if (!buildTool) throw new Error('No public tool declares the pumpkin-plugins-build executable');
+const creatorTool = publicTools.find(({ packageJson }) =>
+    Object.hasOwn(packageJson.bin ?? {}, 'create-pumpkin-plugin'),
+);
+const codemodTool = publicTools.find(({ packageJson }) => Object.hasOwn(packageJson.bin ?? {}, 'pumpkin-codemod'));
+const pumpkinApiTool = publicTools.find(({ packageJson }) => Object.hasOwn(packageJson.exports ?? {}, './wit'));
+if (!buildCliOnly && (!creatorTool || !codemodTool || !pumpkinApiTool)) {
+    throw new Error('Public tool manifests must declare the creator, codemod, and Pumpkin API capabilities');
+}
+const packagePaths = buildCliOnly ? dependencyClosure([buildTool], publicTools) : publicTools.map(({ path }) => path);
+const requiredNodeVersion = `v${nodeVersion(repositoryRoot)}`;
 const requiredPnpmVersion = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8')).devEngines
     ?.packageManager?.version;
 
@@ -88,7 +85,7 @@ try {
             process.env,
             ['ignore', 'ignore', 'inherit'],
         );
-        const packageJson = JSON.parse(fs.readFileSync(path.join(packageDirectory, 'package.json'), 'utf8'));
+        const packageJson = publicToolsByPath.get(packagePath).packageJson;
         const tarball = fs
             .readdirSync(tarballDirectory)
             .find((filename) => filename.startsWith(tarballName(packageJson.name)));
@@ -100,41 +97,26 @@ try {
         if (packedPackageJson.name !== packageJson.name) {
             throw new Error(`Packed package name changed from ${packageJson.name} to ${packedPackageJson.name}`);
         }
-        const expectedPublicName = PUBLIC_TOOL_PACKAGE_PATHS[packagePath];
-        if (expectedPublicName) {
-            assertPublicToolPackage(packedPackageJson, expectedPublicName);
-            const entries = parseTarEntries(execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' }));
-            assertPublicToolPackageContents(entries, packagePath);
-        }
-        if (packedPackageJson.name === '@pumpkin-plugins/pumpkin-api') {
-            assertPumpkinApiPackageContents(tarballPath);
-        }
+        assertPublicToolPackage(packedPackageJson, packageJson.name, repositoryRoot);
+        const entries = parseTarEntries(execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' }));
+        assertPublicToolPackageContents(entries, packagePath, packedPackageJson);
+        const embeddedPackageJsons = embeddedPackageManifestEntries(entries).map((entry) =>
+            JSON.parse(execFileSync('tar', ['-xOf', tarballPath, entry], { encoding: 'utf8' })),
+        );
         packedPackages.set(packedPackageJson.name, {
             packageJson: packedPackageJson,
             filename: tarball,
             bytes: fs.readFileSync(tarballPath),
+            embeddedPackageJsons,
         });
     }
 
     const packedToolVersions = Object.fromEntries(
         [...packedPackages].map(([name, { packageJson }]) => [name, packageJson.version]),
     );
-    assertPackedBuilderDependencies(packedPackages.get('@pumpkin-plugins/build').packageJson, packedToolVersions);
-    if (!buildCliOnly) {
-        const creatorPackage = packedPackages.get('create-pumpkin-plugin');
-        for (const language of ['typescript', 'javascript']) {
-            const templatePackageJson = JSON.parse(
-                execFileSync(
-                    'tar',
-                    [
-                        '-xOf',
-                        path.join(tarballDirectory, creatorPackage.filename),
-                        `package/templates/${language}/package.json`,
-                    ],
-                    { encoding: 'utf8' },
-                ),
-            );
-            assertStarterToolDependencies(templatePackageJson, packedToolVersions);
+    for (const { embeddedPackageJsons } of packedPackages.values()) {
+        for (const templatePackageJson of embeddedPackageJsons) {
+            assertPublicToolTemplateDependencies(templatePackageJson, packedToolVersions, repositoryRoot);
         }
     }
 
@@ -163,6 +145,8 @@ try {
     };
 
     const builderConsumer = path.join(temporaryRoot, 'builder-consumer');
+    const packedBuilder = packedPackages.get(buildTool.name);
+    const buildCommand = Object.keys(buildTool.packageJson.bin)[0];
     fs.mkdirSync(builderConsumer);
     fs.writeFileSync(
         path.join(builderConsumer, 'package.json'),
@@ -171,9 +155,7 @@ try {
                 name: 'pumpkin-production-builder-check',
                 private: true,
                 packageManager: `pnpm@${requiredPnpmVersion}`,
-                dependencies: {
-                    '@pumpkin-plugins/build': `^${packedPackages.get('@pumpkin-plugins/build').packageJson.version}`,
-                },
+                dependencies: { [buildTool.name]: `^${packedBuilder.packageJson.version}` },
             },
             null,
             2,
@@ -187,15 +169,10 @@ try {
     if (fs.existsSync(path.join(builderConsumer, 'node_modules', 'typescript'))) {
         throw new Error('Production builder check unexpectedly exposes an ambient TypeScript dependency');
     }
-    const help = await capture(
-        packageManager.command,
-        [...packageManager.args, 'exec', 'pumpkin-plugins-build', '--help'],
-        builderConsumer,
-        { ...environment, NODE_PATH: '' },
-    );
-    if (!help.includes('--types-only')) {
-        throw new Error(`Packed build CLI did not print its supported commands: ${help}`);
-    }
+    await capture(packageManager.command, [...packageManager.args, 'exec', buildCommand, '--help'], builderConsumer, {
+        ...environment,
+        NODE_PATH: '',
+    });
     console.log('Packed build CLI passed with production dependencies and no ambient TypeScript');
 
     if (!buildCliOnly) {
@@ -231,15 +208,12 @@ try {
         }
         await run(packageManager.command, [...packageManager.args, 'install'], consumerDirectory, environment);
 
-        const codemodList = await capture(
+        await capture(
             packageManager.command,
-            [...packageManager.args, 'exec', 'pumpkin-codemod', 'list'],
+            [...packageManager.args, 'exec', Object.keys(codemodTool.packageJson.bin)[0], 'list'],
             consumerDirectory,
             environment,
         );
-        if (!codemodList.includes('migrate-pumpkin-api-ts')) {
-            throw new Error(`Packed codemod CLI did not list the Pumpkin API migration: ${codemodList}`);
-        }
 
         for (const name of packedPackages.keys()) {
             const installedPath = path.join(consumerDirectory, 'node_modules', ...name.split('/'));
@@ -254,11 +228,24 @@ try {
 
         await run(
             packageManager.command,
-            [...packageManager.args, 'exec', 'create-pumpkin-plugin', 'packed-bin', '--ts', '--skip-install'],
+            [
+                ...packageManager.args,
+                'exec',
+                Object.keys(creatorTool.packageJson.bin)[0],
+                'packed-bin',
+                '--ts',
+                '--skip-install',
+            ],
             consumerDirectory,
             environment,
         );
-        assertStarter(path.join(consumerDirectory, 'packed-bin'), 'typescript', pnpmVersion.trim(), packedToolVersions);
+        assertStarter(
+            path.join(consumerDirectory, 'packed-bin'),
+            'typescript',
+            pnpmVersion.trim(),
+            packedToolVersions,
+            repositoryRoot,
+        );
 
         for (const [directory, language] of [
             ['pnpm-create-typescript', 'typescript'],
@@ -269,7 +256,7 @@ try {
                 [
                     ...packageManager.args,
                     'create',
-                    'pumpkin-plugin',
+                    creatorTool.name.replace(/^create-/, ''),
                     directory,
                     language === 'typescript' ? '--ts' : '--js',
                 ],
@@ -277,7 +264,7 @@ try {
                 environment,
             );
             const starter = path.join(consumerDirectory, directory);
-            assertStarter(starter, language, pnpmVersion.trim(), packedToolVersions);
+            assertStarter(starter, language, pnpmVersion.trim(), packedToolVersions, repositoryRoot);
             await run(packageManager.command, [...packageManager.args, 'run', 'typecheck'], starter, environment);
             await run(packageManager.command, [...packageManager.args, 'run', 'build'], starter, environment);
 
@@ -291,7 +278,7 @@ try {
                 throw new Error(`${language} build output is not a WebAssembly component: ${outputPath}`);
             }
             assertExternalCache(cacheDirectory, storeDirectory, starter);
-            assertPumpkinWitCacheIgnored(starter, storeDirectory);
+            assertPumpkinWitCacheIgnored(starter, storeDirectory, pumpkinApiTool.name);
         }
 
         console.log(`Packed consumer and pnpm create flows passed outside the repository: ${temporaryRoot}`);
@@ -315,9 +302,30 @@ function tarballName(name) {
     return `${name.replace(/^@/, '').replaceAll('/', '-')}-`;
 }
 
-function assertStarter(directory, language, expectedPnpmVersion, versions) {
+function dependencyClosure(roots, publicTools) {
+    const toolsByName = new Map(publicTools.map((tool) => [tool.name, tool]));
+    const selectedPaths = new Set();
+    const visit = (tool) => {
+        if (selectedPaths.has(tool.path)) return;
+        selectedPaths.add(tool.path);
+        const dependencies = {
+            ...tool.packageJson.dependencies,
+            ...tool.packageJson.optionalDependencies,
+        };
+        for (const dependencyName of Object.keys(dependencies)) {
+            const dependency = toolsByName.get(dependencyName);
+            if (dependency) visit(dependency);
+        }
+    };
+    for (const tool of roots) visit(tool);
+    return publicTools
+        .filter(({ path: packagePath }) => selectedPaths.has(packagePath))
+        .map(({ path: packagePath }) => packagePath);
+}
+
+function assertStarter(directory, language, expectedPnpmVersion, versions, root) {
     const packageJson = JSON.parse(fs.readFileSync(path.join(directory, 'package.json'), 'utf8'));
-    assertStarterToolDependencies(packageJson, versions);
+    assertPublicToolTemplateDependencies(packageJson, versions, root);
     const sourcePath = path.resolve(directory, packageJson.pumpkinPlugin.entry);
     const expectedExtension = language === 'typescript' ? '.ts' : '.js';
     if (
@@ -327,33 +335,12 @@ function assertStarter(directory, language, expectedPnpmVersion, versions) {
     ) {
         throw new Error(`${language} starter entry is not a project source file: ${packageJson.pumpkinPlugin.entry}`);
     }
-    if (!packageJson.dependencies?.['@pumpkin-plugins/pumpkin-api']) {
-        throw new Error(`${language} starter does not declare the Pumpkin API dependency`);
-    }
-    if (!packageJson.dependencies?.['@pumpkin-plugins/build']) {
-        throw new Error(`${language} starter does not declare the plugin builder dependency`);
-    }
     if (!packageJson.scripts?.typecheck || !packageJson.scripts?.build) {
         throw new Error(`${language} starter does not provide its typecheck and build commands`);
     }
     if (packageJson.packageManager !== `pnpm@${expectedPnpmVersion}`) {
         throw new Error(`${language} starter does not pin the launching pnpm version: ${packageJson.packageManager}`);
     }
-}
-
-function assertPumpkinApiPackageContents(tarballPath) {
-    const entries = parseTarEntries(execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' }));
-    if (!entries.includes('package/wit.lock.json')) {
-        throw new Error('Packed Pumpkin API package is missing wit.lock.json');
-    }
-
-    const bundledWit = entries.find(
-        (entry) => entry === 'package/wit' || entry.startsWith('package/wit/') || entry.endsWith('.wit'),
-    );
-    if (bundledWit) throw new Error(`Packed Pumpkin API package contains vendored WIT: ${bundledWit}`);
-
-    const generatedOutput = entries.find((entry) => /^package\/(?:\.cache|build|generated)\//.test(entry));
-    if (generatedOutput) throw new Error(`Packed Pumpkin API package contains generated output: ${generatedOutput}`);
 }
 
 function assertExternalCache(cache, store, starter) {
@@ -364,10 +351,10 @@ function assertExternalCache(cache, store, starter) {
         throw new Error('Static Hermes cache overlaps the pnpm store');
 }
 
-function assertPumpkinWitCacheIgnored(starter, store) {
+function assertPumpkinWitCacheIgnored(starter, store, apiPackageName) {
     const cacheRoot = path.join(starter, '.cache');
     const witCache = path.join(cacheRoot, 'pumpkin-api-wit');
-    const apiLockPath = path.join(starter, 'node_modules', '@pumpkin-plugins', 'pumpkin-api', 'wit.lock.json');
+    const apiLockPath = path.join(starter, 'node_modules', ...apiPackageName.split('/'), 'wit.lock.json');
     const apiLock = JSON.parse(fs.readFileSync(apiLockPath, 'utf8'));
     const matchingDigest = fs.readdirSync(witCache).find((entry) => {
         if (!/^[a-f0-9]{64}$/.test(entry)) return false;

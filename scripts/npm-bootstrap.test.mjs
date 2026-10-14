@@ -5,45 +5,17 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { bootstrapPublicTool, parseBootstrapArguments } from './npm-bootstrap.mjs';
+import { discoverPublicToolPackages, nodeEngineRange } from './utils/tool-packages.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const temporaryDirectories = [];
-const API = '@pumpkin-plugins/pumpkin-api';
-const DOCS = '@pumpkin-plugins/docs';
-const RUNTIME = '@pumpkin-plugins/static-hermes-runtime';
-const BUILD = '@pumpkin-plugins/build';
-const packageNames = {
-    'tools/pumpkin-api': API,
-    'tools/static-hermes-runtime': RUNTIME,
-    'tools/build': BUILD,
-    'tools/create-pumpkin-plugin': 'create-pumpkin-plugin',
-    'tools/codemod': '@pumpkin-plugins/codemod',
-    'tools/cspell-dict-minecraft': '@pumpkin-plugins/cspell-dict-minecraft',
-    'tools/docs': DOCS,
-    'tools/config': '@pumpkin-plugins/config',
-    'tools/update-check': '@pumpkin-plugins/update-check',
-    'tools/plugin-kit': '@pumpkin-plugins/plugin-kit',
-};
-const prerequisitePathsByPackage = {
-    'tools/config': [[DOCS, 'tools/docs']],
-    'tools/update-check': [
-        [DOCS, 'tools/docs'],
-        [API, 'tools/pumpkin-api'],
-    ],
-    'tools/plugin-kit': [
-        [DOCS, 'tools/docs'],
-        [API, 'tools/pumpkin-api'],
-        ['@pumpkin-plugins/update-check', 'tools/update-check'],
-    ],
-    'tools/build': [
-        ['@pumpkin-plugins/pumpkin-api', 'tools/pumpkin-api'],
-        ['@pumpkin-plugins/static-hermes-runtime', 'tools/static-hermes-runtime'],
-    ],
-    'tools/create-pumpkin-plugin': [
-        ['@pumpkin-plugins/pumpkin-api', 'tools/pumpkin-api'],
-        ['@pumpkin-plugins/build', 'tools/build'],
-    ],
-};
+const publicTools = discoverPublicToolPackages(root);
+const toolsByPath = new Map(publicTools.map((tool) => [tool.path, tool]));
+const packageNames = Object.fromEntries(publicTools.map(({ path: packagePath, name }) => [packagePath, name]));
+const API = toolsByPath.get('tools/pumpkin-api').name;
+const DOCS = toolsByPath.get('tools/docs').name;
+const RUNTIME = toolsByPath.get('tools/static-hermes-runtime').name;
+const BUILD = toolsByPath.get('tools/build').name;
 
 afterEach(() => {
     for (const directory of temporaryDirectories.splice(0)) {
@@ -52,66 +24,27 @@ afterEach(() => {
 });
 
 function manifest(packagePath, overrides = {}) {
+    const source = JSON.parse(fs.readFileSync(path.join(root, packagePath, 'package.json'), 'utf8'));
+    const publicNames = new Set(publicTools.map(({ name }) => name));
+    const dependencies = Object.fromEntries(
+        Object.keys(source.dependencies ?? {})
+            .filter((name) => publicNames.has(name))
+            .map((name) => [name, '0.1.0']),
+    );
     const packageJson = {
         name: packageNames[packagePath],
         version: '0.1.0',
-        engines: { node: '>=24.21.0' },
+        engines: { node: nodeEngineRange(root) },
         publishConfig: { access: 'public' },
+        exports: { '.': './src/index.ts' },
+        ...(Object.keys(dependencies).length > 0 ? { dependencies } : {}),
         ...overrides,
     };
-    if (packagePath === 'tools/build' && !overrides.dependencies) {
-        packageJson.dependencies = { [API]: '0.1.0', [RUNTIME]: '0.1.0' };
-    }
     return packageJson;
 }
 
-function contentEntries(packagePath) {
-    const required = {
-        'tools/pumpkin-api': [
-            'package/src/index.ts',
-            'package/src/wit.mjs',
-            'package/src/wit.d.mts',
-            'package/wit.lock.json',
-        ],
-        'tools/static-hermes-runtime': [
-            'package/src/index.ts',
-            'package/dist/index.js',
-            'package/cmake/wasi-sdk-hermes-p2.cmake',
-            'package/hermes-patches/0001-wasi-p2-configure-platform.patch',
-        ],
-        'tools/build': [
-            'package/dist/cli.js',
-            'package/runtime/quickjs-runtime-bigint.wasm',
-            'package/wasi-wit.lock.json',
-        ],
-        'tools/create-pumpkin-plugin': [
-            'package/bin/create-pumpkin-plugin.ts',
-            'package/dist/create-pumpkin-plugin.js',
-            'package/templates/typescript/package.json',
-            'package/templates/javascript/package.json',
-        ],
-        'tools/codemod': [
-            'package/dist/bin/pumpkin-codemod.js',
-            'package/dist/src/index.js',
-            'package/dist/src/index.d.ts',
-            'package/README.md',
-            'package/docs/using-codemods.md',
-            'package/docs/authoring-codemods.md',
-        ],
-        'tools/cspell-dict-minecraft': [
-            'package/cspell-ext.json',
-            'package/minecraft.txt',
-            'package/README.md',
-            'package/LICENSE',
-        ],
-        'tools/docs': [
-            'package/src/info.ts',
-            'package/src/markdown.ts',
-            'package/src/node.ts',
-            'package/bin/pumpkin-plugins-docs.mjs',
-        ],
-    };
-    return ['package/package.json', ...required[packagePath]];
+function contentEntries() {
+    return ['package/package.json', 'package/src/index.ts'];
 }
 
 function makeFixture({
@@ -120,7 +53,7 @@ function makeFixture({
     sourceManifest,
     packedManifest,
     packedEntries,
-    templateManifests = [],
+    embeddedPackageJsons = [],
     registry = {},
 } = {}) {
     const events = {
@@ -163,16 +96,13 @@ function makeFixture({
             extract: async (_archiveFile, destination, extractedRoot) => {
                 events.extracted.push(extractedRoot);
                 const sourceRoot = path.join(destination, extractedRoot);
-                fs.mkdirSync(path.join(sourceRoot, packagePath), { recursive: true });
-                fs.writeFileSync(
-                    path.join(sourceRoot, packagePath, 'package.json'),
-                    `${JSON.stringify(selectedManifest)}\n`,
-                );
-                for (const [, dependencyPath] of prerequisitePathsByPackage[packagePath] ?? []) {
-                    fs.mkdirSync(path.join(sourceRoot, dependencyPath), { recursive: true });
+                fs.mkdirSync(sourceRoot, { recursive: true });
+                fs.copyFileSync(path.join(root, '.node-version'), path.join(sourceRoot, '.node-version'));
+                for (const { path: toolPath } of publicTools) {
+                    fs.mkdirSync(path.join(sourceRoot, toolPath), { recursive: true });
                     fs.writeFileSync(
-                        path.join(sourceRoot, dependencyPath, 'package.json'),
-                        `${JSON.stringify(manifest(dependencyPath))}\n`,
+                        path.join(sourceRoot, toolPath, 'package.json'),
+                        `${JSON.stringify(toolPath === packagePath ? selectedManifest : manifest(toolPath))}\n`,
                     );
                 }
                 fs.copyFileSync(
@@ -189,9 +119,9 @@ function makeFixture({
                 return tarball;
             },
             inspectPackage: async () => ({
-                entries: packedEntries ?? contentEntries(packagePath),
+                entries: packedEntries ?? contentEntries(),
                 packageJson: packedManifest ?? manifest(packagePath),
-                templatePackageJsons: templateManifests,
+                embeddedPackageJsons,
             }),
         },
         registry: {
@@ -403,7 +333,7 @@ describe('npm first-release bootstrap', () => {
 
         await assert.rejects(
             bootstrapFixture(fixture),
-            /@pumpkin-plugins\/pumpkin-api builder dependency must resolve to packed version 0\.1\.0/,
+            /@pumpkin-plugins\/pumpkin-api build dependency must resolve to packed version 0\.1\.0/,
         );
         assert.deepEqual(fixture.events.registry, []);
         assert.deepEqual(fixture.events.published, []);
@@ -412,7 +342,7 @@ describe('npm first-release bootstrap', () => {
     it('checks both creator templates against their exact public API and build versions', async () => {
         const fixture = makeFixture({
             packagePath: 'tools/create-pumpkin-plugin',
-            templateManifests: [
+            embeddedPackageJsons: [
                 { dependencies: { [API]: '^0.2.0', [BUILD]: '^0.2.0' } },
                 { dependencies: { [API]: '^0.2.0', [BUILD]: '^0.2.0' } },
             ],
@@ -420,7 +350,7 @@ describe('npm first-release bootstrap', () => {
 
         await assert.rejects(
             bootstrapFixture(fixture),
-            /@pumpkin-plugins\/pumpkin-api starter dependency must be \^0\.1\.0/,
+            /@pumpkin-plugins\/pumpkin-api template dependency must be \^0\.1\.0/,
         );
         assert.deepEqual(fixture.events.registry, []);
         assert.deepEqual(fixture.events.published, []);
@@ -557,7 +487,7 @@ describe('npm first-release bootstrap', () => {
     it('requires an explicit owner/write confirmation for an unclaimed unscoped package', async () => {
         const fixture = makeFixture({
             packagePath: 'tools/create-pumpkin-plugin',
-            templateManifests: [
+            embeddedPackageJsons: [
                 { dependencies: { [API]: '^0.1.0', [BUILD]: '^0.1.0' } },
                 { dependencies: { [API]: '^0.1.0', [BUILD]: '^0.1.0' } },
             ],

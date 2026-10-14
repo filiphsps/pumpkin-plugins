@@ -73,16 +73,15 @@ source references and update the named roles if its palette or log handling chan
 
 ## Package metadata
 
-Every `package.json` (the root, each plugin, each tool) carries the same author,
-contributors, homepage, repository, bugs and funding fields, and a description of at most 70
-characters. Tools that export code also set `sideEffects`, `module`, `types`, `files` and
-`publishConfig`. `node scripts/package-metadata.mjs` checks it and `--fix` writes everything that can
-be derived; `pnpm gen` already generates plugins that pass. Package JSON strings use literal UTF-8
-for non-ASCII characters (for example `Sandström`), rather than Unicode escapes. The metadata
-check rejects escaped non-ASCII characters; `--fix` writes them literally. The homepage of a package is its folder's
-README on `master`. Packages use MIT by default. A package with its own `LICENSE`, `LICENSE.md`
-or `LICENSE.txt` file keeps the license declared in its `package.json`, including when metadata
-is fixed.
+`node scripts/package-metadata.mjs` checks the license, homepage, repository, bugs and a
+description of at most 70 characters. It derives workspace links from the root repository URL.
+`--fix` writes derived values but leaves descriptions and package-specific fields alone. Public npm
+tools set `engines.node` from the version in `.node-version`. Importable tools also set
+`sideEffects`, `module` and `types`; each tool owns its `files` and `publishConfig` settings.
+`pnpm gen` generates plugins that pass. The homepage of a package is its folder's README on
+`master`. Packages use MIT by default. A package with its own `LICENSE`, `LICENSE.md` or
+`LICENSE.txt` file keeps the license declared in its `package.json`, including when metadata is
+fixed.
 
 ## Docs match the code
 

@@ -147,19 +147,21 @@ Actions import shared runtime helpers from `actions/common/src/`. Each action ta
 snapshot of those files, so changes to a shared helper must also include releasable changes under
 each consuming action directory to publish the updated helper with those actions.
 
-The public npm package set and dependency order are maintained in
-[`tool-packages.mjs`](../scripts/utils/tool-packages.mjs). Seed each package with a metadata-only
-`0.0.0` placeholder so its trusted publisher can be configured. Release Please creates and the
-workflow publishes the first functional `0.1.0` release. See
+Public npm tools are discovered from package manifests under `tools/` that declare
+`publishConfig.access: "public"` and are not private. Their declared production dependencies and
+packed project templates determine release order. Seed each package with a metadata-only `0.0.0`
+placeholder so its trusted publisher can be configured. Release Please creates and the workflow
+publishes the first functional `0.1.0` release. See
 [Publishing public npm tools](npm-publishing.md) for the sequence and
 [Trusted publishing for npm tools](npm-trusted-publishing.md) for the `ci.yml` identity, OIDC
 permissions, two-day validation window, provenance, and recovery.
 
 To register a new public tool, add its publishable package under `tools/` and run
-`pnpm register:tool tools/<path>`. The command validates the canonical package name, public access
-and first version, then updates both Release Please files. It sets a missing first-release pin on an
-existing entry and rejects a conflicting one. Add the package to the public-tool metadata, pack and
-external-consumer checks when it has files or commands those checks should verify.
+`pnpm register:tool tools/<path>`. The command uses the package name from its manifest, validates
+public access and the first version, then updates both Release Please files. It sets a missing
+first-release pin on an existing entry and rejects a conflicting one. Public tool pack checks
+discover the package from its manifest; add a consumer smoke check only for a user-facing flow that
+needs coverage.
 
 The merge of a release PR is its own commit, so its push can start a run while the previous commit's
 run is still active. The older run may create the tag and release first, using an artifact built from
@@ -375,7 +377,7 @@ generator and the checks can't drift:
 | Script | Fails when |
 | --- | --- |
 | `scripts/check-release-config.mjs` | a plugin, action or public tool is missing from either release-please file, a paused plugin is still tracked, an action is not using the `simple` strategy, `component` isn't the folder name, the manifest and package/version file disagree, an unreleased component lacks its required first-release pin, or a released one still has it |
-| `scripts/package-metadata.mjs` | a `package.json` lacks the license, author, contributors, homepage, repository, bugs, funding or a short description, or a library lacks `sideEffects`, `module`, `types`, `files` and `publishConfig`. `--fix` writes everything but the description |
+| `scripts/package-metadata.mjs` | a `package.json` has an incorrect derived license, homepage, repository or bugs field, lacks a short description, or a library lacks `sideEffects`, `module` or `types`. Public npm tool engines must match `.node-version`. `--fix` writes derived fields |
 | `scripts/check-docs.mjs` | a package has no README, a link, heading or path in the docs doesn't exist, a `pnpm` command isn't a script, a doc page isn't in the docs index, a root script isn't documented, or a CI job isn't in the table above |
 
 `pnpm test:scripts` runs the tests of those three, `scripts/unpin-release-as.mjs`,

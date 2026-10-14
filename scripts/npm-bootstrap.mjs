@@ -5,39 +5,19 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-    assertPackedBuilderDependencies,
     assertPublicToolPackage,
     assertPublicToolPackageContents,
+    discoverPublicToolPackages,
+    embeddedPackageManifestEntries,
     getPublicToolReleasePrerequisites,
     orderPublicToolReleasePaths,
-    PUBLIC_TOOL_PACKAGE_PATHS,
     parseTarEntries,
+    publicToolPackageVersions,
 } from './utils/tool-packages.mjs';
 
 const REPOSITORY_ROOT = path.resolve(import.meta.dirname, '..');
 const REGISTRY_URL = 'https://registry.npmjs.org/';
 const FIRST_RELEASE_VERSION = '0.1.0';
-const PREREQUISITE_SOURCE_PATHS = {
-    'tools/config': [['@pumpkin-plugins/docs', 'tools/docs']],
-    'tools/update-check': [
-        ['@pumpkin-plugins/docs', 'tools/docs'],
-        ['@pumpkin-plugins/pumpkin-api', 'tools/pumpkin-api'],
-    ],
-    'tools/plugin-kit': [
-        ['@pumpkin-plugins/docs', 'tools/docs'],
-        ['@pumpkin-plugins/pumpkin-api', 'tools/pumpkin-api'],
-        ['@pumpkin-plugins/update-check', 'tools/update-check'],
-    ],
-    'tools/build': [
-        ['@pumpkin-plugins/pumpkin-api', 'tools/pumpkin-api'],
-        ['@pumpkin-plugins/static-hermes-runtime', 'tools/static-hermes-runtime'],
-    ],
-    'tools/create-pumpkin-plugin': [
-        ['@pumpkin-plugins/pumpkin-api', 'tools/pumpkin-api'],
-        ['@pumpkin-plugins/build', 'tools/build'],
-    ],
-};
-
 /**
  * Parses the one-package bootstrap command's positional path, release tag, and dry-run option.
  *
@@ -102,8 +82,9 @@ export function parseBootstrapArguments(args) {
 export async function bootstrapPublicTool(options, injected = {}) {
     const root = injected.root ?? REPOSITORY_ROOT;
     const { packagePath, tag, dryRun = false } = options;
-    const [selectedPath] = orderPublicToolReleasePaths([packagePath]);
-    const packageName = PUBLIC_TOOL_PACKAGE_PATHS[selectedPath];
+    const [selectedPath] = orderPublicToolReleasePaths([packagePath], root);
+    const tool = discoverPublicToolPackages(root).find(({ path: candidate }) => candidate === selectedPath);
+    const packageName = tool.name;
     const releaseConfig = readJson(path.join(root, 'release-please-config.json'), 'release-please-config.json');
     const component = releaseConfig.packages?.[selectedPath]?.component;
     if (typeof component !== 'string' || !component) {
@@ -158,7 +139,7 @@ export async function bootstrapPublicTool(options, injected = {}) {
                 )}@${String(sourceManifest.version)}`,
             );
         }
-        const taggedPrerequisiteVersions = readTaggedPrerequisiteVersions(sourceRoot, selectedPath);
+        const taggedPrerequisiteVersions = readTaggedPrerequisiteVersions(sourceRoot);
 
         await archive.install(sourceRoot);
         const packDirectory = path.join(temporaryDirectory, 'packed');
@@ -166,7 +147,7 @@ export async function bootstrapPublicTool(options, injected = {}) {
         const tarball = await archive.pack(packageDirectory, packDirectory);
         assertPathWithin(tarball, temporaryDirectory, 'packed tarball');
         const integrity = readTarballIntegrity(tarball);
-        const packed = await archive.inspectPackage(tarball, selectedPath);
+        const packed = await archive.inspectPackage(tarball);
 
         if (
             packed.packageJson?.name !== sourceManifest.name ||
@@ -176,13 +157,13 @@ export async function bootstrapPublicTool(options, injected = {}) {
                 `${packageName} packed metadata does not match its tagged source manifest: expected ${packageName}@${FIRST_RELEASE_VERSION}`,
             );
         }
-        assertPublicToolPackage(packed.packageJson, packageName);
+        assertPublicToolPackage(packed.packageJson, packageName, sourceRoot);
         if (packed.packageJson.version !== FIRST_RELEASE_VERSION) {
             throw new Error(`${packageName} packed version must be ${FIRST_RELEASE_VERSION}`);
         }
-        assertPublicToolPackageContents(normalizeTarEntries(packed.entries), selectedPath);
+        assertPublicToolPackageContents(normalizeTarEntries(packed.entries), selectedPath, packed.packageJson);
 
-        const prerequisites = getPrerequisites(selectedPath, packed, taggedPrerequisiteVersions);
+        const prerequisites = getPrerequisites(selectedPath, packed, taggedPrerequisiteVersions, sourceRoot);
         for (const prerequisite of prerequisites) {
             const result = await readRegistryVersion(registry, prerequisite.packageName, prerequisite.version);
             if (result.kind !== 'found') {
@@ -269,33 +250,17 @@ export async function bootstrapPublicTool(options, injected = {}) {
     }
 }
 
-function readTaggedPrerequisiteVersions(sourceRoot, packagePath) {
-    const versions = {};
-    for (const [packageName, dependencyPath] of PREREQUISITE_SOURCE_PATHS[packagePath] ?? []) {
-        const manifestPath = path.join(sourceRoot, dependencyPath, 'package.json');
-        assertPathWithin(manifestPath, sourceRoot, `${dependencyPath}/package.json`);
-        const manifest = readJson(manifestPath, `${dependencyPath}/package.json`);
-        if (manifest.name !== packageName || typeof manifest.version !== 'string' || manifest.version.length === 0) {
-            throw new Error(
-                `${dependencyPath} tagged source manifest must identify ${packageName} with a version; received ${String(
-                    manifest.name,
-                )}@${String(manifest.version)}`,
-            );
-        }
-        versions[packageName] = manifest.version;
-    }
-    return versions;
+function readTaggedPrerequisiteVersions(sourceRoot) {
+    return publicToolPackageVersions(sourceRoot);
 }
 
-function getPrerequisites(packagePath, packed, taggedVersions) {
-    if (packagePath === 'tools/build') {
-        assertPackedBuilderDependencies(packed.packageJson, taggedVersions);
-    }
+function getPrerequisites(packagePath, packed, taggedVersions, sourceRoot) {
     return getPublicToolReleasePrerequisites(
         packagePath,
         packed.packageJson,
         taggedVersions,
-        packed.templatePackageJsons ?? [],
+        packed.embeddedPackageJsons ?? [],
+        sourceRoot,
     );
 }
 
@@ -440,19 +405,15 @@ function createArchiveAdapter(run) {
                 throw new Error('pnpm pack did not produce exactly one selected-package tarball');
             return path.join(destination, tarballs[0]);
         },
-        async inspectPackage(tarball, packagePath) {
+        async inspectPackage(tarball) {
             const listing = run('tar', ['-tzf', tarball]);
             assertCommandSucceeded(listing, `tar listing for ${path.basename(tarball)}`);
             const entries = parseTarEntries(listing.stdout);
             const packageJson = readTarJson(run, tarball, 'package/package.json');
-            const templatePackageJsons =
-                packagePath === 'tools/create-pumpkin-plugin'
-                    ? [
-                          readTarJson(run, tarball, 'package/templates/typescript/package.json'),
-                          readTarJson(run, tarball, 'package/templates/javascript/package.json'),
-                      ]
-                    : [];
-            return { entries, packageJson, templatePackageJsons };
+            const embeddedPackageJsons = embeddedPackageManifestEntries(entries).map((entry) =>
+                readTarJson(run, tarball, entry),
+            );
+            return { entries, packageJson, embeddedPackageJsons };
         },
     };
 }

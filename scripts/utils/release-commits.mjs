@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
 import { ignoredCommitShas } from './ignored-commits.mjs';
-import { PUBLIC_TOOL_PACKAGE_PATHS } from './tool-packages.mjs';
 
 /** Reads workspace package manifests for identifying code bundled into each plugin. */
 export function workspacePackages(root) {
@@ -124,6 +123,16 @@ async function firstPackageCommitSha(github, branch, path) {
 export function bundledChangesPlugin(github, branch, packages, releasedVersions, maxCommits = 500) {
     return {
         async preconfigure(strategies, commitsByPath, releasesByPath) {
+            const publicToolPaths = new Set(
+                [...packages.values()]
+                    .filter(
+                        ({ path, manifest }) =>
+                            path.startsWith('tools/') &&
+                            manifest.private !== true &&
+                            manifest.publishConfig?.access === 'public',
+                    )
+                    .map(({ path }) => path),
+            );
             const actionPaths = Object.keys(strategies).filter((path) => path.startsWith('actions/'));
             for (const path of actionPaths) {
                 const component = path.split('/').at(-1);
@@ -132,7 +141,7 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
                 );
             }
             const pluginPaths = Object.keys(strategies).filter((path) => path.startsWith('packages/'));
-            const toolPaths = Object.keys(strategies).filter((path) => Object.hasOwn(PUBLIC_TOOL_PACKAGE_PATHS, path));
+            const toolPaths = Object.keys(strategies).filter((path) => publicToolPaths.has(path));
             const extensionPaths = Object.keys(strategies).filter((path) => path.startsWith('extensions/'));
             const packagePaths = [...pluginPaths, ...toolPaths, ...extensionPaths];
             const releasePaths = [...packagePaths, ...actionPaths];

@@ -1,104 +1,53 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { discoverComponents } from '@pumpkin-plugins/docs/node';
 
-/** Public npm packages that make up the standalone Pumpkin plugin toolchain. */
-export const PUBLIC_TOOL_PACKAGE_PATHS = Object.freeze({
-    'tools/create-pumpkin-plugin': 'create-pumpkin-plugin',
-    'tools/codemod': '@pumpkin-plugins/codemod',
-    'tools/pumpkin-api': '@pumpkin-plugins/pumpkin-api',
-    'tools/build': '@pumpkin-plugins/build',
-    'tools/static-hermes-runtime': '@pumpkin-plugins/static-hermes-runtime',
-    'tools/cspell-dict-minecraft': '@pumpkin-plugins/cspell-dict-minecraft',
-    'tools/docs': '@pumpkin-plugins/docs',
-    'tools/plugin-kit': '@pumpkin-plugins/plugin-kit',
-    'tools/config': '@pumpkin-plugins/config',
-    'tools/update-check': '@pumpkin-plugins/update-check',
-    'tools/minecraft-colors': '@pumpkin-plugins/minecraft-colors',
-    'tools/apis/pumpkin-pie-api': '@pumpkin-plugins/pumpkin-pie-api',
-});
-
-/** Public npm package release order, with internal prerequisites preceding their consumers. */
-export const PUBLIC_TOOL_RELEASE_ORDER = Object.freeze([
-    'tools/pumpkin-api',
-    'tools/static-hermes-runtime',
-    'tools/docs',
-    'tools/update-check',
-    'tools/plugin-kit',
-    'tools/config',
-    'tools/minecraft-colors',
-    'tools/apis/pumpkin-pie-api',
-    'tools/build',
-    'tools/create-pumpkin-plugin',
-    'tools/codemod',
-    'tools/cspell-dict-minecraft',
-]);
-
-const STARTER_TOOL_PACKAGE_PATHS = Object.freeze({
-    '@pumpkin-plugins/pumpkin-api': 'tools/pumpkin-api',
-    '@pumpkin-plugins/build': 'tools/build',
-});
-const BUILDER_TOOL_PACKAGE_NAMES = Object.freeze([
-    '@pumpkin-plugins/pumpkin-api',
-    '@pumpkin-plugins/static-hermes-runtime',
-]);
-const TOOL_PREREQUISITE_NAMES = Object.freeze({
-    'tools/config': ['@pumpkin-plugins/docs'],
-    'tools/update-check': ['@pumpkin-plugins/docs', '@pumpkin-plugins/pumpkin-api'],
-    'tools/plugin-kit': ['@pumpkin-plugins/docs', '@pumpkin-plugins/pumpkin-api', '@pumpkin-plugins/update-check'],
-});
-const PACKED_TOOL_CONTENTS = Object.freeze({
-    'tools/create-pumpkin-plugin': [
-        'package/bin/create-pumpkin-plugin.ts',
-        'package/dist/create-pumpkin-plugin.js',
-        'package/templates/typescript/package.json',
-        'package/templates/javascript/package.json',
-    ],
-    'tools/pumpkin-api': [
-        'package/src/index.ts',
-        'package/src/wit.mjs',
-        'package/src/wit.d.mts',
-        'package/wit.lock.json',
-    ],
-    'tools/static-hermes-runtime': [
-        'package/src/index.ts',
-        'package/dist/index.js',
-        'package/cmake/wasi-sdk-hermes-p2.cmake',
-        'package/hermes-patches/0001-wasi-p2-configure-platform.patch',
-    ],
-    'tools/build': ['package/dist/cli.js', 'package/runtime/quickjs-runtime-bigint.wasm', 'package/wasi-wit.lock.json'],
-    'tools/codemod': [
-        'package/dist/bin/pumpkin-codemod.js',
-        'package/dist/src/index.js',
-        'package/dist/src/index.d.ts',
-        'package/README.md',
-        'package/docs/using-codemods.md',
-        'package/docs/authoring-codemods.md',
-    ],
-    'tools/cspell-dict-minecraft': [
-        'package/cspell-ext.json',
-        'package/minecraft.txt',
-        'package/README.md',
-        'package/LICENSE',
-    ],
-    'tools/docs': [
-        'package/src/info.ts',
-        'package/src/markdown.ts',
-        'package/src/node.ts',
-        'package/bin/pumpkin-plugins-docs.mjs',
-    ],
-    'tools/plugin-kit': [
-        'package/src/commands.ts',
-        'package/src/host.ts',
-        'package/src/plugin.ts',
-        'package/src/register-commands.ts',
-    ],
-    'tools/config': ['package/src/index.ts'],
-    'tools/update-check': ['package/src/index.ts'],
-    'tools/minecraft-colors': ['package/src/index.ts'],
-    'tools/apis/pumpkin-pie-api': ['package/src/index.ts'],
-});
-const TEMPLATE_LANGUAGES = ['typescript', 'javascript'];
+const REPOSITORY_ROOT = path.resolve(import.meta.dirname, '../..');
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+/** Finds tool workspaces that opt into public npm publishing in their package manifest. */
+export function discoverPublicToolPackages(root = REPOSITORY_ROOT) {
+    const packages = discoverComponents(root, 'tools')
+        .map(({ directory, metadataFile }) => ({
+            path: toWorkspacePath(root, directory),
+            packageJson: readPackageJson(metadataFile),
+        }))
+        .filter(({ packageJson }) => packageJson.private !== true && packageJson.publishConfig?.access === 'public')
+        .map(({ path: packagePath, packageJson }) => ({ path: packagePath, name: packageJson.name, packageJson }))
+        .sort((left, right) => left.path.localeCompare(right.path));
+
+    const names = new Set();
+    for (const tool of packages) {
+        if (typeof tool.name !== 'string' || tool.name.length === 0) {
+            throw new Error(`${tool.path}/package.json must have a package name`);
+        }
+        if (names.has(tool.name)) throw new Error(`public tool package name is duplicated: ${tool.name}`);
+        names.add(tool.name);
+    }
+    return packages;
+}
+
+/** Reads package versions by npm name for the public tools in one workspace. */
+export function publicToolPackageVersions(root = REPOSITORY_ROOT) {
+    return Object.fromEntries(
+        discoverPublicToolPackages(root).map(({ path: packagePath, name, packageJson }) => {
+            assertVersion(packageJson.version, `${name} in ${packagePath}/package.json version`);
+            return [name, packageJson.version];
+        }),
+    );
+}
+
+/** Returns the Node version pinned for the workspace. */
+export function nodeVersion(root = REPOSITORY_ROOT) {
+    const version = fs.readFileSync(path.join(root, '.node-version'), 'utf8').trim().replace(/^v/, '');
+    assertVersion(version, '.node-version');
+    return version;
+}
+
+/** Returns the engine range supported by the workspace's pinned Node version. */
+export function nodeEngineRange(root = REPOSITORY_ROOT) {
+    return `>=${nodeVersion(root)}`;
+}
 
 /**
  * Parses a `tar -t` listing from any supported host platform.
@@ -110,15 +59,20 @@ export function parseTarEntries(listing) {
     return listing.split(/\r?\n/).filter(Boolean);
 }
 
+/** Finds embedded package manifests in a package tarball. */
+export function embeddedPackageManifestEntries(entries) {
+    return entries.filter((entry) => /^package\/.+\/package\.json$/.test(entry));
+}
+
 /**
- * Checks that a public tool's packed package metadata permits public npm publication.
+ * Checks that packed package metadata still permits public npm publication.
  *
  * @param {Record<string, unknown>} packageJson - The packed package metadata to validate.
- * @param {string} expectedName - The canonical npm package name for this tool.
- * @returns {void}
- * @throws {Error} When the package is private, misnamed, or not configured for public access.
+ * @param {string} expectedName - The package name in the source manifest.
+ * @param {string} [root] - Workspace root containing `.node-version`.
+ * @throws {Error} When the packed package differs from its source identity or publication requirements.
  */
-export function assertPublicToolPackage(packageJson, expectedName) {
+export function assertPublicToolPackage(packageJson, expectedName, root = REPOSITORY_ROOT) {
     if (packageJson.name !== expectedName) {
         throw new Error(`Public tool package name must be ${expectedName}; received ${String(packageJson.name)}`);
     }
@@ -126,8 +80,9 @@ export function assertPublicToolPackage(packageJson, expectedName) {
     if (packageJson.publishConfig?.access !== 'public') {
         throw new Error(`${expectedName} publishConfig.access must be public`);
     }
-    if (packageJson.engines?.node !== '>=24.21.0') {
-        throw new Error(`${expectedName} engines.node must be >=24.21.0`);
+    const expectedEngine = nodeEngineRange(root);
+    if (packageJson.engines?.node !== expectedEngine) {
+        throw new Error(`${expectedName} engines.node must be ${expectedEngine}`);
     }
     assertPackedDependencySpecs(packageJson);
     assertVersion(packageJson.version, `${expectedName} version`);
@@ -137,7 +92,6 @@ export function assertPublicToolPackage(packageJson, expectedName) {
  * Rejects dependency fields that still contain pnpm-only workspace or catalog references.
  *
  * @param {Record<string, unknown>} packageJson - The packed package metadata to inspect.
- * @returns {void}
  * @throws {Error} When a dependency field contains an unresolved pnpm specifier.
  */
 export function assertPackedDependencySpecs(packageJson) {
@@ -153,183 +107,281 @@ export function assertPackedDependencySpecs(packageJson) {
 }
 
 /**
- * Orders a selected set of public tool paths and rejects invalid release selections.
+ * Orders selected public tools so each selected workspace dependency is published first.
  *
- * @param {string[]} selectedPaths - Public tool workspace paths selected by the release workflow.
- * @returns {string[]} Selected paths in canonical publication order.
- * @throws {Error} When a path is unknown or appears more than once.
+ * @param {string[]} selectedPaths - Tool workspace paths selected by the release workflow.
+ * @param {string} [root] - Workspace root containing tool manifests.
+ * @returns {string[]} Selected paths in dependency order.
+ * @throws {Error} When a path is not a public tool, appears more than once, or creates a dependency cycle.
  */
-export function orderPublicToolReleasePaths(selectedPaths) {
+export function orderPublicToolReleasePaths(selectedPaths, root = REPOSITORY_ROOT) {
+    const publicTools = discoverPublicToolPackages(root);
+    const toolsByPath = new Map(publicTools.map((tool) => [tool.path, tool]));
     const selected = new Set();
     for (const packagePath of selectedPaths) {
-        if (!Object.hasOwn(PUBLIC_TOOL_PACKAGE_PATHS, packagePath)) {
-            throw new Error(`unknown public tool release path: ${String(packagePath)}`);
-        }
+        if (!toolsByPath.has(packagePath)) throw new Error(`unknown public tool release path: ${String(packagePath)}`);
         if (selected.has(packagePath)) throw new Error(`duplicate public tool release path: ${packagePath}`);
         selected.add(packagePath);
     }
-    return PUBLIC_TOOL_RELEASE_ORDER.filter((packagePath) => selected.has(packagePath));
+
+    const pathsByName = new Map(publicTools.map(({ path: packagePath, name }) => [name, packagePath]));
+    const prerequisites = new Map(
+        publicTools.map(({ path: packagePath }) => [
+            packagePath,
+            sourcePrerequisitePaths(root, packagePath, pathsByName),
+        ]),
+    );
+    const remaining = new Set(selected);
+    const ordered = [];
+    while (remaining.size > 0) {
+        const next = [...remaining]
+            .sort((left, right) => left.localeCompare(right))
+            .find((packagePath) =>
+                [...(prerequisites.get(packagePath) ?? [])].every((dependency) => !remaining.has(dependency)),
+            );
+        if (!next) throw new Error(`public tool dependencies contain a cycle: ${[...remaining].join(', ')}`);
+        remaining.delete(next);
+        ordered.push(next);
+    }
+    return ordered;
 }
 
 /**
- * Resolves the public package versions that must exist before a tool can be published.
+ * Resolves public packages required by a packed tool and its embedded project templates.
  *
  * @param {string} packagePath - Repository path identifying the public tool package.
- * @param {Record<string, unknown>} packageJson - The packed package metadata.
- * @param {Record<string, string>} [packageVersions] - Exact public dependency versions represented by packed tools.
- * @param {Record<string, unknown>[]} [starterTemplatePackageJsons] - Both packed creator template manifests.
+ * @param {Record<string, unknown>} packageJson - Packed package metadata.
+ * @param {Record<string, string>} [packageVersions] - Versions represented by packed public tools.
+ * @param {Record<string, unknown>[]} [templatePackageJsons] - Embedded project manifests from the packed package.
+ * @param {string} [root] - Workspace root used to discover public package names.
  * @returns {{ packageName: string; version: string }[]} Internal public production prerequisites.
- * @throws {Error} When a required dependency or creator template does not resolve to an exact public version.
+ * @throws {Error} When a public dependency does not resolve to an exact package version.
  */
 export function getPublicToolReleasePrerequisites(
     packagePath,
     packageJson,
     packageVersions = {},
-    starterTemplatePackageJsons = [],
+    templatePackageJsons = [],
+    root = REPOSITORY_ROOT,
 ) {
-    if (!Object.hasOwn(PUBLIC_TOOL_PACKAGE_PATHS, packagePath)) {
+    const publicTools = discoverPublicToolPackages(root);
+    const packageNames = new Set(publicTools.map(({ name }) => name));
+    if (!publicTools.some((tool) => tool.path === packagePath)) {
         throw new Error(`unknown public tool release path: ${String(packagePath)}`);
     }
 
-    if (packagePath === 'tools/build') {
-        return BUILDER_TOOL_PACKAGE_NAMES.map((packageName) => {
-            const version = packageJson.dependencies?.[packageName];
-            assertVersion(version, `${packageName} packed builder dependency`);
-            return { packageName, version };
-        });
-    }
-
-    if (packagePath === 'tools/create-pumpkin-plugin') {
-        if (starterTemplatePackageJsons.length !== TEMPLATE_LANGUAGES.length) {
-            throw new Error('both packed creator template manifests are required to resolve publication prerequisites');
+    const prerequisites = new Map();
+    for (const dependency of publicDependencies(packageJson, packageNames)) {
+        const expectedVersion = packageVersions[dependency.name];
+        if (expectedVersion !== undefined && dependency.spec !== expectedVersion) {
+            throw new Error(
+                `${dependency.name} ${path.basename(packagePath)} dependency must resolve to packed version ${expectedVersion}; received ${String(dependency.spec)}`,
+            );
         }
-        for (const templatePackageJson of starterTemplatePackageJsons) {
-            assertStarterToolDependencies(templatePackageJson, packageVersions);
+        addPrerequisite(prerequisites, dependency.name, dependency.spec, `${dependency.name} packed dependency`);
+    }
+    for (const templatePackageJson of templatePackageJsons) {
+        for (const dependency of publicDependencies(templatePackageJson, packageNames)) {
+            const expectedVersion = packageVersions[dependency.name];
+            const version = templateDependencyVersion(dependency.spec, dependency.name, expectedVersion);
+            addPrerequisite(prerequisites, dependency.name, version, `${dependency.name} template dependency`);
         }
-        return Object.entries(STARTER_TOOL_PACKAGE_PATHS).map(([packageName]) => ({
-            packageName,
-            version: packageVersions[packageName],
-        }));
     }
-
-    const prerequisiteNames = TOOL_PREREQUISITE_NAMES[packagePath];
-    if (prerequisiteNames) {
-        return prerequisiteNames.map((packageName) => {
-            const version = packageJson.dependencies?.[packageName];
-            assertVersion(version, `${packageName} packed ${path.basename(packagePath)} dependency`);
-            return { packageName, version };
-        });
-    }
-
-    return [];
+    return [...prerequisites].map(([packageName, version]) => ({ packageName, version }));
 }
 
 /**
- * Checks a packed public tool's required files and excludes development test sources.
+ * Checks that a packed public tool contains files named by its entrypoints and excludes test sources.
  *
  * @param {string[]} entries - Tarball entries, including their `package/` prefix.
- * @param {string} packagePath - Repository path identifying the public tool package.
- * @returns {void}
- * @throws {Error} When runtime files are missing or development sources are packed.
+ * @param {string} packagePath - Repository path used in diagnostics.
+ * @param {Record<string, unknown>} packageJson - Packed package metadata describing its entrypoints.
+ * @throws {Error} When an entrypoint is missing or a development test source was packed.
  */
-export function assertPublicToolPackageContents(entries, packagePath) {
-    const requiredEntries = PACKED_TOOL_CONTENTS[packagePath];
-    if (!requiredEntries) return;
-
-    for (const requiredEntry of requiredEntries) {
-        if (!entries.includes(requiredEntry)) {
-            throw new Error(`${packagePath} packed package is missing ${requiredEntry}`);
+export function assertPublicToolPackageContents(entries, packagePath, packageJson) {
+    for (const target of packageTargets(packageJson)) {
+        const packedTarget = `package/${target.replace(/^\.\//, '')}`;
+        if (!entries.some((entry) => matchesPackageTarget(entry, packedTarget))) {
+            throw new Error(`${packagePath} packed package is missing ${packedTarget}`);
         }
     }
 
     const testSource = entries.find((entry) => /^package\/.*\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(entry));
     if (testSource) throw new Error(`${packagePath} packed package contains a development test source: ${testSource}`);
-
-    if (packagePath === 'tools/build') {
-        const sourceFile = entries.find((entry) => entry.startsWith('package/src/'));
-        if (sourceFile) throw new Error(`CLI-only package contains source: ${sourceFile}`);
-    }
 }
 
 /**
- * Checks that the packed builder resolves its public API and runtime dependencies to the packed versions.
+ * Checks that embedded project manifests use the exact versions being packed for public tools.
  *
- * @param {{ dependencies?: Record<string, string> }} packageJson - The packed builder package metadata.
+ * @param {Record<string, unknown>} packageJson - An embedded project manifest.
  * @param {Record<string, string>} versions - Package names and versions represented by packed tarballs.
- * @returns {void}
- * @throws {Error} When a builder dependency does not exactly resolve to its packed package version.
+ * @param {string} [root] - Workspace root used to discover public package names.
+ * @throws {Error} When an embedded project declares a stale range for a public tool.
  */
-export function assertPackedBuilderDependencies(packageJson, versions) {
-    for (const packageName of BUILDER_TOOL_PACKAGE_NAMES) {
-        const version = versions[packageName];
-        assertVersion(version, `${packageName} packed version`);
-        if (packageJson.dependencies?.[packageName] !== version) {
-            throw new Error(
-                `${packageName} builder dependency must resolve to packed version ${version}; received ${String(
-                    packageJson.dependencies?.[packageName],
-                )}`,
-            );
-        }
-    }
-}
-
-/**
- * Checks that a starter template requests the public API and builder release versions being packed.
- *
- * @param {{ dependencies?: Record<string, string> }} packageJson - The starter template manifest.
- * @param {Record<string, string>} versions - Package names and versions represented by packed tarballs.
- * @returns {void}
- * @throws {Error} When a required starter dependency uses an outdated range.
- */
-export function assertStarterToolDependencies(packageJson, versions) {
-    for (const packageName of Object.keys(STARTER_TOOL_PACKAGE_PATHS)) {
-        const version = versions[packageName];
-        assertVersion(version, `${packageName} packed version`);
+export function assertPublicToolTemplateDependencies(packageJson, versions, root = REPOSITORY_ROOT) {
+    const packageNames = new Set(discoverPublicToolPackages(root).map(({ name }) => name));
+    for (const dependency of publicDependencies(packageJson, packageNames)) {
+        const version = versions[dependency.name];
+        assertVersion(version, `${dependency.name} packed version`);
         const expectedRange = `^${version}`;
-        if (packageJson.dependencies?.[packageName] !== expectedRange) {
+        if (dependency.spec !== expectedRange) {
             throw new Error(
-                `${packageName} starter dependency must be ${expectedRange}; received ${String(
-                    packageJson.dependencies?.[packageName],
-                )}`,
+                `${dependency.name} template dependency must be ${expectedRange}; received ${String(dependency.spec)}`,
             );
         }
     }
 }
 
-/**
- * Updates both starter templates to match the public API and builder package versions in this checkout.
- *
- * @param {string} root - The repository root containing the public tool packages and templates.
- * @returns {boolean} Whether either template manifest changed.
- */
+/** Updates embedded tool templates to match the current public package versions. */
 export function syncStarterToolDependencies(root) {
-    const versions = Object.fromEntries(
-        Object.entries(STARTER_TOOL_PACKAGE_PATHS).map(([packageName, packagePath]) => {
-            const packageJson = readPackageJson(path.join(root, packagePath, 'package.json'));
-            if (packageJson.name !== packageName) {
-                throw new Error(`${packagePath}/package.json must be named ${packageName}`);
-            }
-            assertVersion(packageJson.version, `${packageName} version`);
-            return [packageName, packageJson.version];
-        }),
-    );
-
+    const versions = publicToolPackageVersions(root);
     let changed = false;
-    for (const language of TEMPLATE_LANGUAGES) {
-        const file = path.join(root, 'tools/create-pumpkin-plugin/templates', language, 'package.json');
-        const packageJson = readPackageJson(file);
-        packageJson.dependencies ??= {};
-        let templateChanged = false;
-        for (const [packageName, version] of Object.entries(versions)) {
-            const range = `^${version}`;
-            if (packageJson.dependencies[packageName] === range) continue;
-            packageJson.dependencies[packageName] = range;
-            templateChanged = true;
-            changed = true;
+    for (const { path: packagePath, packageJson: sourcePackageJson } of discoverPublicToolPackages(root)) {
+        for (const file of nestedPackageJsonFiles(path.join(root, packagePath), sourcePackageJson)) {
+            const packageJson = readPackageJson(file);
+            let templateChanged = false;
+            for (const field of ['dependencies', 'optionalDependencies']) {
+                const dependencies = packageJson[field];
+                if (!dependencies || typeof dependencies !== 'object' || Array.isArray(dependencies)) continue;
+                for (const [packageName, version] of Object.entries(versions)) {
+                    if (!Object.hasOwn(dependencies, packageName)) continue;
+                    const range = `^${version}`;
+                    if (dependencies[packageName] === range) continue;
+                    dependencies[packageName] = range;
+                    templateChanged = true;
+                    changed = true;
+                }
+            }
+            if (templateChanged) fs.writeFileSync(file, `${JSON.stringify(packageJson, null, 4)}\n`);
         }
-        if (templateChanged) fs.writeFileSync(file, `${JSON.stringify(packageJson, null, 4)}\n`);
     }
     return changed;
+}
+
+function sourcePrerequisitePaths(root, packagePath, pathsByName) {
+    const packageDirectory = path.join(root, packagePath);
+    const packageJson = readPackageJson(path.join(packageDirectory, 'package.json'));
+    const manifests = [packageJson, ...nestedPackageJsonFiles(packageDirectory, packageJson).map(readPackageJson)];
+    const names = manifests.flatMap((manifest) => [
+        ...Object.keys(manifest.dependencies ?? {}),
+        ...Object.keys(manifest.optionalDependencies ?? {}),
+    ]);
+    return new Set(names.map((name) => pathsByName.get(name)).filter(Boolean));
+}
+
+function publicDependencies(packageJson, packageNames) {
+    const dependencies = { ...packageJson.dependencies, ...packageJson.optionalDependencies };
+    return Object.entries(dependencies)
+        .filter(([name]) => packageNames.has(name))
+        .map(([name, spec]) => ({ name, spec }));
+}
+
+function templateDependencyVersion(spec, packageName, expectedVersion) {
+    if (expectedVersion !== undefined) {
+        assertVersion(expectedVersion, `${packageName} packed version`);
+        const expectedRange = `^${expectedVersion}`;
+        if (spec !== expectedRange) {
+            throw new Error(`${packageName} template dependency must be ${expectedRange}; received ${String(spec)}`);
+        }
+        return expectedVersion;
+    }
+    if (typeof spec !== 'string' || !spec.startsWith('^')) {
+        throw new Error(`${packageName} template dependency must use an exact caret version; received ${String(spec)}`);
+    }
+    const version = spec.slice(1);
+    assertVersion(version, `${packageName} template dependency`);
+    return version;
+}
+
+function addPrerequisite(prerequisites, packageName, version, label) {
+    assertVersion(version, label);
+    const existingVersion = prerequisites.get(packageName);
+    if (existingVersion !== undefined && existingVersion !== version) {
+        throw new Error(`${packageName} has conflicting required versions: ${existingVersion} and ${version}`);
+    }
+    prerequisites.set(packageName, version);
+}
+
+function packageTargets(packageJson) {
+    const targets = new Set();
+    for (const field of ['main', 'module', 'types', 'typings', 'exports']) {
+        collectTargets(packageJson[field], targets);
+    }
+    const binTargets = typeof packageJson.bin === 'string' ? [packageJson.bin] : Object.values(packageJson.bin ?? {});
+    for (const target of binTargets) {
+        if (typeof target === 'string') targets.add(target.startsWith('./') ? target : `./${target}`);
+    }
+    return [...targets].filter((target) => target.startsWith('./'));
+}
+
+function collectTargets(value, targets) {
+    if (typeof value === 'string') {
+        targets.add(value);
+    } else if (Array.isArray(value)) {
+        for (const item of value) collectTargets(item, targets);
+    } else if (value && typeof value === 'object') {
+        for (const item of Object.values(value)) collectTargets(item, targets);
+    }
+}
+
+function matchesPackageTarget(entry, target) {
+    if (target.endsWith('/')) return entry.startsWith(target);
+    if (!target.includes('*')) return entry === target;
+    const expression = new RegExp(`^${escapeRegExp(target).replaceAll('\\*', '.*')}$`);
+    return expression.test(entry);
+}
+
+function escapeRegExp(value) {
+    return value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+}
+
+function nestedPackageJsonFiles(packageDirectory, packageJson) {
+    const files = [];
+    const visit = (directory) => {
+        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+            if (
+                entry.name === 'node_modules' ||
+                entry.name === '.git' ||
+                entry.name === 'dist' ||
+                entry.name === 'build'
+            )
+                continue;
+            const file = path.join(directory, entry.name);
+            if (entry.isDirectory()) visit(file);
+            else if (entry.name === 'package.json') files.push(file);
+        }
+    };
+    visit(packageDirectory);
+    return files
+        .filter((file) => file !== path.join(packageDirectory, 'package.json'))
+        .filter((file) => isPackedFile(path.relative(packageDirectory, file), packageJson.files))
+        .sort();
+}
+
+function isPackedFile(file, patterns) {
+    if (!Array.isArray(patterns)) return true;
+    let included = false;
+    for (const rawPattern of patterns) {
+        const excluded = rawPattern.startsWith('!');
+        const pattern = (excluded ? rawPattern.slice(1) : rawPattern).replaceAll('\\', '/').replace(/^\.\//, '');
+        if (matchesFilePattern(file, pattern)) included = !excluded;
+    }
+    return included;
+}
+
+function matchesFilePattern(file, pattern) {
+    const normalizedFile = file.replaceAll('\\', '/');
+    if (!pattern.includes('*')) return normalizedFile === pattern || normalizedFile.startsWith(`${pattern}/`);
+    const expressionSource = pattern
+        .split('**')
+        .map((part) => escapeRegExp(part).replaceAll('*', '[^/]*'))
+        .join('.*');
+    const expression = new RegExp(`^${expressionSource}$`);
+    return expression.test(normalizedFile);
+}
+
+function toWorkspacePath(root, directory) {
+    return path.relative(root, directory).split(path.sep).join('/');
 }
 
 function readPackageJson(file) {

@@ -16,13 +16,26 @@ const packages = new Map([
             },
         },
     ],
-    ['kit', { path: 'tools/plugin-kit', manifest: { dependencies: { updates: 'workspace:*' } } }],
-    ['updates', { path: 'tools/update-check', manifest: { dependencies: { kit: 'workspace:*' } } }],
+    [
+        'kit',
+        {
+            path: 'tools/plugin-kit',
+            manifest: { publishConfig: { access: 'public' }, dependencies: { updates: 'workspace:*' } },
+        },
+    ],
+    [
+        'updates',
+        {
+            path: 'tools/update-check',
+            manifest: { publishConfig: { access: 'public' }, dependencies: { kit: 'workspace:*' } },
+        },
+    ],
     [
         '@pumpkin-plugins/build',
         {
             path: 'tools/build',
             manifest: {
+                publishConfig: { access: 'public' },
                 dependencies: {
                     '@pumpkin-plugins/pumpkin-api': 'workspace:*',
                     '@pumpkin-plugins/static-hermes-runtime': 'workspace:*',
@@ -30,8 +43,11 @@ const packages = new Map([
             },
         },
     ],
-    ['@pumpkin-plugins/pumpkin-api', { path: 'tools/pumpkin-api', manifest: {} }],
-    ['@pumpkin-plugins/static-hermes-runtime', { path: 'tools/static-hermes-runtime', manifest: {} }],
+    ['@pumpkin-plugins/pumpkin-api', { path: 'tools/pumpkin-api', manifest: { publishConfig: { access: 'public' } } }],
+    [
+        '@pumpkin-plugins/static-hermes-runtime',
+        { path: 'tools/static-hermes-runtime', manifest: { publishConfig: { access: 'public' } } },
+    ],
     [
         'minecraft-terms',
         {
@@ -39,7 +55,10 @@ const packages = new Map([
             manifest: { pumpkinBundleDependencies: ['@pumpkin-plugins/cspell-dict-minecraft'] },
         },
     ],
-    ['@pumpkin-plugins/cspell-dict-minecraft', { path: 'tools/cspell-dict-minecraft', manifest: {} }],
+    [
+        '@pumpkin-plugins/cspell-dict-minecraft',
+        { path: 'tools/cspell-dict-minecraft', manifest: { publishConfig: { access: 'public' } } },
+    ],
     ['harness', { path: 'tools/test-harness', manifest: {} }],
 ]);
 const releaseConfig = JSON.parse(readFileSync(new URL('../../release-please-config.json', import.meta.url), 'utf8'));

@@ -5,28 +5,19 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-    assertPackedBuilderDependencies,
     assertPublicToolPackage,
     assertPublicToolPackageContents,
+    discoverPublicToolPackages,
+    embeddedPackageManifestEntries,
     getPublicToolReleasePrerequisites,
+    nodeEngineRange,
     orderPublicToolReleasePaths,
-    PUBLIC_TOOL_PACKAGE_PATHS,
     parseTarEntries,
+    publicToolPackageVersions,
 } from './utils/tool-packages.mjs';
 
 const rootDirectory = fileURLToPath(new URL('..', import.meta.url));
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
-const BUILDER_PACKAGE_VERSIONS = Object.freeze({
-    '@pumpkin-plugins/pumpkin-api': 'tools/pumpkin-api',
-    '@pumpkin-plugins/static-hermes-runtime': 'tools/static-hermes-runtime',
-});
-const CREATOR_PACKAGE_VERSIONS = Object.freeze({
-    '@pumpkin-plugins/pumpkin-api': 'tools/pumpkin-api',
-    '@pumpkin-plugins/build': 'tools/build',
-});
-const PACKAGE_PATH_BY_NAME = new Map(
-    Object.entries(PUBLIC_TOOL_PACKAGE_PATHS).map(([packagePath, packageName]) => [packageName, packagePath]),
-);
 
 /**
  * Publishes selected public tools sequentially after validating their release tags, packed files,
@@ -57,14 +48,17 @@ export async function publishToolPackages({
         throw new Error('Release Please metadata must be a JSON object');
     }
 
-    const orderedPaths = orderPublicToolReleasePaths(selectedPaths);
+    const toolsByPath = new Map(discoverPublicToolPackages(root).map((tool) => [tool.path, tool]));
+    const packagePathByName = new Map([...toolsByPath.values()].map(({ path, name }) => [name, path]));
+    const packageVersions = publicToolPackageVersions(root);
+    const orderedPaths = orderPublicToolReleasePaths(selectedPaths, root);
     const selectedPathSet = new Set(orderedPaths);
     const completedVersions = new Map();
 
     for (const packagePath of orderedPaths) {
-        const expectedName = PUBLIC_TOOL_PACKAGE_PATHS[packagePath];
+        const expectedName = toolsByPath.get(packagePath).name;
         const sourcePackageJson = readPackageJson(path.join(root, packagePath, 'package.json'));
-        validateSourcePackage(sourcePackageJson, packagePath, expectedName);
+        validateSourcePackage(sourcePackageJson, packagePath, root);
         const tag = releaseMetadata[`${packagePath}--tag_name`];
         const version = validateReleaseTag(packagePath, expectedName, sourcePackageJson.version, tag);
         const releaseLabel = `${expectedName}@${version}`;
@@ -73,22 +67,13 @@ export async function publishToolPackages({
         try {
             log(`Packing ${releaseLabel} from ${packagePath}`);
             packed = await packPackage(packagePath, root);
-            validatePackedPackage(packagePath, expectedName, version, packed);
-
-            const packageVersions =
-                packagePath === 'tools/build'
-                    ? readSourcePackageVersions(root, BUILDER_PACKAGE_VERSIONS)
-                    : packagePath === 'tools/create-pumpkin-plugin'
-                      ? readSourcePackageVersions(root, CREATOR_PACKAGE_VERSIONS)
-                      : {};
-            if (packagePath === 'tools/build') {
-                assertPackedBuilderDependencies(packed.packageJson, packageVersions);
-            }
+            validatePackedPackage(packagePath, expectedName, version, packed, root);
             const prerequisites = getPublicToolReleasePrerequisites(
                 packagePath,
                 packed.packageJson,
                 packageVersions,
-                packed.starterTemplatePackageJsons,
+                packed.embeddedPackageJsons,
+                root,
             );
 
             for (const prerequisite of prerequisites) {
@@ -96,6 +81,7 @@ export async function publishToolPackages({
                     consumerName: expectedName,
                     consumerVersion: version,
                     prerequisite,
+                    packagePathByName,
                     selectedPathSet,
                     completedVersions,
                     getRegistryIntegrity,
@@ -134,23 +120,23 @@ export async function publishToolPackages({
     }
 }
 
-function validateSourcePackage(packageJson, packagePath, expectedName) {
+function validateSourcePackage(packageJson, packagePath, root) {
     if (!packageJson || typeof packageJson !== 'object' || Array.isArray(packageJson)) {
         throw new Error(`${packagePath}/package.json must contain an object`);
     }
-    if (packageJson.name !== expectedName) {
-        throw new Error(
-            `${packagePath}/package.json must be named ${expectedName}; received ${String(packageJson.name)}`,
-        );
+    const packageName = packageJson.name;
+    if (typeof packageName !== 'string' || packageName.length === 0) {
+        throw new Error(`${packagePath}/package.json must have a package name`);
     }
-    if (packageJson.private === true) throw new Error(`${expectedName} source package must not be private`);
+    if (packageJson.private === true) throw new Error(`${packageName} source package must not be private`);
     if (packageJson.publishConfig?.access !== 'public') {
-        throw new Error(`${expectedName} source publishConfig.access must be public`);
+        throw new Error(`${packageName} source publishConfig.access must be public`);
     }
-    if (packageJson.engines?.node !== '>=24.21.0') {
-        throw new Error(`${expectedName} source engines.node must be >=24.21.0`);
+    const expectedEngine = nodeEngineRange(root);
+    if (packageJson.engines?.node !== expectedEngine) {
+        throw new Error(`${packageName} source engines.node must be ${expectedEngine}`);
     }
-    assertVersion(packageJson.version, `${expectedName} source package version`);
+    assertVersion(packageJson.version, `${packageName} source package version`);
 }
 
 function validateReleaseTag(packagePath, packageName, sourceVersion, tag) {
@@ -170,14 +156,14 @@ function validateReleaseTag(packagePath, packageName, sourceVersion, tag) {
     return version;
 }
 
-function validatePackedPackage(packagePath, expectedName, version, packed) {
+function validatePackedPackage(packagePath, expectedName, version, packed, root) {
     if (!packed || typeof packed !== 'object' || Array.isArray(packed)) {
         throw new Error(`${packagePath} pack adapter did not return package metadata`);
     }
     if (typeof packed.integrity !== 'string' || packed.integrity.length === 0) {
         throw new Error(`${packagePath} packed tarball has no SRI integrity`);
     }
-    assertPublicToolPackage(packed.packageJson, expectedName);
+    assertPublicToolPackage(packed.packageJson, expectedName, root);
     if (packed.packageJson.version !== version) {
         throw new Error(
             `${expectedName}@${version} release tag version differs from packed manifest version ${String(
@@ -185,18 +171,19 @@ function validatePackedPackage(packagePath, expectedName, version, packed) {
             )}`,
         );
     }
-    assertPublicToolPackageContents(packed.entries, packagePath);
+    assertPublicToolPackageContents(packed.entries, packagePath, packed.packageJson);
 }
 
 async function assertPrerequisiteAvailable({
     consumerName,
     consumerVersion,
     prerequisite,
+    packagePathByName,
     selectedPathSet,
     completedVersions,
     getRegistryIntegrity,
 }) {
-    const prerequisitePath = PACKAGE_PATH_BY_NAME.get(prerequisite.packageName);
+    const prerequisitePath = packagePathByName.get(prerequisite.packageName);
     const requiredLabel = `${prerequisite.packageName}@${prerequisite.version}`;
     const consumerLabel = `${consumerName}@${consumerVersion}`;
 
@@ -224,19 +211,6 @@ function validateRegistryIntegrityResult(integrity, packageName, version) {
     if (integrity !== null && (typeof integrity !== 'string' || integrity.length === 0)) {
         throw new Error(`registry returned a malformed dist.integrity for ${packageName}@${version}`);
     }
-}
-
-function readSourcePackageVersions(root, packagePathsByName) {
-    return Object.fromEntries(
-        Object.entries(packagePathsByName).map(([packageName, packagePath]) => {
-            const packageJson = readPackageJson(path.join(root, packagePath, 'package.json'));
-            if (packageJson.name !== packageName) {
-                throw new Error(`${packagePath}/package.json must be named ${packageName}`);
-            }
-            assertVersion(packageJson.version, `${packageName} source package version`);
-            return [packageName, packageJson.version];
-        }),
-    );
 }
 
 function readPackageJson(file) {
@@ -322,15 +296,11 @@ function packPublicToolPackage(packagePath, root) {
         const tarballPath = path.join(temporaryDirectory, tarballs[0]);
         const entries = parseTarEntries(execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' }));
         const packageJson = readPackedJson(tarballPath, 'package/package.json');
-        const starterTemplatePackageJsons =
-            packagePath === 'tools/create-pumpkin-plugin'
-                ? [
-                      readPackedJson(tarballPath, 'package/templates/typescript/package.json'),
-                      readPackedJson(tarballPath, 'package/templates/javascript/package.json'),
-                  ]
-                : [];
+        const embeddedPackageJsons = embeddedPackageManifestEntries(entries).map((entry) =>
+            readPackedJson(tarballPath, entry),
+        );
         const integrity = `sha512-${createHash('sha512').update(fs.readFileSync(tarballPath)).digest('base64')}`;
-        return { temporaryDirectory, tarballPath, entries, packageJson, starterTemplatePackageJsons, integrity };
+        return { temporaryDirectory, tarballPath, entries, packageJson, embeddedPackageJsons, integrity };
     } catch (error) {
         fs.rmSync(temporaryDirectory, { recursive: true, force: true });
         throw error;

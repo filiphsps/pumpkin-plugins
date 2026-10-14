@@ -27,7 +27,8 @@ const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? '').split('/');
 if (!owner || !repo || !process.env.GITHUB_TOKEN) throw new Error('GITHUB_REPOSITORY and GITHUB_TOKEN are required');
 const github = await GitHub.create({ owner, repo, token: process.env.GITHUB_TOKEN });
 const branch = github.repository.defaultBranch;
-const packages = workspacePackages(resolve(import.meta.dirname, '..'));
+const repositoryRoot = resolve(import.meta.dirname, '..');
+const packages = workspacePackages(repositoryRoot);
 const load = async () => {
     const manifest = await Manifest.fromManifest(
         github,
@@ -129,7 +130,7 @@ if (!dryRun && !pullRequestsOnly) {
         );
         return false;
     });
-    const releasePaths = partitionReleasePaths(releases);
+    const releasePaths = partitionReleasePaths(releases, repositoryRoot);
     outputs.paths_released = JSON.stringify(releasePaths.pluginPaths);
     outputs.action_paths_released = JSON.stringify(releasePaths.actionPaths);
     outputs.tool_paths_released = JSON.stringify(releasePaths.toolPaths);

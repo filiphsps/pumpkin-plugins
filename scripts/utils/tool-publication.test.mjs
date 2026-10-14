@@ -5,14 +5,18 @@ import { join } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { partitionReleasePaths } from './release-fanout.mjs';
 import {
-    assertPackedBuilderDependencies,
     assertPackedDependencySpecs,
     assertPublicToolPackage,
     assertPublicToolPackageContents,
-    assertStarterToolDependencies,
+    assertPublicToolTemplateDependencies,
+    discoverPublicToolPackages,
+    embeddedPackageManifestEntries,
     getPublicToolReleasePrerequisites,
+    nodeEngineRange,
+    nodeVersion,
     orderPublicToolReleasePaths,
     parseTarEntries,
+    publicToolPackageVersions,
     syncStarterToolDependencies,
 } from './tool-packages.mjs';
 
@@ -21,73 +25,91 @@ afterEach(() => {
     for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
 });
 
+function workspace(packages) {
+    const root = mkdtempSync(join(tmpdir(), 'tool-publication-'));
+    temporaryDirectories.push(root);
+    mkdirSync(join(root, 'tools'), { recursive: true });
+    for (const [packagePath, packageJson, files = {}] of packages) {
+        const directory = join(root, packagePath);
+        mkdirSync(directory, { recursive: true });
+        writeFileSync(join(directory, 'package.json'), JSON.stringify(packageJson));
+        for (const [file, contents] of Object.entries(files)) {
+            const filePath = join(directory, file);
+            mkdirSync(join(filePath, '..'), { recursive: true });
+            writeFileSync(filePath, JSON.stringify(contents));
+        }
+    }
+    return root;
+}
+
+function publicPackage(name, extra = {}) {
+    return {
+        name,
+        version: '1.0.0',
+        publishConfig: { access: 'public' },
+        ...extra,
+    };
+}
+
 describe('public tool release fanout', () => {
-    it('keeps public tool packages out of plugin artifact fanout', () => {
+    it('keeps public tools out of plugin, action, and extension artifacts', () => {
         assert.deepEqual(
             partitionReleasePaths([
                 { path: 'packages/waypoints' },
                 { path: 'actions/sign-pumpkin-plugin' },
                 { path: 'tools/build' },
-                { path: 'tools/pumpkin-api' },
-                { path: 'tools/static-hermes-runtime' },
-                { path: 'tools/create-pumpkin-plugin' },
-                { path: 'tools/codemod' },
-                { path: 'tools/cspell-dict-minecraft' },
+                { path: 'extensions/minecraft-terms' },
             ]),
             {
                 pluginPaths: ['packages/waypoints'],
                 actionPaths: ['actions/sign-pumpkin-plugin'],
-                toolPaths: [
-                    'tools/build',
-                    'tools/pumpkin-api',
-                    'tools/static-hermes-runtime',
-                    'tools/create-pumpkin-plugin',
-                    'tools/codemod',
-                    'tools/cspell-dict-minecraft',
-                ],
-                extensionPaths: [],
+                toolPaths: ['tools/build'],
+                extensionPaths: ['extensions/minecraft-terms'],
             },
         );
-    });
-
-    it('routes VS Code extensions to their own release publisher', () => {
-        assert.deepEqual(partitionReleasePaths([{ path: 'extensions/minecraft-terms' }]), {
-            pluginPaths: [],
-            actionPaths: [],
-            toolPaths: [],
-            extensionPaths: ['extensions/minecraft-terms'],
-        });
     });
 });
 
 describe('public tool package metadata', () => {
-    it('rejects private packages and requires public npm access', () => {
+    it('discovers publishable tools from package manifests and skips private workspaces', () => {
+        const root = workspace([
+            ['tools/new-tool', publicPackage('@example/new-tool')],
+            ['tools/private-helper', publicPackage('@example/private-helper', { private: true })],
+            ['tools/unpublished', { name: '@example/unpublished', private: true }],
+        ]);
+
+        assert.deepEqual(
+            discoverPublicToolPackages(root).map(({ path: packagePath, name }) => [packagePath, name]),
+            [['tools/new-tool', '@example/new-tool']],
+        );
+    });
+
+    it('checks public metadata against the workspace Node pin', () => {
         const metadata = {
-            name: '@pumpkin-plugins/build',
-            version: '0.1.0',
-            engines: { node: '>=24.21.0' },
-            publishConfig: { access: 'public' },
+            ...publicPackage('@example/tool'),
+            engines: { node: nodeEngineRange() },
         };
 
-        assert.doesNotThrow(() => assertPublicToolPackage(metadata, '@pumpkin-plugins/build'));
+        assert.doesNotThrow(() => assertPublicToolPackage(metadata, '@example/tool'));
         assert.throws(
-            () => assertPublicToolPackage({ ...metadata, private: true }, '@pumpkin-plugins/build'),
+            () => assertPublicToolPackage({ ...metadata, private: true }, '@example/tool'),
             /must not be private/,
         );
         assert.throws(
-            () => assertPublicToolPackage({ ...metadata, publishConfig: undefined }, '@pumpkin-plugins/build'),
-            /publishConfig.access must be public/,
+            () => assertPublicToolPackage({ ...metadata, publishConfig: undefined }, '@example/tool'),
+            /publishConfig\.access must be public/,
         );
         assert.throws(
-            () => assertPublicToolPackage({ ...metadata, engines: undefined }, '@pumpkin-plugins/build'),
-            /engines.node must be >=24\.21\.0/,
+            () => assertPublicToolPackage({ ...metadata, engines: undefined }, '@example/tool'),
+            /engines\.node must be/,
         );
+        assert.match(nodeVersion(), /^\d+\.\d+\.\d+$/);
     });
 
     it('rejects unresolved workspace and catalog specs in packed dependency fields', () => {
         assert.doesNotThrow(() =>
             assertPackedDependencySpecs({
-                dependencies: { '@pumpkin-plugins/pumpkin-api': '0.1.0' },
+                dependencies: { '@example/api': '1.0.0' },
                 peerDependencies: { typescript: '^6.0.0' },
             }),
         );
@@ -102,72 +124,152 @@ describe('public tool package metadata', () => {
     });
 });
 
-describe('public tool release order and prerequisites', () => {
-    const canonicalOrder = [
-        'tools/pumpkin-api',
-        'tools/static-hermes-runtime',
-        'tools/build',
-        'tools/create-pumpkin-plugin',
-        'tools/codemod',
-        'tools/cspell-dict-minecraft',
-    ];
-
-    it('orders any selected public paths canonically and rejects unknown or duplicate paths', () => {
-        assert.deepEqual(orderPublicToolReleasePaths([...canonicalOrder].reverse()), canonicalOrder);
-        assert.deepEqual(orderPublicToolReleasePaths(['tools/codemod', 'tools/pumpkin-api']), [
-            'tools/pumpkin-api',
-            'tools/codemod',
+describe('public tool release dependencies', () => {
+    it('orders tools from their declared production dependencies', () => {
+        const root = workspace([
+            ['tools/api', publicPackage('@example/api')],
+            ['tools/cli', publicPackage('@example/cli', { dependencies: { '@example/api': '^1.0.0' } })],
+            ['tools/private', publicPackage('@example/private', { private: true })],
         ]);
-        assert.throws(() => orderPublicToolReleasePaths(['tools/not-public']), /unknown public tool release path/);
+
+        const ordered = orderPublicToolReleasePaths(['tools/cli', 'tools/api'], root);
+
+        assert.equal(ordered.length, 2);
+        assert.ok(ordered.indexOf('tools/api') < ordered.indexOf('tools/cli'));
+        assert.throws(() => orderPublicToolReleasePaths(['tools/private'], root), /unknown public tool release path/);
         assert.throws(
-            () => orderPublicToolReleasePaths(['tools/codemod', 'tools/codemod']),
+            () => orderPublicToolReleasePaths(['tools/api', 'tools/api'], root),
             /duplicate public tool release path/,
         );
     });
 
-    it('derives exact builder production prerequisites without treating development dependencies as prerequisites', () => {
-        assert.deepEqual(
-            getPublicToolReleasePrerequisites('tools/build', {
-                dependencies: {
-                    '@pumpkin-plugins/pumpkin-api': '0.2.0',
-                    '@pumpkin-plugins/static-hermes-runtime': '0.4.1',
-                },
-                devDependencies: { '@pumpkin-plugins/minecraft-colors': '0.3.0' },
-            }),
+    it('ignores dependencies in nested manifests excluded from the package', () => {
+        const root = workspace([
+            ['tools/base', publicPackage('@example/base')],
             [
-                { packageName: '@pumpkin-plugins/pumpkin-api', version: '0.2.0' },
-                { packageName: '@pumpkin-plugins/static-hermes-runtime', version: '0.4.1' },
+                'tools/consumer',
+                publicPackage('@example/consumer', {
+                    dependencies: { '@example/base': '^1.0.0' },
+                    files: ['dist/**'],
+                }),
+                {
+                    'test/fixtures/package.json': {
+                        name: 'test-fixture',
+                        dependencies: { '@example/consumer': '^1.0.0' },
+                    },
+                },
             ],
-        );
+        ]);
+
+        assert.deepEqual(orderPublicToolReleasePaths(['tools/consumer', 'tools/base'], root), [
+            'tools/base',
+            'tools/consumer',
+        ]);
+    });
+
+    it('orders optional public dependencies declared by packages and embedded projects', () => {
+        const root = workspace([
+            ['tools/y-package', publicPackage('@example/y-package')],
+            ['tools/z-template', publicPackage('@example/z-template')],
+            [
+                'tools/a-consumer',
+                publicPackage('@example/a-consumer', { optionalDependencies: { '@example/y-package': '^1.0.0' } }),
+                {
+                    'templates/app/package.json': {
+                        name: 'template-app',
+                        optionalDependencies: { '@example/z-template': '^1.0.0' },
+                    },
+                },
+            ],
+        ]);
+
         assert.deepEqual(
-            getPublicToolReleasePrerequisites('tools/static-hermes-runtime', {
-                devDependencies: { '@pumpkin-plugins/pumpkin-api': '0.2.0' },
-            }),
-            [],
+            orderPublicToolReleasePaths(['tools/a-consumer', 'tools/z-template', 'tools/y-package'], root),
+            ['tools/y-package', 'tools/z-template', 'tools/a-consumer'],
         );
     });
 
-    it('derives creator prerequisites only after both templates match the exact public versions', () => {
-        const versions = {
-            '@pumpkin-plugins/pumpkin-api': '0.2.0',
-            '@pumpkin-plugins/build': '0.3.4',
-        };
+    it('uses embedded project dependencies as publication prerequisites', () => {
+        const root = workspace([
+            ['tools/api', publicPackage('@example/api')],
+            ['tools/cli', publicPackage('@example/cli')],
+            ['tools/starter', publicPackage('@example/starter')],
+        ]);
+        const versions = { '@example/api': '1.2.3', '@example/cli': '2.3.4' };
         const templates = [
-            { dependencies: { '@pumpkin-plugins/pumpkin-api': '^0.2.0', '@pumpkin-plugins/build': '^0.3.4' } },
-            { dependencies: { '@pumpkin-plugins/pumpkin-api': '^0.2.0', '@pumpkin-plugins/build': '^0.3.4' } },
+            { dependencies: { '@example/api': '^1.2.3', '@example/cli': '^2.3.4' } },
+            { dependencies: { '@example/api': '^1.2.3', '@example/cli': '^2.3.4' } },
         ];
 
-        assert.deepEqual(getPublicToolReleasePrerequisites('tools/create-pumpkin-plugin', {}, versions, templates), [
-            { packageName: '@pumpkin-plugins/pumpkin-api', version: '0.2.0' },
-            { packageName: '@pumpkin-plugins/build', version: '0.3.4' },
-        ]);
+        const prerequisites = getPublicToolReleasePrerequisites('tools/starter', {}, versions, templates, root);
+
+        assert.deepEqual(
+            new Map(prerequisites.map(({ packageName, version }) => [packageName, version])),
+            new Map(Object.entries(versions)),
+        );
         assert.throws(
             () =>
-                getPublicToolReleasePrerequisites('tools/create-pumpkin-plugin', {}, versions, [
-                    templates[0],
-                    { dependencies: { ...templates[1].dependencies, '@pumpkin-plugins/build': '^0.3.3' } },
-                ]),
-            /starter dependency must be \^0\.3\.4/,
+                getPublicToolReleasePrerequisites(
+                    'tools/starter',
+                    {},
+                    versions,
+                    [templates[0], { dependencies: { '@example/api': '^1.2.2' } }],
+                    root,
+                ),
+            /template dependency must be \^1\.2\.3/,
+        );
+    });
+
+    it('updates only public tool dependencies found in embedded manifests', () => {
+        const root = workspace([
+            ['tools/api', publicPackage('@example/api')],
+            ['tools/extra', publicPackage('@example/extra')],
+            [
+                'tools/starter',
+                publicPackage('@example/starter'),
+                {
+                    'templates/typed/package.json': {
+                        name: 'typed-starter',
+                        dependencies: { '@example/api': '^0.9.0', unrelated: '^3.0.0' },
+                        optionalDependencies: { '@example/extra': '^0.9.0' },
+                    },
+                    'templates/plain/package.json': {
+                        name: 'plain-starter',
+                        dependencies: { '@example/api': '^0.8.0' },
+                    },
+                },
+            ],
+        ]);
+
+        assert.equal(syncStarterToolDependencies(root), true);
+        assert.equal(syncStarterToolDependencies(root), false);
+        const typed = JSON.parse(readFileSync(join(root, 'tools/starter/templates/typed/package.json'), 'utf8'));
+        const plain = JSON.parse(readFileSync(join(root, 'tools/starter/templates/plain/package.json'), 'utf8'));
+        assert.equal(typed.dependencies['@example/api'], '^1.0.0');
+        assert.equal(typed.dependencies.unrelated, '^3.0.0');
+        assert.equal(typed.optionalDependencies['@example/extra'], '^1.0.0');
+        assert.equal(plain.dependencies['@example/api'], '^1.0.0');
+        assert.deepEqual(publicToolPackageVersions(root), {
+            '@example/api': '1.0.0',
+            '@example/extra': '1.0.0',
+            '@example/starter': '1.0.0',
+        });
+    });
+
+    it('checks embedded projects without knowing their package names', () => {
+        const root = workspace([['tools/api', publicPackage('@example/api')]]);
+        const versions = { '@example/api': '1.0.0' };
+
+        assert.doesNotThrow(() =>
+            assertPublicToolTemplateDependencies(
+                { dependencies: { '@example/api': '^1.0.0', unrelated: 'workspace:*' } },
+                versions,
+                root,
+            ),
+        );
+        assert.throws(
+            () => assertPublicToolTemplateDependencies({ dependencies: { '@example/api': '^0.9.0' } }, versions, root),
+            /template dependency must be \^1\.0\.0/,
         );
     });
 });
@@ -180,201 +282,57 @@ describe('packed public tool contents', () => {
         ]);
     });
 
-    it('requires the Minecraft CSpell package config and dictionary', () => {
-        const entries = ['package/cspell-ext.json', 'package/minecraft.txt', 'package/README.md', 'package/LICENSE'];
-        assert.doesNotThrow(() => assertPublicToolPackageContents(entries, 'tools/cspell-dict-minecraft'));
+    it('requires the exported files and executable declared in the packed manifest', () => {
+        const packageJson = {
+            name: '@example/cli',
+            bin: { example: 'dist/bin/example.js' },
+            exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
+        };
+
         assert.throws(
             () =>
                 assertPublicToolPackageContents(
-                    entries.filter((entry) => !entry.endsWith('minecraft.txt')),
-                    'tools/cspell-dict-minecraft',
+                    ['package/package.json', 'package/dist/index.d.ts', 'package/dist/index.js'],
+                    'tools/example-cli',
+                    packageJson,
                 ),
-            /missing package\/minecraft\.txt/,
+            /missing package\/dist\/bin\/example\.js/,
         );
-    });
-
-    it('keeps Pumpkin API type sources and excludes source tests', () => {
-        const entries = [
-            'package/src/index.ts',
-            'package/src/core.ts',
-            'package/src/wit.mjs',
-            'package/src/wit.d.mts',
-            'package/wit.lock.json',
-            'package/src/index.test.ts',
-        ];
-
-        assert.throws(() => assertPublicToolPackageContents(entries, 'tools/pumpkin-api'), /development test source/);
         assert.doesNotThrow(() =>
             assertPublicToolPackageContents(
-                entries.filter((entry) => !entry.endsWith('.test.ts')),
-                'tools/pumpkin-api',
+                [
+                    'package/package.json',
+                    'package/dist/bin/example.js',
+                    'package/dist/index.d.ts',
+                    'package/dist/index.js',
+                ],
+                'tools/example-cli',
+                packageJson,
             ),
         );
     });
 
-    it('keeps Static Hermes type sources and runtime assets while excluding source tests', () => {
-        const entries = [
-            'package/src/index.ts',
-            'package/dist/index.js',
-            'package/cmake/wasi-sdk-hermes-p2.cmake',
-            'package/hermes-patches/0001-wasi-p2-configure-platform.patch',
-            'package/src/component/build.test.ts',
-        ];
-
-        assert.throws(
-            () => assertPublicToolPackageContents(entries, 'tools/static-hermes-runtime'),
-            /development test source/,
-        );
-        assert.doesNotThrow(() =>
-            assertPublicToolPackageContents(
-                entries.filter((entry) => !entry.endsWith('.test.ts')),
-                'tools/static-hermes-runtime',
-            ),
-        );
-    });
-
-    it('keeps only the build CLI bundle and runtime assets', () => {
-        const entries = [
-            'package/dist/cli.js',
-            'package/runtime/quickjs-runtime-bigint.wasm',
-            'package/wasi-wit.lock.json',
-            'package/src/cli.ts',
-        ];
-
-        assert.throws(
-            () => assertPublicToolPackageContents(entries, 'tools/build'),
-            /CLI-only package contains source/,
-        );
-        assert.doesNotThrow(() =>
-            assertPublicToolPackageContents(
-                entries.filter((entry) => !entry.startsWith('package/src/')),
-                'tools/build',
-            ),
-        );
-    });
-
-    it('keeps the generator CLI source while excluding its development test source', () => {
-        const entries = [
-            'package/bin/create-pumpkin-plugin.ts',
-            'package/dist/create-pumpkin-plugin.js',
-            'package/templates/typescript/package.json',
-            'package/templates/javascript/package.json',
-            'package/bin/create-pumpkin-plugin.test.ts',
-        ];
-
-        assert.throws(
-            () => assertPublicToolPackageContents(entries, 'tools/create-pumpkin-plugin'),
-            /development test source/,
-        );
-        assert.doesNotThrow(() =>
-            assertPublicToolPackageContents(
-                entries.filter((entry) => !entry.endsWith('.test.ts')),
-                'tools/create-pumpkin-plugin',
-            ),
-        );
-    });
-
-    it('keeps the codemod CLI and framework declarations in the packed package', () => {
-        const entries = [
-            'package/dist/bin/pumpkin-codemod.js',
-            'package/dist/src/index.js',
-            'package/dist/src/index.d.ts',
-            'package/README.md',
-            'package/docs/using-codemods.md',
-            'package/docs/authoring-codemods.md',
-            'package/src/runner.test.ts',
-        ];
-
-        assert.throws(() => assertPublicToolPackageContents(entries, 'tools/codemod'), /development test source/);
-        assert.doesNotThrow(() =>
-            assertPublicToolPackageContents(
-                entries.filter((entry) => !entry.endsWith('.test.ts')),
-                'tools/codemod',
-            ),
-        );
-    });
-});
-
-describe('starter tool dependency versions', () => {
-    it('syncs both templates to the current API and builder release ranges', () => {
-        const root = mkdtempSync(join(tmpdir(), 'pumpkin-tool-versions-'));
-        temporaryDirectories.push(root);
-        for (const [directory, name, version] of [
-            ['tools/pumpkin-api', '@pumpkin-plugins/pumpkin-api', '0.2.0'],
-            ['tools/build', '@pumpkin-plugins/build', '0.3.4'],
-        ]) {
-            mkdirSync(join(root, directory), { recursive: true });
-            writeFileSync(join(root, directory, 'package.json'), JSON.stringify({ name, version }));
-        }
-
-        const templateDirectories = ['typescript', 'javascript'];
-        for (const language of templateDirectories) {
-            const directory = join(root, 'tools/create-pumpkin-plugin/templates', language);
-            mkdirSync(directory, { recursive: true });
-            writeFileSync(
-                join(directory, 'package.json'),
-                JSON.stringify({
-                    dependencies: {
-                        '@pumpkin-plugins/pumpkin-api': '^0.1.0',
-                        '@pumpkin-plugins/build': '^0.1.0',
-                    },
-                }),
-            );
-        }
-
-        assert.equal(syncStarterToolDependencies(root), true);
-        for (const language of templateDirectories) {
-            const packageJson = JSON.parse(
-                readFileSync(join(root, 'tools/create-pumpkin-plugin/templates', language, 'package.json'), 'utf8'),
-            );
-            assertStarterToolDependencies(packageJson, {
-                '@pumpkin-plugins/pumpkin-api': '0.2.0',
-                '@pumpkin-plugins/build': '0.3.4',
-            });
-        }
-    });
-
-    it('fails if either starter template is stale for the packages that will be packed', () => {
-        const packageJson = {
-            dependencies: {
-                '@pumpkin-plugins/pumpkin-api': '^0.1.0',
-                '@pumpkin-plugins/build': '^0.1.0',
-            },
-        };
-
+    it('rejects development test sources from a tarball', () => {
         assert.throws(
             () =>
-                assertStarterToolDependencies(packageJson, {
-                    '@pumpkin-plugins/pumpkin-api': '0.2.0',
-                    '@pumpkin-plugins/build': '0.3.4',
-                }),
-            /must be \^0\.2\.0/,
+                assertPublicToolPackageContents(
+                    ['package/src/index.js', 'package/src/index.test.js'],
+                    'tools/example',
+                    { exports: { '.': './src/index.js' } },
+                ),
+            /development test source/,
         );
     });
-});
 
-describe('packed builder tool dependencies', () => {
-    it('requires packed API and runtime versions to match the builder manifest', () => {
-        const builder = {
-            dependencies: {
-                '@pumpkin-plugins/pumpkin-api': '0.2.0',
-                '@pumpkin-plugins/static-hermes-runtime': '0.4.1',
-            },
-        };
-
-        assert.doesNotThrow(() =>
-            assertPackedBuilderDependencies(builder, {
-                '@pumpkin-plugins/pumpkin-api': '0.2.0',
-                '@pumpkin-plugins/static-hermes-runtime': '0.4.1',
-            }),
-        );
-        assert.throws(
-            () =>
-                assertPackedBuilderDependencies(builder, {
-                    '@pumpkin-plugins/pumpkin-api': '0.3.0',
-                    '@pumpkin-plugins/static-hermes-runtime': '0.4.1',
-                }),
-            /must resolve to packed version 0\.3\.0/,
+    it('finds embedded manifests without assuming template names', () => {
+        assert.deepEqual(
+            embeddedPackageManifestEntries([
+                'package/package.json',
+                'package/templates/ts/package.json',
+                'package/templates/js/package.json',
+                'package/other.json',
+            ]),
+            ['package/templates/ts/package.json', 'package/templates/js/package.json'],
         );
     });
 });

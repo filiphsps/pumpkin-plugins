@@ -9,7 +9,6 @@ import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { parse } from 'yaml';
-import { PUBLIC_TOOL_PACKAGE_PATHS } from './utils/tool-packages.mjs';
 
 const scripts = import.meta.dirname;
 const dirs = [];
@@ -215,19 +214,12 @@ describe('upstream pin workflow', () => {
     });
 });
 
-const AUTHOR = 'Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)';
 const REPO = 'https://github.com/filiphsps/pumpkin-plugins';
 const metadata = (dir) => ({
     homepage: dir === '.' ? REPO : `${REPO}/tree/master/${dir}#readme`,
     bugs: { url: `${REPO}/issues` },
     repository: { type: 'git', url: `git+${REPO}.git`, ...(dir === '.' ? {} : { directory: dir }) },
-    funding: [
-        { type: 'github', url: 'https://github.com/sponsors/filiphsps' },
-        { type: 'custom', url: 'https://paypal.me/filiph' },
-    ],
     license: 'MIT',
-    author: AUTHOR,
-    contributors: [AUTHOR],
 });
 
 describe('check-docs', () => {
@@ -388,6 +380,7 @@ describe('check-docs', () => {
 
 describe('package-metadata', () => {
     const files = (override = {}) => ({
+        '.node-version': '24.21.0\n',
         LICENSE: 'MIT',
         'package.json': { name: 'root', description: 'Root', ...metadata('.') },
         'packages/plug/package.json': {
@@ -407,12 +400,13 @@ describe('package-metadata', () => {
             types: './src/index.ts',
             files: ['src'],
             publishConfig: { access: 'public' },
+            engines: { node: '>=24.21.0' },
         },
         'tools/lib/src/index.ts': '',
         ...override,
     });
 
-    it("accepts package metadata in Biome's key order", () => {
+    it('accepts package metadata with fields in any order', () => {
         const result = run('package-metadata.mjs', repo(files()));
         assert.ok(result.ok, result.out);
     });
@@ -517,7 +511,6 @@ describe('package-metadata', () => {
         const result = run('package-metadata.mjs', repo(files({ 'tools/lib/package.json': lib })));
         assert.match(result.out, /"sideEffects" should be false/);
         assert.match(result.out, /"module" should be "\.\/src\/index\.ts"/);
-        assert.match(result.out, /"publishConfig" should be/);
     });
 
     it('--fix writes what can be derived and still fails on a missing description', () => {
@@ -528,7 +521,8 @@ describe('package-metadata', () => {
         const fixed = JSON.parse(fs.readFileSync(path.join(dir, 'tools/lib/package.json'), 'utf8'));
         assert.equal(fixed.license, 'MIT');
         assert.equal(fixed.sideEffects, false);
-        assert.deepEqual(Object.keys(fixed).slice(0, 3), ['name', 'homepage', 'bugs']);
+        assert.equal(fixed.repository.directory, 'tools/lib');
+        assert.equal(fixed.homepage.endsWith('/tools/lib#readme'), true);
     });
 
     it('fails without a LICENSE file', () => {
@@ -538,14 +532,13 @@ describe('package-metadata', () => {
 });
 
 describe('check-release-config', () => {
-    const publicTools = PUBLIC_TOOL_PACKAGE_PATHS;
-    const publicToolCount = Object.keys(publicTools).length;
+    const publicTools = { 'tools/example-tool': '@example/tool' };
     const files = ({ manifest = '0.0.0', releaseAs = '0.0.1', version = '0.0.0' } = {}) => ({
         'packages/plug/package.json': { name: 'plug', version },
         ...Object.fromEntries(
             Object.entries(publicTools).map(([directory, name]) => [
                 `${directory}/package.json`,
-                { name, version: '0.1.0' },
+                { name, version: '0.1.0', publishConfig: { access: 'public' } },
             ]),
         ),
         '.release-please-manifest.json': {
@@ -624,26 +617,25 @@ describe('check-release-config', () => {
     it('passes for an unreleased plugin that is set to release 0.0.1', () => {
         const result = run('check-release-config.mjs', repo(files()));
         assert.ok(result.ok, result.out);
-        assert.match(result.out, new RegExp(`${publicToolCount} public tools`));
     });
 
     it('requires the public tool release pin and package version to match its first 0.1.0 release', () => {
         const missingPin = files();
-        missingPin['release-please-config.json'].packages['tools/build']['release-as'] = undefined;
-        assert.match(run('check-release-config.mjs', repo(missingPin)).out, /tools\/build.*release-as.*0\.1\.0/);
+        missingPin['release-please-config.json'].packages['tools/example-tool']['release-as'] = undefined;
+        assert.match(run('check-release-config.mjs', repo(missingPin)).out, /tools\/example-tool.*release-as.*0\.1\.0/);
 
         const mismatchedVersion = files();
-        mismatchedVersion['tools/build/package.json'].version = '0.1.1';
+        mismatchedVersion['tools/example-tool/package.json'].version = '0.1.1';
         assert.match(
             run('check-release-config.mjs', repo(mismatchedVersion)).out,
-            /tools\/build\/package\.json must be/,
+            /tools\/example-tool\/package\.json must be/,
         );
     });
 
     it('retires a public tool pin only after the manifest records its first release', () => {
         const released = files();
-        released['.release-please-manifest.json']['tools/build'] = '0.1.0';
-        released['release-please-config.json'].packages['tools/build']['release-as'] = undefined;
+        released['.release-please-manifest.json']['tools/example-tool'] = '0.1.0';
+        released['release-please-config.json'].packages['tools/example-tool']['release-as'] = undefined;
         assert.ok(run('check-release-config.mjs', repo(released)).ok);
     });
 
@@ -656,12 +648,6 @@ describe('check-release-config', () => {
 
         const result = run('check-release-config.mjs', repo(paused));
         assert.ok(result.ok, result.out);
-        assert.match(
-            result.out,
-            new RegExp(
-                `1 plugin, 0 actions, ${publicToolCount} public tools, and 0 extensions: .*packages/plug.*; 1 paused: packages/not-ready`,
-            ),
-        );
     });
 
     it('rejects a paused plugin that remains tracked or has no reason', () => {
@@ -718,7 +704,6 @@ describe('check-release-config', () => {
     it('registers actions as simple release components with matching version.txt entries', () => {
         const result = run('check-release-config.mjs', repo(withAction()));
         assert.ok(result.ok, result.out);
-        assert.match(result.out, new RegExp(`1 plugin, 1 action, ${publicToolCount} public tools, and 0 extensions`));
 
         const wrongType = run('check-release-config.mjs', repo(withAction(files(), { releaseType: 'node' })));
         assert.match(wrongType.out, /needs "release-type": "simple"/);

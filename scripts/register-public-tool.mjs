@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { PUBLIC_TOOL_PACKAGE_PATHS } from './utils/tool-packages.mjs';
 
 const FIRST_TOOL_VERSION = '0.1.0';
 const FIRST_MANIFEST_VERSION = '0.0.0';
@@ -23,9 +22,8 @@ export function registerPublicTool(root, toolDirectory) {
     const packagePath = path.join(root, toolDirectory, 'package.json');
     const packageJson = readJson(packagePath);
     const component = path.basename(toolDirectory);
-    const expectedName = PUBLIC_TOOL_PACKAGE_PATHS[toolDirectory] ?? `@pumpkin-plugins/${component}`;
-    if (packageJson.name !== expectedName) {
-        throw new Error(`${packagePath} must have package name ${expectedName}.`);
+    if (typeof packageJson.name !== 'string' || packageJson.name.length === 0) {
+        throw new Error(`${packagePath} must have a package name.`);
     }
     if (packageJson.private === true || packageJson.publishConfig?.access !== 'public') {
         throw new Error(`${packagePath} must be publishable with publishConfig.access set to public.`);
