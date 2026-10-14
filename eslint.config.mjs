@@ -53,15 +53,17 @@ const jsdocConfig = {
 export default [
     {
         ignores: [
-            '**/node_modules/**',
+            '**/.cache/**',
+            '**/.codex-tmp/**',
+            '**/.coverage/**',
+            '**/.turbo/**',
+            '**/.vitepress/cache/**',
             '**/coverage/**',
+            '**/dist/**',
+            '**/node_modules/**',
             'build/**',
             'packages/*/build/**',
             'tools/*/build/**',
-            '**/dist/**',
-            '**/.turbo/**',
-            '**/.cache/**',
-            '**/.vitepress/cache/**',
             'turbo/generators/templates/**',
         ],
     },

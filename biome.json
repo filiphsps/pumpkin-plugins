@@ -10,15 +10,16 @@
         "maxSize": 2097152,
         "includes": [
             "**",
-            "!**/node_modules",
-            "!**/dist",
-            "!packages/*/build",
-            "!**/coverage",
             "!**/.cache",
+            "!**/.codex-tmp",
             "!**/.vitepress/cache",
+            "!**/*.bak",
             "!**/*.lock",
             "!**/*.log",
-            "!**/*.bak",
+            "!**/coverage",
+            "!**/dist",
+            "!**/node_modules",
+            "!packages/*/build",
             "!pnpm-lock.yaml"
         ]
     },

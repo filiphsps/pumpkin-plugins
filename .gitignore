@@ -15,3 +15,6 @@ dist/
 # Turborepo local cache
 .turbo/
 coverage/
+
+# Local Codex temporary worktrees
+/.codex-tmp/
