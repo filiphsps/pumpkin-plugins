@@ -14,6 +14,7 @@ import { printBuildOutput } from './output.ts';
 import { readPluginConfig, requireBuildFields } from './plugin-config.ts';
 import { cacheDir } from './repo.ts';
 import { generateTypes } from './types.ts';
+import { isBuildUpdateCheckAllowed, startBuildUpdateCheck } from './update-check.ts';
 import { ensureWasiWit, readLock } from './wasi-wit.ts';
 import { withWasiWitFileLock } from './wasi-wit-lock.ts';
 import { prepareWit, publishWitSnapshot } from './wit.ts';
@@ -30,6 +31,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
         .version((createRequire(import.meta.url)('../package.json') as { version: string }).version)
         .option('--types-only', 'Generate guest declarations without building a component')
         .option('--parse-ts', 'Use Hermes TypeScript parsing for the component bundle')
+        .option('--no-update-notifier', 'Skip the npm update check')
         .configureOutput({ outputError: () => {} })
         .exitOverride();
     try {
@@ -128,6 +130,27 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
     } finally {
         if (temporaryWitRoot !== undefined) fs.rmSync(temporaryWitRoot, { recursive: true, force: true });
     }
+}
+
+/** Dependencies for the executable CLI boundary. */
+export interface ExecuteCliOptions {
+    /** Environment used to decide whether to check for an update. */
+    environment?: NodeJS.ProcessEnv;
+    /** Whether standard output is an interactive terminal. */
+    isTTY?: boolean;
+    /** Starts an update lookup; injectable to test CLI dispatch without network access. */
+    startUpdateCheck?: typeof startBuildUpdateCheck;
+}
+
+/** Starts an optional background update lookup and runs the build command. */
+export async function executeCli(args: string[], pluginDir: string, options: ExecuteCliOptions = {}): Promise<void> {
+    const startUpdateCheck = options.startUpdateCheck ?? startBuildUpdateCheck;
+    const environment = options.environment ?? process.env;
+    const isTTY = options.isTTY ?? process.stdout.isTTY === true;
+    if (isBuildUpdateCheckAllowed(args, environment, isTTY)) {
+        void startUpdateCheck(args, { environment, isTTY }).catch(() => undefined);
+    }
+    await main(args, pluginDir);
 }
 
 /**
@@ -234,5 +257,5 @@ export async function main(args: string[], pluginDir: string): Promise<void> {
 
 // Resolve pnpm's symlink before comparing the invoked executable with this module.
 if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-    await main(process.argv.slice(2), process.cwd());
+    await executeCli(process.argv.slice(2), process.cwd());
 }
