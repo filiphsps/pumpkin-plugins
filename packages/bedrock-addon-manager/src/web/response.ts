@@ -33,10 +33,10 @@ function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
     return out;
 }
 
-function textResponse(status: number, extra: Record<string, string> = {}): ResponsePlan {
+function textResponse(status: number, extra: Record<string, string> = {}, headOnly = false): ResponsePlan {
     const body = strToU8(`${status}\n`);
     const head = responseHead(status, { 'Content-Type': 'text/plain', 'Content-Length': body.length, ...extra });
-    return { head: concat(head, body) };
+    return { head: headOnly ? head : concat(head, body) };
 }
 
 /**
@@ -52,7 +52,7 @@ export function planResponse(request: HttpRequest | undefined, lookup: PackLooku
 
     const name = routePack(request.target);
     const file = name === null ? undefined : lookup(name);
-    if (!file) return textResponse(404);
+    if (!file) return textResponse(404, {}, request.method === 'HEAD');
 
     const range = parseRange(request.headers.range, file.size);
     if (range === 'unsatisfiable') {

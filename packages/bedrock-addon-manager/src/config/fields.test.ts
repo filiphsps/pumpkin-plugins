@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { httpUrl, ipv4Address, relativeFolder } from './fields.ts';
+import { httpBaseUrl, httpUrl, ipv4Address, relativeFolder } from './fields.ts';
 
 describe('ipv4Address', () => {
     it('accepts dotted quads', () => {
@@ -22,6 +22,17 @@ describe('httpUrl', () => {
     it('allows an empty value only when asked', () => {
         expect(httpUrl({ description: 'd', default: '', allowEmpty: true }).parse('')).toEqual({ ok: true, value: '' });
         expect(httpUrl({ description: 'd' }).parse('')).toEqual({ ok: false });
+    });
+
+    it('uses valid examples for optional URL fields', () => {
+        expect(httpUrl({ description: 'd' }).parse('https://example.com')).toEqual({
+            ok: true,
+            value: 'https://example.com',
+        });
+        expect(httpBaseUrl({ description: 'd' }).parse('https://example.com')).toEqual({
+            ok: true,
+            value: 'https://example.com',
+        });
     });
 });
 

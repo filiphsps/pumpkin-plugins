@@ -1,4 +1,4 @@
-import { strToU8, zipSync } from 'fflate';
+import { strToU8, unzipSync, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import { makeMcpack, manifestJson, noise } from '../../test/fixtures.ts';
 import { readAddon } from './addon.ts';
@@ -34,6 +34,7 @@ describe('readAddon', () => {
         const inner = readAddon(packs[0].bytes.length ? zipSync({ 'x.mcpack': packs[0].bytes }) : packs[0].bytes);
         expect(inner.packs).toHaveLength(1);
         expect(packs[0].bytes.length).toBeGreaterThan(texture.length);
+        expect(unzipSync(packs[0].bytes)['textures/a.png']).toEqual(texture);
     });
 
     it('extracts nested .mcpack archives as they are', () => {

@@ -45,6 +45,30 @@ describe('configSchema', () => {
         expect(store.text).not.toContain('legacy_option');
     });
 
+    it.each([
+        'https://packs.example.com?token=secret',
+        'https://packs.example.com#packs',
+        'https://packs.example.com:bad',
+        'https://packs.example.com:65536',
+    ])('rejects a malformed public base URL: %s', (publicUrl) => {
+        const store = new MemoryStore();
+        store.text = `[web]\npublic_url = "${publicUrl}"\n`;
+
+        const result = loadConfig(configSchema, store, CONFIG_RENDER_OPTIONS);
+
+        expect(result.values.web.public_url).toBe('');
+        expect(result.warnings.join('\n')).toContain('web.public_url');
+    });
+
+    it('keeps a reverse-proxy path and removes its trailing slash', () => {
+        const store = new MemoryStore();
+        store.text = '[web]\npublic_url = "https://packs.example.com/resources/"\n';
+
+        const result = loadConfig(configSchema, store, CONFIG_RENDER_OPTIONS);
+
+        expect(result.values.web.public_url).toBe('https://packs.example.com/resources');
+    });
+
     it('describes every setting in the README info, including the per-pack ones', () => {
         const keys = configInfo.options?.map((o) => o.key);
         expect(keys).toContain('web.public_url');

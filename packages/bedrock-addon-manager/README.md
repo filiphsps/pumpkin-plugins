@@ -64,7 +64,7 @@ Settings live in `plugins/data/BedrockAddonManager/config.toml`. The plugin crea
 | `web.enabled` | boolean | `true` | Serve the packs over HTTP. Turn this off if the packs are hosted elsewhere and every pack has a download_url override. |
 | `web.bind` | string | `"0.0.0.0"` | IPv4 address to listen on. |
 | `web.port` | integer | `8123` | Port to listen on. |
-| `web.public_url` | string | `""` | Base URL Bedrock clients should use to download packs, without a trailing slash; for example "https://packs.example.com". The plugin serves plain HTTP. Put a reverse proxy in front of it for HTTPS. When empty, the plugin uses the public address reported by UPnPumpkin if forwarding succeeds, or a loopback URL on the configured port otherwise. A loopback URL works only for players on the server machine. |
+| `web.public_url` | string | `""` | Base URL Bedrock clients should use to download packs, without a trailing slash, query or fragment; for example "https://packs.example.com". The plugin serves plain HTTP. Put a reverse proxy in front of it for HTTPS. When empty, the plugin uses the public address reported by UPnPumpkin if forwarding succeeds, or a loopback URL on the configured port otherwise. A loopback URL works only for players on the server machine. |
 | `web.port_forwarding` | boolean | `true` | When `public_url` is empty and `bind` is "0.0.0.0", ask UPnPumpkin to open `port` on your router (UPnP or NAT-PMP) and use the public address it returns. No port is opened when this machine already has a public address or UPnPumpkin is not installed. Set to false to disable forwarding. |
 | `packs.directory` | string | `"packs"` | Folder inside this plugin's data folder that is scanned for .mcpack and .mcaddon files. |
 | `packs.force` | boolean | `false` | Make pack downloads required before players can join. This currently has no effect because Pumpkin does not support pack delivery. |
@@ -100,11 +100,11 @@ bind = "0.0.0.0"
 # Port to listen on.
 port = 8123
 
-# Base URL Bedrock clients should use to download packs, without a trailing slash; for example
-# "https://packs.example.com". The plugin serves plain HTTP. Put a reverse proxy in front of it for
-# HTTPS. When empty, the plugin uses the public address reported by UPnPumpkin if forwarding
-# succeeds, or a loopback URL on the configured port otherwise. A loopback URL works only for
-# players on the server machine.
+# Base URL Bedrock clients should use to download packs, without a trailing slash, query or
+# fragment; for example "https://packs.example.com". The plugin serves plain HTTP. Put a reverse
+# proxy in front of it for HTTPS. When empty, the plugin uses the public address reported by
+# UPnPumpkin if forwarding succeeds, or a loopback URL on the configured port otherwise. A loopback
+# URL works only for players on the server machine.
 public_url = ""
 
 # When `public_url` is empty and `bind` is "0.0.0.0", ask UPnPumpkin to open `port` on your router

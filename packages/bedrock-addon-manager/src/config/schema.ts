@@ -11,7 +11,7 @@ import {
     table,
 } from '@pumpkin-plugins/config';
 import { PLUGIN_NAME } from '../name.ts';
-import { httpUrl, ipv4Address, relativeFolder } from './fields.ts';
+import { httpBaseUrl, httpUrl, ipv4Address, relativeFolder } from './fields.ts';
 
 /** Name of the config file in the plugin's data folder. */
 export const CONFIG_FILE = 'config.toml';
@@ -33,9 +33,9 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
             }),
             bind: ipv4Address({ description: 'IPv4 address to listen on.', default: '0.0.0.0' }),
             port: int({ description: 'Port to listen on.', default: 8123, min: 1, max: 65535 }),
-            public_url: httpUrl({
+            public_url: httpBaseUrl({
                 description:
-                    'Base URL Bedrock clients should use to download packs, without a trailing slash; for example "https://packs.example.com". The plugin serves plain HTTP. Put a reverse proxy in front of it for HTTPS. When empty, the plugin uses the public address reported by UPnPumpkin if forwarding succeeds, or a loopback URL on the configured port otherwise. A loopback URL works only for players on the server machine.',
+                    'Base URL Bedrock clients should use to download packs, without a trailing slash, query or fragment; for example "https://packs.example.com". The plugin serves plain HTTP. Put a reverse proxy in front of it for HTTPS. When empty, the plugin uses the public address reported by UPnPumpkin if forwarding succeeds, or a loopback URL on the configured port otherwise. A loopback URL works only for players on the server machine.',
                 default: '',
                 allowEmpty: true,
             }),
