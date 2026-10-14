@@ -94,9 +94,78 @@ describe('signWasm', () => {
         expect(JSON.parse(json)).toEqual(METADATA);
     });
 
+    it('preserves safe integer ID boundaries when signing', () => {
+        const metadata = {
+            ...METADATA,
+            plugin_id: Number.MAX_SAFE_INTEGER,
+            dev_id: Number.MIN_SAFE_INTEGER,
+            user_id: 0,
+        };
+        const result = verifyWasm(signWasm(wasm, metadata, SEED));
+
+        expect(result.valid).toBe(true);
+        expect(result.metadata).toMatchObject({
+            plugin_id: 9007199254740991n,
+            dev_id: -9007199254740991n,
+            user_id: 0n,
+        });
+    });
+
+    it('serializes bigint IDs as exact signed 64-bit JSON integers', () => {
+        const signed = signWasm(
+            wasm,
+            {
+                ...METADATA,
+                plugin_id: 9223372036854775807n,
+                dev_id: -9223372036854775808n,
+                user_id: 9007199254740993n,
+            },
+            SEED,
+        );
+        const section = parseSections(signed).find((entry) => entry.name === 'pumpkin.metadata');
+        const json = Buffer.from(section?.data ?? []).toString('utf8');
+        const result = verifyWasm(signed);
+
+        expect(json).toContain('"plugin_id":9223372036854775807');
+        expect(json).toContain('"dev_id":-9223372036854775808');
+        expect(json).toContain('"user_id":9007199254740993');
+        expect(result.valid).toBe(true);
+        expect(result.metadata).toMatchObject({
+            plugin_id: 9223372036854775807n,
+            dev_id: -9223372036854775808n,
+            user_id: 9007199254740993n,
+        });
+    });
+
+    it.each(['plugin_id', 'dev_id', 'user_id'])(
+        'rejects an unsafe number for %s before signing rounded metadata',
+        (field) => {
+            const metadata = { ...METADATA, [field]: Number.MAX_SAFE_INTEGER + 1 };
+
+            expect(() => signWasm(wasm, metadata as typeof METADATA, SEED)).toThrow(/safe integer or bigint/);
+        },
+    );
+
+    it.each(['9223372036854775808', '-9223372036854775809'])(
+        'rejects bigint IDs outside the host s64 range: %s',
+        (value) => {
+            const metadata = {
+                ...METADATA,
+                plugin_id: BigInt(value),
+            };
+
+            expect(() => signWasm(wasm, metadata, SEED)).toThrow(/signed 64-bit integer/);
+        },
+    );
+
     it('drops fields that are not part of the format', () => {
         const extra = signWasm(wasm, { ...METADATA, extra: 1 } as typeof METADATA, SEED);
-        expect(verifyWasm(extra).metadata).toEqual(METADATA);
+        expect(verifyWasm(extra).metadata).toEqual({
+            ...METADATA,
+            plugin_id: 0n,
+            dev_id: 0n,
+            user_id: 0n,
+        });
     });
 
     it('writes the envelope with the documented fields', () => {
@@ -148,7 +217,12 @@ describe('verifyWasm', () => {
         expect(verifyWasm(signed)).toEqual({
             signed: true,
             valid: true,
-            metadata: METADATA,
+            metadata: {
+                ...METADATA,
+                plugin_id: 0n,
+                dev_id: 0n,
+                user_id: 0n,
+            },
             publicKeyHex: publicKeyOf(SEED),
         });
     });
@@ -204,9 +278,18 @@ describe('verifyWasm', () => {
         },
     );
 
-    it.each(['9223372036854775807', '-9223372036854775808', '-1', '0'])('accepts the host i64 ID %s', (id) => {
+    it.each([
+        ['safe upper boundary', '9007199254740991', 9007199254740991n],
+        ['safe lower boundary', '-9007199254740991', -9007199254740991n],
+        ['first integer above safe range', '9007199254740993', 9007199254740993n],
+        ['host s64 maximum', '9223372036854775807', 9223372036854775807n],
+        ['host s64 minimum', '-9223372036854775808', -9223372036854775808n],
+    ])('returns the exact bigint for the %s metadata ID', (_label, id, expected) => {
         const json = JSON.stringify(METADATA).replace('"plugin_id":0', `"plugin_id":${id}`);
-        expect(verifyWasm(signedMetadata(json)).valid).toBe(true);
+        const result = verifyWasm(signedMetadata(json));
+
+        expect(result.valid).toBe(true);
+        expect(result.metadata?.plugin_id).toBe(expected);
     });
 
     it('accepts omitted license keys, empty strings, opaque dates and unknown fields like the host', () => {

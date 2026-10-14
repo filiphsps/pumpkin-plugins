@@ -11,6 +11,13 @@ checks the signature against the module bytes and embedded metadata and reports 
 release fields. Signing sections can be stripped or parsed when a tool needs to inspect or replace
 them. Existing signature sections are replaced when producing a new signature.
 
+## Metadata IDs
+
+`signWasm` accepts `bigint` IDs across the host's signed 64-bit range. Safe integer `number` values
+are also accepted; unsafe numbers and values outside that range are rejected. `verifyWasm` returns
+`plugin_id`, `dev_id`, and `user_id` as `bigint` so their exact values survive JSON parsing. Convert
+them to `number` only when the value is within JavaScript's safe integer range.
+
 The key is a 32-byte Ed25519 seed, represented in workflows as 64 hexadecimal characters. Keep the
 secret key in a protected secret store; publish the public key through a separately trusted channel
 so consumers can pin the expected signer. A valid signature proves the file matches its metadata,

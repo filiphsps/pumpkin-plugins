@@ -2,8 +2,10 @@ export {
     generateKeyPair,
     type KeyPair,
     publicKeyOf,
+    type SigningId,
     type SigningMetadata,
     signWasm,
+    type VerifiedSigningMetadata,
     type VerifyResult,
     verifyWasm,
 } from './sign.ts';
