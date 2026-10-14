@@ -163,12 +163,10 @@ describe('public tool release order and prerequisites', () => {
         ]);
         assert.throws(
             () =>
-                getPublicToolReleasePrerequisites(
-                    'tools/create-pumpkin-plugin',
-                    {},
-                    versions,
-                    [templates[0], { dependencies: { ...templates[1].dependencies, '@pumpkin-plugins/build': '^0.3.3' } }],
-                ),
+                getPublicToolReleasePrerequisites('tools/create-pumpkin-plugin', {}, versions, [
+                    templates[0],
+                    { dependencies: { ...templates[1].dependencies, '@pumpkin-plugins/build': '^0.3.3' } },
+                ]),
             /starter dependency must be \^0\.3\.4/,
         );
     });
