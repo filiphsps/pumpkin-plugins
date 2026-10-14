@@ -70,10 +70,19 @@ describe('planResponse', () => {
         expect(plan(undefined).text).toMatch(/^HTTP\/1\.1 400 /);
     });
 
-    it('includes the whole body of an error in the head, with a matching length', () => {
+    it('includes the whole body of a GET error in the response head, with a matching length', () => {
         const p = plan({ target: '/packs/nope.mcpack' });
         expect(p.text.endsWith('\r\n\r\n404\n')).toBe(true);
         expect(p.text).toContain('Content-Length: 4\r\n');
+    });
+
+    it('keeps the GET error length but omits its body for HEAD', () => {
+        const p = plan({ method: 'HEAD', target: '/packs/nope.mcpack' });
+        expect(p.text).toMatch(/^HTTP\/1\.1 404 /);
+        expect(p.text).toContain('Content-Type: text/plain\r\n');
+        expect(p.text).toContain('Content-Length: 4\r\n');
+        expect(p.text.endsWith('\r\n\r\n')).toBe(true);
+        expect(p.body).toBeUndefined();
     });
 
     it('handles an empty pack without trying to stream it', () => {

@@ -3,6 +3,7 @@ import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
+import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { handleCommand as apiHandleCommand } from '@pumpkin-plugins/pumpkin-api';
 import { registerCommands } from './commands/register.ts';
 import { info } from './info.ts';
@@ -13,6 +14,7 @@ import { TcpWebServer } from './web/tcp-server.ts';
 
 /** Serves Bedrock resource packs over HTTP. */
 class BedrockAddonManager extends PluginBase {
+    private files: WasiDataDir | undefined;
     private manager: PackManager | undefined;
     private tickTask: number | undefined;
 
@@ -29,6 +31,7 @@ class BedrockAddonManager extends PluginBase {
             );
             return;
         }
+        this.files = files;
 
         const manager = new PackManager(
             files,
@@ -44,8 +47,26 @@ class BedrockAddonManager extends PluginBase {
 
     /** Stops the tick and the web server. */
     protected override onPluginUnload(_ctx: Context): void {
-        if (this.tickTask !== undefined) cancelTask(this.tickTask);
-        this.manager?.stop({ releasePort: false });
+        const files = this.files;
+        this.files = undefined;
+        const tickTask = this.tickTask;
+        let cleanupFailed = false;
+        let firstCleanupError: unknown;
+        const attemptCleanup = (cleanup: () => void): void => {
+            try {
+                cleanup();
+            } catch (error) {
+                if (cleanupFailed) return;
+                cleanupFailed = true;
+                firstCleanupError = error;
+            }
+        };
+
+        if (tickTask !== undefined) attemptCleanup(() => cancelTask(tickTask));
+        attemptCleanup(() => this.manager?.stop({ releasePort: false }));
+        attemptCleanup(() => disposeWasiResource(files));
+
+        if (cleanupFailed) throw firstCleanupError;
     }
 }
 
