@@ -71,7 +71,12 @@ class DynamicLightsPumpkin extends PluginBase {
         try {
             this.initializePlugin(ctx, files, clientLightStates);
         } catch (error) {
-            this.disposeDataDir();
+            try {
+                if (this.entityTask !== undefined) cancelTask(this.entityTask);
+                this.entityTask = undefined;
+            } finally {
+                this.disposeDataDir();
+            }
             throw error;
         }
     }
