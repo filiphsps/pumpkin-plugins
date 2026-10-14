@@ -43,7 +43,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "fflate": "0.8.3"
+        "fflate": "catalog:"
     },
     "devDependencies": {
         "@types/node": "catalog:",

@@ -363,7 +363,7 @@ importers:
         specifier: 'catalog:'
         version: link:../../tools/pumpkin-api
       fflate:
-        specifier: 0.8.3
+        specifier: 'catalog:'
         version: 0.8.3
     devDependencies:
       '@pumpkin-plugins/build':
@@ -458,7 +458,7 @@ importers:
         specifier: 'catalog:'
         version: link:../../tools/pumpkin-api
       fflate:
-        specifier: 0.8.3
+        specifier: 'catalog:'
         version: 0.8.3
     devDependencies:
       '@pumpkin-plugins/build':
@@ -544,7 +544,7 @@ importers:
         specifier: workspace:*
         version: link:../../tools/apis/upnpumpkin-api
       fflate:
-        specifier: 0.8.3
+        specifier: 'catalog:'
         version: 0.8.3
     devDependencies:
       '@pumpkin-plugins/build':
@@ -637,7 +637,7 @@ importers:
   tools/apis/upnpumpkin-api:
     dependencies:
       fflate:
-        specifier: 0.8.3
+        specifier: 'catalog:'
         version: 0.8.3
     devDependencies:
       '@types/node':
@@ -833,7 +833,7 @@ importers:
         specifier: 5.11.2
         version: 5.11.2
       fflate:
-        specifier: 0.8.3
+        specifier: 'catalog:'
         version: 0.8.3
     devDependencies:
       '@types/node':
@@ -956,7 +956,7 @@ importers:
         specifier: 'catalog:'
         version: link:../pumpkin-api
       fflate:
-        specifier: 0.8.3
+        specifier: 'catalog:'
         version: 0.8.3
     devDependencies:
       '@pumpkin-plugins/build':
