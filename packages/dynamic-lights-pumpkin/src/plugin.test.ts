@@ -12,7 +12,8 @@ interface LoadedPlugin {
 
 const state = vi.hoisted(() => ({
     plugin: undefined as LoadedPlugin | undefined,
-    files: undefined as MemoryFiles | undefined,
+    files: undefined as (MemoryFiles & { [Symbol.dispose](): void }) | undefined,
+    registerCommands: vi.fn(),
     events: new Map<string, (server: Server, event: unknown) => void>(),
     tasks: new Map<number, { repeating: boolean; run: (server: Server) => void }>(),
     nextTask: 0,
@@ -38,7 +39,7 @@ vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({
     cancelTask: (id: number) => state.tasks.delete(id),
     runCommand: vi.fn(),
 }));
-vi.mock('./commands/register.ts', () => ({ registerCommands: vi.fn() }));
+vi.mock('./commands/register.ts', () => ({ registerCommands: state.registerCommands }));
 vi.mock('./platform/client-light-states.ts', () => ({ resolveClientLightStates: () => (level: number) => level }));
 
 function schedule(run: (server: Server) => void, repeating: boolean): number {
@@ -52,7 +53,8 @@ describe('DynamicLightsPumpkin host lifecycle', () => {
         vi.resetModules();
         state.events.clear();
         state.tasks.clear();
-        state.files = new MemoryFiles();
+        state.registerCommands.mockReset();
+        state.files = Object.assign(new MemoryFiles(), { [Symbol.dispose]: vi.fn() });
         await import('./plugin.ts');
     }, 20_000);
 
@@ -147,6 +149,7 @@ describe('DynamicLightsPumpkin host lifecycle', () => {
 
     it('restores client blocks and cancels pending work on unload', () => {
         const env = setup();
+        const files = state.files;
         env.player.item = 'minecraft:torch';
         env.event('player-join-event');
         env.delayed();
@@ -156,6 +159,19 @@ describe('DynamicLightsPumpkin host lifecycle', () => {
 
         expect(env.player.resets).toEqual([{ x: 0, y: 64, z: 0 }]);
         expect(state.tasks.size).toBe(0);
+        expect(files?.[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
+
+    it('disposes the data directory when setup fails after opening it', () => {
+        const plugin = state.plugin;
+        const files = state.files;
+        if (plugin === undefined || files === undefined) throw new Error('Missing plugin fixture');
+        state.registerCommands.mockImplementationOnce(() => {
+            throw new Error('registration failed');
+        });
+
+        expect(() => plugin.onPluginLoad({} as Context)).toThrow('registration failed');
+        expect(files[Symbol.dispose]).toHaveBeenCalledOnce();
     });
 
     it('cancels a pending refresh when the player leaves', () => {
