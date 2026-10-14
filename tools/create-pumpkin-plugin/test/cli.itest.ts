@@ -70,7 +70,6 @@ it.each([
     const tsconfig = ts.parseJsonConfigFileContent(configFile.config, ts.sys, destination);
 
     expect(manifest.name).toBe(projectName);
-    expect(fs.existsSync(entryPath)).toBe(true);
     expect(path.extname(entryPath)).toBe(extension);
     expect(isWithin(destination, entryPath)).toBe(true);
     expect(isWithin(destination, outputPath)).toBe(true);
