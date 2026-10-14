@@ -103,6 +103,36 @@ describe('upstream pin workflow', () => {
     );
     const releaseWorkflow = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/release.yml'), 'utf8'));
 
+    it('bootstraps dependencies before discovering upstream updates', () => {
+        const steps = workflow.jobs.discover.steps;
+        const bootstrapIndex = steps.findIndex((step) => step.uses === './.github/common/bootstrap');
+        const discoverIndex = steps.findIndex((step) => step.id === 'pins');
+
+        assert.ok(bootstrapIndex > 0, 'discover job must install repository dependencies');
+        assert.ok(discoverIndex > bootstrapIndex, 'discovery must run after the dependency install');
+    });
+
+    it('fails discovery when the Node command fails', () => {
+        const steps = workflow.jobs.discover.steps;
+        const discover = steps.find((step) => step.id === 'pins');
+        const dir = repo({ 'bin/node': '#!/bin/sh\nexit 23\n' });
+        const output = path.join(dir, 'github-output');
+        fs.chmodSync(path.join(dir, 'bin/node'), 0o755);
+
+        const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', discover.run], {
+            cwd: scripts,
+            env: {
+                ...process.env,
+                PATH: `${path.join(dir, 'bin')}:${process.env.PATH}`,
+                GITHUB_OUTPUT: output,
+            },
+            encoding: 'utf8',
+        });
+
+        assert.equal(result.status, 23, `${result.stdout}${result.stderr}`);
+        assert.equal(fs.existsSync(output), false, 'failed discovery must not write an empty matrix');
+    });
+
     it('uses the release GitHub App token so created pull requests trigger CI', () => {
         const update = workflow.jobs.update;
         const token = update.steps.find((step) => step.id === 'app-token');

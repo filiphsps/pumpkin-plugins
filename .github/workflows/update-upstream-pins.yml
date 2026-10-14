@@ -26,9 +26,15 @@ jobs:
               with:
                   ref: ${{ github.event.repository.default_branch }}
 
+            - name: 📦 Bootstrap workspace
+              uses: ./.github/common/bootstrap
+
             - name: 🔎 Discover upstream updates
               id: pins
-              run: echo "matrix=$(node scripts/upstream-pins.mjs discover)" >> "$GITHUB_OUTPUT"
+              run: |
+                  set -euo pipefail
+                  matrix="$(node scripts/upstream-pins.mjs discover)"
+                  echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
     update:
         name: ${{ matrix.source.name }}
