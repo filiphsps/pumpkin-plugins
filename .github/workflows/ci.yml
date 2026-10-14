@@ -10,6 +10,7 @@ on:
             - '!packages/*/docs/**'
             - '!tools/**/docs/**'
             - '!actions/*/docs/**'
+            - '!extensions/*/docs/**'
             - '!.github/workflows/docs.yml'
             - '!.github/workflows/actionlint.yml'
             - '!.github/actionlint.yaml'
@@ -18,6 +19,7 @@ on:
             - 'README.md'
             - 'packages/*/README.md'
             - 'actions/*/README.md'
+            - 'extensions/*/README.md'
     push:
         branches:
             - master
@@ -30,6 +32,7 @@ on:
             - '!packages/*/docs/**'
             - '!tools/**/docs/**'
             - '!actions/*/docs/**'
+            - '!extensions/*/docs/**'
             - '!.github/workflows/docs.yml'
             - '!.github/workflows/actionlint.yml'
             - '!.github/actionlint.yaml'
@@ -38,6 +41,7 @@ on:
             - 'README.md'
             - 'packages/*/README.md'
             - 'actions/*/README.md'
+            - 'extensions/*/README.md'
 
 concurrency:
     group: ci-${{ github.ref }}
@@ -61,6 +65,8 @@ jobs:
             code: ${{ steps.classify.outputs.code }}
             actions: ${{ steps.classify.outputs.actions }}
             actions_to_test: ${{ steps.classify.outputs.actions_to_test }}
+            extensions: ${{ steps.classify.outputs.extensions }}
+            extensions_to_test: ${{ steps.classify.outputs.extensions_to_test }}
             generated_readmes: ${{ steps.classify.outputs.generated_readmes }}
             integration_scope: ${{ steps.classify.outputs.integration_scope }}
             integration_extra: ${{ steps.classify.outputs.integration_extra }}
@@ -95,6 +101,8 @@ jobs:
                 needs.changes.outputs.code == 'true' ||
                 needs.changes.outputs.actions != '[]' ||
                 needs.changes.outputs.actions_to_test != '[]' ||
+                needs.changes.outputs.extensions != '[]' ||
+                needs.changes.outputs.extensions_to_test != '[]' ||
                 needs.changes.outputs.generated_readmes == 'true'
               )
             }}
@@ -206,6 +214,40 @@ jobs:
                   echo "Required action verification did not pass: $TEST_RESULT" >&2
                   exit 1
 
+    extension-tests:
+        name: 🧪 Extension tests
+        needs: [changes]
+        if: needs.changes.outputs.extensions_to_test != '[]'
+        uses: ./.github/workflows/extensions.yml
+        with:
+            extensions: ${{ needs.changes.outputs.extensions_to_test }}
+
+    extension-gate:
+        name: 🛡️ Extension test gate
+        needs: [changes, extension-tests]
+        if: ${{ always() }}
+        timeout-minutes: 5
+        runs-on: ubuntu-26.04
+        steps:
+            - name: 🛡️ Require selected extension suites to pass
+              env:
+                  CHANGES_RESULT: ${{ needs.changes.result }}
+                  EXTENSIONS: ${{ needs.changes.outputs.extensions_to_test }}
+                  TEST_RESULT: ${{ needs['extension-tests'].result }}
+              run: |
+                  if [[ "$CHANGES_RESULT" != 'success' ]]; then
+                      echo 'Change classification failed.' >&2
+                      exit 1
+                  fi
+                  if [[ "$EXTENSIONS" == '[]' && "$TEST_RESULT" == 'skipped' ]]; then
+                      exit 0
+                  fi
+                  if [[ "$EXTENSIONS" != '[]' && "$TEST_RESULT" == 'success' ]]; then
+                      exit 0
+                  fi
+                  echo "Required extension verification did not pass: $TEST_RESULT" >&2
+                  exit 1
+
     docs:
         name: 📝 Docs and config
         needs: [changes]
@@ -214,6 +256,8 @@ jobs:
               needs.changes.outputs.code == 'true' ||
               needs.changes.outputs.actions != '[]' ||
               needs.changes.outputs.actions_to_test != '[]' ||
+              needs.changes.outputs.extensions != '[]' ||
+              needs.changes.outputs.extensions_to_test != '[]' ||
               needs.changes.outputs.generated_readmes == 'true'
             }}
         timeout-minutes: 10
@@ -455,6 +499,9 @@ jobs:
             - name: 🧬 Generate a sample action
               run: pnpm gen:action --args ci-sample-action "CI Sample Action" "Generator smoke test action"
 
+            - name: 🧬 Generate a sample extension
+              run: pnpm gen:extension --args ci-sample-extension "CI Sample Extension" "Generator smoke test extension"
+
             - name: 🏷️ It is registered and documented
               run: |
                   pnpm run check
@@ -462,6 +509,13 @@ jobs:
 
             - name: 🧪 Test the generated action
               run: node --test actions/ci-sample-action/src/*.test.mjs
+
+            - name: 🧪 Test and package the generated extension
+              run: |
+                  pnpm --filter ./extensions/ci-sample-extension run typecheck
+                  pnpm --filter ./extensions/ci-sample-extension run test
+                  pnpm --filter ./extensions/ci-sample-extension run build
+                  pnpm --filter ./extensions/ci-sample-extension run package -- --out "$RUNNER_TEMP/ci-sample-extension.vsix"
 
             - name: 🎃 Typecheck, build and load it on a real Pumpkin
               run: |
@@ -481,7 +535,7 @@ jobs:
 
     release:
         name: 🚢 Release
-        needs: [changes, lint, typecheck, build, external-consumer, engine-comparison, test, docs, integration, action-gate]
+        needs: [changes, lint, typecheck, build, external-consumer, engine-comparison, test, docs, integration, action-gate, extension-gate]
         if: >-
             ${{
               always() &&
@@ -489,6 +543,7 @@ jobs:
               needs.changes.result == 'success' &&
               needs.docs.result == 'success' &&
               needs['action-gate'].result == 'success' &&
+              needs['extension-gate'].result == 'success' &&
               (
                 (
                   needs.changes.outputs.code == 'true' &&
@@ -508,7 +563,10 @@ jobs:
                 ) ||
                 (
                   needs.changes.outputs.code != 'true' &&
-                  needs.changes.outputs.actions != '[]'
+                  (
+                    needs.changes.outputs.actions != '[]' ||
+                    needs.changes.outputs.extensions != '[]'
+                  )
                 )
               )
             }}

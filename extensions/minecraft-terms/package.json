@@ -1,0 +1,60 @@
+{
+    "name": "minecraft-terms",
+    "displayName": "Minecraft Terms",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Minecraft terminology for Code Spell Checker",
+    "categories": [
+        "Programming Languages"
+    ],
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/extensions/minecraft-terms#readme",
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
+        "directory": "extensions/minecraft-terms"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/filiphsps"
+        },
+        {
+            "type": "custom",
+            "url": "https://paypal.me/filiph"
+        }
+    ],
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
+    "publisher": "filiph",
+    "main": "./dist/extension.js",
+    "scripts": {
+        "build": "tsc -p . && node scripts/copy-dictionary.mjs",
+        "package": "node ../../scripts/package-extension.mjs",
+        "test": "vitest run",
+        "typecheck": "tsc -p . --noEmit"
+    },
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "devDependencies": {
+        "@types/vscode": "catalog:",
+        "@vscode/vsce": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:"
+    },
+    "extensionDependencies": [
+        "streetsidesoftware.code-spell-checker"
+    ],
+    "engines": {
+        "vscode": "^1.140.0"
+    },
+    "pumpkinBundleDependencies": [
+        "@pumpkin-plugins/cspell-dict-minecraft"
+    ]
+}

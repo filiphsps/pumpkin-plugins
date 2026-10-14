@@ -33,6 +33,7 @@ const packagePaths = buildCliOnly
           'tools/plugin-kit',
           'tools/create-pumpkin-plugin',
           'tools/codemod',
+          'tools/cspell-dict-minecraft',
       ];
 const requiredNodeVersion = 'v24.21.0';
 const requiredPnpmVersion = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8')).devEngines

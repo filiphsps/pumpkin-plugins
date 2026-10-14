@@ -20,6 +20,8 @@ it('discovers sorted components by metadata and walks Markdown with explicit exc
         put('tools/apis/upnpumpkin-api/package.json');
         put('tools/_scratch/package.json');
         put('tools/other/README.md');
+        put('extensions/minecraft-terms/package.json');
+        put('extensions/_scratch/package.json');
         put('actions/y/action.yaml');
         put('actions/x/action.yml');
         put('docs/index.md');
@@ -33,6 +35,7 @@ it('discovers sorted components by metadata and walks Markdown with explicit exc
             'z',
         ]);
         expect(discoverComponents(root, 'actions').map((item) => item.slug)).toEqual(['x', 'y']);
+        expect(discoverComponents(root, 'extensions').map((item) => item.slug)).toEqual(['minecraft-terms']);
         expect(discoverComponents(root, 'packages')).toEqual([]);
         expect(localLicenseFile(join(root, 'tools/a'))).toBe(join(root, 'tools/a/LICENSE.md'));
         expect(localLicenseFile(join(root, 'tools/z'))).toBeUndefined();

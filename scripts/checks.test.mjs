@@ -118,6 +118,23 @@ describe('upstream pin workflow', () => {
         assert.match(tagCheck.run, /git\/tags\/\$sha/);
         assert.doesNotMatch(tagCheck.run, /git\/tags\/\$RELEASE_TAG/);
     });
+
+    it('packages released extensions and attaches VSIX files to GitHub releases', () => {
+        const publish = releaseWorkflow.jobs['publish-extensions'];
+        assert.ok(releaseWorkflow.jobs.release.outputs.extension_paths_released);
+        assert.ok(publish, 'release workflow needs a VSIX packaging job for extensions');
+        assert.match(publish.if, /extension_paths_released/);
+        assert.equal(
+            publish.strategy.matrix.path,
+            ['$', '{{ fromJSON(needs.release.outputs.extension_paths_released) }}'].join(''),
+        );
+        const steps = publish.steps.map((step) => step.run ?? '').join('\n');
+        assert.match(steps, /run build/);
+        assert.match(steps, /run package/);
+        assert.match(steps, /gh release upload/);
+        assert.match(steps, /git\/ref\/tags\/\$TAG/);
+        assert.match(releaseWorkflow.jobs['release-fanout-check'].steps[0].run, /extension_count/);
+    });
 });
 
 const AUTHOR = 'Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)';
@@ -449,6 +466,7 @@ describe('check-release-config', () => {
         'tools/pumpkin-api': '@pumpkin-plugins/pumpkin-api',
         'tools/static-hermes-runtime': '@pumpkin-plugins/static-hermes-runtime',
         'tools/codemod': '@pumpkin-plugins/codemod',
+        'tools/cspell-dict-minecraft': '@pumpkin-plugins/cspell-dict-minecraft',
     };
     const files = ({ manifest = '0.0.0', releaseAs = '0.0.1', version = '0.0.0' } = {}) => ({
         'packages/plug/package.json': { name: 'plug', version },
@@ -504,11 +522,37 @@ describe('check-release-config', () => {
             },
         },
     });
+    const withExtension = (base = files(), { manifest = '0.0.0', releaseAs = '0.0.1', version = '0.0.0' } = {}) => ({
+        ...base,
+        'extensions/minecraft-terms/package.json': {
+            name: 'code-spell-checker-minecraft',
+            version,
+            publisher: 'filiphsps',
+            displayName: 'Minecraft Terms',
+            engines: { vscode: '^1.100.0' },
+        },
+        'extensions/minecraft-terms/README.md': '# Minecraft Terms\n',
+        'extensions/minecraft-terms/CHANGELOG.md': '# Changelog\n',
+        '.release-please-manifest.json': {
+            ...base['.release-please-manifest.json'],
+            'extensions/minecraft-terms': manifest,
+        },
+        'release-please-config.json': {
+            ...base['release-please-config.json'],
+            packages: {
+                ...base['release-please-config.json'].packages,
+                'extensions/minecraft-terms': {
+                    component: 'minecraft-terms',
+                    ...(releaseAs ? { 'release-as': releaseAs } : {}),
+                },
+            },
+        },
+    });
 
     it('passes for an unreleased plugin that is set to release 0.0.1', () => {
         const result = run('check-release-config.mjs', repo(files()));
         assert.ok(result.ok, result.out);
-        assert.match(result.out, /5 public tools/);
+        assert.match(result.out, /6 public tools/);
     });
 
     it('requires the public tool release pin and package version to match its first 0.1.0 release', () => {
@@ -542,7 +586,7 @@ describe('check-release-config', () => {
         assert.ok(result.ok, result.out);
         assert.match(
             result.out,
-            /1 plugin, 0 actions, and 5 public tools: .*packages\/plug.*; 1 paused: packages\/not-ready/,
+            /1 plugin, 0 actions, 6 public tools, and 0 extensions: .*packages\/plug.*; 1 paused: packages\/not-ready/,
         );
     });
 
@@ -600,7 +644,7 @@ describe('check-release-config', () => {
     it('registers actions as simple release components with matching version.txt entries', () => {
         const result = run('check-release-config.mjs', repo(withAction()));
         assert.ok(result.ok, result.out);
-        assert.match(result.out, /1 plugin, 1 action, and 5 public tools/);
+        assert.match(result.out, /1 plugin, 1 action, 6 public tools, and 0 extensions/);
 
         const wrongType = run('check-release-config.mjs', repo(withAction(files(), { releaseType: 'node' })));
         assert.match(wrongType.out, /needs "release-type": "simple"/);
@@ -624,6 +668,24 @@ describe('check-release-config', () => {
             repo(withAction(files(), { manifest: '0.0.1', releaseAs: null, version: '0.0.1' })),
         );
         assert.ok(releasedWithoutPin.ok, releasedWithoutPin.out);
+    });
+
+    it('registers VS Code extensions as independent versioned release components', () => {
+        const result = run('check-release-config.mjs', repo(withExtension()));
+        assert.ok(result.ok, result.out);
+        assert.match(result.out, /1 extension/);
+
+        const noPin = run('check-release-config.mjs', repo(withExtension(files(), { releaseAs: null })));
+        assert.match(noPin.out, /extensions\/minecraft-terms has not been released yet.*release-as/);
+
+        const wrongVersion = run('check-release-config.mjs', repo(withExtension(files(), { version: '0.0.2' })));
+        assert.match(wrongVersion.out, /package\.json is "0\.0\.2"/);
+
+        const released = run(
+            'check-release-config.mjs',
+            repo(withExtension(files(), { manifest: '0.0.1', releaseAs: null, version: '0.0.1' })),
+        );
+        assert.ok(released.ok, released.out);
     });
 
     it('requires independent release PRs that refresh even when release notes are unchanged', () => {
@@ -667,6 +729,7 @@ describe('check-release-config', () => {
 describe('action release prerequisites', () => {
     const ci = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/ci.yml'), 'utf8'));
     const actions = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/actions.yml'), 'utf8'));
+    const extensions = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/extensions.yml'), 'utf8'));
     const evaluate = (expression, context) =>
         runInNewContext(expression.trim().replace(/^\$\{\{|\}\}$/g, ''), { always: () => true, ...context });
 
@@ -686,6 +749,7 @@ describe('action release prerequisites', () => {
             'docs',
             'integration',
             'action-gate',
+            'extension-gate',
         ]);
         assert.match(ci.jobs.release.if, /needs\.lint\.result == 'success'/);
         assert.match(ci.jobs.release.if, /needs\.typecheck\.result == 'success'/);
@@ -703,6 +767,7 @@ describe('action release prerequisites', () => {
             'docs',
             'integration',
             'action-gate',
+            'extension-gate',
         ]);
         assert.deepEqual(ci.jobs['action-gate'].needs, ['changes', 'action-tests']);
         assert.equal(evaluate(ci.jobs['action-gate'].if, {}), true);
@@ -741,6 +806,7 @@ describe('action release prerequisites', () => {
             docs: { result: 'success' },
             integration: { result: 'skipped' },
             'action-gate': { result: 'success' },
+            'extension-gate': { result: 'success' },
         };
         assert.equal(evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }), true);
     });
@@ -772,11 +838,32 @@ describe('action release prerequisites', () => {
         assert.equal(evaluate(actions.jobs.test.if, { inputs: { actions: '["common"]' } }), true);
     });
 
+    it('passes extensions into their own test and VSIX packaging workflow', () => {
+        assert.equal(ci.jobs['extension-tests']?.uses, './.github/workflows/extensions.yml');
+        assert.ok(extensions.on.workflow_call.inputs.extensions.required);
+        assert.equal(extensions.on.workflow_call.inputs.extensions.type, 'string');
+        const outputs = { extensions_to_test: '["minecraft-terms"]' };
+        assert.equal(
+            evaluate(ci.jobs['extension-tests'].with.extensions, { needs: { changes: { outputs } } }),
+            '["minecraft-terms"]',
+        );
+        assert.equal(evaluate(ci.jobs['extension-tests'].if, { needs: { changes: { outputs } } }), true);
+        assert.equal(
+            evaluate(ci.jobs['extension-tests'].if, { needs: { changes: { outputs: { extensions_to_test: '[]' } } } }),
+            false,
+        );
+        assert.deepEqual(ci.jobs['extension-gate'].needs, ['changes', 'extension-tests']);
+        assert.ok(extensions.jobs.verify.steps.some((step) => step.run?.includes('run package')));
+    });
+
     for (const code of ['true', 'false']) {
         for (const result of ['success', 'failure', 'cancelled', 'skipped']) {
             it(`allows ${code === 'true' ? 'mixed' : 'action-only'} release only after a successful action gate (${result})`, () => {
                 const needs = {
-                    changes: { result: 'success', outputs: { code, actions: '["sign-pumpkin-plugin"]' } },
+                    changes: {
+                        result: 'success',
+                        outputs: { code, actions: '["sign-pumpkin-plugin"]', extensions: '[]' },
+                    },
                     lint: { result: code === 'true' ? 'success' : 'skipped' },
                     typecheck: { result: code === 'true' ? 'success' : 'skipped' },
                     docs: { result: 'success' },
@@ -786,6 +873,7 @@ describe('action release prerequisites', () => {
                     test: { result: code === 'true' ? 'success' : 'skipped' },
                     integration: { result: code === 'true' ? 'success' : 'skipped' },
                     'action-gate': { result },
+                    'extension-gate': { result: 'success' },
                 };
                 assert.equal(
                     evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }),
@@ -801,10 +889,55 @@ describe('action release prerequisites', () => {
             ['[]', '["common"]'],
         ]) {
             const needs = {
-                changes: { outputs: { code: 'false', actions, actions_to_test, generated_readmes: 'false' } },
+                changes: {
+                    outputs: {
+                        code: 'false',
+                        actions,
+                        actions_to_test,
+                        extensions: '[]',
+                        extensions_to_test: '[]',
+                        generated_readmes: 'false',
+                    },
+                },
             };
             assert.equal(evaluate(ci.jobs.docs.if, { needs }), true);
             assert.equal(evaluate(ci.jobs.commits.if, { needs, github: { event_name: 'pull_request' } }), true);
+        }
+        const extensionChanges = {
+            changes: {
+                outputs: {
+                    code: 'false',
+                    actions: '[]',
+                    actions_to_test: '[]',
+                    extensions: '["minecraft-terms"]',
+                    extensions_to_test: '["minecraft-terms"]',
+                    generated_readmes: 'false',
+                },
+            },
+        };
+        assert.equal(evaluate(ci.jobs.docs.if, { needs: extensionChanges }), true);
+        assert.equal(
+            evaluate(ci.jobs.commits.if, { needs: extensionChanges, github: { event_name: 'pull_request' } }),
+            true,
+        );
+    });
+
+    it('allows an extension-only release only after extension verification succeeds', () => {
+        for (const result of ['success', 'failure', 'cancelled', 'skipped']) {
+            const needs = {
+                changes: {
+                    result: 'success',
+                    outputs: { code: 'false', actions: '[]', extensions: '["minecraft-terms"]' },
+                },
+                docs: { result: 'success' },
+                'action-gate': { result: 'success' },
+                'extension-gate': { result },
+            };
+            assert.equal(
+                evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }),
+                result === 'success',
+                result,
+            );
         }
     });
 
@@ -816,7 +949,7 @@ describe('action release prerequisites', () => {
             ['true', '[]', 'success', true],
         ]) {
             const needs = {
-                changes: { result: 'success', outputs: { code, actions: selected } },
+                changes: { result: 'success', outputs: { code, actions: selected, extensions: '[]' } },
                 lint: { result: code === 'true' ? 'success' : 'skipped' },
                 typecheck: { result: code === 'true' ? 'success' : 'skipped' },
                 docs: { result: docs },
@@ -826,6 +959,7 @@ describe('action release prerequisites', () => {
                 test: { result: 'success' },
                 integration: { result: 'success' },
                 'action-gate': { result: 'success' },
+                'extension-gate': { result: 'success' },
             };
             assert.equal(evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }), expected);
             if (code === 'true') {
@@ -869,6 +1003,29 @@ describe('action release prerequisites', () => {
             const outcome = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
                 encoding: 'utf8',
                 env: { ...process.env, ACTIONS: matrix, TEST_RESULT: result, CHANGES_RESULT: changes },
+            });
+            assert.equal(outcome.status, expected, `${matrix}/${result}/${changes}: ${outcome.stderr}`);
+        }
+    });
+
+    it('executes the extension gate for required failures, cancellations, and an empty matrix', () => {
+        const gate = ci.jobs['extension-gate'];
+        assert.ok(gate, 'Extension result gate is missing');
+        const step = gate.steps.find((step) => step.env?.TEST_RESULT);
+        assert.ok(step, 'Extension result gate has no test result input');
+        for (const [matrix, result, changes, expected] of [
+            ['["minecraft-terms"]', 'success', 'success', 0],
+            ['["minecraft-terms"]', 'failure', 'success', 1],
+            ['["minecraft-terms"]', 'cancelled', 'success', 1],
+            ['["minecraft-terms"]', 'skipped', 'success', 1],
+            ['[]', 'skipped', 'success', 0],
+            ['[]', 'failure', 'success', 1],
+            ['[]', 'cancelled', 'success', 1],
+            ['[]', 'skipped', 'failure', 1],
+        ]) {
+            const outcome = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
+                encoding: 'utf8',
+                env: { ...process.env, EXTENSIONS: matrix, TEST_RESULT: result, CHANGES_RESULT: changes },
             });
             assert.equal(outcome.status, expected, `${matrix}/${result}/${changes}: ${outcome.stderr}`);
         }

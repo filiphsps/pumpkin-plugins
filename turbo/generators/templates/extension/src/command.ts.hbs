@@ -1,0 +1,31 @@
+export interface Disposable {
+    /** Disposes of the registered VS Code command. */
+    dispose(): void;
+}
+
+export interface CommandContext {
+    /** Disposables released when the extension deactivates. */
+    subscriptions: Disposable[];
+}
+
+/** Registers a simple message command using injected VS Code APIs.
+ *
+ * @param context - Extension context receiving the command disposable.
+ * @param registerCommand - VS Code command registration function.
+ * @param showMessage - VS Code information-message function.
+ * @param command - Command identifier to register.
+ * @param message - Message shown when the command runs.
+ */
+export function registerHelloWorld(
+    context: CommandContext,
+    registerCommand: (command: string, callback: () => void) => Disposable,
+    showMessage: (message: string) => unknown,
+    command: string,
+    message: string,
+): void {
+    context.subscriptions.push(
+        registerCommand(command, () => {
+            void showMessage(message);
+        }),
+    );
+}

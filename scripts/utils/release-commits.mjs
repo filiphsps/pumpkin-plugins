@@ -6,7 +6,7 @@ import { PUBLIC_TOOL_PACKAGE_PATHS } from './tool-packages.mjs';
 /** Reads workspace package manifests for identifying code bundled into each plugin. */
 export function workspacePackages(root) {
     const packages = new Map();
-    for (const group of ['packages', 'tools']) {
+    for (const group of ['packages', 'tools', 'extensions']) {
         for (const { slug, metadataFile } of discoverComponents(root, group)) {
             const path = `${group}/${slug}`;
             const manifest = JSON.parse(readFileSync(metadataFile, 'utf8'));
@@ -23,6 +23,7 @@ export function bundledPaths(packages, pluginPath) {
         if (!pkg || paths.has(pkg.path)) return;
         paths.add(pkg.path);
         for (const name of Object.keys(pkg.manifest.dependencies ?? {})) visit(packages.get(name));
+        for (const name of pkg.manifest.pumpkinBundleDependencies ?? []) visit(packages.get(name));
         // The build tool changes shipped WASM, while other dev dependencies only run checks.
         if (pkg.manifest.devDependencies?.['@pumpkin-plugins/build']) visit(packages.get('@pumpkin-plugins/build'));
     };
@@ -33,7 +34,7 @@ export function bundledPaths(packages, pluginPath) {
 
 function shippedFile(file, paths) {
     if (
-        /\.md$|(?:^|\/)(?:test|testing|__tests__)\/|^(?:packages|tools)\/[^/]+\/(?:build|dist|node_modules)\/|\.(?:test|itest)\.[cm]?[jt]s$/.test(
+        /\.md$|(?:^|\/)(?:test|testing|__tests__)\/|^(?:packages|tools|extensions)\/[^/]+\/(?:build|dist|node_modules)\/|\.(?:test|itest)\.[cm]?[jt]s$/.test(
             file,
         )
     )
@@ -132,7 +133,8 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
             }
             const pluginPaths = Object.keys(strategies).filter((path) => path.startsWith('packages/'));
             const toolPaths = Object.keys(strategies).filter((path) => Object.hasOwn(PUBLIC_TOOL_PACKAGE_PATHS, path));
-            const packagePaths = [...pluginPaths, ...toolPaths];
+            const extensionPaths = Object.keys(strategies).filter((path) => path.startsWith('extensions/'));
+            const packagePaths = [...pluginPaths, ...toolPaths, ...extensionPaths];
             const releasePaths = [...packagePaths, ...actionPaths];
             if (releasePaths.length === 0) return strategies;
             const commits = [];

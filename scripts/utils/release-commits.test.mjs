@@ -32,6 +32,14 @@ const packages = new Map([
     ],
     ['@pumpkin-plugins/pumpkin-api', { path: 'tools/pumpkin-api', manifest: {} }],
     ['@pumpkin-plugins/static-hermes-runtime', { path: 'tools/static-hermes-runtime', manifest: {} }],
+    [
+        'minecraft-terms',
+        {
+            path: 'extensions/minecraft-terms',
+            manifest: { pumpkinBundleDependencies: ['@pumpkin-plugins/cspell-dict-minecraft'] },
+        },
+    ],
+    ['@pumpkin-plugins/cspell-dict-minecraft', { path: 'tools/cspell-dict-minecraft', manifest: {} }],
     ['harness', { path: 'tools/test-harness', manifest: {} }],
 ]);
 const releaseConfig = JSON.parse(readFileSync(new URL('../../release-please-config.json', import.meta.url), 'utf8'));
@@ -81,6 +89,13 @@ describe('bundled release commits', () => {
             'tools/update-check',
         ]);
         assert.throws(() => bundledPaths(packages, 'packages/missing'), /Unknown release package/);
+    });
+
+    it('includes declared bundled assets when selecting extension release commits', () => {
+        assert.deepEqual([...bundledPaths(packages, 'extensions/minecraft-terms')].sort(), [
+            'extensions/minecraft-terms',
+            'tools/cspell-dict-minecraft',
+        ]);
     });
 
     it('includes checker changes and build inputs once, skipping unrelated tools and tests', () => {

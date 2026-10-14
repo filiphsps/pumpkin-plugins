@@ -1,0 +1,2 @@
+import:
+  - '@pumpkin-plugins/cspell-dict-minecraft/cspell-ext.json'

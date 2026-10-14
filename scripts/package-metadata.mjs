@@ -30,9 +30,11 @@ const EXPECTED_PUBLIC_TOOL_NAMES = PUBLIC_TOOL_PACKAGE_PATHS;
 /** Biome's order for package.json keys. Unknown keys go after these. */
 const KEY_ORDER = [
     'name',
+    'displayName',
     'version',
     'private',
     'description',
+    'categories',
     'keywords',
     'homepage',
     'bugs',
@@ -41,6 +43,7 @@ const KEY_ORDER = [
     'license',
     'author',
     'contributors',
+    'publisher',
     'sideEffects',
     'type',
     'exports',
@@ -50,14 +53,18 @@ const KEY_ORDER = [
     'bin',
     'files',
     'scripts',
+    'contributes',
+    'activationEvents',
     'dependencies',
     'devDependencies',
+    'extensionDependencies',
     'peerDependencies',
     'optionalDependencies',
     'engines',
     'devEngines',
     'publishConfig',
     'pumpkinPlugin',
+    'pumpkinBundleDependencies',
 ];
 
 /**
@@ -81,6 +88,7 @@ const TOOL_FILE_ALLOWLISTS = {
     ],
     'tools/create-pumpkin-plugin': ['bin/create-pumpkin-plugin.ts', 'dist', 'templates', 'README.md'],
     'tools/codemod': ['dist', 'README.md', 'docs', 'LICENSE'],
+    'tools/cspell-dict-minecraft': ['cspell-ext.json', 'minecraft.txt', 'README.md', 'LICENSE'],
     'tools/static-hermes-runtime': [
         'src/**/*.ts',
         '!src/**/*.test.ts',
@@ -110,7 +118,9 @@ function hasEscapedUnicode(source) {
 const hasLocalLicense = (dir) => dir !== '.' && Boolean(localLicenseFile(path.join(root, dir)));
 const packageDirs = () => [
     '.',
-    ...['packages', 'tools'].flatMap((group) => discoverComponents(root, group).map(({ slug }) => `${group}/${slug}`)),
+    ...['packages', 'extensions', 'tools'].flatMap((group) =>
+        discoverComponents(root, group).map(({ slug }) => `${group}/${slug}`),
+    ),
 ];
 /** Find private benchmark workspaces that need release-registration checks. */
 const benchmarkPackageDirs = () => {

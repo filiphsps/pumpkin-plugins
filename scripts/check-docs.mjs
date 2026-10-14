@@ -17,7 +17,7 @@ const markdownFiles = (dir) =>
         path.relative(root, file).split(path.sep).join('/'),
     );
 
-const packages = [...packageDirs('packages'), ...packageDirs('tools')];
+const packages = [...packageDirs('packages'), ...packageDirs('extensions'), ...packageDirs('tools')];
 const generatedPackageOutputs = new Set(
     packages.flatMap((dir) => {
         const manifest = JSON.parse(read(dir, 'package.json'));
@@ -35,6 +35,7 @@ const generatedPackageOutputs = new Set(
     }),
 );
 const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
+const extensions = discoverComponents(root, 'extensions').map(({ slug }) => `extensions/${slug}`);
 /** Include the private engine-comparison package when checking documentation links and paths. */
 const benchmarkDocs = exists('benchmarks/engine-comparison/README.md')
     ? ['benchmarks/engine-comparison/README.md', ...markdownFiles('benchmarks/engine-comparison')]
@@ -46,6 +47,8 @@ const docs = [
     ...packages.flatMap((p) => markdownFiles(`${p}/docs`)),
     ...actions.map((p) => `${p}/README.md`).filter((p) => exists(p)),
     ...actions.flatMap((p) => markdownFiles(`${p}/docs`)),
+    ...extensions.map((p) => `${p}/README.md`).filter((p) => exists(p)),
+    ...extensions.flatMap((p) => markdownFiles(`${p}/docs`)),
     ...benchmarkDocs,
     ...markdownFiles('.github'),
     ...(exists('AGENTS.md') ? ['AGENTS.md'] : []),
@@ -63,10 +66,18 @@ for (const dir of packages) {
     const text = read(dir, 'README.md');
     if (!text.startsWith('# ')) problems.push(`${dir}/README.md must start with a "# " title`);
     if (dir.startsWith('tools/') && !text.includes(name)) problems.push(`${dir}/README.md should mention ${name}`);
+    if (dir.startsWith('extensions/')) {
+        const displayName = JSON.parse(read(dir, 'package.json')).displayName;
+        if (typeof displayName !== 'string' || !text.includes(displayName)) {
+            problems.push(`${dir}/README.md should mention its package.json displayName`);
+        }
+    }
 }
-for (const dir of actions) {
+for (const dir of [...actions, ...extensions]) {
     if (!exists(dir, 'README.md')) {
-        problems.push(`${dir}/README.md is missing. Every action needs an overview and usage instructions`);
+        problems.push(
+            `${dir}/README.md is missing. Every action and extension needs an overview and usage instructions`,
+        );
     }
 }
 
@@ -130,7 +141,7 @@ const code = (text) => [...text.matchAll(/```[\s\S]*?```|`[^`\n]*`/g)].map((m) =
 const PLACEHOLDERS = ['my-plugin', 'my-action'];
 
 // 3. Repo paths in code spans exist.
-const PATH_IN_CODE = /`((?:packages|tools|actions|benchmarks|scripts|docs|\.github|\.agents)\/[\w./@-]+)`/g;
+const PATH_IN_CODE = /`((?:packages|tools|actions|extensions|benchmarks|scripts|docs|\.github|\.agents)\/[\w./@-]+)`/g;
 for (const file of docs) {
     for (const match of read(file).matchAll(PATH_IN_CODE)) {
         const target = (match[1] ?? '').replace(/[.,;:]+$/, '');

@@ -45,6 +45,7 @@ const outputs = {
     paths_released: '[]',
     action_paths_released: '[]',
     tool_paths_released: '[]',
+    extension_paths_released: '[]',
     release_count: '0',
     prs: '[]',
     pr_count: '0',
@@ -132,6 +133,7 @@ if (!dryRun && !pullRequestsOnly) {
     outputs.paths_released = JSON.stringify(releasePaths.pluginPaths);
     outputs.action_paths_released = JSON.stringify(releasePaths.actionPaths);
     outputs.tool_paths_released = JSON.stringify(releasePaths.toolPaths);
+    outputs.extension_paths_released = JSON.stringify(releasePaths.extensionPaths);
     outputs.release_count = String(releases.length);
     for (const release of releases) {
         outputs[`${release.path}--release_created`] = !release.recovered;
@@ -181,6 +183,6 @@ if (dryRun) {
     }
     console.log(`Prepared ${prs.length} release PR(s)`);
     console.log(
-        `Release fan-out: plugin paths=${outputs.paths_released}, action paths=${outputs.action_paths_released}, tool paths=${outputs.tool_paths_released}, release PR count=${prs.length}`,
+        `Release fan-out: plugin paths=${outputs.paths_released}, action paths=${outputs.action_paths_released}, tool paths=${outputs.tool_paths_released}, extension paths=${outputs.extension_paths_released}, release PR count=${prs.length}`,
     );
 }

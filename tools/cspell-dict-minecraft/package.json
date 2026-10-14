@@ -1,0 +1,53 @@
+{
+    "name": "@pumpkin-plugins/cspell-dict-minecraft",
+    "version": "0.1.0",
+    "description": "Minecraft terminology for Code Spell Checker and cspell",
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/cspell-dict-minecraft#readme",
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
+        "directory": "tools/cspell-dict-minecraft"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/filiphsps"
+        },
+        {
+            "type": "custom",
+            "url": "https://paypal.me/filiph"
+        }
+    ],
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
+    "sideEffects": false,
+    "exports": {
+        "./cspell-ext.json": "./cspell-ext.json",
+        "./minecraft.txt": "./minecraft.txt"
+    },
+    "files": [
+        "cspell-ext.json",
+        "minecraft.txt",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "test": "node --test test/*.test.mjs && cspell lint --no-progress --config samples/cspell.config.yaml samples/minecraft-terms.md",
+        "test:coverage": "pnpm test"
+    },
+    "devDependencies": {
+        "cspell": "catalog:"
+    },
+    "engines": {
+        "node": ">=24.21.0"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

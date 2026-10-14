@@ -1,5 +1,5 @@
-// Fails if a plugin or action isn't registered for releases or explicitly paused.
-// See "Registering a plugin for releases" in docs/ci-and-releases.md.
+// Fails if a plugin, action, extension, or public tool isn't registered for releases.
+// See the release registration guides in docs/ci-and-releases.md.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
@@ -36,15 +36,22 @@ for (const [dir, reason] of pausedEntries) {
 }
 const plugins = discoveredPlugins.filter((dir) => !pausedPlugins.has(dir));
 const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
+const extensions = discoverComponents(root, 'extensions').map(({ slug }) => `extensions/${slug}`);
 const tools = Object.keys(PUBLIC_TOOL_PACKAGE_PATHS);
 for (const dir of actions) {
     for (const file of ['README.md', 'CHANGELOG.md', 'version.txt']) {
         if (!fs.existsSync(path.join(root, dir, file))) problems.push(`${dir}/${file} is missing`);
     }
 }
+for (const dir of extensions) {
+    for (const file of ['README.md', 'CHANGELOG.md']) {
+        if (!fs.existsSync(path.join(root, dir, file))) problems.push(`${dir}/${file} is missing`);
+    }
+}
 const components = new Map([
     ...plugins.map((dir) => [dir, { type: 'plugin', version: read(`${dir}/package.json`).version }]),
     ...tools.map((dir) => [dir, { type: 'tool', version: read(`${dir}/package.json`).version }]),
+    ...extensions.map((dir) => [dir, { type: 'extension', version: read(`${dir}/package.json`).version }]),
     ...actions.map((dir) => [
         dir,
         {
@@ -131,11 +138,12 @@ for (const [dir, { type, version }] of components) {
     }
 }
 for (const dir of Object.keys(config.packages ?? {})) {
-    if (!components.has(dir)) problems.push(`release-please-config.json lists ${dir}, which is not a plugin or action`);
+    if (!components.has(dir))
+        problems.push(`release-please-config.json lists ${dir}, which is not a discovered release component`);
 }
 for (const dir of Object.keys(manifest)) {
     if (!components.has(dir))
-        problems.push(`.release-please-manifest.json lists ${dir}, which is not a plugin or action`);
+        problems.push(`.release-please-manifest.json lists ${dir}, which is not a discovered release component`);
 }
 
 if (problems.length) {
@@ -144,5 +152,5 @@ if (problems.length) {
 }
 const pausedSummary = pausedPlugins.size ? `; ${pausedPlugins.size} paused: ${[...pausedPlugins].join(', ')}` : '';
 console.log(
-    `Release config covers ${plugins.length} plugin${plugins.length === 1 ? '' : 's'}, ${actions.length} action${actions.length === 1 ? '' : 's'}, and ${tools.length} public tool${tools.length === 1 ? '' : 's'}: ${[...components.keys()].join(', ')}${pausedSummary}`,
+    `Release config covers ${plugins.length} plugin${plugins.length === 1 ? '' : 's'}, ${actions.length} action${actions.length === 1 ? '' : 's'}, ${tools.length} public tool${tools.length === 1 ? '' : 's'}, and ${extensions.length} extension${extensions.length === 1 ? '' : 's'}: ${[...components.keys()].join(', ')}${pausedSummary}`,
 );

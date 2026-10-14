@@ -26,6 +26,10 @@
             "component": "verify-pumpkin-plugin",
             "release-type": "simple"
         },
+        "extensions/minecraft-terms": {
+            "component": "minecraft-terms",
+            "release-as": "0.0.1"
+        },
         "packages/apple-skin-pumpkin": {
             "component": "apple-skin-pumpkin"
         },
@@ -51,6 +55,10 @@
         },
         "tools/create-pumpkin-plugin": {
             "component": "create-pumpkin-plugin",
+            "release-as": "0.1.0"
+        },
+        "tools/cspell-dict-minecraft": {
+            "component": "cspell-dict-minecraft",
             "release-as": "0.1.0"
         },
         "tools/pumpkin-api": {

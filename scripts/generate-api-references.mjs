@@ -138,6 +138,16 @@ function fallbackSourcePath(relativePage) {
             ? path.relative(repoRoot, moduleSource).split(path.sep).join('/')
             : `${toolDirectory}/README.md`;
     }
+    if (parts[0] === 'extensions' && parts[1]) {
+        const extensionDirectory = `extensions/${parts[1]}`;
+        const moduleParts = parts.slice(2, -1);
+        const moduleSource = moduleSourcePath(path.join(repoRoot, extensionDirectory, 'src'), moduleParts, [
+            '.ts',
+            '.tsx',
+        ]);
+        if (moduleSource) return path.relative(repoRoot, moduleSource).split(path.sep).join('/');
+        return `${extensionDirectory}/src/extension.ts`;
+    }
     if (parts[0] === 'actions' && parts[1]) {
         const actionDirectory = path.join(repoRoot, 'actions', parts[1]);
         const yamlName = fs.existsSync(path.join(actionDirectory, 'action.yml')) ? 'action.yml' : 'action.yaml';
@@ -172,9 +182,14 @@ function addEditLinks() {
 
 const pluginPackages = packages('packages').filter(({ manifest }) => manifest.pumpkinPlugin);
 const toolPackages = packages('tools');
+const extensionPackages = packages('extensions');
 
-for (const component of [...pluginPackages, ...toolPackages]) {
-    const group = pluginPackages.includes(component) ? 'packages' : 'tools';
+for (const component of [...pluginPackages, ...toolPackages, ...extensionPackages]) {
+    const group = pluginPackages.includes(component)
+        ? 'packages'
+        : toolPackages.includes(component)
+          ? 'tools'
+          : 'extensions';
     const out = path.join(repoRoot, 'docs', componentApiRoute(group, component.slug, component.manifest.name));
     const sourceDirectory = path.join(component.directory, 'src');
     await generateTypeDoc({
@@ -196,6 +211,11 @@ const toolItems = toolPackages.map(({ manifest }) => ({
     label: manifest.name,
     description: manifest.description ?? '',
 }));
+const extensionItems = extensionPackages.map(({ slug, manifest }) => ({
+    slug,
+    label: manifest.displayName ?? manifest.name,
+    description: manifest.description ?? '',
+}));
 
 writePage(
     path.join(apiRoot, 'plugins/index.md'),
@@ -206,6 +226,11 @@ writePage(
     path.join(apiRoot, 'tools/index.md'),
     'typedoc.json',
     componentIndex('Tool API reference', toolItems, '/api/tools'),
+);
+writePage(
+    path.join(apiRoot, 'extensions/index.md'),
+    'scripts/generate-api-references.mjs',
+    componentIndex('VS Code extension API reference', extensionItems, '/api/extensions'),
 );
 
 const actions = discoverComponents(repoRoot, 'actions')
@@ -251,7 +276,7 @@ await generateTypeDoc({
 writePage(
     path.join(apiRoot, 'index.md'),
     'scripts/generate-api-references.mjs',
-    '# Reference\n\nThe generated references below follow the package source, action metadata, and script JSDoc comments.\n\n- [Plugins](/api/plugins/) — plugin implementation APIs\n- [Tools](/api/tools/) — shared libraries and developer tools\n- [Actions](/api/actions/) — action inputs, outputs, and code references\n- [Scripts](/api/scripts/) — repository script APIs',
+    '# Reference\n\nThe generated references below follow the package source, action metadata, and script JSDoc comments.\n\n- [Plugins](/api/plugins/) — plugin implementation APIs\n- [Tools](/api/tools/) — shared libraries and developer tools\n- [VS Code extensions](/api/extensions/) — extension implementation APIs\n- [Actions](/api/actions/) — action inputs, outputs, and code references\n- [Scripts](/api/scripts/) — repository script APIs',
 );
 
 addEditLinks();

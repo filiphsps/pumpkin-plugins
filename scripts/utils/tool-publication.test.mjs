@@ -29,6 +29,7 @@ describe('public tool release fanout', () => {
                 { path: 'tools/static-hermes-runtime' },
                 { path: 'tools/create-pumpkin-plugin' },
                 { path: 'tools/codemod' },
+                { path: 'tools/cspell-dict-minecraft' },
             ]),
             {
                 pluginPaths: ['packages/waypoints'],
@@ -39,9 +40,20 @@ describe('public tool release fanout', () => {
                     'tools/static-hermes-runtime',
                     'tools/create-pumpkin-plugin',
                     'tools/codemod',
+                    'tools/cspell-dict-minecraft',
                 ],
+                extensionPaths: [],
             },
         );
+    });
+
+    it('routes VS Code extensions to their own release publisher', () => {
+        assert.deepEqual(partitionReleasePaths([{ path: 'extensions/minecraft-terms' }]), {
+            pluginPaths: [],
+            actionPaths: [],
+            toolPaths: [],
+            extensionPaths: ['extensions/minecraft-terms'],
+        });
     });
 });
 
@@ -76,6 +88,19 @@ describe('packed public tool contents', () => {
             'package/package.json',
             'package/src/index.ts',
         ]);
+    });
+
+    it('requires the Minecraft CSpell package config and dictionary', () => {
+        const entries = ['package/cspell-ext.json', 'package/minecraft.txt', 'package/README.md', 'package/LICENSE'];
+        assert.doesNotThrow(() => assertPublicToolPackageContents(entries, 'tools/cspell-dict-minecraft'));
+        assert.throws(
+            () =>
+                assertPublicToolPackageContents(
+                    entries.filter((entry) => !entry.endsWith('minecraft.txt')),
+                    'tools/cspell-dict-minecraft',
+                ),
+            /missing package\/minecraft\.txt/,
+        );
     });
 
     it('keeps Pumpkin API type sources and excludes source tests', () => {

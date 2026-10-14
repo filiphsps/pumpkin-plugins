@@ -1,0 +1,11 @@
+{
+    "version": "0.2",
+    "dictionaryDefinitions": [
+        {
+            "name": "minecraft",
+            "path": "./dist/minecraft.txt",
+            "addWords": false
+        }
+    ],
+    "dictionaries": ["minecraft"]
+}

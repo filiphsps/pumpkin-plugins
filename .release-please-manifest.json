@@ -3,6 +3,7 @@
     "actions/sign-pumpkin-plugin": "0.0.3",
     "actions/update-pumpkin-market-listing": "0.0.2",
     "actions/verify-pumpkin-plugin": "0.0.4",
+    "extensions/minecraft-terms": "0.0.0",
     "packages/apple-skin-pumpkin": "0.0.7",
     "packages/distant-horizons-support-pumpkin": "0.0.13",
     "packages/dynamic-lights-pumpkin": "0.0.8",
@@ -11,6 +12,7 @@
     "tools/build": "0.0.0",
     "tools/codemod": "0.0.0",
     "tools/create-pumpkin-plugin": "0.0.0",
+    "tools/cspell-dict-minecraft": "0.0.0",
     "tools/pumpkin-api": "0.0.0",
     "tools/static-hermes-runtime": "0.0.0"
 }

@@ -5,10 +5,11 @@ navigation:
 
 # CI and releases
 
-Plugin, action and public tool checks are in `.github/workflows/ci.yml`; the external-consumer matrix is
+Plugin, action, extension and public tool checks are in `.github/workflows/ci.yml`; the external-consumer matrix is
 in the reusable `.github/workflows/external-consumer.yml`. Release orchestration is in the reusable
 `.github/workflows/release.yml`, called after the CI gates pass. Action tests run through
-the reusable `.github/workflows/actions.yml`, scoped to action code. The documentation site has its own
+the reusable `.github/workflows/actions.yml`, scoped to action code. Extension checks run through
+`.github/workflows/extensions.yml`, scoped to changed extensions. The documentation site has its own
 `.github/workflows/docs.yml`, which checks and publishes the VitePress site and mirrors it to
 `gh-pages`. GitHub workflow validation runs independently in `.github/workflows/actionlint.yml`. The
 shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
@@ -19,22 +20,24 @@ shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
 
 | Job | Runs | What |
 | --- | --- | --- |
-| 🔍 Changed files | CI-triggering changes | Separates plugin/repository code from changed action directories and documentation; detects generated README refresh commits |
-| 💬 Commit messages | code, action, or generated README changes on PRs | Lints every commit with `commitlint.config.mjs` |
+| 🔍 Changed files | CI-triggering changes | Separates plugin/repository code, action directories, extension directories and documentation; detects generated README refresh commits |
+| 💬 Commit messages | code, action, extension, or generated README changes on PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
 | 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
 | 📦 External consumer | code changes | Packs public tools and their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters and runs `pumpkin-codemod list` outside the repository on Linux, macOS arm64 and Windows x64 with the pinned Node and pnpm versions |
 | 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or common plus all four public consumers for shared helper changes, then uploads c8 coverage to Codecov |
 | 🛡️ Action test gate | every CI run, after classification and action tests | Requires every selected action suite to pass; accepts skipped tests only for an empty matrix |
-| 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
+| 🧪 Extension tests | extension implementation changes | `.github/workflows/extensions.yml` lints, typechecks, tests and packages each changed extension |
+| 🛡️ Extension test gate | every CI run, after classification and extension tests | Requires every selected extension suite to pass; accepts skipped tests only for an empty matrix |
+| 📝 Docs and config | code, action, extension, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after change classification | Starts Static Hermes preparation while lint and typecheck run, then builds every production plugin with its configured engine (Static Hermes by default), runs integration checks, and rebuilds release artifacts with the same runtime before signing and verification |
 | 📊 Engine comparison | code changes, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`; nine engine configurations run as parallel matrix jobs, then a report job validates and combines their real-Pumpkin results |
 | 📈 Engine comparison comment | successful PR CI runs with a benchmark report | `.github/workflows/engine-comparison-comment.yml` compares with the latest matching default-branch report, updates one PR comment, and uploads an SVG timing-change chart |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
-| 🧬 Generator | code changes, after lint and build | Reuses the Static Hermes cache saved by Build, then generates a throwaway plugin and action, checks release registration and READMEs, tests the action, and typechecks, builds and integration-tests the plugin |
-| 🚢 Release | plugin, action or public tool release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; actions create GitHub releases, public tools publish npm tarballs, and plugins produce signed artifacts and Market listings |
-| 📝 Prepare release PR | all open release PRs on release runs | Keeps plugin READMEs, action README examples, starter dependency ranges and first-release pins current |
+| 🧬 Generator | code changes, after lint and build | Reuses the Static Hermes cache saved by Build, then generates a throwaway plugin, action and extension; checks release registration and READMEs; tests the action and extension; and typechecks, builds and integration-tests the plugin |
+| 🚢 Release | plugin, action, extension or public tool release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; actions create GitHub releases, extensions attach VSIX packages, public tools publish npm tarballs, and plugins produce signed artifacts and Market listings |
+| 📝 Prepare release PR | all open release PRs on release runs | Keeps plugin and extension READMEs, action README examples, starter dependency ranges and first-release pins current |
 | 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs and uploads the exact build artifact, publishes it to an existing Market listing, then syncs its description and commands |
 | 🧹 Cleanup artifacts | after artifact consumers finish | Deletes handoffs whose consumers succeeded or were skipped, even if another job failed; retains artifacts needed to rerun failed consumers |
 
@@ -55,10 +58,10 @@ the push's `before` commit). Both it and `scripts/utils/release-commits.mjs` exc
 `.git-blame-ignore-revs`; that file is also GitHub's blame ignore list. Add a short reason comment
 above each SHA so future entries retain their context. Markdown, `docs/`,
 component-level `docs/` folders and `LICENSE` changes are documentation. Changes under
-`actions/{name}/` are reported separately from plugin and repository code. An action-only change
-skips the plugin build, integration suites and repository test jobs; CI calls the reusable Actions
-workflow, which tests that action when its code changes; common helper changes test common and all
-four public consumers.
+`actions/{name}/` and `extensions/{name}/` are reported separately from plugin and repository code.
+An action-only or extension-only change skips the plugin build, integration suites and repository
+test jobs; CI calls the matching reusable workflow for each changed component. Common action helper
+changes test common and all four public consumers.
 Common is excluded from release selection. Action tests live beside their implementation in
 `actions/{name}/src/*.test.mjs`; shared helper tests live in `actions/common/src/*.test.mjs`. README,
 changelog and version-file-only changes skip action tests.
@@ -72,15 +75,15 @@ their dependents when all code changes are within plugin or runtime-tool package
 changes run the full integration suite. Biome, the type checker and the tests read none of the
 documentation files, so a docs-only change cannot fail them.
 
-The main CI `📝 Docs and config` job runs for code and action changes, and for the automatic
+The main CI `📝 Docs and config` job runs for code, action and extension changes, and for the automatic
 `docs: update generated READMEs` commit. Release PRs also change version and changelog files, so
 GitHub continues to trigger CI as the README refresh commit is added. The classifier recognizes that
 commit and reruns the repository checks that validate the generated README. Ordinary docs-only PRs
 skip the main CI workflow entirely.
 
-On a push, the release job waits for the action test gate and docs/config checks. Plugin/repository
+On a push, the release job waits for the action and extension test gates and docs/config checks. Plugin/repository
 changes also require build, engine comparison, unit test and integration jobs.
-Empty action matrices pass the gate without running action tests, including version-only release changes.
+Empty action and extension matrices pass their gates without running component tests, including version-only release changes.
 Release Please only releases a component with
 releasable changes, so running it for changed action code does not create an empty release.
 
@@ -114,7 +117,7 @@ Changes to the dependency catalog or shared TypeScript configuration count for e
 ## Releases
 
 On `master`, once the checks pass, [release-please](https://github.com/googleapis/release-please)
-keeps an independent release PR up to date for each plugin, action, and public npm tool with
+keeps an independent release PR up to date for each plugin, action, VS Code extension, and public npm tool with
 releasable conventional commits. Merging a plugin release PR:
 
 - bumps each changed plugin's version and changelog,
@@ -132,12 +135,21 @@ Merging an action release PR updates its `version.txt` and `CHANGELOG.md`, tags 
 `<folder>-v<version>`, and creates a GitHub release. Action releases do not run plugin packaging,
 attach WebAssembly files, or publish to Pumpkin Market.
 
+Merging a VS Code extension release PR updates its `package.json` version and `CHANGELOG.md`, tags
+it `<folder>-v<version>`, and creates a GitHub release with the built `<folder>.vsix` attached.
+Extension releases do not run plugin packaging or publish to Pumpkin Market.
+
+Create and register a new extension with `pnpm gen:extension`. The generator creates its independent
+Release Please manifest entry and first-release pin; the release-config check verifies its README,
+changelog, package version and tag component.
+
 Actions import shared runtime helpers from `actions/common/src/`. Each action tag contains its own
 snapshot of those files, so changes to a shared helper must also include releasable changes under
 each consuming action directory to publish the updated helper with those actions.
 
 Public tools are registered at `tools/build`, `tools/codemod`, `tools/create-pumpkin-plugin`,
-`tools/pumpkin-api`, and `tools/static-hermes-runtime`. Their first npm release is `0.1.0`; the manifest uses `0.0.0`
+`tools/pumpkin-api`, `tools/static-hermes-runtime`, and `tools/cspell-dict-minecraft`. Their first npm
+release is `0.1.0`; the manifest uses `0.0.0`
 until each first release, and the repository check enforces the first-release pins. Tool tags use
 their component name, such as `build-v0.1.0`. The `📦 Publish npm` job checks out the exact tagged
 commit, runs pnpm's package pack command so pnpm resolves `catalog:` and `workspace:` specs in the published
