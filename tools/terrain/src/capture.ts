@@ -78,6 +78,13 @@ export class TerrainCapture {
     private y: number;
     private segmentCount = 0;
 
+    /**
+     * Initializes an empty capture that starts at the highest Y of the first column.
+     *
+     * @param region - Absolute block origin and dimensions to capture.
+     * @param options - Optional empty-material predicate and retained segment limit.
+     * @throws If the region or segment limit is invalid.
+     */
     constructor(
         private readonly region: TerrainRegion,
         options: TerrainCaptureOptions = {},
@@ -137,7 +144,11 @@ export class TerrainCapture {
             const column = this.columns[this.column] ?? [];
             this.columns[this.column] = column;
             const previous = column[column.length - 1];
-            if (previous?.materialId === materialId) {
+            if (
+                previous?.materialId === materialId &&
+                previous.skyLight === sample.skyLight &&
+                previous.blockLight === sample.blockLight
+            ) {
                 previous.startY = this.y - span + 1;
                 previous.height += span;
             } else {

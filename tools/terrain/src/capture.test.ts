@@ -32,6 +32,28 @@ describe('terrain capture', () => {
         });
     });
 
+    it('keeps adjacent samples with different light values in separate runs', () => {
+        const capture = new TerrainCapture({ originX: 0, originZ: 0, width: 1, depth: 1, minY: 0, height: 5 });
+        const source: TerrainSource = {
+            minY: 0,
+            height: 5,
+            sample: (_x, y) => ({
+                material: 'stone',
+                skyLight: y >= 3 ? 15 : 14,
+                blockLight: y >= 3 || y === 2 ? 0 : 1,
+            }),
+        };
+
+        expect(capture.step(source, 5)).toBe(true);
+        expect(capture.result().columns).toEqual([
+            [
+                { materialId: 0, startY: 3, height: 2, skyLight: 15, blockLight: 0 },
+                { materialId: 0, startY: 2, height: 1, skyLight: 14, blockLight: 0 },
+                { materialId: 0, startY: 0, height: 2, skyLight: 14, blockLight: 1 },
+            ],
+        ]);
+    });
+
     it('skips empty blocks above the surface while preserving the captured result', () => {
         const tallRegion: TerrainRegion = { originX: 0, originZ: 0, width: 1, depth: 1, minY: -10, height: 20 };
         const sample = (_x: number, y: number, _z: number) => ({
