@@ -16,7 +16,8 @@ it('uses the repository cache by default when generating API types', async () =>
     delete process.env.PUMPKIN_PLUGINS_CACHE_DIR;
 
     try {
-        await import(new URL('../scripts/gen-types.mjs', import.meta.url).href);
+        const { generateTypes } = await import(new URL('../scripts/gen-types.mjs', import.meta.url).href);
+        generateTypes(['node', 'gen-types.mjs']);
 
         expect(mocks.ensurePumpkinWit).toHaveBeenCalledWith({
             lockFile: path.join(apiRoot, 'wit.lock.json'),

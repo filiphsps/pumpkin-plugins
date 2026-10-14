@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { prepareStaticHermesBuild } from '@pumpkin-plugins/static-hermes-runtime';
+import { Command } from 'commander';
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const turboCli = path.join(workspaceRoot, 'node_modules/turbo/bin/turbo');
@@ -41,16 +42,26 @@ export function normalizeTurboArgs(args) {
     return separator === -1 ? args : [...args.slice(0, separator), ...args.slice(separator + 1)];
 }
 
-/** Choose the Turbo task from the root parser flag and remove that flag from forwarded arguments.
+/** Choose the Turbo task from the wrapper flags and retain all Turbo arguments for forwarding.
  * @param args - Arguments received by the root build script.
- * @returns The selected Turbo task and its remaining arguments.
+ * @returns The selected Turbo task, forwarded arguments, and dry-run mode.
  */
 export function normalizeBuildRequest(args) {
-    const turboArgs = normalizeTurboArgs(args);
-    const parseTypeScript = turboArgs.includes('--parse-ts');
+    const program = new Command()
+        .name('pumpkin-plugins-build')
+        .description('Run the selected Turbo build tasks.')
+        .allowUnknownOption()
+        .allowExcessArguments()
+        .option('--parse-ts', 'Run the build:parse-ts Turbo task')
+        .option('--dry [format]', 'Forward Turbo dry-run mode without preparing Hermes')
+        .parse(normalizeTurboArgs(args), { from: 'user' });
+    const { parseTs, dry } = program.opts();
+    const forwardedArgs = [...program.args];
+    if (dry !== undefined) forwardedArgs.push(dry === true ? '--dry' : `--dry=${dry}`);
     return {
-        task: parseTypeScript ? 'build:parse-ts' : 'build',
-        args: parseTypeScript ? turboArgs.filter((argument) => argument !== '--parse-ts') : turboArgs
+        task: parseTs ? 'build:parse-ts' : 'build',
+        args: forwardedArgs,
+        dryRun: dry !== undefined
     };
 }
 
@@ -112,8 +123,8 @@ export async function prepareHermesInIsolatedEnvironment({
 
 /** Run the root Turbo build and prepare its shared Hermes inputs once when needed. */
 async function build() {
-    const { task, args } = normalizeBuildRequest(process.argv.slice(2));
-    if (args.some((argument) => argument === '--dry' || argument.startsWith('--dry='))) {
+    const { task, args, dryRun: requestedDryRun } = normalizeBuildRequest(process.argv.slice(2));
+    if (requestedDryRun) {
         process.exitCode = runTurbo(task, args).status ?? 1;
         return;
     }

@@ -169,6 +169,14 @@ it('previews without publishing releases, modifying PRs or setting workflow outp
     assert.equal(result.output, '');
 });
 
+it('prints Commander help before requiring the release-please executable', () => {
+    const result = run(['--help']);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Usage: release/);
+    assert.match(result.stdout, /--dry-run/);
+    assert.match(result.stdout, /--component <name>/);
+});
+
 it('uses pre-major versioning for every component when creating releases and PRs', () => {
     const result = run([]);
     assert.equal(result.status, 0, result.stderr);

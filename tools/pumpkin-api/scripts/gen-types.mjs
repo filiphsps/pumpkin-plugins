@@ -2,21 +2,32 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { Command } from 'commander';
 import { ensurePumpkinWit } from '../src/wit.mjs';
 
 const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workspaceRoot = path.resolve(apiRoot, '../..');
-const cacheRoot = process.env.PUMPKIN_PLUGINS_CACHE_DIR ?? path.join(workspaceRoot, '.cache');
-const witDir = ensurePumpkinWit({ lockFile: path.join(apiRoot, 'wit.lock.json'), cacheRoot });
-const jco = resolveJcoCli(path.join(apiRoot, 'package.json'));
-const outputDirectory = process.argv[2] ? path.resolve(process.argv[2]) : path.join(apiRoot, 'build/types');
 
-execFileSync(
-    process.execPath,
-    [jco, 'guest-types', witDir, '-n', 'plugin', '-o', outputDirectory, '--name', 'index', '--quiet'],
-    { cwd: apiRoot, stdio: 'inherit' }
-);
+/** Generate the plugin guest types using the pinned Pumpkin WIT package. */
+export function generateTypes(args = process.argv) {
+    const program = new Command()
+        .name('gen-types')
+        .description('Generate TypeScript bindings for the pinned Pumpkin WIT.')
+        .argument('[output-directory]', 'Directory where guest types are written', path.join(apiRoot, 'build/types'))
+        .parse(args);
+    const [outputDirectoryArgument] = program.processedArgs;
+    const cacheRoot = process.env.PUMPKIN_PLUGINS_CACHE_DIR ?? path.join(workspaceRoot, '.cache');
+    const witDir = ensurePumpkinWit({ lockFile: path.join(apiRoot, 'wit.lock.json'), cacheRoot });
+    const jco = resolveJcoCli(path.join(apiRoot, 'package.json'));
+    const outputDirectory = path.resolve(outputDirectoryArgument);
+
+    execFileSync(
+        process.execPath,
+        [jco, 'guest-types', witDir, '-n', 'plugin', '-o', outputDirectory, '--name', 'index', '--quiet'],
+        { cwd: apiRoot, stdio: 'inherit' }
+    );
+}
 
 function resolveJcoCli(packageJsonPath) {
     const require = createRequire(packageJsonPath);
@@ -44,3 +55,5 @@ function resolveJcoCli(packageJsonPath) {
     }
     throw new Error(`could not locate @bytecodealliance/jco package metadata from ${entry}`);
 }
+
+if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) generateTypes();

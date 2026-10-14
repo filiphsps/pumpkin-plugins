@@ -1,6 +1,7 @@
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { basename, isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { Command } from 'commander';
 
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
@@ -79,8 +80,13 @@ function isInside(parent, child) {
 }
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
-    const [tag, root = process.cwd()] = process.argv.slice(2);
-    if (!tag) throw new Error('Usage: node scripts/resolve-plugin-release.mjs <tag> [source-root]');
+    const program = new Command()
+        .name('resolve-plugin-release')
+        .description('Resolve a plugin release tag using the source tree at that tag.')
+        .argument('<tag>', 'Plugin release tag')
+        .argument('[source-root]', 'Source tree root', process.cwd())
+        .parse(process.argv);
+    const [tag, root] = program.processedArgs;
     const release = await resolvePluginRelease(root, tag);
     if (process.env.GITHUB_OUTPUT) {
         for (const [key, value] of Object.entries(release)) {

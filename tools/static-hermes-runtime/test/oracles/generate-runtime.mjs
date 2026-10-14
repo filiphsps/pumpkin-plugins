@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { Command, InvalidArgumentError, Option } from 'commander';
 import { parseJsonStringArray } from './cli-arguments.mjs';
 import {
     generateWasiAdapterDispatch,
@@ -10,28 +11,31 @@ import {
     readWitPackage
 } from './wit-api.mjs';
 
-const args = new Map();
-for (let index = 2; index < process.argv.length; index += 2) {
-    const key = process.argv[index];
-    const value = process.argv[index + 1];
-    if (!key?.startsWith('--') || !value || args.has(key.slice(2))) {
-        throw new Error(`Invalid argument near ${key ?? '(end)'}`);
-    }
-    args.set(key.slice(2), value);
-}
+const program = new Command()
+    .name('generate-runtime')
+    .description('Generate Static Hermes runtime dispatch code from WIT and bundle metadata.')
+    .addOption(requiredOption('wit', 'WIT directory'))
+    .addOption(requiredOption('bundle', 'Bundled plugin JavaScript'))
+    .addOption(requiredOption('template', 'Runtime source template'))
+    .addOption(requiredOption('wasi-imports', 'JSON array of selected WASI interfaces'))
+    .addOption(optionalOption('wasi-methods', 'JSON array of selected WASI operations'))
+    .addOption(optionalOption('api-methods', 'JSON array of selected Pumpkin API operations'))
+    .addOption(requiredOption('output', 'Generated runtime source destination'))
+    .parse(process.argv);
+const options = program.opts();
 
-const witDir = requiredPath('wit');
-const bundlePath = requiredPath('bundle');
-const templatePath = requiredPath('template');
-const outputPath = requiredPath('output');
-const imports = parseJsonStringArray(required('wasi-imports'), 'wasi-imports', 'module specifiers');
-const wasiMethods = parseJsonStringArray(args.get('wasi-methods'), 'wasi-methods', 'WASI method identifiers');
+const witDir = path.resolve(options.wit);
+const bundlePath = path.resolve(options.bundle);
+const templatePath = path.resolve(options.template);
+const outputPath = path.resolve(options.output);
+const imports = parseJsonStringArray(options.wasiImports, 'wasi-imports', 'module specifiers');
+const wasiMethods = parseJsonStringArray(options.wasiMethods, 'wasi-methods', 'WASI method identifiers');
 const usedMethodImports = (wasiMethods ?? []).flatMap((operationId) => {
     const separator = operationId.indexOf('#');
     return separator > 0 ? [operationId.slice(0, separator)] : [];
 });
 const adapterImports = [...new Set([...imports, ...usedMethodImports])];
-const apiMethods = parseJsonStringArray(args.get('api-methods'), 'api-methods', 'method identifiers');
+const apiMethods = parseJsonStringArray(options.apiMethods, 'api-methods', 'method identifiers');
 const bundleSource = fs.readFileSync(bundlePath, 'utf8');
 const sourceTemplate = fs.readFileSync(templatePath, 'utf8');
 const apiPackage = readWitPackage(witDir);
@@ -62,16 +66,22 @@ try {
     fs.rmSync(temporaryPath, { force: true });
 }
 
-/** Read a required command-line argument. */
-function required(name) {
-    const value = args.get(name);
-    if (!value) throw new Error(`Missing --${name}`);
-    return value;
+/** Create a Commander option that must be supplied. */
+function requiredOption(name, description) {
+    return option(name, description).makeOptionMandatory();
 }
 
-/** Resolve a required command-line path against the current directory. */
-function requiredPath(name) {
-    return path.resolve(required(name));
+/** Create an optional Commander option. */
+function optionalOption(name, description) {
+    return option(name, description);
+}
+
+/** Create a Commander option that preserves the CLI's duplicate-value rejection. */
+function option(name, description) {
+    return new Option(`--${name} <value>`, description).argParser((value, previous) => {
+        if (previous !== undefined) throw new InvalidArgumentError(`Option --${name} may only be provided once`);
+        return value;
+    });
 }
 
 /** Replace the one required template marker with generated source. */

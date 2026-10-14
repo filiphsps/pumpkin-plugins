@@ -2,12 +2,14 @@
 // Usage: node scripts/verify-plugin.mjs <file.wasm>
 import * as fs from 'node:fs';
 import { verifyWasm } from '@pumpkin-plugins/signing';
+import { Command } from 'commander';
 
-const file = process.argv[2];
-if (!file) {
-    console.error('Usage: node scripts/verify-plugin.mjs <file.wasm>');
-    process.exit(2);
-}
+const program = new Command()
+    .name('verify-plugin')
+    .description('Check the signature of a Pumpkin plugin WebAssembly component.')
+    .argument('<file>', 'WebAssembly component to verify')
+    .parse(process.argv);
+const [file] = program.args;
 
 const result = verifyWasm(fs.readFileSync(file));
 console.log(`signed:     ${result.signed}`);

@@ -6,10 +6,16 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { discoverComponents, localLicenseFile } from '@pumpkin-plugins/docs/node';
+import { Command } from 'commander';
 import { PUBLIC_TOOL_PACKAGE_PATHS } from './tool-packages.mjs';
 
+const program = new Command()
+    .name('package-metadata')
+    .description('Check package metadata and optionally fix values derived from the workspace.')
+    .option('--fix', 'Write metadata values that can be derived')
+    .parse(process.argv);
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
-const fix = process.argv.includes('--fix');
+const fix = program.opts().fix ?? false;
 
 const REPO = 'https://github.com/filiphsps/pumpkin-plugins';
 const AUTHOR = 'Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)';

@@ -1,19 +1,22 @@
 #!/usr/bin/env node
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { Command } from 'commander';
 
-const args = new Map();
-for (let index = 2; index < process.argv.length; index += 2) {
-    const key = process.argv[index];
-    const value = process.argv[index + 1];
-    if (!key?.startsWith('--') || !value) throw new Error(`Invalid argument near ${key ?? '(end)'}`);
-    args.set(key.slice(2), value);
-}
+const program = new Command()
+    .name('generate-api-enums')
+    .description('Generate the Pumpkin API enum lookup header from WIT and C bindings.')
+    .requiredOption('--wit <directory>', 'Directory containing the Pumpkin WIT files')
+    .requiredOption('--bundle <file>', 'Bundled plugin JavaScript')
+    .requiredOption('--header <file>', 'Generated Pumpkin plugin C header')
+    .requiredOption('--output <file>', 'Generated enum header destination')
+    .parse(process.argv);
+const options = program.opts();
 
-const witDir = required('wit');
-const bundle = fs.readFileSync(required('bundle'), 'utf8');
-const headerPath = required('header');
-const outputPath = required('output');
+const witDir = path.resolve(options.wit);
+const bundle = fs.readFileSync(path.resolve(options.bundle), 'utf8');
+const headerPath = path.resolve(options.header);
+const outputPath = path.resolve(options.output);
 const header = fs.readFileSync(headerPath, 'utf8');
 const entries = [
     ['eventTypes', 'event.wit', 'event-type', 'PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_'],
@@ -62,13 +65,6 @@ try {
     fs.renameSync(temporaryPath, outputPath);
 } finally {
     fs.rmSync(temporaryPath, { force: true });
-}
-
-/** Read a required command-line path and resolve it against the current directory. */
-function required(name) {
-    const value = args.get(name);
-    if (!value) throw new Error(`Missing --${name}`);
-    return path.resolve(value);
 }
 
 /** Check whether the bundle contains a WIT enum value as a quoted string. */

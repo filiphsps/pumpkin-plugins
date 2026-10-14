@@ -2,6 +2,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { stripSignature, verifyWasm } from '@pumpkin-plugins/signing';
+import { Command } from 'commander';
 
 /**
  * Verifies the release artifact and returns its unsigned WebAssembly component for Market to sign.
@@ -28,11 +29,14 @@ export function prepareMarketPlugin(wasm, expected) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
-    const [file, pluginName, version] = process.argv.slice(2);
-    if (!file || !pluginName || !version) {
-        console.error('usage: node scripts/prepare-market-plugin.mjs <wasm-file> <plugin-name> <version>');
-        process.exit(2);
-    }
+    const program = new Command()
+        .name('prepare-market-plugin')
+        .description('Verify a signed release artifact and prepare it for Market signing.')
+        .argument('<wasm-file>', 'Signed plugin artifact')
+        .argument('<plugin-name>', 'Canonical plugin name')
+        .argument('<version>', 'Release version')
+        .parse(process.argv);
+    const [file, pluginName, version] = program.args;
 
     const prepared = prepareMarketPlugin(fs.readFileSync(file), { pluginName, version });
     fs.writeFileSync(file, prepared);

@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Command } from 'commander';
 import { createInternalRegistry } from './external-consumer-registry.mjs';
 import {
     assertPackedBuilderDependencies,
@@ -14,7 +15,12 @@ import {
 } from './tool-packages.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const buildCliOnly = process.argv.includes('--build-cli-only');
+const program = new Command()
+    .name('test-external-consumer')
+    .description('Check packed tool dependencies in an isolated consumer project.')
+    .option('--build-cli-only', 'Check the packed builder CLI without compiling starter projects')
+    .parse(process.argv);
+const buildCliOnly = program.opts().buildCliOnly ?? false;
 const buildPackagePaths = ['tools/pumpkin-api', 'tools/static-hermes-runtime', 'tools/build'];
 const packagePaths = buildCliOnly
     ? buildPackagePaths

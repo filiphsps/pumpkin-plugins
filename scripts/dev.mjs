@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
+import { Command } from 'commander';
 
 const REPOSITORY = 'Pumpkin-MC/Pumpkin';
 const RELEASES_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
@@ -556,18 +557,27 @@ export async function runDev({
 
 /** Parses dev server command-line arguments. */
 export function parseDevArgs(args) {
+    const program = new Command()
+        .name('pumpkin-plugins-dev')
+        .description('Build plugins and launch a local Pumpkin server.')
+        .option('--no-hot-reload', 'Disable plugin rebuilds while files change')
+        .option('--nightly', 'Use the latest Pumpkin nightly build')
+        .option('--release', 'Use the latest stable Pumpkin release')
+        .option('--parse-ts', 'Use Hermes TypeScript parsing for plugin builds')
+        .parse(args, { from: 'user' });
+    const options = program.opts();
     return {
-        hotReload: !args.includes('--no-hot-reload'),
-        nightly: args.includes('--nightly'),
-        release: args.includes('--release')
+        hotReload: options.hotReload ?? true,
+        nightly: options.nightly ?? false,
+        release: options.release ?? false,
+        parseTypeScript: options.parseTs ?? false
     };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-    const args = process.argv.slice(2);
-    const { hotReload, nightly, release } = parseDevArgs(args);
+    const { hotReload, nightly, release, parseTypeScript } = parseDevArgs(process.argv.slice(2));
     const command = hotReload ? 'pnpm dev' : 'pnpm dev:no-hot-reload';
-    runDev({ hotReload, nightly, release, parseTypeScript: args.includes('--parse-ts') }).catch((error) => {
+    runDev({ hotReload, nightly, release, parseTypeScript }).catch((error) => {
         console.error(`${command}: ${error.message}`);
         process.exitCode = 1;
     });

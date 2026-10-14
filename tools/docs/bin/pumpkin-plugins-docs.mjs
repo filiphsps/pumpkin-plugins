@@ -2,6 +2,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { Argument, Command } from 'commander';
 import {
     generateActionReadmes,
     generateActionVersions,
@@ -10,27 +11,30 @@ import {
     generateRootReadme
 } from '../src/node.ts';
 
-const args = process.argv.slice(2);
-const check = args.includes('--check');
-const positional = args.filter((arg) => arg !== '--check');
-const command = positional[0] ?? 'plugin';
+const program = new Command()
+    .name('pumpkin-plugins-docs')
+    .description('Generate or check plugin, action, and repository documentation.')
+    .addArgument(
+        new Argument('[command]', 'Documentation target')
+            .choices(['plugin', 'root', 'generate', 'actions', 'action-versions'])
+            .default('plugin')
+    )
+    .addArgument(new Argument('[module]', 'Custom documents module; used with generate'))
+    .option('--check', 'Check generated documentation without writing files')
+    .parse(process.argv);
+const [command, module] = program.args;
+const check = program.opts().check ?? false;
 const cwd = process.cwd();
 
 try {
-    if (
-        args.some((arg) => arg.startsWith('--') && arg !== '--check') ||
-        !['plugin', 'root', 'generate', 'actions', 'action-versions'].includes(command) ||
-        positional.length > (command === 'generate' ? 2 : 1)
-    ) {
-        throw new Error('Usage: pumpkin-plugins-docs [plugin|root|actions|action-versions|generate MODULE] [--check]');
-    }
+    if (module && command !== 'generate') throw new Error('A documents module is only accepted with `generate`');
     if (command === 'root' && !fs.existsSync(path.join(cwd, 'pnpm-workspace.yaml'))) {
         throw new Error('run `root` from the repository root');
     }
     let status;
     let where;
     if (command === 'generate') {
-        const file = path.resolve(cwd, positional[1] ?? 'docs.ts');
+        const file = path.resolve(cwd, module ?? 'docs.ts');
         const config = await import(pathToFileURL(file).href);
         if (!Array.isArray(config.documents)) throw new Error(`${file} must export a documents array`);
         status = generateDocuments(config.documents, cwd, check);

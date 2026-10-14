@@ -5,6 +5,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
+import { Command } from 'commander';
 
 const root = path.resolve(import.meta.dirname, '..');
 
@@ -56,10 +57,11 @@ function isMain() {
 }
 
 if (isMain()) {
-    const args = process.argv.slice(2);
-    const manifestFlag = args.indexOf('--manifest');
-    if (manifestFlag !== -1 && (!args[manifestFlag + 1] || args[manifestFlag + 2])) {
-        throw new Error('Usage: node scripts/collect-plugins.mjs [--manifest <path>]');
-    }
-    await collectPlugins({ manifestFile: manifestFlag === -1 ? undefined : path.resolve(args[manifestFlag + 1]) });
+    const program = new Command()
+        .name('collect-plugins')
+        .description('Collect built plugins into the release distribution directory.')
+        .option('--manifest <path>', 'Write the collected plugin metadata to a JSON file')
+        .parse(process.argv);
+    const { manifest } = program.opts();
+    await collectPlugins({ manifestFile: manifest ? path.resolve(manifest) : undefined });
 }

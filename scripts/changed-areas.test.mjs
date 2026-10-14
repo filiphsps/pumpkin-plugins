@@ -66,6 +66,22 @@ function run(dir, ...args) {
 }
 
 describe('changed-areas', () => {
+    it('classifies changes without installed workspace dependencies', () => {
+        const dir = repo({
+            'changed-areas.mjs': fs.readFileSync(path.join(scripts, 'changed-areas.mjs'), 'utf8'),
+            'docs/guide.md': '# Guide\n'
+        });
+        const script = path.join(dir, 'changed-areas.mjs');
+        const base = change(dir, { 'docs/guide.md': '# Guide\n\nMore.\n' });
+        const result = spawnSync('node', [script, base, 'HEAD'], {
+            cwd: dir,
+            encoding: 'utf8'
+        });
+
+        assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+        assert.match(result.stdout, /No plugin or repository code/);
+    });
+
     it('skips the code jobs for a change that is only documentation', () => {
         const dir = repo({ 'docs/guide.md': '# Guide\n', 'packages/plug/README.md': '# Plug\n' });
         const base = change(dir, { 'docs/guide.md': '# Guide\n\nMore.\n' });

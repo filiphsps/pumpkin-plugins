@@ -14,7 +14,12 @@ const COMMON_CONSUMERS = [
     'verify-pumpkin-plugin'
 ];
 
-const [base, head = 'HEAD'] = process.argv.slice(2);
+const args = process.argv.slice(2);
+if (args.includes('--help') || args.includes('-h')) {
+    console.log('Usage: changed-areas.mjs <base> [head]');
+    process.exit(0);
+}
+const [base, head = 'HEAD'] = args;
 if (!base) {
     console.error('Usage: changed-areas.mjs <base> [head]');
     process.exit(1);

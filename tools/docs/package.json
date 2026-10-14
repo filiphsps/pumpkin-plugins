@@ -52,6 +52,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "commander": "catalog:",
         "yaml": "catalog:"
     },
     "devDependencies": {

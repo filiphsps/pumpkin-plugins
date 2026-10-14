@@ -1,10 +1,17 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { Command } from 'commander';
 import { strFromU8, unzipSync } from 'fflate';
 
+const program = new Command()
+    .name('generate-icon-sprites')
+    .description('Generate the vanilla item icon texture map from a Minecraft client archive.')
+    .argument('<client-archive>', 'Minecraft client JAR or ZIP archive')
+    .parse(process.argv);
+const [clientArchive] = program.args;
 // Only texture identifiers are emitted; no Minecraft artwork is copied.
-const assets = unzipSync(readFileSync(process.argv[2]));
+const assets = unzipSync(readFileSync(clientArchive));
 const sprites = {};
 /** Resolves inherited item model textures from the supplied Minecraft client archive. */
 function textures(model, seen = new Set()) {

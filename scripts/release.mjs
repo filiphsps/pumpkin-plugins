@@ -4,23 +4,22 @@ import { randomUUID } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+import { Command } from 'commander';
 import { bundledChangesPlugin, workspacePackages } from './release-commits.mjs';
 import { partitionReleasePaths } from './release-fanout.mjs';
 
-const args = process.argv.slice(2);
-if (
-    args.some(
-        (arg) =>
-            arg.startsWith('--') &&
-            arg !== '--dry-run' &&
-            arg !== '--pull-requests-only' &&
-            !/^--component=.+$/.test(arg)
-    )
-) {
-    throw new Error('Supported options: --dry-run, --pull-requests-only, --component=<name>');
-}
-const cliPath = args.find((arg) => !arg.startsWith('--'));
-if (!cliPath) throw new Error('Pass the release-please executable path from pnpm dlx');
+const program = new Command()
+    .name('release')
+    .description('Create release PRs with the pinned release-please runtime.')
+    .argument('<release-please-cli>', 'Path to the release-please executable supplied by pnpm dlx')
+    .option('--dry-run', 'Preview release PRs without publishing or writing workflow outputs')
+    .option('--pull-requests-only', 'Create or update release PRs without publishing releases')
+    .option('--component <name>', 'Limit a dry-run or PR-only run to one component')
+    .parse(process.argv);
+const [cliPath] = program.args;
+const { dryRun, pullRequestsOnly, component } = program.opts();
+if (component && !dryRun && !pullRequestsOnly)
+    throw new Error('--component requires --dry-run or --pull-requests-only');
 const requireRuntime = createRequire(resolve(cliPath));
 const { GitHub, Manifest, VERSION } = requireRuntime('release-please');
 if (VERSION !== '17.11.2') throw new Error(`Expected release-please 17.11.2, received ${VERSION}`);
@@ -29,13 +28,6 @@ if (!owner || !repo || !process.env.GITHUB_TOKEN) throw new Error('GITHUB_REPOSI
 const github = await GitHub.create({ owner, repo, token: process.env.GITHUB_TOKEN });
 const branch = github.repository.defaultBranch;
 const packages = workspacePackages(resolve(import.meta.dirname, '..'));
-if (
-    args.some((arg) => arg.startsWith('--component=')) &&
-    !args.includes('--dry-run') &&
-    !args.includes('--pull-requests-only')
-) {
-    throw new Error('--component requires --dry-run or --pull-requests-only');
-}
 const load = async () => {
     const manifest = await Manifest.fromManifest(
         github,
@@ -69,7 +61,7 @@ function isImmutableReleaseConflict(error) {
     );
 }
 
-if (!args.includes('--dry-run') && !args.includes('--pull-requests-only')) {
+if (!dryRun && !pullRequestsOnly) {
     const manifest = await load();
     const createReleasesForPullRequest = manifest.createReleasesForPullRequest.bind(manifest);
     let existingReleasesByTag;
@@ -154,7 +146,6 @@ const manifest = await load();
 manifest.plugins.push(
     bundledChangesPlugin(github, branch, packages, manifest.releasedVersions, manifest.commitSearchDepth)
 );
-const component = args.find((arg) => arg.startsWith('--component='))?.slice('--component='.length);
 if (component) {
     manifest.plugins.push({
         preconfigure: async (strategies) => strategies,
@@ -162,7 +153,7 @@ if (component) {
         run: async (candidates) => candidates.filter((candidate) => candidate.config.component === component)
     });
 }
-if (args.includes('--dry-run')) {
+if (dryRun) {
     const candidates = await manifest.buildPullRequests();
     console.log(
         JSON.stringify(

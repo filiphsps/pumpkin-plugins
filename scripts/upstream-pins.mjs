@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
+import { Command } from 'commander';
 
 const DEFAULT_CATALOG = '.github/upstream-pins.json';
 const COMMIT_PATTERN = /^[0-9a-f]{40}$/i;
@@ -316,21 +317,34 @@ function runValidation({ workspaceRoot, catalogPath, id }) {
 }
 
 async function main() {
-    const [command, ...args] = process.argv.slice(2);
     const workspaceRoot = process.cwd();
     const catalogPath = process.env.UPSTREAM_PIN_CATALOG ?? DEFAULT_CATALOG;
-    if (command === 'discover') {
-        const include = await discoverUpstreamPins({ workspaceRoot, catalogPath });
-        process.stdout.write(`${JSON.stringify({ include })}\n`);
-    } else if (command === 'apply' && args.length === 2) {
-        applyUpstreamPin({ workspaceRoot, catalogPath, id: args[0], commit: args[1] });
-    } else if (command === 'validate' && args.length === 1) {
-        runValidation({ workspaceRoot, catalogPath, id: args[0] });
-    } else if (command === 'reconcile' && args.length === 0) {
-        reconcileUpstreamPin(reconciliationInputFromEnvironment(), { workspaceRoot });
-    } else {
-        throw new Error('Usage: upstream-pins.mjs discover | apply <id> <commit> | validate <id> | reconcile');
-    }
+    const program = new Command()
+        .name('upstream-pins')
+        .description('Discover, apply, validate, or reconcile configured upstream pins.');
+    program
+        .command('discover')
+        .description('Discover the latest commit for each configured upstream pin.')
+        .action(async () => {
+            const include = await discoverUpstreamPins({ workspaceRoot, catalogPath });
+            process.stdout.write(`${JSON.stringify({ include })}\n`);
+        });
+    program
+        .command('apply')
+        .description('Update one upstream pin to a commit.')
+        .argument('<id>', 'Upstream pin source id')
+        .argument('<commit>', 'Commit SHA to apply')
+        .action((id, commit) => applyUpstreamPin({ workspaceRoot, catalogPath, id, commit }));
+    program
+        .command('validate')
+        .description('Run the configured validation command for one upstream pin.')
+        .argument('<id>', 'Upstream pin source id')
+        .action((id) => runValidation({ workspaceRoot, catalogPath, id }));
+    program
+        .command('reconcile')
+        .description('Reconcile the configured pin with its update pull request or review issue.')
+        .action(() => reconcileUpstreamPin(reconciliationInputFromEnvironment(), { workspaceRoot }));
+    await program.parseAsync(process.argv);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) {

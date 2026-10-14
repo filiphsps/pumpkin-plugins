@@ -149,11 +149,23 @@ describe('parse-ts build commands', () => {
     it('selects the parser task and removes its selector before calling Turbo', () => {
         assert.deepEqual(buildModule.normalizeBuildRequest?.(['--parse-ts', '--', '--filter=example']), {
             task: 'build:parse-ts',
-            args: ['--filter=example']
+            args: ['--filter=example'],
+            dryRun: false
         });
         assert.deepEqual(buildModule.normalizeBuildRequest?.(['--', '--filter=example']), {
             task: 'build',
-            args: ['--filter=example']
+            args: ['--filter=example'],
+            dryRun: false
+        });
+        assert.deepEqual(buildModule.normalizeBuildRequest?.(['--dry=json', '--filter=example']), {
+            task: 'build',
+            args: ['--filter=example', '--dry=json'],
+            dryRun: true
+        });
+        assert.deepEqual(buildModule.normalizeBuildRequest?.(['--dry', '--filter=example']), {
+            task: 'build',
+            args: ['--filter=example', '--dry'],
+            dryRun: true
         });
     });
 });

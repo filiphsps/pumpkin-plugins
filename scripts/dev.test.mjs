@@ -41,13 +41,24 @@ afterEach(() => {
 
 describe('parseDevArgs', () => {
     it('selects the server and plugin build modes from command-line arguments', () => {
-        assert.deepEqual(parseDevArgs([]), { hotReload: true, nightly: false, release: false });
+        assert.deepEqual(parseDevArgs([]), {
+            hotReload: true,
+            nightly: false,
+            release: false,
+            parseTypeScript: false
+        });
         assert.deepEqual(parseDevArgs(['--nightly', '--no-hot-reload']), {
             hotReload: false,
             nightly: true,
-            release: false
+            release: false,
+            parseTypeScript: false
         });
-        assert.deepEqual(parseDevArgs(['--release']), { hotReload: true, nightly: false, release: true });
+        assert.deepEqual(parseDevArgs(['--release', '--parse-ts']), {
+            hotReload: true,
+            nightly: false,
+            release: true,
+            parseTypeScript: true
+        });
     });
 });
 

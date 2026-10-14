@@ -26,8 +26,14 @@ function fixture() {
     const sdk = join(dir, 'sdk');
     const bin = join(dir, 'bin');
     const copiedRuntime = join(dir, 'tools/build/runtime');
+    const copiedPackageNodeModules = join(dir, 'tools/build/node_modules');
     const builtArtifact = join(dir, 'built-artifact.wasm');
-    for (const path of [source, join(sdk, 'bin'), bin]) mkdirSync(path, { recursive: true });
+    for (const path of [source, join(sdk, 'bin'), bin, copiedPackageNodeModules]) mkdirSync(path, { recursive: true });
+    symlinkSync(
+        resolve(import.meta.dirname, '../node_modules/commander'),
+        join(copiedPackageNodeModules, 'commander'),
+        'junction'
+    );
     cpSync(runtime, copiedRuntime, { recursive: true });
     cpSync(join(runtime, 'quickjs-runtime-bigint.wasm'), builtArtifact);
     const git = (...args: string[]) => execFileSync(realGit, ['-C', source, ...args], { stdio: 'pipe' });
@@ -84,7 +90,7 @@ function fixture() {
     const run = () =>
         spawnSync('sh', [join(copiedRuntime, 'build.sh')], {
             encoding: 'utf8',
-            timeout: 5000,
+            timeout: 15000,
             env
         });
     return {

@@ -50,6 +50,7 @@
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",
+        "commander": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
     },
