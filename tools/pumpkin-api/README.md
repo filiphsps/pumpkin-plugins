@@ -1,5 +1,9 @@
 # @pumpkin-plugins/pumpkin-api
 
+[![npm downloads](https://img.shields.io/npm/d18m/%40pumpkin-plugins%2Fpumpkin-api?label=downloads%20%2818m%29)](https://www.npmjs.com/package/@pumpkin-plugins/pumpkin-api)
+[![latest npm release](https://img.shields.io/npm/v/%40pumpkin-plugins%2Fpumpkin-api?label=latest%20release)](https://www.npmjs.com/package/@pumpkin-plugins/pumpkin-api)
+[![npm license](https://img.shields.io/npm/l/%40pumpkin-plugins%2Fpumpkin-api)](https://www.npmjs.com/package/@pumpkin-plugins/pumpkin-api)
+
 TypeScript facade for PumpkinMC plugins. The package preserves the v0.1.1 API surface as its compatibility baseline and pins the upstream Pumpkin WIT source in `wit.lock.json`, including the exact Git commit and package subdirectory. The builder fetches the locked source on first use and caches it outside installed packages.
 
 The npm package version and host ABI version are independent. The active [compatibility matrix](compatibility/v0.1.1.json) records the exact WIT revision, ABI package, and Pumpkin release currently under audit. The builder generates guest declarations from the fetched WIT; generated declarations are not checked in as a second source of truth. The first fetch, and any lockfile change, requires Git and network access unless that exact lock digest is cached already.

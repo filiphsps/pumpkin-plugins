@@ -12,8 +12,7 @@ upstream [repository](https://github.com/Rennex07/PumpkinPIE); that project publ
 through its [releases](https://github.com/Rennex07/PumpkinPIE/releases). This workspace package
 provides the TypeScript client API and does not build or bundle the provider.
 
-This is a private workspace package. Its production dependency tree contains only `fflate`; the host
-transport is injected by each consumer.
+Its production dependency tree contains only `fflate`; consumers inject the host transport.
 
 ## Resolve a line
 

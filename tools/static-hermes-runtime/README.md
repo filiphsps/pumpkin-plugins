@@ -1,5 +1,9 @@
 # Static Hermes Runtime
 
+[![npm downloads](https://img.shields.io/npm/d18m/%40pumpkin-plugins%2Fstatic-hermes-runtime?label=downloads%20%2818m%29)](https://www.npmjs.com/package/@pumpkin-plugins/static-hermes-runtime)
+[![latest npm release](https://img.shields.io/npm/v/%40pumpkin-plugins%2Fstatic-hermes-runtime?label=latest%20release)](https://www.npmjs.com/package/@pumpkin-plugins/static-hermes-runtime)
+[![npm license](https://img.shields.io/npm/l/%40pumpkin-plugins%2Fstatic-hermes-runtime)](https://www.npmjs.com/package/@pumpkin-plugins/static-hermes-runtime)
+
 This package supplies the Static Hermes backend for Pumpkin plugin components. It compiles bundled
 JavaScript to Hermes bytecode by default, with optional TypeScript parsing through `-parse-ts`, then
 links the bytecode, Hermes, the JSI shim, and generated Pumpkin/WASI bindings into a WebAssembly component. Static Hermes is the default engine;

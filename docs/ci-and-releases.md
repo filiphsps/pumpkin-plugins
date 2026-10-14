@@ -156,7 +156,7 @@ workflow publishes the first functional `0.1.0` release. See
 permissions, two-day validation window, provenance, and recovery.
 
 To register a new public tool, add its publishable package under `tools/` and run
-`pnpm register:tool tools/<name>`. The command validates the canonical package name, public access
+`pnpm register:tool tools/<path>`. The command validates the canonical package name, public access
 and first version, then updates both Release Please files. It sets a missing first-release pin on an
 existing entry and rejects a conflicting one. Add the package to the public-tool metadata, pack and
 external-consumer checks when it has files or commands those checks should verify.

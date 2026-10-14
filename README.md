@@ -45,7 +45,7 @@ Browse the [public documentation site](https://filiphsps.github.io/pumpkin-plugi
 | [@pumpkin-plugins/build](tools/build) | Shared build tool for the plugins | MIT |
 | [@pumpkin-plugins/codemod](tools/codemod) | Codemod runner for Pumpkin plugins | [MIT](tools/codemod/LICENSE) |
 | [@pumpkin-plugins/config](tools/config) | Schema-driven TOML config for plugins | MIT |
-| [create-pumpkin-plugin](tools/create-pumpkin-plugin) | Create a minimal Pumpkin plugin project | MIT |
+| [create-pumpkin-plugin](tools/create-pumpkin-plugin) | Create a minimal Pumpkin plugin project | [MIT](tools/create-pumpkin-plugin/LICENSE) |
 | [@pumpkin-plugins/cspell-dict-minecraft](tools/cspell-dict-minecraft) | Minecraft terminology for Code Spell Checker and cspell | [MIT](tools/cspell-dict-minecraft/LICENSE) |
 | [@pumpkin-plugins/docs](tools/docs) | Generates component READMEs, doc links, and repository catalogs | MIT |
 | [@pumpkin-plugins/minecraft-colors](tools/minecraft-colors) | Chalk-like Minecraft text formatting for plugins | MIT |

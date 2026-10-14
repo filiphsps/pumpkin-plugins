@@ -1,5 +1,9 @@
 # @pumpkin-plugins/minecraft-colors
 
+[![npm downloads](https://img.shields.io/npm/d18m/%40pumpkin-plugins%2Fminecraft-colors?label=downloads%20%2818m%29)](https://www.npmjs.com/package/@pumpkin-plugins/minecraft-colors)
+[![latest npm release](https://img.shields.io/npm/v/%40pumpkin-plugins%2Fminecraft-colors?label=latest%20release)](https://www.npmjs.com/package/@pumpkin-plugins/minecraft-colors)
+[![npm license](https://img.shields.io/npm/l/%40pumpkin-plugins%2Fminecraft-colors)](https://www.npmjs.com/package/@pumpkin-plugins/minecraft-colors)
+
 Chalk-like formatting for Minecraft strings, with no runtime dependencies.
 
 ```ts

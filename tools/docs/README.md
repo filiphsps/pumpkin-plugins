@@ -1,12 +1,16 @@
 # @pumpkin-plugins/docs
 
+[![npm downloads](https://img.shields.io/npm/d18m/%40pumpkin-plugins%2Fdocs?label=downloads%20%2818m%29)](https://www.npmjs.com/package/@pumpkin-plugins/docs)
+[![latest npm release](https://img.shields.io/npm/v/%40pumpkin-plugins%2Fdocs?label=latest%20release)](https://www.npmjs.com/package/@pumpkin-plugins/docs)
+[![npm license](https://img.shields.io/npm/l/%40pumpkin-plugins%2Fdocs)](https://www.npmjs.com/package/@pumpkin-plugins/docs)
+
 Defines what a plugin says about itself (`PluginInfo`, commands, permissions) and generates plugin READMEs, component API links, the root action and package tables, and custom generated blocks across component documents. It provides the `pumpkin-plugins-docs` command, including action input/output generation.
 
 Use `@pumpkin-plugins/docs/markdown` for shared Markdown formatting and
 `@pumpkin-plugins/docs/node` for file generation, drift checks and source discovery.
 See the [generator guide](docs/index.md) for typed document modules and CLI usage.
 
-This package is internal to the repository and is not published to npm. See the
+For plugin metadata and generated READMEs, see the
 [plugin info and READMEs guide](../../docs/plugin-info-and-readmes.md).
 
 <!-- docs:begin reference -->
