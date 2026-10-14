@@ -20,6 +20,7 @@ test('accepts generated API links when the ignored API output is absent', () => 
             'packages',
             'extensions',
             'scripts',
+            'plans',
             '.agents',
             '.github',
             'package.json',

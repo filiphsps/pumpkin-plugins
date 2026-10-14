@@ -5,7 +5,7 @@ navigation:
 
 # Setup and build
 
-Standalone plugin projects use `@pumpkin-plugins/pumpkin-api` for the runtime facade and `@pumpkin-plugins/build` for the `pumpkin-plugins-build` command. The packages are part of Plan 004's release order; until their first release, do not assume they are available from npm.
+Standalone plugin projects use `@pumpkin-plugins/pumpkin-api` for the runtime facade and `@pumpkin-plugins/build` for the `pumpkin-plugins-build` command. Their npm names and dependency order are maintained in the [public-tool package metadata](../../scripts/utils/tool-packages.mjs). Install them after their functional Release Please releases are available on npm.
 
 After release, add both dependencies:
 

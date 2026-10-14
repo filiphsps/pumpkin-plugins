@@ -147,31 +147,19 @@ Actions import shared runtime helpers from `actions/common/src/`. Each action ta
 snapshot of those files, so changes to a shared helper must also include releasable changes under
 each consuming action directory to publish the updated helper with those actions.
 
-Public tools are registered at `tools/build`, `tools/codemod`, `tools/create-pumpkin-plugin`,
-`tools/pumpkin-api`, `tools/static-hermes-runtime`, and `tools/cspell-dict-minecraft`. Their first npm
-release is `0.1.0`; the manifest uses `0.0.0`
-until each first release, and the repository check enforces the first-release pins. Tool tags use
-their component name, such as `build-v0.1.0`. The `📦 Publish npm` job checks out the exact tagged
-commit, runs pnpm's package pack command so pnpm resolves `catalog:` and `workspace:` specs in the published
-manifest, then publishes that tarball with npm trusted publishing and provenance. An already-published
-version is accepted only when its tarball integrity matches. Builder releases include changes from
-the public API and Static Hermes runtime because those packages are builder dependencies. Release PR
-preparation syncs both creator templates to the API and builder versions on the release branch.
-
-Before the first npm release, configure a GitHub Actions trusted publisher on each of the six npm
-packages. Use organization or user `filiphsps`, repository `pumpkin-plugins`, workflow filename
-`ci.yml`, and no environment name. npm validates the caller workflow filename when a reusable
-workflow publishes, and OIDC needs `id-token: write` in both the caller job and reusable publish
-job. The workflows use Node `24.21.0` with npm `11.5.1` or newer; no npm write token is stored in
-GitHub Actions. See [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) for the npm
-side setup.
+The public npm package set and dependency order are maintained in
+[`tool-packages.mjs`](../scripts/utils/tool-packages.mjs). Seed each package with a metadata-only
+`0.0.0` placeholder so its trusted publisher can be configured. Release Please creates and the
+workflow publishes the first functional `0.1.0` release. See
+[Publishing public npm tools](npm-publishing.md) for the sequence and
+[Trusted publishing for npm tools](npm-trusted-publishing.md) for the `ci.yml` identity, OIDC
+permissions, two-day validation window, provenance, and recovery.
 
 To register a new public tool, add its publishable package under `tools/` and run
 `pnpm register:tool tools/<name>`. The command validates the canonical package name, public access
 and first version, then updates both Release Please files. It sets a missing first-release pin on an
 existing entry and rejects a conflicting one. Add the package to the public-tool metadata, pack and
-external-consumer checks when it has files or commands those checks should verify. The existing
-unscoped `create-pumpkin-plugin` package name remains supported.
+external-consumer checks when it has files or commands those checks should verify.
 
 The merge of a release PR is its own commit, so its push can start a run while the previous commit's
 run is still active. The older run may create the tag and release first, using an artifact built from
