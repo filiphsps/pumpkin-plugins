@@ -732,13 +732,13 @@ importers:
 
   tools/config:
     dependencies:
+      '@pumpkin-plugins/docs':
+        specifier: workspace:*
+        version: link:../docs
       smol-toml:
         specifier: 1.9.0
         version: 1.9.0
     devDependencies:
-      '@pumpkin-plugins/docs':
-        specifier: workspace:*
-        version: link:../docs
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
@@ -967,6 +967,9 @@ importers:
 
   tools/update-check:
     dependencies:
+      '@pumpkin-plugins/docs':
+        specifier: workspace:*
+        version: link:../docs
       '@pumpkin-plugins/pumpkin-api':
         specifier: 'catalog:'
         version: link:../pumpkin-api

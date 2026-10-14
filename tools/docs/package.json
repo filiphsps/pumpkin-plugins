@@ -1,7 +1,7 @@
 {
     "name": "@pumpkin-plugins/docs",
     "version": "0.1.0",
-    "private": true,
+    "description": "Generates component READMEs, doc links, and repository catalogs",
     "keywords": [
         "minecraft",
         "pumpkin",
@@ -10,7 +10,6 @@
         "readme",
         "generator"
     ],
-    "description": "Generates component READMEs, doc links, and repository catalogs",
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/docs#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
@@ -48,8 +47,11 @@
         "pumpkin-plugins-docs": "bin/pumpkin-plugins-docs.mjs"
     },
     "files": [
-        "src",
-        "bin"
+        "src/**/*.ts",
+        "!src/**/*.test.ts",
+        "!src/**/*.spec.ts",
+        "bin/**/*.mjs",
+        "README.md"
     ],
     "scripts": {
         "test": "vitest run",
@@ -65,6 +67,9 @@
         "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
+    },
+    "engines": {
+        "node": ">=24.21.0"
     },
     "publishConfig": {
         "access": "public"

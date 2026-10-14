@@ -1,7 +1,7 @@
 {
     "name": "@pumpkin-plugins/minecraft-colors",
     "version": "0.1.0",
-    "private": true,
+    "description": "Chalk-like Minecraft text formatting for plugins",
     "keywords": [
         "minecraft",
         "pumpkin",
@@ -10,7 +10,6 @@
         "chat",
         "text-formatting"
     ],
-    "description": "Chalk-like Minecraft text formatting for plugins",
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/minecraft-colors#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
@@ -43,7 +42,9 @@
     "module": "./src/index.ts",
     "types": "./src/index.ts",
     "files": [
-        "src"
+        "src/**/*.ts",
+        "!src/**/*.test.ts",
+        "!src/**/*.spec.ts"
     ],
     "scripts": {
         "test": "vitest run",
@@ -55,6 +56,9 @@
         "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
+    },
+    "engines": {
+        "node": ">=24.21.0"
     },
     "publishConfig": {
         "access": "public"

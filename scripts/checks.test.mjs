@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { parse } from 'yaml';
+import { PUBLIC_TOOL_PACKAGE_PATHS } from './utils/tool-packages.mjs';
 
 const scripts = import.meta.dirname;
 const dirs = [];
@@ -537,14 +538,8 @@ describe('package-metadata', () => {
 });
 
 describe('check-release-config', () => {
-    const publicTools = {
-        'tools/build': '@pumpkin-plugins/build',
-        'tools/create-pumpkin-plugin': 'create-pumpkin-plugin',
-        'tools/pumpkin-api': '@pumpkin-plugins/pumpkin-api',
-        'tools/static-hermes-runtime': '@pumpkin-plugins/static-hermes-runtime',
-        'tools/codemod': '@pumpkin-plugins/codemod',
-        'tools/cspell-dict-minecraft': '@pumpkin-plugins/cspell-dict-minecraft',
-    };
+    const publicTools = PUBLIC_TOOL_PACKAGE_PATHS;
+    const publicToolCount = Object.keys(publicTools).length;
     const files = ({ manifest = '0.0.0', releaseAs = '0.0.1', version = '0.0.0' } = {}) => ({
         'packages/plug/package.json': { name: 'plug', version },
         ...Object.fromEntries(
@@ -629,7 +624,7 @@ describe('check-release-config', () => {
     it('passes for an unreleased plugin that is set to release 0.0.1', () => {
         const result = run('check-release-config.mjs', repo(files()));
         assert.ok(result.ok, result.out);
-        assert.match(result.out, /6 public tools/);
+        assert.match(result.out, new RegExp(`${publicToolCount} public tools`));
     });
 
     it('requires the public tool release pin and package version to match its first 0.1.0 release', () => {
@@ -663,7 +658,9 @@ describe('check-release-config', () => {
         assert.ok(result.ok, result.out);
         assert.match(
             result.out,
-            /1 plugin, 0 actions, 6 public tools, and 0 extensions: .*packages\/plug.*; 1 paused: packages\/not-ready/,
+            new RegExp(
+                `1 plugin, 0 actions, ${publicToolCount} public tools, and 0 extensions: .*packages/plug.*; 1 paused: packages/not-ready`,
+            ),
         );
     });
 
@@ -721,7 +718,7 @@ describe('check-release-config', () => {
     it('registers actions as simple release components with matching version.txt entries', () => {
         const result = run('check-release-config.mjs', repo(withAction()));
         assert.ok(result.ok, result.out);
-        assert.match(result.out, /1 plugin, 1 action, 6 public tools, and 0 extensions/);
+        assert.match(result.out, new RegExp(`1 plugin, 1 action, ${publicToolCount} public tools, and 0 extensions`));
 
         const wrongType = run('check-release-config.mjs', repo(withAction(files(), { releaseType: 'node' })));
         assert.match(wrongType.out, /needs "release-type": "simple"/);

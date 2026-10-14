@@ -18,6 +18,16 @@ const REPOSITORY_ROOT = path.resolve(import.meta.dirname, '..');
 const REGISTRY_URL = 'https://registry.npmjs.org/';
 const FIRST_RELEASE_VERSION = '0.1.0';
 const PREREQUISITE_SOURCE_PATHS = {
+    'tools/config': [['@pumpkin-plugins/docs', 'tools/docs']],
+    'tools/update-check': [
+        ['@pumpkin-plugins/docs', 'tools/docs'],
+        ['@pumpkin-plugins/pumpkin-api', 'tools/pumpkin-api'],
+    ],
+    'tools/plugin-kit': [
+        ['@pumpkin-plugins/docs', 'tools/docs'],
+        ['@pumpkin-plugins/pumpkin-api', 'tools/pumpkin-api'],
+        ['@pumpkin-plugins/update-check', 'tools/update-check'],
+    ],
     'tools/build': [
         ['@pumpkin-plugins/pumpkin-api', 'tools/pumpkin-api'],
         ['@pumpkin-plugins/static-hermes-runtime', 'tools/static-hermes-runtime'],

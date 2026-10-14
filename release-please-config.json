@@ -45,12 +45,20 @@
         "packages/waypoints": {
             "component": "waypoints"
         },
+        "tools/apis/pumpkin-pie-api": {
+            "component": "pumpkin-pie-api",
+            "release-as": "0.1.0"
+        },
         "tools/build": {
             "component": "build",
             "release-as": "0.1.0"
         },
         "tools/codemod": {
             "component": "codemod",
+            "release-as": "0.1.0"
+        },
+        "tools/config": {
+            "component": "config",
             "release-as": "0.1.0"
         },
         "tools/create-pumpkin-plugin": {
@@ -61,12 +69,28 @@
             "component": "cspell-dict-minecraft",
             "release-as": "0.1.0"
         },
+        "tools/docs": {
+            "component": "docs",
+            "release-as": "0.1.0"
+        },
+        "tools/minecraft-colors": {
+            "component": "minecraft-colors",
+            "release-as": "0.1.0"
+        },
+        "tools/plugin-kit": {
+            "component": "plugin-kit",
+            "release-as": "0.1.0"
+        },
         "tools/pumpkin-api": {
             "component": "pumpkin-api",
             "release-as": "0.1.0"
         },
         "tools/static-hermes-runtime": {
             "component": "static-hermes-runtime",
+            "release-as": "0.1.0"
+        },
+        "tools/update-check": {
+            "component": "update-check",
             "release-as": "0.1.0"
         }
     },

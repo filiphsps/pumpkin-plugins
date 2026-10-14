@@ -10,13 +10,14 @@ const FIRST_MANIFEST_VERSION = '0.0.0';
 /** Registers an existing public tool in Release Please's config and version manifest.
  *
  * @param {string} root - Repository root containing the tool and both Release Please files.
- * @param {string} toolDirectory - One-level path under `tools/`, such as `tools/codemod`.
+ * @param {string} toolDirectory - Workspace path under `tools/`, for example `tools/codemod` or
+ *   `tools/apis/pumpkin-pie-api`.
  * @returns {{ configChanged: boolean; manifestChanged: boolean }} Which files were updated.
  * @throws {Error} If the tool path, package, version or existing release registration is invalid.
  */
 export function registerPublicTool(root, toolDirectory) {
-    if (!/^tools\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(toolDirectory)) {
-        throw new Error('Public tool path must be under tools/ and use a single kebab-case folder name.');
+    if (!/^tools(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)+$/.test(toolDirectory)) {
+        throw new Error('Public tool path must be under tools/ and use kebab-case path segments.');
     }
 
     const packagePath = path.join(root, toolDirectory, 'package.json');
@@ -107,7 +108,7 @@ function readJson(filePath) {
 function main(args = process.argv.slice(2)) {
     const [toolDirectory, ...extraArguments] = args;
     if (!toolDirectory || extraArguments.length > 0) {
-        throw new Error('Usage: pnpm register:tool tools/<name>');
+        throw new Error('Usage: pnpm register:tool tools/<path>');
     }
     const root = path.resolve(import.meta.dirname, '..');
     const result = registerPublicTool(root, toolDirectory);

@@ -1,7 +1,7 @@
 {
     "name": "@pumpkin-plugins/plugin-kit",
     "version": "0.1.0",
-    "private": true,
+    "description": "Host helpers shared by plugins",
     "keywords": [
         "minecraft",
         "pumpkin",
@@ -10,7 +10,6 @@
         "wasi",
         "runtime"
     ],
-    "description": "Host helpers shared by plugins",
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/plugin-kit#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
@@ -54,7 +53,9 @@
         "./wasi-error": "./src/wasi-error.ts"
     },
     "files": [
-        "src"
+        "src/**/*.ts",
+        "!src/**/*.test.ts",
+        "!src/**/*.spec.ts"
     ],
     "scripts": {
         "test": "vitest run",
@@ -72,6 +73,9 @@
         "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
+    },
+    "engines": {
+        "node": ">=24.21.0"
     },
     "publishConfig": {
         "access": "public"

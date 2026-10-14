@@ -14,6 +14,12 @@ const versions = {
     'tools/create-pumpkin-plugin': '3.4.5',
     'tools/codemod': '4.5.6',
     'tools/cspell-dict-minecraft': '5.6.7',
+    'tools/docs': '6.6.7',
+    'tools/plugin-kit': '6.7.8',
+    'tools/config': '7.8.9',
+    'tools/update-check': '8.9.10',
+    'tools/minecraft-colors': '9.10.11',
+    'tools/apis/pumpkin-pie-api': '10.11.12',
 };
 const expectedEntries = {
     'tools/create-pumpkin-plugin': [
@@ -49,6 +55,22 @@ const expectedEntries = {
         'package/README.md',
         'package/LICENSE',
     ],
+    'tools/docs': [
+        'package/src/info.ts',
+        'package/src/markdown.ts',
+        'package/src/node.ts',
+        'package/bin/pumpkin-plugins-docs.mjs',
+    ],
+    'tools/plugin-kit': [
+        'package/src/commands.ts',
+        'package/src/host.ts',
+        'package/src/plugin.ts',
+        'package/src/register-commands.ts',
+    ],
+    'tools/config': ['package/src/index.ts'],
+    'tools/update-check': ['package/src/index.ts'],
+    'tools/minecraft-colors': ['package/src/index.ts'],
+    'tools/apis/pumpkin-pie-api': ['package/src/index.ts'],
 };
 
 afterEach(() => {
@@ -70,6 +92,19 @@ function createRoot() {
             packageJson.dependencies = {
                 '@pumpkin-plugins/pumpkin-api': versions['tools/pumpkin-api'],
                 '@pumpkin-plugins/static-hermes-runtime': versions['tools/static-hermes-runtime'],
+            };
+        } else if (packagePath === 'tools/config') {
+            packageJson.dependencies = { '@pumpkin-plugins/docs': versions['tools/docs'] };
+        } else if (packagePath === 'tools/update-check') {
+            packageJson.dependencies = {
+                '@pumpkin-plugins/docs': versions['tools/docs'],
+                '@pumpkin-plugins/pumpkin-api': versions['tools/pumpkin-api'],
+            };
+        } else if (packagePath === 'tools/plugin-kit') {
+            packageJson.dependencies = {
+                '@pumpkin-plugins/docs': versions['tools/docs'],
+                '@pumpkin-plugins/pumpkin-api': versions['tools/pumpkin-api'],
+                '@pumpkin-plugins/update-check': versions['tools/update-check'],
             };
         }
         const file = path.join(root, packagePath, 'package.json');
@@ -301,6 +336,43 @@ describe('publishToolPackages', () => {
             '@pumpkin-plugins/pumpkin-api@1.2.3',
             '@pumpkin-plugins/static-hermes-runtime@1.3.4',
         ]);
+    });
+
+    it('requires docs before each public consumer that imports its API', async () => {
+        const cases = [
+            { packagePath: 'tools/config', prerequisitePaths: ['tools/docs'] },
+            { packagePath: 'tools/update-check', prerequisitePaths: ['tools/docs', 'tools/pumpkin-api'] },
+            {
+                packagePath: 'tools/plugin-kit',
+                prerequisitePaths: ['tools/docs', 'tools/pumpkin-api', 'tools/update-check'],
+            },
+        ];
+
+        for (const { packagePath, prerequisitePaths } of cases) {
+            const root = createRoot();
+            const requested = [];
+
+            await publishToolPackages({
+                root,
+                selectedPaths: [packagePath],
+                releaseMetadata: createReleaseMetadata([packagePath]),
+                packPackage: createPackAdapter(root),
+                getRegistryIntegrity: async (packageName, version) => {
+                    if (packageName === PUBLIC_TOOL_PACKAGE_PATHS[packagePath]) return null;
+                    requested.push(`${packageName}@${version}`);
+                    return 'sha512-present';
+                },
+                publishPackage: async () => {},
+                log: () => {},
+            });
+
+            assert.deepEqual(
+                requested,
+                prerequisitePaths.map(
+                    (dependencyPath) => `${PUBLIC_TOOL_PACKAGE_PATHS[dependencyPath]}@${versions[dependencyPath]}`,
+                ),
+            );
+        }
     });
 
     it('requires exact API and builder versions from both packed creator templates', async () => {

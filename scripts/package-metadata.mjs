@@ -24,6 +24,7 @@ const FUNDING = [
     { type: 'custom', url: 'https://paypal.me/filiph' },
 ];
 const MAX_DESCRIPTION = 70;
+const PUBLIC_TOOL_NODE_ENGINE = '>=24.21.0';
 /** Canonical package names for tools that are published under public names. */
 const EXPECTED_PUBLIC_TOOL_NAMES = PUBLIC_TOOL_PACKAGE_PATHS;
 
@@ -89,6 +90,12 @@ const TOOL_FILE_ALLOWLISTS = {
     'tools/create-pumpkin-plugin': ['bin/create-pumpkin-plugin.ts', 'dist', 'templates', 'README.md'],
     'tools/codemod': ['dist', 'README.md', 'docs', 'LICENSE'],
     'tools/cspell-dict-minecraft': ['cspell-ext.json', 'minecraft.txt', 'README.md', 'LICENSE'],
+    'tools/docs': ['src/**/*.ts', '!src/**/*.test.ts', '!src/**/*.spec.ts', 'bin/**/*.mjs', 'README.md'],
+    'tools/plugin-kit': ['src/**/*.ts', '!src/**/*.test.ts', '!src/**/*.spec.ts'],
+    'tools/config': ['src/**/*.ts', '!src/**/*.test.ts', '!src/**/*.spec.ts'],
+    'tools/update-check': ['src/**/*.ts', '!src/**/*.test.ts', '!src/**/*.spec.ts'],
+    'tools/minecraft-colors': ['src/**/*.ts', '!src/**/*.test.ts', '!src/**/*.spec.ts'],
+    'tools/apis/pumpkin-pie-api': ['src/**/*.ts', '!src/**/*.test.ts', '!src/**/*.spec.ts'],
     'tools/static-hermes-runtime': [
         'src/**/*.ts',
         '!src/**/*.test.ts',
@@ -165,7 +172,10 @@ function expected(dir, pkg) {
             ...binSourceFiles,
         ];
     }
-    if (Object.hasOwn(EXPECTED_PUBLIC_TOOL_NAMES, dir)) want.publishConfig = { access: 'public' };
+    if (Object.hasOwn(EXPECTED_PUBLIC_TOOL_NAMES, dir)) {
+        want.engines = { node: PUBLIC_TOOL_NODE_ENGINE };
+        want.publishConfig = { access: 'public' };
+    }
     return want;
 }
 

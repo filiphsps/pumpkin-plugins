@@ -1,7 +1,7 @@
 {
     "name": "@pumpkin-plugins/pumpkin-pie-api",
     "version": "0.1.0",
-    "private": true,
+    "description": "Validated PumpkinPIE client, expansions and provider lifecycle",
     "keywords": [
         "minecraft",
         "pumpkin",
@@ -11,7 +11,6 @@
         "expansions",
         "typescript"
     ],
-    "description": "Validated PumpkinPIE client, expansions and provider lifecycle",
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/apis/pumpkin-pie-api#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
@@ -45,7 +44,9 @@
     "module": "./src/index.ts",
     "types": "./src/index.ts",
     "files": [
-        "src"
+        "src/**/*.ts",
+        "!src/**/*.test.ts",
+        "!src/**/*.spec.ts"
     ],
     "scripts": {
         "readme": "pumpkin-plugins-docs generate docs.ts",
@@ -65,6 +66,9 @@
         "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
+    },
+    "engines": {
+        "node": ">=24.21.0"
     },
     "publishConfig": {
         "access": "public"

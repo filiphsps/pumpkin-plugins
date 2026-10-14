@@ -9,6 +9,7 @@ import { bootstrapPublicTool, parseBootstrapArguments } from './npm-bootstrap.mj
 const root = path.resolve(import.meta.dirname, '..');
 const temporaryDirectories = [];
 const API = '@pumpkin-plugins/pumpkin-api';
+const DOCS = '@pumpkin-plugins/docs';
 const RUNTIME = '@pumpkin-plugins/static-hermes-runtime';
 const BUILD = '@pumpkin-plugins/build';
 const packageNames = {
@@ -18,8 +19,22 @@ const packageNames = {
     'tools/create-pumpkin-plugin': 'create-pumpkin-plugin',
     'tools/codemod': '@pumpkin-plugins/codemod',
     'tools/cspell-dict-minecraft': '@pumpkin-plugins/cspell-dict-minecraft',
+    'tools/docs': DOCS,
+    'tools/config': '@pumpkin-plugins/config',
+    'tools/update-check': '@pumpkin-plugins/update-check',
+    'tools/plugin-kit': '@pumpkin-plugins/plugin-kit',
 };
 const prerequisitePathsByPackage = {
+    'tools/config': [[DOCS, 'tools/docs']],
+    'tools/update-check': [
+        [DOCS, 'tools/docs'],
+        [API, 'tools/pumpkin-api'],
+    ],
+    'tools/plugin-kit': [
+        [DOCS, 'tools/docs'],
+        [API, 'tools/pumpkin-api'],
+        ['@pumpkin-plugins/update-check', 'tools/update-check'],
+    ],
     'tools/build': [
         ['@pumpkin-plugins/pumpkin-api', 'tools/pumpkin-api'],
         ['@pumpkin-plugins/static-hermes-runtime', 'tools/static-hermes-runtime'],
@@ -88,6 +103,12 @@ function contentEntries(packagePath) {
             'package/minecraft.txt',
             'package/README.md',
             'package/LICENSE',
+        ],
+        'tools/docs': [
+            'package/src/info.ts',
+            'package/src/markdown.ts',
+            'package/src/node.ts',
+            'package/bin/pumpkin-plugins-docs.mjs',
         ],
     };
     return ['package/package.json', ...required[packagePath]];
@@ -208,6 +229,20 @@ function bootstrapFixture(fixture, options = {}, adapters = fixture.adapters, ex
 }
 
 describe('npm first-release bootstrap', () => {
+    it('supports bootstrapping the public docs package at its first release', async () => {
+        const fixture = makeFixture({ packagePath: 'tools/docs' });
+
+        const result = await bootstrapFixture(fixture, { dryRun: true });
+
+        assert.equal(result.status, 'dry-run');
+        assert.equal(result.packageName, DOCS);
+        assert.equal(result.version, '0.1.0');
+        assert.deepEqual(fixture.events.registry, [
+            ['package', DOCS],
+            ['version', DOCS, '0.1.0'],
+        ]);
+    });
+
     it('requires explicit owner identity and write-access confirmation before normal work', async () => {
         const fixture = makeFixture();
 

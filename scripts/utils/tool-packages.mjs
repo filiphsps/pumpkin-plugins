@@ -9,12 +9,24 @@ export const PUBLIC_TOOL_PACKAGE_PATHS = Object.freeze({
     'tools/build': '@pumpkin-plugins/build',
     'tools/static-hermes-runtime': '@pumpkin-plugins/static-hermes-runtime',
     'tools/cspell-dict-minecraft': '@pumpkin-plugins/cspell-dict-minecraft',
+    'tools/docs': '@pumpkin-plugins/docs',
+    'tools/plugin-kit': '@pumpkin-plugins/plugin-kit',
+    'tools/config': '@pumpkin-plugins/config',
+    'tools/update-check': '@pumpkin-plugins/update-check',
+    'tools/minecraft-colors': '@pumpkin-plugins/minecraft-colors',
+    'tools/apis/pumpkin-pie-api': '@pumpkin-plugins/pumpkin-pie-api',
 });
 
 /** Public npm package release order, with internal prerequisites preceding their consumers. */
 export const PUBLIC_TOOL_RELEASE_ORDER = Object.freeze([
     'tools/pumpkin-api',
     'tools/static-hermes-runtime',
+    'tools/docs',
+    'tools/update-check',
+    'tools/plugin-kit',
+    'tools/config',
+    'tools/minecraft-colors',
+    'tools/apis/pumpkin-pie-api',
     'tools/build',
     'tools/create-pumpkin-plugin',
     'tools/codemod',
@@ -29,6 +41,11 @@ const BUILDER_TOOL_PACKAGE_NAMES = Object.freeze([
     '@pumpkin-plugins/pumpkin-api',
     '@pumpkin-plugins/static-hermes-runtime',
 ]);
+const TOOL_PREREQUISITE_NAMES = Object.freeze({
+    'tools/config': ['@pumpkin-plugins/docs'],
+    'tools/update-check': ['@pumpkin-plugins/docs', '@pumpkin-plugins/pumpkin-api'],
+    'tools/plugin-kit': ['@pumpkin-plugins/docs', '@pumpkin-plugins/pumpkin-api', '@pumpkin-plugins/update-check'],
+});
 const PACKED_TOOL_CONTENTS = Object.freeze({
     'tools/create-pumpkin-plugin': [
         'package/bin/create-pumpkin-plugin.ts',
@@ -63,6 +80,22 @@ const PACKED_TOOL_CONTENTS = Object.freeze({
         'package/README.md',
         'package/LICENSE',
     ],
+    'tools/docs': [
+        'package/src/info.ts',
+        'package/src/markdown.ts',
+        'package/src/node.ts',
+        'package/bin/pumpkin-plugins-docs.mjs',
+    ],
+    'tools/plugin-kit': [
+        'package/src/commands.ts',
+        'package/src/host.ts',
+        'package/src/plugin.ts',
+        'package/src/register-commands.ts',
+    ],
+    'tools/config': ['package/src/index.ts'],
+    'tools/update-check': ['package/src/index.ts'],
+    'tools/minecraft-colors': ['package/src/index.ts'],
+    'tools/apis/pumpkin-pie-api': ['package/src/index.ts'],
 });
 const TEMPLATE_LANGUAGES = ['typescript', 'javascript'];
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
@@ -143,7 +176,7 @@ export function orderPublicToolReleasePaths(selectedPaths) {
  *
  * @param {string} packagePath - Repository path identifying the public tool package.
  * @param {Record<string, unknown>} packageJson - The packed package metadata.
- * @param {Record<string, string>} [packageVersions] - Exact API and builder versions represented by packed tools.
+ * @param {Record<string, string>} [packageVersions] - Exact public dependency versions represented by packed tools.
  * @param {Record<string, unknown>[]} [starterTemplatePackageJsons] - Both packed creator template manifests.
  * @returns {{ packageName: string; version: string }[]} Internal public production prerequisites.
  * @throws {Error} When a required dependency or creator template does not resolve to an exact public version.
@@ -177,6 +210,15 @@ export function getPublicToolReleasePrerequisites(
             packageName,
             version: packageVersions[packageName],
         }));
+    }
+
+    const prerequisiteNames = TOOL_PREREQUISITE_NAMES[packagePath];
+    if (prerequisiteNames) {
+        return prerequisiteNames.map((packageName) => {
+            const version = packageJson.dependencies?.[packageName];
+            assertVersion(version, `${packageName} packed ${path.basename(packagePath)} dependency`);
+            return { packageName, version };
+        });
     }
 
     return [];
