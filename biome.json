@@ -84,6 +84,7 @@
         }
     },
     "javascript": {
+        "experimentalEmbeddedSnippetsEnabled": true,
         "formatter": {
             "quoteProperties": "asNeeded",
             "trailingCommas": "none",
