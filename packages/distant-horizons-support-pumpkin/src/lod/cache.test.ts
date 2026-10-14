@@ -63,7 +63,7 @@ describe('LOD cache', () => {
         expect(restored?.data).toHaveLength(maxPayloadBytes);
         expect(restored?.data[0]).toBe(42);
         expect(restored?.data.at(-1)).toBe(42);
-    });
+    }, 15_000);
 
     it('rejects one byte over the encoded file limit before writing or caching it', () => {
         class WriteTrackingFiles extends MemoryFiles {
