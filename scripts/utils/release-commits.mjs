@@ -34,7 +34,7 @@ export function bundledPaths(packages, pluginPath) {
 
 function shippedFile(file, paths) {
     if (
-        /\.md$|(?:^|\/)(?:test|testing|__tests__)\/|^(?:packages|tools|extensions)\/[^/]+\/(?:build|dist|node_modules)\/|\.(?:test|itest)\.[cm]?[jt]s$/.test(
+        /\.md$|(?:^|\/)(?:test|testing|__tests__)\/|^(?:packages|tools|extensions)\/[^/]+\/(?:build|dist|node_modules)\/|\.(?:spec|test|itest)\.[cm]?[jt]s$/.test(
             file,
         )
     )

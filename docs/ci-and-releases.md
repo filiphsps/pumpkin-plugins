@@ -158,7 +158,7 @@ version is accepted only when its tarball integrity matches. Builder releases in
 the public API and Static Hermes runtime because those packages are builder dependencies. Release PR
 preparation syncs both creator templates to the API and builder versions on the release branch.
 
-Before the first npm release, configure a GitHub Actions trusted publisher on each of the five npm
+Before the first npm release, configure a GitHub Actions trusted publisher on each of the six npm
 packages. Use organization or user `filiphsps`, repository `pumpkin-plugins`, workflow filename
 `ci.yml`, and no environment name. npm validates the caller workflow filename when a reusable
 workflow publishes, and OIDC needs `id-token: write` in both the caller job and reusable publish
@@ -418,8 +418,8 @@ the publisher. The metadata action sends a patch, so it leaves the listing's oth
 Market listing editor. Builds aren't byte-reproducible, so the job must upload the artifact rather
 than rebuild.
 
-The action looks up the canonical plugin name using PPM's flow: try the direct plugin endpoint, then
-search a limited result set and require an exact name match. It never creates a listing: listing
+The action looks up the canonical plugin name by searching a limited result set and requiring an
+exact name match. It never creates a listing: listing
 metadata and review happen in Market. If the plugin is not listed, has not yet been published there,
 or the token is not configured, the action fails by default. Set `warn: true` to emit a warning and
 continue; this repository opts into that mode so GitHub releases remain independent of Market

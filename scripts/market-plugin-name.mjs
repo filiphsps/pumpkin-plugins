@@ -15,5 +15,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(pluginDir, 'package.json'), 'ut
 const infoFile = path.resolve(pluginDir, pkg.pumpkinPlugin?.info ?? 'src/info.ts');
 const mod = await import(pathToFileURL(infoFile).href);
 const name = (mod.info ?? mod.default)?.name;
-if (typeof name !== 'string' || !name) throw new Error(`${infoFile} must export an info object with a name`);
+if (typeof name !== 'string' || !name || /[\r\n\u2028\u2029]/u.test(name)) {
+    throw new Error(`${infoFile} must export an info object with a nonempty single-line name`);
+}
 console.log(name);
