@@ -56,6 +56,16 @@ describe('host scheduling', () => {
         expect(run).not.toHaveBeenCalled();
     });
 
+    it('ignores scheduler task ids not returned by a plugin-kit helper', async () => {
+        const { cancelTask } = await import('./host.ts');
+        host.delayed.mockReturnValue(43);
+        const apiTaskId = host.delayed(900_001, 1n);
+
+        cancelTask(apiTaskId);
+
+        expect(host.cancel).not.toHaveBeenCalled();
+    });
+
     it('removes callbacks when submission fails', async () => {
         const { scheduleRepeating, scheduleDelayed, runTask } = await import('./host.ts');
         for (const [schedule, mock] of [

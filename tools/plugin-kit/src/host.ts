@@ -53,9 +53,11 @@ export function scheduleDelayed(delayTicks: number, run: (server: Server) => voi
  * @param taskId - The id returned by either scheduling helper.
  */
 export function cancelTask(taskId: number): void {
-    scheduler.cancelTask(taskId);
     const handlerId = taskHandlers.get(taskId);
-    if (handlerId !== undefined) tasks.take(handlerId);
+    if (handlerId === undefined) return;
+
+    scheduler.cancelTask(taskId);
+    tasks.take(handlerId);
     taskHandlers.delete(taskId);
 }
 
