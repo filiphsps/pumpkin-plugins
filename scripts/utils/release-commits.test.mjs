@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -34,6 +34,7 @@ const packages = new Map([
     ['@pumpkin-plugins/static-hermes-runtime', { path: 'tools/static-hermes-runtime', manifest: {} }],
     ['harness', { path: 'tools/test-harness', manifest: {} }],
 ]);
+const releaseConfig = JSON.parse(readFileSync(new URL('../../release-please-config.json', import.meta.url), 'utf8'));
 const commit = (sha, files, message = 'fix: ship a change') => ({ sha, files, message });
 
 class TestTagName {
@@ -304,6 +305,34 @@ describe('bundled release commits', () => {
         assert.deepEqual(
             commits['packages/plugin'].map((entry) => entry.sha),
             ['after-addition', 'added'],
+        );
+    });
+
+    it('fetches enough history to reach an unreleased public tool boundary', async () => {
+        const history = [
+            commit('after-release', ['tools/build/src/index.ts']),
+            ...Array.from({ length: 716 }, (_, index) => commit(`older-${index}`, ['README.md'])),
+            commit('boundary', ['tools/build/package.json']),
+        ];
+        const github = {
+            async *mergeCommitIterator(_branch, { maxResults }) {
+                yield* history.slice(0, maxResults);
+            },
+        };
+        const plugin = bundledChangesPlugin(
+            github,
+            'master',
+            packages,
+            { 'tools/build': '0.1.0' },
+            releaseConfig['commit-search-depth'],
+        );
+        const commits = { 'tools/build': [] };
+
+        await plugin.preconfigure({ 'tools/build': {} }, commits, { 'tools/build': { sha: 'boundary' } });
+
+        assert.deepEqual(
+            commits['tools/build'].map((entry) => entry.sha),
+            ['after-release'],
         );
     });
 

@@ -3,6 +3,7 @@
     "release-type": "node",
     "bump-minor-pre-major": true,
     "bump-patch-for-minor-pre-major": true,
+    "commit-search-depth": 1000,
     "separate-pull-requests": true,
     "always-update": true,
     "force-tag-creation": true,
