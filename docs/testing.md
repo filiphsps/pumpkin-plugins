@@ -21,9 +21,9 @@ tests verify compiled WASM behavior but do not collect guest-code coverage. The 
 also tests changed actions under c8 and uploads their coverage to Codecov.
 
 Run one plugin's integration tests with
-`pnpm exec turbo run test:integration --filter=@pumpkin-plugins/<folder>`. To run only changed
+`pnpm turbo run test:integration --filter=@pumpkin-plugins/<folder>`. To run only changed
 packages and their dependents locally, compare with the base branch, for example
-`pnpm exec turbo run test:integration --filter='...[origin/master]'`.
+`pnpm turbo run test:integration --filter='...[origin/master]'`.
 
 ## Integration tests
 

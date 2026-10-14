@@ -436,10 +436,10 @@ function pnpmCommand() {
 }
 
 /** Starts the root build wrapper for all workspace plugins. */
-export function startInitialBuild(root, spawnImpl = spawn, env = process.env, parseTypeScript = false) {
+export function startInitialBuild(root, spawnImpl = spawn, env = process.env, parseTypeScript = false, turboArgs = []) {
     return spawnChild(
         pnpmCommand(),
-        ['run', 'build', '--', '--ui=stream', ...(parseTypeScript ? ['--parse-ts'] : [])],
+        ['run', 'build', '--', '--ui=stream', ...(parseTypeScript ? ['--parse-ts'] : []), ...turboArgs],
         {
             cwd: root,
             stdio: 'inherit',
@@ -459,6 +459,7 @@ export async function runDev({
     nightly = false,
     release = false,
     parseTypeScript = false,
+    turboArgs = [],
     shutdownTimeoutMs = CHILD_SHUTDOWN_TIMEOUT_MS,
     signalSource = process
 } = {}) {
@@ -504,7 +505,7 @@ export async function runDev({
         console.log(
             `Building every plugin, then launching the latest ${nightly ? 'nightly build' : 'stable release'}.`
         );
-        const initialBuild = startInitialBuild(root, spawnImpl, buildEnv, parseTypeScript);
+        const initialBuild = startInitialBuild(root, spawnImpl, buildEnv, parseTypeScript, turboArgs);
         children.push(initialBuild);
         const buildResult = initialBuild.done.then(({ code, signal }) => {
             if (!shuttingDown && (code !== 0 || signal)) {
@@ -522,7 +523,7 @@ export async function runDev({
             outputs = watchBuildOutputs(plugins, serverPluginsDir);
             const turbo = spawnChild(
                 pnpmCommand(),
-                ['exec', 'turbo', 'watch', parseTypeScript ? 'build:parse-ts' : 'build', '--ui=stream'],
+                ['turbo', 'watch', parseTypeScript ? 'build:parse-ts' : 'build', '--ui=stream', ...turboArgs],
                 {
                     cwd: root,
                     stdio: 'inherit',
@@ -557,6 +558,17 @@ export async function runDev({
 
 /** Parses dev server command-line arguments. */
 export function parseDevArgs(args) {
+    const devArgs = [];
+    const turboArgs = [];
+    for (const arg of args) {
+        if (arg === '--') continue;
+        if (!['--no-hot-reload', '--nightly', '--release', '--parse-ts', '-h', '--help'].includes(arg)) {
+            turboArgs.push(arg);
+        } else {
+            devArgs.push(arg);
+        }
+    }
+
     const program = new Command()
         .name('pumpkin-plugins-dev')
         .description('Build plugins and launch a local Pumpkin server.')
@@ -564,20 +576,21 @@ export function parseDevArgs(args) {
         .option('--nightly', 'Use the latest Pumpkin nightly build')
         .option('--release', 'Use the latest stable Pumpkin release')
         .option('--parse-ts', 'Use Hermes TypeScript parsing for plugin builds')
-        .parse(args, { from: 'user' });
+        .parse(devArgs, { from: 'user' });
     const options = program.opts();
     return {
         hotReload: options.hotReload ?? true,
         nightly: options.nightly ?? false,
         release: options.release ?? false,
-        parseTypeScript: options.parseTs ?? false
+        parseTypeScript: options.parseTs ?? false,
+        turboArgs
     };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-    const { hotReload, nightly, release, parseTypeScript } = parseDevArgs(process.argv.slice(2));
+    const { hotReload, nightly, release, parseTypeScript, turboArgs } = parseDevArgs(process.argv.slice(2));
     const command = hotReload ? 'pnpm dev' : 'pnpm dev:no-hot-reload';
-    runDev({ hotReload, nightly, release, parseTypeScript }).catch((error) => {
+    runDev({ hotReload, nightly, release, parseTypeScript, turboArgs }).catch((error) => {
         console.error(`${command}: ${error.message}`);
         process.exitCode = 1;
     });

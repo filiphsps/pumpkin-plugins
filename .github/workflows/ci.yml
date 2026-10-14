@@ -264,7 +264,7 @@ jobs:
               run: pnpm run build
 
             - name: 🔬 Run Static Hermes integration test
-              run: pnpm exec turbo run test:integration --filter=@pumpkin-plugins/apple-skin-pumpkin
+              run: pnpm turbo run test:integration --filter=@pumpkin-plugins/apple-skin-pumpkin
 
             - name: 📦 Build release artifacts
               run: pnpm run build
@@ -400,7 +400,7 @@ jobs:
                   path: tools/update-check/build/
 
             - name: 🏗️ Build plugin CLI for isolated integration tests
-              run: pnpm exec turbo run build --filter=@pumpkin-plugins/build
+              run: pnpm turbo run build --filter=@pumpkin-plugins/build
 
             - name: 🎃 Integration tests
               env:
@@ -414,9 +414,9 @@ jobs:
                       if [ -n "$INTEGRATION_EXTRA" ]; then
                           filters+=(--filter="$INTEGRATION_EXTRA")
                       fi
-                      pnpm exec turbo run test:integration --concurrency=2 --only "${filters[@]}"
+                      pnpm turbo run test:integration --concurrency=2 --only "${filters[@]}"
                   else
-                      pnpm exec turbo run test:integration --concurrency=2 --only
+                      pnpm turbo run test:integration --concurrency=2 --only
                   fi
 
             - name: 📤 Upload server logs
@@ -466,7 +466,7 @@ jobs:
             - name: 🎃 Typecheck, build and load it on a real Pumpkin
               run: |
                   pnpm build --filter=@pumpkin-plugins/ci-sample
-                  pnpm exec turbo run typecheck test:integration --filter=@pumpkin-plugins/ci-sample
+                  pnpm turbo run typecheck test:integration --filter=@pumpkin-plugins/ci-sample
               env:
                   PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/pumpkin-logs
 

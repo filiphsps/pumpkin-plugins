@@ -89,7 +89,7 @@ jobs:
               run: node --test docs/.vitepress/team.data.test.mjs docs/.vitepress/doc-links.test.mjs
 
             - name: 🔨 Build the plugin builder CLI
-              run: pnpm exec turbo run build --filter=@pumpkin-plugins/build
+              run: pnpm turbo run build --filter=@pumpkin-plugins/build
 
             - name: 🏗️ Build the documentation site
               run: pnpm run docs

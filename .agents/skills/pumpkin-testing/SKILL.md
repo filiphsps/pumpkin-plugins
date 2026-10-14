@@ -18,7 +18,7 @@ It checks workspace dependents, but never runs integration tests.
 For changed guest code or a bundled shared library, run affected real-server suites:
 
 ```sh
-pnpm exec turbo run test:integration --filter=...@pumpkin-plugins/<folder> --output-logs=errors-only
+pnpm turbo run test:integration --filter=...@pumpkin-plugins/<folder> --output-logs=errors-only
 ```
 
 Include consumers that are connected at runtime rather than by workspace imports. In particular,

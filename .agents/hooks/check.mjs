@@ -93,7 +93,6 @@ export function planChecks(files, exists = defaultExists, packageName = defaultP
         steps.push({
             name: 'Typecheck and unit tests',
             args: [
-                'exec',
                 'turbo',
                 'run',
                 'typecheck',

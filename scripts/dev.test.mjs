@@ -45,19 +45,22 @@ describe('parseDevArgs', () => {
             hotReload: true,
             nightly: false,
             release: false,
-            parseTypeScript: false
+            parseTypeScript: false,
+            turboArgs: []
         });
         assert.deepEqual(parseDevArgs(['--nightly', '--no-hot-reload']), {
             hotReload: false,
             nightly: true,
             release: false,
-            parseTypeScript: false
+            parseTypeScript: false,
+            turboArgs: []
         });
-        assert.deepEqual(parseDevArgs(['--release', '--parse-ts']), {
+        assert.deepEqual(parseDevArgs(['--release', '--parse-ts', '--', '--output-logs=errors-only']), {
             hotReload: true,
             nightly: false,
             release: true,
-            parseTypeScript: true
+            parseTypeScript: true,
+            turboArgs: ['--output-logs=errors-only']
         });
     });
 });
@@ -670,7 +673,7 @@ describe('runDev', () => {
 
             assert.equal(calls[0].options.env.PUMPKIN_DEV_MODE, undefined);
             assert.equal(calls[1].options.env.PUMPKIN_DEV_MODE, undefined);
-            assert.deepEqual(calls[1].args, ['exec', 'turbo', 'watch', 'build', '--ui=stream']);
+            assert.deepEqual(calls[1].args, ['turbo', 'watch', 'build', '--ui=stream']);
             assert.equal(calls.at(-1).command, '/fake/pumpkin');
         } finally {
             if (previousDevMode === undefined) delete process.env.PUMPKIN_DEV_MODE;
@@ -678,7 +681,7 @@ describe('runDev', () => {
         }
     });
 
-    it('starts without hot reload or build watchers when disabled', async () => {
+    it('uses pnpm-forwarded release and parser flags without hot reload', async () => {
         const root = tempDir();
         const packageDir = path.join(root, 'packages', 'plugin');
         const output = path.join(packageDir, 'build', 'plugin.wasm');
@@ -690,6 +693,8 @@ describe('runDev', () => {
         fs.writeFileSync(output, 'cached build');
         const calls = [];
         let resolvedOptions;
+        const previousDevMode = process.env.PUMPKIN_DEV_MODE;
+        process.env.PUMPKIN_DEV_MODE = '1';
         const spawnImpl = (command, args, options) => {
             const child = new EventEmitter();
             child.kill = (signal) => process.nextTick(() => child.emit('exit', null, signal));
@@ -700,20 +705,27 @@ describe('runDev', () => {
             return child;
         };
 
-        await runDev({
-            root,
-            spawnImpl,
-            hotReload: false,
-            nightly: true,
-            resolveBinary: async (options) => {
-                resolvedOptions = options;
-                return { binary: '/fake/pumpkin', release: 'test release' };
-            }
-        });
+        try {
+            await runDev({
+                root,
+                spawnImpl,
+                ...parseDevArgs(['--no-hot-reload', '--nightly', '--', '--parse-ts', '--release']),
+                resolveBinary: async (options) => {
+                    resolvedOptions = options;
+                    return { binary: '/fake/pumpkin', release: 'test release' };
+                }
+            });
+        } finally {
+            if (previousDevMode === undefined) delete process.env.PUMPKIN_DEV_MODE;
+            else process.env.PUMPKIN_DEV_MODE = previousDevMode;
+        }
 
         assert.equal(calls.length, 2);
-        assert.deepEqual(resolvedOptions, { root, nightly: true });
-        assert.equal(calls[0].options.env.PUMPKIN_DEV_MODE, '1');
+        assert.equal(resolvedOptions.root, root);
+        assert.equal(resolvedOptions.nightly, true);
+        assert.equal(calls[0].options.env.PUMPKIN_DEV_MODE, undefined);
+        assert.ok(calls[0].args.includes('--parse-ts'));
+        assert.equal(calls[0].args.includes('--release'), false);
         assert.equal(calls.at(-1).command, '/fake/pumpkin');
         assert.match(
             fs.readFileSync(path.join(root, '.cache', 'pumpkin-dev', 'pumpkin.toml'), 'utf8'),

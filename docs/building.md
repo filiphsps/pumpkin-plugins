@@ -113,6 +113,9 @@ deferred.
 Tasks are defined in `turbo.json` and run with the root scripts (`pnpm build`, `pnpm typecheck`,
 `pnpm test`, `pnpm test:integration`, `pnpm readme`, `pnpm package`):
 
+The [Turborepo commands guide](turborepo.md) explains the `pnpm turbo` wrapper, its log defaults,
+and how to override them.
+
 | Task | Notes |
 | --- | --- |
 | `transit` | Does nothing; it carries a package's dependencies' hashes (see below) |
@@ -155,7 +158,7 @@ Restart the command after changing a plugin.
 
 The dev server lives in `.cache/pumpkin-dev`, so its world and settings remain between runs. Each
 command sets Pumpkin's plugin hot reload to match the selected mode. In hot-reload mode, `pnpm dev`
-uses `turbo watch` to rebuild plugins as workspace packages change and copies each completed `.wasm`
+watches workspace packages, rebuilds affected plugins and copies each completed `.wasm`
 into the server's `plugins/` directory. This copy is needed because Pumpkin watches that directory,
 while build outputs live under each package. A file linked to a build output would not notify Pumpkin
 when the target changes. Automatic Market update checks are disabled for the default dev builds and
