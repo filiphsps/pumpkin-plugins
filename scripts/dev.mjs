@@ -345,7 +345,9 @@ function watchBuildOutputs(plugins, serverPluginsDir) {
 function configureHotReload(config, hotReload) {
     const newline = config.includes('\r\n') ? '\r\n' : '\n';
     const lines = config === '' ? [] : config.split(/\r?\n/);
-    const pluginsStart = lines.findIndex((line) => /^\s*\[plugins\]\s*(?:#.*)?$/.test(line));
+    const pluginsStart = lines.findIndex((line) =>
+        /^\s*\[\s*(?:plugins|"plugins"|'plugins')\s*\]\s*(?:#.*)?$/.test(line),
+    );
 
     if (pluginsStart === -1) {
         const section = ['[plugins]', `hot_reload = ${hotReload}`];
@@ -355,7 +357,10 @@ function configureHotReload(config, hotReload) {
         let pluginsEnd = lines.findIndex((line, index) => index > pluginsStart && /^\s*\[/.test(line));
         if (pluginsEnd === -1) pluginsEnd = lines.length;
         const hotReloadLine = lines.findIndex(
-            (line, index) => index > pluginsStart && index < pluginsEnd && /^\s*hot_reload\s*=/.test(line),
+            (line, index) =>
+                index > pluginsStart &&
+                index < pluginsEnd &&
+                /^\s*(?:hot_reload|"hot_reload"|'hot_reload')\s*=/.test(line),
         );
         if (hotReloadLine === -1) {
             lines.splice(pluginsStart + 1, 0, `hot_reload = ${hotReload}`);
