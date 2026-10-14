@@ -62,8 +62,8 @@ Settings live in `plugins/data/TabDisplay/config.toml`. The plugin creates the f
 | `placeholders.provider` | string | `"PumpkinPIE"` | Pumpkin plugin that supplies placeholder values. |
 | `placeholders.missing_provider` | string | `"literal"` | Text to show when PumpkinPIE is unavailable: `literal` keeps tokens, `empty` removes them. |
 | `placeholders.unresolved` | string | `"literal"` | Text to show for unresolved identifiers: `literal` keeps tokens, `empty` removes them. |
-| `header.lines` | string | `[{ text = "Welcome %player_name%", color = "#FFB347" }]` | Header lines in display order. Use a TOML array of inline tables, for example [{ text = "Welcome %player_name%", color = "#FFB347" }]. |
-| `footer.lines` | string | `[{ text = "%server_online% players online", color = "#AAAAAA" }]` | Footer lines in display order. Use a TOML array of inline tables, for example [{ text = "Welcome %player_name%", color = "#FFB347" }]. |
+| `header.lines` | table[] | `[{ text = "Welcome %player_name%", color = "#FFB347" }]` | Header lines in display order. Use a TOML array of inline tables, for example [{ text = "Welcome %player_name%", color = "#FFB347" }]. |
+| `footer.lines` | table[] | `[{ text = "%server_online% players online", color = "#AAAAAA" }]` | Footer lines in display order. Use a TOML array of inline tables, for example [{ text = "%server_online% players online", color = "#AAAAAA" }]. |
 | `entry.enabled` | boolean | `true` | Apply a custom name to real player rows. |
 | `entry.text` | string | `"%player_name%"` | Name template for each listed player. |
 | `entry.color` | string | `"#FFFFFF"` | Optional RGB text color in `#RRGGBB` form. |
@@ -71,7 +71,7 @@ Settings live in `plugins/data/TabDisplay/config.toml`. The plugin creates the f
 | `entry.italic` | boolean | `false` | Render the row name in italics. |
 | `entry.underlined` | boolean | `false` | Underline the row name. |
 | `entry.strikethrough` | boolean | `false` | Strike through the row name. |
-| `sorting.rules` | string | `[]` | Reserved sorting keys. Non-empty rules are rejected until native Java order direction is verified. |
+| `sorting.rules` | table[] | `[]` | Reserved sorting keys. Non-empty rules are rejected until native Java order direction is verified. |
 | `objective.enabled` | boolean | `false` | Show a numeric objective in the Java player list. |
 | `objective.value` | string | `"ping"` | Value source reserved for the verified objective adapter. |
 | `bedrock.objective_enabled` | boolean | `false` | Show a numeric objective in the native Bedrock player list. |
@@ -122,8 +122,8 @@ lines = [{ text = "Welcome %player_name%", color = "#FFB347" }]
 # Personalized footer lines. Each player sees their own placeholder context.
 [footer]
 
-# Footer lines in display order. Use a TOML array of inline tables, for example [{ text = "Welcome
-# %player_name%", color = "#FFB347" }].
+# Footer lines in display order. Use a TOML array of inline tables, for example [{ text =
+# "%server_online% players online", color = "#AAAAAA" }].
 lines = [{ text = "%server_online% players online", color = "#AAAAAA" }]
 
 # Global real-player row formatting. Placeholder context is the listed subject.

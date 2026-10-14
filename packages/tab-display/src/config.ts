@@ -228,12 +228,13 @@ function templateLinesField(
 ): Field<readonly TemplateLineConfig[]> {
     const format = (lines: readonly TemplateLineConfig[]) =>
         formatInlineTableArray(lines.map((line) => lineFields(line)));
+    const example = format(defaults);
     return {
-        type: 'string',
-        description: `${description} Use a TOML array of inline tables, for example [{ text = "Welcome %player_name%", color = "#FFB347" }].`,
+        type: 'table[]',
+        description: `${description} Use a TOML array of inline tables, for example ${example}.`,
         default: defaults,
         expected: 'an array of line tables with text and optional style fields',
-        example: format(defaults),
+        example,
         parse: (raw) => {
             if (!Array.isArray(raw) || !raw.every(isTemplateLine)) return { ok: false };
             return { ok: true, value: raw.map(copyTemplateLine) };
@@ -246,7 +247,7 @@ function sortRulesField(defaults: readonly ConfigSortRule[]): Field<readonly Con
     const format = (rules: readonly ConfigSortRule[]) =>
         formatInlineTableArray(rules.map((rule) => ({ kind: rule.kind, direction: rule.direction })));
     return {
-        type: 'string',
+        type: 'table[]',
         description:
             'Reserved sorting keys. Non-empty rules are rejected until native Java order direction is verified.',
         default: defaults,

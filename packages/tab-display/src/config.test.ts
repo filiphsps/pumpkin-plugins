@@ -1,6 +1,6 @@
 import { defaultValues } from '@pumpkin-plugins/config';
 import { describe, expect, it } from 'vitest';
-import { configSchema, loadTabDisplayConfig, validateConfig } from './config.ts';
+import { configInfo, configSchema, loadTabDisplayConfig, validateConfig } from './config.ts';
 
 function memoryStore(initial?: string) {
     let contents = initial;
@@ -22,6 +22,27 @@ describe('tab display configuration', () => {
         expect(loaded.config.header.lines[0]?.text).toContain('%player_name%');
         expect(loaded.config.sorting.rules).toEqual([]);
         expect(store.value()).toContain('text =');
+    });
+
+    it('documents arrays of inline tables with their structured type', () => {
+        const structuredOptions = configInfo.options?.filter(({ key }) =>
+            ['header.lines', 'footer.lines', 'sorting.rules'].includes(key),
+        );
+        expect(structuredOptions?.map(({ key, type }) => [key, type])).toEqual([
+            ['header.lines', 'table[]'],
+            ['footer.lines', 'table[]'],
+            ['sorting.rules', 'table[]'],
+        ]);
+    });
+
+    it('uses each template section default in its TOML line example', () => {
+        const descriptions = new Map(configInfo.options?.map(({ key, description }) => [key, description]));
+        expect(descriptions.get('header.lines')).toContain(
+            'for example [{ text = "Welcome %player_name%", color = "#FFB347" }]',
+        );
+        expect(descriptions.get('footer.lines')).toContain(
+            'for example [{ text = "%server_online% players online", color = "#AAAAAA" }]',
+        );
     });
 
     it('rejects malformed structured arrays without rewriting the user file', () => {
