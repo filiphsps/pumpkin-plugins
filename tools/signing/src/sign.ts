@@ -7,10 +7,13 @@ const SECRET_PATTERN = /^[0-9a-fA-F]{64}$/;
 const PUBLIC_PATTERN = /^[0-9a-f]{64}$/;
 const SIGNATURE_PATTERN = /^[0-9a-f]{128}$/;
 
+/** An ID in Pumpkin signing metadata. Numbers must be safe integers; bigints support the full s64 range. */
+export type SigningId = bigint | number;
+
 /** The metadata Pumpkin expects in the `pumpkin.metadata` section. Field order is the JSON order. */
 export interface SigningMetadata {
     /** Marketplace developer id; 0 for independent plugins. */
-    dev_id: number;
+    dev_id: SigningId;
     /** The developer's name. */
     dev_name: string;
     /** Whether the plugin is paid. */
@@ -22,21 +25,31 @@ export interface SigningMetadata {
     /** Marketplace the plugin comes from; empty for independent plugins. */
     marketplace_url: string;
     /** Marketplace plugin id; 0 for independent plugins. */
-    plugin_id: number;
+    plugin_id: SigningId;
     /** The Pumpkin plugin name. */
     plugin_name: string;
     /** Marketplace user id; 0 for independent plugins. */
-    user_id: number;
+    user_id: SigningId;
     /** The plugin version. */
     version: string;
 }
+
+/** Metadata returned by {@link verifyWasm}; IDs remain exact `bigint` values. */
+export type VerifiedSigningMetadata = Omit<SigningMetadata, 'dev_id' | 'plugin_id' | 'user_id'> & {
+    /** Marketplace developer id as an exact s64 value. */
+    dev_id: bigint;
+    /** Marketplace plugin id as an exact s64 value. */
+    plugin_id: bigint;
+    /** Marketplace user id as an exact s64 value. */
+    user_id: bigint;
+};
 
 /** Result of {@link verifyWasm}. */
 export interface VerifyResult {
     /** Why the binary isn't valid. */
     error?: string;
     /** The signed metadata, when it could be read. */
-    metadata?: SigningMetadata;
+    metadata?: VerifiedSigningMetadata;
     /** The public key from the signature envelope, in hex. */
     publicKeyHex?: string;
     /** Whether the binary carries signing sections at all. */
@@ -94,24 +107,25 @@ export function generateKeyPair(): KeyPair {
  * @param metadata - What to embed; only the documented fields are written, in order.
  * @param secretKeyHex - The 32-byte seed as 64 hex characters.
  * @returns The binary with `pumpkin.metadata` and `wasm_signature` sections appended.
- * @throws {Error} When the key is malformed or the bytes aren't a wasm binary.
+ * @throws {Error} When the key or bytes are invalid, or a metadata ID is unsafe or outside the s64 range.
  */
 export function signWasm(wasm: Uint8Array, metadata: SigningMetadata, secretKeyHex: string): Buffer {
     const key = secretKey(secretKeyHex);
     const { clean } = stripSignature(wasm);
+    const fields: [string, string][] = [
+        ['marketplace_url', jsonString(metadata.marketplace_url)],
+        ['plugin_id', serializeMetadataId(metadata.plugin_id, 'plugin_id')],
+        ['plugin_name', jsonString(metadata.plugin_name)],
+        ['version', jsonString(metadata.version)],
+        ['dev_id', serializeMetadataId(metadata.dev_id, 'dev_id')],
+        ['dev_name', jsonString(metadata.dev_name)],
+        ['is_paid', String(metadata.is_paid)],
+        ['user_id', serializeMetadataId(metadata.user_id, 'user_id')],
+    ];
+    if (metadata.license_key !== undefined) fields.push(['license_key', jsonString(metadata.license_key)]);
+    fields.push(['issued_at', jsonString(metadata.issued_at)]);
     const metadataJson = Buffer.from(
-        JSON.stringify({
-            marketplace_url: metadata.marketplace_url,
-            plugin_id: metadata.plugin_id,
-            plugin_name: metadata.plugin_name,
-            version: metadata.version,
-            dev_id: metadata.dev_id,
-            dev_name: metadata.dev_name,
-            is_paid: metadata.is_paid,
-            user_id: metadata.user_id,
-            license_key: metadata.license_key,
-            issued_at: metadata.issued_at,
-        }),
+        `{${fields.map(([name, value]) => `${JSON.stringify(name)}:${value}`).join(',')}}`,
         'utf8',
     );
     const signature = sign(null, Buffer.concat([clean, metadataJson]), key);
@@ -138,6 +152,24 @@ const ID_FIELDS = ['plugin_id', 'dev_id', 'user_id'];
 const MIN_I64 = -(1n << 63n);
 const MAX_I64 = (1n << 63n) - 1n;
 
+function jsonString(value: string | null): string {
+    return JSON.stringify(value) ?? 'null';
+}
+
+function serializeMetadataId(value: SigningId, field: string): string {
+    if (typeof value === 'number' && !Number.isSafeInteger(value)) {
+        throw new Error(`metadata.${field} must be a safe integer or bigint`);
+    }
+    if (typeof value !== 'number' && typeof value !== 'bigint') {
+        throw new Error(`metadata.${field} must be a safe integer or bigint`);
+    }
+    const id = typeof value === 'bigint' ? value : BigInt(value);
+    if (id < MIN_I64 || id > MAX_I64) {
+        throw new Error(`metadata.${field} must be a signed 64-bit integer`);
+    }
+    return id.toString();
+}
+
 function parseJson(data: Uint8Array, metadataIds = false): Record<string, unknown> | undefined {
     try {
         const invalidIds = new WeakSet<object>();
@@ -145,11 +177,14 @@ function parseJson(data: Uint8Array, metadataIds = false): Record<string, unknow
             Buffer.from(data).toString('utf8'),
             function (this: object, key: string, field: unknown, context?: { source: string }) {
                 if (metadataIds && ID_FIELDS.includes(key) && typeof field === 'number') {
-                    // Source text preserves the host's i64 range at JavaScript rounding boundaries.
                     const source = context?.source;
-                    if (!source || !/^-?\d+$/.test(source) || BigInt(source) < MIN_I64 || BigInt(source) > MAX_I64) {
+                    if (!source || !/^-?\d+$/.test(source)) {
                         invalidIds.add(this);
+                        return field;
                     }
+                    const id = BigInt(source);
+                    if (id < MIN_I64 || id > MAX_I64) invalidIds.add(this);
+                    else return id;
                 }
                 return field;
             },
@@ -164,13 +199,13 @@ function parseJson(data: Uint8Array, metadataIds = false): Record<string, unknow
 
 function isSigningMetadata(
     value: Record<string, unknown> | undefined,
-): value is SigningMetadata & Record<string, unknown> {
+): value is VerifiedSigningMetadata & Record<string, unknown> {
     if (!value) return false;
     return (
         ['marketplace_url', 'plugin_name', 'version', 'dev_name', 'issued_at'].every(
             (key) => typeof value[key] === 'string',
         ) &&
-        ID_FIELDS.every((key) => typeof value[key] === 'number' && Number.isInteger(value[key])) &&
+        ID_FIELDS.every((key) => typeof value[key] === 'bigint') &&
         typeof value.is_paid === 'boolean' &&
         (value.license_key === undefined || value.license_key === null || typeof value.license_key === 'string')
     );
