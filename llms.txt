@@ -74,6 +74,10 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [UPnPumpkin plugin API README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/apis/upnpumpkin-api/README.md): Additional component overview and usage details.
 - [Plugin build tool](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/build/docs/index.md): Shared build tool for the plugins
 - [Plugin build tool README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/build/README.md): Additional component overview and usage details.
+- [Pumpkin codemods](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/docs/index.md): Codemod runner for Pumpkin plugins
+- [Pumpkin codemods README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/README.md): Additional component overview and usage details.
+- [Pumpkin codemods: Adding codemods](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/docs/authoring-codemods.md): Codemods in @pumpkin-plugins/codemod use a small per-file contract.
+- [Pumpkin codemods: Using codemods](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/docs/using-codemods.md): @pumpkin-plugins/codemod provides named, repeatable migrations for Pumpkin plugin projects.
 - [Plugin configuration library](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/config/docs/index.md): Schema-driven TOML config for plugins
 - [Plugin configuration library README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/config/README.md): Additional component overview and usage details.
 - [create-pumpkin-plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/create-pumpkin-plugin/README.md): Create a minimal Pumpkin plugin project
@@ -128,6 +132,7 @@ Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source
 - [PumpkinPIE API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/pumpkin-pie-api/): Validated PumpkinPIE client, expansions and provider lifecycle
 - [UPnPumpkin plugin API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/upnpumpkin-api/): Asks UPnPumpkin to open a port
 - [Plugin build tool API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/build/): Shared build tool for the plugins
+- [Pumpkin codemods API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/codemod/): Codemod runner for Pumpkin plugins
 - [Plugin configuration library API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/config/): Schema-driven TOML config for plugins
 - [Documentation generator API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/docs/): Generates component READMEs, doc links, and repository catalogs
 - [Minecraft colors API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/minecraft-colors/): Chalk-like Minecraft text formatting for plugins
