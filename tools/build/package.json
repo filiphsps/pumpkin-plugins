@@ -43,6 +43,7 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@badisi/latest-version": "catalog:",
         "@bytecodealliance/jco": "catalog:",
         "@commander-js/extra-typings": "catalog:",
         "@di-framework/componentize-qjs": "0.4.4-di.3",

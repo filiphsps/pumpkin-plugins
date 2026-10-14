@@ -54,13 +54,16 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@badisi/latest-version": "catalog:",
         "@commander-js/extra-typings": "catalog:",
         "commander": "catalog:",
         "jsonc-parser": "3.3.1",
+        "semver": "7.8.5",
         "typescript": "catalog:"
     },
     "devDependencies": {
         "@types/node": "catalog:",
+        "@types/semver": "7.8.0",
         "vitest": "catalog:"
     },
     "engines": {
