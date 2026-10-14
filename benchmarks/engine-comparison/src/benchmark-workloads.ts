@@ -24,6 +24,7 @@ type WorkloadScenario = Pick<BenchmarkWorkload, 'name' | 'area' | 'operationsPer
 /** Number of timed runs for each workload, after one un-timed warm-up. */
 const SAMPLE_COUNT = 5;
 const STRING_PART_COUNT = 25_000;
+const STRING_JOIN_REPEAT_COUNT = 64;
 const COMMAND_OPERATION_COUNT = 4_000;
 
 const CONFIG_SOURCE = JSON.stringify({
@@ -47,9 +48,21 @@ const WORKLOADS: readonly WorkloadScenario[] = [
     },
     {
         name: 'string-join',
-        area: 'Dense-array string joining',
-        operationsPerSample: STRING_PART_COUNT,
+        area: 'Batched dense ASCII array joining',
+        operationsPerSample: STRING_PART_COUNT * STRING_JOIN_REPEAT_COUNT,
         run: runStringJoin
+    },
+    {
+        name: 'string-radix-integer',
+        area: 'Integer radix formatting',
+        operationsPerSample: STRING_PART_COUNT,
+        run: runStringRadixInteger
+    },
+    {
+        name: 'string-join-unicode',
+        area: 'Unicode join correctness and code-unit behavior',
+        operationsPerSample: 7,
+        run: runStringJoinUnicode
     },
     {
         name: 'config-validation',
@@ -211,9 +224,58 @@ function runStringConstruction(): number {
 }
 
 function runStringJoin(): number {
-    const joined = STRING_PARTS.join('|');
+    let checksum = 0;
+    for (let repeat = 0; repeat < STRING_JOIN_REPEAT_COUNT; repeat++) {
+        const joined = STRING_PARTS.join('|');
+        checksum += joined.length + joined.charCodeAt(joined.length - 1);
+    }
+    return checksum;
+}
+
+function runStringRadixInteger(): number {
+    let checksum = 0;
+    for (let index = 0; index < STRING_PART_COUNT; index++) {
+        const text = index.toString(36);
+        checksum = (checksum + text.length + text.charCodeAt(text.length - 1)) >>> 0;
+    }
+
+    for (const [value, radix, expected] of RADIX_STRING_CASES) {
+        if (value.toString(radix) !== expected) return -1;
+    }
+    return checksum;
+}
+
+function runStringJoinUnicode(): number {
+    const parts: (string | null | undefined | { toString: () => string })[] = ['before', 'é', '𐐷', undefined, null];
+    parts[6] = {
+        toString() {
+            parts[0] = 'after';
+            return 'later';
+        }
+    };
+
+    const joined = parts.join('·');
+    if (joined !== 'before·é·𐐷····later') return -1;
     return joined.length + joined.charCodeAt(joined.length - 1);
 }
+
+const RADIX_STRING_CASES: readonly [number, number, string][] = [
+    [0, 36, '0'],
+    [35, 36, 'z'],
+    [36, 36, '10'],
+    [1, 2, '1'],
+    [2, 2, '10'],
+    [4, 2, '100'],
+    [8, 2, '1000'],
+    [-35, 36, '-z'],
+    [-36, 36, '-10'],
+    [-Number.MAX_SAFE_INTEGER, 36, '-2gosa7pa2gv'],
+    [Number.MAX_SAFE_INTEGER, 36, '2gosa7pa2gv'],
+    [-0, 36, '0'],
+    [0.5, 2, '0.1'],
+    [10.5, 2, '1010.1'],
+    [Number.MAX_SAFE_INTEGER + 1, 36, '2gosa7pa2gw']
+];
 
 function buildStringParts(): string[] {
     const parts = new Array<string>(STRING_PART_COUNT);

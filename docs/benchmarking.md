@@ -38,15 +38,15 @@ Each configuration receives the same workload source and input count. The integr
 - the production component is non-empty and within the build-size limit;
 - the plugin registers its command and exercises selected real Pumpkin API behavior.
 
-Workload timing uses JavaScript `Date.now()`, so samples are reported as integer milliseconds; the clock may be coarser in practice. For each workload, the report shows the median and the minimum-to-maximum range of the five samples. The timer covers the workload body; it does not include component compilation, server startup, plugin loading, or dispatching the outer benchmark command.
+Workload timing uses JavaScript `Date.now()`, so samples are reported as integer milliseconds; the clock may be coarser in practice. For each workload, the report shows the median and the minimum-to-maximum range of the five samples. The timer covers the workload body; it does not include component compilation, server startup, plugin loading, or dispatching the outer benchmark command. The repeated ASCII join baseline measured 44–82 ms across the nine configurations on this macOS arm64 host, above the 10 ms resolution target for this run; timing remains diagnostic and has no pass threshold.
 
-There are 24 timed workloads: 23 deterministic guest-side fixtures and one real Pumpkin API call. The fixture algorithms are representative examples written for this benchmark; they are not executions of the named plugins or Pumpkin’s own command router. Player-directory and other player-oriented fixture workloads use in-memory test data, not connected players.
+There are 26 timed workloads: 25 deterministic guest-side fixtures and one real Pumpkin API call. The fixture algorithms are representative examples written for this benchmark; they are not executions of the named plugins or Pumpkin’s own command router. Player-directory and other player-oriented fixture workloads use in-memory test data, not connected players.
 
 The configurations run serially: QuickJS first, then each Static Hermes profile, collector, and parser-mode combination, each with a newly started server. The real API workload calls `server.getAllPlayers()` 10,000 times per sample, or 60,000 calls per configuration including the warm-up and five measured samples. The test server has no connected players, so the returned list is empty. The test separately registers and dispatches one real `server.command()` command, along with event and scheduled-task behavior checks. That command dispatch is API behavior coverage, not a timed command-routing workload.
 
 ### Workload inventory
 
-“Inputs per sample” is the fixture’s configured loop or request count. It describes work within that particular row; it is not a common unit that makes different rows directly comparable.
+“Inputs per sample” is the fixture’s configured loop or request count. It describes work within that particular row; it is not a common unit that makes different rows directly comparable. For `string-join`, the count is array-element visits across all 64 joins in one sample.
 
 | Kind | Workload | Inputs per sample | What it represents |
 | --- | --- | ---: | --- |
@@ -54,7 +54,9 @@ The configurations run serially: QuickJS first, then each Static Hermes profile,
 | Synthetic | `objects` | 50,000 | Object allocation and traversal |
 | Synthetic | `strings` | 25,000 | String construction followed by joining |
 | Synthetic | `string-construction` | 25,000 | Construction of string parts |
-| Synthetic | `string-join` | 25,000 | Joining a prebuilt dense array of strings |
+| Synthetic | `string-join` | 1,600,000 | 64 joins of the same prebuilt dense array of 25,000 ASCII strings |
+| Synthetic | `string-radix-integer` | 25,000 | Converting integers from 0 through 24,999 to base 36 |
+| Synthetic | `string-join-unicode` | 7 | Joining sparse and mixed-Unicode values with a non-ASCII separator |
 | Synthetic | `config-validation` | 1,000 | JSON parsing and configuration validation |
 | Synthetic | `command-routing` | 4,000 | Guest-side tokenization, alias resolution, and route-map lookup |
 | Synthetic | `command-tokenization` | 4,000 | Command tokenization in isolation |
@@ -75,7 +77,7 @@ The configurations run serially: QuickJS first, then each Static Hermes profile,
 | Synthetic | `custom-payload` | 16,384 | Custom payload encoding |
 | Real API | `pumpkin-api` | 10,000 | Calls to `server.getAllPlayers()` |
 
-The string and command rows deliberately separate composite work from selected sub-operations. The composite string workload constructs and joins 25,000 parts; its two component workloads isolate construction and joining. Command routing combines tokenization, alias resolution, and route lookup; the standalone tokenization and lookup rows help show which portion may account for a difference.
+The string and command rows deliberately separate composite work from selected sub-operations. The composite string workload constructs and joins 25,000 parts; `string-construction` and `string-join` isolate construction and batched joining. The join repeats the same dense ASCII array 64 times per sample to make its timing easier to resolve with the millisecond clock. `string-radix-integer` uses the same 25,000-number range as the construction fixture and checks radix boundaries, negative and maximum safe integers, negative zero, fractional fallback, and an integer above the safe range. `string-join-unicode` checks a non-ASCII separator, ASCII/BMP/supplementary characters, holes, `null`, `undefined`, and a `toString` side effect that mutates an earlier array entry. JavaScript strings remain UTF-16 code-unit sequences, so the supplementary character contributes two to `String.length`. Command routing combines tokenization, alias resolution, and route lookup; the standalone tokenization and lookup rows help show which portion may account for a difference.
 
 ## Reading the report
 
@@ -84,13 +86,13 @@ The current report contains production component sizes, per-workload timings and
 - **Component sizes** are final production component byte counts. Size differences use QuickJS as the baseline: negative means smaller than QuickJS, positive means larger.
 - **Per-workload timings** show each engine’s median and sample range in milliseconds. Lower time means that engine completed that particular workload sooner in that run.
 - **QuickJS/engine** is the QuickJS median divided by that Static Hermes configuration's median. A ratio above 1 means Hermes was lower; below 1 means QuickJS was lower. A ratio shown as 1.00x can be a rounded tie, especially for workloads close to the timer’s one-millisecond resolution.
-- **Average benchmark median** is the arithmetic mean of the 24 per-workload medians. Every workload contributes equally, despite different input counts and different kinds of work. Treat it as a compact report statistic, not a representative plugin or server-performance score.
+- **Average benchmark median** is the arithmetic mean of the 26 per-workload medians. Every workload contributes equally, despite different input counts and different kinds of work. Treat it as a compact report statistic, not a representative plugin or server-performance score.
 
 The integration test has no timing thresholds. Timing results are diagnostic evidence, while checksum, API behavior, and component-size checks provide pass/fail assertions.
 
 ## Example CI result
 
-The [engine-comparison job linked from PR 99](https://github.com/filiphsps/pumpkin-plugins/actions/runs/38254750702/job/114834399434?pr=99) is one reference result. It checked out the PR merge ref at commit `2a4cfa19157cfabed67f41de16b199c3fc1c0775` on a GitHub-hosted Ubuntu 26.04 runner. The run is evidence for that merge candidate and runner only; it does not describe master or another revision. The job log does not identify the runner’s CPU model. This historical run predates the GC and parser axes in the current matrix; it compares QuickJS with full and lean Hermes using Hades GC. The workload implementations match the inventory documented here, and the table below uses the current workload identifiers.
+The [engine-comparison job linked from PR 99](https://github.com/filiphsps/pumpkin-plugins/actions/runs/38254750702/job/114834399434?pr=99) is one reference result. It checked out the PR merge ref at commit `2a4cfa19157cfabed67f41de16b199c3fc1c0775` on a GitHub-hosted Ubuntu 26.04 runner. The run is evidence for that merge candidate and runner only; it does not describe master or another revision. The job log does not identify the runner’s CPU model. This historical run predates the GC and parser axes in the current matrix; it compares QuickJS with full and lean Hermes using Hades GC. It also predates the repeated join and radix/Unicode workloads described above, so its string-join row measures a single join and is not a result for the current workload.
 
 ### Component sizes in that run
 
