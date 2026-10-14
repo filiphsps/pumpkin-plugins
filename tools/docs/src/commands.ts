@@ -324,7 +324,11 @@ export function commandPermissionInfos(tree: CommandTree): CommandPermissionInfo
     ): CommandPermissionInfo => {
         const existing = permissions.get(node);
         if (existing) {
-            if (JSON.stringify(existing.defaultPermission) !== JSON.stringify(defaultPermission)) {
+            const defaultsMatch =
+                existing.defaultPermission.tag === defaultPermission.tag &&
+                (existing.defaultPermission.tag !== 'op' ||
+                    (defaultPermission.tag === 'op' && existing.defaultPermission.val === defaultPermission.val));
+            if (!defaultsMatch) {
                 throw new Error(`conflicting defaults for command permission ${node}`);
             }
             return existing;
