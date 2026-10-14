@@ -47,7 +47,7 @@
     },
     "dependencies": {
         "fast-xml-parser": "5.11.2",
-        "fflate": "0.8.3"
+        "fflate": "catalog:"
     },
     "devDependencies": {
         "@types/node": "catalog:",
