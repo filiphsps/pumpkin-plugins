@@ -158,22 +158,41 @@ class WasiDial implements Dial {
     poll(): Connection | undefined {
         const socket = this.socket;
         if (!socket) return undefined;
+        let streams: [InputStream, OutputStream] | undefined;
         try {
-            const [input, output] = socket.finishConnect();
-            this.socket = undefined;
+            streams = socket.finishConnect();
             const local = socket.localAddress();
             const from = local.tag === 'ipv4' ? local.val.address : [0, 0, 0, 0];
-            return new WasiConnection(socket, input, output, [from[0] ?? 0, from[1] ?? 0, from[2] ?? 0, from[3] ?? 0]);
+            const connection = new WasiConnection(socket, streams[0], streams[1], [
+                from[0] ?? 0,
+                from[1] ?? 0,
+                from[2] ?? 0,
+                from[3] ?? 0,
+            ]);
+            this.socket = undefined;
+            return connection;
         } catch (err) {
-            if (wasiErrorCode(err) === 'would-block') return undefined;
+            if (!streams && wasiErrorCode(err) === 'would-block') return undefined;
+            for (const stream of streams ?? []) {
+                try {
+                    disposeWasiResource(stream);
+                } catch {
+                    // Already released.
+                }
+            }
             this.abort();
             throw new Error(describe(err));
         }
     }
 
     abort(): void {
-        if (this.socket) disposeWasiResource(this.socket);
+        const socket = this.socket;
         this.socket = undefined;
+        try {
+            disposeWasiResource(socket);
+        } catch {
+            // Already released.
+        }
     }
 }
 

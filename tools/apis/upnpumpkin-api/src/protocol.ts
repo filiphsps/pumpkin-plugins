@@ -58,9 +58,45 @@ const MAX_KEY = 64;
 const MAX_DESCRIPTION = 100;
 
 const isPort = (value: unknown): value is number =>
-    Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 65535;
+    typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 65535;
 const isText = (value: unknown, max: number): value is string =>
     typeof value === 'string' && value.length > 0 && value.length <= max;
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isPortStatus = (value: unknown): value is PortStatus => {
+    if (!isRecord(value)) return false;
+
+    switch (value.kind) {
+        case 'pending':
+        case 'unknown':
+            return true;
+        case 'open':
+            return (
+                (value.via === 'public' || value.via === 'upnp' || value.via === 'nat-pmp') &&
+                typeof value.address === 'string' &&
+                isPort(value.port)
+            );
+        case 'failed':
+            return typeof value.reason === 'string';
+        default:
+            return false;
+    }
+};
+
+const isNetworkInfo = (value: unknown): value is NetworkInfo => {
+    if (!isRecord(value)) return false;
+    if (value.externalAddress !== undefined && typeof value.externalAddress !== 'string') return false;
+    if (value.localAddress !== undefined && typeof value.localAddress !== 'string') return false;
+
+    const gateway = value.gateway;
+    return (
+        gateway === undefined ||
+        (isRecord(gateway) &&
+            (gateway.kind === 'upnp' || gateway.kind === 'nat-pmp') &&
+            typeof gateway.address === 'string')
+    );
+};
 
 /** Writes a request as the bytes of an IPC message. */
 export function encodeRequest(request: Request): Uint8Array {
@@ -125,13 +161,19 @@ export function decodeRequest(bytes: Uint8Array): { request: Request } | { error
  */
 export function decodeReply(bytes: Uint8Array): Reply | undefined {
     try {
-        const value = JSON.parse(strFromU8(bytes)) as Record<string, unknown>;
-        if (value.v !== PROTOCOL_VERSION || typeof value.ok !== 'boolean') return undefined;
+        const value: unknown = JSON.parse(strFromU8(bytes));
+        if (!isRecord(value) || value.v !== PROTOCOL_VERSION || typeof value.ok !== 'boolean') return undefined;
         if (!value.ok) return { ok: false, error: typeof value.error === 'string' ? value.error : 'unknown error' };
+
+        const status = value.status;
+        const info = value.info;
+        if (status !== undefined && !isPortStatus(status)) return undefined;
+        if (info !== undefined && !isNetworkInfo(info)) return undefined;
+
         return {
             ok: true,
-            status: value.status as PortStatus | undefined,
-            info: value.info as NetworkInfo | undefined,
+            status,
+            info,
         };
     } catch {
         return undefined;

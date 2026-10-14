@@ -43,8 +43,21 @@ describe('requests', () => {
 describe('replies', () => {
     it('survive the trip', () => {
         const replies = [
+            { ok: true, status: { kind: 'pending' } },
             { ok: true, status: { kind: 'open', via: 'upnp', address: '1.2.3.4', port: 8123 } },
+            { ok: true, status: { kind: 'open', via: 'public', address: '1.2.3.4', port: 8123 } },
+            { ok: true, status: { kind: 'open', via: 'nat-pmp', address: '1.2.3.4', port: 8123 } },
+            { ok: true, status: { kind: 'failed', reason: 'router denied the request' } },
+            { ok: true, status: { kind: 'unknown' } },
             { ok: true, info: { localAddress: '192.168.1.5' } },
+            {
+                ok: true,
+                info: {
+                    externalAddress: '1.2.3.4',
+                    gateway: { kind: 'nat-pmp', address: '192.168.1.1' },
+                    localAddress: '192.168.1.5',
+                },
+            },
             { ok: false, error: 'nope' },
         ] as const;
         for (const reply of replies) expect(decodeReply(encodeReply(reply))).toEqual(reply);
@@ -54,5 +67,22 @@ describe('replies', () => {
         expect(decodeReply(strToU8('{"v":2,"ok":true}'))).toBeUndefined();
         expect(decodeReply(strToU8('{"v":1}'))).toBeUndefined();
         expect(decodeReply(strToU8('garbage'))).toBeUndefined();
+    });
+
+    it('ignores success replies with malformed status or info', () => {
+        const malformed = [
+            { ok: true, status: { kind: 'open', via: 'upnp', address: '1.2.3.4' } },
+            { ok: true, status: { kind: 'open', via: 'unknown', address: '1.2.3.4', port: 8123 } },
+            { ok: true, status: { kind: 'open', via: 'public', address: '1.2.3.4', port: '8123' } },
+            { ok: true, status: { kind: 'failed', reason: 42 } },
+            { ok: true, status: { kind: 'connected' } },
+            { ok: true, info: 'connected' },
+            { ok: true, info: { localAddress: 42 } },
+            { ok: true, info: { gateway: { kind: 'unknown', address: '192.168.1.1' } } },
+        ];
+
+        for (const reply of malformed) {
+            expect(decodeReply(strToU8(JSON.stringify({ v: 1, ...reply })))).toBeUndefined();
+        }
     });
 });
