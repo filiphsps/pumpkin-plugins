@@ -30,7 +30,7 @@ export interface BenchmarkComparison {
 /** Inputs used to write a repeatable pull request comment for one benchmark run. */
 export interface BenchmarkCommentDetails {
     baselineSha?: string;
-    chartRunUrl?: string;
+    chartUrl?: string;
     comparison?: BenchmarkComparison;
     currentSha: string;
     noBaselineReason?: string;
@@ -181,7 +181,13 @@ export function formatBenchmarkComment(details: BenchmarkCommentDetails): string
     }
 
     lines.push(`[Full benchmark matrix report](${details.reportRunUrl}).`);
-    if (details.chartRunUrl) lines.push(`[Download the SVG comparison chart](${details.chartRunUrl}).`);
+    if (details.chartUrl) {
+        lines.push(
+            `[Download the SVG comparison chart](${details.chartUrl}).`,
+            '',
+            `![Benchmark timing changes](${details.chartUrl})`,
+        );
+    }
     return lines.join('\n');
 }
 

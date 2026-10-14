@@ -30,7 +30,7 @@ shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after change classification | Starts Static Hermes preparation while lint and typecheck run, then builds every production plugin with its configured engine (Static Hermes by default), runs integration checks, and rebuilds release artifacts with the same runtime before signing and verification |
 | 📊 Engine comparison | code changes, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`; nine engine configurations run as parallel matrix jobs, then a report job validates and combines their real-Pumpkin results |
-| 📈 Engine comparison comment | successful PR CI runs with a benchmark report | `.github/workflows/engine-comparison-comment.yml` compares with the latest matching default-branch report, updates one PR comment, and uploads an SVG timing-change chart |
+| 📈 Engine comparison comment | successful PR CI runs with a benchmark report | `.github/workflows/engine-comparison-comment.yml` compares with the latest matching default-branch report, updates one PR comment, and publishes and embeds a durable SVG timing-change chart |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint and build | Reuses the Static Hermes cache saved by Build, then generates a throwaway plugin and action, checks release registration and READMEs, tests the action, and typechecks, builds and integration-tests the plugin |
 | 🚢 Release | plugin, action or public tool release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; actions create GitHub releases, public tools publish npm tarballs, and plugins produce signed artifacts and Market listings |
@@ -43,7 +43,13 @@ link in the build job summary, for one day. CI deletes the integration WASM file
 integration succeeds or is skipped, even if another job fails; it keeps them when integration fails
 so that job can be retried. Per-release handoff artifacts are deleted only after the reusable
 release workflow succeeds; a failed release keeps them available for a failed-job rerun. Failure
-logs remain available for diagnosis. The Docs workflow deletes its `docs-site` and `github-pages`
+logs remain available for diagnosis. Benchmark reports and chart artifacts are excluded from CI
+cleanup and retained for 90 days. Comment charts are also published to the isolated
+`benchmark-reports` branch, so their direct links and inline images survive artifact expiration.
+The comment workflow uses the release GitHub App's installation token with Actions read, contents
+write and pull-requests write permissions for discovery, downloads, chart publication and comments.
+The App installation must grant those permissions.
+The Docs workflow deletes its `docs-site` and `github-pages`
 artifacts after publishing succeeds or is skipped, and keeps them if publishing fails so it can be
 retried. Fork and Dependabot pull requests use read-only tokens, so their temporary artifacts expire
 after one day instead of being deleted by the workflows.
@@ -414,8 +420,9 @@ These aren't done by the workflows:
 
 1. Settings, General, Pull Requests: enable **Allow rebase merging** only. Disable squash and merge
    commits.
-2. Create and install a GitHub App on this repository with `contents`, `issues` and `pull-requests`
-   write permissions. Add its Client ID as the `RELEASE_APP_CLIENT_ID` Actions variable and its
+2. Create and install a GitHub App on this repository with `actions` read and `contents`, `issues`
+   and `pull-requests` write permissions. The benchmark comment workflow uses Actions read to
+   discover and download reports. Add its Client ID as the `RELEASE_APP_CLIENT_ID` Actions variable and its
    private key as the `RELEASE_APP_PRIVATE_KEY` Actions secret. The release jobs use its
    installation tokens so release PRs and their updates trigger CI.
 3. Add the Ed25519 signing key as the `PLUGIN_SIGNING_KEY` secret (see [Signing](#signing)).

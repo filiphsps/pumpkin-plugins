@@ -47,8 +47,14 @@ ancestor of the PR base. Changes within 10% are treated as runner jitter by defa
 variable `BENCHMARK_JITTER_PERCENT` to change that threshold. A slower result beyond the threshold
 produces a warning, significant improvements produce a celebration when there are no regressions, and
 otherwise the comment reports the run without a performance alert. The comment links to the full
-matrix report and an SVG chart of the largest changes. If no matching baseline artifact exists, the
-comment reports that and does not classify timing changes.
+matrix report and embeds an SVG chart of the largest changes, with a direct SVG download link.
+The trusted comment workflow stores each chart under its run ID and attempt on the dedicated
+`benchmark-reports` branch using the same GitHub App credentials as releases. Artifact discovery and
+chart publication run through `scripts/discover-benchmark-artifacts.mjs` and
+`scripts/publish-benchmark-chart.mjs`. Published charts remain available after Actions artifact cleanup or
+expiration; later reports and reruns preserve earlier charts. The chart artifact is also retained
+for 90 days. If no matching baseline artifact exists, the comment reports that and does not classify
+timing changes.
 
 The benchmark plugin and workload definitions are in [benchmark-plugin.ts](../benchmarks/engine-comparison/src/benchmark-plugin.ts) and [benchmark-workloads.ts](../benchmarks/engine-comparison/src/benchmark-workloads.ts).
 

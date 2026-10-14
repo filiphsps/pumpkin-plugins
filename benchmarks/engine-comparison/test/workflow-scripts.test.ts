@@ -103,6 +103,8 @@ it('writes a PR comment and SVG from current and baseline result artifacts', () 
             ENGINE_COMPARISON_BASELINE_RESULTS: baselineResultsPath,
             BENCHMARK_COMMENT_FILE: commentPath,
             BENCHMARK_CHANGE_SVG: chartPath,
+            BENCHMARK_CHART_URL:
+                'https://raw.githubusercontent.com/example/repo/benchmark-reports/charts/789/1/engine-comparison-change.svg',
             BASELINE_SHA: '1234567890abcdef',
             CURRENT_SHA: 'abcdef1234567890',
             GITHUB_REPOSITORY: 'example/repo',
@@ -117,7 +119,11 @@ it('writes a PR comment and SVG from current and baseline result artifacts', () 
         expect(comment.split('\n')[0]).toMatch(/regression/i);
         expect(comment).toContain('shared-workload');
         expect(comment).toContain('https://github.com/example/repo/actions/runs/456');
-        expect(comment).toContain('https://github.com/example/repo/actions/runs/789/artifacts');
+        const chartUrl =
+            'https://raw.githubusercontent.com/example/repo/benchmark-reports/charts/789/1/engine-comparison-change.svg';
+        expect(comment).toContain(`[Download the SVG comparison chart](${chartUrl})`);
+        expect(comment).toContain(`![Benchmark timing changes](${chartUrl})`);
+        expect(comment).not.toContain('/artifacts');
         expect(chart).toContain('<svg');
         expect(chart).toContain('shared-workload');
     } finally {

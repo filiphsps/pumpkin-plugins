@@ -99,6 +99,19 @@ it('escapes benchmark labels in the repeatable PR comment', () => {
     expect(comment).not.toContain('<script>');
 });
 
+it('links and embeds the published chart even without a baseline', () => {
+    const chartUrl = 'https://raw.githubusercontent.com/example/repo/benchmark-reports/charts/123/1/chart.svg';
+    const comment = formatBenchmarkComment({
+        currentSha: 'abcdef1234567890',
+        reportRunUrl: 'https://github.com/example/repo/actions/runs/123',
+        chartUrl,
+    });
+
+    expect(comment).toContain(`[Download the SVG comparison chart](${chartUrl})`);
+    expect(comment).toContain(`![Benchmark timing changes](${chartUrl})`);
+    expect(comment).toContain('No matching baseline');
+});
+
 function engine(id: string, workloads: BenchmarkWorkload[]): EngineResult {
     return {
         apiBehavior: {

@@ -8,6 +8,8 @@ const cliScripts = [
     'scripts/build.mjs',
     'scripts/changed-areas.mjs',
     'scripts/collect-plugins.mjs',
+    'scripts/discover-benchmark-artifacts.mjs',
+    'scripts/publish-benchmark-chart.mjs',
     'scripts/dev.mjs',
     'scripts/market-plugin-metadata.mjs',
     'scripts/market-plugin-name.mjs',
