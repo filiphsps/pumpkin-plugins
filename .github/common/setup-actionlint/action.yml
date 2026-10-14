@@ -1,0 +1,19 @@
+name: Setup actionlint
+description: Install the pinned actionlint version for workflow validation
+
+runs:
+    using: composite
+    steps:
+        - name: 📥 Install actionlint
+          shell: bash
+          run: |
+              set -euo pipefail
+              actionlint_version=1.7.12
+              install_directory="$RUNNER_TEMP/actionlint"
+              installer="$RUNNER_TEMP/download-actionlint.bash"
+              mkdir -p "$install_directory"
+              curl --fail --location --silent --show-error \
+                  "https://raw.githubusercontent.com/rhysd/actionlint/v${actionlint_version}/scripts/download-actionlint.bash" \
+                  --output "$installer"
+              bash "$installer" "$actionlint_version" "$install_directory"
+              echo "$install_directory" >> "$GITHUB_PATH"

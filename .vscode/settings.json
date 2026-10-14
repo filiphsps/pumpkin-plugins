@@ -1,4 +1,5 @@
 {
+    "actionlint.enable": true,
     "biome.requireConfiguration": true,
     "cSpell.words": [
         "appleskin",
@@ -33,6 +34,7 @@
         "pollable",
         "pumpkinmc",
         "rcode",
+        "shermes",
         "smol",
         "Speedport",
         "SSDP",

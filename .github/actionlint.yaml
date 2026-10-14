@@ -1,0 +1,10 @@
+# This GitHub-hosted runner label is newer than actionlint's built-in runner list.
+self-hosted-runner:
+  labels:
+    - ubuntu-26.04
+
+paths:
+  .github/workflows/release.yml:
+    ignore:
+      # Single-quoted JS and command strings intentionally defer expansion to the inner shell.
+      - "shellcheck reported issue in this script: SC2016:.*Expressions don't expand in single quotes, use double quotes for that"

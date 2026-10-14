@@ -1,0 +1,31 @@
+name: Actionlint
+
+on:
+    pull_request:
+    push:
+        branches:
+            - master
+            - main
+    workflow_dispatch:
+
+concurrency:
+    group: actionlint-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+    contents: read
+
+jobs:
+    lint:
+        name: 🔍 Lint GitHub workflows
+        timeout-minutes: 5
+        runs-on: ubuntu-26.04
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🔧 Setup actionlint
+              uses: ./.github/common/setup-actionlint
+
+            - name: 🔍 Lint GitHub workflows
+              run: actionlint -color

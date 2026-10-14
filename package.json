@@ -29,6 +29,7 @@
         "gen": "turbo gen plugin",
         "gen:action": "turbo gen action",
         "lint": "biome check . && eslint .",
+        "lint:actions": "actionlint -color",
         "lint:fix": "biome check --write --unsafe --html-formatter-enabled=true . && eslint --fix .",
         "lint:commits": "commitlint --from HEAD~1",
         "build": "node scripts/build.mjs --log-order=grouped --log-prefix=task --output-logs=new-only",

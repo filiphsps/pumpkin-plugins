@@ -10,8 +10,9 @@ in the reusable `.github/workflows/external-consumer.yml`. Release orchestration
 `.github/workflows/release.yml`, called after the CI gates pass. Action tests run through
 the reusable `.github/workflows/actions.yml`, scoped to action code. The documentation site has its own
 `.github/workflows/docs.yml`, which checks and publishes the VitePress site and mirrors it to
-`gh-pages`. The shared setup (pnpm, Node,
-install, Turborepo cache) is the composite action in `.github/common/bootstrap`. Most CI jobs use
+`gh-pages`. GitHub workflow validation runs independently in `.github/workflows/actionlint.yml`. The
+shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
+`.github/common/bootstrap`. Most CI jobs use
 `ubuntu-26.04`; the external-consumer matrix also runs on `macos-15` and `windows-2025`.
 
 ## Jobs

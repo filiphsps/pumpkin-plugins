@@ -11,6 +11,8 @@ on:
             - '!tools/**/docs/**'
             - '!actions/*/docs/**'
             - '!.github/workflows/docs.yml'
+            - '!.github/workflows/actionlint.yml'
+            - '!.github/actionlint.yaml'
             - '!LICENSE'
             # The generated README commit needs CI's generated_readmes check to run.
             - 'README.md'
@@ -29,6 +31,8 @@ on:
             - '!tools/**/docs/**'
             - '!actions/*/docs/**'
             - '!.github/workflows/docs.yml'
+            - '!.github/workflows/actionlint.yml'
+            - '!.github/actionlint.yaml'
             - '!LICENSE'
             # The generated README commit needs CI's generated_readmes check to run.
             - 'README.md'

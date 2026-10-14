@@ -24,6 +24,7 @@ From the repo root:
 node .agents/hooks/check.mjs --plan
 node .agents/hooks/check.mjs
 node .agents/hooks/check.mjs packages/upnpumpkin/src/plugin.ts
+pnpm run lint:actions
 ```
 
 `--plan` prints JSON with the files and commands without executing them. With no paths, the runner
@@ -35,6 +36,7 @@ include deleted files. Checks never apply lint fixes. Use scoped `pnpm exec biom
 | --- | --- |
 | Existing files | Biome; TypeScript files also get the JSDoc lint |
 | Lint configuration | Whole-repo lint, to catch newly invalid existing code |
+| GitHub workflow or `.github/actionlint.yaml` | `pnpm run lint:actions` |
 | Package code | Typecheck and unit tests for that package and workspace dependents |
 | Shared root build inputs or lockfile | Typecheck and unit tests for all packages |
 | Deleted package | All package typechecks and unit tests, to catch remaining imports |
@@ -45,6 +47,18 @@ include deleted files. Checks never apply lint fixes. Use scoped `pnpm exec biom
 Markdown-only package edits skip package tests. `tools/build/src/` is source, not generated output.
 Real-server tests are deliberately separate; see [Testing](testing.md) and
 [the testing skill](https://github.com/filiphsps/pumpkin-plugins/blob/master/.agents/skills/pumpkin-testing/SKILL.md).
+
+The Actionlint workflow installs actionlint `1.7.12` and lints every workflow. To run the same check
+locally, install that version using the [upstream installation guide](https://github.com/rhysd/actionlint/blob/v1.7.12/docs/install.md).
+With Go installed, run:
+
+```sh
+go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+pnpm run lint:actions
+```
+
+The `.github/actionlint.yaml` config registers the `ubuntu-26.04` runner label, which is not yet in
+actionlint's built-in runner list.
 
 The direct no-path runner checks every dirty file in the checkout. Codex completion hooks compare the
 working tree around each tool call, then record only changed files explicitly targeted by `Edit`,
