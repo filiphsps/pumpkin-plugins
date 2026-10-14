@@ -8,7 +8,6 @@ import {
     acquireChunk,
     type TerrainAccess,
     type TerrainRegion,
-    type TerrainSample,
     unavailableChunkLoader,
     unavailableTerrainGenerator,
 } from '@pumpkin-plugins/terrain';
@@ -49,7 +48,7 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
         let lastColumn = '',
             columnTopY: number | undefined,
             lastId = -1,
-            lastSample: TerrainSample | undefined,
+            lastMaterial: string | undefined,
             lastBiome = '',
             surfaceBiome: string | undefined;
         const sampleBiomes3d = settings.worlds[level]?.sample_biomes_3d === true;
@@ -63,7 +62,7 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
             surfaceBiome = undefined;
             lastId = -1;
             lastBiome = '';
-            lastSample = undefined;
+            lastMaterial = undefined;
         };
         const topBlockY = (x: number, z: number) => {
             enterColumn(x, z);
@@ -130,23 +129,25 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                     }
                     biome = surfaceBiome;
                 }
-                if (id === lastId && biome === lastBiome && lastSample) return lastSample;
-                const state = blockStateToInfo(id);
-                if (!state) throw new Error('Unknown block state');
-                const properties = [...state.properties]
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([k, v]) => `{${k}:${v}}`)
-                    .join('');
-                const material = `${biome}_DH-BSW_${state.name}${properties ? `_STATE_${properties}` : ''}`;
+                let material = lastMaterial;
+                if (id !== lastId || biome !== lastBiome || material === undefined) {
+                    const state = blockStateToInfo(id);
+                    if (!state) throw new Error('Unknown block state');
+                    const properties = [...state.properties]
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([k, v]) => `{${k}:${v}}`)
+                        .join('');
+                    material = `${biome}_DH-BSW_${state.name}${properties ? `_STATE_${properties}` : ''}`;
+                    lastId = id;
+                    lastBiome = biome;
+                    lastMaterial = material;
+                }
                 const lightPos = { x, y: Math.min(minY + height - 1, y + 1), z };
-                lastId = id;
-                lastBiome = biome;
-                lastSample = {
+                return {
                     material,
                     skyLight: terrainWorld.getSkyLight(lightPos),
                     blockLight: terrainWorld.getBlockLight(lightPos),
                 };
-                return lastSample;
             },
         };
         use({

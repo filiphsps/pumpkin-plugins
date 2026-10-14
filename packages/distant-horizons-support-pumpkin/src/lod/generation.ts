@@ -2,8 +2,28 @@ import { SECTION_SIZE_BLOCKS } from '../protocol/constants.ts';
 
 /** Radius used when a forced LOD capture does not specify one. */
 export const DEFAULT_LOD_GENERATION_RADIUS = 0;
-/** Maximum forced capture radius, in LOD sections. */
-export const MAX_LOD_GENERATION_RADIUS = 16_384;
+/** Maximum selected sections for one forced capture request. */
+export const MAX_LOD_GENERATION_SECTIONS = 4_096;
+/** Maximum square radius whose selected area fits the forced-capture section limit. */
+export const MAX_LOD_GENERATION_RADIUS = Math.floor((Math.floor(Math.sqrt(MAX_LOD_GENERATION_SECTIONS)) - 1) / 2);
+
+/**
+ * Returns the number of sections selected by a square radius after enforcing the work limit.
+ *
+ * @param radius - Radius in LOD sections
+ * @returns The selected section count
+ * @throws {RangeError} When the radius is invalid or exceeds the selected-section limit
+ */
+export function lodGenerationSectionCount(radius: number): number {
+    const rangeError = new RangeError(
+        `Radius must be between 0 and ${MAX_LOD_GENERATION_RADIUS} LOD sections (at most ${MAX_LOD_GENERATION_SECTIONS} requested sections).`,
+    );
+    if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_GENERATION_RADIUS) throw rangeError;
+
+    const diameter = radius * 2 + 1;
+    if (diameter > Math.floor(MAX_LOD_GENERATION_SECTIONS / diameter)) throw rangeError;
+    return diameter * diameter;
+}
 
 /** A LOD section in signed section coordinates. */
 export interface LodSectionCoordinate {
@@ -25,9 +45,7 @@ export function* iterateLodSectionsAround(
     blockZ: number,
     radius = DEFAULT_LOD_GENERATION_RADIUS,
 ): Generator<LodSectionCoordinate> {
-    if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_GENERATION_RADIUS) {
-        throw new RangeError(`Radius must be between 0 and ${MAX_LOD_GENERATION_RADIUS} LOD sections.`);
-    }
+    lodGenerationSectionCount(radius);
     if (!Number.isSafeInteger(blockX) || !Number.isSafeInteger(blockZ)) {
         throw new RangeError('Block coordinates must be safe integers.');
     }
@@ -49,9 +67,7 @@ export function* iterateLodSectionsWithin(
     radius: number,
     bounds: LodSectionBounds,
 ): Generator<LodSectionCoordinate> {
-    if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_GENERATION_RADIUS) {
-        throw new RangeError(`Radius must be between 0 and ${MAX_LOD_GENERATION_RADIUS} LOD sections.`);
-    }
+    lodGenerationSectionCount(radius);
     if (!Number.isSafeInteger(blockX) || !Number.isSafeInteger(blockZ)) {
         throw new RangeError('Block coordinates must be safe integers.');
     }

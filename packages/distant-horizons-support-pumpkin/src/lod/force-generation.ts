@@ -10,7 +10,8 @@ import {
     iterateLodSectionsWithin,
     type LodSectionBounds,
     type LodSectionCoordinate,
-    MAX_LOD_GENERATION_RADIUS,
+    lodGenerationSectionCount,
+    MAX_LOD_GENERATION_SECTIONS,
     sectionKey,
 } from './generation.ts';
 import { lodLocation } from './location.ts';
@@ -85,9 +86,7 @@ export class ForcedLodGeneration {
     /** Starts one bounded, cache-refreshing job around the selected block position. */
     start(peer: ForcedLodPeer, blockX: number, blockZ: number, radius = 0): ForcedLodStart {
         if (this.job) throw new Error('A forced LOD generation job is already running.');
-        if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_GENERATION_RADIUS) {
-            throw new RangeError(`Radius must be between 0 and ${MAX_LOD_GENERATION_RADIUS} LOD sections.`);
-        }
+        const sections = lodGenerationSectionCount(radius);
         if (!Number.isSafeInteger(blockX) || !Number.isSafeInteger(blockZ)) {
             throw new RangeError('Block coordinates must be safe integers.');
         }
@@ -95,7 +94,7 @@ export class ForcedLodGeneration {
         if (memoryLimit === 0 && diskLimit === 0) throw new Error('Both LOD cache tiers are disabled.');
 
         const selection = this.validateSelection(peer, blockX, blockZ, radius);
-        return this.begin(peer, blockX, blockZ, radius, selection);
+        return this.begin(peer, blockX, blockZ, radius, { ...selection, sections });
     }
 
     /** Backs up, removes and rebuilds one explicitly selected cached LOD section. */
@@ -104,6 +103,7 @@ export class ForcedLodGeneration {
         if (!Number.isSafeInteger(blockX) || !Number.isSafeInteger(blockZ)) {
             throw new RangeError('Block coordinates must be safe integers.');
         }
+        const sections = lodGenerationSectionCount(0);
         const { memoryLimit, diskLimit } = this.cache.stats();
         if (memoryLimit === 0 && diskLimit === 0) throw new Error('Both LOD cache tiers are disabled.');
 
@@ -122,7 +122,7 @@ export class ForcedLodGeneration {
 
         const backup = this.cache.backupAndRemove(key);
         if (!backup) throw new Error('Selected cache entry could not be backed up; it was preserved.');
-        return { start: this.begin(peer, blockX, blockZ, 0, selection), backup };
+        return { start: this.begin(peer, blockX, blockZ, 0, { ...selection, sections }), backup };
     }
 
     private begin(
@@ -130,11 +130,11 @@ export class ForcedLodGeneration {
         blockX: number,
         blockZ: number,
         radius: number,
-        selection: { bounds: LodSectionBounds; inBorderSections: number },
+        selection: { bounds: LodSectionBounds; inBorderSections: number; sections: number },
     ): ForcedLodStart {
-        const sections = (radius * 2 + 1) ** 2;
         const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
         const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
+        const { sections } = selection;
 
         this.job = {
             owner: peer.name,
@@ -373,7 +373,12 @@ export class ForcedLodGeneration {
         );
         if (minX > maxX || minZ > maxZ) throw new Error('No requested LOD sections are inside the world border.');
 
-        const inBorderSections = (maxX - minX + 1) * (maxZ - minZ + 1);
+        const width = maxX - minX + 1;
+        const depth = maxZ - minZ + 1;
+        if (width > Math.floor(MAX_LOD_GENERATION_SECTIONS / depth)) {
+            throw new RangeError('Selected LOD sections exceed the forced-generation work limit.');
+        }
+        const inBorderSections = width * depth;
         return { bounds: { minX, maxX, minZ, maxZ }, inBorderSections };
     }
 

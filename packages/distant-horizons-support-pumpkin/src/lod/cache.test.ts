@@ -4,7 +4,89 @@ import { Reader } from '../protocol/bytes.ts';
 import { LodCache } from './cache.ts';
 
 const lod = (updated: number) => ({ updated, data: new Uint8Array(100).fill(updated) });
+const oversizedCacheFile = new Uint8Array(16 * 1024 * 1024 + 1);
+
+class TrackingFiles extends MemoryFiles {
+    readonly openedPaths: string[] = [];
+
+    override open(path: string) {
+        this.openedPaths.push(path);
+        return super.open(path);
+    }
+}
+
+class ShortReadFiles extends MemoryFiles {
+    readonly writes: string[] = [];
+
+    override open(path: string) {
+        const file = super.open(path);
+        let returnedPrefix = false;
+        return {
+            size: file.size,
+            read(offset: number, length: number): Uint8Array {
+                if (returnedPrefix) return new Uint8Array();
+                returnedPrefix = true;
+                return file.read(offset, Math.min(length, 8));
+            },
+            close: () => file.close(),
+        };
+    }
+
+    override writeFile(path: string, content: Uint8Array): void {
+        this.writes.push(path);
+        super.writeFile(path, content);
+    }
+}
+
+function onlyCachePath(files: MemoryFiles): string {
+    const name = files.list('cache')[0];
+    if (!name) throw new Error('Expected one cached entry');
+    return `cache/${name}`;
+}
+
 describe('LOD cache', () => {
+    it('restores a disk-only entry whose encoded file reaches the size limit', () => {
+        const files = new MemoryFiles();
+        const key = 'world:🌍';
+        const maxPayloadBytes = 16 * 1024 * 1024 - 22 - 10;
+        const data = new Uint8Array(maxPayloadBytes).fill(42);
+
+        new LodCache(files, 0, 1).put(key, { updated: 1234, data });
+
+        const name = files.list('cache')[0];
+        if (!name) throw new Error('Expected the cache entry to be persisted');
+        const path = `cache/${name}`;
+        expect(files.stat(path)?.size).toBe(16 * 1024 * 1024);
+
+        const restored = new LodCache(files, 0, 1).get(key);
+        expect(restored?.updated).toBe(1234);
+        expect(restored?.data).toHaveLength(maxPayloadBytes);
+        expect(restored?.data[0]).toBe(42);
+        expect(restored?.data.at(-1)).toBe(42);
+    });
+
+    it('rejects one byte over the encoded file limit before writing or caching it', () => {
+        class WriteTrackingFiles extends MemoryFiles {
+            writeCount = 0;
+
+            override writeFile(path: string, content: Uint8Array): void {
+                this.writeCount++;
+                super.writeFile(path, content);
+            }
+        }
+
+        const files = new WriteTrackingFiles();
+        const cache = new LodCache(files, 1, 1);
+        const key = 'world:🌍';
+        const maxPayloadBytes = 16 * 1024 * 1024 - 22 - 10;
+
+        expect(() => cache.put(key, { updated: 1234, data: new Uint8Array(maxPayloadBytes + 1) })).toThrow(
+            'LOD exceeds cache size limit',
+        );
+        expect(files.writeCount).toBe(0);
+        expect(cache.stats()).toMatchObject({ memoryEntries: 0, diskEntries: 0 });
+    });
+
     it('does not rescan the disk directory when writing after startup', () => {
         class CountingFiles extends MemoryFiles {
             listCalls = 0;
@@ -87,6 +169,83 @@ describe('LOD cache', () => {
         expect(() => cache.backupAndRemove(key)).toThrow('manifest write failed');
         expect(cache.get(key)?.data).toEqual(new Uint8Array(64).fill(8));
         expect(files.list('cache-recovery')).toHaveLength(1);
+    });
+
+    it('preserves the source when a disk backup read reaches EOF before the reported size', () => {
+        const files = new ShortReadFiles();
+        const key = 'world:short-read';
+        new LodCache(files, 0, 2).put(key, lod(1));
+        const cachePath = onlyCachePath(files);
+        files.writes.length = 0;
+        const cache = new LodCache(files, 0, 2);
+
+        expect(cache.backupAndRemove(key)).toBeUndefined();
+
+        expect(files.writes).toEqual([]);
+        expect(files.stat(cachePath)?.kind).toBe('file');
+        expect(cache.has(key)).toBe(true);
+        expect(files.stat('cache-recovery')).toBeUndefined();
+    });
+
+    it('preserves an indexed oversized disk recovery entry without reading or backing it up', () => {
+        const files = new TrackingFiles();
+        const key = 'world:oversized-indexed';
+        new LodCache(files, 0, 2).put(key, lod(1));
+        const cachePath = onlyCachePath(files);
+        files.put(cachePath, oversizedCacheFile);
+
+        const cache = new LodCache(files, 0, 2);
+        files.reads.clear();
+        files.openedPaths.length = 0;
+
+        expect(cache.backupAndRemove(key)).toBeUndefined();
+        expect(files.reads.get(cachePath) ?? 0).toBe(0);
+        expect(files.openedPaths).toEqual([]);
+        expect(cache.has(key)).toBe(true);
+        expect(cache.stats()).toMatchObject({ diskEntries: 1 });
+        expect(files.stat(cachePath)?.size).toBe(oversizedCacheFile.length);
+        expect(files.stat('cache-recovery')).toBeUndefined();
+    });
+
+    it('checks the opened file size when the disk index is stale', () => {
+        const files = new TrackingFiles();
+        const key = 'world:oversized-after-index';
+        const cache = new LodCache(files, 0, 2);
+        cache.put(key, lod(1));
+        const cachePath = onlyCachePath(files);
+        files.put(cachePath, oversizedCacheFile);
+        files.reads.clear();
+        files.openedPaths.length = 0;
+
+        expect(cache.backupAndRemove(key)).toBeUndefined();
+        expect(files.openedPaths).toEqual([cachePath]);
+        expect(files.reads.get(cachePath) ?? 0).toBe(0);
+        expect(cache.has(key)).toBe(true);
+        expect(cache.stats()).toMatchObject({ diskEntries: 1 });
+        expect(files.stat(cachePath)?.size).toBe(oversizedCacheFile.length);
+        expect(files.stat('cache-recovery')).toBeUndefined();
+    });
+
+    it('backs up from memory without reading an oversized disk copy', () => {
+        const files = new TrackingFiles();
+        const cache = new LodCache(files, 1, 2);
+        const key = 'world:memory-backed-recovery';
+        cache.put(key, lod(1));
+        const cachePath = onlyCachePath(files);
+        const expectedBackup = files.readFile(cachePath);
+        files.put(cachePath, oversizedCacheFile);
+        files.reads.clear();
+        files.openedPaths.length = 0;
+
+        const backup = cache.backupAndRemove(key);
+
+        expect(backup).toMatchObject({ key });
+        if (!backup) throw new Error('Selected cache entry was not backed up');
+        expect(files.reads.get(cachePath) ?? 0).toBe(0);
+        expect(files.openedPaths).toEqual([]);
+        expect(files.readFile(backup.dataPath)).toEqual(expectedBackup);
+        expect(cache.has(key)).toBe(false);
+        expect(files.stat(cachePath)).toBeUndefined();
     });
 
     it('persists captures across restarts, uses bounded filenames and detects corruption', () => {

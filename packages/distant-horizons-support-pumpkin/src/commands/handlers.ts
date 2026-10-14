@@ -6,7 +6,7 @@ import prettyBytes from 'pretty-bytes';
 import type { Settings } from '../config/schema.ts';
 import type { LodCache } from '../lod/cache.ts';
 import { FORCE_BLOCK_SAMPLES_PER_TICK, type ForcedLodStart } from '../lod/force-generation.ts';
-import { DEFAULT_LOD_GENERATION_RADIUS, MAX_LOD_GENERATION_RADIUS } from '../lod/generation.ts';
+import { DEFAULT_LOD_GENERATION_RADIUS, lodGenerationSectionCount } from '../lod/generation.ts';
 import { DEFAULT_LOD_MAP_RADIUS, MAX_LOD_MAP_RADIUS, renderLodMap } from '../lod/map.ts';
 import { withPlayer } from '../platform/peers.ts';
 import type { Sessions } from '../session.ts';
@@ -63,8 +63,10 @@ function generateLODs(
     radius: number,
     coordinates?: readonly [x: number, z: number],
 ): CommandLine[] {
-    if (!Number.isSafeInteger(radius) || radius < 0 || radius > MAX_LOD_GENERATION_RADIUS) {
-        throw new CommandFailed(`Radius must be between 0 and ${MAX_LOD_GENERATION_RADIUS} LOD sections.`);
+    try {
+        lodGenerationSectionCount(radius);
+    } catch (err) {
+        throw new CommandFailed(err instanceof Error ? err.message : String(err));
     }
     const player = sender.asPlayer();
     if (!player) return [errorLine('Run this command as a Java player so the current world is known.')];

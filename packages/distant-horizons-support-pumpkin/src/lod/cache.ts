@@ -1,6 +1,10 @@
 import type { DataFiles } from '@pumpkin-plugins/plugin-kit/files';
 import { Reader, Writer } from '../protocol/bytes.ts';
 
+const MAX_CACHE_FILE_BYTES = 16 * 1024 * 1024;
+const CACHE_FILE_READ_CHUNK_BYTES = 1 << 20;
+const CACHE_ENTRY_FIXED_BYTES = 20;
+
 /** Last captured terrain data and its server timestamp. */
 export interface CachedLod {
     data: Uint8Array;
@@ -56,7 +60,7 @@ export class LodCache {
                 return undefined;
             }
             try {
-                if (stat.kind !== 'file' || stat.size > 16 * 1024 * 1024) throw new Error('Invalid cached LOD');
+                if (stat.kind !== 'file' || stat.size > MAX_CACHE_FILE_BYTES) throw new Error('Invalid cached LOD');
                 const input = new Reader(this.files.readFile(path));
                 if (input.int() !== 0x44485031) throw new Error('Invalid cache format');
                 if (input.string() !== key) throw new Error('Cache key mismatch');
@@ -81,7 +85,10 @@ export class LodCache {
     }
     /** Saves a complete capture atomically and evicts entries above their respective limits. */
     put(key: string, value: CachedLod): void {
-        if (value.data.length > 16 * 1024 * 1024) throw new Error('LOD exceeds cache size limit');
+        const encodedKeyLength = new Writer().string(key).finish().length;
+        if (encodedKeyLength + CACHE_ENTRY_FIXED_BYTES + value.data.length > MAX_CACHE_FILE_BYTES) {
+            throw new Error('LOD exceeds cache size limit');
+        }
         if (this.diskLimit !== 0) {
             const path = this.path(key);
             this.files.writeFile(path, this.encode(key, value));
@@ -102,7 +109,9 @@ export class LodCache {
         const name = this.name(key);
         const memoryValue = this.memory.get(key);
         const sourcePath = this.path(key);
-        const diskValue = this.diskIndex.has(name) ? this.files.readFile(sourcePath) : undefined;
+        const diskEntry = this.diskIndex.get(name);
+        let diskValue: Uint8Array | undefined;
+        if (!memoryValue && diskEntry) diskValue = this.readDiskEntry(sourcePath, diskEntry.size);
         if (!memoryValue && !diskValue) return undefined;
 
         this.files.createDirectory('cache-recovery');
@@ -158,6 +167,24 @@ export class LodCache {
     }
     private path(key: string): string {
         return `cache/${this.name(key)}`;
+    }
+    private readDiskEntry(path: string, indexedSize: number): Uint8Array | undefined {
+        if (indexedSize > MAX_CACHE_FILE_BYTES) return undefined;
+        const file = this.files.open(path);
+        try {
+            if (file.size > MAX_CACHE_FILE_BYTES) return undefined;
+            const bytes = new Uint8Array(file.size);
+            let offset = 0;
+            while (offset < bytes.length) {
+                const chunk = file.read(offset, Math.min(CACHE_FILE_READ_CHUNK_BYTES, bytes.length - offset));
+                if (chunk.length === 0) break;
+                bytes.set(chunk, offset);
+                offset += chunk.length;
+            }
+            return offset === bytes.length ? bytes : undefined;
+        } finally {
+            file.close();
+        }
     }
     private encode(key: string, value: CachedLod): Uint8Array {
         return new Writer()
