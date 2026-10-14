@@ -2,7 +2,7 @@
 // Run it on a release PR branch: release-please only writes versions,
 // changelogs and the manifest, so the pin would otherwise reach master, fail the release config
 // check, and take the release and attach jobs down with it, leaving the release untagged with no
-// .wasm attached. See "Registering a plugin for releases" in docs/ci-and-releases.md.
+// release asset attached. See "Registering a component for releases" in docs/ci-and-releases.md.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -30,7 +30,7 @@ for (const [dir, entry] of Object.entries(config.packages ?? {})) {
 }
 
 if (!retired.length) {
-    console.log('No plugin or action is past its first release, so every "release-as" stays.');
+    console.log('No component is past its first release, so every "release-as" stays.');
 } else {
     fs.writeFileSync(file, `${JSON.stringify(config, null, 4)}\n`);
     console.log(`Removed "release-as" from ${retired.join(', ')}`);

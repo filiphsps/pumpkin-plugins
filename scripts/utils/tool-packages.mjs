@@ -8,6 +8,7 @@ export const PUBLIC_TOOL_PACKAGE_PATHS = Object.freeze({
     'tools/pumpkin-api': '@pumpkin-plugins/pumpkin-api',
     'tools/build': '@pumpkin-plugins/build',
     'tools/static-hermes-runtime': '@pumpkin-plugins/static-hermes-runtime',
+    'tools/cspell-dict-minecraft': '@pumpkin-plugins/cspell-dict-minecraft',
 });
 
 const STARTER_TOOL_PACKAGE_PATHS = Object.freeze({
@@ -45,6 +46,12 @@ const PACKED_TOOL_CONTENTS = Object.freeze({
         'package/README.md',
         'package/docs/using-codemods.md',
         'package/docs/authoring-codemods.md',
+    ],
+    'tools/cspell-dict-minecraft': [
+        'package/cspell-ext.json',
+        'package/minecraft.txt',
+        'package/README.md',
+        'package/LICENSE',
     ],
 });
 const TEMPLATE_LANGUAGES = ['typescript', 'javascript'];

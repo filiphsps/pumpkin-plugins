@@ -94,7 +94,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
         );
         assert.match(result.log, /No plugin or repository code/);
     });
@@ -106,7 +106,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
         );
     });
 
@@ -117,7 +117,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
         );
     });
 
@@ -128,7 +128,18 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
+        );
+    });
+
+    it('does not schedule extension tests for extension-local docs assets', () => {
+        const dir = repo({ 'extensions/one/src/extension.ts': 'export {};' });
+        const base = change(dir, { 'extensions/one/docs/diagram.png': 'diagram' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
         );
     });
 
@@ -139,7 +150,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n',
         );
         assert.match(result.log, /Code: packages\/plug\/src\/index\.ts/);
     });
@@ -151,7 +162,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=benchmark\nintegration_extra=\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=benchmark\nintegration_extra=\n',
         );
         assert.match(result.log, /Code: benchmarks\/engine-comparison\/src\/workload.ts/);
     });
@@ -163,7 +174,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
         );
     });
 
@@ -174,7 +185,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=@pumpkin-plugins/bedrock-addon-manager\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=@pumpkin-plugins/bedrock-addon-manager\n',
         );
     });
 
@@ -188,7 +199,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
         );
         assert.match(result.log, /Code: \.github\/workflows\/ci\.yml/);
     });
@@ -200,7 +211,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n',
         );
     });
 
@@ -225,7 +236,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n',
         );
     });
 
@@ -236,9 +247,21 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=["two"]\nactions_to_test=["two"]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=["two"]\nactions_to_test=["two"]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
         );
         assert.match(result.log, /Actions to test: two/);
+    });
+
+    it('skips plugin code jobs and selects tests for the changed extension', () => {
+        const dir = repo({ 'extensions/one/src/extension.ts': 'export const changed = false;\n' });
+        const base = change(dir, { 'extensions/one/src/extension.ts': 'export const changed = true;\n' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=["one"]\nextensions_to_test=["one"]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
+        );
+        assert.match(result.log, /Extensions to test: one/);
     });
 
     it('reports changed actions separately when they change with plugin code', () => {
@@ -255,7 +278,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=["two"]\nactions_to_test=["two"]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n',
+            'code=true\nactions=["two"]\nactions_to_test=["two"]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n',
         );
     });
 
@@ -266,7 +289,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=["one"]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=["one"]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
         );
     });
 
@@ -280,7 +303,7 @@ describe('changed-areas', () => {
             assert.ok(result.ok, result.log);
             assert.equal(
                 result.outputs,
-                'code=false\nactions=[]\nactions_to_test=["common","publish-to-pumpkin-market","sign-pumpkin-plugin","update-pumpkin-market-listing","verify-pumpkin-plugin"]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
+                'code=false\nactions=[]\nactions_to_test=["common","publish-to-pumpkin-market","sign-pumpkin-plugin","update-pumpkin-market-listing","verify-pumpkin-plugin"]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
             );
         });
     }
@@ -295,7 +318,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=all\nintegration_extra=\n',
         );
     });
 
@@ -310,7 +333,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=["sign-pumpkin-plugin"]\nactions_to_test=["common","publish-to-pumpkin-market","sign-pumpkin-plugin","update-pumpkin-market-listing","verify-pumpkin-plugin"]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n',
+            'code=true\nactions=["sign-pumpkin-plugin"]\nactions_to_test=["common","publish-to-pumpkin-market","sign-pumpkin-plugin","update-pumpkin-market-listing","verify-pumpkin-plugin"]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\nintegration_scope=affected\nintegration_extra=\n',
         );
     });
 
@@ -322,7 +345,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\ngenerated_readmes=true\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=true\nintegration_scope=all\nintegration_extra=\n',
         );
         assert.match(result.log, /Generated README update commit detected/);
     });

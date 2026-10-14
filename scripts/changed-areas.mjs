@@ -1,12 +1,13 @@
-// Classifies changed files for CI: plugin/repo code, action directories, and documentation. Plugin
-// code jobs and action tests have separate gates, so action-only changes don't run Pumpkin suites.
+// Classifies changed files for CI: plugin/repo code, action directories, extension directories, and documentation.
+// Plugin code jobs, action tests, and extension tests have separate gates.
 // See the Jobs table in docs/ci-and-releases.md.
 import { spawnSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
+import * as path from 'node:path';
 import { ignoredCommitShas } from './utils/ignored-commits.mjs';
 
 /** A changed file matching any of these is documentation, which nothing that builds or tests reads. */
-const DOCS = [/\.md$/, /^docs\//, /^LICENSE$/, /^(packages|tools|actions)\/[^/]+\/docs(?:\/|$)/];
+const DOCS = [/\.md$/, /^docs\//, /^LICENSE$/, /^(packages|tools|actions|extensions)\/[^/]+\/docs(?:\/|$)/];
 
 const COMMON_CONSUMERS = [
     'publish-to-pumpkin-market',
@@ -65,7 +66,18 @@ const actionCodePaths = actionPaths.filter((file) => !file.endsWith('/version.tx
 const tests = new Set(actionCodePaths.map((file) => file.split('/')[1]));
 if (tests.has('common')) for (const consumer of COMMON_CONSUMERS) tests.add(consumer);
 const actionsToTest = [...tests].sort();
-const code = changed.filter((file) => !isDocs(file) && !/^actions\/[^/]+\//.test(file));
+const extensionPaths = changed.filter((file) => !isDocs(file) && /^extensions\/[^/]+\//.test(file));
+const extensions = [...new Set(extensionPaths.map((file) => file.split('/')[1]))].sort();
+const extensionsToTest = [
+    ...new Set(
+        extensionPaths
+            .filter((file) => !['README.md', 'CHANGELOG.md', 'LICENSE'].includes(path.basename(file)))
+            .map((file) => file.split('/')[1]),
+    ),
+].sort();
+const code = changed.filter(
+    (file) => !isDocs(file) && !/^actions\/[^/]+\//.test(file) && !/^extensions\/[^/]+\//.test(file),
+);
 /** Keep the benchmark comparison scoped to its dedicated real-server workflow. */
 const benchmarkOnly = code.length > 0 && code.every((file) => file.startsWith('benchmarks/engine-comparison/'));
 const integrationScope = benchmarkOnly
@@ -87,6 +99,8 @@ if (code.length) console.log(`Code: ${code.join(', ')}`);
 else console.log('No plugin or repository code, so the plugin code jobs are skipped.');
 if (actions.length) console.log(`Changed actions: ${actions.join(', ')}`);
 if (actionsToTest.length) console.log(`Actions to test: ${actionsToTest.join(', ')}`);
+if (extensions.length) console.log(`Changed extensions: ${extensions.join(', ')}`);
+if (extensionsToTest.length) console.log(`Extensions to test: ${extensionsToTest.join(', ')}`);
 console.log(`Integration scope: ${integrationScope}`);
 if (generatedReadmes) console.log('Generated README update commit detected.');
 if (integrationExtra) console.log(`Additional integration package: ${integrationExtra}`);
@@ -94,6 +108,6 @@ if (integrationExtra) console.log(`Additional integration package: ${integration
 if (process.env.GITHUB_OUTPUT) {
     appendFileSync(
         process.env.GITHUB_OUTPUT,
-        `code=${code.length > 0}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\ngenerated_readmes=${generatedReadmes}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n`,
+        `code=${code.length > 0}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\nextensions=${JSON.stringify(extensions)}\nextensions_to_test=${JSON.stringify(extensionsToTest)}\ngenerated_readmes=${generatedReadmes}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n`,
     );
 }

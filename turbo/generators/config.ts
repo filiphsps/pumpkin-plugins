@@ -8,6 +8,17 @@ const PASCAL_CASE = /^[A-Z][A-Za-z0-9]*$/;
 // Same limit as scripts/package-metadata.mjs, which checks every package.json.
 const MAX_DESCRIPTION = 70;
 const ACTION_FILES = ['README.md', 'CHANGELOG.md', 'version.txt', 'action.yml', 'src/index.mjs', 'src/index.test.mjs'];
+const EXTENSION_FILES = [
+    'README.md',
+    'CHANGELOG.md',
+    'LICENSE',
+    'package.json',
+    'tsconfig.json',
+    '.vscodeignore',
+    'src/extension.ts',
+    'src/command.ts',
+    'src/extension.test.ts',
+];
 
 const FILES = [
     'README.md',
@@ -42,16 +53,21 @@ function run(root: string, command: string, args: string[], done: string) {
 }
 
 function sortReleaseEntries(entries: [string, unknown][]): [string, unknown][] {
+    const group = (name: string) => {
+        if (name.startsWith('actions/')) return 0;
+        if (name.startsWith('extensions/')) return 1;
+        if (name.startsWith('packages/')) return 2;
+        return 3;
+    };
     return entries.sort(([a], [b]) => {
-        const groupA = a.startsWith('actions/') ? 1 : 0;
-        const groupB = b.startsWith('actions/') ? 1 : 0;
-        return groupA - groupB || a.localeCompare(b);
+        return group(a) - group(b) || a.localeCompare(b);
     });
 }
 
-/** Defines the `plugin` generator that scaffolds a new plugin package. Run it with `pnpm gen`. */
+/** Defines Turbo generators for plugins, actions, and extensions. */
 export default function generator(plop: PlopTypes.NodePlopAPI): void {
     plop.setHelper('json', (value: string) => JSON.stringify(value));
+    plop.setHelper('helloWorld', (displayName: string) => JSON.stringify(`Hello World from ${displayName}`));
 
     plop.setGenerator('plugin', {
         description: 'Create a new Pumpkin plugin package in packages/',
@@ -230,6 +246,87 @@ export default function generator(plop: PlopTypes.NodePlopAPI): void {
                             '.release-please-manifest.json',
                         ],
                         'Formatted the new action',
+                    ),
+            ];
+        },
+    });
+
+    plop.setGenerator('extension', {
+        description: 'Create a VS Code extension in extensions/',
+        prompts: [
+            {
+                type: 'input',
+                name: 'name',
+                message: 'Folder and extension name (kebab-case, e.g. minecraft-terms):',
+                validate: (value: string) => {
+                    if (!KEBAB_CASE.test(value)) return 'Use kebab-case: lowercase letters, digits and dashes';
+                    if (fs.existsSync(path.join(process.cwd(), 'extensions', value)))
+                        return `extensions/${value} already exists`;
+                    return true;
+                },
+            },
+            {
+                type: 'input',
+                name: 'displayName',
+                message: 'Extension display name:',
+                default: (answers: { name: string }) =>
+                    answers.name
+                        .split('-')
+                        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                        .join(' '),
+                validate: (value: string) => {
+                    if (!value.trim()) return 'An extension name is required';
+                    return !/[\r\n]/.test(value) || 'Enter a one-line extension name';
+                },
+            },
+            {
+                type: 'input',
+                name: 'description',
+                message: `One-line description (at most ${MAX_DESCRIPTION} characters):`,
+                validate: (value: string) => {
+                    if (!value.trim()) return 'A description is required';
+                    if (value.length > MAX_DESCRIPTION) return `Keep it under ${MAX_DESCRIPTION} characters`;
+                    return !/[\r\n]/.test(value) || 'Enter a one-line description';
+                },
+            },
+        ],
+        actions: (data) => {
+            const answers = data as Answers;
+            const root = answers.turbo.paths.root;
+            const name = answers.name;
+            return [
+                ...EXTENSION_FILES.map((file) => ({
+                    type: 'add',
+                    path: `{{ turbo.paths.root }}/extensions/{{ name }}/${file}`,
+                    templateFile: `templates/extension/${file}.hbs`,
+                })),
+                registerRelease('release-please-config.json', (json, name) => {
+                    const packages = json.packages as Record<string, unknown>;
+                    packages[`extensions/${name}`] = { component: name, 'release-as': '0.0.1' };
+                    json.packages = Object.fromEntries(sortReleaseEntries(Object.entries(packages)));
+                }),
+                registerRelease('.release-please-manifest.json', (json, name) => {
+                    json[`extensions/${name}`] = '0.0.0';
+                    const sorted = sortReleaseEntries(Object.entries(json));
+                    for (const key of Object.keys(json)) delete json[key];
+                    Object.assign(json, Object.fromEntries(sorted));
+                }),
+                () => run(root, 'pnpm', ['install', '--no-frozen-lockfile'], 'Installed dependencies'),
+                () => run(root, 'pnpm', ['exec', 'pumpkin-plugins-docs', 'root'], 'Updated root README and references'),
+                () =>
+                    run(
+                        root,
+                        'pnpm',
+                        [
+                            'exec',
+                            'biome',
+                            'check',
+                            '--write',
+                            `extensions/${name}`,
+                            'release-please-config.json',
+                            '.release-please-manifest.json',
+                        ],
+                        'Formatted the extension and release registration',
                     ),
             ];
         },

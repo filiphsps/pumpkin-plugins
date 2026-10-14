@@ -1,0 +1,66 @@
+name: Extensions
+
+on:
+    workflow_call:
+        inputs:
+            extensions:
+                description: JSON array of VS Code extensions selected by CI
+                required: true
+                type: string
+
+env:
+    CI: true
+    DO_NOT_TRACK: 1
+
+permissions:
+    contents: read
+
+jobs:
+    verify:
+        name: 🧩 Verify ${{ matrix.extension }}
+        if: inputs.extensions != '[]'
+        timeout-minutes: 15
+        runs-on: ubuntu-26.04
+        strategy:
+            fail-fast: false
+            matrix:
+                extension: ${{ fromJSON(inputs.extensions) }}
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 📋 Lint extension
+              env:
+                  EXTENSION: ${{ matrix.extension }}
+              run: pnpm exec biome check "extensions/$EXTENSION/"
+
+            - name: ✅ Typecheck extension
+              env:
+                  EXTENSION: ${{ matrix.extension }}
+              run: pnpm --filter "./extensions/$EXTENSION" run typecheck
+
+            - name: 🧪 Test extension
+              env:
+                  EXTENSION: ${{ matrix.extension }}
+              run: pnpm --filter "./extensions/$EXTENSION" run test
+
+            - name: 🔨 Build extension
+              env:
+                  EXTENSION: ${{ matrix.extension }}
+              run: pnpm --filter "./extensions/$EXTENSION" run build
+
+            - name: 📦 Package extension VSIX
+              env:
+                  EXTENSION: ${{ matrix.extension }}
+              run: pnpm --filter "./extensions/$EXTENSION" run package -- --out "$RUNNER_TEMP/$EXTENSION.vsix"
+
+            - name: 📦 Upload VSIX verification artifact
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  name: extension-${{ matrix.extension }}
+                  path: ${{ runner.temp }}/${{ matrix.extension }}.vsix
+                  if-no-files-found: error
+                  retention-days: 1

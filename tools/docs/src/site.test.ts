@@ -25,4 +25,5 @@ it('normalizes source repository URLs and derives shared API routes', () => {
     expect(componentApiRoute('packages', 'plugin')).toBe('api/plugins/plugin/');
     expect(componentApiRoute('tools', 'tool', '@scope/tool')).toBe('api/tools/@scope/tool/');
     expect(componentApiRoute('actions', 'action')).toBe('api/actions/action/');
+    expect(componentApiRoute('extensions', 'minecraft-terms')).toBe('api/extensions/minecraft-terms/');
 });

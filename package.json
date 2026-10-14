@@ -50,6 +50,7 @@
         "fix": "node scripts/check-release-config.mjs && node scripts/package-metadata.mjs --fix && pnpm readme && node scripts/check-docs.mjs && pnpm lint:fix",
         "gen": "pnpm turbo gen plugin",
         "gen:action": "pnpm turbo gen action",
+        "gen:extension": "pnpm turbo gen extension",
         "lint": "biome check . && eslint .",
         "lint:actions": "actionlint -color",
         "lint:commits": "commitlint --from HEAD~1",

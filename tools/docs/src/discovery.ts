@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
 /** Repository component kinds with package or GitHub Action metadata. */
-export type ComponentGroup = 'packages' | 'tools' | 'actions';
+export type ComponentGroup = 'packages' | 'tools' | 'actions' | 'extensions';
 
 /** A discovered component; callers decide whether they need source files, READMEs or other metadata. */
 export interface SourceComponent {

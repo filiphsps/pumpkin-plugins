@@ -146,6 +146,15 @@ describe('root README', { timeout: 15000 }, () => {
         put('packages/alpha/src/info.ts', plugin('Alpha', 'Alpha plugin.'));
         put('packages/beta/package.json', '{"name":"@x/beta","description":"Beta from package.json","license":"MIT"}');
         put('tools/build/package.json', '{"name":"@x/build","description":"Builds","license":"MIT"}');
+        put(
+            'extensions/minecraft-terms/package.json',
+            '{"name":"code-spell-checker-minecraft","displayName":"Minecraft Terms","description":"Minecraft vocabulary for Code Spell Checker.","license":"MIT"}',
+        );
+        put(
+            'extensions/minecraft-terms/README.md',
+            '# Minecraft Terms\n\n<!-- docs:begin reference -->\n<!-- docs:end reference -->\n',
+        );
+        put('extensions/minecraft-terms/src/extension.ts', 'export function activate() {}\n');
     });
 
     it('has one linked row per package folder and follows additions', () => {
@@ -156,8 +165,12 @@ describe('root README', { timeout: 15000 }, () => {
         expect(first).toContain('| [Alpha](packages/alpha) | Alpha plugin. | MIT |');
         expect(first).toContain('| [@x/beta](packages/beta) | Beta from package.json | MIT |');
         expect(first).toContain('| [@x/build](tools/build) | Builds | MIT |');
+        expect(first).toContain(
+            '| [Minecraft Terms](extensions/minecraft-terms) | Minecraft vocabulary for Code Spell Checker. | MIT |',
+        );
+        expect(read('extensions/minecraft-terms/README.md')).toContain('/api/extensions/minecraft-terms/');
         expect(first).toContain('After.');
-        expect(first.match(/^\| \[/gm)).toHaveLength(3);
+        expect(first.match(/^\| \[/gm)).toHaveLength(4);
 
         put('packages/gamma/package.json', '{"name":"@x/gamma","description":"Gamma"}');
         const beforeStaleCheck = read('README.md');
@@ -168,7 +181,7 @@ describe('root README', { timeout: 15000 }, () => {
         expect(expanded.status).toBe(0);
         const expandedReadme = read('README.md');
         expect(expandedReadme).toMatchSnapshot();
-        expect(expandedReadme.match(/^\| \[/gm)).toHaveLength(4);
+        expect(expandedReadme.match(/^\| \[/gm)).toHaveLength(5);
         expect(expandedReadme).toContain('[@x/gamma](packages/gamma)');
 
         fs.rmSync(path.join(dir, 'packages/beta'), { recursive: true });

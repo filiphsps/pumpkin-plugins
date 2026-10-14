@@ -1,0 +1,26 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import { registerHelloWorld } from './command.js';
+
+describe({{{ json displayName }}} + ' extension', () => {
+    const message = vi.fn();
+    const disposable = { dispose: vi.fn() };
+    const registerCommand = vi.fn(() => disposable);
+
+    it('registers a command and adds its disposable to the extension context', () => {
+        const context = { subscriptions: [] as { dispose(): void }[] };
+        registerHelloWorld(context, registerCommand, message, '{{name}}.helloWorld', {{{ helloWorld displayName }}});
+
+        expect(registerCommand).toHaveBeenCalledWith('{{name}}.helloWorld', expect.any(Function));
+        expect(context.subscriptions).toHaveLength(1);
+        expect(context.subscriptions[0]).toBe(disposable);
+    });
+
+    it('shows its greeting when the command runs', () => {
+        const context = { subscriptions: [] as { dispose(): void }[] };
+        registerHelloWorld(context, registerCommand, message, '{{name}}.helloWorld', {{{ helloWorld displayName }}});
+        const callback = registerCommand.mock.calls.at(-1)?.[1];
+        callback?.();
+        expect(message).toHaveBeenCalledWith({{{ helloWorld displayName }}});
+    });
+});
