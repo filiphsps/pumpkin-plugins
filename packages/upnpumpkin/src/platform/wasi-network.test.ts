@@ -96,6 +96,8 @@ interface FakeTcp {
     failConnect(code: string): void;
     /** Make the connection break once it is made. */
     failFinish(code: string): void;
+    /** Make reading the connected socket's local address fail. */
+    failLocalAddress(code: string): void;
     /** What `read` gives back, and what it throws when given an error. */
     read(bytesToGive: Uint8Array): void;
     readError(code: string): void;
@@ -109,6 +111,7 @@ function fakeTcp(local: [number, number, number, number] = [192, 168, 1, 50]): F
     let blocks = 0;
     let connectError: string | undefined;
     let finishError: string | undefined;
+    let localAddressError: string | undefined;
     let readResult: Uint8Array | undefined;
     let readFailure: string | undefined;
     let written: Uint8Array | undefined;
@@ -140,7 +143,10 @@ function fakeTcp(local: [number, number, number, number] = [192, 168, 1, 50]): F
             }
             return [input, output];
         }),
-        localAddress: () => ({ tag: 'ipv4', val: { port: 50000, address: local } }),
+        localAddress: vi.fn(() => {
+            if (localAddressError) throw wasiError(localAddressError);
+            return { tag: 'ipv4', val: { port: 50000, address: local } };
+        }),
         [Symbol.dispose]: vi.fn(() => disposed.socket++),
     };
     return {
@@ -148,6 +154,7 @@ function fakeTcp(local: [number, number, number, number] = [192, 168, 1, 50]): F
         blockConnect: (times) => (blocks = times),
         failConnect: (code) => (connectError = code),
         failFinish: (code) => (finishError = code),
+        failLocalAddress: (code) => (localAddressError = code),
         read: (given) => (readResult = given),
         readError: (code) => (readFailure = code),
         disposed,
@@ -378,6 +385,20 @@ describe('a connection', () => {
 
         expect(() => dial.poll()).toThrow('the connection timed out');
         expect(tcp.disposed.socket).toBe(1);
+    });
+
+    it('releases both streams and the socket when reading the local address fails', () => {
+        const tcp = fakeTcp();
+        tcp.failLocalAddress('access-denied');
+        const dial = adapter(tcp).dial(router);
+
+        expect(() => dial.poll()).toThrow('network.* permissions');
+        expect(tcp.disposed).toEqual({ socket: 1, input: 1, output: 1 });
+        dial.abort();
+        dial.abort();
+
+        expect(tcp.disposed).toEqual({ socket: 1, input: 1, output: 1 });
+        expect(dial.poll()).toBeUndefined();
     });
 
     it('gives up on a dial that is aborted, without throwing', () => {

@@ -18,6 +18,8 @@ let forwarder: PortForwarder | undefined;
 
 /** Opens ports on the router with UPnP and NAT-PMP, for the server itself and for other plugins. */
 class UPnPumpkin extends PluginBase {
+    private dataDir: WasiDataDir | undefined;
+    private activeForwarder: PortForwarder | undefined;
     private tickTask: number | undefined;
 
     constructor() {
@@ -34,18 +36,42 @@ class UPnPumpkin extends PluginBase {
             return;
         }
 
-        const started = new PortForwarder(files, hostLogger, new WasiNetwork(wasiSockets));
-        started.start();
-        forwarder = started;
-        this.tickTask = scheduleRepeating(1, () => started.tick());
-        registerCommands(ctx, started);
+        this.dataDir = files;
+        try {
+            const started = new PortForwarder(files, hostLogger, new WasiNetwork(wasiSockets));
+            this.activeForwarder = started;
+            started.start();
+            forwarder = started;
+            this.tickTask = scheduleRepeating(1, () => started.tick());
+            registerCommands(ctx, started);
+        } catch (error) {
+            this.releaseResources();
+            throw error;
+        }
     }
 
-    /** Stops the tick and closes the ports. */
+    /** Stops the tick, closes the ports and disposes the data directory. */
     protected override onPluginUnload(_ctx: Context): void {
-        if (this.tickTask !== undefined) cancelTask(this.tickTask);
-        forwarder?.stop();
-        forwarder = undefined;
+        this.releaseResources();
+    }
+
+    private releaseResources(): void {
+        const task = this.tickTask;
+        try {
+            if (task !== undefined) cancelTask(task);
+            this.tickTask = undefined;
+        } finally {
+            const started = this.activeForwarder;
+            this.activeForwarder = undefined;
+            const files = this.dataDir;
+            this.dataDir = undefined;
+            if (started !== undefined && forwarder === started) forwarder = undefined;
+            try {
+                started?.stop();
+            } finally {
+                files?.[Symbol.dispose]();
+            }
+        }
     }
 }
 
