@@ -98,6 +98,14 @@ describe('bundled release commits', () => {
         ]);
     });
 
+    it('excludes spec files from bundled release commits', () => {
+        const history = [
+            commit('runtime-spec', ['tools/static-hermes-runtime/src/hermes/build.spec.ts']),
+            commit('boundary', ['packages/plugin/package.json']),
+        ];
+        assert.deepEqual(releaseCommits(history, new Set(['tools/static-hermes-runtime']), 'boundary', 'plugin'), []);
+    });
+
     it('includes checker changes and build inputs once, skipping unrelated tools and tests', () => {
         const history = [
             commit('checker', ['tools/update-check/src/http.ts']),

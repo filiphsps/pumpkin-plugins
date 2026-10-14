@@ -380,7 +380,7 @@ jobs:
                   ref="$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')"
                   sha="${ref##* }"
                   if [ "${ref%% *}" = tag ]; then
-                      sha="$(gh api "repos/$GH_REPO/git/tags/$TAG" --jq '.object.sha')"
+                      sha="$(gh api "repos/$GH_REPO/git/tags/$sha" --jq '.object.sha')"
                   fi
                   if [ "$sha" != "$GITHUB_SHA" ]; then
                       echo "::error::$TAG releases $sha, but this run built $GITHUB_SHA. Not attaching anything."
@@ -392,10 +392,12 @@ jobs:
               env:
                   RELEASE_TAG: ${{ env.TAG }}
               run: |
+                  set -euo pipefail
+                  plugin_name="$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")"
                   {
-                      echo "plugin_name=$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")"
-                      echo "version=${RELEASE_TAG##*-v}"
-                      echo "wasm_file=dist/$(basename "$PLUGIN_DIRECTORY").wasm"
+                      printf 'plugin_name=%s\n' "$plugin_name"
+                      printf 'version=%s\n' "${RELEASE_TAG##*-v}"
+                      printf 'wasm_file=dist/%s.wasm\n' "$(basename "$PLUGIN_DIRECTORY")"
                   } >> "$GITHUB_OUTPUT"
 
             - name: 🔏 Sign release artifact
@@ -463,10 +465,12 @@ jobs:
                   PLUGIN_DIRECTORY: ${{ matrix.path }}
                   RELEASE_TAG: ${{ env.TAG }}
               run: |
+                  set -euo pipefail
+                  plugin_name="$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")"
                   {
-                      echo "plugin_name=$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")"
-                      echo "version=${RELEASE_TAG##*-v}"
-                      echo "wasm_file=dist/$(basename "$PLUGIN_DIRECTORY").wasm"
+                      printf 'plugin_name=%s\n' "$plugin_name"
+                      printf 'version=%s\n' "${RELEASE_TAG##*-v}"
+                      printf 'wasm_file=dist/%s.wasm\n' "$(basename "$PLUGIN_DIRECTORY")"
                   } >> "$GITHUB_OUTPUT"
 
             # The GitHub release keeps its publisher signature. Market signs each public download,
