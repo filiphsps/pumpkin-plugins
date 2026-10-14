@@ -25,6 +25,9 @@ type WorkloadScenario = Pick<BenchmarkWorkload, 'name' | 'area' | 'operationsPer
 const SAMPLE_COUNT = 5;
 const STRING_PART_COUNT = 25_000;
 const STRING_JOIN_REPEAT_COUNT = 64;
+const STRING_REPEAT_COUNT = 4_000;
+const STRING_PAD_COUNT = 4_000;
+const ARRAY_LOCALE_STRING_COUNT = 8_000;
 const COMMAND_OPERATION_COUNT = 4_000;
 
 const CONFIG_SOURCE = JSON.stringify({
@@ -35,6 +38,7 @@ const CONFIG_SOURCE = JSON.stringify({
 });
 
 const STRING_PARTS = buildStringParts();
+const ARRAY_LOCALE_STRING_VALUES = ['a', 'b', 'c', 'd'].map((value) => value.repeat(64));
 
 const WORKLOADS: readonly WorkloadScenario[] = [
     { name: 'numeric', area: 'Numeric arithmetic baseline', operationsPerSample: 1_000_000, run: runNumeric },
@@ -63,6 +67,24 @@ const WORKLOADS: readonly WorkloadScenario[] = [
         area: 'Unicode join correctness and code-unit behavior',
         operationsPerSample: 7,
         run: runStringJoinUnicode,
+    },
+    {
+        name: 'string-repeat-ascii',
+        area: 'Repeated ASCII string construction',
+        operationsPerSample: STRING_REPEAT_COUNT,
+        run: runStringRepeatASCII,
+    },
+    {
+        name: 'string-pad-ascii',
+        area: 'ASCII string padding at both ends',
+        operationsPerSample: STRING_PAD_COUNT * 2,
+        run: runStringPadASCII,
+    },
+    {
+        name: 'array-to-locale-string-ascii',
+        area: 'Locale string conversion for ASCII array elements',
+        operationsPerSample: ARRAY_LOCALE_STRING_COUNT * ARRAY_LOCALE_STRING_VALUES.length,
+        run: runArrayToLocaleStringASCII,
     },
     {
         name: 'config-validation',
@@ -257,6 +279,43 @@ function runStringJoinUnicode(): number {
     const joined = parts.join('·');
     if (joined !== 'before·é·𐐷····later') return -1;
     return joined.length + joined.charCodeAt(joined.length - 1);
+}
+
+function runStringRepeatASCII(): number {
+    let checksum = 0;
+    for (let index = 0; index < STRING_REPEAT_COUNT; index++) {
+        const repeated = 'abcd'.repeat(128);
+        checksum += repeated.length + repeated.charCodeAt(repeated.length - 1);
+    }
+
+    if ('é𐐷'.repeat(2) !== 'é𐐷é𐐷') return -1;
+    return checksum;
+}
+
+function runStringPadASCII(): number {
+    let checksum = 0;
+    for (let index = 0; index < STRING_PAD_COUNT; index++) {
+        const start = 'item-42'.padStart(256, '._');
+        const end = 'item-42'.padEnd(256, '._');
+        if (start.length !== 256 || end.length !== 256) return -1;
+        checksum += start.length + start.charCodeAt(start.length - 1);
+        checksum += end.length + end.charCodeAt(end.length - 1);
+    }
+
+    if ('x'.padStart(4, 'é') !== 'éééx') return -1;
+    return checksum;
+}
+
+function runArrayToLocaleStringASCII(): number {
+    let checksum = 0;
+    for (let index = 0; index < ARRAY_LOCALE_STRING_COUNT; index++) {
+        const converted = ARRAY_LOCALE_STRING_VALUES.toLocaleString();
+        if (converted.length !== 259 || converted.slice(0, 2) !== 'aa') return -1;
+        checksum += converted.length + converted.charCodeAt(converted.length - 1);
+    }
+
+    if (['é', '𐐷'].toLocaleString() !== 'é,𐐷') return -1;
+    return checksum;
 }
 
 const RADIX_STRING_CASES: readonly [number, number, string][] = [

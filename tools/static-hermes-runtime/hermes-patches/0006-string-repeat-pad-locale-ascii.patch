@@ -1,0 +1,56 @@
+diff --git a/lib/VM/JSLib/Array.cpp b/lib/VM/JSLib/Array.cpp
+index 8947108..3e4ad8c 100644
+--- a/lib/VM/JSLib/Array.cpp
++++ b/lib/VM/JSLib/Array.cpp
+@@ -694,6 +694,8 @@ CallResult<HermesValue> arrayPrototypeToLocaleString(void *, Runtime &runtime) {
+ 
+   // Final size of the result string. Initialize to account for the separators.
+   SafeUInt32 size(len32 - 1);
++  // The comma separator is ASCII; track converted values for compact output.
++  bool allASCII = true;
+ 
+   // Array to store each of the strings of the elements.
+   auto arrRes = JSArray::create(runtime, len32, len32);
+@@ -761,6 +763,7 @@ CallResult<HermesValue> arrayPrototypeToLocaleString(void *, Runtime &runtime) {
+           return ExecutionStatus::EXCEPTION;
+         }
+         lv.strElement = std::move(*strRes);
++        allASCII = allASCII && lv.strElement->isASCII();
+         uint32_t strLength = lv.strElement->getStringLength();
+         // Throw RangeError on overflow.
+         size.add(strLength);
+@@ -779,7 +782,7 @@ CallResult<HermesValue> arrayPrototypeToLocaleString(void *, Runtime &runtime) {
+   }
+ 
+   // Create and then populate the result string.
+-  auto builder = StringBuilder::createStringBuilder(runtime, size);
++  auto builder = StringBuilder::createStringBuilder(runtime, size, allASCII);
+   if (builder == ExecutionStatus::EXCEPTION) {
+     return ExecutionStatus::EXCEPTION;
+   }
+diff --git a/lib/VM/JSLib/String.cpp b/lib/VM/JSLib/String.cpp
+index f355962..6a59243 100644
+--- a/lib/VM/JSLib/String.cpp
++++ b/lib/VM/JSLib/String.cpp
+@@ -1445,7 +1445,9 @@ CallResult<HermesValue> stringPrototypeRepeat(void *, Runtime &runtime) {
+   // It's safe to multiply as the overflow check is done above.
+   SafeUInt32 finalLen(strLen * n);
+ 
+-  auto builderRes = StringBuilder::createStringBuilder(runtime, finalLen);
++  // The source encoding is known, so ASCII repeats can use compact storage.
++  auto builderRes = StringBuilder::createStringBuilder(
++      runtime, finalLen, lv.S->isASCII());
+   if (LLVM_UNLIKELY(builderRes == ExecutionStatus::EXCEPTION)) {
+     return ExecutionStatus::EXCEPTION;
+   }
+@@ -2126,7 +2128,9 @@ CallResult<HermesValue> stringPrototypePad(void *ctx, Runtime &runtime) {
+         runtime.getPredefinedString(Predefined::emptyString));
+   }
+ 
+-  auto builderRes = StringBuilder::createStringBuilder(runtime, size);
++  // Preserve compact output when both the string and filler are ASCII.
++  auto builderRes = StringBuilder::createStringBuilder(
++      runtime, size, lv.S->isASCII() && lv.filler->isASCII());
+   if (LLVM_UNLIKELY(builderRes == ExecutionStatus::EXCEPTION)) {
+     return ExecutionStatus::EXCEPTION;
+   }
