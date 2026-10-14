@@ -2,6 +2,14 @@
     "name": "@pumpkin-plugins/update-check",
     "version": "0.1.0",
     "private": true,
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "updates",
+        "version-check",
+        "pumpkin-market"
+    ],
     "description": "Check plugin versions against Pumpkin Market",
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/update-check#readme",
     "bugs": {

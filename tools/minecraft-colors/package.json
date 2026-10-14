@@ -2,6 +2,14 @@
     "name": "@pumpkin-plugins/minecraft-colors",
     "version": "0.1.0",
     "private": true,
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "colors",
+        "formatting",
+        "chat",
+        "text-formatting"
+    ],
     "description": "Chalk-like Minecraft text formatting for plugins",
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/minecraft-colors#readme",
     "bugs": {

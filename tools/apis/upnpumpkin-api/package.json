@@ -3,6 +3,14 @@
     "version": "0.1.0",
     "private": true,
     "description": "Asks UPnPumpkin to open a port",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "api",
+        "upnp",
+        "nat-pmp",
+        "port-forwarding"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/apis/upnpumpkin-api#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

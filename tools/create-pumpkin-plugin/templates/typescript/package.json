@@ -2,6 +2,14 @@
     "name": "__PLUGIN_NAME__",
     "version": "0.1.0",
     "private": true,
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "typescript",
+        "template",
+        "webassembly"
+    ],
     "type": "module",
     "scripts": {
         "build": "pumpkin-plugins-build",

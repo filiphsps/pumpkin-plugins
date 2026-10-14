@@ -3,6 +3,15 @@
     "version": "0.0.0",
     "private": true,
     "description": "Compares plugin engines on a real Pumpkin server",
+    "keywords": [
+        "pumpkin",
+        "minecraft",
+        "plugin",
+        "benchmark",
+        "quickjs",
+        "hermes",
+        "webassembly"
+    ],
     "type": "module",
     "scripts": {
         "benchmark:build": "node scripts/build-engine-comparison.ts",

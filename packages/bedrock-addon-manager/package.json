@@ -3,6 +3,17 @@
     "version": "0.0.0",
     "private": true,
     "description": "Serves Bedrock packs over HTTP; Pumpkin can't send them to players yet",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "bedrock",
+        "addon",
+        "resource-pack",
+        "mcpack",
+        "mcaddon",
+        "http"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/packages/bedrock-addon-manager#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

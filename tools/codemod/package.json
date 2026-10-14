@@ -2,6 +2,14 @@
     "name": "@pumpkin-plugins/codemod",
     "version": "0.1.0",
     "description": "Codemod runner for Pumpkin plugins",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "codemod",
+        "migration",
+        "typescript"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/codemod#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

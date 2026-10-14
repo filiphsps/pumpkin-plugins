@@ -1,6 +1,13 @@
 {
     "name": "pumpkin-api-integration-consumer",
     "version": "0.1.0",
+    "keywords": [
+        "pumpkin",
+        "api",
+        "integration-test",
+        "fixture",
+        "consumer"
+    ],
     "type": "module",
     "dependencies": {
         "@pumpkin-plugins/pumpkin-api": "0.1.0"

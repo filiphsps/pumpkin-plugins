@@ -3,6 +3,15 @@
     "version": "0.0.4",
     "private": true,
     "description": "Server-managed waypoints with access rules and a Java 26.3 HUD",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "waypoints",
+        "navigation",
+        "hud",
+        "permissions"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/packages/waypoints#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

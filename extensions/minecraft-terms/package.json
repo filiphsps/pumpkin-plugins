@@ -7,6 +7,13 @@
     "categories": [
         "Programming Languages"
     ],
+    "keywords": [
+        "minecraft",
+        "cspell",
+        "code-spell-checker",
+        "spell-checking",
+        "vscode-extension"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/extensions/minecraft-terms#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

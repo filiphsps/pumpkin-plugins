@@ -2,6 +2,15 @@
     "name": "create-pumpkin-plugin",
     "version": "0.1.0",
     "description": "Create a minimal Pumpkin plugin project",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "scaffolding",
+        "generator",
+        "typescript",
+        "javascript"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/create-pumpkin-plugin#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

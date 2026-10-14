@@ -2,6 +2,15 @@
     "name": "@pumpkin-plugins/static-hermes-runtime",
     "version": "0.1.0",
     "description": "Static Hermes Runtime shim for Pumpkin plugin components",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "hermes",
+        "javascript",
+        "webassembly",
+        "wasm",
+        "wasi"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/static-hermes-runtime#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

@@ -3,6 +3,14 @@
     "version": "0.0.13",
     "private": true,
     "description": "Unofficial Distant Horizons server support for Pumpkin",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "distant-horizons",
+        "lod",
+        "server"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/packages/distant-horizons-support-pumpkin#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

@@ -3,6 +3,15 @@
     "version": "0.0.8",
     "private": true,
     "description": "Server-side dynamic lights for held light sources",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "dynamic-lights",
+        "lighting",
+        "light-sources",
+        "server"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/packages/dynamic-lights-pumpkin#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

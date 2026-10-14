@@ -3,6 +3,15 @@
     "version": "0.0.7",
     "private": true,
     "description": "AppleSkin server-side support",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "appleskin",
+        "food",
+        "hunger",
+        "saturation"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/packages/apple-skin-pumpkin#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

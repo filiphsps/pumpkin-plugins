@@ -3,6 +3,15 @@
     "version": "0.1.0",
     "private": true,
     "description": "Ed25519 signing for plugin builds",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "ed25519",
+        "signing",
+        "webassembly",
+        "wasm"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/signing#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

@@ -2,6 +2,13 @@
     "name": "tab-display-pie-expansion-fixture",
     "version": "0.0.0",
     "private": true,
+    "keywords": [
+        "pumpkin",
+        "pumpkin-pie",
+        "plugin",
+        "expansion",
+        "test-fixture"
+    ],
     "type": "module",
     "pumpkinPlugin": {
         "entry": "src/plugin.ts",

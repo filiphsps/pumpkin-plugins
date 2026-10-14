@@ -2,6 +2,14 @@
     "name": "@pumpkin-plugins/config",
     "version": "0.1.0",
     "private": true,
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "configuration",
+        "toml",
+        "schema"
+    ],
     "description": "Schema-driven TOML config for plugins",
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/config#readme",
     "bugs": {

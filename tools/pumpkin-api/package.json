@@ -2,6 +2,15 @@
     "name": "@pumpkin-plugins/pumpkin-api",
     "version": "0.1.0",
     "description": "TypeScript API for PumpkinMC plugins",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "api",
+        "typescript",
+        "webassembly",
+        "wasi"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/pumpkin-api#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

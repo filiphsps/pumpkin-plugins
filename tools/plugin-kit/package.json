@@ -2,6 +2,14 @@
     "name": "@pumpkin-plugins/plugin-kit",
     "version": "0.1.0",
     "private": true,
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "typescript",
+        "wasi",
+        "runtime"
+    ],
     "description": "Host helpers shared by plugins",
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/plugin-kit#readme",
     "bugs": {

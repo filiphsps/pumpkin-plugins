@@ -3,6 +3,13 @@
     "version": "0.1.0",
     "private": true,
     "description": "Shared terrain capture and access contracts",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "terrain",
+        "chunks",
+        "capture"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/terrain#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

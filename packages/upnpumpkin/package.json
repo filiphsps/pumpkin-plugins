@@ -3,6 +3,15 @@
     "version": "0.0.8",
     "private": true,
     "description": "Opens router ports for Pumpkin with UPnP and NAT-PMP",
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "upnp",
+        "nat-pmp",
+        "port-forwarding",
+        "networking"
+    ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/packages/upnpumpkin#readme",
     "bugs": {
         "url": "https://github.com/filiphsps/pumpkin-plugins/issues"

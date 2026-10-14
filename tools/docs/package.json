@@ -2,6 +2,14 @@
     "name": "@pumpkin-plugins/docs",
     "version": "0.1.0",
     "private": true,
+    "keywords": [
+        "minecraft",
+        "pumpkin",
+        "plugin",
+        "documentation",
+        "readme",
+        "generator"
+    ],
     "description": "Generates component READMEs, doc links, and repository catalogs",
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/docs#readme",
     "bugs": {
