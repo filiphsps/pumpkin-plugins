@@ -86,6 +86,68 @@ it('finds the current report and newest default-branch baseline before the PR ba
     assert.ok(requests.every(({ options }) => options.headers.Authorization === 'Bearer app-token'));
 });
 
+it('finds an eligible baseline on the next workflow-runs page', async () => {
+    const outputs = [];
+    const requests = [];
+    const responses = new Map([
+        [
+            '/repos/example/project/actions/runs/100/artifacts?per_page=100',
+            jsonResponse({ artifacts: [{ name: 'engine-comparison-report', id: 900, expired: false }] }),
+        ],
+        [
+            '/repos/example/project/actions/workflows/ci.yml/runs?branch=master&event=push&status=success&per_page=100',
+            jsonResponse({ workflow_runs: [{ id: 80, head_sha: 'diverged' }] }, 200, {
+                Link: '<https://api.github.com/repos/example/project/actions/workflows/ci.yml/runs?branch=master&event=push&status=success&per_page=100&page=2>; rel="next"',
+            }),
+        ],
+        [
+            '/repos/example/project/actions/workflows/ci.yml/runs?branch=master&event=push&status=success&per_page=100&page=2',
+            jsonResponse({ workflow_runs: [{ id: 70, head_sha: 'ancestor' }] }),
+        ],
+        ['/repos/example/project/compare/diverged...base', jsonResponse({ status: 'diverged' })],
+        ['/repos/example/project/compare/ancestor...base', jsonResponse({ status: 'ahead' })],
+        [
+            '/repos/example/project/actions/runs/70/artifacts?per_page=100',
+            jsonResponse({ artifacts: [{ name: 'engine-comparison-report', id: 700, expired: false }] }),
+        ],
+    ]);
+
+    const result = await discoverBenchmarkArtifacts(
+        {
+            apiUrl: 'https://api.github.com',
+            defaultBranch: 'master',
+            pullRequestBaseSha: 'base',
+            pullRequestNumber: '42',
+            repository: 'example/project',
+            sourceRunId: '100',
+            token: 'app-token',
+        },
+        {
+            fetchImpl: async (url, options) => {
+                requests.push({ url: String(url), options });
+                const pathname = new URL(url).pathname + new URL(url).search;
+                assert.ok(responses.has(pathname), `Unexpected API request: ${pathname}`);
+                return responses.get(pathname);
+            },
+            writeOutput: (name, value) => outputs.push([name, value]),
+        },
+    );
+
+    assert.equal(result.baselineRunId, '70');
+    assert.equal(result.baselineSha, 'ancestor');
+    assert.ok(
+        requests.some(({ url }) =>
+            url.endsWith('/actions/workflows/ci.yml/runs?branch=master&event=push&status=success&per_page=100&page=2'),
+        ),
+    );
+    assert.deepEqual(outputs, [
+        ['has_report', 'true'],
+        ['pr_base_sha', 'base'],
+        ['baseline_run_id', '70'],
+        ['baseline_sha', 'ancestor'],
+    ]);
+});
+
 it('skips runs without an unexpired benchmark report artifact', async () => {
     const outputs = [];
     const result = await discoverBenchmarkArtifacts(
@@ -153,9 +215,9 @@ it('uploads the SVG and exposes the durable attachment URL as a workflow output'
     }
 });
 
-function jsonResponse(body, status = 200) {
+function jsonResponse(body, status = 200, headers = {}) {
     return new Response(JSON.stringify(body), {
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...headers },
         status,
     });
 }
