@@ -13,6 +13,8 @@
 | [Plugin API: ABI and runtime support](plugin-api/abi-and-runtime.md) | Package versions, WIT ABI alignment and runtime support notes |
 | [Plugin API: evolution and migration](plugin-api/api-evolution-and-migration.md) | Compatibility decisions, migration and SemVer policy |
 | [Creating an action](creating-an-action.md) | The `pnpm gen:action` generator, generated input/output docs, and release setup |
+| [Using codemods](../tools/codemod/docs/using-codemods.md) | Run the Pumpkin API migration, preview changes, and finish the manual review |
+| [Adding codemods](../tools/codemod/docs/authoring-codemods.md) | Add, register, test, and package a Pumpkin codemod |
 | [Plugin info and READMEs](plugin-info-and-readmes.md) | How a plugin describes itself in `src/info.ts` and how the READMEs are generated |
 | [Plugin config](plugin-config.md) | Declaring settings as a schema: the file, validation, upgrades and docs all come from it |
 | [Checking for plugin updates](plugin-updates.md) | Checking plugin versions against Pumpkin Market |

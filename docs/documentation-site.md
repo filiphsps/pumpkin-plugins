@@ -127,8 +127,8 @@ built site.
 The pipeline can also be run in stages: `pnpm run docs:types` generates the binding declarations,
 `pnpm run docs:api` generates the TypeDoc reference after the bindings, and
 `pnpm run docs:site` builds the VitePress site from those generated pages. The binding steps can be
-run individually with `pnpm run docs:types:plugin-kit`, `pnpm run docs:types:update-check` or
-`pnpm run docs:types:pumpkin-api`.
+run individually with `pnpm run docs:types:plugin-kit`, `pnpm run docs:types:update-check`,
+`pnpm run docs:types:pumpkin-api` or `pnpm run docs:types:codemod`.
 Plugin guest declarations can be generated with `pnpm run docs:types:plugins`.
 `pnpm run docs:build` is an alias for the complete production build.
 

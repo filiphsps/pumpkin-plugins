@@ -43,6 +43,7 @@ Browse the [public documentation site](https://filiphsps.github.io/pumpkin-plugi
 | [@pumpkin-plugins/pumpkin-pie-api](tools/apis/pumpkin-pie-api) | Validated PumpkinPIE client, expansions and provider lifecycle | MIT |
 | [@pumpkin-plugins/upnpumpkin-api](tools/apis/upnpumpkin-api) | Asks UPnPumpkin to open a port | MIT |
 | [@pumpkin-plugins/build](tools/build) | Shared build tool for the plugins | MIT |
+| [@pumpkin-plugins/codemod](tools/codemod) | Codemod runner for Pumpkin plugins | [MIT](tools/codemod/LICENSE) |
 | [@pumpkin-plugins/config](tools/config) | Schema-driven TOML config for plugins | MIT |
 | [create-pumpkin-plugin](tools/create-pumpkin-plugin) | Create a minimal Pumpkin plugin project | MIT |
 | [@pumpkin-plugins/docs](tools/docs) | Generates component READMEs, doc links, and repository catalogs | MIT |
