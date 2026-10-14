@@ -1,11 +1,12 @@
 diff --git a/lib/VM/JSLib/Array.cpp b/lib/VM/JSLib/Array.cpp
-index 9bde39065..455f723f9 100644
+index 9bde39065..8947108c7 100644
 --- a/lib/VM/JSLib/Array.cpp
 +++ b/lib/VM/JSLib/Array.cpp
-@@ -1115,6 +1115,7 @@ CallResult<HermesValue> arrayPrototypeJoin(void *, Runtime &runtime) {
+@@ -1115,6 +1115,8 @@ CallResult<HermesValue> arrayPrototypeJoin(void *, Runtime &runtime) {
  
    // The first element not processed by the fast path.
    uint32_t fastPathEnd = 0;
++  // Preserve ASCII knowledge so the result can use compact string storage.
 +  bool isASCII = lv.sep->isASCII();
  
    // 1. Fast Path: Process as many elements as possible quickly.
@@ -43,13 +44,15 @@ index 9bde39065..455f723f9 100644
      return ExecutionStatus::EXCEPTION;
    }
 diff --git a/lib/VM/Operations.cpp b/lib/VM/Operations.cpp
-index ea2484f10..e41a5c3cf 100644
+index ea2484f10..d3fe15390 100644
 --- a/lib/VM/Operations.cpp
 +++ b/lib/VM/Operations.cpp
-@@ -1384,6 +1384,26 @@ numberToStringWithRadix(Runtime &runtime, double number, unsigned radix) {
+@@ -1384,6 +1384,28 @@ numberToStringWithRadix(Runtime &runtime, double number, unsigned radix) {
      number = -number;
    }
  
++  // Safe integers can use exact integer division, avoiding floating-point
++  // decomposition in the general radix conversion below.
 +  constexpr double MAX_SAFE_INTEGER = 9007199254740991.0;
 +  if (std::isfinite(number) && number <= MAX_SAFE_INTEGER &&
 +      std::floor(number) == number) {
