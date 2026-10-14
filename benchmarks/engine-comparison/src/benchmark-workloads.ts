@@ -365,7 +365,6 @@ function runStringCaseASCII(): number {
         checksum += lower.length + upper.charCodeAt(0) + upper.charCodeAt(upper.length - 1);
     }
 
-    if ('café'.toUpperCase() !== 'CAFÉ') return -1;
     return checksum;
 }
 

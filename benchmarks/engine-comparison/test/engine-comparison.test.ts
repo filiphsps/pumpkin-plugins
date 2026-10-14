@@ -179,6 +179,7 @@ function validateWorkloads(results: EngineResult[], baseline: EngineResult): voi
             expect(workload.operationsPerSample).toBeGreaterThan(0);
             expect(workload.operationsPerSample).toBe(expected.operationsPerSample);
             expect(Number.isFinite(workload.checksum)).toBe(true);
+            expect(workload.checksum, `${result.label} ${workload.name} correctness checks`).not.toBe(-1);
             expect(workload.checksum, `${result.label} ${workload.name} checksum`).toBe(expected.checksum);
             expect(workload.samplesMs.length).toBeGreaterThan(0);
             expect(workload.samplesMs.length).toBe(expected.samplesMs.length);
