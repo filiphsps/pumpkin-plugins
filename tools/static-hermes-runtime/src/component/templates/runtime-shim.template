@@ -1808,6 +1808,7 @@ static bool dispatchAiGoalCallback(
     });
 
     try {
+        initializeRuntime();
         serverState = makeOwnedWitCallbackResource(
             server.__handle, ResourceKind::Server, "server", "server");
         entityState = makeOwnedWitCallbackResource(
