@@ -58,8 +58,8 @@ public ID. Set exactly one of those inputs.
 | `published-version` | Version successfully published to the listing |
 <!-- action-outputs:end -->
 
-Listing lookup follows PPM: try the direct plugin endpoint, then search a limited result set and
-require a case-insensitive exact name match. An empty token, missing
+Name lookup uses bounded search and requires a case-insensitive exact match. ID lookup uses the
+direct plugin endpoint. An empty token, missing
 listing, or unpublished listing fails by default. Set `warn: true` to emit a warning and skip the
 upload; API errors always fail the action. Successful and skipped uploads are added to the GitHub
 Actions step summary when one is available.

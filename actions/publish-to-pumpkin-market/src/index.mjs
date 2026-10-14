@@ -2,8 +2,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { safeBody } from '../../common/src/diagnostics.mjs';
-import { getInput, setOutput } from '../../common/src/utils.mjs';
+import { readBoundedJson, safeResponseBody } from '../../common/src/diagnostics.mjs';
+import { escapeMarkdownText, escapeWorkflowCommand, getInput, setOutput } from '../../common/src/utils.mjs';
 
 const pluginName = getInput('plugin-name').trim();
 const pluginId = getInput('plugin-id').trim();
@@ -14,7 +14,6 @@ const marketUrl = (getInput('api-url').trim() || 'https://market.pumpkinmc.org')
 const track = getInput('track').trim() || 'stable';
 const releaseNotes = getInput('release-notes').trim();
 const warnOnUnavailable = getInput('warn').trim().toLowerCase() === 'true';
-
 try {
     await publish();
 } catch (error) {
@@ -59,36 +58,35 @@ async function publish() {
     });
     if (!response.ok)
         throw new Error(
-            `Market update for ${listing.name} failed (${response.status}): ${safeBody(await response.text(), token)}`,
+            `Market update for ${listing.name} failed (${response.status}): ${await safeResponseBody(response, token)}`,
         );
 
     setListingOutputs(listing);
     setOutput('status', 'success');
     setOutput('published-version', version);
     const message = `Published ${listing.name} ${version} to Market listing ${listing.id}.`;
-    console.log(message);
-    summary(`### 🛒 ${listing.name} ${version}: published to Pumpkin Market\n${message}\n`);
+    console.log(escapeWorkflowCommand(message));
+    summary(
+        `### 🛒 ${escapeMarkdownText(listing.name)} ${escapeMarkdownText(version)}: published to Pumpkin Market\n` +
+            `${escapeMarkdownText(message)}\n`,
+    );
 }
 
-/** Retrieves a Market listing directly, then falls back to a bounded exact-name search. */
+/** Finds a Market listing by an exact, case-insensitive name match in bounded search results. */
 async function findListingByName(name) {
-    const direct = await marketFetch(`${marketUrl}/api/v1/rest/plugins/${encodeURIComponent(name)}`);
-    if (direct.ok) {
-        const listing = await direct.json();
-        if (isExactName(listing, name) && Number.isInteger(listing.id)) return listing;
-    }
-
     const searchUrl = new URL(`${marketUrl}/api/v1/rest/plugins`);
     searchUrl.searchParams.set('q', name);
     searchUrl.searchParams.set('limit', '20');
     const response = await marketFetch(searchUrl);
     if (!response.ok)
         throw new Error(
-            `Could not search Market plugins (${response.status}): ${safeBody(await response.text(), token)}`,
+            `Could not search Market plugins (${response.status}): ${await safeResponseBody(response, token)}`,
         );
-    const listings = await response.json();
+    const listings = await readBoundedJson(response);
     if (!Array.isArray(listings)) throw new Error('Market plugin search response was not an array');
     const matches = listings.filter((listing) => isExactName(listing, name) && Number.isInteger(listing.id));
+    if (matches.some((listing) => !isValidListing(listing)))
+        throw new Error('Market plugin lookup response was not a valid listing');
     if (matches.length > 1) throw new Error(`Market has multiple listings named ${JSON.stringify(name)}`);
     return matches[0];
 }
@@ -100,18 +98,22 @@ async function findListingById(id) {
     if (!response.ok) throw new Error(`Could not look up Market plugin ${JSON.stringify(id)} (${response.status})`);
     let listing;
     try {
-        listing = await response.json();
-    } catch {
+        listing = await readBoundedJson(response);
+    } catch (error) {
+        if (error instanceof RangeError) throw error;
         throw new Error('Market plugin lookup response was not valid JSON');
     }
-    if (
-        !Number.isInteger(listing?.id) ||
-        typeof listing.name !== 'string' ||
-        !listing.name ||
-        (listing.version !== null && typeof listing.version !== 'string')
-    )
-        throw new Error('Market plugin lookup response was not a valid listing');
+    if (!isValidListing(listing)) throw new Error('Market plugin lookup response was not a valid listing');
     return listing;
+}
+
+function isValidListing(listing) {
+    return (
+        Number.isInteger(listing?.id) &&
+        typeof listing.name === 'string' &&
+        Boolean(listing.name) &&
+        (listing.version === null || typeof listing.version === 'string')
+    );
 }
 
 function isExactName(listing, name) {
@@ -123,7 +125,7 @@ function unavailable(message, listing) {
     if (listing) setListingOutputs(listing);
     setOutput('status', 'skipped');
     console.log(`::warning title=Not published to Pumpkin Market::${escapeWorkflowCommand(message)}`);
-    summary(`### ⚠️ Not published to Pumpkin Market\n${message}\n`);
+    summary(`### ⚠️ Not published to Pumpkin Market\n${escapeMarkdownText(message)}\n`);
 }
 
 function displayPlugin() {
@@ -137,10 +139,6 @@ function setListingOutputs(listing) {
 
 function marketFetch(url, options = {}) {
     return fetch(url, { ...options, signal: AbortSignal.timeout(30_000) });
-}
-
-function escapeWorkflowCommand(value) {
-    return value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
 }
 
 function summary(content) {

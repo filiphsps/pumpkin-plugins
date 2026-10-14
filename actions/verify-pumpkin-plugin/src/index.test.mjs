@@ -68,6 +68,22 @@ describe('verify-pumpkin-plugin action', () => {
         assert.match(result.outputs, /issued-at<<.*\n2026-01-02T03:04:05\.000Z\n/);
     });
 
+    it('keeps untrusted signed metadata on one success-log line', () => {
+        const { dir, wasmFile } = fixture();
+        const pluginName = 'demo\n::error::injected';
+        const version = '1.2.3\n::error::injected';
+        fs.writeFileSync(wasmFile, signWasm(minimalWasm(), { ...METADATA, plugin_name: pluginName, version }, SEED));
+
+        const result = run(dir);
+
+        assert.ok(result.ok, result.out);
+        assert.match(
+            result.out,
+            /Verified plugin\.wasm: demo%0A::error::injected 1\.2\.3%0A::error::injected \(Ed25519/,
+        );
+        assert.equal(result.out.trimEnd().split(/\r?\n/).length, 1);
+    });
+
     it('verifies every file and checks plugin name and version from a manifest', () => {
         const { dir, signed } = fixture();
         fs.writeFileSync(path.join(dir, 'second.wasm'), signed);

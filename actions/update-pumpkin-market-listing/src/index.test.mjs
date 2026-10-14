@@ -150,6 +150,82 @@ describe('update-pumpkin-market-listing action', () => {
         }
     });
 
+    it('escapes a Market listing name before writing the step summary', async () => {
+        const dir = fixture();
+        fs.writeFileSync(path.join(dir, 'metadata.json'), JSON.stringify({ category: 'Utilities' }));
+        const summaryFile = path.join(dir, 'summary.md');
+        const market = await server((request, response) => {
+            if (request.method === 'GET') {
+                response.setHeader('content-type', 'application/json');
+                response.end(JSON.stringify({ id: 42, name: '[label](https://example.com)' }));
+                return;
+            }
+            request.resume();
+            response.end('{}');
+        });
+
+        try {
+            const result = await run(
+                dir,
+                inputs({
+                    'INPUT_METADATA-FILE': 'metadata.json',
+                    'INPUT_API-URL': market.url,
+                    GITHUB_STEP_SUMMARY: summaryFile,
+                }),
+            );
+
+            assert.equal(result.status, 0, result.stderr);
+            const summary = fs.readFileSync(summaryFile, 'utf8');
+            assert.ok(
+                summary.includes(String.raw`\[label\]\(https://example\.com\)`),
+                'step summary should escape Markdown link syntax in the listing name',
+            );
+            assert.doesNotMatch(summary, /\[label\]\(https:\/\/example\.com\)/);
+        } finally {
+            market.instance.close();
+        }
+    });
+
+    it('rejects an oversized chunked listing before uploading metadata or writing success outputs', async () => {
+        const dir = fixture();
+        fs.writeFileSync(path.join(dir, 'metadata.json'), JSON.stringify({ category: 'Utilities' }));
+        const outputFile = path.join(dir, 'outputs.txt');
+        const listing = JSON.stringify({ id: 42, name: 'x'.repeat(1_048_576) });
+        let uploads = 0;
+        let hadContentLength = false;
+        const market = await server((request, response) => {
+            if (request.method !== 'GET') {
+                uploads++;
+                response.end('{}');
+                return;
+            }
+            hadContentLength = response.hasHeader('content-length');
+            response.setHeader('content-type', 'application/json');
+            response.write(listing.slice(0, 512 * 1024));
+            response.end(listing.slice(512 * 1024));
+        });
+
+        try {
+            const result = await run(
+                dir,
+                inputs({
+                    'INPUT_METADATA-FILE': 'metadata.json',
+                    'INPUT_API-URL': market.url,
+                    GITHUB_OUTPUT: outputFile,
+                }),
+            );
+
+            assert.equal(hadContentLength, false, 'the oversized lookup should use chunked transfer');
+            assert.equal(result.status, 1, result.stderr);
+            assert.match(result.stderr, /JSON response exceeds 1048576 byte limit/);
+            assert.doesNotMatch(result.stderr, /invalid JSON/);
+            assert.equal(uploads, 0, 'oversized listing data must not trigger a metadata upload');
+            assert.equal(fs.existsSync(outputFile), false, 'oversized listing data must not write success outputs');
+        } finally {
+            market.instance.close();
+        }
+    });
+
     it('uses the publisher name lookup and sends full metadata from a file', async () => {
         const dir = fixture();
         const metadataFile = path.join(dir, 'metadata.json');
@@ -275,6 +351,35 @@ describe('update-pumpkin-market-listing action', () => {
             assert.equal(result.status, 1);
             assert.match(result.stderr, /multiple listings named/);
             assert.equal(putCount, 0);
+        } finally {
+            market.instance.close();
+        }
+    });
+
+    it('redacts and bounds failed name-search response bodies', async () => {
+        const dir = fixture();
+        const market = await server((_request, response) => {
+            if (_request.url === '/api/v1/rest/plugins/Test%20Listing') {
+                response.statusCode = 404;
+                response.end('not found');
+                return;
+            }
+            response.statusCode = 503;
+            response.end(`rejected test-token ${'x'.repeat(1500)} tail-marker`);
+        });
+
+        try {
+            const result = await run(dir, {
+                'INPUT_PLUGIN-NAME': 'Test Listing',
+                INPUT_DESCRIPTION: 'Description',
+                'INPUT_API-TOKEN': 'test-token',
+                'INPUT_API-URL': market.url,
+            });
+            assert.equal(result.status, 1);
+            assert.match(result.stderr, /Could not search Market plugins \(503\): rejected \[REDACTED\]/);
+            assert.doesNotMatch(result.stderr, /test-token/);
+            assert.doesNotMatch(result.stderr, /tail-marker/);
+            assert.ok(result.stderr.length < 1200, 'search error diagnostic should be bounded');
         } finally {
             market.instance.close();
         }

@@ -5,9 +5,9 @@ listing. It does not build the plugin or create a listing. Run it after the buil
 have produced the release artifact you intend to distribute.
 
 For a workflow example and the complete input list, see the [action README](../README.md). Set
-exactly one of `plugin-name` and `plugin-id`; the action resolves a name using a bounded exact-name
-lookup. The version is supplied without a leading `v`. You can also set the release track and
-release notes.
+exactly one of `plugin-name` and `plugin-id`; the action resolves a name with bounded search and a
+case-insensitive exact-name match. The version is supplied without a leading `v`. You can also set
+the release track and release notes.
 
 The token needs the Market scopes for updating plugins and uploading versions. By default, a
 missing token or unavailable listing fails the step. `warn: true` changes those cases to a warning

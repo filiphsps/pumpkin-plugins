@@ -49,6 +49,16 @@ function run(dir, inputs = {}) {
     return { ok: result.status === 0, out: `${result.stdout}${result.stderr}` };
 }
 
+function runBatch(dir, plugins) {
+    fs.writeFileSync(path.join(dir, 'plugins.json'), JSON.stringify(plugins));
+    return run(dir, {
+        'INPUT_PLUGIN-NAME': '',
+        INPUT_VERSION: '',
+        'INPUT_WASM-FILE': '',
+        'INPUT_PLUGINS-MANIFEST': 'plugins.json',
+    });
+}
+
 describe('sign-pumpkin-plugin action', () => {
     it('signs and verifies the file and refreshes an adjacent checksum', () => {
         const { dir, wasmFile, original } = fixture();
@@ -66,6 +76,21 @@ describe('sign-pumpkin-plugin action', () => {
             fs.readFileSync(`${wasmFile}.sha256`, 'utf8'),
             `${createHash('sha256').update(signed).digest('hex')}  plugin.wasm\n`,
         );
+    });
+
+    it('keeps untrusted plugin names and versions on one success-log line', () => {
+        const { dir } = fixture();
+        const pluginName = 'TestPlugin\n::error::injected';
+        const version = '1.2.3\n::error::injected';
+
+        const result = run(dir, { 'INPUT_PLUGIN-NAME': pluginName, INPUT_VERSION: version });
+
+        assert.ok(result.ok, result.out);
+        assert.match(
+            result.out,
+            /Signed TestPlugin%0A::error::injected 1\.2\.3%0A::error::injected with Ed25519 public key/,
+        );
+        assert.equal(result.out.trimEnd().split(/\r?\n/).length, 1);
     });
 
     it('signs every file listed in a plugins manifest', () => {
@@ -107,18 +132,51 @@ describe('sign-pumpkin-plugin action', () => {
 
     it('rejects invalid manifest entries without changing the files', () => {
         const { dir, wasmFile, original } = fixture();
-        fs.writeFileSync(path.join(dir, 'plugins.json'), JSON.stringify([{}]));
+        const checksumFile = `${wasmFile}.sha256`;
+        const originalChecksum = fs.readFileSync(checksumFile);
 
-        const result = run(dir, {
-            'INPUT_PLUGIN-NAME': '',
-            INPUT_VERSION: '',
-            'INPUT_WASM-FILE': '',
-            'INPUT_PLUGINS-MANIFEST': 'plugins.json',
-        });
+        const result = runBatch(dir, [
+            { 'plugin-name': 'TestPlugin', version: '1.2.3', 'wasm-file': 'plugin.wasm' },
+            {},
+        ]);
 
         assert.equal(result.ok, false);
         assert.match(result.out, /must include string plugin-name, version, and wasm-file fields/);
         assert.deepEqual(fs.readFileSync(wasmFile), original);
+        assert.deepEqual(fs.readFileSync(checksumFile), originalChecksum);
+    });
+
+    it('does not change earlier artifacts when a later manifest file is missing', () => {
+        const { dir, wasmFile, original } = fixture();
+        const checksumFile = `${wasmFile}.sha256`;
+        const originalChecksum = fs.readFileSync(checksumFile);
+
+        const result = runBatch(dir, [
+            { 'plugin-name': 'TestPlugin', version: '1.2.3', 'wasm-file': 'plugin.wasm' },
+            { 'plugin-name': 'MissingPlugin', version: '4.5.6', 'wasm-file': 'missing.wasm' },
+        ]);
+
+        assert.equal(result.ok, false);
+        assert.match(result.out, /WASM file not found/);
+        assert.deepEqual(fs.readFileSync(wasmFile), original);
+        assert.deepEqual(fs.readFileSync(checksumFile), originalChecksum);
+    });
+
+    it('does not change earlier artifacts when a later manifest file is malformed', () => {
+        const { dir, wasmFile, original } = fixture();
+        const checksumFile = `${wasmFile}.sha256`;
+        const originalChecksum = fs.readFileSync(checksumFile);
+        fs.writeFileSync(path.join(dir, 'malformed.wasm'), 'not a wasm file');
+
+        const result = runBatch(dir, [
+            { 'plugin-name': 'TestPlugin', version: '1.2.3', 'wasm-file': 'plugin.wasm' },
+            { 'plugin-name': 'MalformedPlugin', version: '4.5.6', 'wasm-file': 'malformed.wasm' },
+        ]);
+
+        assert.equal(result.ok, false);
+        assert.match(result.out, /not a WebAssembly/);
+        assert.deepEqual(fs.readFileSync(wasmFile), original);
+        assert.deepEqual(fs.readFileSync(checksumFile), originalChecksum);
     });
 
     it('fails on an empty key by default without changing the file', () => {

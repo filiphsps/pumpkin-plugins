@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { publicKeyOf, signWasm, verifyWasm } from '../../../tools/signing/src/index.ts';
-import { getInput } from '../../common/src/utils.mjs';
+import { escapeWorkflowCommand, getInput } from '../../common/src/utils.mjs';
 
 const pluginName = getInput('plugin-name').trim();
 const version = getInput('version').trim();
@@ -32,6 +32,7 @@ function signRelease() {
         if (!Array.isArray(plugins) || plugins.length === 0) {
             throw new Error(`plugins-manifest must contain a non-empty JSON array: ${manifestFile}`);
         }
+        const preparedPlugins = [];
         for (const [index, plugin] of plugins.entries()) {
             if (!plugin || typeof plugin !== 'object' || Array.isArray(plugin)) {
                 throw new Error(`plugins-manifest entry ${index + 1} must be an object`);
@@ -44,15 +45,16 @@ function signRelease() {
                     `plugins-manifest entry ${index + 1} must include string plugin-name, version, and wasm-file fields`,
                 );
             }
-            signPlugin(name, pluginVersion, fileName);
+            preparedPlugins.push(preparePlugin(name, pluginVersion, fileName));
         }
+        preparedPlugins.forEach(writePlugin);
         return;
     }
 
-    signPlugin(pluginName, version, wasmFile);
+    writePlugin(preparePlugin(pluginName, version, wasmFile));
 }
 
-function signPlugin(name, pluginVersion, fileName) {
+function preparePlugin(name, pluginVersion, fileName) {
     if (!name) throw new Error('plugin-name is required (or provide plugins-manifest)');
     if (!pluginVersion) throw new Error('version is required (or provide plugins-manifest)');
     if (!fileName) throw new Error('wasm-file is required (or provide plugins-manifest)');
@@ -64,7 +66,7 @@ function signPlugin(name, pluginVersion, fileName) {
         const message = `${name} ${pluginVersion} was not signed because the signing-key input is empty.`;
         if (!warnOnMissingKey) throw new Error(message);
         console.log(`::warning title=Plugin is unsigned::${escapeWorkflowCommand(message)}`);
-        return;
+        return null;
     }
 
     const publicKey = publicKeyOf(signingKey);
@@ -91,16 +93,22 @@ function signPlugin(name, pluginVersion, fileName) {
         );
     }
 
-    fs.writeFileSync(file, signed);
     const checksumFile = `${file}.sha256`;
-    if (fs.existsSync(checksumFile)) {
-        const checksum = createHash('sha256').update(signed).digest('hex');
-        fs.writeFileSync(checksumFile, `${checksum}  ${path.basename(file)}\n`);
-    }
+    const checksumContents = fs.existsSync(checksumFile)
+        ? `${createHash('sha256').update(signed).digest('hex')}  ${path.basename(file)}\n`
+        : null;
 
-    console.log(`Signed ${name} ${pluginVersion} with Ed25519 public key ${publicKey}.`);
+    return { file, signed, checksumFile, checksumContents, name, pluginVersion, publicKey };
 }
 
-function escapeWorkflowCommand(value) {
-    return value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+function writePlugin(preparedPlugin) {
+    if (!preparedPlugin) return;
+
+    const { file, signed, checksumFile, checksumContents, name, pluginVersion, publicKey } = preparedPlugin;
+    fs.writeFileSync(file, signed);
+    if (checksumContents !== null) fs.writeFileSync(checksumFile, checksumContents);
+
+    console.log(
+        `Signed ${escapeWorkflowCommand(name)} ${escapeWorkflowCommand(pluginVersion)} with Ed25519 public key ${publicKey}.`,
+    );
 }
