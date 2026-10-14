@@ -1,0 +1,179 @@
+diff --git a/lib/VM/JSLib/Base64.cpp b/lib/VM/JSLib/Base64.cpp
+--- a/lib/VM/JSLib/Base64.cpp
++++ b/lib/VM/JSLib/Base64.cpp
+@@ -78,7 +78,9 @@
+     return runtime.raiseError("Not a valid base64 encoded string length");
+   }
+   CallResult<StringBuilder> builder =
+-      StringBuilder::createStringBuilder(runtime, SafeUInt32(*expectedLength));
++      // Decoded bytes are compact while ASCII; appendCharacter widens as needed.
++      StringBuilder::createStringBuilder(
++          runtime, SafeUInt32(*expectedLength), true);
+   if (LLVM_UNLIKELY(builder == ExecutionStatus::EXCEPTION)) {
+     return ExecutionStatus::EXCEPTION;
+   }
+diff --git a/lib/VM/JSLib/String.cpp b/lib/VM/JSLib/String.cpp
+--- a/lib/VM/JSLib/String.cpp
++++ b/lib/VM/JSLib/String.cpp
+@@ -435,7 +435,9 @@
+     char16_t ch = res->getNumber();
+     return runtime.getCharacterString(ch).getHermesValue();
+   }
+-  auto builder = StringBuilder::createStringBuilder(runtime, SafeUInt32{n});
++  // Start compact for common ASCII input; appendCharacter widens when needed.
++  auto builder =
++      StringBuilder::createStringBuilder(runtime, SafeUInt32{n}, true);
+   if (builder == ExecutionStatus::EXCEPTION) {
+     return ExecutionStatus::EXCEPTION;
+   }
+@@ -984,7 +986,8 @@
+       }
+ 
+       SafeUInt32 len(S->getStringLength());
+-      auto builder = StringBuilder::createStringBuilder(runtime, len);
++      // The ASCII check above guarantees compact output for this conversion.
++      auto builder = StringBuilder::createStringBuilder(runtime, len, true);
+       if (builder == ExecutionStatus::EXCEPTION) {
+         return ExecutionStatus::EXCEPTION;
+       }
+@@ -1978,7 +1981,8 @@
+     stringView.slice(endOfLastMatch).appendUTF16String(result);
+   }
+   // 16. Return result.
+-  return StringPrimitive::create(runtime, result);
++  // Compact the result when all replacement output is ASCII.
++  return StringPrimitive::createEfficient(runtime, result);
+ }
+ 
+ CallResult<HermesValue> stringPrototypeMatch(void *, Runtime &runtime) {
+@@ -2317,7 +2321,8 @@
+       .appendUTF16String(newString);
+   strView.slice(tailPos).appendUTF16String(newString);
+   // 15. Return newString.
+-  return StringPrimitive::create(runtime, newString);
++  // Compact the result when all replacement output is ASCII.
++  return StringPrimitive::createEfficient(runtime, newString);
+ }
+ 
+ CallResult<HermesValue> stringPrototypeSearch(void *, Runtime &runtime) {
+diff --git a/lib/VM/JSLib/TypedArray.cpp b/lib/VM/JSLib/TypedArray.cpp
+--- a/lib/VM/JSLib/TypedArray.cpp
++++ b/lib/VM/JSLib/TypedArray.cpp
+@@ -1817,6 +1817,8 @@
+   // Final size of the resultant string.
+   // Its safe to multiply as overflow check is done above
+   SafeUInt32 size(sepLength * (len - 1));
++  // The separator and every converted value must be ASCII for compact output.
++  bool allASCII = lv.sep->isASCII();
+ 
+   // Storage for the strings for each element.
+   auto arrRes = JSArray::create(runtime, len, 0);
+@@ -1844,6 +1846,7 @@
+         lv.elem = std::move(*res2);
+       }
+       auto stringPtr = vmcast<StringPrimitive>(lv.elem.getHermesValue());
++      allASCII = allASCII && stringPtr->isASCII();
+       size.add(stringPtr->getStringLength());
+       if (LLVM_UNLIKELY(
+               JSArray::setElementAt(
+@@ -1857,7 +1860,7 @@
+   }
+ 
+   // Allocate the complete result.
+-  auto builder = StringBuilder::createStringBuilder(runtime, size);
++  auto builder = StringBuilder::createStringBuilder(runtime, size, allASCII);
+   if (builder == ExecutionStatus::EXCEPTION) {
+     return ExecutionStatus::EXCEPTION;
+   }
+@@ -2220,6 +2223,8 @@
+ 
+   // Final size of the result string. Initialize to account for the separators.
+   SafeUInt32 size(len - 1);
++  // Locale methods may return Unicode, so track every converted element.
++  bool allASCII = true;
+ 
+   struct : public Locals {
+     PinnedValue<JSArray> strings;
+@@ -2282,6 +2287,7 @@
+         return ExecutionStatus::EXCEPTION;
+       }
+       lv.elementStr = std::move(*strRes);
++      allASCII = allASCII && lv.elementStr->isASCII();
+       if (LLVM_UNLIKELY(
+               JSArray::setElementAt(lv.strings, runtime, i, lv.elementStr) ==
+               ExecutionStatus::EXCEPTION))
+@@ -2293,7 +2299,7 @@
+     gcScope.flushToMarker(marker);
+   }
+ 
+-  auto builder = StringBuilder::createStringBuilder(runtime, size);
++  auto builder = StringBuilder::createStringBuilder(runtime, size, allASCII);
+   if (builder == ExecutionStatus::EXCEPTION) {
+     return ExecutionStatus::EXCEPTION;
+   }
+diff --git a/unittests/VMRuntime/JSLibTest.cpp b/unittests/VMRuntime/JSLibTest.cpp
+--- a/unittests/VMRuntime/JSLibTest.cpp
++++ b/unittests/VMRuntime/JSLibTest.cpp
+@@ -950,6 +950,62 @@
+ 
+   // Make sure the prototype is correct.
+   ASSERT_EQ(prototype.get(), newStr->getParent(runtime));
++}
++
++TEST_F(JSLibTest, StringFastPathResultsUseCompactASCIIStorage) {
++  auto runRes = runtime.run(
++      R"(
++        [
++          'MiXeD ASCII'.toLowerCase(),
++          'mixed ascii'.toUpperCase(),
++          new Uint8Array([65, 66]).join('-'),
++          new Uint8Array([1, 2]).toLocaleString(),
++          String.fromCharCode(65, 66, 67),
++          'alpha'.replace('ph', 'PH'),
++          'aba'.replaceAll('a', 'A'),
++          atob('YWJj'),
++          String.fromCharCode(65, 128),
++          new Uint8Array([65, 66]).join('\u03bb'),
++          (() => {
++            const original = Number.prototype.toLocaleString;
++            Number.prototype.toLocaleString = () => '\u03bb';
++            const result = new Uint8Array([1, 2]).toLocaleString();
++            Number.prototype.toLocaleString = original;
++            return result;
++          })(),
++          'A\u03bbB'.replace('A', 'X'),
++          atob('gA=='),
++        ];
++      )",
++      "string-fast-path-test.js",
++      CompileFlags{});
++  ASSERT_RETURNED(runRes.getStatus());
++
++  auto results = runtime.makeHandle<JSArray>(vmcast<JSArray>(*runRes));
++
++  auto expectString = [&](uint32_t index,
++                          UTF16Ref expected,
++                          bool expectedASCII) {
++    auto actual = runtime.makeHandle<StringPrimitive>(
++        results->at(runtime, index).getString(runtime));
++    EXPECT_EQ(expectedASCII, actual->isASCII());
++    EXPECT_TRUE(
++        StringPrimitive::createStringView(runtime, actual).equals(expected));
++  };
++
++  expectString(0, createUTF16Ref(u"mixed ascii"), true);
++  expectString(1, createUTF16Ref(u"MIXED ASCII"), true);
++  expectString(2, createUTF16Ref(u"A-B"), true);
++  expectString(3, createUTF16Ref(u"1,2"), true);
++  expectString(4, createUTF16Ref(u"ABC"), true);
++  expectString(5, createUTF16Ref(u"alPha"), true);
++  expectString(6, createUTF16Ref(u"AbA"), true);
++  expectString(7, createUTF16Ref(u"abc"), true);
++  expectString(8, createUTF16Ref(u"A\u0080"), false);
++  expectString(9, createUTF16Ref(u"A\u03bbB"), false);
++  expectString(10, createUTF16Ref(u"\u03bb,\u03bb"), false);
++  expectString(11, createUTF16Ref(u"X\u03bbB"), false);
++  expectString(12, createUTF16Ref(u"\u0080"), false);
+ }
+ 
+ TEST_F(JSLibTest, SmallSortTest) {
