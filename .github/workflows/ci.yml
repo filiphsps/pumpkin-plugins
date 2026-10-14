@@ -426,7 +426,8 @@ jobs:
 
     generator:
         name: 🧬 Generator
-        needs: [changes, lint]
+        # Build saves the prepared Static Hermes cache that this job restores.
+        needs: [changes, lint, build]
         if: needs.changes.outputs.code == 'true'
         timeout-minutes: 60
         runs-on: ubuntu-26.04
