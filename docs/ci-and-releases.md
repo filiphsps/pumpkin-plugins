@@ -34,14 +34,17 @@ install, Turborepo cache) is the composite action in `.github/common/bootstrap`.
 | 🚢 Release | plugin, action or public tool release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; actions create GitHub releases, public tools publish npm tarballs, and plugins produce signed artifacts and Market listings |
 | 📝 Prepare release PR | all open release PRs on release runs | Keeps plugin READMEs, action README examples, starter dependency ranges and first-release pins current |
 | 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs and uploads the exact build artifact, publishes it to an existing Market listing, then syncs its description and commands |
-| 🧹 Cleanup artifacts | after successful consumers | Deletes integration and release handoff artifacts after their last use |
+| 🧹 Cleanup artifacts | after artifact consumers finish | Deletes handoffs whose consumers succeeded or were skipped, even if another job failed; retains artifacts needed to rerun failed consumers |
 
 The signed `plugins` build artifact remains available in the run summary, with a direct download
-link in the build job summary, for one day. Successful runs delete the integration fixture and
-per-release handoff artifacts after all consumers finish. If an artifact consumer fails, cleanup is
-skipped so its handoff artifacts remain available for a rerun. Fork and Dependabot pull requests use
-read-only tokens, so their temporary artifacts expire after one day instead of being deleted by the
-workflow.
+link in the build job summary, for one day. CI deletes the integration WASM files and fixture after
+integration succeeds or is skipped, even if another job fails; it keeps them when integration fails
+so that job can be retried. Per-release handoff artifacts are deleted only after the reusable
+release workflow succeeds; a failed release keeps them available for a failed-job rerun. Failure
+logs remain available for diagnosis. The Docs workflow deletes its `docs-site` and `github-pages`
+artifacts after publishing succeeds or is skipped, and keeps them if publishing fails so it can be
+retried. Fork and Dependabot pull requests use read-only tokens, so their temporary artifacts expire
+after one day instead of being deleted by the workflows.
 
 ## Running only what a change needs
 

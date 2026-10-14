@@ -164,3 +164,39 @@ jobs:
             - name: 🚀 Deploy site to GitHub Pages
               id: deployment
               uses: actions/deploy-pages@v5.0.1
+
+    cleanup:
+        name: 🧹 Cleanup docs artifacts
+        needs: [build, publish]
+        if: >-
+            ${{
+              always() &&
+              (needs.publish.result == 'success' || needs.publish.result == 'skipped') &&
+              (
+                github.event_name != 'pull_request' ||
+                (
+                  github.actor != 'dependabot[bot]' &&
+                  github.event.pull_request.head.repo.full_name == github.repository
+                )
+              )
+            }}
+        timeout-minutes: 5
+        runs-on: ubuntu-26.04
+        permissions:
+            actions: write
+        steps:
+            - name: 🧹 Delete docs artifacts after their last consumer
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  artifact_ids="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+                      --jq '.artifacts[] | select(.name == "docs-site" or .name == "github-pages") | .id')"
+                  if [ -z "$artifact_ids" ]; then
+                      echo "No docs artifacts to delete"
+                      exit 0
+                  fi
+                  while IFS= read -r artifact_id; do
+                      [ -z "$artifact_id" ] && continue
+                      gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id"
+                      echo "Deleted docs artifact $artifact_id"
+                  done <<< "$artifact_ids"

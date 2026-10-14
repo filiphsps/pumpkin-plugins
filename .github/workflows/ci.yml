@@ -520,10 +520,6 @@ jobs:
         if: >-
             ${{
               always() &&
-              needs.build.result == 'success' &&
-              (needs['engine-comparison'].result == 'success' || needs['engine-comparison'].result == 'skipped') &&
-              (needs.integration.result == 'success' || needs.integration.result == 'skipped') &&
-              (needs.release.result == 'success' || needs.release.result == 'skipped') &&
               (
                 github.event_name != 'pull_request' ||
                 (
@@ -540,15 +536,34 @@ jobs:
             - name: 🧹 Delete artifacts after their last consumer
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  CLEAN_INTEGRATION_ARTIFACTS: ${{ needs.integration.result == 'success' || needs.integration.result == 'skipped' }}
+                  CLEAN_RELEASE_ARTIFACTS: ${{ needs.release.result == 'success' }}
               run: |
-                  artifact_ids="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
-                      --jq '.artifacts[] | select(.name == "plugin-wasm" or .name == "update-check-fixture" or (.name | startswith("release-"))) | .id')"
-                  if [ -z "$artifact_ids" ]; then
+                  artifact_records="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
+                      --jq '.artifacts[] | [.id, .name] | @tsv')"
+                  if [ -z "$artifact_records" ]; then
                       echo "No temporary artifacts to delete"
                       exit 0
                   fi
-                  while IFS= read -r artifact_id; do
+                  while IFS=$'\t' read -r artifact_id artifact_name; do
                       [ -z "$artifact_id" ] && continue
+                      case "$artifact_name" in
+                          plugin-wasm|update-check-fixture)
+                              if [ "$CLEAN_INTEGRATION_ARTIFACTS" != true ]; then
+                                  echo "Keeping $artifact_name so the failed integration job can be retried"
+                                  continue
+                              fi
+                              ;;
+                          release-*)
+                              if [ "$CLEAN_RELEASE_ARTIFACTS" != true ]; then
+                                  echo "Keeping $artifact_name so the failed release can be retried"
+                                  continue
+                              fi
+                              ;;
+                          *)
+                              continue
+                              ;;
+                      esac
                       gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id"
-                      echo "Deleted temporary artifact $artifact_id"
-                  done <<< "$artifact_ids"
+                      echo "Deleted $artifact_name artifact $artifact_id"
+                  done <<< "$artifact_records"
