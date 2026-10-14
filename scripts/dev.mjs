@@ -449,13 +449,14 @@ export function startInitialBuild(root, spawnImpl = spawn, env = process.env, pa
     );
 }
 
-/** Starts a server running all workspace plugins with optional build and plugin hot reload. */
+/** Starts a dev server with optional plugin hot reload and release-mode builds. */
 export async function runDev({
     root = path.resolve(import.meta.dirname, '..'),
     spawnImpl = spawn,
     resolveBinary = resolvePumpkinBinary,
     hotReload = true,
     nightly = false,
+    release = false,
     parseTypeScript = false,
     shutdownTimeoutMs = CHILD_SHUTDOWN_TIMEOUT_MS,
     signalSource = process
@@ -465,7 +466,10 @@ export async function runDev({
 
     const serverDir = path.join(root, '.cache', 'pumpkin-dev');
     const serverPluginsDir = createServerDirectory(serverDir, hotReload);
-    const devEnv = { ...process.env, PUMPKIN_DEV_MODE: '1' };
+    const buildEnv = { ...process.env };
+    // biome-ignore lint/performance/noDelete: dev script, performant isn't super important here.
+    if (release) delete buildEnv.PUMPKIN_DEV_MODE;
+    else buildEnv.PUMPKIN_DEV_MODE = '1';
     let outputs;
     const children = [];
     let shuttingDown = false;
@@ -499,7 +503,7 @@ export async function runDev({
         console.log(
             `Building every plugin, then launching the latest ${nightly ? 'nightly build' : 'stable release'}.`
         );
-        const initialBuild = startInitialBuild(root, spawnImpl, devEnv, parseTypeScript);
+        const initialBuild = startInitialBuild(root, spawnImpl, buildEnv, parseTypeScript);
         children.push(initialBuild);
         const buildResult = initialBuild.done.then(({ code, signal }) => {
             if (!shuttingDown && (code !== 0 || signal)) {
@@ -522,7 +526,7 @@ export async function runDev({
                     cwd: root,
                     stdio: 'inherit',
                     shell: process.platform === 'win32',
-                    env: devEnv
+                    env: buildEnv
                 },
                 spawnImpl
             );
@@ -536,8 +540,8 @@ export async function runDev({
             );
         }
 
-        const { binary: serverBinary, release } = resolvedBinary;
-        console.log(`Starting Pumpkin ${release} with ${plugins.length} plugins in ${serverDir}`);
+        const { binary: serverBinary, release: serverRelease } = resolvedBinary;
+        console.log(`Starting Pumpkin ${serverRelease} with ${plugins.length} plugins in ${serverDir}`);
         const server = spawnChild(serverBinary, [], { cwd: serverDir, stdio: 'inherit' }, spawnImpl);
         children.push(server);
         const serverResult = await Promise.race([server.done, ...backgroundTasks, shutdown]);
@@ -554,15 +558,16 @@ export async function runDev({
 export function parseDevArgs(args) {
     return {
         hotReload: !args.includes('--no-hot-reload'),
-        nightly: args.includes('--nightly')
+        nightly: args.includes('--nightly'),
+        release: args.includes('--release')
     };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
     const args = process.argv.slice(2);
-    const { hotReload, nightly } = parseDevArgs(args);
+    const { hotReload, nightly, release } = parseDevArgs(args);
     const command = hotReload ? 'pnpm dev' : 'pnpm dev:no-hot-reload';
-    runDev({ hotReload, nightly, parseTypeScript: args.includes('--parse-ts') }).catch((error) => {
+    runDev({ hotReload, nightly, release, parseTypeScript: args.includes('--parse-ts') }).catch((error) => {
         console.error(`${command}: ${error.message}`);
         process.exitCode = 1;
     });

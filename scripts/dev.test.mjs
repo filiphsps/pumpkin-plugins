@@ -40,9 +40,14 @@ afterEach(() => {
 });
 
 describe('parseDevArgs', () => {
-    it('selects the nightly build and hot reload mode from command-line arguments', () => {
-        assert.deepEqual(parseDevArgs([]), { hotReload: true, nightly: false });
-        assert.deepEqual(parseDevArgs(['--nightly', '--no-hot-reload']), { hotReload: false, nightly: true });
+    it('selects the server and plugin build modes from command-line arguments', () => {
+        assert.deepEqual(parseDevArgs([]), { hotReload: true, nightly: false, release: false });
+        assert.deepEqual(parseDevArgs(['--nightly', '--no-hot-reload']), {
+            hotReload: false,
+            nightly: true,
+            release: false
+        });
+        assert.deepEqual(parseDevArgs(['--release']), { hotReload: true, nightly: false, release: true });
     });
 });
 
@@ -626,6 +631,40 @@ describe('runDev', () => {
             fs.readFileSync(path.join(root, '.cache', 'pumpkin-dev', 'plugins', 'plugin.wasm'), 'utf8'),
             'cached build'
         );
+    });
+
+    it('builds release plugins for the initial and watch builds', async () => {
+        const root = tempDir();
+        addPluginFixture(root);
+        const calls = [];
+        const previousDevMode = process.env.PUMPKIN_DEV_MODE;
+        process.env.PUMPKIN_DEV_MODE = '1';
+        const spawnImpl = (command, args, options) => {
+            const child = new EventEmitter();
+            child.kill = (signal) => process.nextTick(() => child.emit('exit', null, signal));
+            calls.push({ command, args, options });
+            if (args.includes('run') || command === '/fake/pumpkin') {
+                process.nextTick(() => child.emit('exit', 0, null));
+            }
+            return child;
+        };
+
+        try {
+            await runDev({
+                root,
+                spawnImpl,
+                release: true,
+                resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' })
+            });
+
+            assert.equal(calls[0].options.env.PUMPKIN_DEV_MODE, undefined);
+            assert.equal(calls[1].options.env.PUMPKIN_DEV_MODE, undefined);
+            assert.deepEqual(calls[1].args, ['exec', 'turbo', 'watch', 'build', '--ui=stream']);
+            assert.equal(calls.at(-1).command, '/fake/pumpkin');
+        } finally {
+            if (previousDevMode === undefined) delete process.env.PUMPKIN_DEV_MODE;
+            else process.env.PUMPKIN_DEV_MODE = previousDevMode;
+        }
     });
 
     it('starts without hot reload or build watchers when disabled', async () => {
