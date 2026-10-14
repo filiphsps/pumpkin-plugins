@@ -44,12 +44,25 @@ describe('parseDescription', () => {
     it('prefers IP connections over PPP and newer over older, and honors URLBase', () => {
         const service = (type: string, url: string) =>
             `<service><serviceType>urn:schemas-upnp-org:service:${type}</serviceType><controlURL>${url}</controlURL></service>`;
-        const xml = `<root><URLBase>http://10.0.0.1:49000/</URLBase><device><serviceList>${service('WANPPPConnection:1', '/ppp')}${service('Layer3Forwarding:1', '/l3')}${service('WANIPConnection:1', '/ip1')}${service('WANIPConnection:2', '/ip2')}</serviceList></device></root>`;
+        const xml = `<root><URLBase>http://192.168.1.1:49000/</URLBase><device><serviceList>${service('WANPPPConnection:1', '/ppp')}${service('Layer3Forwarding:1', '/l3')}${service('WANIPConnection:1', '/ip1')}${service('WANIPConnection:2', '/ip2')}</serviceList></device></root>`;
         expect(parseDescription(xml, location).map((c) => c.controlUrl)).toEqual([
-            'http://10.0.0.1:49000/ip2',
-            'http://10.0.0.1:49000/ip1',
-            'http://10.0.0.1:49000/ppp',
+            'http://192.168.1.1:49000/ip2',
+            'http://192.168.1.1:49000/ip1',
+            'http://192.168.1.1:49000/ppp',
         ]);
+    });
+
+    it.each([
+        [
+            'URLBase',
+            '<root><URLBase>http://192.168.1.2:49000/</URLBase><device><serviceList><service><serviceType>urn:schemas-upnp-org:service:WANIPConnection:1</serviceType><controlURL>/ctl</controlURL></service></serviceList></device></root>',
+        ],
+        [
+            'controlURL',
+            '<root><device><serviceList><service><serviceType>urn:schemas-upnp-org:service:WANIPConnection:1</serviceType><controlURL>http://192.168.1.2:49000/ctl</controlURL></service></serviceList></device></root>',
+        ],
+    ])('rejects a description with a cross-host %s', (_field, xml) => {
+        expect(parseDescription(String(xml), location)).toEqual([]);
     });
 
     it('returns nothing for documents without a WAN service', () => {
@@ -137,5 +150,22 @@ describe('SOAP', () => {
         ).body;
         expect(() => parseSoapResponse(fault, 'AddPortMapping', 500)).toThrow(UpnpError);
         expect(() => parseSoapResponse(fault, 'AddPortMapping', 500)).toThrow('(501)');
+    });
+
+    it('keeps router fault descriptions on one line before surfacing them as errors', () => {
+        const description = 'mapping rejected\r\nWARN: forged\t\u007f\u0085\u2028\u2029router detail';
+        const fault = envelope(
+            `<Fault><detail><UPnPError><errorCode>718</errorCode><errorDescription>${description}</errorDescription></UPnPError></detail></Fault>`,
+        );
+
+        let surfaced: unknown;
+        try {
+            parseSoapResponse(fault, 'AddPortMapping', 500);
+        } catch (error) {
+            surfaced = error;
+        }
+
+        expect(surfaced).toBeInstanceOf(UpnpError);
+        expect((surfaced as Error).message).toBe('mapping rejected WARN: forged router detail (718)');
     });
 });

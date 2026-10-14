@@ -53,6 +53,34 @@ describe('httpRequest', () => {
         expect(runSteps(net, httpRequest(net, to, get)).body).toBe('hello world');
     });
 
+    it('handles many small reads and chunked body pieces', () => {
+        const script = `
+            import { httpRequest } from ${JSON.stringify(new URL('./http.ts', import.meta.url).href)};
+            const body = '1\\r\\nx\\r\\n'.repeat(8192) + '0\\r\\n\\r\\n';
+            const bytes = new TextEncoder().encode(
+                'HTTP/1.1 200 OK\\r\\nTransfer-Encoding: chunked\\r\\n\\r\\n' + body,
+            );
+            let at = 0;
+            const connection = {
+                localAddress: [192, 168, 1, 50],
+                read: () => at < bytes.length ? bytes.subarray(at, ++at) : 'closed',
+                writable: () => 65536,
+                write: () => {},
+                close: () => {},
+            };
+            const net = { now: () => 0, dial: () => ({ poll: () => connection }) };
+            const result = httpRequest(net, { address: [192, 168, 1, 1], port: 80 }, { method: 'GET', path: '/' }).next();
+            if (!result.done || result.value.body !== 'x'.repeat(8192)) throw new Error('response was not decoded');
+        `;
+        const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+            encoding: 'utf8',
+            timeout: 3000,
+            killSignal: 'SIGKILL',
+        });
+        expect(result.error).toBeUndefined();
+        expect(result.status).toBe(0);
+    });
+
     it('accepts hexadecimal chunks with extensions', () => {
         const { net } = scripted([
             text('HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nA;name=value\r\n0123456789\r\n0\r\n\r\n'),
@@ -190,5 +218,39 @@ describe('httpRequest', () => {
         });
         expect(() => runSteps(stuck, httpRequest(stuck, to, get, 500))).toThrow('could not connect');
         expect(aborted).toBe(true);
+    });
+
+    it.each([
+        ['connection poll', 'could not connect'],
+        ['request write', 'could not send'],
+        ['response read', 'response took too long'],
+    ])('enforces the deadline when a %s completes late', (operation, message) => {
+        const net = new FakeNetwork();
+        const response = text('HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok');
+        let closed = false;
+        const connection: Connection = {
+            localAddress: [192, 168, 1, 50],
+            read: () => {
+                if (operation === 'response read') net.time = 11;
+                return response;
+            },
+            writable: () => 65536,
+            write: () => {
+                if (operation === 'request write') net.time = 11;
+            },
+            close: () => {
+                closed = true;
+            },
+        };
+        net.dial = (): Dial => ({
+            poll: () => {
+                if (operation === 'connection poll') net.time = 11;
+                return connection;
+            },
+            abort: () => {},
+        });
+
+        expect(() => runSteps(net, httpRequest(net, to, get, 10))).toThrow(message);
+        expect(closed).toBe(true);
     });
 });

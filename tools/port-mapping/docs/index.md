@@ -7,9 +7,12 @@ It is independent of Pumpkin APIs and WASI: network operations are supplied thro
 ## Mapping lifecycle
 
 `PortMapper` discovers a gateway, requests mappings, renews leases, and removes mappings when they
-are released. UPnP and NAT-PMP discovery can run together; UPnP is preferred when both respond.
-Mappings can move to another external port when the requested one is unavailable. Failures are
-retried with increasing delays, and a failed operation triggers router rediscovery.
+are released. When UPnP is enabled, its SSDP search and device-description reads finish before
+NAT-PMP starts. UPnP SOAP requests and NAT-PMP requests then run together; UPnP is preferred when
+both respond. With a screen, the web probe comes first and UPnP devices are screened after their
+descriptions are read, before protocol requests begin. Mappings can move to another external port
+when the requested one is unavailable. Failures are retried with increasing delays, and a failed
+operation triggers router rediscovery.
 
 The engine is tick-friendly. Network work is represented as yielded steps and advanced through a
 `Task`, so callers can make progress without blocking a game tick. Supply a `Network` adapter that

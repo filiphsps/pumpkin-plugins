@@ -24,9 +24,10 @@ Plugins run inside a game tick and can't wait, so the engine is written as gener
 while they wait for the network (`Steps<T>`, run by `Task`). `PortMapper` owns the work:
 
 1. If this machine's address toward the internet is public, nothing is opened.
-2. Otherwise `discover` looks for a router: UPnP (an SSDP search, then the router's description
-   and a SOAP `GetExternalIPAddress`) and NAT-PMP (a request to the first and last address of the
-   local /24, or the gateway from the config) side by side. UPnP wins when both answer.
+2. Otherwise, when UPnP is enabled, `discover` completes its SSDP search and reads device
+   descriptions before starting NAT-PMP. UPnP SOAP requests and NAT-PMP requests then run side by
+   side; UPnP wins when both answer. NAT-PMP checks the first and last address of the local /24, or
+   the configured gateway.
 3. A router whose own internet-side address isn't public (carrier-grade NAT) is reported as a
    failure, because no mapping can make the server reachable through it.
 4. Each requested port is opened with a lease, renewed at half the lease, moved to another public
@@ -34,6 +35,10 @@ while they wait for the network (`Steps<T>`, run by `Task`). `PortMapper` owns t
 5. Failures are retried with growing waits (30 s up to 10 min), and the router is searched for
    again when an operation fails. Each failure is logged once, not on every retry; it is logged
    again after the port opened and later failed anew, or when the reason changes.
+
+UPnP `LOCATION` and `URLBase` must use the IPv4 address that sent the SSDP response; resolved WAN
+control URLs must use that address too. Their HTTP ports may differ from the SSDP port and from
+each other. Devices that rely on cross-host descriptions or control URLs are not used.
 
 ### Telling routers apart
 
@@ -49,8 +54,9 @@ identified. The order is:
    configured NAT-PMP gateway, are asked, on port 80, with a short timeout.
 2. UPnP devices: the SSDP search and the device description, whose `manufacturer`, `modelName`,
    `modelNumber` and `friendlyName` are the identity. No SOAP action is sent yet.
-3. Only then the protocols themselves (the UPnP actions, NAT-PMP). NAT-PMP therefore waits for the
-   UPnP search, which makes finding a router take up to the length of that search longer.
+3. Only then do protocol requests begin: UPnP SOAP actions and NAT-PMP requests run side by side.
+   NAT-PMP waits for the full UPnP search and description-screening pass, so discovery can take
+   longer than the search window alone.
 
 NAT-PMP has no way to ask a router what it is, so a NAT-PMP-only router is only recognized by its web
 interface. A router that says nothing about itself is never turned down.

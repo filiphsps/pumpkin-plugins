@@ -87,6 +87,8 @@ const backoff = (failures: number) => Math.min(RETRY_MS * 2 ** Math.max(0, failu
 const refusedText = ({ identity, reason }: { identity: RouterIdentity; reason: string }) =>
     `${describeIdentity(identity)} cannot be used: ${reason}`;
 const reason = (err: unknown) => (err instanceof Error ? err.message : String(err));
+const nonPublicExternalAddressReason = (address: Ipv4) =>
+    `the router's address on the internet is ${formatIpv4(address)}, which is not public (your provider shares one address between customers)`;
 
 /**
  * Keeps a set of ports open on the router: finds the router, opens each port, renews it before the
@@ -105,6 +107,7 @@ export class PortMapper {
     private lastFound: string | undefined;
     private readonly warned = new Map<string, string>();
     private local: { address: Ipv4 | undefined; checkedAt: number } | undefined;
+    private hasPublicAddress = false;
 
     /** Creates a mapper that does nothing until a mapping is requested. */
     constructor(
@@ -276,7 +279,9 @@ export class PortMapper {
             this.local = { address: this.net.localAddress(), checkedAt: now };
         }
         const address = this.local.address;
-        if (!address || !isPublicIpv4(address)) return false;
+        const hasPublicAddress = address !== undefined && isPublicIpv4(address);
+        if (hasPublicAddress !== this.hasPublicAddress) this.syncPublicAddressMode(hasPublicAddress);
+        if (!hasPublicAddress || !address) return false;
         for (const entry of this.entries.values()) {
             entry.mapping.state = {
                 kind: 'open',
@@ -288,13 +293,37 @@ export class PortMapper {
         return true;
     }
 
+    private syncPublicAddressMode(hasPublicAddress: boolean): void {
+        this.hasPublicAddress = hasPublicAddress;
+        this.discovered = undefined;
+        this.discoveryFailures = 0;
+        this.lastDiscoveryFailure = undefined;
+        this.discoveryRetryAt = 0;
+        this.refusal = undefined;
+        this.warned.delete('discovery');
+
+        const mappings = new Set([...this.entries.values()].map(({ mapping }) => mapping));
+        for (const mapping of mappings) {
+            mapping.renewAt = undefined;
+            if (hasPublicAddress) {
+                if (mapping.applied && !this.removals.includes(mapping.applied)) {
+                    this.removals.push(mapping.applied);
+                }
+                mapping.applied = undefined;
+            } else {
+                mapping.state = { kind: 'pending' };
+                mapping.retryAt = 0;
+                mapping.failures = 0;
+            }
+        }
+    }
+
     private *search(): Steps<void> {
         const { log } = this.options;
         try {
             const found = yield* discover(this.net, this.options);
             if (!isPublicIpv4(found.externalAddress)) {
-                const text = `the router's address on the internet is ${formatIpv4(found.externalAddress)}, which is not public (your provider shares one address between customers)`;
-                this.discoveryFailed(text);
+                this.discoveryFailed(nonPublicExternalAddressReason(found.externalAddress));
                 return;
             }
             this.discovered = found;
@@ -376,6 +405,11 @@ export class PortMapper {
             }
             const address = yield* gateway.externalAddress();
             if (!this.owned(entry)) return;
+            if (!isPublicIpv4(address)) {
+                this.discovered = undefined;
+                this.discoveryFailed(nonPublicExternalAddressReason(address));
+                return;
+            }
             const { result } = entry.applied;
             found.externalAddress = address;
             entry.state = { kind: 'open', via: gateway.kind, address, port: result.externalPort };

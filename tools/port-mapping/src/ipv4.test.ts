@@ -42,4 +42,17 @@ describe('isPublicIpv4', () => {
         ])
             expect(isPublicIpv4(parseIpv4(text) as never), text).toBe(true);
     });
+
+    it('honors globally reachable exceptions at the edge of 192.0.0.0/24', () => {
+        for (const text of ['192.0.0.8', '192.0.0.11'])
+            expect(isPublicIpv4(parseIpv4(text) as never), text).toBe(false);
+
+        for (const text of ['192.0.0.9', '192.0.0.10']) expect(isPublicIpv4(parseIpv4(text) as never), text).toBe(true);
+    });
+
+    it('rejects the non-global 192.88.99.2 exception without excluding adjacent addresses', () => {
+        expect(isPublicIpv4(parseIpv4('192.88.99.1') as never), '192.88.99.1').toBe(true);
+        expect(isPublicIpv4(parseIpv4('192.88.99.2') as never), '192.88.99.2').toBe(false);
+        expect(isPublicIpv4(parseIpv4('192.88.99.3') as never), '192.88.99.3').toBe(true);
+    });
 });
