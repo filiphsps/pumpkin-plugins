@@ -45,6 +45,9 @@ native code for size while keeping Hermes source locations and native line table
 Run `pnpm build:parse-ts` to build the repository's plugin packages with that parser.
 For the dev server, run `pnpm dev -- --parse-ts` to use that task for the initial build and watch builds.
 
+Static Hermes uses Hades garbage collection by default. Set `"staticHermesGc": "malloc"` in the
+package's `pumpkinPlugin` configuration to use malloc-managed GC. This choice requires Static Hermes.
+
 Set `PUMPKIN_PLUGINS_VERBOSE_BUILD=1` to include Static Hermes tool output and the selected
 `--wasi-imports`, `--wasi-methods`, `--api-methods` and `--event-types` for each component. Root builds
 normally hide cached task logs, so add `--force` to print the selections for every plugin:

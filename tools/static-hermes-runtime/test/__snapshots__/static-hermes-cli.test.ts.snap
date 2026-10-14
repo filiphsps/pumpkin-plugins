@@ -98,6 +98,8 @@ Options:
                                all
   --event-types <json-array>   Event type names; omit to include all
   --runtime-variant <variant>  Hermes archive profile (choices: "full", "lean")
+  --gc-variant <variant>       Hermes garbage collector (choices: "hades",
+                               "malloc")
   -h, --help                   display help for command
 "
 `;

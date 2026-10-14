@@ -1,3 +1,5 @@
+import type { HermesGcVariant } from '../hermes/gc.ts';
+
 /** Bundle, WIT, output, and feature selections for a Static Hermes component build. */
 export interface ComponentBuildOptions {
     /** Consumer project directory used to find the nearest pnpm workspace root for runtime caches. */
@@ -22,4 +24,6 @@ export interface ComponentBuildOptions {
     eventTypes?: string[];
     /** Hermes archive profile; omitted to use the configured default. */
     runtimeVariant?: 'full' | 'lean';
+    /** Garbage collector linked into the component; omitted to use Hades. */
+    gcVariant?: HermesGcVariant;
 }

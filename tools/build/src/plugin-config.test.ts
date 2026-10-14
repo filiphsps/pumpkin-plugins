@@ -28,6 +28,7 @@ describe('readPluginConfig', () => {
             output: 'build/p.wasm',
             wasi: ['sockets'],
             engine: 'static-hermes',
+            staticHermesGc: 'hades',
             version: '1.2.3'
         });
     });
@@ -62,6 +63,14 @@ describe('readPluginConfig', () => {
         );
 
         expect(config.staticHermesRuntime).toBe('lean');
+    });
+
+    it('supports selecting malloc instead of the default Hades garbage collector', () => {
+        const config = readPluginConfig(
+            packageWith({ version: '1.2.3', pumpkinPlugin: { engine: 'static-hermes', staticHermesGc: 'malloc' } })
+        );
+
+        expect(config.staticHermesGc).toBe('malloc');
     });
 
     it('uses the default engine when selecting a Static Hermes Runtime profile', () => {
@@ -111,6 +120,16 @@ describe('readPluginConfig', () => {
                 packageWith({ version: '0.0.0', pumpkinPlugin: { engine: 'quickjs', staticHermesRuntime: 'lean' } })
             )
         ).toThrow('"pumpkinPlugin.staticHermesRuntime" requires "engine": "static-hermes"');
+        expect(() =>
+            readPluginConfig(
+                packageWith({ version: '0.0.0', pumpkinPlugin: { engine: 'static-hermes', staticHermesGc: 'gen-gc' } })
+            )
+        ).toThrow('"pumpkinPlugin.staticHermesGc" must be "hades" or "malloc"');
+        expect(() =>
+            readPluginConfig(
+                packageWith({ version: '0.0.0', pumpkinPlugin: { engine: 'quickjs', staticHermesGc: 'malloc' } })
+            )
+        ).toThrow('"pumpkinPlugin.staticHermesGc" requires "engine": "static-hermes"');
         expect(() => readPluginConfig(packageWith({ version: '0.0.0', pumpkinPlugin: { wasi: [null] } }))).toThrow(
             '"pumpkinPlugin.wasi" must contain only capability names'
         );

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { StaticHermesRuntimeVariant } from '@pumpkin-plugins/static-hermes-runtime';
+import type { StaticHermesGcVariant, StaticHermesRuntimeVariant } from '@pumpkin-plugins/static-hermes-runtime';
 import { CAPABILITIES, type Capability, isCapability } from './capabilities.ts';
 import { BuildError } from './errors.ts';
 
@@ -8,6 +8,8 @@ import { BuildError } from './errors.ts';
 export type PluginEngine = 'quickjs' | 'static-hermes';
 /** Static Hermes Runtime profile linked into the plugin component. */
 export type StaticHermesRuntime = StaticHermesRuntimeVariant;
+/** Static Hermes garbage collector linked into the plugin component. */
+export type StaticHermesGc = StaticHermesGcVariant;
 
 /** What a package declares under `pumpkinPlugin` in its `package.json`. */
 export interface PluginBuildConfig {
@@ -21,6 +23,8 @@ export interface PluginBuildConfig {
     engine: PluginEngine;
     /** Optional Static Hermes VM profile. Lean omits runtime bytecode generation. */
     staticHermesRuntime?: StaticHermesRuntime;
+    /** Static Hermes garbage collector. Defaults to Hades. */
+    staticHermesGc?: StaticHermesGc;
     /** The package's version, injected as `__PLUGIN_VERSION__`. */
     version: string;
 }
@@ -73,6 +77,16 @@ export function readPluginConfig(pluginDir: string): PluginBuildConfig {
         }
     }
 
+    const configuredStaticHermesGc = config.staticHermesGc;
+    if (configuredStaticHermesGc !== undefined) {
+        if (engine !== 'static-hermes')
+            throw new BuildError('"pumpkinPlugin.staticHermesGc" requires "engine": "static-hermes"');
+        if (configuredStaticHermesGc !== 'hades' && configuredStaticHermesGc !== 'malloc') {
+            throw new BuildError('"pumpkinPlugin.staticHermesGc" must be "hades" or "malloc"');
+        }
+    }
+    const staticHermesGc = engine === 'static-hermes' ? (configuredStaticHermesGc ?? 'hades') : undefined;
+
     const wasiValue = config.wasi === undefined ? [] : config.wasi;
     if (!Array.isArray(wasiValue)) throw new BuildError('"pumpkinPlugin.wasi" must be an array of capability names');
     const wasi: Capability[] = [];
@@ -90,6 +104,7 @@ export function readPluginConfig(pluginDir: string): PluginBuildConfig {
         output,
         engine,
         ...(staticHermesRuntime === undefined ? {} : { staticHermesRuntime }),
+        ...(staticHermesGc === undefined ? {} : { staticHermesGc }),
         wasi,
         version: pkg.version
     };

@@ -1,5 +1,5 @@
 import { ansi } from '@pumpkin-plugins/minecraft-colors';
-import type { PluginEngine, StaticHermesRuntime } from './plugin-config.ts';
+import type { PluginEngine, StaticHermesGc, StaticHermesRuntime } from './plugin-config.ts';
 
 /** A message emitted by the shared plugin build output formatter. */
 export type BuildOutputMessage =
@@ -8,12 +8,14 @@ export type BuildOutputMessage =
           entry: string;
           engine: PluginEngine;
           runtimeVariant?: StaticHermesRuntime;
+          gcVariant?: StaticHermesGc;
           parseTypeScript?: boolean;
       }
     | {
           type: 'componentize';
           engine: PluginEngine;
           runtimeVariant?: StaticHermesRuntime;
+          gcVariant?: StaticHermesGc;
           parseTypeScript?: boolean;
           selections?: {
               wasiImports: string[];
@@ -42,7 +44,7 @@ export function formatBuildOutput(message: BuildOutputMessage): string {
     }
 
     const runtime = ansi.named.name(
-        runtimeLabel(message.engine, message.runtimeVariant, message.parseTypeScript ?? false)
+        runtimeLabel(message.engine, message.runtimeVariant, message.gcVariant, message.parseTypeScript ?? false)
     );
     if (message.type === 'bundle') return `[build] Bundling ${ansi.named.name(message.entry)} with ${runtime}...`;
 
@@ -68,10 +70,11 @@ export function printBuildOutput(message: BuildOutputMessage): void {
 function runtimeLabel(
     engine: PluginEngine,
     runtimeVariant: StaticHermesRuntime | undefined,
+    gcVariant: StaticHermesGc | undefined,
     parseTypeScript: boolean
 ): string {
     if (engine === 'quickjs') return 'QuickJS';
-    const options = [runtimeVariant, ...(parseTypeScript ? ['-parse-ts'] : [])].filter(
+    const options = [runtimeVariant, gcVariant ?? 'hades', ...(parseTypeScript ? ['-parse-ts'] : [])].filter(
         (option): option is string => option !== undefined
     );
     return `Static Hermes${options.length === 0 ? '' : ` (${options.join(', ')})`}`;

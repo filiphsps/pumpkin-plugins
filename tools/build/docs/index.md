@@ -12,9 +12,9 @@ capabilities. The result is the configured `.wasm` file under the package's buil
 The optional `engine` setting defaults to `static-hermes`; set it to `quickjs` to build a QuickJS
 plugin. Both engines are supported, and current plugin packages use the Static Hermes default. Static
 Hermes is the WASI 2 backend described in the [runtime guide](../../static-hermes-runtime/README.md).
-It uses the lean runtime archive by default. Set `staticHermesRuntime` to `"full"` to retain runtime
-source compilation, or set `STATIC_HERMES_ENABLE_LEAN_ARCHIVE=0` to disable the lean archive for
-builds.
+It uses the lean runtime archive and Hades garbage collector by default. Set `staticHermesRuntime`
+to `"full"` to retain runtime source compilation, or set `STATIC_HERMES_ENABLE_LEAN_ARCHIVE=0` to
+disable the lean archive for builds. Set `staticHermesGc` to `"malloc"` to select malloc-managed GC.
 
 The executable is compiled from TypeScript to `dist/cli.js`. Repository-wide build and typecheck
 commands compile it before consumers run. For a direct workspace package command after a fresh

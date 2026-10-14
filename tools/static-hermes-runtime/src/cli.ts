@@ -111,6 +111,7 @@ export function createStaticHermesProgram(dependencies: StaticHermesCliDependenc
         .option('--api-methods <json-array>', 'Pumpkin operation identifiers; omit to include all')
         .option('--event-types <json-array>', 'Event type names; omit to include all')
         .addOption(new Option('--runtime-variant <variant>', 'Hermes archive profile').choices(['full', 'lean']))
+        .addOption(new Option('--gc-variant <variant>', 'Hermes garbage collector').choices(['hades', 'malloc']))
         .action(async (options) => dependencies.componentBuild(parseComponentBuild(options)));
 
     return program;
@@ -192,6 +193,7 @@ function parseComponentBuild(options: {
     apiMethods?: string;
     eventTypes?: string;
     runtimeVariant?: 'full' | 'lean';
+    gcVariant?: 'hades' | 'malloc';
 }): ComponentBuildOptions {
     const wasiMethods = parseJsonStringArray(options.wasiMethods, 'wasi-methods', 'WASI method identifiers');
     const apiMethods = parseJsonStringArray(options.apiMethods, 'api-methods', 'method identifiers');
@@ -207,7 +209,8 @@ function parseComponentBuild(options: {
         ...(wasiMethods === undefined ? {} : { wasiMethods }),
         ...(apiMethods === undefined ? {} : { apiMethods }),
         ...(eventTypes === undefined ? {} : { eventTypes }),
-        ...(options.runtimeVariant === undefined ? {} : { runtimeVariant: options.runtimeVariant })
+        ...(options.runtimeVariant === undefined ? {} : { runtimeVariant: options.runtimeVariant }),
+        ...(options.gcVariant === undefined ? {} : { gcVariant: options.gcVariant })
     };
 }
 

@@ -19,6 +19,7 @@ it('forwards selected build options to the packaged CLI', () => {
         developmentMode: true,
         parseTypeScript: true,
         runtimeVariant: 'full' as const,
+        gcVariant: 'malloc' as const,
         quietOutput: true,
         wasiImports: ['wasi:filesystem/types@0.2.3'],
         wasiMethods: ['wasi:filesystem/types@0.2.3#read-via-stream'],
@@ -54,7 +55,9 @@ it('forwards selected build options to the packaged CLI', () => {
             '--event-types',
             JSON.stringify(options.eventTypes),
             '--runtime-variant',
-            'full'
+            'full',
+            '--gc-variant',
+            'malloc'
         ],
         { stdio: ['inherit', 'ignore', 'pipe'], maxBuffer: 16 * 1024 * 1024 }
     );
@@ -87,5 +90,6 @@ it('uses empty WASI imports and omits optional selections by default', () => {
     expect(args).not.toContain('--api-methods');
     expect(args).not.toContain('--event-types');
     expect(args).not.toContain('--runtime-variant');
+    expect(args).not.toContain('--gc-variant');
     expect(args).not.toContain('--parse-ts');
 });

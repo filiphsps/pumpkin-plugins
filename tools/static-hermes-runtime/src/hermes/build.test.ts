@@ -63,7 +63,10 @@ it('builds missing archives, reuses a current cache, and rebuilds when settings 
 
     await buildHermes(options);
     expect(cmakeCalls(calls)).toHaveLength(4);
-    expect(fs.existsSync(path.join(options.cacheRoot, 'prepared-build.json'))).toBe(true);
+    expect(fs.existsSync(path.join(options.cacheRoot, 'prepared-build-hades.json'))).toBe(true);
+    expect(cmakeCalls(calls).find(({ args }) => args[0] === '-S' && args[3] === options.wasiBuild)?.args).toContain(
+        '-DHERMESVM_GCKIND=HADES'
+    );
 
     await buildHermes(options);
     expect(cmakeCalls(calls)).toHaveLength(4);
@@ -75,6 +78,24 @@ it('builds missing archives, reuses a current cache, and rebuilds when settings 
     expect(cmakeCalls(calls)).toHaveLength(8);
     expect(cmakeCalls(calls).some(({ args }) => args.includes('-DHERMES_ENABLE_CORE_EXTENSIONS=ON'))).toBe(true);
     expect(fs.existsSync(path.join(options.cacheRoot, 'prepare.lock'))).toBe(false);
+});
+
+it('keeps Hades and malloc build artifacts cached independently', async () => {
+    const { options, calls } = fixture();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const mallocOptions = { ...options, gcVariant: 'malloc' as const, wasiBuild: `${options.wasiBuild}-malloc` };
+
+    await buildHermes(options);
+    await buildHermes(mallocOptions);
+    await buildHermes(options);
+
+    const gcConfigurations = cmakeCalls(calls)
+        .filter(({ args }) => args[0] === '-S' && args[3] !== options.hostBuild)
+        .map(({ args }) => args.find((argument) => argument.startsWith('-DHERMESVM_GCKIND=')));
+    expect(gcConfigurations).toEqual(['-DHERMESVM_GCKIND=HADES', '-DHERMESVM_GCKIND=MALLOC']);
+    expect(fs.existsSync(path.join(options.cacheRoot, 'prepared-build-hades.json'))).toBe(true);
+    expect(fs.existsSync(path.join(options.cacheRoot, 'prepared-build-malloc.json'))).toBe(true);
+    expect(cmakeCalls(calls)).toHaveLength(8);
 });
 
 it('releases the preparation lock when a CMake build fails', async () => {
@@ -491,9 +512,9 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
                 writeArtifact(path.join(hostBuild, 'bin', optionsPlatform === 'win32' ? 'shermes.exe' : 'shermes'));
                 writeArtifact(path.join(hostBuild, 'bin', optionsPlatform === 'win32' ? 'hermesc.exe' : 'hermesc'));
             } else {
-                writeArtifact(path.join(wasiBuild, 'lib/libhermesvm_a.a'));
-                writeArtifact(path.join(wasiBuild, 'lib/libhermesvmlean_a.a'));
-                writeArtifact(path.join(wasiBuild, 'jsi/libjsi.a'));
+                writeArtifact(path.join(buildDirectory, 'lib/libhermesvm_a.a'));
+                writeArtifact(path.join(buildDirectory, 'lib/libhermesvmlean_a.a'));
+                writeArtifact(path.join(buildDirectory, 'jsi/libjsi.a'));
             }
         },
         output(command, args) {
@@ -543,6 +564,7 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
 
 function writeArtifact(filename: string): void {
     fs.mkdirSync(path.dirname(filename), { recursive: true });
+    if (fs.existsSync(filename) && fs.readFileSync(filename, 'utf8') === 'fixture artifact') return;
     fs.writeFileSync(filename, 'fixture artifact');
 }
 

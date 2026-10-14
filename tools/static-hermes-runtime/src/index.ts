@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { HermesGcVariant } from './hermes/gc.ts';
 
 export { staticHermesImportsPlugin } from './esbuild-plugin.ts';
 export { buildHermesArtifacts, patchHermesSource, prepareHermes, prepareHermesSource } from './hermes/prepare.ts';
@@ -10,6 +11,9 @@ export { prepareStaticHermesBuild, setupHermesToolchainEnvironment } from './her
 
 /** Hermes archive profile linked into a Static Hermes plugin component. */
 export type StaticHermesRuntimeVariant = 'full' | 'lean';
+
+/** Garbage collector linked into a Static Hermes plugin component. */
+export type StaticHermesGcVariant = HermesGcVariant;
 
 /** Inputs for compiling a bundled plugin as a Static Hermes WASI component. */
 export interface StaticHermesBuildOptions {
@@ -29,6 +33,8 @@ export interface StaticHermesBuildOptions {
     quietOutput?: boolean;
     /** Hermes archive profile; defaults to the configured profile, usually `lean`. */
     runtimeVariant?: StaticHermesRuntimeVariant;
+    /** Garbage collector linked into the component; defaults to Hades. */
+    gcVariant?: StaticHermesGcVariant;
     /** WASI interface specifiers requested by the plugin; defaults to no additional imports. */
     wasiImports?: string[];
     /** WASI operation identifiers selected for native adapter generation. */
@@ -67,7 +73,8 @@ export function buildStaticHermesComponent(options: StaticHermesBuildOptions): v
             ...(options.wasiMethods === undefined ? [] : ['--wasi-methods', JSON.stringify(options.wasiMethods)]),
             ...(options.apiMethods === undefined ? [] : ['--api-methods', JSON.stringify(options.apiMethods)]),
             ...(options.eventTypes === undefined ? [] : ['--event-types', JSON.stringify(options.eventTypes)]),
-            ...(options.runtimeVariant === undefined ? [] : ['--runtime-variant', options.runtimeVariant])
+            ...(options.runtimeVariant === undefined ? [] : ['--runtime-variant', options.runtimeVariant]),
+            ...(options.gcVariant === undefined ? [] : ['--gc-variant', options.gcVariant])
         ],
         {
             stdio: options.quietOutput ? ['inherit', 'ignore', 'pipe'] : 'inherit',

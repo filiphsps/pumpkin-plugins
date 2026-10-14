@@ -2,17 +2,19 @@
 
 This guide explains what the engine comparison measures, how to read its report, and what conclusions its results support. It is intended for plugin authors, Pumpkin developers, runtime and CI contributors, and readers curious about the trade-offs.
 
-The comparison builds production WebAssembly components and exercises them on a real Pumpkin server. It compares QuickJS, Static Hermes full, and Static Hermes lean. It is a focused workload suite, not a universal JavaScript-engine ranking.
+The comparison builds production WebAssembly components and exercises them on a real Pumpkin server. It compares QuickJS and the full matrix of Static Hermes profiles (`full` and `lean`) and collectors (Hades and malloc). It is a focused workload suite, not a universal JavaScript-engine ranking.
 
 ## What the comparison runs
 
 The build tool bundles the same benchmark plugin source for each engine:
 
 - **QuickJS** bundles JavaScript as an ES module and "componentizes" it with this repository’s QuickJS runtime.
-- **Static Hermes full** compiles the JavaScript bundle to Hermes bytecode, embeds it in a statically linked Hermes/JSI WASI component, and retains runtime source compilation.
-- **Static Hermes lean** uses the same precompiled-bytecode execution model but omits runtime source compilation. In lean mode, `eval` and the `Function` constructor are unavailable.
+- **Static Hermes full, Hades GC** compiles the JavaScript bundle to Hermes bytecode, embeds it in a statically linked Hermes/JSI WASI component, retains runtime source compilation, and uses the default collector.
+- **Static Hermes full, malloc GC** uses the full runtime profile with malloc-managed garbage collection.
+- **Static Hermes lean, Hades GC** uses the default collector and omits runtime source compilation. In lean mode, `eval` and the `Function` constructor are unavailable.
+- **Static Hermes lean, malloc GC** uses the lean profile with malloc-managed garbage collection.
 
-Here, “Static Hermes” means Hermes linked into the WASI component. The plugin’s JavaScript is compiled to Hermes bytecode before the component runs; the benchmark does not translate JavaScript into native Wasm instructions. JIT is disabled for the WASI build. All three are Wasm components executed by Pumpkin’s runtime, not native desktop engine binaries.
+Here, “Static Hermes” means Hermes linked into the WASI component. The plugin’s JavaScript is compiled to Hermes bytecode before the component runs; the benchmark does not translate JavaScript into native Wasm instructions. JIT is disabled for the WASI build. Every configuration is a Wasm component executed by Pumpkin’s runtime, not a native desktop engine binary.
 
 Production builds minify the bundle and enforce the repository’s 5 MiB component limit (5,242,880 bytes). Build flags, toolchain pins, and runtime details are in the [Static Hermes Runtime guide](../tools/static-hermes-runtime/README.md) and [build guide](building.md).
 
@@ -28,7 +30,7 @@ The benchmark plugin and workload definitions are in [benchmark-plugin.ts](../be
 
 ## Method and scope
 
-Each engine receives the same workload source and input count. The integration test checks that all three engines return matching deterministic checksums for every workload; it also pins expected checksum values for selected string and command fixtures. It checks that:
+Each configuration receives the same workload source and input count. The integration test checks that all five configurations return matching deterministic checksums for every workload; it also pins expected checksum values for selected string and command fixtures. It checks that:
 
 - every engine reports the same workload identifiers, input counts, and checksums;
 - each timed workload has one un-timed warm-up followed by five measured samples;
@@ -39,7 +41,7 @@ Workload timing uses JavaScript `Date.now()`, so samples are reported as integer
 
 There are 24 timed workloads: 23 deterministic guest-side fixtures and one real Pumpkin API call. The fixture algorithms are representative examples written for this benchmark; they are not executions of the named plugins or Pumpkin’s own command router. Player-directory and other player-oriented fixture workloads use in-memory test data, not connected players.
 
-The engines run serially in QuickJS, full Hermes, then lean Hermes order, each with a newly started server. The real API workload calls `server.getAllPlayers()` 10,000 times per sample, or 60,000 calls per engine including the warm-up and five measured samples. The test server has no connected players, so the returned list is empty. The test separately registers and dispatches one real `server.command()` command, along with event and scheduled-task behavior checks. That command dispatch is API behavior coverage, not a timed command-routing workload.
+The configurations run serially in QuickJS, full Hades, full malloc, lean Hades, then lean malloc order, each with a newly started server. The real API workload calls `server.getAllPlayers()` 10,000 times per sample, or 60,000 calls per configuration including the warm-up and five measured samples. The test server has no connected players, so the returned list is empty. The test separately registers and dispatches one real `server.command()` command, along with event and scheduled-task behavior checks. That command dispatch is API behavior coverage, not a timed command-routing workload.
 
 ### Workload inventory
 

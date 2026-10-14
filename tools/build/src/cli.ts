@@ -101,11 +101,13 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
                     ? 'full'
                     : (config.staticHermesRuntime ?? 'lean')
                 : undefined;
+        const staticHermesGc = engine === 'static-hermes' ? (config.staticHermesGc ?? 'hades') : undefined;
         printBuildOutput({
             type: 'bundle',
             entry,
             engine,
             ...(staticHermesRuntime === undefined ? {} : { runtimeVariant: staticHermesRuntime }),
+            ...(staticHermesGc === undefined ? {} : { gcVariant: staticHermesGc }),
             ...(parseTs ? { parseTypeScript: true } : {})
         });
         const size = await bundlePlugin({
@@ -118,6 +120,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
             quietRuntimeOutput: process.env.PUMPKIN_PLUGINS_VERBOSE_BUILD !== '1',
             onOutput: printBuildOutput,
             ...(staticHermesRuntime === undefined ? {} : { staticHermesRuntime }),
+            ...(staticHermesGc === undefined ? {} : { staticHermesGc }),
             ...(parseTs ? { parseTypeScript: true } : {}),
             developmentMode: process.env.PUMPKIN_DEV_MODE === '1'
         });

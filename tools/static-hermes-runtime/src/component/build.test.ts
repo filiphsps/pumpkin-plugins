@@ -210,6 +210,31 @@ describe('buildStaticHermesComponent', () => {
         );
     });
 
+    it('prepares and links malloc when the shared build already prepared Hades', async () => {
+        const toolchain = configureToolchain();
+        process.env.PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED = '1';
+        const mallocBuild = `${toolchain.STATIC_HERMES_WASI_BUILD_DIR}-malloc`;
+        mocks.prepareHermes.mockImplementation(async ({ gcVariant }: { gcVariant?: string }) => {
+            expect(gcVariant).toBe('malloc');
+            for (const artifact of ['lib/libhermesvm_a.a', 'lib/libhermesvmlean_a.a', 'jsi/libjsi.a']) {
+                const filename = path.join(mallocBuild, artifact);
+                fs.mkdirSync(path.dirname(filename), { recursive: true });
+                fs.writeFileSync(filename, 'malloc archive');
+            }
+        });
+
+        await buildStaticHermesComponent({ ...buildOptions(), gcVariant: 'malloc' });
+
+        expect(mocks.prepareHermes).toHaveBeenCalledOnce();
+        expect(mocks.compile).toHaveBeenCalledWith(
+            expect.objectContaining({
+                toolchain: expect.objectContaining({
+                    hermesRuntimeArchive: path.join(mallocBuild, 'lib/libhermesvmlean_a.a')
+                })
+            })
+        );
+    });
+
     it('rejects an invalid runtime profile before setting up the toolchain', async () => {
         const options = { ...buildOptions(), runtimeVariant: 'invalid' as 'lean' };
 

@@ -6,7 +6,7 @@ import { buildStaticHermesComponent, staticHermesImportsPlugin } from '@pumpkin-
 import * as esbuild from 'esbuild';
 import { runtimeBuildError } from './errors.ts';
 import type { BuildOutputMessage } from './output.ts';
-import type { PluginEngine, StaticHermesRuntime } from './plugin-config.ts';
+import type { PluginEngine, StaticHermesGc, StaticHermesRuntime } from './plugin-config.ts';
 import { generateTypes } from './types.ts';
 import { findUsedWitMethods } from './wit-method-usage.ts';
 
@@ -32,6 +32,8 @@ export interface BundleOptions {
     engine?: PluginEngine;
     /** Static Hermes VM profile. Defaults to lean, which omits runtime `eval`. */
     staticHermesRuntime?: StaticHermesRuntime;
+    /** Static Hermes garbage collector. Defaults to Hades. */
+    staticHermesGc?: StaticHermesGc;
     /** Pass the bundle to Hermes's partial, unstable TypeScript parser. Static Hermes only. */
     parseTypeScript?: boolean;
     /** Whether this is a development build. */
@@ -111,6 +113,7 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                 type: 'componentize',
                 engine,
                 ...(options.staticHermesRuntime === undefined ? {} : { runtimeVariant: options.staticHermesRuntime }),
+                ...(options.staticHermesGc === undefined ? {} : { gcVariant: options.staticHermesGc }),
                 ...(options.parseTypeScript ? { parseTypeScript: true } : {}),
                 ...(engine === 'static-hermes' && !quietRuntimeOutput
                     ? {
@@ -141,6 +144,7 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
                     ...(options.staticHermesRuntime === undefined
                         ? {}
                         : { runtimeVariant: options.staticHermesRuntime }),
+                    ...(options.staticHermesGc === undefined ? {} : { gcVariant: options.staticHermesGc }),
                     ...(options.parseTypeScript ? { parseTypeScript: true } : {}),
                     ...(usedWitMethods === undefined
                         ? {}

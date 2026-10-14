@@ -25,7 +25,8 @@ const engineProfiles = [
     { name: 'QuickJS', options: { engine: 'quickjs' } },
     { name: 'default engine and runtime', options: {} },
     { name: 'Static Hermes full runtime', options: { engine: 'static-hermes', staticHermesRuntime: 'full' } },
-    { name: 'Static Hermes lean runtime', options: { engine: 'static-hermes', staticHermesRuntime: 'lean' } }
+    { name: 'Static Hermes lean runtime', options: { engine: 'static-hermes', staticHermesRuntime: 'lean' } },
+    { name: 'Static Hermes malloc collector', options: { engine: 'static-hermes', staticHermesGc: 'malloc' } }
 ] as const;
 const componentize = vi.mocked(execFileSync);
 const esbuild = vi.mocked(build);
@@ -77,6 +78,7 @@ describe('bundlePlugin', () => {
 
         const engine = 'engine' in options ? options.engine : 'static-hermes';
         const runtimeVariant = 'staticHermesRuntime' in options ? options.staticHermesRuntime : undefined;
+        const gcVariant = 'staticHermesGc' in options ? options.staticHermesGc : undefined;
         expect(componentize.mock.calls[0]?.[2]).toEqual({
             stdio: ['inherit', 'ignore', 'pipe'],
             maxBuffer: 16 * 1024 * 1024
@@ -85,8 +87,14 @@ describe('bundlePlugin', () => {
         expect(onOutput).toHaveBeenCalledWith({
             type: 'componentize',
             engine,
-            ...(runtimeVariant === undefined ? {} : { runtimeVariant })
+            ...(runtimeVariant === undefined ? {} : { runtimeVariant }),
+            ...(gcVariant === undefined ? {} : { gcVariant })
         });
+        if (gcVariant === undefined) expect(componentize.mock.calls[0]?.[1]).not.toContain('--gc-variant');
+        else {
+            expect(componentize.mock.calls[0]?.[1]).toContain('--gc-variant');
+            expect(componentize.mock.calls[0]?.[1]).toContain(gcVariant);
+        }
     });
 
     it('reports selected Static Hermes methods and events when runtime output is enabled', async () => {

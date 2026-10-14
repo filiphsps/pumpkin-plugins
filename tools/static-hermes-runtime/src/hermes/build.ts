@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { HermesGcVariant } from './gc.ts';
 import { ensurePatchOnlyChanges, type HermesPatch, verifyHermesPatchSeriesApplied } from './patch.ts';
 import type { HermesSourcePin } from './source.ts';
 import { type HermesFileSystem, type HermesProcessRunner, hermesFileSystem, hermesProcess } from './system.ts';
@@ -18,6 +19,8 @@ export interface HermesBuildOptions {
     hostBuild: string;
     /** CMake build directory for WASI Hermes and JSI libraries. */
     wasiBuild: string;
+    /** Garbage collector compiled into the WASI Hermes libraries; defaults to Hades. */
+    gcVariant?: HermesGcVariant;
     /** WASI SDK used by the WASI C and C++ compilers. */
     wasiSdk: string;
     /** CMake toolchain file used for the WASI build. */
@@ -98,7 +101,8 @@ export async function buildHermesWithLockHeld(options: HermesBuildOptions): Prom
     ensurePatchOnlyChanges(options.source, options.patches, runner);
     verifyHermesPatchSeriesApplied(options.source, options.patches, runner);
 
-    const buildStatePath = path.join(options.cacheRoot, 'prepared-build.json');
+    const gcVariant = options.gcVariant ?? 'hades';
+    const buildStatePath = path.join(options.cacheRoot, `prepared-build-${gcVariant}.json`);
     const platform = options.platform ?? process.platform;
     const artifacts = requiredHermesArtifacts(options.hostBuild, options.wasiBuild, platform);
     const fingerprint = hermesBuildFingerprint(options, artifacts, environment, filesystem, runner);
@@ -239,6 +243,7 @@ export function hermesBuildFingerprint(
             source: options.source,
             hostBuild: options.hostBuild,
             wasiBuild: options.wasiBuild,
+            gcVariant: options.gcVariant ?? 'hades',
             enableJsiExtensions: environment.STATIC_HERMES_ENABLE_JSI_EXTENSIONS === '1',
             enableUnicodeRegexpPropertyEscapes: environment.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0'
         },
@@ -727,7 +732,7 @@ function configureAndBuildHermes(
         '-DHERMESVM_ALLOW_JIT=0',
         '-DHERMES_UNICODE_LITE=ON',
         '-DHERMES_ALLOW_BOOST_CONTEXT=0',
-        '-DHERMESVM_GCKIND=MALLOC'
+        `-DHERMESVM_GCKIND=${(options.gcVariant ?? 'hades').toUpperCase()}`
     ]);
     runner.run('cmake', [
         '--build',

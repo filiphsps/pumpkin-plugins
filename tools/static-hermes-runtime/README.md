@@ -87,14 +87,17 @@ Omitting `engine` selects Static Hermes. Set `"engine": "quickjs"` in the packag
   "entry": "src/plugin.ts",
   "output": "build/plugin.wasm",
   "wasi": [],
-  "staticHermesRuntime": "full"
+  "staticHermesRuntime": "full",
+  "staticHermesGc": "malloc"
 }
 ```
 
-Static Hermes defaults to the lean profile. Both profiles execute precompiled Hermes bytecode; full
-also retains runtime source compilation, including `eval` and the `Function` constructor. Set
-`staticHermesRuntime` to `"full"` to use it. This setting requires the Static Hermes engine and
-cannot be combined with QuickJS.
+Static Hermes defaults to the lean profile and Hades garbage collection. Both profiles execute
+precompiled Hermes bytecode; full also retains runtime source compilation, including `eval` and the
+`Function` constructor. Set `staticHermesRuntime` to `"full"` to use it. Set `staticHermesGc` to
+`"malloc"` to use malloc-managed GC. Both settings require the Static Hermes engine and cannot be
+combined with QuickJS. The wasm32 WASI build has threads disabled, so Hades uses incremental
+collection.
 
 Build the plugin with:
 
@@ -128,7 +131,7 @@ compilation, and WASI C/C++ compilation and linking.
 | `STATIC_HERMES_CACHE_DIR` | Cache root override. By default, Static Hermes uses `.cache/hermes/` under the nearest pnpm workspace containing the consumer project directory, or under that directory for standalone projects. |
 | `STATIC_HERMES_SOURCE_DIR` | Hermes checkout; defaults to `source/` under the cache root. |
 | `STATIC_HERMES_HOST_BUILD_DIR` | Host build directory; defaults to `build-host/` under the cache root. |
-| `STATIC_HERMES_WASI_BUILD_DIR` | WASI build directory; defaults to `build-wasip2/` under the cache root. |
+| `STATIC_HERMES_WASI_BUILD_DIR` | Hades WASI build directory; defaults to `build-wasip2/` under the cache root. The malloc build uses a sibling directory with the `-malloc` suffix. |
 | `WIT_BINDGEN` | Optional `wit-bindgen` path override. The override, cached executable, and `~/.cargo/bin/wit-bindgen` must report the pinned `tools.wit-bindgen` version from `toolchain-versions.json`; a mismatch fails setup. If no executable exists, setup installs the pinned version. |
 | `WASM_TOOLS` | Optional `wasm-tools` path override for component builds and WIT analysis. It must report the pinned `tools.wasm-tools` version from `toolchain-versions.json`; otherwise setup reuses a valid cache or downloads and replaces an invalid cached executable. |
 
@@ -151,7 +154,8 @@ compilation, and WASI C/C++ compilation and linking.
 | `HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES=ON` | Keeps `\p{...}` and `\P{...}` regexp support. `STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES=0` removes that support and can reduce component size. |
 | `HERMES_CHECK_NATIVE_STACK=ON` | Converts native recursion overflow into a catchable JavaScript `RangeError`; the comparison checks this for full and lean builds. |
 | `HERMES_ALLOW_BOOST_CONTEXT=0` | Avoids Boost.Context, which is unavailable on this WASI target. |
-| `HERMESVM_GCKIND=MALLOC` | Selects malloc-managed GC for WASI; this is not a size optimization and uses more memory. |
+| `HERMESVM_GCKIND=HADES` | Default collector. With threads disabled on this wasm32 WASI target, Hades uses incremental collection. |
+| `HERMESVM_GCKIND=MALLOC` | Selects malloc-managed GC for WASI. Set `pumpkinPlugin.staticHermesGc` to `"malloc"` to choose it. |
 
 ### JavaScript-to-C compiler
 

@@ -684,14 +684,15 @@ describe('run arguments', () => {
                 version: '1.2.3',
                 engine: 'static-hermes',
                 staticHermesRuntime: 'lean',
+                staticHermesGc: 'hades',
                 parseTypeScript: true,
                 developmentMode: false,
                 quietRuntimeOutput: true,
                 onOutput: expect.any(Function)
             });
             expect(consoleLog.mock.calls.map(([message]) => message)).toEqual([
-                '[build] Bundling \u001b[36msrc/plugin.ts\u001b[0m with \u001b[36mStatic Hermes (lean, -parse-ts)\u001b[0m...',
-                '[build] Componentizing with \u001b[36mStatic Hermes (lean, -parse-ts)\u001b[0m...',
+                '[build] Bundling \u001b[36msrc/plugin.ts\u001b[0m with \u001b[36mStatic Hermes (lean, hades, -parse-ts)\u001b[0m...',
+                '[build] Componentizing with \u001b[36mStatic Hermes (lean, hades, -parse-ts)\u001b[0m...',
                 '[build] Built \u001b[36mbuild/plugin.wasm\u001b[0m (\u001b[94m2 KiB\u001b[0m)'
             ]);
         } finally {
@@ -996,6 +997,7 @@ describe('run arguments', () => {
                 version: '1.2.3',
                 engine: 'static-hermes',
                 staticHermesRuntime: 'lean',
+                staticHermesGc: 'hades',
                 developmentMode: true,
                 quietRuntimeOutput: true,
                 onOutput: expect.any(Function)

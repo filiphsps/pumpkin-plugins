@@ -12,6 +12,7 @@ interface EngineVariant {
     label: string;
     pluginEngine: 'quickjs' | 'static-hermes';
     staticHermesRuntime?: 'full' | 'lean';
+    staticHermesGc?: 'hades' | 'malloc';
     runtimeSourceCompilation: boolean;
     expectedUnicodePropertyEscapes: () => boolean;
 }
@@ -26,17 +27,37 @@ const engineVariants: EngineVariant[] = [
     },
     {
         id: 'static-hermes-full',
-        label: 'Static Hermes full',
+        label: 'Static Hermes full, Hades GC',
         pluginEngine: 'static-hermes',
         staticHermesRuntime: 'full',
+        staticHermesGc: 'hades',
+        runtimeSourceCompilation: true,
+        expectedUnicodePropertyEscapes: () => process.env.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0'
+    },
+    {
+        id: 'static-hermes-full-malloc',
+        label: 'Static Hermes full, malloc GC',
+        pluginEngine: 'static-hermes',
+        staticHermesRuntime: 'full',
+        staticHermesGc: 'malloc',
         runtimeSourceCompilation: true,
         expectedUnicodePropertyEscapes: () => process.env.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0'
     },
     {
         id: 'static-hermes-lean',
-        label: 'Static Hermes lean',
+        label: 'Static Hermes lean, Hades GC',
         pluginEngine: 'static-hermes',
         staticHermesRuntime: 'lean',
+        staticHermesGc: 'hades',
+        runtimeSourceCompilation: false,
+        expectedUnicodePropertyEscapes: () => process.env.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0'
+    },
+    {
+        id: 'static-hermes-lean-malloc',
+        label: 'Static Hermes lean, malloc GC',
+        pluginEngine: 'static-hermes',
+        staticHermesRuntime: 'lean',
+        staticHermesGc: 'malloc',
         runtimeSourceCompilation: false,
         expectedUnicodePropertyEscapes: () => process.env.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0'
     }
@@ -57,7 +78,7 @@ it('compares configured engines across component sizes, behavior, and matching w
 
     try {
         for (const variant of engineVariants) {
-            const { id, label, pluginEngine, staticHermesRuntime } = variant;
+            const { id, label, pluginEngine, staticHermesRuntime, staticHermesGc } = variant;
             const packageDir = path.join(temporaryDir, id);
             const sourceDir = path.join(packageDir, 'src');
             const apiLink = path.join(packageDir, 'node_modules/@pumpkin-plugins/pumpkin-api');
@@ -77,7 +98,8 @@ it('compares configured engines across component sizes, behavior, and matching w
                             output: 'build/plugin.wasm',
                             engine: pluginEngine,
                             wasi: [],
-                            ...(pluginEngine === 'static-hermes' && staticHermesRuntime ? { staticHermesRuntime } : {})
+                            ...(pluginEngine === 'static-hermes' && staticHermesRuntime ? { staticHermesRuntime } : {}),
+                            ...(pluginEngine === 'static-hermes' && staticHermesGc ? { staticHermesGc } : {})
                         }
                     },
                     null,
@@ -153,7 +175,8 @@ it('compares configured engines across component sizes, behavior, and matching w
         validateWorkloads(results, baseline);
 
         const hermesVariants = engineVariants.filter(
-            ({ pluginEngine, staticHermesRuntime }) => pluginEngine === 'static-hermes' && staticHermesRuntime
+            ({ pluginEngine, staticHermesRuntime, staticHermesGc }) =>
+                pluginEngine === 'static-hermes' && staticHermesRuntime && staticHermesGc === 'hades'
         );
         for (const { staticHermesRuntime } of hermesVariants) {
             if (staticHermesRuntime) await verifyHermesStackGuard(temporaryDir, apiRoot, buildCli, staticHermesRuntime);

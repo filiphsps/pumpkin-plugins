@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { hermesWasiBuildDirectory } from '../hermes/gc.ts';
 import { prepareHermes } from '../hermes/prepare.ts';
 import { setupHermesToolchainEnvironment } from '../hermes/toolchain-environment.ts';
 import { hermesHostCompilerPath } from '../hermes/toolchain-paths.ts';
@@ -25,8 +26,10 @@ export async function buildStaticHermesComponent(options: ComponentBuildOptions)
     const environment = process.env;
     const runtimeVariant =
         options.runtimeVariant ?? (environment.STATIC_HERMES_ENABLE_LEAN_ARCHIVE === '0' ? 'full' : 'lean');
+    const gcVariant = options.gcVariant ?? 'hades';
     const stackSizeBytes = environment.STATIC_HERMES_STACK_SIZE ?? '262144';
     validateRuntimeVariant(runtimeVariant);
+    validateGcVariant(gcVariant);
     validateStackSize(stackSizeBytes);
     preflightComponentInputs(options);
     const outputDirectory = path.dirname(options.output);
@@ -42,9 +45,6 @@ export async function buildStaticHermesComponent(options: ComponentBuildOptions)
     });
     Object.assign(environment, toolchain);
     const analysis = analyzeComponentWit(options);
-    if (environment.PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED !== '1') {
-        await prepareHermes({ workspaceRoot, environment });
-    }
 
     const cacheRoot = configuredPath(environment, 'STATIC_HERMES_CACHE_DIR', path.join(workspaceRoot, '.cache/hermes'));
     const hermesSource = configuredPath(environment, 'STATIC_HERMES_SOURCE_DIR', path.join(cacheRoot, 'source'));
@@ -53,22 +53,26 @@ export async function buildStaticHermesComponent(options: ComponentBuildOptions)
         'STATIC_HERMES_HOST_BUILD_DIR',
         path.join(cacheRoot, 'build-host')
     );
-    const hermesWasiBuild = configuredPath(
-        environment,
-        'STATIC_HERMES_WASI_BUILD_DIR',
-        path.join(cacheRoot, 'build-wasip2')
-    );
+    const hermesWasiBuild = hermesWasiBuildDirectory(cacheRoot, environment, gcVariant);
     const wasiSdk = configuredEnvironmentPath(environment, 'STATIC_HERMES_WASI_SDK_PATH');
     const bindgen = configuredEnvironmentPath(environment, 'WIT_BINDGEN');
     const hermesRuntimeArchive = path.join(
         hermesWasiBuild,
         `lib/libhermesvm${runtimeVariant === 'lean' ? 'lean' : ''}_a.a`
     );
+    const hermesJsiArchive = path.join(hermesWasiBuild, 'jsi/libjsi.a');
+    if (
+        environment.PUMPKIN_PLUGINS_STATIC_HERMES_PREPARED !== '1' ||
+        !fs.existsSync(hermesRuntimeArchive) ||
+        !fs.existsSync(hermesJsiArchive)
+    ) {
+        await prepareHermes({ workspaceRoot, environment, gcVariant });
+    }
     const hermesc = hermesHostCompilerPath(hermesHostBuild);
     requirePath('Hermes source', hermesSource);
     requirePath('Hermes host compiler', hermesc);
     requirePath(`WASI Hermes ${runtimeVariant} runtime archive`, hermesRuntimeArchive);
-    requirePath('WASI Hermes JSI archive', path.join(hermesWasiBuild, 'jsi/libjsi.a'));
+    requirePath('WASI Hermes JSI archive', hermesJsiArchive);
     requirePath('wit-bindgen', bindgen);
 
     const temporaryDirectory = fs.mkdtempSync(path.join(outputDirectory, '.static-hermes-'));
@@ -123,6 +127,10 @@ function requirePath(description: string, filename: string): void {
 
 function validateRuntimeVariant(value: string): asserts value is 'full' | 'lean' {
     if (value !== 'full' && value !== 'lean') throw new Error('--runtime-variant must be "full" or "lean"');
+}
+
+function validateGcVariant(value: string): void {
+    if (value !== 'hades' && value !== 'malloc') throw new Error('--gc-variant must be "hades" or "malloc"');
 }
 
 function validateStackSize(value: string): void {

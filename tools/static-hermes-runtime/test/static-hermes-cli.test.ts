@@ -109,7 +109,8 @@ it.each([
             '--development-mode',
             '--parse-ts',
             '--event-types <json-array>',
-            '--runtime-variant'
+            '--runtime-variant',
+            '--gc-variant'
         ]
     }
 ])('documents $args command', ({ args, requiredOptions }) => {
@@ -228,6 +229,8 @@ it('forwards the consumer project root to the component build action', async () 
             '--workspace-root',
             'consumer',
             '--parse-ts',
+            '--gc-variant',
+            'malloc',
             '--event-types',
             '["server-tick-end-event"]'
         ],
@@ -242,6 +245,7 @@ it('forwards the consumer project root to the component build action', async () 
             workspaceRoot: path.resolve('consumer'),
             developmentMode: false,
             parseTypeScript: true,
+            gcVariant: 'malloc',
             wasiImports: [],
             eventTypes: ['server-tick-end-event']
         }
