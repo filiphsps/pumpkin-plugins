@@ -11,6 +11,11 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [Creating an action](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-action.md): This runs the action Turborepo generator in turbo/generators/.
 - [Documentation site](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/documentation-site.md): The VitePress site combines the hand-written guides in docs/, component READMEs, component-level guides, and generated API references.
 
+## CI and releases
+
+- [Publishing public npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-publishing.md): This guide covers the six public tool packages maintained in this repository.
+- [Trusted publishing for npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-trusted-publishing.md): The release workflow publishes the public tools with npm trusted publishing. npm authenticates the GitHub Actions workflow through OpenID Connect (OIDC); no npm write token is…
+
 ## Guides
 
 - [Benchmarking QuickJS and Static Hermes](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/benchmarking.md): This guide explains what the engine comparison measures, how to read its report, and what conclusions its results support.
