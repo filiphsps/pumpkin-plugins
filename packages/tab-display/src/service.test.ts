@@ -251,7 +251,7 @@ describe('TabDisplayService', () => {
     });
 
     it('does not repeat setters for stable unsupported capabilities', () => {
-        const host = new FakeHost([viewers[0]!]);
+        const host = new FakeHost([viewers[0]]);
         const unsupported = { kind: 'unsupported', reason: 'Not available for this client' } as const;
         const setEntryName = vi.spyOn(host, 'setEntryName').mockReturnValue(unsupported);
         const setHeaderFooter = vi.spyOn(host, 'setHeaderFooter').mockReturnValue(unsupported);
@@ -272,7 +272,7 @@ describe('TabDisplayService', () => {
     it.each(['version change', 'disconnect', 'disable', 'shutdown'] as const)(
         'retries unsupported setters after %s invalidates the player capability',
         (invalidation) => {
-            const player = { ...viewers[0]!, javaVersion: 'v-1-21-1' };
+            const player = { ...viewers[0], javaVersion: 'v-1-21-1' };
             const host = new FakeHost([player]);
             const setEntryName = vi.spyOn(host, 'setEntryName').mockReturnValue({
                 kind: 'unsupported',
