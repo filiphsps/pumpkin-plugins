@@ -716,7 +716,11 @@ describe('action release prerequisites', () => {
         assert.equal(job.uses, './.github/workflows/engine-comparison.yml');
         assert.deepEqual(job.needs, ['changes', 'build']);
         assert.equal(job.if, "needs.changes.outputs.code == 'true'");
-        assert.ok(comparison.jobs.compare.steps.some((step) => step.run?.includes('compare-engines')));
+        assert.ok(
+            Object.values(comparison.jobs).some((job) =>
+                job.steps?.some((step) => step.run?.includes('compare-engines')),
+            ),
+        );
     });
 
     it('skips general integration suites only for benchmark-only code changes', () => {
