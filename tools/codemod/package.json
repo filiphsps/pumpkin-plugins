@@ -1,0 +1,72 @@
+{
+    "name": "@pumpkin-plugins/codemod",
+    "version": "0.1.0",
+    "description": "Codemod runner for Pumpkin plugins",
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/codemod#readme",
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
+        "directory": "tools/codemod"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/filiphsps"
+        },
+        {
+            "type": "custom",
+            "url": "https://paypal.me/filiph"
+        }
+    ],
+    "license": "MIT",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
+    "sideEffects": false,
+    "type": "module",
+    "exports": {
+        ".": {
+            "types": "./dist/src/index.d.ts",
+            "import": "./dist/src/index.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "main": "./dist/src/index.js",
+    "module": "./dist/src/index.js",
+    "types": "./dist/src/index.d.ts",
+    "bin": {
+        "pumpkin-codemod": "dist/bin/pumpkin-codemod.js"
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "docs",
+        "LICENSE"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "prepack": "pnpm build",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@commander-js/extra-typings": "catalog:",
+        "commander": "catalog:",
+        "jsonc-parser": "3.3.1",
+        "typescript": "catalog:"
+    },
+    "devDependencies": {
+        "@types/node": "catalog:",
+        "vitest": "catalog:"
+    },
+    "engines": {
+        "node": ">=24.21.0"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

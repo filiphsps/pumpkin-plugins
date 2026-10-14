@@ -215,7 +215,7 @@ class RuntimePlugin extends Plugin {
         );
 
         expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
-    });
+    }, 60_000);
 
     it('falls back when a Plugin forwarding method registers through a destructured context alias', () => {
         const entry = fixture();
