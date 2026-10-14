@@ -4,7 +4,7 @@ import { PortInUseError } from './gateway.ts';
 import { httpRequest } from './http.ts';
 import type { RouterIdentity } from './identify.ts';
 import type { Endpoint, Ipv4 } from './ipv4.ts';
-import { formatIpv4, parseIpv4 } from './ipv4.ts';
+import { formatIpv4, parseIpv4, sameIpv4 } from './ipv4.ts';
 import type { Network } from './network.ts';
 import type { Steps } from './task.ts';
 import { parseHttpUrl, resolveUrl } from './url.ts';
@@ -17,14 +17,36 @@ export interface ControlPoint {
     serviceType: string;
 }
 
+const normalizeErrorDescription = (description: string) => {
+    let normalized = '';
+    let inControlSequence = false;
+    for (const character of description) {
+        const codePoint = character.codePointAt(0) ?? 0;
+        const isControl =
+            codePoint <= 0x1f ||
+            (codePoint >= 0x7f && codePoint <= 0x9f) ||
+            codePoint === 0x2028 ||
+            codePoint === 0x2029;
+        if (isControl) {
+            if (!inControlSequence) normalized += ' ';
+            inControlSequence = true;
+            continue;
+        }
+        normalized += character;
+        inControlSequence = false;
+    }
+    return normalized.trim();
+};
+
 /** An error code a gateway answered a SOAP action with. */
 export class UpnpError extends Error {
-    /** Creates the error from the gateway's code and text. */
+    /** Creates the error from the gateway's code and a single-line description. */
     constructor(
         readonly code: number,
         description: string,
     ) {
-        super(`${description || 'UPnP error'} (${code})`);
+        const singleLineDescription = normalizeErrorDescription(description);
+        super(`${singleLineDescription || 'UPnP error'} (${code})`);
     }
 }
 
@@ -41,10 +63,20 @@ const rank = (type: string) => (type.includes('WANIPConnection:2') ? 0 : type.in
  * Finds the WAN connection services in a device description.
  * @param xml - The description document.
  * @param location - The URL it was fetched from, for resolving relative control URLs.
+ * @param responder - The SSDP responder's address. Defaults to the host in `location`.
  */
-export function parseDescription(xml: string, location: string): ControlPoint[] {
+export function parseDescription(xml: string, location: string, responder?: Ipv4): ControlPoint[] {
+    const locationUrl = parseHttpUrl(location);
+    if (!locationUrl) return [];
+    const expectedAddress = responder ?? locationUrl.endpoint.address;
+    if (!sameIpv4(locationUrl.endpoint.address, expectedAddress)) return [];
+
     const root = parser.parse(xml) as { root?: { URLBase?: string; device?: unknown } };
-    const base = typeof root.root?.URLBase === 'string' && root.root.URLBase ? root.root.URLBase : location;
+    const urlBase = typeof root.root?.URLBase === 'string' ? root.root.URLBase.trim() : '';
+    const base = urlBase || location;
+    const baseUrl = parseHttpUrl(base);
+    if (!baseUrl || !sameIpv4(baseUrl.endpoint.address, expectedAddress)) return [];
+
     const found: ControlPoint[] = [];
     const walk = (node: unknown): void => {
         if (Array.isArray(node)) {
@@ -59,8 +91,13 @@ export function parseDescription(xml: string, location: string): ControlPoint[] 
                         serviceType?: string;
                         controlURL?: string;
                     };
-                    if (serviceType && controlURL && WAN_SERVICE.test(serviceType))
-                        found.push({ serviceType, controlUrl: resolveUrl(controlURL, base) });
+                    if (serviceType && controlURL && WAN_SERVICE.test(serviceType)) {
+                        const controlUrl = resolveUrl(controlURL, base);
+                        const control = parseHttpUrl(controlUrl);
+                        if (control && sameIpv4(control.endpoint.address, expectedAddress)) {
+                            found.push({ serviceType, controlUrl });
+                        }
+                    }
                 }
             } else {
                 walk(value);

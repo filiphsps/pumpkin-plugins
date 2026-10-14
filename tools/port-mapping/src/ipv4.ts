@@ -30,17 +30,20 @@ export function sameIpv4(a: Ipv4, b: Ipv4): boolean {
 }
 
 /**
- * Whether the address can be reached from the internet: not private (RFC 1918), shared carrier
- * space (100.64.0.0/10), loopback, link-local, multicast or otherwise reserved.
+ * Whether the address is globally reachable, excluding private-use and special-purpose ranges that
+ * IANA marks as not globally reachable.
  */
 export function isPublicIpv4(address: Ipv4): boolean {
-    const [a, b, c] = address;
+    const [a, b, c, d] = address;
     if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
     if (a === 100 && b >= 64 && b <= 127) return false;
     if (a === 169 && b === 254) return false;
     if (a === 172 && b >= 16 && b <= 31) return false;
     if (a === 192 && b === 168) return false;
-    if (a === 192 && b === 0 && (c === 0 || c === 2)) return false;
+    if (a === 192 && b === 0 && c === 2) return false;
+    // IANA marks only .9 and .10 globally reachable inside the otherwise non-global 192.0.0.0/24.
+    if (a === 192 && b === 0 && c === 0 && d !== 9 && d !== 10) return false;
+    if (a === 192 && b === 88 && c === 99 && d === 2) return false;
     if (a === 198 && (b === 18 || b === 19)) return false;
     if (a === 198 && b === 51 && c === 100) return false;
     if (a === 203 && b === 0 && c === 113) return false;

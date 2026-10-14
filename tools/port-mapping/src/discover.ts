@@ -2,9 +2,9 @@ import type { Gateway } from './gateway.ts';
 import { httpRequest } from './http.ts';
 import { probeWeb, type RouterIdentity, RouterRefusedError, type Screen } from './identify.ts';
 import type { Endpoint, Ipv4 } from './ipv4.ts';
-import { formatIpv4 } from './ipv4.ts';
+import { formatIpv4, sameIpv4 } from './ipv4.ts';
 import { NAT_PMP_PORT, NatPmpGateway } from './natpmp.ts';
-import type { Network } from './network.ts';
+import type { Datagram, Network } from './network.ts';
 import { parseSearchResponse, SEARCH_TARGETS, SSDP_ADDRESS, searchRequest } from './ssdp.ts';
 import { parallel, type Steps } from './task.ts';
 import { type ControlPoint, parseDescription, parseIdentity, UpnpGateway } from './upnp.ts';
@@ -44,16 +44,25 @@ interface UpnpCandidate {
     points: ControlPoint[];
 }
 
+/** An SSDP description URL and the device address that advertised it. */
+interface UpnpResponse {
+    location: string;
+    responder: Ipv4;
+}
+
 /** How long to keep listening once the first router has answered, so slower ones can still be heard. */
 const GRACE_MS = 750;
 const MAX_LOCATIONS = 5;
+const MAX_DATAGRAMS_PER_POLL = 16;
 
 /**
- * Finds a router that can open ports. UPnP and NAT-PMP are tried side by side; UPnP wins when both answer.
+ * Finds a router that can open ports. When both protocols are enabled, UPnP search and description
+ * reads finish before NAT-PMP starts. Their protocol requests then run together, with UPnP preferred
+ * when both answer.
  *
- * With a `screen`, routers are identified first, and nothing is asked of one that is turned down:
- * its web interface is looked at, then UPnP devices describe themselves, and only then are the
- * protocols spoken. That makes a search take longer, since NAT-PMP waits for the UPnP search.
+ * With a `screen`, the web probe runs first, followed by UPnP search and description screening when
+ * UPnP is enabled. A rejected router receives no protocol requests; when UPnP is enabled, NAT-PMP
+ * waits for that discovery pass to finish.
  * @throws {RouterRefusedError} When the only routers found are turned down by the `screen`.
  * @throws {Error} Saying why each protocol found nothing.
  */
@@ -93,13 +102,13 @@ function* failWith(err: unknown): Steps<Discovered> {
 
 /** Searches for UPnP routers and reads what each says about itself, leaving out those the `screen` turns down. */
 function* surveyUpnp(net: Network, options: DiscoveryOptions): Steps<UpnpCandidate[]> {
-    const locations = yield* search(net, options.ssdp ?? SSDP_ADDRESS, options.searchMs ?? 3000);
-    if (locations.length === 0) throw new Error('no router answered the search');
+    const responses = yield* search(net, options.ssdp ?? SSDP_ADDRESS, options.searchMs ?? 3000);
+    if (responses.length === 0) throw new Error('no router answered the search');
 
     const candidates: UpnpCandidate[] = [];
     let refusal: RouterRefusedError | undefined;
-    for (const location of locations.slice(0, MAX_LOCATIONS)) {
-        const candidate = yield* describeSteps(net, location);
+    for (const response of responses) {
+        const candidate = yield* describeSteps(net, response);
         const reason = candidate.identity && options.screen?.(candidate.identity);
         if (candidate.identity && reason) refusal ??= new RouterRefusedError(reason, candidate.identity);
         else candidates.push(candidate);
@@ -123,23 +132,31 @@ function* connectUpnp(net: Network, candidates: readonly UpnpCandidate[]): Steps
     throw new Error(lastError);
 }
 
-function* describeSteps(net: Network, location: string): Steps<UpnpCandidate> {
+function* describeSteps(net: Network, { location, responder }: UpnpResponse): Steps<UpnpCandidate> {
     const url = parseHttpUrl(location);
-    if (!url) return { points: [] };
+    if (!url || !sameIpv4(url.endpoint.address, responder)) return { points: [] };
     try {
         const response = yield* httpRequest(net, url.endpoint, { method: 'GET', path: url.path });
         if (response.status !== 200) return { points: [] };
-        return { points: parseDescription(response.body, location), identity: parseIdentity(response.body) };
+        return {
+            points: parseDescription(response.body, location, responder),
+            identity: parseIdentity(response.body),
+        };
     } catch {
         return { points: [] };
     }
 }
 
-function* search(net: Network, to: Endpoint, windowMs: number): Steps<string[]> {
+/**
+ * Searches for UPnP responses and yields after each bounded receive batch.
+ * @internal
+ */
+export function* search(net: Network, to: Endpoint, windowMs: number): Steps<UpnpResponse[]> {
     const socket = net.openDatagram();
     try {
         const start = net.now();
         const found = new Set<string>();
+        const responses: UpnpResponse[] = [];
         let firstAt: number | undefined;
         let sends = 0;
         while (net.now() - start < windowMs && !(firstAt !== undefined && net.now() - firstAt > GRACE_MS)) {
@@ -148,19 +165,30 @@ function* search(net: Network, to: Endpoint, windowMs: number): Steps<string[]> 
                 for (const target of SEARCH_TARGETS) socket.send(to, searchRequest(target, to));
                 sends++;
             }
-            for (let d = socket.receive(); d; d = socket.receive()) {
-                const location = parseSearchResponse(d.data);
-                if (location && !found.has(location)) {
-                    found.add(location);
+            for (let i = 0; i < MAX_DATAGRAMS_PER_POLL; i++) {
+                const datagram = socket.receive();
+                if (!datagram) break;
+                if (responses.length >= MAX_LOCATIONS) continue;
+                const response = parseUpnpResponse(datagram);
+                if (response) {
+                    const key = `${formatIpv4(response.responder)}\0${response.location}`;
+                    if (found.has(key)) continue;
+                    found.add(key);
+                    responses.push(response);
                     firstAt ??= net.now();
                 }
             }
             yield;
         }
-        return [...found];
+        return responses;
     } finally {
         socket.close();
     }
+}
+
+function parseUpnpResponse(datagram: Datagram): UpnpResponse | undefined {
+    const location = parseSearchResponse(datagram.data);
+    return location ? { location, responder: datagram.from.address } : undefined;
 }
 
 function* discoverNatPmp(

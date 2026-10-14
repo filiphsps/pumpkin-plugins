@@ -89,6 +89,46 @@ describe('PortMapper', () => {
         expect(net.connections).toHaveLength(0);
     });
 
+    it('discovers and opens a router mapping when a public host becomes private', () => {
+        const { igd, mapper, settle, net } = setup();
+        net.local = [93, 184, 216, 99];
+        mapper.request('web', spec);
+        settle(() => {
+            const state = mapper.state('web');
+            return state?.kind === 'open' && state.via === 'public';
+        });
+
+        net.local = [192, 168, 1, 50];
+        net.time += 60_000;
+        settle(() => {
+            const state = mapper.state('web');
+            return state?.kind === 'open' && state.via === 'upnp';
+        });
+
+        expect(mapper.state('web')).toMatchObject({ kind: 'open', via: 'upnp', port: 8123 });
+        expect(igd?.mappings.has('tcp:8123')).toBe(true);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('closes router mappings when a private host becomes public', () => {
+        const { igd, mapper, settle, net } = setup();
+        mapper.request('web', spec);
+        settle(() => open(mapper.state('web')));
+        expect(igd?.mappings.has('tcp:8123')).toBe(true);
+
+        net.local = [93, 184, 216, 99];
+        net.time += 60_000;
+        settle(() => {
+            const state = mapper.state('web');
+            return state?.kind === 'open' && state.via === 'public';
+        });
+        settle(() => igd?.mappings.size === 0);
+
+        expect(mapper.state('web')).toMatchObject({ kind: 'open', via: 'public', address: [93, 184, 216, 99] });
+        expect(igd?.mappings.size).toBe(0);
+        expect(net.leaks).toBe(0);
+    });
+
     it('keeps working when requested again with the same spec, and replaces a mapping whose spec changed', () => {
         const { igd, mapper, settle } = setup();
         mapper.request('web', spec);
@@ -358,6 +398,42 @@ describe('PortMapper', () => {
         expect(adds()).toBe(1);
         settle(() => (adds() ?? 0) > 1, 5000);
         expect(adds()).toBe(2);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('fails and rediscovers when the router WAN address becomes non-public during renewal', () => {
+        const { igd, mapper, settle, net } = setup(new FakeIgd(), { leaseSeconds: 100 });
+        mapper.request('web', spec);
+        settle(() => open(mapper.state('web')));
+        const searches = () => net.sent.filter(({ to }) => to.port === 1900).length;
+        const wanAddressChecks = () => igd?.actions.filter((action) => action === 'GetExternalIPAddress').length ?? 0;
+        const initialSearches = searches();
+
+        if (igd) igd.options.externalAddress = [100, 64, 0, 1];
+        net.time += 50_000;
+        settle(() => mapper.state('web')?.kind === 'failed', 1000);
+
+        expect(mapper.state('web')).toMatchObject({
+            kind: 'failed',
+            reason: expect.stringContaining('100.64.0.1'),
+        });
+        expect(mapper.info().externalAddress).toBeUndefined();
+        const checksAfterRenewal = wanAddressChecks();
+
+        settle(() => searches() > initialSearches, 35_000);
+        settle(() => wanAddressChecks() > checksAfterRenewal, 5000);
+        settle(() => false, 2000);
+        expect(mapper.state('web')).toMatchObject({
+            kind: 'failed',
+            reason: expect.stringContaining('100.64.0.1, which is not public'),
+        });
+
+        if (igd) igd.options.externalAddress = [93, 184, 216, 35];
+        settle(() => {
+            const state = mapper.state('web');
+            return state?.kind === 'open' && state.via === 'upnp' && state.address[3] === 35;
+        }, 120_000);
+        expect(mapper.state('web')).toMatchObject({ kind: 'open', via: 'upnp', address: [93, 184, 216, 35] });
         expect(net.leaks).toBe(0);
     });
 

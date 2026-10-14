@@ -1,10 +1,90 @@
 import { describe, expect, it } from 'vitest';
-import { discover } from './discover.ts';
+import { discover, search } from './discover.ts';
 import { RouterRefusedError } from './identify.ts';
+import type { Ipv4 } from './ipv4.ts';
+import type { Datagram, DatagramSocket } from './network.ts';
+import { SSDP_ADDRESS } from './ssdp.ts';
 import { FakeIgd } from './testing/fake-igd.ts';
 import { FakeNetwork, runSteps } from './testing/fake-network.ts';
 
 const both = { upnp: true, natPmp: true };
+
+class FloodNetwork extends FakeNetwork {
+    readonly received: Datagram[] = [];
+    closed = false;
+    private readonly pending: Datagram[];
+
+    constructor(datagrams: Datagram[]) {
+        super();
+        this.pending = datagrams;
+    }
+
+    override openDatagram(): DatagramSocket {
+        return {
+            close: () => {
+                this.closed = true;
+            },
+            receive: () => {
+                const datagram = this.pending.shift();
+                if (datagram) this.received.push(datagram);
+                return datagram;
+            },
+            send: () => {},
+        };
+    }
+
+    get pendingCount(): number {
+        return this.pending.length;
+    }
+}
+
+function searchDatagrams(count: number): Datagram[] {
+    return Array.from({ length: count }, (_, index) => {
+        const host = index + 1;
+        const address: Ipv4 = [192, 168, 1, host];
+        return {
+            data: new TextEncoder().encode(
+                `HTTP/1.1 200 OK\r\nLOCATION: http://192.168.1.${host}:5000/root.xml\r\n\r\n`,
+            ),
+            from: { address, port: 1900 },
+        };
+    });
+}
+
+describe('SSDP search', () => {
+    it('retains only the first five unique responses from a flood', () => {
+        const net = new FloodNetwork(searchDatagrams(32));
+        const steps = search(net, SSDP_ADDRESS, 3000);
+
+        let result = steps.next();
+        while (!result.done && net.pendingCount > 0) result = steps.next();
+        net.time = 751;
+        result = steps.next();
+
+        expect(result).toEqual({
+            done: true,
+            value: [
+                { location: 'http://192.168.1.1:5000/root.xml', responder: [192, 168, 1, 1] },
+                { location: 'http://192.168.1.2:5000/root.xml', responder: [192, 168, 1, 2] },
+                { location: 'http://192.168.1.3:5000/root.xml', responder: [192, 168, 1, 3] },
+                { location: 'http://192.168.1.4:5000/root.xml', responder: [192, 168, 1, 4] },
+                { location: 'http://192.168.1.5:5000/root.xml', responder: [192, 168, 1, 5] },
+            ],
+        });
+        expect(net.closed).toBe(true);
+    });
+
+    it('yields after a bounded batch while flood datagrams remain queued', () => {
+        const net = new FloodNetwork(searchDatagrams(100));
+        const steps = search(net, SSDP_ADDRESS, 3000);
+
+        expect(steps.next().done).toBe(false);
+        expect(net.received).toHaveLength(16);
+        expect(net.pendingCount).toBe(84);
+        expect(() => steps.throw(new Error('stop search'))).toThrow('stop search');
+        expect(net.closed).toBe(true);
+    });
+});
 
 describe('discover', () => {
     it('finds a UPnP router through the multicast search and reads its external address', () => {
@@ -82,6 +162,29 @@ describe('discover', () => {
         broken.handleHttp = () => ({ status: 500, body: '' });
         net.routers.push(broken);
         expect(runSteps(net, discover(net, { upnp: true, natPmp: false })).gateway.kind).toBe('upnp');
+    });
+
+    it('does not fetch a LOCATION hosted by a different device than the SSDP responder', () => {
+        const responder = new FakeIgd({ natPmp: false });
+        Object.defineProperty(responder, 'location', {
+            get: () => 'http://192.168.1.2:6000/rootDesc.xml',
+        });
+        const otherDevice = new FakeIgd({ address: [192, 168, 1, 2], httpPort: 6000, natPmp: false });
+        otherDevice.handleDatagram = () => [];
+        const net = new FakeNetwork([responder, otherDevice]);
+
+        expect(() => runSteps(net, discover(net, { upnp: true, natPmp: false }))).toThrow('no port mapping service');
+        expect(net.connections).toHaveLength(0);
+        expect(net.leaks).toBe(0);
+    });
+
+    it('accepts a private router whose HTTP services use a different port from SSDP', () => {
+        const igd = new FakeIgd({ httpPort: 6000, natPmp: false });
+        const net = new FakeNetwork([igd]);
+
+        expect(runSteps(net, discover(net, { upnp: true, natPmp: false })).gateway.kind).toBe('upnp');
+        expect(net.connections).toHaveLength(2);
+        expect(net.leaks).toBe(0);
     });
 
     describe('with a screen', () => {
