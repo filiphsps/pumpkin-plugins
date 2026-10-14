@@ -69,7 +69,10 @@ describe('changed-areas', () => {
     it('classifies changes without installed workspace dependencies', () => {
         const dir = repo({
             'scripts/changed-areas.mjs': fs.readFileSync(path.join(scripts, 'changed-areas.mjs'), 'utf8'),
-            'scripts/ignored-commits.mjs': fs.readFileSync(path.join(scripts, 'ignored-commits.mjs'), 'utf8'),
+            'scripts/utils/ignored-commits.mjs': fs.readFileSync(
+                path.join(scripts, 'utils/ignored-commits.mjs'),
+                'utf8',
+            ),
             '.git-blame-ignore-revs': fs.readFileSync(path.join(scripts, '../.git-blame-ignore-revs'), 'utf8'),
             'docs/guide.md': '# Guide\n',
         });

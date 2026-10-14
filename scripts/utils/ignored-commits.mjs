@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const file = resolve(import.meta.dirname, '../.git-blame-ignore-revs');
+const file = resolve(import.meta.dirname, '../../.git-blame-ignore-revs');
 const commits = readFileSync(file, 'utf8')
     .split(/\r?\n/)
     .map((line) => line.trim())

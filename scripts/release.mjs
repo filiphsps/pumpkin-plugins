@@ -5,8 +5,8 @@ import { appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { Command } from 'commander';
-import { bundledChangesPlugin, workspacePackages } from './release-commits.mjs';
-import { partitionReleasePaths } from './release-fanout.mjs';
+import { bundledChangesPlugin, workspacePackages } from './utils/release-commits.mjs';
+import { partitionReleasePaths } from './utils/release-fanout.mjs';
 
 const program = new Command()
     .name('release')

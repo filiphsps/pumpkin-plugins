@@ -51,7 +51,7 @@ after one day instead of being deleted by the workflows.
 ## Running only what a change needs
 
 `scripts/changed-areas.mjs` diffs the change against what came before it (the pull request base or
-the push's `before` commit). Both it and `scripts/release-commits.mjs` exclude commits listed in
+the push's `before` commit). Both it and `scripts/utils/release-commits.mjs` exclude commits listed in
 `.git-blame-ignore-revs`; that file is also GitHub's blame ignore list. Add a short reason comment
 above each SHA so future entries retain their context. Markdown, `docs/`,
 component-level `docs/` folders and `LICENSE` changes are documentation. Changes under
@@ -200,7 +200,7 @@ changes bump major, features bump minor, and fixes and performance improvements 
 release config checker requires the corresponding `bump-minor-pre-major` and
 `bump-patch-for-minor-pre-major` options and rejects package overrides that disable them.
 
-`scripts/release-commits.mjs` supplies shared commits through its plugin hook before versions and
+`scripts/utils/release-commits.mjs` supplies shared commits through its plugin hook before versions and
 changelogs are calculated. A shipped change is included for every plugin that bundles the affected
 package, and each plugin's version bump is calculated from its own current version. Features, fixes
 and performance improvements appear in the notes. After publishing, the runner reloads the manifest

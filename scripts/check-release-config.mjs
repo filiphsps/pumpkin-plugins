@@ -3,7 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
-import { PUBLIC_TOOL_PACKAGE_PATHS } from './tool-packages.mjs';
+import { PUBLIC_TOOL_PACKAGE_PATHS } from './utils/tool-packages.mjs';
 
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
 const read = (file) => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));

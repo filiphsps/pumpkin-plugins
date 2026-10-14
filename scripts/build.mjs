@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { prepareStaticHermesBuild } from '@pumpkin-plugins/static-hermes-runtime';
 import { Command } from 'commander';
-import { withDefaultTurboFlags } from './turbo-args.mjs';
+import { withDefaultTurboFlags } from './utils/turbo-args.mjs';
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const turboCli = path.join(workspaceRoot, 'node_modules/turbo/bin/turbo');

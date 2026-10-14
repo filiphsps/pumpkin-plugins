@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { withDefaultTurboFlags } from './turbo-args.mjs';
+import { withDefaultTurboFlags } from './utils/turbo-args.mjs';
 
 const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const turboCli = path.join(workspaceRoot, 'node_modules/turbo/bin/turbo');

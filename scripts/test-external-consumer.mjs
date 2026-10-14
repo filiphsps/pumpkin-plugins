@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
-import { createInternalRegistry } from './external-consumer-registry.mjs';
+import { createInternalRegistry } from './utils/external-consumer-registry.mjs';
 import {
     assertPackedBuilderDependencies,
     assertPublicToolPackage,
@@ -12,7 +12,7 @@ import {
     assertStarterToolDependencies,
     PUBLIC_TOOL_PACKAGE_PATHS,
     parseTarEntries,
-} from './tool-packages.mjs';
+} from './utils/tool-packages.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const program = new Command()

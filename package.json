@@ -59,7 +59,7 @@
         "test": "pnpm turbo run test",
         "test:external-consumer": "node scripts/test-external-consumer.mjs",
         "test:integration": "pnpm turbo run test:integration --concurrency=4",
-        "test:scripts": "node --test scripts/*.test.mjs .agents/hooks/*.test.mjs",
+        "test:scripts": "node --test scripts/*.test.mjs scripts/utils/*.test.mjs .agents/hooks/*.test.mjs",
         "turbo": "node scripts/turbo.mjs",
         "typecheck": "pnpm turbo run typecheck"
     },

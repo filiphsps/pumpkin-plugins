@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { discoverComponents, localLicenseFile } from '@pumpkin-plugins/docs/node';
 import { Command } from 'commander';
-import { PUBLIC_TOOL_PACKAGE_PATHS } from './tool-packages.mjs';
+import { PUBLIC_TOOL_PACKAGE_PATHS } from './utils/tool-packages.mjs';
 
 const program = new Command()
     .name('package-metadata')

@@ -3,7 +3,7 @@
 // See the Jobs table in docs/ci-and-releases.md.
 import { spawnSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
-import { ignoredCommitShas } from './ignored-commits.mjs';
+import { ignoredCommitShas } from './utils/ignored-commits.mjs';
 
 /** A changed file matching any of these is documentation, which nothing that builds or tests reads. */
 const DOCS = [/\.md$/, /^docs\//, /^LICENSE$/, /^(packages|tools|actions)\/[^/]+\/docs(?:\/|$)/];
