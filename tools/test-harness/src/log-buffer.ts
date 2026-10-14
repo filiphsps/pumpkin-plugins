@@ -35,6 +35,11 @@ export class LogBuffer {
             }
             this.notify();
         });
+        stream.once('end', () => {
+            const line = stripAnsi(pending);
+            if (line.trim()) this.lines.push(line);
+            this.notify();
+        });
     }
 
     /** Wakes everything that is waiting so it can look again. Call when the process state changes. */

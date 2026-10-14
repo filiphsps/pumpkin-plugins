@@ -24,7 +24,7 @@ function setupCache(): string {
 }
 
 describe('resolvePumpkinBinary', () => {
-    it('downloads a checksum-verified binary once and reuses the cache', async () => {
+    it('verifies a downloaded binary against the checksum before reusing the cache', async () => {
         const cache = setupCache();
         const asset = assetName(process.platform, process.arch);
         const bytes = Buffer.from('test Pumpkin binary');
@@ -39,9 +39,28 @@ describe('resolvePumpkinBinary', () => {
         expect(await resolvePumpkinBinary()).toBe(expected);
         expect(fs.readFileSync(expected)).toEqual(bytes);
         expect(fs.statSync(expected).mode & 0o777).toBe(0o755);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
 
         expect(await resolvePumpkinBinary()).toBe(expected);
-        expect(fetchMock).toHaveBeenCalledTimes(2);
+        expect(fetchMock).toHaveBeenCalledTimes(3);
+        expect(String(fetchMock.mock.calls[2]?.[0])).toContain('/checksums.sha256');
+    });
+
+    it('rejects a cached binary that does not match the pinned release checksum', async () => {
+        const cache = setupCache();
+        const asset = assetName(process.platform, process.arch);
+        const trustedBytes = Buffer.from('trusted Pumpkin binary');
+        const corruptedBytes = Buffer.from('corrupted cached Pumpkin binary');
+        const checksum = createHash('sha256').update(trustedBytes).digest('hex');
+        const expected = path.join(cache, `${PUMPKIN_RELEASE}-${asset}`);
+        fs.writeFileSync(expected, corruptedBytes);
+        const fetchMock = vi.fn<typeof fetch>(async () => new Response(`${checksum}  ${asset}\n`));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(resolvePumpkinBinary()).rejects.toThrow(/Checksum mismatch/);
+        expect(fetchMock).toHaveBeenCalledOnce();
+        expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/checksums.sha256');
+        expect(fs.readFileSync(expected)).toEqual(corruptedBytes);
     });
 
     it('rejects a binary with the wrong checksum without caching it', async () => {

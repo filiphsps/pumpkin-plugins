@@ -22,6 +22,20 @@ describe('LogBuffer', () => {
         expect(buffer.lines).toEqual([]);
     });
 
+    it('emits and notifies a half-written line when the stream ends', async () => {
+        const buffer = new LogBuffer();
+        const stream = new PassThrough();
+        buffer.attach(stream);
+        stream.write('final output');
+        expect(buffer.lines).toEqual([]);
+
+        const wait = buffer.waitFor(/final output/, options({ timeoutMs: 2000 }));
+        stream.end();
+
+        await expect(wait).resolves.toBe('final output');
+        expect(buffer.lines).toEqual(['final output']);
+    });
+
     it('finds lines already there and lines that arrive later', async () => {
         const buffer = new LogBuffer();
         const stream = new PassThrough();

@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { parse } from 'smol-toml';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -9,9 +11,17 @@ afterEach(() => {
     for (const dir of made.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
+async function expectRejectedPath(relativePath: string): Promise<void> {
+    const result = prepareServerDir({ files: { [relativePath]: 'content' } }).then((server) => {
+        made.push(server.dir);
+        throw new Error('Server directory unexpectedly accepted an escaping file path.');
+    });
+    await expect(result).rejects.toThrow(/must be relative to and remain inside the server directory/);
+}
+
 describe('prepareServerDir', () => {
     it('writes a config with free loopback ports, copies plugins and seeds files', async () => {
-        const wasm = path.join(await fs.promises.mkdtemp(path.join(process.env.TMPDIR ?? '/tmp', 'x-')), 'p.wasm');
+        const wasm = path.join(await fs.promises.mkdtemp(path.join(os.tmpdir(), 'x-')), 'p.wasm');
         fs.writeFileSync(wasm, 'wasm');
         made.push(path.dirname(wasm));
 
@@ -38,12 +48,83 @@ describe('prepareServerDir', () => {
         expect(config.extra).toEqual({ x: 1 });
     });
 
+    it.each([
+        ['the same destination basename', 'shared.wasm', 'shared.wasm'],
+        ['basenames that differ only by case', 'shared.wasm', 'Shared.wasm'],
+    ])('rejects plugins with %s', async (_description, firstName, secondName) => {
+        const sourceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-plugin-sources-'));
+        made.push(sourceDir);
+        const firstPlugin = path.join(sourceDir, 'first', firstName);
+        const secondPlugin = path.join(sourceDir, 'second', secondName);
+        fs.mkdirSync(path.dirname(firstPlugin));
+        fs.mkdirSync(path.dirname(secondPlugin));
+        fs.writeFileSync(firstPlugin, 'first');
+        fs.writeFileSync(secondPlugin, 'second');
+
+        const outcome = await prepareServerDir({ plugins: [firstPlugin, secondPlugin] }).then(
+            (server) => {
+                made.push(server.dir);
+                return server.dir;
+            },
+            (error: unknown) => error,
+        );
+
+        expect(outcome).toBeInstanceOf(Error);
+        expect((outcome as Error).message).toMatch(/(?:duplicate|collid).*shared\.wasm/i);
+    });
+
     it('gives every server its own directory and ports', async () => {
         const a = await prepareServerDir();
         const b = await prepareServerDir();
         made.push(a.dir, b.dir);
         expect(a.dir).not.toBe(b.dir);
         expect(new Set([a.javaPort, a.bedrockPort, b.javaPort, b.bedrockPort]).size).toBe(4);
+    });
+
+    it('removes the temporary directory when setup fails', async () => {
+        const missingPlugin = path.join(os.tmpdir(), `pumpkin-missing-${randomUUID()}.wasm`);
+        const failure = await prepareServerDir({ plugins: [missingPlugin] }).then(
+            (server) => {
+                made.push(server.dir);
+                throw new Error('Expected plugin copy to fail.');
+            },
+            (error: unknown) => error,
+        );
+
+        expect(failure).toMatchObject({ code: 'ENOENT', syscall: 'copyfile' });
+        const destination = (failure as { dest?: unknown }).dest;
+        if (typeof destination !== 'string') {
+            throw new Error(`Expected copy failure to include its destination, received ${String(failure)}`);
+        }
+        const serverDir = path.dirname(path.dirname(destination));
+        made.push(serverDir);
+        expect(fs.existsSync(serverDir)).toBe(false);
+    });
+
+    it('rejects a seeded path that escapes the server directory without changing the outside file', async () => {
+        const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-test-outside-'));
+        made.push(outsideDir);
+        const outsideFile = path.join(outsideDir, 'outside.txt');
+        fs.writeFileSync(outsideFile, 'original');
+
+        const validationRoot = path.join(os.tmpdir(), 'pumpkin-test-validation-root');
+        const relativePath = path.relative(validationRoot, outsideFile);
+        const nestedRelativePath = ['nested', path.relative(path.join(validationRoot, 'nested'), outsideFile)].join(
+            path.sep,
+        );
+        const windowsRelativePath = relativePath.split(path.sep).join(path.win32.sep);
+        const nestedWindowsRelativePath = nestedRelativePath.split(path.sep).join(path.win32.sep);
+
+        for (const filePath of new Set([
+            relativePath,
+            nestedRelativePath,
+            windowsRelativePath,
+            nestedWindowsRelativePath,
+            outsideFile,
+        ])) {
+            await expectRejectedPath(filePath);
+        }
+        expect(fs.readFileSync(outsideFile, 'utf8')).toBe('original');
     });
 });
 

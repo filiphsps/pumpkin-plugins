@@ -3,10 +3,11 @@ import * as dgram from 'node:dgram';
 import * as net from 'node:net';
 
 /**
- * Test servers listen on ports from here rather than on the ports the operating system hands out.
- * The ports the OS uses for itself start at 32768 on Linux and 49152 on macOS and Windows, so a
- * port below those is out of the way of every connection the harness and the servers themselves
- * make while a server is starting up.
+ * Test servers use this range, which is below common default ephemeral-port ranges (32768 on Linux
+ * and 49152 on macOS and Windows). Those ranges are configurable, so this is not a guarantee that
+ * the OS will never allocate one of these ports. `freePort()` probes TCP and UDP loopback binds and
+ * reserves each selected port within this process; another process can still claim it before the
+ * server binds it, so startup retries with fresh ports when Pumpkin reports `Address already in use`.
  */
 const FIRST_PORT = 20_000;
 const LAST_PORT = 30_000;
@@ -38,10 +39,15 @@ function tcpFree(port: number): Promise<boolean> {
     });
 }
 
-function udpFree(port: number): Promise<boolean> {
+/**
+ * Checks whether a UDP loopback port is available.
+ *
+ * @internal
+ */
+export function udpFree(port: number): Promise<boolean> {
     return new Promise((resolve) => {
         const socket = dgram.createSocket('udp4');
-        socket.once('error', () => resolve(false));
+        socket.once('error', () => socket.close(() => resolve(false)));
         socket.bind(port, '127.0.0.1', () => socket.close(() => resolve(true)));
     });
 }
