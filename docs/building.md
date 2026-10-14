@@ -187,7 +187,8 @@ Things to know when changing `turbo.json`:
   package a package depends on (including `devDependencies` such as `tools/build`, whose
   `wasi-wit.lock.json` and `src/` decide what a plugin is built from) invalidates exactly its
   dependents. New tools need nothing added, as long as a plugin lists them in its `package.json`.
-  `globalDependencies` is only for inputs outside any package: `tsconfig.base.json` and
+  `globalDependencies` is only for inputs outside any package: `.node-version` (the Node version
+  selected in CI; Turborepo does not hash `process.version`), `tsconfig.base.json` and
   `pnpm-workspace.yaml` (the API package and ABI pin). The lockfile and the root `package.json` invalidate
   everything, and so do the packages the root `package.json` depends on (`tools/docs` and
   `tools/signing`), because Turborepo treats those as global.

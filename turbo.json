@@ -1,7 +1,7 @@
 {
     "$schema": "https://v2-11-8.turborepo.dev/schema.json",
     "agentGuidance": false,
-    "globalDependencies": ["pnpm-workspace.yaml", "tsconfig.base.json"],
+    "globalDependencies": [".node-version", "pnpm-workspace.yaml", "tsconfig.base.json"],
     "globalPassThroughEnv": [
         "PUMPKIN_BIN",
         "PUMPKIN_CACHE_DIR",
