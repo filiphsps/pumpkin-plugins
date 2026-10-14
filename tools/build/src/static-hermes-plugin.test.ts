@@ -192,7 +192,7 @@ describe('Static Hermes esbuild plugin', () => {
 
         const bundle = result.outputFiles[0]?.text ?? '';
         expect(bundle).toContain('__pumpkinWasiFilesystemPreopens');
-        expect(bundle).toContain('__staticHermesWasiError');
+        expect(bundle).toContain('__staticHermesWitError');
         expect(bundle).toContain('error.payload = errorCode');
         expect(bundle).not.toContain('__require("wasi:filesystem/preopens@0.2.3")');
         expect(imports).toEqual(['wasi:filesystem/preopens@0.2.3']);

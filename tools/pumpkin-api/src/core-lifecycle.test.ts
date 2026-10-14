@@ -67,7 +67,7 @@ describe('registration callback lifetime', () => {
         const sender = {} as never;
         const request = {} as never;
         const entity = {} as never;
-        const phase = 'populate' as never;
+        const phase = 'surface' as never;
         const chunk = {} as never;
 
         handleEvent(eventId, server, event);
@@ -109,10 +109,16 @@ describe('registration callback lifetime', () => {
         expect(commandHandler).toHaveBeenCalledOnce();
         expect(suggestionHandler).toHaveBeenCalledOnce();
         expect(goal.canStart).toHaveBeenCalledOnce();
+        expect(goal.canStart).toHaveBeenCalledWith(server, entity);
         expect(goal.shouldContinue).toHaveBeenCalledOnce();
+        expect(goal.shouldContinue).toHaveBeenCalledWith(server, entity);
         expect(goal.start).toHaveBeenCalledOnce();
+        expect(goal.start).toHaveBeenCalledWith(server, entity);
         expect(goal.tick).toHaveBeenCalledOnce();
+        expect(goal.tick).toHaveBeenCalledWith(server, entity);
         expect(goal.stop).toHaveBeenCalledOnce();
+        expect(goal.stop).toHaveBeenCalledWith(server, entity);
         expect(generator).toHaveBeenCalledOnce();
+        expect(generator).toHaveBeenCalledWith(phase, chunk);
     });
 });

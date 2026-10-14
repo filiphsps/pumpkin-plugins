@@ -803,7 +803,7 @@ function generateWitResult(
     return undefined;
 }
 
-/** Convert a failed WIT result enum into the error marker consumed by its facade. */
+/** Convert a failed WIT result payload into the error marker consumed by its facade. */
 function generateWitErrorReturn(
     apiPackage: WitApiPackage,
     apiInterface: WitApiInterface,
@@ -813,7 +813,7 @@ function generateWitErrorReturn(
     if (type.kind === 'enum') return generateWitEnumErrorReturn(apiPackage, type, expression);
     const value = generateWitResultValue(apiPackage, apiInterface, type, expression, 'wasiError');
     if (!value) return `throw JSError(rt, ${JSON.stringify(`WIT call ${resolvedTypeName(type)} failed`)});`;
-    return `${value.setup.join(' ')} auto errorPayload = ${value.expression}; Object errorValue(rt); errorValue.setProperty(rt, "__staticHermesWasiError", std::move(errorPayload)); return errorValue;`;
+    return `${value.setup.join(' ')} auto errorPayload = ${value.expression}; Object errorValue(rt); errorValue.setProperty(rt, "__staticHermesWitError", std::move(errorPayload)); return errorValue;`;
 }
 
 function generateWitEnumErrorReturn(
@@ -823,7 +823,7 @@ function generateWitEnumErrorReturn(
 ): string {
     const cases = type.values.map(
         (value) =>
-            `case ${enumValue(apiPackage, type, value)}: { Object errorValue(rt); errorValue.setProperty(rt, "__staticHermesWasiError", jsString(rt, ${JSON.stringify(value)})); return errorValue; }`,
+            `case ${enumValue(apiPackage, type, value)}: { Object errorValue(rt); errorValue.setProperty(rt, "__staticHermesWitError", jsString(rt, ${JSON.stringify(value)})); return errorValue; }`,
     );
     return `switch (${expression}) { ${cases.join(' ')} default: throw JSError(rt, ${JSON.stringify(`Unknown ${type.name} value`)}); }`;
 }

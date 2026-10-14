@@ -4,7 +4,8 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
 import { generateEsmFacade, generateWasiEsmFacade } from './facades.ts';
-import type { WitApiInterface, WitFunction, WitWasiInterface } from './types.ts';
+import { generateWitApiFunctionForResolvedOperation } from './native-adapters.ts';
+import type { ResolvedWitType, WitApiInterface, WitApiPackage, WitFunction, WitWasiInterface } from './types.ts';
 
 const directories: string[] = [];
 const globalState = globalThis as typeof globalThis & Record<string, unknown>;
@@ -37,6 +38,37 @@ it('allows scheduler task cancellation during unload and blocks other host calls
     expect(() => module.scheduleTask()).toThrow('Pumpkin host calls are unavailable during plugin unload');
 });
 
+it('turns Pumpkin WIT result errors into JavaScript errors', async () => {
+    const saveAll = { ...operation('save-all'), result: 'result<_, string>' };
+    const server = apiInterface('server', 'pumpkin:plugin/server@0.1.0', [saveAll]);
+    const apiPackage: WitApiPackage = {
+        packageName: 'pumpkin:plugin',
+        version: '0.1.0',
+        interfaces: [server],
+    };
+    const resultType: ResolvedWitType = {
+        kind: 'result',
+        ok: { kind: 'unit' },
+        error: { kind: 'primitive', name: 'string' },
+    };
+    const adapter = generateWitApiFunctionForResolvedOperation({
+        apiPackage,
+        apiInterface: server,
+        operation: saveAll,
+        parameters: [],
+        resultType,
+    });
+    if (!adapter) throw new Error('Expected an adapter for the supported Pumpkin result operation');
+    expect(adapter).toContain('__staticHermesWitError');
+
+    const module = (await importFacade(generateEsmFacade(server))) as unknown as { saveAll(): unknown };
+    globalState.__pumpkinHost = {
+        server: { saveAll: () => ({ __staticHermesWitError: 'disk full' }) },
+    };
+
+    expect(() => module.saveAll()).toThrow('Pumpkin API error: disk full');
+});
+
 it('wraps WASI resource lifetimes and turns native error markers into JavaScript errors', async () => {
     const wasiInterface = wasiApiInterface();
     const module = (await importFacade(generateWasiEsmFacade(wasiInterface))) as unknown as WasiFacade;
@@ -52,7 +84,7 @@ it('wraps WASI resource lifetimes and turns native error markers into JavaScript
         },
     };
     globalState.__pumpkinWasiFilesystemTypes = {
-        lookup: () => ({ __staticHermesWasiError: { tag: 'not-found' } }),
+        lookup: () => ({ __staticHermesWitError: { tag: 'not-found' } }),
         file: { constructor: () => nativeResource },
     };
 
