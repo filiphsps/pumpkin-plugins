@@ -28,6 +28,13 @@ This example is for plain-text files where `old-` at the start of a line is the 
 Raw replacements can also alter comments and string values in source code; use syntax-aware matching
 for JavaScript and TypeScript.
 
+Builder-release migrations are registered in `src/codemods/build-migrations.ts` with the first
+published builder version that requires each change. Add an entry only for a verified consumer
+change in that release, and add focused tests for its behavior and repeat-run idempotence. The
+`update-build` workflow selects entries in semver order only when their release version is newer
+than the installed builder and no newer than npm's target release. Keep the registry empty when no
+published release requires a migration; do not add placeholders.
+
 The ID becomes a CLI argument, so keep it unique and stable. `matchesFile` receives a slash-separated
 path relative to the runner's current working directory, which is where the CLI was invoked. For
 example, a source file is reported relative to the plugin directory when invoked there, or relative
