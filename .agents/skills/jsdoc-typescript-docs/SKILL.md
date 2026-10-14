@@ -16,6 +16,14 @@ Create comprehensive inline documentation for TypeScript codebases.
 5. **Generate docs**: TypeDoc output
 6. **Integrate CI**: Automated doc generation
 
+## Examples in JSDoc Comments
+
+Treat every fenced snippet in a JSDoc `@example` as repository source code. Check
+[`biome.json`](../../../biome.json) for the applicable formatting and lint rules, and make the
+snippet conform. Keep that config as the source of truth; do not duplicate its individual settings
+here. Keep each example valid in its declared language, and check every JSDoc example against the
+config before finishing.
+
 ## Function Documentation
 
 ### Basic Function
@@ -153,7 +161,7 @@ export function format(value: number, formatStr?: string): string {
  *     email: 'john@example.com',
  *     name: 'John Doe',
  *     role: 'admin',
- *     createdAt: new Date(),
+ *     createdAt: new Date()
  * };
  * ```
  */
@@ -282,7 +290,7 @@ export type Result<T, E = Error> = { success: true; data: T } | { success: false
  * ```typescript
  * const client = ApiClient.create({
  *     baseUrl: 'https://api.example.com',
- *     apiKey: process.env.API_KEY,
+ *     apiKey: process.env.API_KEY
  * });
  *
  * const users = await client.get<User[]>('/users');
@@ -395,7 +403,7 @@ export enum OrderStatus {
     Cancelled = 'cancelled',
 
     /** Order has been returned by the customer */
-    Returned = 'returned',
+    Returned = 'returned'
 }
 ```
 
@@ -415,7 +423,7 @@ export enum OrderStatus {
  * <Button onClick={handleClick}>Click me</Button>
  *
  * // With variant and size
- * <Button variant="secondary" size="lg">
+ * <Button variant='secondary' size='lg'>
  *     Large Secondary Button
  * </Button>
  *
@@ -425,32 +433,32 @@ export enum OrderStatus {
  */
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     /**
-    * The visual style variant.
-    * @default 'primary'
-    */
+     * The visual style variant.
+     * @default 'primary'
+     */
     variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
 
     /**
-    * The size of the button.
-    * @default 'md'
-    */
+     * The size of the button.
+     * @default 'md'
+     */
     size?: 'sm' | 'md' | 'lg';
 
     /**
-    * Whether the button is in a loading state.
-    * When true, the button is disabled and shows a spinner.
-    * @default false
-    */
+     * Whether the button is in a loading state.
+     * When true, the button is disabled and shows a spinner.
+     * @default false
+     */
     loading?: boolean;
 
     /**
-    * Icon to display before the button text.
-    */
+     * Icon to display before the button text.
+     */
     leftIcon?: React.ReactNode;
 
     /**
-    * Icon to display after the button text.
-    */
+     * Icon to display after the button text.
+     */
     rightIcon?: React.ReactNode;
 }
 

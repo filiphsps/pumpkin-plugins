@@ -21,7 +21,8 @@ test('accepts generated API links when the ignored API output is absent', () => 
             'scripts',
             '.agents',
             '.github',
-            'package.json'
+            'package.json',
+            'biome.json'
         ]) {
             const source = path.join(repositoryRoot, entry);
             if (!fs.existsSync(source)) continue;
