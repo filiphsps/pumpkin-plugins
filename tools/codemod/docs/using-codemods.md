@@ -12,6 +12,27 @@ After the first public npm release, list the available migrations from your plug
 pnpm dlx @pumpkin-plugins/codemod list
 ```
 
+Install the plugin's dependencies before updating its builder version. From the plugin root, preview
+the latest published builder update and its release-specific migrations:
+
+```sh
+pnpm dlx @pumpkin-plugins/codemod update-build .
+```
+
+The command resolves the builder version installed in that project and fetches npm's current
+`latest` version without using a cached result. It applies only migrations introduced after the
+installed version and no later than the target release, in release order. Preview is the default;
+apply the result with `--write`:
+
+```sh
+pnpm dlx @pumpkin-plugins/codemod update-build . --write
+```
+
+Supported exact, caret and tilde builder ranges keep their range style. Catalog, workspace, npm
+alias, URL, file, git and composite ranges remain unchanged with a manual update note. The codemod
+does not add a direct builder dependency when one is absent. Review the preview and run your package
+manager after applying changes to refresh the lockfile.
+
 Preview the Pumpkin API migration:
 
 ```sh

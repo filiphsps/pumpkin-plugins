@@ -1,6 +1,9 @@
 import { Command } from '@commander-js/extra-typings';
 import { codemods } from './codemods/index.js';
 import { runCodemod } from './runner.js';
+import { runUpdateBuild, type UpdateBuildOptions } from './update-build.js';
+
+const updateBuildDescription = 'Update @pumpkin-plugins/build and apply its release migrations.';
 
 /** Output functions and working directory used by the CLI. */
 export interface CliOptions {
@@ -12,6 +15,9 @@ export interface CliOptions {
 
     /** Receives help text, summaries, and printed transformed files. */
     stdout?: (text: string) => void;
+
+    /** Testable dependencies for the explicit builder update workflow. */
+    updateBuild?: Omit<UpdateBuildOptions, 'cwd' | 'write'>;
 }
 
 /** Parses CLI arguments, lists codemods, or runs a selected migration. */
@@ -34,9 +40,31 @@ export async function runCli(argv: string[] = process.argv, options: CliOptions 
         .action(async (codemodId, paths, flags) => {
             if (codemodId === 'list') {
                 if (paths.length > 0) throw new Error('The list command does not accept file paths.');
+                const availableCodemods = [
+                    ...codemods.map(({ id, description }) => ({ id, description })),
+                    {
+                        id: 'update-build',
+                        description: updateBuildDescription,
+                    },
+                ];
                 stdout(
-                    `Available codemods:\n${codemods.map(({ id, description }) => `  ${id}  ${description}`).join('\n')}\n`,
+                    `Available codemods:\n${availableCodemods.map(({ id, description }) => `  ${id}  ${description}`).join('\n')}\n`,
                 );
+                return;
+            }
+
+            if (codemodId === 'update-build') {
+                const report = await runUpdateBuild(paths, {
+                    ...options.updateBuild,
+                    cwd,
+                    write: flags.write,
+                });
+                printReport(report, flags.print === true, stdout);
+                if (report.changedFiles.length > 0) {
+                    stdout(
+                        'Review the changes. After applying them, run your package manager to update the lockfile.\n',
+                    );
+                }
                 return;
             }
 
@@ -49,21 +77,7 @@ export async function runCli(argv: string[] = process.argv, options: CliOptions 
                 cwd,
                 write: flags.write,
             });
-            if (flags.print) {
-                for (const change of report.changedFiles) stdout(`--- ${change.relativePath} ---\n${change.after}\n`);
-            }
-
-            if (report.changedFiles.length === 0) {
-                stdout(`No changes. Scanned ${report.filesScanned} matching file(s).\n`);
-            } else {
-                const action = report.wroteFiles ? 'Updated' : 'Would update';
-                stdout(
-                    `${action} ${report.changedFiles.length} file(s):\n${report.changedFiles
-                        .map(({ relativePath }) => `  ${relativePath}`)
-                        .join('\n')}\n`,
-                );
-            }
-            for (const message of report.messages) stdout(`NOTE ${message.relativePath}: ${message.text}\n`);
+            printReport(report, flags.print === true, stdout);
         });
 
     try {
@@ -76,4 +90,26 @@ export async function runCli(argv: string[] = process.argv, options: CliOptions 
         stderr(`pumpkin-codemod: ${error instanceof Error ? error.message : String(error)}\n`);
         return 1;
     }
+}
+
+function printReport(
+    report: Awaited<ReturnType<typeof runCodemod>>,
+    printContents: boolean,
+    stdout: (text: string) => void,
+): void {
+    if (printContents) {
+        for (const change of report.changedFiles) stdout(`--- ${change.relativePath} ---\n${change.after}\n`);
+    }
+
+    if (report.changedFiles.length === 0) {
+        stdout(`No changes. Scanned ${report.filesScanned} matching file(s).\n`);
+    } else {
+        const action = report.wroteFiles ? 'Updated' : 'Would update';
+        stdout(
+            `${action} ${report.changedFiles.length} file(s):\n${report.changedFiles
+                .map(({ relativePath }) => `  ${relativePath}`)
+                .join('\n')}\n`,
+        );
+    }
+    for (const message of report.messages) stdout(`NOTE ${message.relativePath}: ${message.text}\n`);
 }

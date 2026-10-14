@@ -1,7 +1,8 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import type { LatestVersionOptions } from '@badisi/latest-version';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runCli } from './cli.js';
 
 const temporaryDirectories: string[] = [];
@@ -26,6 +27,53 @@ describe('pumpkin-codemod CLI', () => {
         expect(code).toBe(0);
         expect(output.join('')).toContain('migrate-pumpkin-api-ts');
         expect(output.join('')).toContain('@pumpkin-plugins/pumpkin-api');
+        expect(output.join('')).toContain('update-build');
+    });
+
+    it('previews update-build output by default and prints the complete changed package file', async () => {
+        const root = await createProject();
+        const source = '{\n    "dependencies": { "@pumpkin-plugins/build": "^0.1.0" }\n}\n';
+        await fs.writeFile(path.join(root, 'package.json'), source);
+        const output: string[] = [];
+        const registryLookup = vi.fn(async (_packageName: string, _options?: LatestVersionOptions) => ({
+            name: '@pumpkin-plugins/build',
+            latest: '0.2.0',
+            updatesAvailable: false as const,
+        }));
+
+        const code = await runCli(['node', 'pumpkin-codemod', 'update-build', '.', '--print'], {
+            cwd: root,
+            stdout: (text) => output.push(text),
+            updateBuild: { lookup: registryLookup, resolveInstalledVersion: () => '0.1.0' },
+        });
+
+        expect(code).toBe(0);
+        expect(await fs.readFile(path.join(root, 'package.json'), 'utf8')).toBe(source);
+        expect(output.join('')).toContain('"@pumpkin-plugins/build": "^0.2.0"');
+        expect(output.join('')).toContain('Would update 1 file(s)');
+        expect(output.join('')).toContain('run your package manager');
+    });
+
+    it('writes update-build changes only with --write', async () => {
+        const root = await createProject();
+        const source = '{\n    "dependencies": { "@pumpkin-plugins/build": "^0.1.0" }\n}\n';
+        await fs.writeFile(path.join(root, 'package.json'), source);
+        const registryLookup = vi.fn(async (_packageName: string, _options?: LatestVersionOptions) => ({
+            name: '@pumpkin-plugins/build',
+            latest: '0.2.0',
+            updatesAvailable: false as const,
+        }));
+
+        const code = await runCli(['node', 'pumpkin-codemod', 'update-build', '.', '--write'], {
+            cwd: root,
+            stdout: () => undefined,
+            updateBuild: { lookup: registryLookup, resolveInstalledVersion: () => '0.1.0' },
+        });
+
+        expect(code).toBe(0);
+        expect(await fs.readFile(path.join(root, 'package.json'), 'utf8')).toContain(
+            '"@pumpkin-plugins/build": "^0.2.0"',
+        );
     });
 
     it('previews the migration by default and writes files only with --write', async () => {
