@@ -1,5 +1,12 @@
 import * as path from 'node:path';
 
+const staticHermesProfiles = [
+    { id: 'full', supportsRuntimeSourceCompilation: true },
+    { id: 'lean', supportsRuntimeSourceCompilation: false },
+] as const;
+
+type StaticHermesRuntime = (typeof staticHermesProfiles)[number]['id'];
+
 /** Settings for one real-server engine comparison build. */
 export interface EngineVariant {
     /** Expected Unicode property escape support for this build environment. */
@@ -17,13 +24,29 @@ export interface EngineVariant {
     /** Static Hermes garbage collector, when applicable. */
     staticHermesGc?: 'hades' | 'malloc';
     /** Static Hermes runtime profile, when applicable. */
-    staticHermesRuntime?: 'full' | 'lean';
+    staticHermesRuntime?: StaticHermesRuntime;
 }
 
-const staticHermesProfiles = [
-    { id: 'full', supportsRuntimeSourceCompilation: true },
-    { id: 'lean', supportsRuntimeSourceCompilation: false },
-] as const;
+/** One benchmark job in the GitHub Actions matrix. */
+export interface EngineBenchmarkMatrixEntry {
+    /** Selects result artifact handling in the matrix workflow. */
+    kind: 'benchmark';
+    /** Stable engine or stack-guard identifier. */
+    variant: string;
+}
+
+/** One Static Hermes stack-guard job in the GitHub Actions matrix. */
+export interface EngineStackGuardMatrixEntry {
+    /** Selects result artifact handling in the matrix workflow. */
+    kind: 'stack-guard';
+    /** Static Hermes runtime profile checked by this job. */
+    runtime: StaticHermesRuntime;
+    /** Stable engine or stack-guard identifier. */
+    variant: string;
+}
+
+/** One benchmark or stack-guard job in the GitHub Actions matrix. */
+export type EngineComparisonMatrixEntry = EngineBenchmarkMatrixEntry | EngineStackGuardMatrixEntry;
 
 const staticHermesCollectors = [
     { id: 'hades', label: 'Hades' },
@@ -69,4 +92,22 @@ export function createEngineVariants(): EngineVariant[] {
         },
         ...staticHermesVariants,
     ];
+}
+
+/** Returns all benchmark and Static Hermes stack-guard jobs for CI. */
+export function createEngineComparisonMatrix(): EngineComparisonMatrixEntry[] {
+    const variants = createEngineVariants();
+    const benchmarkJobs = variants.map(({ id }) => ({ kind: 'benchmark' as const, variant: id }));
+    const runtimes = new Set(
+        variants.flatMap(({ pluginEngine, staticHermesRuntime }) =>
+            pluginEngine === 'static-hermes' && staticHermesRuntime ? [staticHermesRuntime] : [],
+        ),
+    );
+    const stackGuardJobs = [...runtimes].map((runtime) => ({
+        kind: 'stack-guard' as const,
+        runtime,
+        variant: `static-hermes-${runtime}-stack-guard`,
+    }));
+
+    return [...benchmarkJobs, ...stackGuardJobs];
 }

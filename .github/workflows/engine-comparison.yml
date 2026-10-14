@@ -7,10 +7,32 @@ permissions:
     contents: read
 
 jobs:
-    compare:
-        name: 📊 Compare QuickJS and Static Hermes
+    variants:
+        name: 🔎 Generate benchmark matrix
+        runs-on: ubuntu-26.04
+        outputs:
+            jobs: ${{ steps.generate.outputs.jobs }}
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🟢 Setup Node
+              uses: actions/setup-node@v7.1.0
+              with:
+                  node-version-file: .node-version
+
+            - name: 🧩 Generate matrix from engine variants
+              id: generate
+              run: node benchmarks/engine-comparison/scripts/write-engine-comparison-matrix.ts
+
+    benchmark:
+        name: 🧪 ${{ matrix.variant }}
+        needs: [variants]
         timeout-minutes: 60
         runs-on: ubuntu-26.04
+        strategy:
+            fail-fast: false
+            matrix: ${{ fromJSON(needs.variants.outputs.jobs) }}
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -19,21 +41,67 @@ jobs:
               uses: ./.github/common/bootstrap
 
             - name: 🔧 Restore Static Hermes toolchain
+              if: startsWith(matrix.variant, 'static-hermes-')
               uses: ./.github/common/setup-static-hermes
 
             - name: 🏗️ Verify Static Hermes is prepared
+              if: startsWith(matrix.variant, 'static-hermes-')
               run: pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
 
-            - name: 📊 Compare QuickJS and Static Hermes
+            - name: 📊 Run benchmark variant
               env:
+                  ENGINE_COMPARISON_VARIANT: ${{ matrix.variant }}
+                  ENGINE_COMPARISON_RESULT_PATH: ${{ runner.temp }}/engine-comparison-results/${{ matrix.variant }}.json
                   PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/engine-comparison-logs
               run: pnpm --filter @pumpkin-plugins/engine-comparison compare-engines
+
+            - name: 📤 Upload benchmark result
+              if: matrix.kind == 'benchmark'
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  name: engine-comparison-result-${{ matrix.variant }}
+                  path: ${{ runner.temp }}/engine-comparison-results/${{ matrix.variant }}.json
+                  retention-days: 1
+                  if-no-files-found: error
 
             - name: 📤 Upload engine comparison server logs
               if: failure()
               uses: actions/upload-artifact@v7.0.2
               with:
                   retention-days: 1
-                  name: engine-comparison-pumpkin-logs
+                  name: engine-comparison-pumpkin-logs-${{ matrix.variant }}
                   path: ${{ runner.temp }}/engine-comparison-logs
                   if-no-files-found: ignore
+
+    report:
+        name: 📋 Collect and display results
+        needs: [benchmark]
+        timeout-minutes: 15
+        runs-on: ubuntu-26.04
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 📥 Download benchmark matrix results
+              uses: actions/download-artifact@v8.0.2
+              with:
+                  pattern: engine-comparison-result-*
+                  path: ${{ runner.temp }}/engine-comparison-results
+                  merge-multiple: true
+
+            - name: 📋 Build combined report
+              env:
+                  ENGINE_COMPARISON_RESULT_DIR: ${{ runner.temp }}/engine-comparison-results
+                  ENGINE_COMPARISON_REPORT_DIR: ${{ runner.temp }}/engine-comparison-report
+              run: pnpm --filter @pumpkin-plugins/engine-comparison benchmark:collect
+
+            - name: 📤 Upload combined benchmark report
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  name: engine-comparison-report
+                  path: ${{ runner.temp }}/engine-comparison-report
+                  retention-days: 90
+                  if-no-files-found: error

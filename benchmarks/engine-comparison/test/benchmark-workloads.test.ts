@@ -24,3 +24,25 @@ it('pins string workload identifiers, operation counts, and checksums', () => {
         { name: 'array-to-locale-string-ascii', operationsPerSample: 32_000, checksum: 2_872_000 },
     ]);
 }, 30_000);
+
+it('pins the additional Hermes string fast-path workloads', () => {
+    const stringWorkloads = measureSyntheticWorkloads()
+        .filter(({ name }) =>
+            [
+                'string-case-ascii',
+                'typed-array-join-ascii',
+                'typed-array-locale-ascii',
+                'string-from-char-code-ascii',
+                'string-replace-ascii',
+            ].includes(name),
+        )
+        .map(({ name, operationsPerSample, checksum }) => ({ name, operationsPerSample, checksum }));
+
+    expect(stringWorkloads).toEqual([
+        { name: 'string-case-ascii', operationsPerSample: 16_000, checksum: 1_408_000 },
+        { name: 'typed-array-join-ascii', operationsPerSample: 128_000, checksum: 544_000 },
+        { name: 'typed-array-locale-ascii', operationsPerSample: 64_000, checksum: 368_000 },
+        { name: 'string-from-char-code-ascii', operationsPerSample: 8_000, checksum: 680_000 },
+        { name: 'string-replace-ascii', operationsPerSample: 16_000, checksum: 1_568_000 },
+    ]);
+}, 30_000);

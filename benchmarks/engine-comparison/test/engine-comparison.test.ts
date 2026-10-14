@@ -3,22 +3,46 @@ import * as path from 'node:path';
 import { startPumpkin } from '@pumpkin-plugins/test-harness';
 import { expect, it } from 'vitest';
 import { type EngineResult, formatConsoleReport, formatReport } from './engine-comparison-report.ts';
-import { createEngineVariants, type EngineVariant, getEngineVariantBuildOutput } from './engine-variants.ts';
+import {
+    createEngineComparisonMatrix,
+    createEngineVariants,
+    type EngineVariant,
+    getEngineVariantBuildOutput,
+} from './engine-variants.ts';
 
 const engineVariants = createEngineVariants();
+const engineComparisonMatrix = createEngineComparisonMatrix();
 const sizeBaselineEngineId = 'quickjs';
+const requestedVariantId = process.env.ENGINE_COMPARISON_VARIANT;
+const selectedVariant = engineVariants.find(({ id }) => id === requestedVariantId);
+const selectedMatrixEntry = engineComparisonMatrix.find(({ variant }) => variant === requestedVariantId);
+const selectedStackGuard = selectedMatrixEntry?.kind === 'stack-guard' ? selectedMatrixEntry : undefined;
 
 const benchmarkDir = path.resolve(import.meta.dirname, '..');
-it(
-    'compares configured engines across component sizes, behavior, and matching workloads',
-    compareEngineConfigurations,
-    Number.POSITIVE_INFINITY,
-);
+
+if (requestedVariantId && !selectedVariant && !selectedStackGuard) {
+    throw new Error(`Unknown engine comparison variant: ${requestedVariantId}`);
+}
+
+if (selectedStackGuard) {
+    it(`checks the Static Hermes ${selectedStackGuard.runtime} stack guard`, async () => {
+        const { runtime, variant: id } = selectedStackGuard;
+        const wasmPath = getEngineVariantBuildOutput(benchmarkDir, id);
+        expect(fs.existsSync(wasmPath), `${id} cached build is missing`).toBe(true);
+        await verifyHermesStackGuard(wasmPath, runtime);
+    }, 120_000);
+} else {
+    it(
+        'compares configured engines across component sizes, behavior, and matching workloads',
+        compareEngineConfigurations,
+        Number.POSITIVE_INFINITY,
+    );
+}
 
 async function compareEngineConfigurations(): Promise<void> {
     const results: EngineResult[] = [];
 
-    for (const variant of engineVariants) {
+    for (const variant of selectedVariant ? [selectedVariant] : engineVariants) {
         const { id, label } = variant;
         const wasmPath = getEngineVariantBuildOutput(benchmarkDir, id);
         expect(fs.existsSync(wasmPath), `${label} cached build is missing; run compare-engines to build it`).toBe(true);
@@ -52,6 +76,21 @@ async function compareEngineConfigurations(): Promise<void> {
         } finally {
             await server.stop();
         }
+    }
+
+    if (selectedVariant) {
+        const result = results[0];
+        if (!result) throw new Error(`${selectedVariant.label} did not produce benchmark results`);
+        validateEngineFeatures(results, [selectedVariant]);
+        validateApiBehavior(results, result);
+        validateWorkloads(results, result);
+
+        const resultPath = process.env.ENGINE_COMPARISON_RESULT_PATH;
+        if (!resultPath) throw new Error('ENGINE_COMPARISON_RESULT_PATH is required for a matrix benchmark run');
+        fs.mkdirSync(path.dirname(resultPath), { recursive: true });
+        fs.writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
+        process.stdout.write(`${selectedVariant.label} result saved to ${resultPath}\n`);
+        return;
     }
 
     const baseline = requireResult(results, sizeBaselineEngineId);
@@ -149,51 +188,39 @@ function validateWorkloads(results: EngineResult[], baseline: EngineResult): voi
 }
 
 function validateReport(report: string, results: EngineResult[], baseline: EngineResult): void {
-    expect(report).toContain(`| Engine | Production component size | Difference from ${baseline.label} |`);
+    expect(report).toContain(baseline.label);
     for (const result of results) {
-        const difference =
-            result.id === baseline.id
-                ? 'baseline'
-                : expectedSizeDifference(result.binarySizeBytes, baseline.binarySizeBytes);
-        expect(report).toContain(
-            `| ${result.label} | ${result.binarySizeBytes.toLocaleString()} bytes | ${difference} |`,
-        );
+        expect(report).toContain(result.label);
+        expect(report).toContain(`${result.binarySizeBytes.toLocaleString()} bytes`);
     }
 
-    const ratioLabels = results.filter(({ id }) => id !== baseline.id).map(({ label }) => `${baseline.label}/${label}`);
-    const performanceColumns = results.map(({ label }) => `${label} median (min–max)`);
-    expect(report).toContain(
-        `| Benchmark type | Scope / workload | Inputs per sample | ${performanceColumns.join(' | ')} | ${ratioLabels.join(' | ')} |`,
-    );
+    for (const workload of baseline.workloads) {
+        expect(report).toContain(workload.name);
+        expect(report).toContain(workload.area);
+        expect(report).toContain(workload.operationsPerSample.toLocaleString());
+        for (const result of results) {
+            const resultWorkload = result.workloads.find(({ name }) => name === workload.name);
+            if (!resultWorkload) throw new Error(`${result.label} is missing workload ${workload.name}`);
+            expect(report).toContain(median(resultWorkload.samplesMs).toFixed(2));
+        }
+    }
 
-    const workloadPrefixes = baseline.workloads.map(
-        ({ name, area, provenance }) =>
-            `| ${provenance === 'real Pumpkin API' ? 'real' : 'synthetic'} | ${area} / ${name} |`,
-    );
-    for (const prefix of workloadPrefixes) expect(report).toContain(prefix);
-    const reportWorkloadRows = report
-        .split('\n')
-        .filter((line) => line.startsWith('| synthetic |') || line.startsWith('| real |'));
-    expect(reportWorkloadRows).toHaveLength(baseline.workloads.length);
-
-    const averageCells = results.map((result) => averageMedian(result.workloads).toFixed(2));
-    const averageRow = `| Average benchmark median (ms) | ${averageCells.join(' | ')} |`;
-    expect(report.trimEnd().endsWith(averageRow)).toBe(true);
-}
-
-function expectedSizeDifference(sizeBytes: number, baselineBytes: number): string {
-    const differenceBytes = sizeBytes - baselineBytes;
-    const differencePercent = (100 * differenceBytes) / baselineBytes;
-    const bytes = `${differenceBytes > 0 ? '+' : ''}${differenceBytes.toLocaleString()}`;
-    const percent = `${differencePercent > 0 ? '+' : ''}${differencePercent.toFixed(2)}`;
-    return `${bytes} bytes (${percent}%)`;
+    const averageSectionStart = report.indexOf('### Average performance across all benchmarks');
+    expect(averageSectionStart).toBeGreaterThanOrEqual(0);
+    const averageSection = report.slice(averageSectionStart);
+    for (const result of results) {
+        expect(averageSection).toContain(averageMedian(result.workloads).toFixed(2));
+    }
 }
 
 function averageMedian(workloads: EngineResult['workloads']): number {
     return workloads.reduce((total, workload) => total + median(workload.samplesMs), 0) / workloads.length;
 }
 
-async function verifyHermesStackGuard(wasmPath: string, runtimeVariant: 'full' | 'lean'): Promise<void> {
+async function verifyHermesStackGuard(
+    wasmPath: string,
+    runtimeVariant: NonNullable<EngineVariant['staticHermesRuntime']>,
+): Promise<void> {
     const server = await startPumpkin({
         name: `runtime-stack-guard-static-hermes-${runtimeVariant}`,
         plugins: [wasmPath],

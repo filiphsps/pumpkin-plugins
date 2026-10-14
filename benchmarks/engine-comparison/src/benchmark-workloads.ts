@@ -28,6 +28,10 @@ const STRING_JOIN_REPEAT_COUNT = 64;
 const STRING_REPEAT_COUNT = 4_000;
 const STRING_PAD_COUNT = 4_000;
 const ARRAY_LOCALE_STRING_COUNT = 8_000;
+const STRING_CASE_COUNT = 8_000;
+const TYPED_ARRAY_STRING_COUNT = 4_000;
+const FROM_CHAR_CODE_COUNT = 8_000;
+const STRING_REPLACE_COUNT = 8_000;
 const COMMAND_OPERATION_COUNT = 4_000;
 
 const CONFIG_SOURCE = JSON.stringify({
@@ -39,6 +43,8 @@ const CONFIG_SOURCE = JSON.stringify({
 
 const STRING_PARTS = buildStringParts();
 const ARRAY_LOCALE_STRING_VALUES = ['a', 'b', 'c', 'd'].map((value) => value.repeat(64));
+const TYPED_ARRAY_JOIN_VALUES = Uint8Array.from({ length: 32 }, (_, index) => index + 1);
+const TYPED_ARRAY_LOCALE_VALUES = Uint8Array.from({ length: 16 }, (_, index) => index + 1);
 
 const WORKLOADS: readonly WorkloadScenario[] = [
     { name: 'numeric', area: 'Numeric arithmetic baseline', operationsPerSample: 1_000_000, run: runNumeric },
@@ -85,6 +91,36 @@ const WORKLOADS: readonly WorkloadScenario[] = [
         area: 'Locale string conversion for ASCII array elements',
         operationsPerSample: ARRAY_LOCALE_STRING_COUNT * ARRAY_LOCALE_STRING_VALUES.length,
         run: runArrayToLocaleStringASCII,
+    },
+    {
+        name: 'string-case-ascii',
+        area: 'ASCII string case conversion',
+        operationsPerSample: STRING_CASE_COUNT * 2,
+        run: runStringCaseASCII,
+    },
+    {
+        name: 'typed-array-join-ascii',
+        area: 'ASCII typed array joining',
+        operationsPerSample: TYPED_ARRAY_STRING_COUNT * TYPED_ARRAY_JOIN_VALUES.length,
+        run: runTypedArrayJoinASCII,
+    },
+    {
+        name: 'typed-array-locale-ascii',
+        area: 'ASCII typed array locale conversion',
+        operationsPerSample: TYPED_ARRAY_STRING_COUNT * TYPED_ARRAY_LOCALE_VALUES.length,
+        run: runTypedArrayLocaleASCII,
+    },
+    {
+        name: 'string-from-char-code-ascii',
+        area: 'ASCII multi-argument character code conversion',
+        operationsPerSample: FROM_CHAR_CODE_COUNT,
+        run: runStringFromCharCodeASCII,
+    },
+    {
+        name: 'string-replace-ascii',
+        area: 'ASCII string replace and replaceAll',
+        operationsPerSample: STRING_REPLACE_COUNT * 2,
+        run: runStringReplaceASCII,
     },
     {
         name: 'config-validation',
@@ -315,6 +351,77 @@ function runArrayToLocaleStringASCII(): number {
     }
 
     if (['é', '𐐷'].toLocaleString() !== 'é,𐐷') return -1;
+    return checksum;
+}
+
+function runStringCaseASCII(): number {
+    let checksum = 0;
+    for (let index = 0; index < STRING_CASE_COUNT; index++) {
+        const lower = 'STATIC HERMES STRING PATH 0123456789'.toLowerCase();
+        const upper = 'static hermes string path 0123456789'.toUpperCase();
+        if (lower !== 'static hermes string path 0123456789' || upper !== 'STATIC HERMES STRING PATH 0123456789') {
+            return -1;
+        }
+        checksum += lower.length + upper.charCodeAt(0) + upper.charCodeAt(upper.length - 1);
+    }
+
+    if ('café'.toUpperCase() !== 'CAFÉ') return -1;
+    return checksum;
+}
+
+function runTypedArrayJoinASCII(): number {
+    let checksum = 0;
+    for (let index = 0; index < TYPED_ARRAY_STRING_COUNT; index++) {
+        const joined = TYPED_ARRAY_JOIN_VALUES.join('|');
+        if (joined.length !== 86 || joined[0] !== '1' || !joined.endsWith('|32')) return -1;
+        checksum += joined.length + joined.charCodeAt(joined.length - 1);
+    }
+
+    if (new Uint8Array([1, 2, 3]).join('λ') !== '1λ2λ3') return -1;
+    return checksum;
+}
+
+function runTypedArrayLocaleASCII(): number {
+    let checksum = 0;
+    const originalToLocaleString = Number.prototype.toLocaleString;
+    Number.prototype.toLocaleString = function () {
+        return this.toString();
+    };
+    try {
+        for (let index = 0; index < TYPED_ARRAY_STRING_COUNT; index++) {
+            const converted = TYPED_ARRAY_LOCALE_VALUES.toLocaleString();
+            if (converted !== '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16') return -1;
+            checksum += converted.length + converted.charCodeAt(converted.length - 1);
+        }
+    } finally {
+        Number.prototype.toLocaleString = originalToLocaleString;
+    }
+
+    return checksum;
+}
+
+function runStringFromCharCodeASCII(): number {
+    let checksum = 0;
+    for (let index = 0; index < FROM_CHAR_CODE_COUNT; index++) {
+        const text = String.fromCharCode(80, 85, 77, 80, 75, 73, 78);
+        if (text !== 'PUMPKIN') return -1;
+        checksum += text.length + text.charCodeAt(text.length - 1);
+    }
+
+    if (String.fromCharCode(65, 128) !== 'A\u0080') return -1;
+    return checksum;
+}
+
+function runStringReplaceASCII(): number {
+    let checksum = 0;
+    for (let index = 0; index < STRING_REPLACE_COUNT; index++) {
+        const once = 'prefix-fast-path-fast'.replace('fast', 'FAST');
+        const all = 'prefix-fast-path-fast'.replaceAll('fast', 'FAST');
+        if (once !== 'prefix-FAST-path-fast' || all !== 'prefix-FAST-path-FAST') return -1;
+        checksum += once.length + all.length + once.charCodeAt(7) + all.charCodeAt(20);
+    }
+
+    if ('AλB'.replace('A', 'X') !== 'XλB') return -1;
     return checksum;
 }
 

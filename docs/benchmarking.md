@@ -27,15 +27,30 @@ From the repository root:
 
 The command first runs the cacheable `benchmark:build` Turbo task, then runs the real-server integration
 test in [engine-comparison.test.ts](../benchmarks/engine-comparison/test/engine-comparison.test.ts).
-The task caches the nine comparison components and two stack-guard fixtures under separate,
-configuration-specific output paths in `build/engine-comparison/`. Turbo hashes the benchmark sources,
-build dependencies, and declared build environment. The matrix is one cache task, so a change to any
-build input rebuilds all eleven components. The integration test starts one Pumpkin server for each
-comparison component, dispatches the benchmark command, collects results, then stops the server.
-Static Hermes preparation runs automatically when a build needs it; CI also restores and verifies its
-pinned toolchain before comparing engines in the [engine comparison workflow](../.github/workflows/engine-comparison.yml).
+Locally, the task builds and caches the nine comparison components and two stack-guard fixtures under
+separate, configuration-specific output paths in `build/engine-comparison/`. Turbo hashes the benchmark
+sources, build dependencies, and declared build environment. The integration test starts one Pumpkin
+server for each comparison component, dispatches the benchmark command, collects results, then stops
+the server.
 
-The benchmark plugin and workload definitions are in [benchmark-plugin.ts](../benchmarks/engine-comparison/src/benchmark-plugin.ts) and [benchmark-workloads.ts](../benchmarks/engine-comparison/src/benchmark-workloads.ts). GitHub Actions appends the report to the job summary.
+CI runs the nine engine configurations as parallel matrix jobs and runs both stack-guard checks in
+parallel. Each engine job writes one result artifact. The final report job checks that all engines
+returned matching workloads and checksums, then appends the combined Markdown report to the job
+summary and uploads the raw results and report for 90 days. Static Hermes preparation runs
+automatically when a local build needs it; CI also restores and verifies its pinned toolchain before
+comparing engines in the [engine comparison workflow](../.github/workflows/engine-comparison.yml).
+
+After a pull-request CI run produces a complete benchmark report, a separate trusted workflow updates
+one benchmark comment on the PR, even if another CI job failed. It compares the current results with
+the newest successful default-branch benchmark that is an
+ancestor of the PR base. Changes within 10% are treated as runner jitter by default; set the repository
+variable `BENCHMARK_JITTER_PERCENT` to change that threshold. A slower result beyond the threshold
+produces a warning, significant improvements produce a celebration when there are no regressions, and
+otherwise the comment reports the run without a performance alert. The comment links to the full
+matrix report and an SVG chart of the largest changes. If no matching baseline artifact exists, the
+comment reports that and does not classify timing changes.
+
+The benchmark plugin and workload definitions are in [benchmark-plugin.ts](../benchmarks/engine-comparison/src/benchmark-plugin.ts) and [benchmark-workloads.ts](../benchmarks/engine-comparison/src/benchmark-workloads.ts).
 
 ## Method and scope
 
@@ -50,7 +65,7 @@ Workload timing uses JavaScript `Date.now()`, so samples are reported as integer
 
 There are 29 timed workloads: 28 deterministic guest-side fixtures and one real Pumpkin API call. The fixture algorithms are representative examples written for this benchmark; they are not executions of the named plugins or Pumpkin’s own command router. Player-directory and other player-oriented fixture workloads use in-memory test data, not connected players.
 
-The configurations run serially: QuickJS first, then each Static Hermes profile, collector, and parser-mode combination, each with a newly started server. The real API workload calls `server.getAllPlayers()` 10,000 times per sample, or 60,000 calls per configuration including the warm-up and five measured samples. The test server has no connected players, so the returned list is empty. The test separately registers and dispatches one real `server.command()` command, along with event and scheduled-task behavior checks. That command dispatch is API behavior coverage, not a timed command-routing workload.
+The local comparison test runs configurations serially: QuickJS first, then each Static Hermes profile, collector, and parser-mode combination, each with a newly started server. CI runs those configurations independently in parallel. The real API workload calls `server.getAllPlayers()` 10,000 times per sample, or 60,000 calls per configuration including the warm-up and five measured samples. The test server has no connected players, so the returned list is empty. The test separately registers and dispatches one real `server.command()` command, along with event and scheduled-task behavior checks. That command dispatch is API behavior coverage, not a timed command-routing workload.
 
 ### Workload inventory
 
@@ -167,7 +182,7 @@ For engine or plugin decisions, benchmark the plugin’s actual hot path with re
 - The linked table is one run of one PR merge candidate. Hardware, host load, Wasmtime/Pumpkin versions, toolchain pins, and source changes can alter results. Use the linked job for provenance and compare like-for-like revisions and environments.
 - The job log identifies a GitHub-hosted Ubuntu 26.04 runner but not its CPU model. Do not infer a CPU from the operating-system image.
 - Five samples with integer-millisecond timing can expose large differences in these workloads, but cannot resolve small differences reliably. A zero-millisecond sample is possible; ratios are unavailable when the denominator median is zero.
-- Engine runs are serial and always follow the same order. Changes in host load during a job can affect later variants; the comparison does not alternate engine order or repeat independent server runs.
+- The local comparison runs engines serially in a fixed order. CI gives each configuration its own matrix job, but runner-to-runner differences can affect timings; each job does not repeat on multiple runners.
 - Input counts differ by design. A million arithmetic iterations and 1,000 config validations are not equivalent units. Do not average or compare rows as if they were normalized operations.
 - The arithmetic mean weights all 29 workload medians equally. A single slower row can move it substantially, and changing the workload set changes its meaning.
 - The real API case is narrow. It measures one API method with an empty result and does not represent all Pumpkin calls or guest-to-host conversion costs.

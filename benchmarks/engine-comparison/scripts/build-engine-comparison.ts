@@ -2,7 +2,11 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
-import { createEngineVariants, getEngineVariantBuildOutput } from '../test/engine-variants.ts';
+import {
+    createEngineComparisonMatrix,
+    createEngineVariants,
+    getEngineVariantBuildOutput,
+} from '../test/engine-variants.ts';
 
 const benchmarkDir = path.resolve(import.meta.dirname, '..');
 const repositoryDir = path.resolve(benchmarkDir, '../..');
@@ -11,12 +15,26 @@ const apiRoot = path.dirname(createRequire(import.meta.url).resolve('@pumpkin-pl
 const cacheDir = path.join(repositoryDir, '.cache');
 const hermesCacheDir = process.env.STATIC_HERMES_CACHE_DIR ?? path.join(cacheDir, 'hermes');
 const stackGuardSource = path.join(benchmarkDir, 'test/fixtures/stack-guard-plugin.ts');
+const requestedVariantId = process.env.ENGINE_COMPARISON_VARIANT;
+const comparisonVariants = createEngineVariants();
+const comparisonMatrix = createEngineComparisonMatrix();
+const selectedMatrixEntry = comparisonMatrix.find(({ variant }) => variant === requestedVariantId);
+const selectedVariant =
+    selectedMatrixEntry?.kind === 'benchmark'
+        ? comparisonVariants.find(({ id }) => id === selectedMatrixEntry.variant)
+        : undefined;
+const selectedStackGuard = selectedMatrixEntry?.kind === 'stack-guard' ? selectedMatrixEntry : undefined;
+
+if (requestedVariantId && !selectedMatrixEntry) {
+    throw new Error(`Unknown engine comparison variant: ${requestedVariantId}`);
+}
 
 fs.mkdirSync(cacheDir, { recursive: true });
 const temporaryDir = fs.mkdtempSync(path.join(cacheDir, 'engine-comparison-build-'));
 
 try {
-    for (const variant of createEngineVariants()) {
+    const variantsToBuild = selectedVariant ? [selectedVariant] : requestedVariantId ? [] : comparisonVariants;
+    for (const variant of variantsToBuild) {
         const packageDir = path.join(temporaryDir, variant.id);
         const sourceDir = path.join(packageDir, 'src');
         createBuildPackage(packageDir, `runtime-benchmark-${variant.id}`, {
@@ -37,8 +55,14 @@ try {
         publishComponent(wasmPath, getEngineVariantBuildOutput(benchmarkDir, variant.id));
     }
 
-    for (const runtimeVariant of ['full', 'lean'] as const) {
-        const id = `static-hermes-${runtimeVariant}-stack-guard`;
+    const stackGuardEntries = selectedStackGuard
+        ? [selectedStackGuard]
+        : requestedVariantId
+          ? []
+          : comparisonMatrix.filter(
+                (entry): entry is Extract<typeof entry, { kind: 'stack-guard' }> => entry.kind === 'stack-guard',
+            );
+    for (const { runtime: runtimeVariant, variant: id } of stackGuardEntries) {
         const packageDir = path.join(temporaryDir, id);
         const sourceDir = path.join(packageDir, 'src');
         createBuildPackage(packageDir, `runtime-benchmark-${id}`, {
