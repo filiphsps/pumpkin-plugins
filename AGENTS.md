@@ -20,6 +20,9 @@ Plugins live in `packages/`; shared libraries and tooling live in
   put dependencies shared by packages in the `catalog:` of `pnpm-workspace.yaml`.
 - For every code-writing task, read [JSDoc TypeScript Documentation](.agents/skills/jsdoc-typescript-docs/SKILL.md)
   before editing and follow the repo-specific JSDoc contract in [Code style](docs/code-style.md).
+- Before any work on a plugin in [packages](packages/) or a shared plugin library in [tools](tools/)
+  (writing, reviewing, debugging, or testing), read
+  [Hermes GC Safe Coding](.agents/skills/hermes-gc-safe-coding/SKILL.md).
 - Before changing an area, read its relevant guide from [docs/README.md](docs/README.md) and load
   any skill whose description matches the task. Project skill files live in `.agents/skills/`.
 
