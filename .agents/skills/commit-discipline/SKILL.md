@@ -5,14 +5,14 @@ description: Use when creating or updating commits in Pumpkin Plugins to keep th
 
 # Commit discipline
 
-Create commits as slices complete only when the user explicitly asks for incremental commits or to
-ship as you go. Otherwise, finish and validate the requested work before following any applicable
-commit instructions.
+Follow the root `AGENTS.md`: for requested feature work, commit each completed, validated slice
+locally. Keep changes local; push, tag, or create, change, or review PRs and issues only when the user
+requests them. The user's direct instructions take precedence over this skill and repository guidance.
 
-When shipping incrementally, keep each commit tiny or small, self-contained, and limited to one domain
-or area. Keep the implementation, tests, and documentation for that same area together when they form
-one coherent change. Split unrelated areas into separate commits, even when they belong to one feature
-request. Commit each completed slice after its relevant checks pass, in dependency order.
+Keep each commit small, self-contained, and limited to one domain or area. Keep the implementation,
+tests, and documentation for that same area together when they form one coherent change. Split
+unrelated areas into separate commits, even when they belong to one feature request. Commit each
+completed slice after its relevant checks pass, in dependency order.
 
 ## Before each commit
 
