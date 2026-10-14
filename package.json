@@ -52,7 +52,7 @@
         "lint": "biome check . && eslint .",
         "lint:actions": "actionlint -color",
         "lint:commits": "commitlint --from HEAD~1",
-        "lint:fix": "biome check --write --unsafe --html-formatter-enabled=true . && eslint --fix .",
+        "lint:fix": "biome check --write --unsafe . && eslint --fix .",
         "package": "node scripts/package-plugins.mjs",
         "readme": "pnpm turbo run readme && pumpkin-plugins-docs actions && pumpkin-plugins-docs root",
         "readme:check": "pnpm turbo run readme:check && pumpkin-plugins-docs actions --check && pumpkin-plugins-docs root --check",
