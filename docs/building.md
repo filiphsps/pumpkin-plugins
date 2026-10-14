@@ -174,6 +174,13 @@ Hermes runtime dependency before plugin builds or typechecks. For direct package
 fresh checkout, run `pnpm --filter @pumpkin-plugins/static-hermes-runtime build` and
 `pnpm --filter @pumpkin-plugins/build build` first.
 
+An interactive invocation may show a cached notice when a newer `@pumpkin-plugins/build` release is
+available on npm. Help and version commands, CI, development mode
+(`PUMPKIN_DEV_MODE=1`) and non-interactive output skip the lookup; registry failures do not affect the
+build. Use `--no-update-notifier` or set `PUMPKIN_PLUGINS_NO_UPDATE_NOTIFIER=1` to disable notices.
+Preview a suggested migration from the plugin root with
+`pnpm dlx @pumpkin-plugins/codemod update-build .`.
+
 The build tool, signing tool, plugin creator and test harness `typecheck` tasks run `tsc --noEmit`,
 so their package-level Turbo configurations declare no outputs. Plugin typechecks keep the root
 `build/types/**` outputs because they generate guest declarations needed by builds and editors.

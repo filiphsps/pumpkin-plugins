@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { bundlePlugin } from './bundle.ts';
-import { main, resolveApiWit, run } from './cli.ts';
+import { executeCli, main, resolveApiWit, run } from './cli.ts';
 import { BuildError } from './errors.ts';
 import { cacheDir } from './repo.ts';
 import { generateTypes } from './types.ts';
@@ -148,7 +148,7 @@ describe('CLI informational options', () => {
             expect(output.join('')).toContain('Usage: pumpkin-plugins-build');
             expect(output.join('')).toContain('--types-only');
             expect(output.join('')).toContain('--parse-ts');
-            if (argument === '--help') expect(output.join('')).toMatchSnapshot();
+            expect(output.join('')).toContain('--no-update-notifier');
             expect(bundlePlugin).not.toHaveBeenCalled();
             expect(generateTypes).not.toHaveBeenCalled();
         } finally {
@@ -169,6 +169,35 @@ describe('CLI informational options', () => {
             );
         } finally {
             stdout.mockRestore();
+        }
+    });
+
+    it.each(['--help', '--version'])('does not start update lookup for %s at the CLI boundary', async (argument) => {
+        const startUpdateCheck = vi.fn();
+
+        await executeCli([argument], '/not-a-package', {
+            environment: {},
+            isTTY: true,
+            startUpdateCheck,
+        });
+
+        expect(startUpdateCheck).not.toHaveBeenCalled();
+    });
+
+    it('does not wait for an update lookup before entering the command', async () => {
+        const startUpdateCheck = vi.fn(() => new Promise<void>(() => undefined));
+        const originalExitCode = process.exitCode;
+
+        try {
+            await executeCli(['--unknown-option'], '/not-a-package', {
+                environment: {},
+                isTTY: true,
+                startUpdateCheck,
+            });
+
+            expect(startUpdateCheck).toHaveBeenCalledOnce();
+        } finally {
+            process.exitCode = originalExitCode;
         }
     });
 

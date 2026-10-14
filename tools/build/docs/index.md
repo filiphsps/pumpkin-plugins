@@ -34,6 +34,13 @@ componentization stage and final artifact size with a shared `[build]` prefix. R
 the QuickJS and Static Hermes toolchains is suppressed; failures include captured stderr diagnostics
 in the same format.
 
+On an interactive terminal, the executable checks npm in the background and may print a notice when
+a newer builder release is available. The lookup uses a one-day cache; registry errors do not affect
+the build result. It is skipped for help and version output, CI, development mode
+(`PUMPKIN_DEV_MODE=1`), and non-interactive output. Pass `--no-update-notifier` or set
+`PUMPKIN_PLUGINS_NO_UPDATE_NOTIFIER=1` to opt out. When a notice appears, preview the release
+migration from the plugin directory with `pnpm dlx @pumpkin-plugins/codemod update-build .`.
+
 ## Build constraints
 
 Static Hermes uses the pinned Pumpkin API WIT and WASI 2. Keep the workspace's Pumpkin API version
