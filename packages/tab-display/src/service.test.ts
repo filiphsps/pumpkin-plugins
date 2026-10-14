@@ -8,12 +8,21 @@ class FakeHost implements TabDisplayHost {
     readonly names = new Map<string, string | undefined>();
     readonly orders = new Map<string, number>();
     readonly headers = new Map<string, { header: readonly RenderedLine[]; footer: readonly RenderedLine[] }>();
+    entryFailuresRemaining = 0;
     resetCount = 0;
-    constructor(readonly players: readonly PlayerSnapshot[]) {}
+    resetFailuresRemaining = 0;
+    players: readonly PlayerSnapshot[];
+    constructor(players: readonly PlayerSnapshot[]) {
+        this.players = players;
+    }
     snapshotPlayers(_limit: number): readonly PlayerSnapshot[] {
         return this.players;
     }
     setEntryName(uuid: string, value: RenderedLine | undefined): ApplyResult {
+        if (this.entryFailuresRemaining > 0) {
+            this.entryFailuresRemaining -= 1;
+            return { kind: 'failed', error: 'Could not apply row name' };
+        }
         this.names.set(uuid, value?.text);
         return { kind: 'applied' };
     }
@@ -25,8 +34,15 @@ class FakeHost implements TabDisplayHost {
         this.headers.set(uuid, { header, footer });
         return { kind: 'applied' };
     }
-    resetOwned(_uuid: string): void {
+    resetOwned(uuid: string): void {
         this.resetCount += 1;
+        if (this.resetFailuresRemaining > 0) {
+            this.resetFailuresRemaining -= 1;
+            throw new Error('Reset failed');
+        }
+        this.names.delete(uuid);
+        this.orders.delete(uuid);
+        this.headers.delete(uuid);
     }
 }
 
@@ -107,6 +123,38 @@ describe('TabDisplayService', () => {
             reason: 'Java tab display calls are gated to v-26-3; live client behavior is unverified (connected: v-1-21-2)',
         });
         expect(service.status().lastFailure).toBeUndefined();
+    });
+
+    it('resolves entry placeholders only for Java players', () => {
+        const host = new FakeHost([
+            { uuid: 'java', name: 'Java', edition: 'java', javaVersion: 'v-26-3' },
+            { uuid: 'bedrock', name: 'Bedrock', edition: 'bedrock' },
+        ]);
+        const requests: { text: string; viewer?: string }[] = [];
+        const service = new TabDisplayService({
+            host,
+            resolver: {
+                resolveBatch: (batch) => {
+                    requests.push(...batch);
+                    return batch.map(({ text, viewer }) => ({
+                        text: text.replaceAll('%player_name%', viewer ?? 'server'),
+                        unresolved: [],
+                    }));
+                },
+            },
+            now: () => 0,
+            config: validConfig(baseConfig()),
+        });
+
+        service.tick();
+
+        expect(requests).toHaveLength(2);
+        expect(requests.every(({ viewer }) => viewer === 'Java')).toBe(true);
+        expect(requests.map(({ text }) => text)).toEqual(expect.arrayContaining(['%player_name%', 'Hi %player_name%']));
+        expect(host.names.get('java')).toBe('Java');
+        expect(host.names.has('bedrock')).toBe(false);
+        expect(host.headers.get('java')?.header[0]?.text).toBe('Hi Java');
+        expect(host.headers.has('bedrock')).toBe(false);
     });
 
     it('restores row names when a valid reload disables entry formatting', () => {
@@ -202,6 +250,91 @@ describe('TabDisplayService', () => {
         expect(warnings).toEqual(['Display update failed: Error: Cannot use a disposed or transferred resource']);
     });
 
+    it('does not repeat setters for stable unsupported capabilities', () => {
+        const host = new FakeHost([viewers[0]!]);
+        const unsupported = { kind: 'unsupported', reason: 'Not available for this client' } as const;
+        const setEntryName = vi.spyOn(host, 'setEntryName').mockReturnValue(unsupported);
+        const setHeaderFooter = vi.spyOn(host, 'setHeaderFooter').mockReturnValue(unsupported);
+        const service = new TabDisplayService({
+            host,
+            resolver: { resolveBatch: (requests) => requests.map(({ text }) => ({ text, unresolved: [] })) },
+            now: () => 0,
+            config: validConfig(baseConfig()),
+        });
+
+        service.tick();
+        service.tick();
+
+        expect(setEntryName).toHaveBeenCalledTimes(1);
+        expect(setHeaderFooter).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['version change', 'disconnect', 'disable', 'shutdown'] as const)(
+        'retries unsupported setters after %s invalidates the player capability',
+        (invalidation) => {
+            const player = { ...viewers[0]!, javaVersion: 'v-1-21-1' };
+            const host = new FakeHost([player]);
+            const setEntryName = vi.spyOn(host, 'setEntryName').mockReturnValue({
+                kind: 'unsupported',
+                reason: 'Not available for this client',
+            });
+            const config = baseConfig();
+            const service = new TabDisplayService({
+                host,
+                resolver: { resolveBatch: (requests) => requests.map(({ text }) => ({ text, unresolved: [] })) },
+                now: () => 0,
+                config: validConfig(config),
+            });
+
+            service.tick();
+            service.tick();
+            expect(setEntryName).toHaveBeenCalledTimes(1);
+
+            if (invalidation === 'version change') {
+                host.players = [{ ...player, javaVersion: 'v-26-3' }];
+                service.tick();
+            } else if (invalidation === 'disconnect') {
+                host.players = [];
+                service.tick();
+                host.players = [player];
+                service.tick();
+            } else if (invalidation === 'disable') {
+                config.general.enabled = false;
+                service.setConfig(config);
+                service.tick();
+                config.general.enabled = true;
+                service.setConfig(config);
+                service.tick();
+            } else {
+                service.shutdown();
+                service.tick();
+            }
+
+            expect(setEntryName).toHaveBeenCalledTimes(2);
+        },
+    );
+
+    it('retries a failed row-name update when the next tick renders the same output', () => {
+        const host = new FakeHost(viewers);
+        host.entryFailuresRemaining = 1;
+        const service = new TabDisplayService({
+            host,
+            resolver: { resolveBatch: (requests) => requests.map(({ text }) => ({ text, unresolved: [] })) },
+            now: () => 0,
+            config: validConfig(baseConfig()),
+        });
+
+        service.tick();
+
+        expect(host.names.has('uuid-a')).toBe(false);
+        expect(service.status().lastFailure).toBe('Could not apply row name');
+
+        service.tick();
+
+        expect(host.names.get('uuid-a')).toBe('%player_name%');
+        expect(service.status().lastFailure).toBeUndefined();
+    });
+
     it('keeps the last valid generation for 30 seconds during provider outages', () => {
         const host = new FakeHost(viewers);
         let available = true;
@@ -241,5 +374,39 @@ describe('TabDisplayService', () => {
         expect(result.kind).toBe('applied');
         service.tick();
         expect(host.resetCount).toBe(2);
+    });
+
+    it('retries failed resets on later ticks while the display remains disabled', () => {
+        const host = new FakeHost([{ uuid: 'uuid-a', name: 'Alex', edition: 'java', javaVersion: 'v-26-3', ping: 20 }]);
+        const config = baseConfig();
+        const service = new TabDisplayService({
+            host,
+            resolver: {
+                resolveBatch: (requests) =>
+                    requests.map(({ text, viewer }) => ({
+                        text: text.replaceAll('%player_name%', viewer ?? 'server'),
+                        unresolved: [],
+                    })),
+            },
+            now: () => 0,
+            config: validConfig(config),
+        });
+        service.tick();
+        host.resetFailuresRemaining = 1;
+        config.general.enabled = false;
+        expect(service.setConfig(config).kind).toBe('applied');
+
+        service.tick();
+
+        expect(host.names.get('uuid-a')).toBe('Alex');
+        expect(host.headers.has('uuid-a')).toBe(true);
+        expect(service.status().lastFailure).toBe('Could not restore plugin-owned tab fields');
+
+        service.tick();
+
+        expect(host.names.has('uuid-a')).toBe(false);
+        expect(host.headers.has('uuid-a')).toBe(false);
+        expect(host.resetCount).toBe(2);
+        expect(service.status().lastFailure).toBeUndefined();
     });
 });

@@ -52,6 +52,7 @@ export interface TabDisplayServiceOptions {
 export const MAX_JOBS_PER_TICK = 256;
 /** Maximum time a previous placeholder frame is retained during provider outages. */
 export const STALE_FRAME_MS = 30_000;
+const RESET_FAILURE = 'Could not restore plugin-owned tab fields';
 
 interface RenderTarget {
     readonly style: Omit<RenderedLine, 'text'>;
@@ -90,6 +91,11 @@ export class TabDisplayService {
     private readonly appliedNames = new Map<string, string | undefined>();
     private readonly appliedOrders = new Map<string, number>();
     private readonly appliedHeaders = new Map<string, string>();
+    private readonly unsupportedNames = new Set<string>();
+    private readonly unsupportedOrders = new Set<string>();
+    private readonly unsupportedHeaders = new Set<string>();
+    private readonly playerCapabilities = new Map<string, string>();
+    private readonly disableResetPending = new Set<string>();
     private latestPlayers: readonly PlayerSnapshot[] = [];
     private disabled = false;
 
@@ -140,17 +146,28 @@ export class TabDisplayService {
             return;
         }
         this.latestPlayers = snapshots.map(copySnapshot);
+        this.syncPlayerCapabilities(this.latestPlayers);
 
         if (!this.config.general.enabled) {
             if (!this.disabled) {
-                for (const player of this.latestPlayers) this.safeReset(player.uuid);
-                this.clearApplied();
-                this.disabled = true;
+                for (const player of this.latestPlayers) this.disableResetPending.add(player.uuid);
+                let resetSucceeded = true;
+                for (const uuid of this.disableResetPending) {
+                    if (!this.safeReset(uuid)) resetSucceeded = false;
+                }
+                if (resetSucceeded) {
+                    this.disableResetPending.clear();
+                    this.clearDisplayCaches();
+                    this.disabled = true;
+                    if (this.lastFailure === RESET_FAILURE) this.lastFailure = undefined;
+                }
             }
             this.pending = undefined;
             this.previousOnline = new Set(this.latestPlayers.map(({ uuid }) => uuid));
             return;
         }
+        if (this.disableResetPending.size > 0) this.clearDisplayCaches();
+        this.disableResetPending.clear();
         this.disabled = false;
         this.resetDisconnected(this.latestPlayers);
 
@@ -178,7 +195,7 @@ export class TabDisplayService {
     shutdown(): void {
         for (const player of this.latestPlayers) this.safeReset(player.uuid);
         this.pending = undefined;
-        this.clearApplied();
+        this.clearDisplayCaches();
         this.previousOnline.clear();
     }
 
@@ -228,7 +245,7 @@ export class TabDisplayService {
     private prepareGeneration(players: readonly PlayerSnapshot[]): PendingGeneration {
         const prepared = players.map((snapshot) => ({
             snapshot,
-            ...(this.config.entry.enabled
+            ...(snapshot.edition === 'java' && this.config.entry.enabled
                 ? {
                       entry: makeTarget({
                           text: this.config.entry.text,
@@ -320,9 +337,9 @@ export class TabDisplayService {
             if (providerAvailable) this.lastSuccessfulAt = now;
             this.unresolved = unresolved;
             phase = 'updating';
-            this.applyGeneration(generation.players, rendered);
+            const failed = this.applyGeneration(generation.players, rendered);
             this.pending = undefined;
-            this.lastFailure = undefined;
+            if (!failed) this.lastFailure = undefined;
         } catch (error) {
             const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
             const reason =
@@ -358,7 +375,8 @@ export class TabDisplayService {
             readonly header: readonly RenderedLine[];
             readonly footer: readonly RenderedLine[];
         }[],
-    ): void {
+    ): boolean {
+        let failed = false;
         const snapshots = prepared.map(({ snapshot }) => snapshot);
         const orderByUuid =
             this.config.sorting.rules.length === 0
@@ -369,46 +387,64 @@ export class TabDisplayService {
 
         for (const item of rendered) {
             const { snapshot } = item;
-            if (snapshot.edition === 'java' && item.entry !== undefined) this.applyName(snapshot.uuid, item.entry);
-            else if (snapshot.edition === 'java' && this.appliedNames.has(snapshot.uuid))
-                this.applyName(snapshot.uuid, undefined);
+            if (snapshot.edition === 'java' && item.entry !== undefined) {
+                if (this.applyName(snapshot.uuid, item.entry)) failed = true;
+            } else if (snapshot.edition === 'java' && this.appliedNames.has(snapshot.uuid)) {
+                if (this.applyName(snapshot.uuid, undefined)) failed = true;
+            }
             if (this.config.sorting.rules.length > 0) {
                 const order = orderByUuid.get(snapshot.uuid) ?? 0;
-                if (this.appliedOrders.get(snapshot.uuid) !== order) {
-                    this.recordApply(this.options.host.setOrder(snapshot.uuid, order));
-                    this.appliedOrders.set(snapshot.uuid, order);
+                if (!this.unsupportedOrders.has(snapshot.uuid) && this.appliedOrders.get(snapshot.uuid) !== order) {
+                    const result = this.options.host.setOrder(snapshot.uuid, order);
+                    if (result.kind === 'unsupported') this.unsupportedOrders.add(snapshot.uuid);
+                    else if (this.recordApply(result)) this.appliedOrders.set(snapshot.uuid, order);
+                    else failed = true;
                 }
-            } else if (this.appliedOrders.has(snapshot.uuid)) {
-                this.recordApply(this.options.host.setOrder(snapshot.uuid, 0));
-                this.appliedOrders.delete(snapshot.uuid);
+            } else if (!this.unsupportedOrders.has(snapshot.uuid) && this.appliedOrders.has(snapshot.uuid)) {
+                const result = this.options.host.setOrder(snapshot.uuid, 0);
+                if (result.kind === 'unsupported') this.unsupportedOrders.add(snapshot.uuid);
+                else if (this.recordApply(result)) this.appliedOrders.delete(snapshot.uuid);
+                else failed = true;
             }
             if (snapshot.edition === 'java') {
                 const key = JSON.stringify([item.header, item.footer]);
-                if (this.appliedHeaders.get(snapshot.uuid) !== key) {
-                    this.recordApply(this.options.host.setHeaderFooter(snapshot.uuid, item.header, item.footer));
-                    this.appliedHeaders.set(snapshot.uuid, key);
+                if (!this.unsupportedHeaders.has(snapshot.uuid) && this.appliedHeaders.get(snapshot.uuid) !== key) {
+                    const result = this.options.host.setHeaderFooter(snapshot.uuid, item.header, item.footer);
+                    if (result.kind === 'unsupported') this.unsupportedHeaders.add(snapshot.uuid);
+                    else if (this.recordApply(result)) this.appliedHeaders.set(snapshot.uuid, key);
+                    else failed = true;
                 }
             }
         }
+        return failed;
     }
 
-    private applyName(uuid: string, value: RenderedLine | undefined): void {
+    private applyName(uuid: string, value: RenderedLine | undefined): boolean {
         const key = value === undefined ? undefined : JSON.stringify(value);
-        if (this.appliedNames.has(uuid) && this.appliedNames.get(uuid) === key) return;
-        this.recordApply(this.options.host.setEntryName(uuid, value));
-        this.appliedNames.set(uuid, key);
+        if (this.appliedNames.has(uuid) && this.appliedNames.get(uuid) === key) return false;
+        if (this.unsupportedNames.has(uuid)) return false;
+        const result = this.options.host.setEntryName(uuid, value);
+        if (result.kind === 'unsupported') {
+            this.unsupportedNames.add(uuid);
+            return false;
+        }
+        if (this.recordApply(result)) {
+            this.appliedNames.set(uuid, key);
+            return false;
+        }
+        return result.kind === 'failed';
     }
 
-    private recordApply(result: ApplyResult): void {
+    private recordApply(result: ApplyResult): boolean {
         switch (result.kind) {
             case 'applied':
             case 'unchanged':
-                return;
+                return true;
             case 'unsupported':
-                return;
+                return false;
             case 'failed':
                 this.lastFailure = result.error;
-                return;
+                return false;
         }
     }
 
@@ -417,25 +453,52 @@ export class TabDisplayService {
         for (const uuid of this.previousOnline) {
             if (current.has(uuid)) continue;
             this.safeReset(uuid);
-            this.appliedNames.delete(uuid);
-            this.appliedOrders.delete(uuid);
-            this.appliedHeaders.delete(uuid);
+            this.clearPlayerCaches(uuid);
         }
         this.previousOnline = current;
     }
 
-    private safeReset(uuid: string): void {
-        try {
-            this.options.host.resetOwned(uuid);
-        } catch {
-            this.lastFailure = 'Could not restore plugin-owned tab fields';
+    private syncPlayerCapabilities(players: readonly PlayerSnapshot[]): void {
+        const current = new Map(players.map((player) => [player.uuid, playerCapabilityKey(player)]));
+        for (const uuid of this.playerCapabilities.keys()) {
+            if (!current.has(uuid)) this.clearPlayerCaches(uuid);
+        }
+        for (const [uuid, capability] of current) {
+            if (this.playerCapabilities.has(uuid) && this.playerCapabilities.get(uuid) !== capability) {
+                this.clearPlayerCaches(uuid);
+            }
+            this.playerCapabilities.set(uuid, capability);
         }
     }
 
-    private clearApplied(): void {
+    private clearPlayerCaches(uuid: string): void {
+        this.appliedNames.delete(uuid);
+        this.appliedOrders.delete(uuid);
+        this.appliedHeaders.delete(uuid);
+        this.unsupportedNames.delete(uuid);
+        this.unsupportedOrders.delete(uuid);
+        this.unsupportedHeaders.delete(uuid);
+        this.playerCapabilities.delete(uuid);
+    }
+
+    private safeReset(uuid: string): boolean {
+        try {
+            this.options.host.resetOwned(uuid);
+            return true;
+        } catch {
+            this.lastFailure = RESET_FAILURE;
+            return false;
+        }
+    }
+
+    private clearDisplayCaches(): void {
         this.appliedNames.clear();
         this.appliedOrders.clear();
         this.appliedHeaders.clear();
+        this.unsupportedNames.clear();
+        this.unsupportedOrders.clear();
+        this.unsupportedHeaders.clear();
+        this.playerCapabilities.clear();
     }
 
     private providerAvailable(): boolean {
@@ -451,6 +514,10 @@ export class TabDisplayService {
         }
         return now;
     }
+}
+
+function playerCapabilityKey(player: PlayerSnapshot): string {
+    return JSON.stringify([player.edition, player.javaVersion]);
 }
 
 function makeTarget(config: TemplateLineConfig): RenderTarget {
