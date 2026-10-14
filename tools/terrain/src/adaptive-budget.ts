@@ -17,6 +17,11 @@ export class AdaptiveWorkBudget {
     private readonly reserveMs: number;
     private workMsPerUnit = 0;
 
+    /**
+     * Creates a budget with the supplied work limit and tick timing.
+     *
+     * @throws RangeError when a work limit or timing value is invalid.
+     */
     constructor(options: AdaptiveWorkBudgetOptions) {
         this.initialUnits = options.initialUnits;
         this.tickDurationMs = options.tickDurationMs ?? 50;
