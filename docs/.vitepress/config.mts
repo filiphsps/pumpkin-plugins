@@ -365,7 +365,7 @@ function generateLlmsText(): string {
         '',
         '> TypeScript plugins, shared tools, and GitHub Actions for Pumpkin Minecraft servers.',
         '',
-        `Plugins are WebAssembly components that run in Pumpkin's QuickJS runtime. Source links below return Markdown from the repository; generated API links point to the [documentation site](${siteLink}). This file is generated from discovered guides, component documentation, package metadata, and API references.`,
+        `Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runtime by default; QuickJS can be selected in the package's build configuration. Source links below return Markdown from the repository; generated API links point to the [documentation site](${siteLink}). This file is generated from discovered guides, component documentation, package metadata, and API references.`,
         '',
         sections.join('\n\n'),
         '',
