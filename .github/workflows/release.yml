@@ -214,23 +214,19 @@ jobs:
                   git push
 
     publish-tools:
-        name: 📦 Publish npm ${{ matrix.path }}
+        name: 📦 Publish npm packages
         needs: [release, release-fanout-check]
         if: ${{ needs.release.outputs.tool_paths_released != '[]' }}
-        timeout-minutes: 15
+        timeout-minutes: 60
         runs-on: ubuntu-26.04
         permissions:
             contents: read
             id-token: write
-        strategy:
-            fail-fast: false
-            matrix:
-                path: ${{ fromJSON(needs.release.outputs.tool_paths_released) }}
         env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             GH_REPO: ${{ github.repository }}
-            TAG: ${{ fromJSON(needs.release.outputs.all)[format('{0}--tag_name', matrix.path)] }}
-            TOOL_DIRECTORY: ${{ matrix.path }}
+            RELEASED_TOOL_PATHS: ${{ needs.release.outputs.tool_paths_released }}
+            RELEASE_METADATA: ${{ needs.release.outputs.all }}
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -238,19 +234,23 @@ jobs:
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
-            - name: 🔒 Check the tag is the commit this run built
-              env:
-                  RELEASE_TAG: ${{ env.TAG }}
+            - name: 🔒 Check each tag is the commit this run built
               run: |
-                  ref="$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha')"
-                  sha="${ref##* }"
-                  if [ "${ref%% *}" = tag ]; then
-                      sha="$(gh api "repos/$GH_REPO/git/tags/$sha" --jq '.object.sha')"
-                  fi
-                  if [ "$sha" != "$GITHUB_SHA" ]; then
-                      echo "::error::$RELEASE_TAG releases $sha, but this run checked out $GITHUB_SHA. Not publishing anything."
-                      exit 1
-                  fi
+                  set -euo pipefail
+                  release_tags="$(jq --raw-output --argjson paths "$RELEASED_TOOL_PATHS" --argjson metadata "$RELEASE_METADATA" \
+                      '$paths[] as $path | $metadata[$path + "--tag_name"]')"
+                  while IFS= read -r RELEASE_TAG; do
+                      [ -n "$RELEASE_TAG" ] || continue
+                      ref="$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha')"
+                      sha="${ref##* }"
+                      if [ "${ref%% *}" = tag ]; then
+                          sha="$(gh api "repos/$GH_REPO/git/tags/$sha" --jq '.object.sha')"
+                      fi
+                      if [ "$sha" != "$GITHUB_SHA" ]; then
+                          echo "::error::$RELEASE_TAG releases $sha, but this run checked out $GITHUB_SHA. Not publishing anything."
+                          exit 1
+                      fi
+                  done <<< "$release_tags"
 
             - name: 📦 Configure npm OIDC publishing
               uses: actions/setup-node@v7.0.0
@@ -259,9 +259,7 @@ jobs:
                   registry-url: https://registry.npmjs.org
                   package-manager-cache: false
 
-            - name: 📤 Pack and publish public npm package
-              env:
-                  PACKAGE_DIRECTORY: ${{ matrix.path }}
+            - name: 📤 Publish verified public npm packages
               run: |
                   set -euo pipefail
                   npm_version="$(npm --version)"
@@ -275,26 +273,7 @@ jobs:
                       }
                   }
                   NODE
-                  package_name="$(node --input-type=module -e 'import { readFileSync } from "node:fs"; process.stdout.write(JSON.parse(readFileSync(`${process.env.PACKAGE_DIRECTORY}/package.json`, "utf8")).name)' )"
-                  package_version="$(node --input-type=module -e 'import { readFileSync } from "node:fs"; process.stdout.write(JSON.parse(readFileSync(`${process.env.PACKAGE_DIRECTORY}/package.json`, "utf8")).version)' )"
-                  mkdir -p "$RUNNER_TEMP/npm-packages"
-                  cd "$PACKAGE_DIRECTORY"
-                  pnpm pack --pack-destination "$RUNNER_TEMP/npm-packages"
-                  tarball="$(find "$RUNNER_TEMP/npm-packages" -maxdepth 1 -type f -name '*.tgz' -print -quit)"
-                  if [ -z "$tarball" ]; then
-                      echo "::error::pnpm pack did not produce a tarball for $package_name@$package_version."
-                      exit 1
-                  fi
-                  candidate_integrity="$(node --input-type=module -e 'import { createHash } from "node:crypto"; import { readFileSync } from "node:fs"; process.stdout.write(`sha512-${createHash("sha512").update(readFileSync(process.argv[1])).digest("base64")}`)' "$tarball")"
-                  if existing_integrity="$(npm view "$package_name@$package_version" dist.integrity 2>/dev/null)"; then
-                      if [ "$existing_integrity" = "$candidate_integrity" ]; then
-                          echo "$package_name@$package_version is already published with the same tarball."
-                          exit 0
-                      fi
-                      echo "::error::$package_name@$package_version is published with different contents."
-                      exit 1
-                  fi
-                  npm publish "$tarball" --access public --provenance
+                  pnpm exec node scripts/publish-tool-packages.mjs
 
     publish-extensions:
         name: 🧩 Package extension ${{ matrix.path }}

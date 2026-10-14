@@ -135,15 +135,35 @@ describe('upstream pin workflow', () => {
         assert.ok(publish, 'release workflow needs a separate npm publish job for tools');
         assert.equal(publish.permissions['id-token'], 'write');
         assert.match(publish.if, /needs\.release\.outputs\.tool_paths_released/);
+        assert.equal(publish.strategy, undefined, 'tool publication must run sequentially in one job');
+        assert.equal(publish['timeout-minutes'], 60);
+        assert.equal(publish['runs-on'], 'ubuntu-26.04');
         assert.equal(
-            publish.strategy.matrix.path,
-            ['$', '{{ fromJSON(needs.release.outputs.tool_paths_released) }}'].join(''),
+            publish.env.RELEASED_TOOL_PATHS,
+            ['$', '{{ needs.release.outputs.tool_paths_released }}'].join(''),
         );
-        assert.match(publish.steps.map((step) => step.run ?? '').join('\n'), /npm publish .*--access public/);
-        assert.match(publish.steps.map((step) => step.run ?? '').join('\n'), /pnpm pack/);
-        const tagCheck = publish.steps.find((step) => step.name === '🔒 Check the tag is the commit this run built');
+        assert.equal(publish.env.RELEASE_METADATA, ['$', '{{ needs.release.outputs.all }}'].join(''));
+        const steps = publish.steps;
+        const tagCheck = steps.find((step) => step.name === '🔒 Check each tag is the commit this run built');
+        assert.match(tagCheck.run, /git\/ref\/tags\/\$RELEASE_TAG/);
         assert.match(tagCheck.run, /git\/tags\/\$sha/);
-        assert.doesNotMatch(tagCheck.run, /git\/tags\/\$RELEASE_TAG/);
+        assert.match(tagCheck.run, /\[ "\$sha" != "\$GITHUB_SHA" \]/);
+        const nodeSetup = steps.find((step) => step.uses === 'actions/setup-node@v7.0.0');
+        assert.equal(nodeSetup.with['node-version'], '24.21.0');
+        const publishScript = steps.find((step) => step.name === '📤 Publish verified public npm packages');
+        assert.match(publishScript.run, /npm 11\.5\.1 or newer/);
+        assert.match(publishScript.run, /pnpm exec node scripts\/publish-tool-packages\.mjs/);
+        const implementation = fs.readFileSync(path.join(scripts, 'publish-tool-packages.mjs'), 'utf8');
+        assert.match(implementation, /execFileSync\('pnpm', \['pack', '--pack-destination'/);
+        assert.match(
+            implementation,
+            /execFileSync\('npm', \['publish', tarballPath, '--access', 'public', '--provenance'\]/,
+        );
+        assert.match(implementation, /packageResponse\.status === 404/);
+        assert.match(implementation, /versionResponse\.status === 404\) return null/);
+        assert.match(implementation, /if \(!response\.ok\)/);
+        assert.match(implementation, /existingIntegrity !== packed\.integrity/);
+        assert.match(implementation, /assertPrerequisiteAvailable/);
     });
 
     it('packages released extensions and attaches VSIX files to GitHub releases', () => {
