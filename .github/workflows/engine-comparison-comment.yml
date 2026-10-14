@@ -25,60 +25,33 @@ jobs:
         permissions:
             actions: read
             contents: read
-            pull-requests: write
         steps:
+            - name: 🔑 Create benchmark comment token
+              id: app-token
+              uses: actions/create-github-app-token@v3.2.0
+              with:
+                  client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+                  private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+                  permission-actions: read
+                  permission-contents: write
+                  permission-issues: write
+                  permission-pull-requests: write
+
+            - name: 🕶️ Checkout trusted default-branch scripts
+              uses: actions/checkout@v7.0.1
+              with:
+                  ref: ${{ github.event.repository.default_branch }}
+
             - name: 🔎 Find benchmark artifacts and a matching baseline
               id: discover
               env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  GH_REPOSITORY: ${{ github.repository }}
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  GITHUB_API_URL: ${{ github.api_url }}
                   SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
                   PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
                   PR_BASE_SHA: ${{ github.event.workflow_run.pull_requests[0].base.sha }}
                   DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-              shell: bash
-              run: |
-                  set -euo pipefail
-
-                  source_artifact_id="$(gh api "repos/$GH_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts" \
-                      --jq '.artifacts[] | select(.name == "engine-comparison-report" and .expired == false) | .id' | head -n 1)"
-                  if [[ -z "$source_artifact_id" ]]; then
-                      echo "has_report=false" >> "$GITHUB_OUTPUT"
-                      echo "CI completed without an engine-comparison report artifact."
-                      exit 0
-                  fi
-
-                  base_sha="$PR_BASE_SHA"
-                  if [[ -z "$base_sha" ]]; then
-                      base_sha="$(gh api "repos/$GH_REPOSITORY/pulls/$PR_NUMBER" --jq '.base.sha')"
-                  fi
-
-                  baseline_run_id=""
-                  baseline_sha=""
-                  run_records="$(gh api "repos/$GH_REPOSITORY/actions/workflows/ci.yml/runs?branch=$DEFAULT_BRANCH&event=push&status=success&per_page=100" \
-                      --jq '.workflow_runs[] | [.id, .head_sha] | @tsv')"
-                  while IFS=$'\t' read -r candidate_run_id candidate_sha; do
-                      [[ -z "$candidate_run_id" ]] && continue
-                      comparison_status="$(gh api "repos/$GH_REPOSITORY/compare/$candidate_sha...$base_sha" --jq '.status')"
-                      if [[ "$comparison_status" != "identical" && "$comparison_status" != "ahead" ]]; then
-                          continue
-                      fi
-
-                      candidate_artifact_id="$(gh api "repos/$GH_REPOSITORY/actions/runs/$candidate_run_id/artifacts" \
-                          --jq '.artifacts[] | select(.name == "engine-comparison-report" and .expired == false) | .id' | head -n 1)"
-                      if [[ -n "$candidate_artifact_id" ]]; then
-                          baseline_run_id="$candidate_run_id"
-                          baseline_sha="$candidate_sha"
-                          break
-                      fi
-                  done <<< "$run_records"
-
-                  {
-                      echo "has_report=true"
-                      echo "pr_base_sha=$base_sha"
-                      echo "baseline_run_id=$baseline_run_id"
-                      echo "baseline_sha=$baseline_sha"
-                  } >> "$GITHUB_OUTPUT"
+              run: node scripts/engine-comparison-comment.mjs discover
 
             - name: 📥 Download current benchmark report
               if: steps.discover.outputs.has_report == 'true'
@@ -87,7 +60,7 @@ jobs:
                   name: engine-comparison-report
                   run-id: ${{ github.event.workflow_run.id }}
                   repository: ${{ github.repository }}
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  github-token: ${{ steps.app-token.outputs.token }}
                   path: ${{ runner.temp }}/engine-comparison-head
 
             - name: 📥 Download latest matching default-branch baseline
@@ -97,20 +70,37 @@ jobs:
                   name: engine-comparison-report
                   run-id: ${{ steps.discover.outputs.baseline_run_id }}
                   repository: ${{ github.repository }}
-                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  github-token: ${{ steps.app-token.outputs.token }}
                   path: ${{ runner.temp }}/engine-comparison-baseline
-
-            - name: 🕶️ Checkout trusted default-branch scripts
-              if: steps.discover.outputs.has_report == 'true'
-              uses: actions/checkout@v7.0.1
-              with:
-                  ref: ${{ github.event.repository.default_branch }}
 
             - name: 🚀 Bootstrap
               if: steps.discover.outputs.has_report == 'true'
               uses: ./.github/common/bootstrap
 
-            - name: 📈 Build benchmark comment and SVG chart
+            - name: 📈 Build benchmark SVG chart
+              if: steps.discover.outputs.has_report == 'true'
+              env:
+                  SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+                  CURRENT_SHA: ${{ github.event.workflow_run.pull_requests[0].head.sha }}
+                  BASELINE_SHA: ${{ steps.discover.outputs.baseline_sha }}
+                  BENCHMARK_JITTER_PERCENT: ${{ vars.BENCHMARK_JITTER_PERCENT || '10' }}
+                  ENGINE_COMPARISON_HEAD_RESULTS: ${{ runner.temp }}/engine-comparison-head/engine-comparison-results.json
+                  ENGINE_COMPARISON_BASELINE_RESULTS: ${{ steps.discover.outputs.baseline_run_id != '' && format('{0}/engine-comparison-baseline/engine-comparison-results.json', runner.temp) || '' }}
+                  BENCHMARK_CHANGE_SVG: ${{ runner.temp }}/engine-comparison-change.svg
+                  NO_BASELINE_REASON: No successful benchmark artifact was found on the default branch at or before base ${{ steps.discover.outputs.pr_base_sha }}.
+              run: node benchmarks/engine-comparison/scripts/build-benchmark-comment.ts
+
+            - name: 🖼️ Publish benchmark chart attachment
+              id: publish-chart
+              if: steps.discover.outputs.has_report == 'true'
+              env:
+                  GH_TOKEN: ${{ steps.app-token.outputs.token }}
+                  GITHUB_REPOSITORY_ID: ${{ github.event.repository.id }}
+                  GITHUB_SERVER_URL: ${{ github.server_url }}
+                  BENCHMARK_CHANGE_SVG: ${{ runner.temp }}/engine-comparison-change.svg
+              run: node scripts/engine-comparison-chart.mjs publish
+
+            - name: 📝 Build benchmark comment
               if: steps.discover.outputs.has_report == 'true'
               env:
                   SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -120,23 +110,15 @@ jobs:
                   ENGINE_COMPARISON_HEAD_RESULTS: ${{ runner.temp }}/engine-comparison-head/engine-comparison-results.json
                   ENGINE_COMPARISON_BASELINE_RESULTS: ${{ steps.discover.outputs.baseline_run_id != '' && format('{0}/engine-comparison-baseline/engine-comparison-results.json', runner.temp) || '' }}
                   BENCHMARK_COMMENT_FILE: ${{ runner.temp }}/engine-comparison-comment.md
-                  BENCHMARK_CHANGE_SVG: ${{ runner.temp }}/engine-comparison-change.svg
+                  BENCHMARK_CHANGE_SVG_URL: ${{ steps.publish-chart.outputs.chart_url }}
                   NO_BASELINE_REASON: No successful benchmark artifact was found on the default branch at or before base ${{ steps.discover.outputs.pr_base_sha }}.
               run: node benchmarks/engine-comparison/scripts/build-benchmark-comment.ts
-
-            - name: 📤 Upload benchmark change chart
-              if: steps.discover.outputs.has_report == 'true'
-              uses: actions/upload-artifact@v7.0.2
-              with:
-                  name: engine-comparison-change-chart
-                  path: ${{ runner.temp }}/engine-comparison-change.svg
-                  retention-days: 90
-                  if-no-files-found: error
 
             - name: 💬 Create or update the benchmark comment
               if: steps.discover.outputs.has_report == 'true'
               uses: marocchino/sticky-pull-request-comment@v3.0.5
               with:
+                  GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
                   header: engine-comparison-benchmark
                   number_force: ${{ github.event.workflow_run.pull_requests[0].number }}
                   path: ${{ runner.temp }}/engine-comparison-comment.md

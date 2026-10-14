@@ -30,7 +30,7 @@ export interface BenchmarkComparison {
 /** Inputs used to write a repeatable pull request comment for one benchmark run. */
 export interface BenchmarkCommentDetails {
     baselineSha?: string;
-    chartRunUrl?: string;
+    chartUrl?: string;
     comparison?: BenchmarkComparison;
     currentSha: string;
     noBaselineReason?: string;
@@ -181,15 +181,22 @@ export function formatBenchmarkComment(details: BenchmarkCommentDetails): string
     }
 
     lines.push(`[Full benchmark matrix report](${details.reportRunUrl}).`);
-    if (details.chartRunUrl) lines.push(`[Download the SVG comparison chart](${details.chartRunUrl}).`);
+    if (details.chartUrl) {
+        lines.push(
+            '',
+            `![Benchmark timing changes](${details.chartUrl})`,
+            '',
+            `[Download the SVG comparison chart](${details.chartUrl}).`,
+        );
+    }
     return lines.join('\n');
 }
 
 /**
- * Renders a compact Vega SVG bar chart of the largest timing changes for the workflow artifact.
+ * Renders a compact Vega SVG bar chart of the largest timing changes for the PR comment.
  *
  * @param comparison - Timing changes and jitter classification from a matrix comparison.
- * @returns Standalone SVG source suitable for an Actions artifact.
+ * @returns Standalone SVG source suitable for GitHub's image attachment upload.
  */
 export async function formatBenchmarkChangeSvg(comparison: BenchmarkComparison): Promise<string> {
     const changes = [...comparison.changes]

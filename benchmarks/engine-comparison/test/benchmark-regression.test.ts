@@ -53,6 +53,25 @@ it('shows warning, celebration, and regular outcomes in the PR comment', () => {
     }
 });
 
+it('embeds the SVG chart and links directly to it from the PR comment', () => {
+    const chartUrl = 'https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000';
+    const comparison = compareBenchmarkResults(
+        [engine('quickjs', [workload('slower', [125])])],
+        [engine('quickjs', [workload('slower', [100])])],
+    );
+    const comment = formatBenchmarkComment({
+        chartUrl,
+        comparison,
+        baselineSha: '1234567890abcdef',
+        currentSha: 'abcdef1234567890',
+        reportRunUrl: 'https://github.com/example/repo/actions/runs/123',
+    });
+
+    expect(comment).toContain(`![Benchmark timing changes](${chartUrl})`);
+    expect(comment).toContain(`[Download the SVG comparison chart](${chartUrl})`);
+    expect(comment).not.toContain('/actions/runs/123/artifacts');
+});
+
 it('renders a labeled SVG chart for the largest changes', async () => {
     const comparison = compareBenchmarkResults(
         [

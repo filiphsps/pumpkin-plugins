@@ -97,16 +97,17 @@ it('writes a PR comment and SVG from current and baseline result artifacts', () 
         const chartPath = path.join(temporaryDirectory, 'changes.svg');
         fs.writeFileSync(headResultsPath, JSON.stringify([createSingleWorkloadEngine('quickjs', 125)]));
         fs.writeFileSync(baselineResultsPath, JSON.stringify([createSingleWorkloadEngine('quickjs', 100)]));
+        const chartUrl = 'https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000';
 
         const result = runScript('build-benchmark-comment.ts', {
             ENGINE_COMPARISON_HEAD_RESULTS: headResultsPath,
             ENGINE_COMPARISON_BASELINE_RESULTS: baselineResultsPath,
             BENCHMARK_COMMENT_FILE: commentPath,
             BENCHMARK_CHANGE_SVG: chartPath,
+            BENCHMARK_CHANGE_SVG_URL: chartUrl,
             BASELINE_SHA: '1234567890abcdef',
             CURRENT_SHA: 'abcdef1234567890',
             GITHUB_REPOSITORY: 'example/repo',
-            GITHUB_RUN_ID: '789',
             GITHUB_SERVER_URL: 'https://github.com',
             SOURCE_RUN_ID: '456',
         });
@@ -117,7 +118,9 @@ it('writes a PR comment and SVG from current and baseline result artifacts', () 
         expect(comment.split('\n')[0]).toMatch(/regression/i);
         expect(comment).toContain('shared-workload');
         expect(comment).toContain('https://github.com/example/repo/actions/runs/456');
-        expect(comment).toContain('https://github.com/example/repo/actions/runs/789/artifacts');
+        expect(comment).toContain(`![Benchmark timing changes](${chartUrl})`);
+        expect(comment).toContain(`[Download the SVG comparison chart](${chartUrl})`);
+        expect(comment).not.toContain('/actions/runs/789/artifacts');
         expect(chart).toContain('<svg');
         expect(chart).toContain('shared-workload');
     } finally {

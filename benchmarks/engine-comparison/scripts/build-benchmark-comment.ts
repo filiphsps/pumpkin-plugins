@@ -19,28 +19,32 @@ const comparison = baselineResults ? compareBenchmarkResults(headResults, baseli
 const currentSha = requiredEnvironment('CURRENT_SHA');
 const baselineSha = baselineResults ? process.env.BASELINE_SHA : undefined;
 const reportRunUrl = `${requiredEnvironment('GITHUB_SERVER_URL')}/${repository}/actions/runs/${requiredEnvironment('SOURCE_RUN_ID')}`;
-const chartRunUrl = `${requiredEnvironment('GITHUB_SERVER_URL')}/${repository}/actions/runs/${requiredEnvironment('GITHUB_RUN_ID')}/artifacts`;
 const comment = formatBenchmarkComment({
     baselineSha,
+    chartUrl: process.env.BENCHMARK_CHANGE_SVG_URL,
     comparison,
     currentSha,
     noBaselineReason:
         process.env.NO_BASELINE_REASON ??
         'No successful default-branch benchmark is available at or before the PR base.',
     reportRunUrl,
-    chartRunUrl,
 });
 
-fs.writeFileSync(
-    requiredEnvironment('BENCHMARK_CHANGE_SVG'),
-    await formatBenchmarkChangeSvg(comparison ?? emptyComparison(jitterThreshold)),
-);
-const commentPath = requiredEnvironment('BENCHMARK_COMMENT_FILE');
-fs.writeFileSync(commentPath, `${comment}\n`);
-process.stdout.write(`Benchmark comment written to ${commentPath}\n`);
+const chartPath = process.env.BENCHMARK_CHANGE_SVG;
+if (chartPath) {
+    fs.writeFileSync(chartPath, await formatBenchmarkChangeSvg(comparison ?? emptyComparison(jitterThreshold)));
+    process.stdout.write(`Benchmark chart written to ${chartPath}\n`);
+}
+
+const commentPath = process.env.BENCHMARK_COMMENT_FILE;
+if (commentPath) {
+    fs.writeFileSync(commentPath, `${comment}\n`);
+    process.stdout.write(`Benchmark comment written to ${commentPath}\n`);
+}
+if (!chartPath && !commentPath) throw new Error('Set BENCHMARK_CHANGE_SVG or BENCHMARK_COMMENT_FILE');
 
 const summaryPath = process.env.GITHUB_STEP_SUMMARY;
-if (summaryPath) fs.appendFileSync(summaryPath, `${comment}\n`);
+if (summaryPath && commentPath) fs.appendFileSync(summaryPath, `${comment}\n`);
 
 function readEngineResults(filePath: string): EngineResult[] {
     const fileSizeBytes = fs.statSync(filePath).size;

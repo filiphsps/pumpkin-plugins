@@ -30,7 +30,7 @@ shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after change classification | Starts Static Hermes preparation while lint and typecheck run, then builds every production plugin with its configured engine (Static Hermes by default), runs integration checks, and rebuilds release artifacts with the same runtime before signing and verification |
 | 📊 Engine comparison | code changes, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`; nine engine configurations run as parallel matrix jobs, then a report job validates and combines their real-Pumpkin results |
-| 📈 Engine comparison comment | successful PR CI runs with a benchmark report | `.github/workflows/engine-comparison-comment.yml` compares with the latest matching default-branch report, updates one PR comment, and uploads an SVG timing-change chart |
+| 📈 Engine comparison comment | successful PR CI runs with a benchmark report | `.github/workflows/engine-comparison-comment.yml` compares with the latest matching default-branch report, updates one PR comment, and embeds an SVG timing-change chart |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
 | 🧬 Generator | code changes, after lint and build | Reuses the Static Hermes cache saved by Build, then generates a throwaway plugin and action, checks release registration and READMEs, tests the action, and typechecks, builds and integration-tests the plugin |
 | 🚢 Release | plugin, action or public tool release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; actions create GitHub releases, public tools publish npm tarballs, and plugins produce signed artifacts and Market listings |
@@ -192,12 +192,14 @@ release merges, preventing conflicts in the shared manifest and release configur
 refreshed PR goes through the README and pin preparation job again. Separate PRs keep a plugin
 that is not ready from being released with one that is.
 
-The release and release-PR preparation jobs authenticate with short-lived GitHub App installation
-tokens. The App is installed on this repository with `contents`, `issues` and `pull-requests` write
-permissions. Actions settings store its Client ID in the `RELEASE_APP_CLIENT_ID` repository variable
-and its private key in the `RELEASE_APP_PRIVATE_KEY` repository secret. Each job mints its own
-repository-scoped token; the release-PR job uses its token to push prepared README and pin updates,
-which trigger the normal pull-request CI checks.
+The release, release-PR preparation and benchmark-comment jobs authenticate with short-lived GitHub
+App installation tokens. The App is installed on this repository with `actions` read and `contents`,
+`issues` and `pull-requests` write permissions. Actions settings store its Client ID in the
+`RELEASE_APP_CLIENT_ID` repository variable and its private key in the `RELEASE_APP_PRIVATE_KEY`
+repository secret. Each job mints its own repository-scoped token; the release-PR job uses its token
+to push prepared README and pin updates, which trigger the normal pull-request CI checks. The
+benchmark-comment job uses its token to read cross-run artifacts and publish its SVG as a GitHub
+attachment embedded in the PR comment.
 
 `scripts/release.mjs` runs the pinned Release Please runtime through `pnpm dlx` and applies the
 pre-1.0.0 versioning policy to every configured component. For a current version below `1.0.0`,
@@ -421,10 +423,11 @@ These aren't done by the workflows:
 
 1. Settings, General, Pull Requests: enable **Allow rebase merging** only. Disable squash and merge
    commits.
-2. Create and install a GitHub App on this repository with `contents`, `issues` and `pull-requests`
-   write permissions. Add its Client ID as the `RELEASE_APP_CLIENT_ID` Actions variable and its
-   private key as the `RELEASE_APP_PRIVATE_KEY` Actions secret. The release jobs use its
-   installation tokens so release PRs and their updates trigger CI.
+2. Create and install a GitHub App on this repository with `actions` read and `contents`, `issues`
+   and `pull-requests` write permissions. Add its Client ID as the `RELEASE_APP_CLIENT_ID` Actions
+   variable and its private key as the `RELEASE_APP_PRIVATE_KEY` Actions secret. The release jobs
+   use its installation tokens so release PRs and their updates trigger CI; the benchmark-comment
+   job uses them to read artifacts from earlier workflow runs and upload its chart attachment.
 3. Add the Ed25519 signing key as the `PLUGIN_SIGNING_KEY` secret (see [Signing](#signing)).
    Non-release checks use an ephemeral key, but the release workflow requires this secret to publish
    signed artifacts.

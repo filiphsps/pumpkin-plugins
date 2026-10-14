@@ -47,8 +47,9 @@ ancestor of the PR base. Changes within 10% are treated as runner jitter by defa
 variable `BENCHMARK_JITTER_PERCENT` to change that threshold. A slower result beyond the threshold
 produces a warning, significant improvements produce a celebration when there are no regressions, and
 otherwise the comment reports the run without a performance alert. The comment links to the full
-matrix report and an SVG chart of the largest changes. If no matching baseline artifact exists, the
-comment reports that and does not classify timing changes.
+matrix report, embeds an SVG chart of the largest changes, and links directly to that chart for
+download. If no matching baseline artifact exists, the comment reports that and does not classify
+timing changes.
 
 The benchmark plugin and workload definitions are in [benchmark-plugin.ts](../benchmarks/engine-comparison/src/benchmark-plugin.ts) and [benchmark-workloads.ts](../benchmarks/engine-comparison/src/benchmark-workloads.ts).
 
