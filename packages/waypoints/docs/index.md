@@ -7,8 +7,12 @@ permission-marker groups. Players can find and teleport to enabled waypoints the
 have no creator ownership.
 
 Install `waypoints.wasm` in the Pumpkin server's `plugins/` directory and restart. The plugin has
-no config file. It stores versioned records in `plugins/data/Waypoints/waypoints.json` and keeps a
-byte-identical `waypoints.v1.json` backup when migrating the previous schema.
+no config file. It stores versioned records in `plugins/data/Waypoints/waypoints.json`. A v1
+migration copies `locatorBar.color` to the waypoint's v2 `color`. The Java adapter's
+`locatorBar.enabled` value did not control the whole waypoint, so it does not set v2 `enabled`, which
+defaults to `true`. V2 has no matching style or platform-adapter fields for Java `javaStyleId` or
+Bedrock `bedrockTexture`. The byte-identical `waypoints.v1.json` backup preserves all original v1
+settings.
 
 ## Create and use waypoints
 

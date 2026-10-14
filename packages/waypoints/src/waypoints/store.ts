@@ -149,6 +149,7 @@ export class WaypointStore {
                 name,
                 dimension: record.dimension,
                 position: { x: record.x, y: record.y, z: record.z },
+                color: record.color,
                 access: {
                     mode: record.visibility === 'public' ? 'public' : 'restricted',
                     grants,
@@ -214,6 +215,7 @@ export class WaypointStore {
 
 interface LegacyWaypoint {
     allowedPlayerIds: string[];
+    color?: string;
     dimension: string;
     id: string;
     name: string;
@@ -222,6 +224,13 @@ interface LegacyWaypoint {
     x: number;
     y: number;
     z: number;
+}
+
+interface LegacyLocatorSettings {
+    bedrockTexture?: string;
+    color?: string;
+    enabled: boolean;
+    javaStyleId?: string;
 }
 
 function validateV2(values: unknown[]): Waypoint[] {
@@ -276,6 +285,7 @@ function validateV1(values: unknown[]): LegacyWaypoint[] {
             x: value.x,
             y: value.y,
             z: value.z,
+            color: value.locatorBar.color,
             ownerId: value.ownerId,
             visibility: value.visibility,
             allowedPlayerIds: value.allowedPlayerIds,
@@ -298,7 +308,7 @@ function isLegacyCoordinate(value: unknown): value is number {
     return Number.isInteger(value) && (value as number) >= INT32_MIN && (value as number) <= INT32_MAX;
 }
 
-function isLegacyLocatorSettings(value: unknown): boolean {
+function isLegacyLocatorSettings(value: unknown): value is LegacyLocatorSettings {
     if (!isRecord(value) || typeof value.enabled !== 'boolean') return false;
     if (value.color !== undefined && (typeof value.color !== 'string' || !/^#[0-9A-F]{6}$/.test(value.color))) {
         return false;

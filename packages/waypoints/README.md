@@ -103,8 +103,12 @@ grants resolve online names and store UUIDs. Group grants check the permission m
 `Waypoints:group.<slug>`; another permission provider must assign that marker to group members.
 
 The versioned store is `plugins/data/Waypoints/waypoints.json`. If it is malformed or has an
-unsupported schema, the plugin preserves it and refuses writes until the issue is corrected. A
-successful v1 migration keeps the original bytes in `waypoints.v1.json`.
+unsupported schema, the plugin preserves it and refuses writes until the issue is corrected. A v1
+migration copies `locatorBar.color` to the waypoint's v2 `color`. The Java adapter's
+`locatorBar.enabled` value did not control the whole waypoint, so it does not set v2 `enabled`, which
+defaults to `true`. V2 has no matching style or platform-adapter fields for Java `javaStyleId` or
+Bedrock `bedrockTexture`. The byte-identical `waypoints.v1.json` backup preserves all original v1
+settings.
 
 ## Java waypoint HUD
 
