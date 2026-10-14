@@ -81,10 +81,13 @@ and runs its CLI without an ambient TypeScript installation. Run
 `pnpm run test:external-consumer --build-cli-only` to check that packaging boundary without compiling
 the starter components.
 
-Ports come from 20000 to 30000, below the range the operating system hands out for connections
-(32768 up on Linux, 49152 on macOS and Windows), so nothing that connects while a server is starting
-can take the port a test was given. A server that still finds one of its ports taken is started again
-on ports of its own, three times over, before the start is failed.
+Ports come from 20000 to 30000, below the common default ephemeral-port range starts (32768 on Linux
+and 49152 on macOS and Windows). Operating systems let that range be reconfigured, so this is not a
+guarantee that they will never allocate one of these ports. Before returning a port, the harness
+probes whether TCP and UDP loopback binds are available and avoids handing out the same port twice
+within its process. Another process can still claim a port before Pumpkin binds it. If Pumpkin
+reports `Address already in use` during startup, the harness retries up to three total starts, each
+with newly selected ports.
 
 ## The server binary
 

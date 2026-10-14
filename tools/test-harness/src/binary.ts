@@ -9,10 +9,17 @@ function downloadUrl(file: string): string {
     return `https://github.com/Pumpkin-MC/Pumpkin/releases/download/${encodeURIComponent(PUMPKIN_RELEASE)}/${file}`;
 }
 
+function verifyChecksum(asset: string, bytes: Buffer, expected: string): void {
+    const actual = createHash('sha256').update(bytes).digest('hex');
+    if (actual !== expected) {
+        throw new Error(`Checksum mismatch for ${asset}: expected ${expected}, got ${actual}`);
+    }
+}
+
 /**
- * Returns the Pumpkin binary to test against: `PUMPKIN_BIN` if set, otherwise the pinned
- * release, downloaded once into `PUMPKIN_CACHE_DIR` (default `<repo>/.cache/pumpkin`) and
- * verified against the release's checksums.sha256.
+ * Returns `PUMPKIN_BIN` when set; otherwise returns the pinned release binary from
+ * `PUMPKIN_CACHE_DIR` (default `<repo>/.cache/pumpkin`), checking downloads and cached files
+ * against the release's `checksums.sha256`.
  */
 export async function resolvePumpkinBinary(): Promise<string> {
     const override = process.env.PUMPKIN_BIN;
@@ -24,21 +31,21 @@ export async function resolvePumpkinBinary(): Promise<string> {
     const asset = assetName(process.platform, process.arch);
     const cacheDir = process.env.PUMPKIN_CACHE_DIR ?? path.join(REPO_ROOT, '.cache/pumpkin');
     const target = path.join(cacheDir, `${PUMPKIN_RELEASE}-${asset}`);
-    if (fs.existsSync(target)) return target;
-
-    fs.mkdirSync(cacheDir, { recursive: true });
     const sums = parseChecksums(await fetchText(downloadUrl('checksums.sha256')));
     const expected = sums.get(asset);
     if (!expected) throw new Error(`checksums.sha256 for ${PUMPKIN_RELEASE} has no entry for ${asset}`);
 
+    if (fs.existsSync(target)) {
+        verifyChecksum(asset, fs.readFileSync(target), expected);
+        return target;
+    }
+
+    fs.mkdirSync(cacheDir, { recursive: true });
     console.log(`Downloading Pumpkin ${PUMPKIN_RELEASE} (${asset})...`);
     const res = await fetch(downloadUrl(asset));
     if (!res.ok) throw new Error(`Downloading ${asset} failed: HTTP ${res.status}`);
     const bytes = Buffer.from(await res.arrayBuffer());
-    const actual = createHash('sha256').update(bytes).digest('hex');
-    if (actual !== expected) {
-        throw new Error(`Checksum mismatch for ${asset}: expected ${expected}, got ${actual}`);
-    }
+    verifyChecksum(asset, bytes, expected);
 
     // Write to a temp name first so a concurrent or interrupted run never sees a partial file.
     const partial = `${target}.${process.pid}.partial`;

@@ -11,7 +11,10 @@ export interface ServerDirOptions {
     config?: Record<string, unknown>;
     /** Files to create before startup, keyed by path relative to the server directory. */
     files?: Record<string, string | Uint8Array>;
-    /** Paths to built plugin `.wasm` files, copied into the server's `plugins/` folder. */
+    /**
+     * Paths to built plugin `.wasm` files copied into the server's `plugins/` folder.
+     * Basenames must be unique ignoring case.
+     */
     plugins?: string[];
 }
 
@@ -23,6 +26,38 @@ export interface ServerDir {
     dir: string;
     /** Port of the Java edition listener. */
     javaPort: number;
+}
+
+function resolveServerFilePath(dir: string, relative: string): string {
+    const file = path.resolve(dir, relative);
+    const relativeToDir = path.relative(dir, file);
+    const windowsRoot = 'C:\\pumpkin-test-validation-root';
+    const windowsFile = path.win32.resolve(windowsRoot, relative);
+    const relativeToWindowsRoot = path.win32.relative(windowsRoot, windowsFile);
+    const hasRoot = path.isAbsolute(relative) || path.win32.parse(relative).root !== '';
+    const escapesDirectory =
+        relativeToDir === '..' ||
+        relativeToDir.startsWith(`..${path.sep}`) ||
+        relativeToWindowsRoot === '..' ||
+        relativeToWindowsRoot.startsWith(`..${path.win32.sep}`);
+
+    if (hasRoot || escapesDirectory) {
+        throw new Error(`Seeded file path must be relative to and remain inside the server directory: ${relative}`);
+    }
+
+    return file;
+}
+
+function assertUniquePluginBasenames(plugins: readonly string[]): void {
+    const seen = new Map<string, string>();
+    for (const plugin of plugins) {
+        const basename = path.basename(plugin);
+        const key = basename.toLowerCase();
+        if (seen.has(key)) {
+            throw new Error(`Plugin paths collide in the server's plugins folder: ${seen.get(key)} and ${basename}`);
+        }
+        seen.set(key, basename);
+    }
 }
 
 /**
@@ -52,20 +87,35 @@ export function baseConfig(javaPort: number, bedrockPort: number): Record<string
  * @returns The directory and the ports chosen.
  */
 export async function prepareServerDir(options: ServerDirOptions = {}): Promise<ServerDir> {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-test-'));
-    const javaPort = await freePort();
-    const bedrockPort = await freePort();
+    const plugins = options.plugins ?? [];
+    assertUniquePluginBasenames(plugins);
 
-    fs.mkdirSync(path.join(dir, 'plugins'));
-    for (const plugin of options.plugins ?? []) {
-        fs.copyFileSync(plugin, path.join(dir, 'plugins', path.basename(plugin)));
+    const files = Object.entries(options.files ?? {});
+    const validationRoot = path.join(os.tmpdir(), 'pumpkin-test-validation-root');
+    for (const [relative] of files) resolveServerFilePath(validationRoot, relative);
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-test-'));
+    try {
+        const javaPort = await freePort();
+        const bedrockPort = await freePort();
+        const fileTargets = files.map(([relative, content]) => ({
+            content,
+            file: resolveServerFilePath(dir, relative),
+        }));
+
+        fs.mkdirSync(path.join(dir, 'plugins'));
+        for (const plugin of plugins) {
+            fs.copyFileSync(plugin, path.join(dir, 'plugins', path.basename(plugin)));
+        }
+        for (const { file, content } of fileTargets) {
+            fs.mkdirSync(path.dirname(file), { recursive: true });
+            fs.writeFileSync(file, content);
+        }
+        const config = deepMerge(baseConfig(javaPort, bedrockPort), options.config ?? {});
+        fs.writeFileSync(path.join(dir, 'pumpkin.toml'), stringify(config));
+        return { dir, javaPort, bedrockPort };
+    } catch (error) {
+        fs.rmSync(dir, { recursive: true, force: true });
+        throw error;
     }
-    for (const [relative, content] of Object.entries(options.files ?? {})) {
-        const file = path.join(dir, relative);
-        fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, content);
-    }
-    const config = deepMerge(baseConfig(javaPort, bedrockPort), options.config ?? {});
-    fs.writeFileSync(path.join(dir, 'pumpkin.toml'), stringify(config));
-    return { dir, javaPort, bedrockPort };
 }

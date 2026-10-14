@@ -1,7 +1,7 @@
 import * as dgram from 'node:dgram';
 import * as net from 'node:net';
-import { describe, expect, it } from 'vitest';
-import { freePort } from './ports.ts';
+import { describe, expect, it, vi } from 'vitest';
+import { freePort, udpFree } from './ports.ts';
 
 /** The lowest port the OS hands out for itself: 32768 on Linux, 49152 on macOS and Windows. */
 const FIRST_EPHEMERAL_PORT = 32_768;
@@ -23,6 +23,19 @@ const bind = (port: number) =>
 const closed = (what: net.Server | dgram.Socket) => new Promise<void>((resolve) => what.close(() => resolve()));
 
 describe('freePort', () => {
+    it('closes its socket when the UDP bind fails', async () => {
+        const occupied = await bind(0);
+        const close = vi.spyOn(dgram.Socket.prototype, 'close');
+
+        try {
+            expect(await udpFree(occupied.address().port)).toBe(false);
+            expect(close).toHaveBeenCalledTimes(1);
+        } finally {
+            close.mockRestore();
+            await closed(occupied);
+        }
+    });
+
     it('gives a port below the range the OS hands out for itself', async () => {
         // A port from that range can be taken by anything connecting while the server starts.
         expect(await freePort()).toBeLessThan(FIRST_EPHEMERAL_PORT);
