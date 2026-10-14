@@ -38,6 +38,7 @@ import { PumpkinLightWorld } from './platform/pumpkin-light-world.ts';
 
 /** The plugin. Pumpkin creates it once and calls `onLoad` when the server starts. */
 class DynamicLightsPumpkin extends PluginBase {
+    private dataDir: WasiDataDir | undefined;
     private tracker: ClientLightTracker | undefined;
     private entityTracker: EntityLightTracker | undefined;
     private lightLevels: HeldItemLightLevels | undefined;
@@ -66,6 +67,16 @@ class DynamicLightsPumpkin extends PluginBase {
             logging.log('error', `${ansi.named.name(info.name)} needs its data-folder permissions to run`);
             return;
         }
+        this.dataDir = files;
+        try {
+            this.initializePlugin(ctx, files, clientLightStates);
+        } catch (error) {
+            this.disposeDataDir();
+            throw error;
+        }
+    }
+
+    private initializePlugin(ctx: Context, files: WasiDataDir, clientLightStates: (level: number) => number): void {
         const config = loadPluginConfig(files, (level, message) =>
             logging.log(level, `${ansi.named.name(info.name)}: ${message}`),
         );
@@ -198,25 +209,35 @@ class DynamicLightsPumpkin extends PluginBase {
 
     /** Drops tracked client overrides before Pumpkin unloads the plugin. */
     protected override onPluginUnload(ctx: Context): void {
-        for (const task of this.delayedTasks) cancelTask(task);
-        this.delayedTasks.clear();
-        this.pendingSyncs.clear();
-        if (this.entityTask !== undefined) cancelTask(this.entityTask);
-        this.entityTask = undefined;
-        const server = ctx.getServer();
         try {
-            const players = server.getAllPlayers();
+            for (const task of this.delayedTasks) cancelTask(task);
+            this.delayedTasks.clear();
+            this.pendingSyncs.clear();
+            if (this.entityTask !== undefined) cancelTask(this.entityTask);
+            this.entityTask = undefined;
+            const server = ctx.getServer();
             try {
-                for (const player of players) this.tracker?.reset(player.getName(), player);
+                const players = server.getAllPlayers();
+                try {
+                    for (const player of players) this.tracker?.reset(player.getName(), player);
+                } finally {
+                    for (const player of players) disposeWasiResource(player);
+                }
             } finally {
-                for (const player of players) disposeWasiResource(player);
+                disposeWasiResource(server);
             }
         } finally {
-            disposeWasiResource(server);
+            this.tracker?.clear();
+            this.playerBlockPositions.clear();
+            this.playerWorlds.clear();
+            this.disposeDataDir();
         }
-        this.tracker?.clear();
-        this.playerBlockPositions.clear();
-        this.playerWorlds.clear();
+    }
+
+    private disposeDataDir(): void {
+        const files = this.dataDir;
+        this.dataDir = undefined;
+        disposeWasiResource(files);
     }
 
     private syncPlayer(player: PlayerJoinEventData['player']): void {
