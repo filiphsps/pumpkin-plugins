@@ -6,9 +6,12 @@ import { afterEach, describe, it } from 'node:test';
 import { partitionReleasePaths } from './release-fanout.mjs';
 import {
     assertPackedBuilderDependencies,
+    assertPackedDependencySpecs,
     assertPublicToolPackage,
     assertPublicToolPackageContents,
     assertStarterToolDependencies,
+    getPublicToolReleasePrerequisites,
+    orderPublicToolReleasePaths,
     parseTarEntries,
     syncStarterToolDependencies,
 } from './tool-packages.mjs';
@@ -78,6 +81,95 @@ describe('public tool package metadata', () => {
         assert.throws(
             () => assertPublicToolPackage({ ...metadata, engines: undefined }, '@pumpkin-plugins/build'),
             /engines.node must be >=24\.21\.0/,
+        );
+    });
+
+    it('rejects unresolved workspace and catalog specs in packed dependency fields', () => {
+        assert.doesNotThrow(() =>
+            assertPackedDependencySpecs({
+                dependencies: { '@pumpkin-plugins/pumpkin-api': '0.1.0' },
+                peerDependencies: { typescript: '^6.0.0' },
+            }),
+        );
+        assert.throws(
+            () => assertPackedDependencySpecs({ dependencies: { api: 'workspace:*' } }),
+            /unresolved dependency spec.*api.*workspace:\*/,
+        );
+        assert.throws(
+            () => assertPackedDependencySpecs({ optionalDependencies: { cli: 'catalog:' } }),
+            /unresolved dependency spec.*cli.*catalog:/,
+        );
+    });
+});
+
+describe('public tool release order and prerequisites', () => {
+    const canonicalOrder = [
+        'tools/pumpkin-api',
+        'tools/static-hermes-runtime',
+        'tools/build',
+        'tools/create-pumpkin-plugin',
+        'tools/codemod',
+        'tools/cspell-dict-minecraft',
+    ];
+
+    it('orders any selected public paths canonically and rejects unknown or duplicate paths', () => {
+        assert.deepEqual(orderPublicToolReleasePaths([...canonicalOrder].reverse()), canonicalOrder);
+        assert.deepEqual(orderPublicToolReleasePaths(['tools/codemod', 'tools/pumpkin-api']), [
+            'tools/pumpkin-api',
+            'tools/codemod',
+        ]);
+        assert.throws(() => orderPublicToolReleasePaths(['tools/not-public']), /unknown public tool release path/);
+        assert.throws(
+            () => orderPublicToolReleasePaths(['tools/codemod', 'tools/codemod']),
+            /duplicate public tool release path/,
+        );
+    });
+
+    it('derives exact builder production prerequisites without treating development dependencies as prerequisites', () => {
+        assert.deepEqual(
+            getPublicToolReleasePrerequisites('tools/build', {
+                dependencies: {
+                    '@pumpkin-plugins/pumpkin-api': '0.2.0',
+                    '@pumpkin-plugins/static-hermes-runtime': '0.4.1',
+                },
+                devDependencies: { '@pumpkin-plugins/minecraft-colors': '0.3.0' },
+            }),
+            [
+                { packageName: '@pumpkin-plugins/pumpkin-api', version: '0.2.0' },
+                { packageName: '@pumpkin-plugins/static-hermes-runtime', version: '0.4.1' },
+            ],
+        );
+        assert.deepEqual(
+            getPublicToolReleasePrerequisites('tools/static-hermes-runtime', {
+                devDependencies: { '@pumpkin-plugins/pumpkin-api': '0.2.0' },
+            }),
+            [],
+        );
+    });
+
+    it('derives creator prerequisites only after both templates match the exact public versions', () => {
+        const versions = {
+            '@pumpkin-plugins/pumpkin-api': '0.2.0',
+            '@pumpkin-plugins/build': '0.3.4',
+        };
+        const templates = [
+            { dependencies: { '@pumpkin-plugins/pumpkin-api': '^0.2.0', '@pumpkin-plugins/build': '^0.3.4' } },
+            { dependencies: { '@pumpkin-plugins/pumpkin-api': '^0.2.0', '@pumpkin-plugins/build': '^0.3.4' } },
+        ];
+
+        assert.deepEqual(getPublicToolReleasePrerequisites('tools/create-pumpkin-plugin', {}, versions, templates), [
+            { packageName: '@pumpkin-plugins/pumpkin-api', version: '0.2.0' },
+            { packageName: '@pumpkin-plugins/build', version: '0.3.4' },
+        ]);
+        assert.throws(
+            () =>
+                getPublicToolReleasePrerequisites(
+                    'tools/create-pumpkin-plugin',
+                    {},
+                    versions,
+                    [templates[0], { dependencies: { ...templates[1].dependencies, '@pumpkin-plugins/build': '^0.3.3' } }],
+                ),
+            /starter dependency must be \^0\.3\.4/,
         );
     });
 });

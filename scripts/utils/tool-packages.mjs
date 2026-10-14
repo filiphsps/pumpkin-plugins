@@ -11,6 +11,16 @@ export const PUBLIC_TOOL_PACKAGE_PATHS = Object.freeze({
     'tools/cspell-dict-minecraft': '@pumpkin-plugins/cspell-dict-minecraft',
 });
 
+/** Public npm package release order, with internal prerequisites preceding their consumers. */
+export const PUBLIC_TOOL_RELEASE_ORDER = Object.freeze([
+    'tools/pumpkin-api',
+    'tools/static-hermes-runtime',
+    'tools/build',
+    'tools/create-pumpkin-plugin',
+    'tools/codemod',
+    'tools/cspell-dict-minecraft',
+]);
+
 const STARTER_TOOL_PACKAGE_PATHS = Object.freeze({
     '@pumpkin-plugins/pumpkin-api': 'tools/pumpkin-api',
     '@pumpkin-plugins/build': 'tools/build',
@@ -86,7 +96,90 @@ export function assertPublicToolPackage(packageJson, expectedName) {
     if (packageJson.engines?.node !== '>=24.21.0') {
         throw new Error(`${expectedName} engines.node must be >=24.21.0`);
     }
+    assertPackedDependencySpecs(packageJson);
     assertVersion(packageJson.version, `${expectedName} version`);
+}
+
+/**
+ * Rejects dependency fields that still contain pnpm-only workspace or catalog references.
+ *
+ * @param {Record<string, unknown>} packageJson - The packed package metadata to inspect.
+ * @returns {void}
+ * @throws {Error} When a dependency field contains an unresolved pnpm specifier.
+ */
+export function assertPackedDependencySpecs(packageJson) {
+    for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies', 'devDependencies']) {
+        const dependencies = packageJson[field];
+        if (!dependencies || typeof dependencies !== 'object' || Array.isArray(dependencies)) continue;
+        for (const [packageName, spec] of Object.entries(dependencies)) {
+            if (typeof spec === 'string' && /^(?:workspace|catalog):/.test(spec)) {
+                throw new Error(`packed package has an unresolved dependency spec for ${packageName}: ${spec}`);
+            }
+        }
+    }
+}
+
+/**
+ * Orders a selected set of public tool paths and rejects invalid release selections.
+ *
+ * @param {string[]} selectedPaths - Public tool workspace paths selected by the release workflow.
+ * @returns {string[]} Selected paths in canonical publication order.
+ * @throws {Error} When a path is unknown or appears more than once.
+ */
+export function orderPublicToolReleasePaths(selectedPaths) {
+    const selected = new Set();
+    for (const packagePath of selectedPaths) {
+        if (!Object.hasOwn(PUBLIC_TOOL_PACKAGE_PATHS, packagePath)) {
+            throw new Error(`unknown public tool release path: ${String(packagePath)}`);
+        }
+        if (selected.has(packagePath)) throw new Error(`duplicate public tool release path: ${packagePath}`);
+        selected.add(packagePath);
+    }
+    return PUBLIC_TOOL_RELEASE_ORDER.filter((packagePath) => selected.has(packagePath));
+}
+
+/**
+ * Resolves the public package versions that must exist before a tool can be published.
+ *
+ * @param {string} packagePath - Repository path identifying the public tool package.
+ * @param {Record<string, unknown>} packageJson - The packed package metadata.
+ * @param {Record<string, string>} [packageVersions] - Exact API and builder versions represented by packed tools.
+ * @param {Record<string, unknown>[]} [starterTemplatePackageJsons] - Both packed creator template manifests.
+ * @returns {{ packageName: string; version: string }[]} Internal public production prerequisites.
+ * @throws {Error} When a required dependency or creator template does not resolve to an exact public version.
+ */
+export function getPublicToolReleasePrerequisites(
+    packagePath,
+    packageJson,
+    packageVersions = {},
+    starterTemplatePackageJsons = [],
+) {
+    if (!Object.hasOwn(PUBLIC_TOOL_PACKAGE_PATHS, packagePath)) {
+        throw new Error(`unknown public tool release path: ${String(packagePath)}`);
+    }
+
+    if (packagePath === 'tools/build') {
+        return BUILDER_TOOL_PACKAGE_NAMES.map((packageName) => {
+            const version = packageJson.dependencies?.[packageName];
+            assertVersion(version, `${packageName} packed builder dependency`);
+            return { packageName, version };
+        });
+    }
+
+    if (packagePath === 'tools/create-pumpkin-plugin') {
+        if (starterTemplatePackageJsons.length !== TEMPLATE_LANGUAGES.length) {
+            throw new Error('both packed creator template manifests are required to resolve publication prerequisites');
+        }
+        for (const templatePackageJson of starterTemplatePackageJsons) {
+            assertStarterToolDependencies(templatePackageJson, packageVersions);
+        }
+        return Object.entries(STARTER_TOOL_PACKAGE_PATHS).map(([packageName]) => ({
+            packageName,
+            version: packageVersions[packageName],
+        }));
+    }
+
+    return [];
 }
 
 /**
