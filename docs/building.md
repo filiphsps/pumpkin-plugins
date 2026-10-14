@@ -170,9 +170,9 @@ Hermes runtime dependency before plugin builds or typechecks. For direct package
 fresh checkout, run `pnpm --filter @pumpkin-plugins/static-hermes-runtime build` and
 `pnpm --filter @pumpkin-plugins/build build` first.
 
-The build tool and test harness `typecheck` tasks run `tsc --noEmit`, so their package-level Turbo
-configurations declare no outputs. Plugin typechecks keep the root `build/types/**` outputs because
-they generate guest declarations needed by builds and editors.
+The build tool, signing tool, plugin creator and test harness `typecheck` tasks run `tsc --noEmit`,
+so their package-level Turbo configurations declare no outputs. Plugin typechecks keep the root
+`build/types/**` outputs because they generate guest declarations needed by builds and editors.
 
 Things to know when changing `turbo.json`:
 
