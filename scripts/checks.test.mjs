@@ -45,12 +45,19 @@ describe('setup-static-hermes action', () => {
     const steps = action.runs.steps;
     const step = (id) => steps.find((candidate) => candidate.id === id);
 
-    it('reads configured toolchain versions and uses them in cache keys', () => {
+    it('uses pinned host tool and toolchain versions in cache keys', () => {
         const versionScript = step('versions').run;
         assert.match(versionScript, /wasi-sdk\.lock\.json/);
         assert.match(versionScript, /toolchain-versions\.json/);
         assert.match(versionScript, /\.tools\["wit-bindgen"\]/);
         assert.match(versionScript, /\.tools\.rust/);
+        assert.match(versionScript, /cmake-version=4\.4\.4/);
+        assert.match(versionScript, /ninja-version=1\.13\.2/);
+
+        const hostToolsCache = step('host-tools-cache').with;
+        assert.match(hostToolsCache.path, /host-tools/);
+        assert.match(hostToolsCache.key, /steps\.versions\.outputs\.cmake-version/);
+        assert.match(hostToolsCache.key, /steps\.versions\.outputs\.ninja-version/);
 
         const witBindgenCache = step('wit-bindgen-cache').with;
         assert.match(witBindgenCache.path, /wit-bindgen-\$\{\{ steps\.versions\.outputs\.wit-bindgen-version \}\}/);
@@ -59,14 +66,34 @@ describe('setup-static-hermes action', () => {
 
         const hermesCache = step('hermes-workspace-cache').with;
         assert.match(hermesCache.path, /\.cache\/hermes/);
-        assert.match(hermesCache.key, /static-hermes-workspace-cache-v5/);
+        assert.match(hermesCache.key, /static-hermes-workspace-cache-v6/);
         assert.match(hermesCache.key, /src\/hermes/);
         assert.match(hermesCache.key, /src\/cli\.ts/);
         assert.doesNotMatch(hermesCache.key, /bin\/toolchain-environment\.mjs/);
+        assert.match(hermesCache.key, /steps\.versions\.outputs\.cmake-version/);
+        assert.match(hermesCache.key, /steps\.versions\.outputs\.ninja-version/);
         assert.match(hermesCache.key, /steps\.versions\.outputs\.wasi-sdk-version/);
         assert.match(hermesCache.key, /steps\.versions\.outputs\.wit-bindgen-version/);
         assert.match(hermesCache.key, /steps\.versions\.outputs\.rust-toolchain-version/);
         assert.doesNotMatch(`${witBindgenCache.key} ${hermesCache.key}`, /wasi-sdk-34|wit-bindgen-0\.62|rust-1\.99/);
+    });
+});
+
+describe('external consumer workflow', () => {
+    const workflow = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/external-consumer.yml'), 'utf8'));
+
+    it('accepts Ninja build suffixes while checking the pinned version on Windows', () => {
+        const verifier = workflow.jobs['external-consumer'].steps.find(
+            (step) => step.name === '🔎 Verify pinned Ninja executable on Windows',
+        );
+
+        assert.match(verifier.run, /\$versionPattern = '\^' \+ \[regex\]::Escape\(\$env:NINJA_VERSION\)/);
+        assert.match(verifier.run, /\$version -notmatch \$versionPattern/);
+
+        const pinnedVersion = '1.13.2';
+        const versionPattern = new RegExp(`^${pinnedVersion.replaceAll('.', '\\.')}(?:$|[.+-])`);
+        assert.match('1.13.2.git.kitware.jobserver-pipe-1', versionPattern);
+        assert.doesNotMatch('1.13.20', versionPattern);
     });
 });
 

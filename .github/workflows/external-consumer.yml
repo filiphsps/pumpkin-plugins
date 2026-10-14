@@ -74,7 +74,8 @@ jobs:
                       throw "Expected pinned Ninja at '$expected', but PATH resolved '$actual'"
                   }
                   $version = (& $actual --version).Trim()
-                  if ($version -ne $env:NINJA_VERSION) {
+                  $versionPattern = '^' + [regex]::Escape($env:NINJA_VERSION) + '(?:$|[.+-])'
+                  if ($version -notmatch $versionPattern) {
                       throw "Expected Ninja $env:NINJA_VERSION at '$actual', got '$version'"
                   }
 
