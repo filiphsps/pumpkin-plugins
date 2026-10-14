@@ -6,62 +6,9 @@ import * as path from 'node:path';
 import { startPumpkin } from '@pumpkin-plugins/test-harness';
 import { expect, it } from 'vitest';
 import { type EngineResult, formatConsoleReport, formatReport } from './engine-comparison-report.ts';
+import { createEngineVariants, type EngineVariant } from './engine-variants.ts';
 
-interface EngineVariant {
-    id: string;
-    label: string;
-    pluginEngine: 'quickjs' | 'static-hermes';
-    staticHermesRuntime?: 'full' | 'lean';
-    staticHermesGc?: 'hades' | 'malloc';
-    runtimeSourceCompilation: boolean;
-    expectedUnicodePropertyEscapes: () => boolean;
-}
-
-const engineVariants: EngineVariant[] = [
-    {
-        id: 'quickjs',
-        label: 'QuickJS',
-        pluginEngine: 'quickjs',
-        runtimeSourceCompilation: true,
-        expectedUnicodePropertyEscapes: () => true
-    },
-    {
-        id: 'static-hermes-full',
-        label: 'Static Hermes full, Hades GC',
-        pluginEngine: 'static-hermes',
-        staticHermesRuntime: 'full',
-        staticHermesGc: 'hades',
-        runtimeSourceCompilation: true,
-        expectedUnicodePropertyEscapes: () => process.env.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0'
-    },
-    {
-        id: 'static-hermes-full-malloc',
-        label: 'Static Hermes full, malloc GC',
-        pluginEngine: 'static-hermes',
-        staticHermesRuntime: 'full',
-        staticHermesGc: 'malloc',
-        runtimeSourceCompilation: true,
-        expectedUnicodePropertyEscapes: () => process.env.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0'
-    },
-    {
-        id: 'static-hermes-lean',
-        label: 'Static Hermes lean, Hades GC',
-        pluginEngine: 'static-hermes',
-        staticHermesRuntime: 'lean',
-        staticHermesGc: 'hades',
-        runtimeSourceCompilation: false,
-        expectedUnicodePropertyEscapes: () => process.env.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0'
-    },
-    {
-        id: 'static-hermes-lean-malloc',
-        label: 'Static Hermes lean, malloc GC',
-        pluginEngine: 'static-hermes',
-        staticHermesRuntime: 'lean',
-        staticHermesGc: 'malloc',
-        runtimeSourceCompilation: false,
-        expectedUnicodePropertyEscapes: () => process.env.STATIC_HERMES_ENABLE_UNICODE_REGEXP_PROPERTY_ESCAPES !== '0'
-    }
-];
+const engineVariants = createEngineVariants();
 const sizeBaselineEngineId = 'quickjs';
 
 const benchmarkDir = path.resolve(import.meta.dirname, '..');
@@ -78,7 +25,7 @@ it('compares configured engines across component sizes, behavior, and matching w
 
     try {
         for (const variant of engineVariants) {
-            const { id, label, pluginEngine, staticHermesRuntime, staticHermesGc } = variant;
+            const { id, label, pluginEngine, staticHermesRuntime, staticHermesGc, parseTypeScript } = variant;
             const packageDir = path.join(temporaryDir, id);
             const sourceDir = path.join(packageDir, 'src');
             const apiLink = path.join(packageDir, 'node_modules/@pumpkin-plugins/pumpkin-api');
@@ -124,7 +71,9 @@ it('compares configured engines across component sizes, behavior, and matching w
                 )}\n`
             );
 
-            const buildOutput = execFileSync(process.execPath, [buildCli], {
+            const buildArguments = [buildCli];
+            if (parseTypeScript) buildArguments.push('--parse-ts');
+            const buildOutput = execFileSync(process.execPath, buildArguments, {
                 cwd: packageDir,
                 encoding: 'utf8',
                 env: {
@@ -134,6 +83,7 @@ it('compares configured engines across component sizes, behavior, and matching w
                 },
                 maxBuffer: 16 * 1024 * 1024
             });
+            expect(buildOutput.includes('-parse-ts'), `${label} parser mode`).toBe(parseTypeScript);
             console.log(`${label} build:\n${buildOutput.trim()}`);
 
             const wasmPath = path.join(packageDir, 'build/plugin.wasm');
@@ -174,12 +124,18 @@ it('compares configured engines across component sizes, behavior, and matching w
         validateApiBehavior(results, baseline);
         validateWorkloads(results, baseline);
 
-        const hermesVariants = engineVariants.filter(
-            ({ pluginEngine, staticHermesRuntime, staticHermesGc }) =>
-                pluginEngine === 'static-hermes' && staticHermesRuntime && staticHermesGc === 'hades'
+        const hermesRuntimeProfiles = new Set(
+            engineVariants
+                .filter(
+                    ({ pluginEngine, staticHermesRuntime, staticHermesGc }) =>
+                        pluginEngine === 'static-hermes' && staticHermesRuntime && staticHermesGc === 'hades'
+                )
+                .map(({ staticHermesRuntime }) => staticHermesRuntime)
         );
-        for (const { staticHermesRuntime } of hermesVariants) {
-            if (staticHermesRuntime) await verifyHermesStackGuard(temporaryDir, apiRoot, buildCli, staticHermesRuntime);
+        for (const staticHermesRuntime of hermesRuntimeProfiles) {
+            if (staticHermesRuntime) {
+                await verifyHermesStackGuard(temporaryDir, apiRoot, buildCli, staticHermesRuntime, hermesCacheDir);
+            }
         }
 
         const report = formatReport(results, baseline.id);
@@ -306,7 +262,8 @@ async function verifyHermesStackGuard(
     temporaryDir: string,
     apiRoot: string,
     buildCli: string,
-    runtimeVariant: 'full' | 'lean'
+    runtimeVariant: 'full' | 'lean',
+    hermesCacheDir: string
 ): Promise<void> {
     const packageDir = path.join(temporaryDir, `static-hermes-${runtimeVariant}-stack-guard`);
     const sourceDir = path.join(packageDir, 'src');
@@ -359,7 +316,7 @@ registerPlugin(new StackGuardPlugin());
             ...process.env,
             // This fixture checks runtime stack handling; production size limits have separate coverage.
             PUMPKIN_DEV_MODE: '1',
-            STATIC_HERMES_CACHE_DIR: path.join(temporaryDir, '.cache/hermes')
+            STATIC_HERMES_CACHE_DIR: hermesCacheDir
         },
         maxBuffer: 16 * 1024 * 1024
     });

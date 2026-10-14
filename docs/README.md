@@ -20,7 +20,7 @@
 | [Code style](code-style.md) | Biome, the JSDoc rule, and how code is organized and tested |
 | [Building](building.md) | The shared build tool, Turborepo setup, and runtime caveats |
 | [Testing](testing.md) | Unit tests and integration tests against a real Pumpkin server |
-| [Benchmarking](benchmarking.md) | QuickJS, full Hermes and lean Hermes workload and component comparisons |
+| [Benchmarking](benchmarking.md) | QuickJS and the Static Hermes profile, collector and parser matrix |
 | [Port forwarding](port-forwarding.md) | UPnP and NAT-PMP for plugins: the engine, UPnPumpkin, its API and how to test them |
 | [CI and releases](ci-and-releases.md) | The CI workflow, release-please, rebase-only merging and the market stub |
 | [Agent tooling](agent-tooling.md) | Agent guidance, skills, portable hooks and scoped check diagnostics |
