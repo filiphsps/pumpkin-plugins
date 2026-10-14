@@ -117,6 +117,7 @@ Tasks are defined in `turbo.json` and run with the root scripts (`pnpm build`, `
 | --- | --- |
 | `transit` | Does nothing; it carries a package's dependencies' hashes (see below) |
 | `build` | Caches `build/**` except `build/types/**`, plus package `dist/**` output |
+| `benchmark:build` | Caches the engine-comparison components and stack-guard fixtures, with separate output paths for each configuration |
 | `typecheck` | Caches the generated `build/types/**`, so a cache hit restores them |
 | `test` | Caches `dist/**` for the `static-hermes-runtime` package's test build |
 | `test:integration` | Depends on `build`, never cached (it starts a real server) |

@@ -1,151 +1,86 @@
-import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import { createRequire } from 'node:module';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { startPumpkin } from '@pumpkin-plugins/test-harness';
 import { expect, it } from 'vitest';
 import { type EngineResult, formatConsoleReport, formatReport } from './engine-comparison-report.ts';
-import { createEngineVariants, type EngineVariant } from './engine-variants.ts';
+import { createEngineVariants, type EngineVariant, getEngineVariantBuildOutput } from './engine-variants.ts';
 
 const engineVariants = createEngineVariants();
 const sizeBaselineEngineId = 'quickjs';
 
 const benchmarkDir = path.resolve(import.meta.dirname, '..');
-const repositoryDir = path.resolve(benchmarkDir, '../..');
-const buildCli = path.join(repositoryDir, 'tools/build/dist/cli.js');
-const benchmarkEntry = path.join(benchmarkDir, 'src/benchmark-plugin.ts');
-const benchmarkWorkloads = path.join(benchmarkDir, 'src/benchmark-workloads.ts');
-const apiRoot = path.dirname(createRequire(import.meta.url).resolve('@pumpkin-plugins/pumpkin-api/package.json'));
-it('compares configured engines across component sizes, behavior, and matching workloads', async () => {
-    const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-engine-comparison-'));
-    // Prefer CI's prepared toolchain; a fresh temp cache fetches WASI SDK release metadata again.
-    const hermesCacheDir = process.env.STATIC_HERMES_CACHE_DIR ?? path.join(temporaryDir, '.cache/hermes');
+it(
+    'compares configured engines across component sizes, behavior, and matching workloads',
+    compareEngineConfigurations,
+    Number.POSITIVE_INFINITY
+);
+
+async function compareEngineConfigurations(): Promise<void> {
     const results: EngineResult[] = [];
 
-    try {
-        for (const variant of engineVariants) {
-            const { id, label, pluginEngine, staticHermesRuntime, staticHermesGc, parseTypeScript } = variant;
-            const packageDir = path.join(temporaryDir, id);
-            const sourceDir = path.join(packageDir, 'src');
-            const apiLink = path.join(packageDir, 'node_modules/@pumpkin-plugins/pumpkin-api');
-            fs.mkdirSync(sourceDir, { recursive: true });
-            fs.mkdirSync(path.dirname(apiLink), { recursive: true });
-            fs.copyFileSync(benchmarkEntry, path.join(sourceDir, 'plugin.ts'));
-            fs.copyFileSync(benchmarkWorkloads, path.join(sourceDir, 'benchmark-workloads.ts'));
-            fs.symlinkSync(apiRoot, apiLink, 'dir');
-            fs.writeFileSync(
-                path.join(packageDir, 'package.json'),
-                `${JSON.stringify(
-                    {
-                        name: `runtime-benchmark-${id}`,
-                        version: '0.0.0',
-                        pumpkinPlugin: {
-                            entry: 'src/plugin.ts',
-                            output: 'build/plugin.wasm',
-                            engine: pluginEngine,
-                            wasi: [],
-                            ...(pluginEngine === 'static-hermes' && staticHermesRuntime ? { staticHermesRuntime } : {}),
-                            ...(pluginEngine === 'static-hermes' && staticHermesGc ? { staticHermesGc } : {})
-                        }
-                    },
-                    null,
-                    2
-                )}\n`
+    for (const variant of engineVariants) {
+        const { id, label } = variant;
+        const wasmPath = getEngineVariantBuildOutput(benchmarkDir, id);
+        expect(fs.existsSync(wasmPath), `${label} cached build is missing; run compare-engines to build it`).toBe(true);
+        const binarySizeBytes = fs.statSync(wasmPath).size;
+        expect(binarySizeBytes, `${label} produced an empty component`).toBeGreaterThan(0);
+
+        const server = await startPumpkin({
+            name: `runtime-benchmark-${id}`,
+            plugins: [wasmPath]
+        });
+        try {
+            const readyLine = await server.waitForLog(
+                /RUNTIME_BENCHMARK_READY|Failed to (?:load|initialize) plugin/,
+                60_000
             );
-            fs.writeFileSync(
-                path.join(packageDir, 'tsconfig.json'),
-                `${JSON.stringify(
-                    {
-                        compilerOptions: {
-                            target: 'ES2022',
-                            module: 'ESNext',
-                            moduleResolution: 'Bundler',
-                            strict: true,
-                            types: []
-                        },
-                        include: ['src/**/*.ts']
-                    },
-                    null,
-                    2
-                )}\n`
+            expect(readyLine, `${label} did not register its benchmark command: ${readyLine}`).toContain(
+                'RUNTIME_BENCHMARK_READY'
             );
-
-            const buildArguments = [buildCli];
-            if (parseTypeScript) buildArguments.push('--parse-ts');
-            const buildOutput = execFileSync(process.execPath, buildArguments, {
-                cwd: packageDir,
-                encoding: 'utf8',
-                env: {
-                    ...process.env,
-                    PUMPKIN_DEV_MODE: '0',
-                    STATIC_HERMES_CACHE_DIR: hermesCacheDir
-                },
-                maxBuffer: 16 * 1024 * 1024
-            });
-            expect(buildOutput.includes('-parse-ts'), `${label} parser mode`).toBe(parseTypeScript);
-            console.log(`${label} build:\n${buildOutput.trim()}`);
-
-            const wasmPath = path.join(packageDir, 'build/plugin.wasm');
-            const binarySizeBytes = fs.statSync(wasmPath).size;
-            expect(binarySizeBytes, `${label} produced an empty component`).toBeGreaterThan(0);
-
-            const server = await startPumpkin({
-                name: `runtime-benchmark-${id}`,
-                plugins: [wasmPath]
-            });
-            try {
-                const readyLine = await server.waitForLog(
-                    /RUNTIME_BENCHMARK_READY|Failed to (?:load|initialize) plugin/,
-                    60_000
-                );
-                expect(readyLine, `${label} did not register its benchmark command: ${readyLine}`).toContain(
-                    'RUNTIME_BENCHMARK_READY'
-                );
-                const commandOutputStart = server.lines.length;
-                server.command('runtime-benchmark');
-                const line = await server.waitForLog(
-                    /RUNTIME_BENCHMARK:|Failed to (?:load|initialize) plugin/,
-                    60_000,
-                    commandOutputStart
-                );
-                const payload = line.match(/RUNTIME_BENCHMARK:(\{.*\})/);
-                expect(payload, `${label} did not emit benchmark results: ${line}`).not.toBeNull();
-                results.push({ id, label, binarySizeBytes, ...JSON.parse(payload?.[1] ?? '') });
-                console.log(`${label} results: ${JSON.stringify(results.at(-1))}`);
-                expect(server.errors(), `${label} logged runtime errors:\n${server.errors().join('\n')}`).toEqual([]);
-            } finally {
-                await server.stop();
-            }
+            const commandOutputStart = server.lines.length;
+            server.command('runtime-benchmark');
+            const line = await server.waitForLog(
+                /RUNTIME_BENCHMARK:|Failed to (?:load|initialize) plugin/,
+                60_000,
+                commandOutputStart
+            );
+            const payload = line.match(/RUNTIME_BENCHMARK:(\{.*\})/);
+            expect(payload, `${label} did not emit benchmark results: ${line}`).not.toBeNull();
+            results.push({ id, label, binarySizeBytes, ...JSON.parse(payload?.[1] ?? '') });
+            console.log(`${label} results: ${JSON.stringify(results.at(-1))}`);
+            expect(server.errors(), `${label} logged runtime errors:\n${server.errors().join('\n')}`).toEqual([]);
+        } finally {
+            await server.stop();
         }
-
-        const baseline = requireResult(results, sizeBaselineEngineId);
-        validateEngineFeatures(results, engineVariants);
-        validateApiBehavior(results, baseline);
-        validateWorkloads(results, baseline);
-
-        const hermesRuntimeProfiles = new Set(
-            engineVariants
-                .filter(
-                    ({ pluginEngine, staticHermesRuntime, staticHermesGc }) =>
-                        pluginEngine === 'static-hermes' && staticHermesRuntime && staticHermesGc === 'hades'
-                )
-                .map(({ staticHermesRuntime }) => staticHermesRuntime)
-        );
-        for (const staticHermesRuntime of hermesRuntimeProfiles) {
-            if (staticHermesRuntime) {
-                await verifyHermesStackGuard(temporaryDir, apiRoot, buildCli, staticHermesRuntime, hermesCacheDir);
-            }
-        }
-
-        const report = formatReport(results, baseline.id);
-        validateReport(report, results, baseline);
-        process.stdout.write(`${formatConsoleReport(results, baseline.id)}\n`);
-        if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${report}\n`);
-    } finally {
-        fs.rmSync(temporaryDir, { recursive: true, force: true });
     }
-}, Number.POSITIVE_INFINITY);
+
+    const baseline = requireResult(results, sizeBaselineEngineId);
+    validateEngineFeatures(results, engineVariants);
+    validateApiBehavior(results, baseline);
+    validateWorkloads(results, baseline);
+
+    const hermesRuntimeProfiles = new Set(
+        engineVariants
+            .filter(
+                ({ pluginEngine, staticHermesRuntime, staticHermesGc }) =>
+                    pluginEngine === 'static-hermes' && staticHermesRuntime && staticHermesGc === 'hades'
+            )
+            .map(({ staticHermesRuntime }) => staticHermesRuntime)
+    );
+    for (const staticHermesRuntime of hermesRuntimeProfiles) {
+        if (staticHermesRuntime) {
+            const stackGuardId = `static-hermes-${staticHermesRuntime}-stack-guard`;
+            const stackGuardPath = getEngineVariantBuildOutput(benchmarkDir, stackGuardId);
+            expect(fs.existsSync(stackGuardPath), `${stackGuardId} cached build is missing`).toBe(true);
+            await verifyHermesStackGuard(stackGuardPath, staticHermesRuntime);
+        }
+    }
+
+    const report = formatReport(results, baseline.id);
+    validateReport(report, results, baseline);
+    process.stdout.write(`${formatConsoleReport(results, baseline.id)}\n`);
+    if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${report}\n`);
+}
 
 function requireResult(results: EngineResult[], id: string): EngineResult {
     const result = results.find((candidate) => candidate.id === id);
@@ -258,72 +193,10 @@ function averageMedian(workloads: EngineResult['workloads']): number {
     return workloads.reduce((total, workload) => total + median(workload.samplesMs), 0) / workloads.length;
 }
 
-async function verifyHermesStackGuard(
-    temporaryDir: string,
-    apiRoot: string,
-    buildCli: string,
-    runtimeVariant: 'full' | 'lean',
-    hermesCacheDir: string
-): Promise<void> {
-    const packageDir = path.join(temporaryDir, `static-hermes-${runtimeVariant}-stack-guard`);
-    const sourceDir = path.join(packageDir, 'src');
-    const apiLink = path.join(packageDir, 'node_modules/@pumpkin-plugins/pumpkin-api');
-    fs.mkdirSync(sourceDir, { recursive: true });
-    fs.mkdirSync(path.dirname(apiLink), { recursive: true });
-    fs.symlinkSync(apiRoot, apiLink, 'dir');
-    fs.writeFileSync(
-        path.join(packageDir, 'package.json'),
-        `${JSON.stringify(
-            {
-                name: `runtime-stack-guard-static-hermes-${runtimeVariant}`,
-                version: '0.0.0',
-                pumpkinPlugin: {
-                    entry: 'src/plugin.ts',
-                    output: 'build/plugin.wasm',
-                    engine: 'static-hermes',
-                    staticHermesRuntime: runtimeVariant,
-                    wasi: []
-                }
-            },
-            null,
-            2
-        )}\n`
-    );
-    fs.writeFileSync(
-        path.join(sourceDir, 'plugin.ts'),
-        `import type { Context } from 'pumpkin:plugin/context@0.1.0';
-import * as logging from 'pumpkin:plugin/logging@0.1.0';
-import type { PluginMetadata } from 'pumpkin:plugin/metadata@0.1.0';
-import { Plugin, registerPlugin } from '@pumpkin-plugins/pumpkin-api';
-export * from '@pumpkin-plugins/pumpkin-api';
-class StackGuardPlugin extends Plugin {
-  metadata(): PluginMetadata { return { name: 'StackGuard', version: '0.0.0', authors: [], description: '', dependencies: [], permissions: [] }; }
-  onLoad(context: Context): void { super.onLoad(context); logging.log('info', \`STACK_GUARD:\${catchesStackOverflow()}\`); }
-}
-function catchesStackOverflow(): boolean {
-  function recurse(): number { return recurse() + 1; }
-  try { recurse(); return false; }
-  catch (error) { return error instanceof RangeError && error.message.includes('Maximum call stack size exceeded'); }
-}
-registerPlugin(new StackGuardPlugin());
-`
-    );
-
-    execFileSync(process.execPath, [buildCli], {
-        cwd: packageDir,
-        encoding: 'utf8',
-        env: {
-            ...process.env,
-            // This fixture checks runtime stack handling; production size limits have separate coverage.
-            PUMPKIN_DEV_MODE: '1',
-            STATIC_HERMES_CACHE_DIR: hermesCacheDir
-        },
-        maxBuffer: 16 * 1024 * 1024
-    });
-
+async function verifyHermesStackGuard(wasmPath: string, runtimeVariant: 'full' | 'lean'): Promise<void> {
     const server = await startPumpkin({
         name: `runtime-stack-guard-static-hermes-${runtimeVariant}`,
-        plugins: [path.join(packageDir, 'build/plugin.wasm')]
+        plugins: [wasmPath]
     });
     try {
         const line = await server.waitForLog(/STACK_GUARD:|Failed to (?:load|initialize) plugin/, 60_000);

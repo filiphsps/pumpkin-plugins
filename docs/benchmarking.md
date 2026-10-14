@@ -25,7 +25,15 @@ From the repository root:
 
     pnpm --filter @pumpkin-plugins/engine-comparison compare-engines
 
-The command runs the real-server integration test in [engine-comparison.test.ts](../benchmarks/engine-comparison/test/engine-comparison.test.ts). The test builds temporary packages, starts one Pumpkin server for each of the nine components, dispatches the benchmark command, collects results, then stops the server. Static Hermes preparation runs automatically when a build needs it; CI also restores and verifies its pinned toolchain before comparing engines in the [engine comparison workflow](../.github/workflows/engine-comparison.yml).
+The command first runs the cacheable `benchmark:build` Turbo task, then runs the real-server integration
+test in [engine-comparison.test.ts](../benchmarks/engine-comparison/test/engine-comparison.test.ts).
+The task caches the nine comparison components and two stack-guard fixtures under separate,
+configuration-specific output paths in `build/engine-comparison/`. Turbo hashes the benchmark sources,
+build dependencies, and declared build environment. The matrix is one cache task, so a change to any
+build input rebuilds all eleven components. The integration test starts one Pumpkin server for each
+comparison component, dispatches the benchmark command, collects results, then stops the server.
+Static Hermes preparation runs automatically when a build needs it; CI also restores and verifies its
+pinned toolchain before comparing engines in the [engine comparison workflow](../.github/workflows/engine-comparison.yml).
 
 The benchmark plugin and workload definitions are in [benchmark-plugin.ts](../benchmarks/engine-comparison/src/benchmark-plugin.ts) and [benchmark-workloads.ts](../benchmarks/engine-comparison/src/benchmark-workloads.ts). GitHub Actions appends the report to the job summary.
 
@@ -38,7 +46,7 @@ Each configuration receives the same workload source and input count. The integr
 - the production component is non-empty and within the build-size limit;
 - the plugin registers its command and exercises selected real Pumpkin API behavior.
 
-Workload timing uses JavaScript `Date.now()`, so samples are reported as integer milliseconds; the clock may be coarser in practice. For each workload, the report shows the median and the minimum-to-maximum range of the five samples. The timer covers the workload body; it does not include component compilation, server startup, plugin loading, or dispatching the outer benchmark command. The repeated ASCII join baseline measured 44–82 ms across the nine configurations on this macOS arm64 host, above the 10 ms resolution target for this run; timing remains diagnostic and has no pass threshold.
+Workload timing uses JavaScript `Date.now()`, so samples are reported as integer milliseconds; the clock may be coarser in practice. For each workload, the report shows the median and the minimum-to-maximum range of the five samples. The timer covers the workload body; it does not include component compilation, server startup, plugin loading, or dispatching the outer benchmark command.
 
 There are 26 timed workloads: 25 deterministic guest-side fixtures and one real Pumpkin API call. The fixture algorithms are representative examples written for this benchmark; they are not executions of the named plugins or Pumpkin’s own command router. Player-directory and other player-oriented fixture workloads use in-memory test data, not connected players.
 

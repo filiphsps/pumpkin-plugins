@@ -1,3 +1,5 @@
+import * as path from 'node:path';
+
 /** Settings for one real-server engine comparison build. */
 export interface EngineVariant {
     /** Stable identifier used for temporary package and result names. */
@@ -32,6 +34,11 @@ const parserModes = [
     { id: 'js', label: 'JS parser', parseTypeScript: false },
     { id: 'ts', label: 'TS parser', parseTypeScript: true }
 ] as const;
+
+/** Returns the stable Turbo output path assigned to an engine configuration. */
+export function getEngineVariantBuildOutput(benchmarkDir: string, variantId: string): string {
+    return path.join(benchmarkDir, 'build', 'engine-comparison', `${variantId}.wasm`);
+}
 
 /** Returns QuickJS and the Cartesian product of the Static Hermes matrix axes. */
 export function createEngineVariants(): EngineVariant[] {
