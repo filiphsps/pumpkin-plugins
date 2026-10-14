@@ -610,6 +610,10 @@ jobs:
                   while IFS=$'\t' read -r artifact_id artifact_name; do
                       [ -z "$artifact_id" ] && continue
                       case "$artifact_name" in
+                          plugins|engine-comparison-report|engine-comparison-change-chart|engine-comparison-change.svg)
+                              echo "Keeping $artifact_name for run history or benchmark comments"
+                              continue
+                              ;;
                           plugin-wasm|update-check-fixture)
                               if [ "$CLEAN_INTEGRATION_ARTIFACTS" != true ]; then
                                   echo "Keeping $artifact_name so the failed integration job can be retried"
