@@ -191,6 +191,23 @@ describe('commandInfos', () => {
         expect(permissions[0]?.children).toEqual([{ node: 'Demo:command.demo.shared', value: true }]);
     });
 
+    it('treats permission defaults with the same values as equal regardless of property order', () => {
+        const tree = defineCommands('Demo', {
+            first: {
+                description: 'First',
+                permission: 'Demo:command.shared',
+                defaultPermission: { tag: 'op', val: 'three' },
+            },
+            second: {
+                description: 'Second',
+                permission: 'Demo:command.shared',
+                defaultPermission: { val: 'three', tag: 'op' },
+            },
+        });
+
+        expect(commandPermissionInfos(tree).map(({ node }) => node)).toEqual(['Demo:command.shared']);
+    });
+
     it('rejects conflicting defaults for a shared permission', () => {
         const tree = defineCommands('Demo', {
             first: {
@@ -202,6 +219,25 @@ describe('commandInfos', () => {
                 description: 'Second',
                 permission: 'Demo:command.shared',
                 defaultPermission: { tag: 'deny' },
+            },
+        });
+
+        expect(() => commandPermissionInfos(tree)).toThrow(
+            'conflicting defaults for command permission Demo:command.shared',
+        );
+    });
+
+    it('rejects operator defaults with different levels for a shared permission', () => {
+        const tree = defineCommands('Demo', {
+            first: {
+                description: 'First',
+                permission: 'Demo:command.shared',
+                defaultPermission: { tag: 'op', val: 'three' },
+            },
+            second: {
+                description: 'Second',
+                permission: 'Demo:command.shared',
+                defaultPermission: { tag: 'op', val: 'two' },
             },
         });
 

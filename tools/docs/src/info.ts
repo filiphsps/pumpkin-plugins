@@ -56,7 +56,8 @@ export interface ConfigOptionInfo {
     description: string;
     /** Dotted TOML key, e.g. `web.port`. */
     key: string;
-    type: 'boolean' | 'integer' | 'string' | 'string[]' | 'table';
+    /** TOML value shape shown in the README, such as `table[]` for an array of inline tables. */
+    type: 'boolean' | 'integer' | 'string' | 'string[]' | 'table' | 'table[]';
 }
 
 /** The plugin's config file, for its README. */
