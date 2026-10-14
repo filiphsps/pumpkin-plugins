@@ -244,7 +244,7 @@ describe('the /dhs commands', () => {
         expect(consoleSender.lines).toEqual(consoleSender.errors);
     });
 
-    it('rejects radii larger than either command limit', () => {
+    it('rejects radii larger than the map and generation command limits', () => {
         const { host, root } = setup();
         const player = {
             getPosition: () => [0, 64, 0],
@@ -256,8 +256,8 @@ describe('the /dhs commands', () => {
         expect(() => host.run(root, ['dhs', 'map', '<radius>'], { radius: 16_385 }, sender as never)).toThrow(
             'Radius must be between 0 and 16384 LOD sections.',
         );
-        expect(() => host.run(root, ['dhs', 'generate', '<radius>'], { radius: 16_385 })).toThrow(
-            'Radius must be between 0 and 16384 LOD sections.',
+        expect(() => host.run(root, ['dhs', 'generate', '<radius>'], { radius: 32 })).toThrow(
+            'Radius must be between 0 and 31 LOD sections (at most 4096 requested sections).',
         );
     });
 

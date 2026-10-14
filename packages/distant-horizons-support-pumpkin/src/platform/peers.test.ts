@@ -163,6 +163,45 @@ describe('Pumpkin terrain adapter', () => {
         expect(getSkyLight).toHaveBeenCalledTimes(2);
         for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
     });
+    it('reads position-specific lighting when the same block and biome recur at different heights', () => {
+        const values = defaultValues(schema),
+            settings = { ...values.support, worlds: values.worlds };
+        state.lookup
+            .mockReturnValueOnce({ name: 'minecraft:stone', properties: [] })
+            .mockReturnValueOnce({ name: 'minecraft:stone', properties: [] });
+        const getSkyLight = vi.fn(({ y }: { y: number }) => (y === 65 ? 15 : 4));
+        const getBlockLight = vi.fn(({ y }: { y: number }) => (y === 65 ? 0 : 9));
+        const border = { getCenterX: () => 0, getCenterZ: () => 0, getSize: () => 100, [Symbol.dispose]: vi.fn() };
+        const world = {
+            getName: () => 'world',
+            getDimension: () => 'minecraft:overworld',
+            getMinY: () => 0,
+            getWorldBorder: () => border,
+            getBlockStateId: () => 1,
+            getBiome: () => 'plains',
+            getTopBlockY: () => 80,
+            getSkyLight,
+            getBlockLight,
+            [Symbol.dispose]: vi.fn(),
+        };
+        const java = { [Symbol.dispose]: vi.fn() };
+        const player = {
+            asJava: () => java,
+            getWorld: () => world,
+            getName: () => 'Alice',
+            getPosition: () => [0, 64, 0],
+        };
+
+        withPlayer(player as unknown as Player, settings, (peer) => {
+            expect(peer.terrain.sample(0, 64, 0)).toMatchObject({ skyLight: 15, blockLight: 0 });
+            expect(peer.terrain.sample(0, 63, 0)).toMatchObject({ skyLight: 4, blockLight: 9 });
+        });
+
+        expect(getSkyLight).toHaveBeenNthCalledWith(1, { x: 0, y: 65, z: 0 });
+        expect(getSkyLight).toHaveBeenNthCalledWith(2, { x: 0, y: 64, z: 0 });
+        expect(getBlockLight).toHaveBeenCalledTimes(2);
+        for (const handle of [border, world, java]) expect(handle[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
     it('reuses one heightmap value per column and refreshes it when the column changes', () => {
         const values = defaultValues(schema),
             settings = { ...values.support, worlds: values.worlds };

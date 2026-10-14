@@ -3,7 +3,6 @@ import { unavailableChunkLoader, unavailableTerrainGenerator } from '@pumpkin-pl
 import { describe, expect, it, vi } from 'vitest';
 import { LodCache } from './cache.ts';
 import { ForcedLodGeneration, type ForcedLodPeer, type ForcedLodPeers } from './force-generation.ts';
-import { MAX_LOD_GENERATION_RADIUS } from './generation.ts';
 
 function fixture(height = 1) {
     const files = new MemoryFiles();
@@ -172,11 +171,27 @@ describe('forced LOD generation', () => {
     it('accepts the maximum radius without materializing its section list', () => {
         const f = fixture();
 
-        const started = f.generation.start(f.peer, 32, 32, MAX_LOD_GENERATION_RADIUS);
+        const started = f.generation.start(f.peer, 32, 32, 31);
 
-        expect(started.sections).toBe((MAX_LOD_GENERATION_RADIUS * 2 + 1) ** 2);
-        expect(f.generation.status()).toContain('97244861 skipped');
+        expect(started.sections).toBe(3969);
+        expect(f.generation.status()).toContain('of 3969');
         f.generation.left(f.peer.name);
+    });
+
+    it('rejects a request above the section limit before considering the world border', () => {
+        const f = fixture();
+        f.peer.borderBounds = { minX: 0.5, maxX: 63.5, minZ: 0.5, maxZ: 63.5 };
+
+        expect(() => f.generation.start(f.peer, 32, 32, 32)).toThrow(/4096/);
+        expect(f.generation.status()).toBeUndefined();
+        expect(f.reports).toEqual([]);
+    });
+
+    it('rejects a very large radius before calculating the selected area', () => {
+        const f = fixture();
+
+        expect(() => f.generation.start(f.peer, 32, 32, Number.MAX_SAFE_INTEGER)).toThrow(/4096/);
+        expect(f.generation.status()).toBeUndefined();
     });
 
     it('verifies the only cached in-border section of a maximum-radius selection on its first tick', () => {
@@ -185,7 +200,7 @@ describe('forced LOD generation', () => {
         f.peer.insideBorder = (x, z) => x >= 0 && x < 64 && z >= 0 && z < 64;
         f.cache.put('world:0:0', { updated: 1, data: new Uint8Array(64) });
 
-        f.generation.start(f.peer, 32, 32, MAX_LOD_GENERATION_RADIUS);
+        f.generation.start(f.peer, 32, 32, 31);
         f.generation.tick(f.peers);
         expect(f.generation.status()).toBeUndefined();
         expect(f.reports.at(-1)).toBe('All requested LOD sections are already generated.');
@@ -196,13 +211,13 @@ describe('forced LOD generation', () => {
         f.peer.borderBounds = { minX: 0.5, maxX: 63.5, minZ: 0.5, maxZ: 63.5 };
         f.peer.insideBorder = (x, z) => x >= 0 && x < 64 && z >= 0 && z < 64;
 
-        f.generation.start(f.peer, 32, 32, MAX_LOD_GENERATION_RADIUS);
+        f.generation.start(f.peer, 32, 32, 31);
         f.generation.tick(f.peers);
 
         expect(f.cache.has('world:0:0')).toBe(true);
         expect(f.generation.status()).toBeUndefined();
         expect(f.samples()).toBe(4096);
-        expect(f.reports.at(-1)).toContain('complete: 1 built, 1073807360 skipped');
+        expect(f.reports.at(-1)).toContain('complete: 1 built, 3968 skipped');
     });
 
     it('rebuilds corrupt persisted entries instead of treating them as generated', () => {

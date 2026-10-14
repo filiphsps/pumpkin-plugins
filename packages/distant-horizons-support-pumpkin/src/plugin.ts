@@ -25,6 +25,8 @@ import { Sessions } from './session.ts';
 
 /** Serves Distant Horizons requests from loaded chunks and previously captured terrain. */
 class DistantHorizonsSupportPumpkin extends PluginBase {
+    private dataDir: WasiDataDir | undefined;
+
     constructor() {
         super(info, __PLUGIN_VERSION__);
     }
@@ -32,6 +34,16 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
     protected onPluginLoad(ctx: Context): void {
         const files = WasiDataDir.open();
         if (!files) throw new Error(`${PLUGIN_NAME} requires access to its data folder`);
+        this.dataDir = files;
+        try {
+            this.initializePlugin(ctx, files);
+        } catch (error) {
+            this.disposeDataDir();
+            throw error;
+        }
+    }
+
+    private initializePlugin(ctx: Context, files: WasiDataDir): void {
         const settings = readSettings(files, hostLogger);
         const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries);
         const sessions = new Sessions(settings, cache, hostLogger);
@@ -78,6 +90,16 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
         hostLogger.info(
             `${PLUGIN_NAME}: serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain. Distant chunk generation is unavailable; see the plugin README TODO.`,
         );
+    }
+
+    protected override onPluginUnload(_ctx: Context): void {
+        this.disposeDataDir();
+    }
+
+    private disposeDataDir(): void {
+        const files = this.dataDir;
+        this.dataDir = undefined;
+        files?.[Symbol.dispose]();
     }
 }
 registerPlugin(new DistantHorizonsSupportPumpkin());

@@ -47,10 +47,10 @@ Pumpkin asks for these on the server console the first time the plugin loads.
 | `/dhs map <radius>` | Show cached LOD sections at your position or block coordinates (default radius 4; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.map` | operators (level 3) |
 | `/dhs map <x> <z>` | Show cached LOD sections at your position or block coordinates (default radius 4; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.map` | operators (level 3) |
 | `/dhs map <x> <z> <radius>` | Show cached LOD sections at your position or block coordinates (default radius 4; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.map` | operators (level 3) |
-| `/dhs generate` | Force-build LOD sections at your position or block coordinates (default radius 0; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.generate` | operators (level 3) |
-| `/dhs generate <radius>` | Force-build LOD sections at your position or block coordinates (default radius 0; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.generate` | operators (level 3) |
-| `/dhs generate <x> <z>` | Force-build LOD sections at your position or block coordinates (default radius 0; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.generate` | operators (level 3) |
-| `/dhs generate <x> <z> <radius>` | Force-build LOD sections at your position or block coordinates (default radius 0; maximum 16_384 sections) | `DistantHorizonsSupportPumpkin:command.dhs.generate` | operators (level 3) |
+| `/dhs generate` | Force-build LOD sections at your position or block coordinates (default radius 0; maximum radius 31 sections; at most 4_096 sections per request) | `DistantHorizonsSupportPumpkin:command.dhs.generate` | operators (level 3) |
+| `/dhs generate <radius>` | Force-build LOD sections at your position or block coordinates (default radius 0; maximum radius 31 sections; at most 4_096 sections per request) | `DistantHorizonsSupportPumpkin:command.dhs.generate` | operators (level 3) |
+| `/dhs generate <x> <z>` | Force-build LOD sections at your position or block coordinates (default radius 0; maximum radius 31 sections; at most 4_096 sections per request) | `DistantHorizonsSupportPumpkin:command.dhs.generate` | operators (level 3) |
+| `/dhs generate <x> <z> <radius>` | Force-build LOD sections at your position or block coordinates (default radius 0; maximum radius 31 sections; at most 4_096 sections per request) | `DistantHorizonsSupportPumpkin:command.dhs.generate` | operators (level 3) |
 <!-- docs:end commands -->
 
 ## Configuration
@@ -191,12 +191,13 @@ chunks) for views up to radius 10; larger views are downsampled to 21 × 21 cell
 chat. These commands need a player so the plugin can resolve the current world.
 
 Use `/dhs generate` or `/dhs generate <x> <z>` to force a capture into the cache. Add `<radius>`
-after the command or coordinates to set the radius, up to 16_384 sections. Sections already in the
-cache are validated and skipped on worker ticks, at most 64 sections per tick. If every requested
-section is valid in the cache, the job reports that all sections are already generated. A forced
-job gets up to 32,768 block samples per tick and pauses ordinary capture sampling while it runs;
-cached request delivery and transfers continue. Progress is reported in chat about every 10%, and
-`/dhs status` shows the active job. Only one forced job can run at a time. This command captures terrain that is
+after the command or coordinates to set the radius, up to 31 sections from the center. Each request
+is capped at 4_096 selected sections; a radius of 31 selects 3_969. Sections already in the cache
+are validated and skipped on worker ticks, at most 64 sections per tick. If every requested section
+is valid in the cache, the job reports that all sections are already generated. A forced job gets up
+to 32,768 block samples per tick and pauses ordinary capture sampling while it runs; cached request
+delivery and transfers continue. Progress is reported in chat about every 10%, and `/dhs status`
+shows the active job. Only one forced job can run at a time. This command captures terrain that is
 already loaded: it does not load or generate Minecraft chunks, and sections with unavailable chunks
 are skipped.
 

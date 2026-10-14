@@ -1,5 +1,5 @@
 import { defineCommands } from '@pumpkin-plugins/docs';
-import { MAX_LOD_GENERATION_RADIUS } from '../lod/generation.ts';
+import { MAX_LOD_GENERATION_RADIUS, MAX_LOD_GENERATION_SECTIONS } from '../lod/generation.ts';
 import { MAX_LOD_MAP_RADIUS } from '../lod/map-constants.ts';
 import { PLUGIN_NAME } from '../name.ts';
 
@@ -7,6 +7,7 @@ import { PLUGIN_NAME } from '../name.ts';
 export const COMMAND_PERMISSION = `${PLUGIN_NAME}:command.dhs` as const;
 const mapRadiusLimit = MAX_LOD_MAP_RADIUS.toLocaleString('en-US').replace(/,/g, '_');
 const generationRadiusLimit = MAX_LOD_GENERATION_RADIUS.toLocaleString('en-US').replace(/,/g, '_');
+const generationSectionsLimit = MAX_LOD_GENERATION_SECTIONS.toLocaleString('en-US').replace(/,/g, '_');
 
 /** Operator commands for inspecting DH work and managing cached terrain. */
 export const commands = defineCommands(PLUGIN_NAME, {
@@ -78,7 +79,7 @@ export const commands = defineCommands(PLUGIN_NAME, {
                 ],
             },
             generate: {
-                description: `Force-build LOD sections at your position or block coordinates (default radius 0; maximum ${generationRadiusLimit} sections)`,
+                description: `Force-build LOD sections at your position or block coordinates (default radius 0; maximum radius ${generationRadiusLimit} sections; at most ${generationSectionsLimit} sections per request)`,
                 permission: `${COMMAND_PERMISSION}.generate`,
                 argumentVariants: [
                     [{ name: 'radius', type: 'integer', min: 0, max: MAX_LOD_GENERATION_RADIUS }],
