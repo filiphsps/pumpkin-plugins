@@ -149,7 +149,7 @@ const __unwrapWasi = (value) => {
 const __wrapWasi = (value) => {
     if (value === null || typeof value !== "object" || ArrayBuffer.isView(value)) return value;
     if (Array.isArray(value)) return value.map(__wrapWasi);
-    const errorCode = value.__staticHermesWasiError;
+    const errorCode = value.__staticHermesWitError;
     if (errorCode !== undefined) {
         const label = typeof errorCode === "string" ? errorCode : errorCode && typeof errorCode.tag === "string" ? errorCode.tag : "unknown";
         const error = new Error("WASI error: " + label);
@@ -248,6 +248,15 @@ const __resourceApi = (name) => {
     if (!api) throw new Error("Static Hermes has no host adapter for Pumpkin resource " + name);
     return api;
 };
+const __unwrapPumpkinError = (value) => {
+    if (value === null || typeof value !== "object") return value;
+    const errorCode = value.__staticHermesWitError;
+    if (errorCode === undefined) return value;
+    const label = typeof errorCode === "string" ? errorCode : errorCode && typeof errorCode.tag === "string" ? errorCode.tag : "unknown";
+    const error = new Error("Pumpkin API error: " + label);
+    error.payload = errorCode;
+    throw error;
+};
 const __unwrap = (value) => {
     if (value === null || typeof value !== "object") return value;
     if (ArrayBuffer.isView(value)) return value;
@@ -306,7 +315,7 @@ const __wrap = (Type, value) => {
             const name = jsName(operation.name);
             const result = wrapResourceResult(operation.result);
             return /* JavaScript */ `export function ${name}(...args) {
-    const value = __api(${JSON.stringify(operation.name)})[${JSON.stringify(name)}](...args.map(__unwrap));
+    const value = __unwrapPumpkinError(__api(${JSON.stringify(operation.name)})[${JSON.stringify(name)}](...args.map(__unwrap)));
     return ${result};
 }`;
         })
@@ -325,7 +334,7 @@ const __wrap = (Type, value) => {
                 ? ''
                 : constructorOperation
                   ? /* JavaScript */ `    constructor(...args) {
-        const native = __resourceApi(${JSON.stringify(jsName(resource.name))})["constructor"](...args.map(__unwrap));
+        const native = __unwrapPumpkinError(__resourceApi(${JSON.stringify(jsName(resource.name))})["constructor"](...args.map(__unwrap)));
         Object.defineProperty(this, "__staticHermesResource", { value: native });
         Object.defineProperty(this, "__staticHermesDisposed", { value: false, writable: true });
     }`
@@ -334,7 +343,7 @@ const __wrap = (Type, value) => {
                 const name = jsName(operation.name);
                 const result = wrapResourceResult(operation.result);
                 return /* JavaScript */ `    static ${name}(...args) {
-        const value = __resourceApi(${JSON.stringify(jsName(resource.name))})[${JSON.stringify(name)}](...args.map(__unwrap));
+        const value = __unwrapPumpkinError(__resourceApi(${JSON.stringify(jsName(resource.name))})[${JSON.stringify(name)}](...args.map(__unwrap)));
         return ${result};
     }`;
             });
@@ -346,7 +355,7 @@ const __wrap = (Type, value) => {
         const native = __assertResourceUsable(this.__staticHermesResource, this);
         const method = native && native[${JSON.stringify(name)}];
         if (typeof method !== "function") throw new Error(${JSON.stringify(`Static Hermes host resource does not implement ${resource.name}.${operation.name}`)});
-        const value = method.apply(native, args.map(__unwrap));
+        const value = __unwrapPumpkinError(method.apply(native, args.map(__unwrap)));
         return ${result};
     }`;
             });
@@ -1763,18 +1772,18 @@ function generateWitResult(apiPackage, apiInterface, type, functionName, argumen
     return undefined;
 }
 
-/** Convert a failed WIT result enum into the error marker consumed by its facade. */
+/** Convert a failed WIT result payload into the error marker consumed by its facade. */
 function generateWitErrorReturn(apiPackage, apiInterface, type, expression) {
     if (type.kind === 'enum') return generateWitEnumErrorReturn(apiPackage, type, expression);
     const value = generateWitResultValue(apiPackage, apiInterface, type, expression, 'wasiError');
     if (!value) return `throw JSError(rt, ${JSON.stringify(`WIT call ${type.name} failed`)});`;
-    return `${value.setup.join(' ')} auto errorPayload = ${value.expression}; Object errorValue(rt); errorValue.setProperty(rt, "__staticHermesWasiError", std::move(errorPayload)); return errorValue;`;
+    return `${value.setup.join(' ')} auto errorPayload = ${value.expression}; Object errorValue(rt); errorValue.setProperty(rt, "__staticHermesWitError", std::move(errorPayload)); return errorValue;`;
 }
 
 function generateWitEnumErrorReturn(apiPackage, type, expression) {
     const cases = type.values.map(
         (value) =>
-            `case ${enumValue(apiPackage, type, value)}: { Object errorValue(rt); errorValue.setProperty(rt, "__staticHermesWasiError", jsString(rt, ${JSON.stringify(value)})); return errorValue; }`,
+            `case ${enumValue(apiPackage, type, value)}: { Object errorValue(rt); errorValue.setProperty(rt, "__staticHermesWitError", jsString(rt, ${JSON.stringify(value)})); return errorValue; }`,
     );
     return `switch (${expression}) { ${cases.join(' ')} default: throw JSError(rt, ${JSON.stringify(`Unknown ${type.name} value`)}); }`;
 }

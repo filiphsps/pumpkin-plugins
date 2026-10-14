@@ -150,7 +150,12 @@ export abstract class Plugin {
         return handlerId;
     }
 
-    /** Register a custom entity AI goal and return its handler ID. */
+    /**
+     * Register a custom entity AI goal and return its handler ID.
+     *
+     * @remarks Pumpkin `0.2.0+26.3-26.51` does not start custom WASM goals because its host returns `false` from both
+     * goal eligibility methods.
+     */
     registerAiGoal(goal: AiGoal): number {
         const handlerId = getNextHandlerId();
         aiGoals.set(handlerId, goal);

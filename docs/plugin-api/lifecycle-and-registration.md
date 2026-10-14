@@ -13,6 +13,17 @@ If event or command registration with the host fails, the corresponding callback
 
 The facade keeps event, command, suggestion, task, AI-goal and chunk-generator callbacks in handler maps and passes numeric IDs to the host. Register callbacks through the plugin context or `Plugin` helper methods; do not call the internal `handle*` dispatch functions from plugin code.
 
+The Static Hermes adapter dispatches all five AI-goal methods and chunk-generator callbacks. It
+exposes the generation phase as one of `biomes`, `noise`, `surface` or `features`. The server,
+entity and chunk resources passed to these callbacks are disposed when the callback returns. If an
+AI-goal callback throws, `canStart` and `shouldContinue` return `false`; errors from void callbacks
+are logged.
+
+Pumpkin `0.2.0+26.3-26.51` does not start custom WASM AI goals: its `canStart` and
+`shouldContinue` host methods return `false`, so gameplay does not reach the registered callbacks.
+This is a host limitation, separate from Static Hermes' implemented callback dispatch. See the
+[pinned Pumpkin host implementation](https://github.com/Pumpkin-MC/Pumpkin/blob/0.2.0%2B26.3-26.51/crates/pumpkin/src/plugin/loader/wasm/wasm_host/wit/v0_1/mob.rs#L291-L298).
+
 The default IPC handler rejects messages. Override `handleIpcMessage(sender, message)` when the plugin accepts IPC. The [generated reference](/api/tools/@pumpkin-plugins/pumpkin-api/) documents the complete facade signatures.
 
 Scheduled helpers return Pumpkin task IDs. Delayed callbacks are released before they run, including

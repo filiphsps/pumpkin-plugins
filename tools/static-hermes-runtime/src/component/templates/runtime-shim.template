@@ -53,6 +53,8 @@ class PluginBundleBuffer final : public Buffer {
 enum class ResourceKind {
     Context,
     Server,
+    Entity,
+    ChunkBuffer,
     Player,
     World,
     JavaPlayer,
@@ -101,6 +103,14 @@ struct ResourceState {
         case ResourceKind::Server:
             pumpkin_plugin_server_server_drop_own(
                 pumpkin_plugin_server_own_server_t{handle});
+            break;
+        case ResourceKind::Entity:
+            pumpkin_plugin_world_entity_drop_own(
+                pumpkin_plugin_world_own_entity_t{handle});
+            break;
+        case ResourceKind::ChunkBuffer:
+            pumpkin_plugin_world_chunk_buffer_drop_own(
+                pumpkin_plugin_world_own_chunk_buffer_t{handle});
             break;
         case ResourceKind::Player:
             pumpkin_plugin_player_player_drop_own(
@@ -378,8 +388,6 @@ std::shared_ptr<ResourceObject>
 makeWitResourceObject(std::shared_ptr<ResourceState> state) {
     return std::make_shared<WitResourceObject>(std::move(state));
 }
-
-Value makeServer(Runtime &runtime, int32_t handle);
 
 class CommandNodeObject final : public ResourceObject {
   public:
@@ -795,12 +803,6 @@ Value ServerObject::getResourceProperty(Runtime &runtime, const PropNameID &name
     return Value::undefined();
 }
 
-Value makeServer(Runtime &runtime, int32_t handle) {
-    auto state = std::make_shared<ResourceState>(
-        ResourceState{ResourceKind::Server, handle, true});
-    return wrapResourceObject(runtime, std::make_shared<ServerObject>(state));
-}
-
 class CommandSenderObject final : public ResourceObject {
   public:
     explicit CommandSenderObject(std::shared_ptr<ResourceState> state)
@@ -964,6 +966,8 @@ resourceIdentity(const ResourceState &state) {
     switch (state.kind) {
     case ResourceKind::Context: return {"context", "context"};
     case ResourceKind::Server: return {"server", "server"};
+    case ResourceKind::Entity: return {"world", "entity"};
+    case ResourceKind::ChunkBuffer: return {"world", "chunk-buffer"};
     case ResourceKind::Player: return {"player", "player"};
     case ResourceKind::World: return {"world", "world"};
     case ResourceKind::JavaPlayer: return {"player", "java-player"};
@@ -1441,19 +1445,30 @@ void exports_plugin_init_plugin(void) {
 
 bool exports_plugin_on_load(plugin_own_context_t context,
                             plugin_string_t *error) {
-    initializeRuntime();
-    auto state = std::make_shared<ResourceState>(
-        ResourceState{ResourceKind::Context, context.__handle, true});
-    auto contextObject = wrapResourceObject(
-        *jsRuntime, std::make_shared<ContextObject>(state));
+    if (error)
+        std::memset(error, 0, sizeof(*error));
+    std::shared_ptr<ResourceState> state;
+    WitScopeGuard contextCleanup([&] {
+        if (state)
+            state->drop();
+        else
+            pumpkin_plugin_context_context_drop_own(
+                pumpkin_plugin_context_own_context_t{context.__handle});
+    });
     try {
+        state = std::make_shared<ResourceState>(
+            ResourceState{ResourceKind::Context, context.__handle, true});
+        initializeRuntime();
+        auto contextObject = wrapResourceObject(
+            *jsRuntime, std::make_shared<ContextObject>(state));
         Value contextValue(std::move(contextObject));
         callExport("onLoad", &contextValue, 1);
-        state->drop();
         return true;
     } catch (const std::exception &exception) {
-        state->drop();
         setError(error, exception.what());
+        return false;
+    } catch (...) {
+        setError(error, "Unknown Static Hermes plugin load failure");
         return false;
     }
 }
@@ -1485,11 +1500,22 @@ void exports_plugin_handle_event(uint32_t event_id,
                                  plugin_event_t *event, plugin_event_t *ret) {
     *ret = *event;
     std::vector<std::shared_ptr<ResourceState>> eventResources;
-    auto serverObject = makeServer(*jsRuntime, server.__handle);
-    auto eventObject = makeEvent(*jsRuntime, event, &eventResources);
-    Value args[] = {Value(static_cast<double>(event_id)),
-                    std::move(serverObject), std::move(eventObject)};
+    std::shared_ptr<ResourceState> serverState;
+    WitScopeGuard serverCleanup([&] {
+        if (serverState)
+            serverState->drop();
+        else
+            pumpkin_plugin_server_server_drop_own(
+                pumpkin_plugin_server_own_server_t{server.__handle});
+    });
     try {
+        serverState = std::make_shared<ResourceState>(
+            ResourceState{ResourceKind::Server, server.__handle, true});
+        auto serverObject = wrapResourceObject(
+            *jsRuntime, std::make_shared<ServerObject>(serverState));
+        auto eventObject = makeEvent(*jsRuntime, event, &eventResources);
+        Value args[] = {Value(static_cast<double>(event_id)),
+                        std::move(serverObject), std::move(eventObject)};
         auto result = callExport("handleEvent", args, 3);
         returnEvent(*jsRuntime, result, event, ret, &eventResources);
     } catch (const std::exception &exception) {
@@ -1497,8 +1523,6 @@ void exports_plugin_handle_event(uint32_t event_id,
     }
     for (const auto &resource : eventResources)
         resource->transfer();
-    pumpkin_plugin_server_server_drop_own(
-        pumpkin_plugin_server_own_server_t{server.__handle});
 }
 
 bool exports_plugin_handle_command(uint32_t command_id,
@@ -1574,23 +1598,144 @@ bool exports_plugin_handle_command(uint32_t command_id,
 }
 
 void exports_plugin_handle_command_suggestion(
-    uint32_t, plugin_own_command_sender_t, plugin_own_server_instance_t,
-    plugin_suggestion_request_t *, plugin_command_suggestions_t *ret) {
+    uint32_t handler_id, plugin_own_command_sender_t sender,
+    plugin_own_server_instance_t server, plugin_suggestion_request_t *request,
+    plugin_command_suggestions_t *ret) {
     std::memset(ret, 0, sizeof(*ret));
+    std::shared_ptr<ResourceState> senderState;
+    std::shared_ptr<ResourceState> serverState;
+    std::vector<std::shared_ptr<ResourceState>> tooltipResources;
+    const auto dropSender = [&] {
+        if (senderState)
+            senderState->drop();
+        else
+            pumpkin_plugin_command_command_sender_drop_own(sender);
+    };
+    const auto dropServer = [&] {
+        if (serverState)
+            serverState->drop();
+        else
+            pumpkin_plugin_server_server_drop_own(server);
+    };
+    WitScopeGuard requestCleanup([&] {
+        if (request)
+            plugin_suggestion_request_free(request);
+    });
+    WitScopeGuard senderCleanup(dropSender);
+    WitScopeGuard serverCleanup(dropServer);
+    WitScopeGuard resultCleanup([&] {
+        for (const auto &resource : tooltipResources)
+            resource->drop();
+        plugin_command_suggestions_free(ret);
+        std::memset(ret, 0, sizeof(*ret));
+    });
+
+    try {
+        if (!request)
+            throw std::runtime_error("Missing command suggestion request");
+        initializeRuntime();
+        senderState = std::make_shared<ResourceState>(
+            ResourceState{ResourceKind::CommandSender, sender.__handle, true});
+        serverState = std::make_shared<ResourceState>(
+            ResourceState{ResourceKind::Server, server.__handle, true});
+        auto senderObject = wrapResourceObject(
+            *jsRuntime, std::make_shared<CommandSenderObject>(senderState));
+        auto serverObject = wrapResourceObject(
+            *jsRuntime, std::make_shared<ServerObject>(serverState));
+
+        Object requestObject(*jsRuntime);
+        requestObject.setProperty(
+            *jsRuntime, "input", jsString(*jsRuntime, wasiStringValue(request->input)));
+        requestObject.setProperty(*jsRuntime, "cursor",
+                                  Value(static_cast<double>(request->cursor)));
+        requestObject.setProperty(*jsRuntime, "start",
+                                  Value(static_cast<double>(request->start)));
+        requestObject.setProperty(*jsRuntime, "remaining",
+                                  jsString(*jsRuntime, wasiStringValue(request->remaining)));
+        Value args[] = {Value(static_cast<double>(handler_id)),
+                        std::move(senderObject), std::move(serverObject),
+                        std::move(requestObject)};
+        const auto result = callExport("handleCommandSuggestion", args, 4);
+        if (!result.isObject())
+            throw JSError(*jsRuntime,
+                          "Plugin command suggestion handler must return an object");
+
+        const auto suggestions = result.asObject(*jsRuntime);
+        ret->start = wasiInputInteger<uint32_t>(
+            *jsRuntime, suggestions.getProperty(*jsRuntime, "start"), "u32");
+        ret->length = wasiInputInteger<uint32_t>(
+            *jsRuntime, suggestions.getProperty(*jsRuntime, "length"), "u32");
+        const auto values = suggestions.getProperty(*jsRuntime, "values")
+                                .asObject(*jsRuntime)
+                                .asArray(*jsRuntime);
+        const auto valueCount = values.size(*jsRuntime);
+        if (valueCount) {
+            ret->values.ptr = static_cast<decltype(ret->values.ptr)>(
+                std::calloc(valueCount, sizeof(*ret->values.ptr)));
+            if (!ret->values.ptr)
+                throw std::bad_alloc();
+            ret->values.len = valueCount;
+        }
+
+        for (std::size_t index = 0; index < valueCount; ++index) {
+            const auto suggestion = values.getValueAtIndex(*jsRuntime, index)
+                                        .asObject(*jsRuntime);
+            const auto tooltip = suggestion.getProperty(*jsRuntime, "tooltip");
+            if (!tooltip.isUndefined() && !tooltip.isNull()) {
+                const auto state = getWitResourceState(
+                    *jsRuntime, tooltip, "text", "text-component");
+                if (!state->owned)
+                    throw JSError(*jsRuntime,
+                                  "Command suggestion tooltip must be an owned text component");
+                for (const auto &resource : tooltipResources) {
+                    if (resource.get() == state.get())
+                        throw JSError(*jsRuntime,
+                                      "A command suggestion tooltip cannot be returned more than once");
+                }
+                try {
+                    tooltipResources.push_back(state);
+                } catch (...) {
+                    state->drop();
+                    throw;
+                }
+                ret->values.ptr[index].tooltip.is_some = true;
+                ret->values.ptr[index].tooltip.val.__handle = state->handle;
+            }
+            copyString(&ret->values.ptr[index].value, *jsRuntime,
+                       suggestion.getProperty(*jsRuntime, "value"));
+        }
+
+        for (const auto &resource : tooltipResources)
+            resource->transfer();
+        resultCleanup.release();
+    } catch (const std::exception &exception) {
+        logPluginError(exception.what());
+    } catch (...) {
+        logPluginError("Unknown Static Hermes command suggestion failure");
+    }
 }
 
 void exports_plugin_handle_task(uint32_t handler_id,
                                 plugin_own_server_instance_t server) {
-    auto serverObject = makeServer(*jsRuntime, server.__handle);
-    Value args[] = {Value(static_cast<double>(handler_id)),
-                    std::move(serverObject)};
+    std::shared_ptr<ResourceState> serverState;
+    WitScopeGuard serverCleanup([&] {
+        if (serverState)
+            serverState->drop();
+        else
+            pumpkin_plugin_server_server_drop_own(
+                pumpkin_plugin_server_own_server_t{server.__handle});
+    });
     try {
+        serverState = std::make_shared<ResourceState>(
+            ResourceState{ResourceKind::Server, server.__handle, true});
+        auto serverObject = wrapResourceObject(
+            *jsRuntime, std::make_shared<ServerObject>(serverState));
+        Value args[] = {Value(static_cast<double>(handler_id)),
+                        std::move(serverObject)};
         callExport("handleTask", args, 2);
     } catch (const std::exception &exception) {
         logPluginError(exception.what());
     }
-    pumpkin_plugin_server_server_drop_own(
-        pumpkin_plugin_server_own_server_t{server.__handle});
 }
 
 bool exports_plugin_handle_ipc_message(plugin_plugin_id_t *sender,
@@ -1636,24 +1781,119 @@ bool exports_plugin_handle_ipc_message(plugin_plugin_id_t *sender,
     }
 }
 
-bool exports_plugin_handle_ai_goal_can_start(uint32_t,
-                                             plugin_own_server_instance_t,
-                                             plugin_own_entity_t) {
+static std::shared_ptr<ResourceState> makeOwnedWitCallbackResource(
+    int32_t handle, ResourceKind kind, const char *interfaceName,
+    const char *resourceName) {
+    return std::make_shared<ResourceState>(ResourceState{
+        kind, handle, true, interfaceName, resourceName, ""});
+}
+
+static bool dispatchAiGoalCallback(
+    const char *exportName, uint32_t goalId,
+    plugin_own_server_instance_t server, plugin_own_entity_t entity,
+    bool returnsBoolean) {
+    std::shared_ptr<ResourceState> serverState;
+    std::shared_ptr<ResourceState> entityState;
+    WitScopeGuard resourceCleanup([&] {
+        if (serverState)
+            serverState->drop();
+        else
+            pumpkin_plugin_server_server_drop_own(
+                pumpkin_plugin_server_own_server_t{server.__handle});
+        if (entityState)
+            entityState->drop();
+        else
+            pumpkin_plugin_world_entity_drop_own(
+                pumpkin_plugin_world_own_entity_t{entity.__handle});
+    });
+
+    try {
+        serverState = makeOwnedWitCallbackResource(
+            server.__handle, ResourceKind::Server, "server", "server");
+        entityState = makeOwnedWitCallbackResource(
+            entity.__handle, ResourceKind::Entity, "world", "entity");
+        auto serverObject = wrapResourceObject(
+            *jsRuntime, std::make_shared<ServerObject>(serverState));
+        auto entityObject = wrapResourceObject(
+            *jsRuntime, makeWitResourceObject(entityState));
+        Value args[] = {Value(static_cast<double>(goalId)),
+                        Value(std::move(serverObject)),
+                        Value(std::move(entityObject))};
+        auto result = callExport(exportName, args, 3);
+        return returnsBoolean ? result.getBool() : false;
+    } catch (const std::exception &exception) {
+        logPluginError(exception.what());
+    } catch (...) {
+        logPluginError("Unknown Static Hermes AI goal callback failure");
+    }
     return false;
 }
-bool exports_plugin_handle_ai_goal_should_continue(uint32_t,
-                                                   plugin_own_server_instance_t,
-                                                   plugin_own_entity_t) {
-    return false;
+
+bool exports_plugin_handle_ai_goal_can_start(
+    uint32_t goalId, plugin_own_server_instance_t server,
+    plugin_own_entity_t entity) {
+    return dispatchAiGoalCallback(
+        "handleAiGoalCanStart", goalId, server, entity, true);
 }
-void exports_plugin_handle_ai_goal_start(uint32_t, plugin_own_server_instance_t,
-                                         plugin_own_entity_t) {}
-void exports_plugin_handle_ai_goal_tick(uint32_t, plugin_own_server_instance_t,
-                                        plugin_own_entity_t) {}
-void exports_plugin_handle_ai_goal_stop(uint32_t, plugin_own_server_instance_t,
-                                        plugin_own_entity_t) {}
-void exports_plugin_handle_generate_phase(uint32_t, plugin_generation_phase_t,
-                                          plugin_own_chunk_buffer_t) {}
+bool exports_plugin_handle_ai_goal_should_continue(
+    uint32_t goalId, plugin_own_server_instance_t server,
+    plugin_own_entity_t entity) {
+    return dispatchAiGoalCallback(
+        "handleAiGoalShouldContinue", goalId, server, entity, true);
+}
+void exports_plugin_handle_ai_goal_start(
+    uint32_t goalId, plugin_own_server_instance_t server,
+    plugin_own_entity_t entity) {
+    dispatchAiGoalCallback("handleAiGoalStart", goalId, server, entity, false);
+}
+void exports_plugin_handle_ai_goal_tick(
+    uint32_t goalId, plugin_own_server_instance_t server,
+    plugin_own_entity_t entity) {
+    dispatchAiGoalCallback("handleAiGoalTick", goalId, server, entity, false);
+}
+void exports_plugin_handle_ai_goal_stop(
+    uint32_t goalId, plugin_own_server_instance_t server,
+    plugin_own_entity_t entity) {
+    dispatchAiGoalCallback("handleAiGoalStop", goalId, server, entity, false);
+}
+
+static const char *generationPhaseName(plugin_generation_phase_t phase) {
+    switch (phase) {
+    case PUMPKIN_PLUGIN_WORLD_GENERATION_PHASE_BIOMES: return "biomes";
+    case PUMPKIN_PLUGIN_WORLD_GENERATION_PHASE_NOISE: return "noise";
+    case PUMPKIN_PLUGIN_WORLD_GENERATION_PHASE_SURFACE: return "surface";
+    case PUMPKIN_PLUGIN_WORLD_GENERATION_PHASE_FEATURES: return "features";
+    default: throw std::runtime_error("Unknown Pumpkin generation phase");
+    }
+}
+
+void exports_plugin_handle_generate_phase(
+    uint32_t generatorId, plugin_generation_phase_t phase,
+    plugin_own_chunk_buffer_t chunk) {
+    std::shared_ptr<ResourceState> chunkState;
+    WitScopeGuard chunkCleanup([&] {
+        if (chunkState)
+            chunkState->drop();
+        else
+            pumpkin_plugin_world_chunk_buffer_drop_own(
+                pumpkin_plugin_world_own_chunk_buffer_t{chunk.__handle});
+    });
+
+    try {
+        chunkState = makeOwnedWitCallbackResource(
+            chunk.__handle, ResourceKind::ChunkBuffer, "world", "chunk-buffer");
+        auto chunkObject = wrapResourceObject(
+            *jsRuntime, makeWitResourceObject(chunkState));
+        Value args[] = {Value(static_cast<double>(generatorId)),
+                        jsString(*jsRuntime, generationPhaseName(phase)),
+                        Value(std::move(chunkObject))};
+        callExport("handleGeneratePhase", args, 3);
+    } catch (const std::exception &exception) {
+        logPluginError(exception.what());
+    } catch (...) {
+        logPluginError("Unknown Static Hermes chunk generation callback failure");
+    }
+}
 
 void exports_pumpkin_plugin_metadata_get_metadata(
     exports_pumpkin_plugin_metadata_plugin_metadata_t *ret) {
