@@ -1,5 +1,5 @@
 name: Bootstrap
-description: Install pnpm and Node, restore the pnpm cache and install dependencies
+description: Install pnpm and Node, restore and share pnpm and Turborepo caches, then install dependencies
 
 runs:
     using: composite
@@ -17,9 +17,13 @@ runs:
           shell: bash
           run: pnpm install --frozen-lockfile
 
-        - name: 💾 Cache Turborepo
+        - name: ♻️ Restore and save shared Turborepo cache
           uses: actions/cache@v6.1.0
           with:
               path: .turbo
-              key: turbo-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
-              restore-keys: turbo-${{ runner.os }}-${{ github.job }}-
+              key: turbo-${{ runner.os }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+              restore-keys: |
+                  turbo-${{ runner.os }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-build
+                  turbo-${{ runner.os }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-
+                  turbo-${{ runner.os }}-${{ github.sha }}-
+                  turbo-${{ runner.os }}-
