@@ -46,11 +46,12 @@ Markdown-only package edits skip package tests. `tools/build/src/` is source, no
 Real-server tests are deliberately separate; see [Testing](testing.md) and
 [the testing skill](https://github.com/filiphsps/pumpkin-plugins/blob/master/.agents/skills/pumpkin-testing/SKILL.md).
 
-The direct no-path runner checks every dirty file in the checkout. Codex completion hooks instead
-compare the working tree before and after each tool call, then check only files changed during that
-agent's turn. Root agents and subagents get separate scopes, so concurrent work in the same checkout
-does not add its failures to another agent's completion report. Passing these fast checks does not
-prove runtime behavior, correct prose or the full CI workflow.
+The direct no-path runner checks every dirty file in the checkout. Codex completion hooks compare the
+working tree around each tool call, then record only changed files explicitly targeted by `Edit`,
+`Write`, `apply_patch` or a shell output redirection. Shell commands with implicit file side effects
+have no attributable file scope. Root agents and subagents get separate scopes, so unrelated work in
+the same checkout does not enter another agent's completion report. Passing these fast checks does
+not prove runtime behavior, correct prose or the full CI workflow.
 
 ## Portable hook protocol
 

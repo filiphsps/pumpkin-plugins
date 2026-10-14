@@ -67,6 +67,13 @@ function changedPaths(before, after) {
     return [...paths].filter((file) => before.get(file) !== after.get(file));
 }
 
+/** Find shell output redirection destinations, the only file targets Bash declares directly. */
+function shellOutputTargets(command) {
+    return [...command.matchAll(/(?:^|[^<])(?:\d+)?(>>?)\s*(?:"([^"]+)"|'([^']+)'|([^\s;&|]+))/g)]
+        .map((match) => match[2] ?? match[3] ?? match[4])
+        .filter((file) => typeof file === 'string' && file !== '' && !file.startsWith('&'));
+}
+
 function toolTargets(root, request) {
     const input = request.tool_input ?? {};
     let files = [];
@@ -76,6 +83,8 @@ function toolTargets(root, request) {
     } else if (request.tool_name === 'Edit' || request.tool_name === 'Write') {
         const file = input.path ?? input.filePath ?? input.file_path;
         if (typeof file === 'string') files = [file];
+    } else if (request.tool_name === 'Bash' && typeof input.command === 'string') {
+        files = shellOutputTargets(input.command);
     }
 
     return new Set(files.map((file) => repoPath(root, file, request.cwd ?? root)).filter((file) => file !== undefined));
@@ -141,7 +150,7 @@ export class HookScope {
         const filesDirectory = path.join(turnDirectory, 'files');
         const candidates = changedPaths(before, after);
         const targets = toolTargets(this.root, request);
-        const changed = targets.size > 0 ? candidates.filter((file) => targets.has(file)) : candidates;
+        const changed = candidates.filter((file) => targets.has(file));
         if (changed.length > 0) fs.mkdirSync(filesDirectory, { recursive: true });
         for (const file of changed) {
             const marker = path.join(filesDirectory, Buffer.from(file).toString('base64url'));

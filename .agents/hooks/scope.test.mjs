@@ -43,6 +43,47 @@ describe('Codex hook scope', () => {
         assert.deepEqual(scope.files('session-b', 'turn-a'), []);
     });
 
+    it('does not claim unrelated changes during a shell command without an output target', () => {
+        const directory = temporaryDirectory();
+        let current = new Map();
+        const scope = new HookScope({ directory, snapshot: () => new Map(current) });
+        const request = {
+            session_id: 'session-a',
+            turn_id: 'turn-a',
+            tool_use_id: 'tool-a',
+            tool_name: 'Bash',
+            tool_input: { command: 'pnpm test:scripts' }
+        };
+
+        scope.beforeTool(request);
+        current = new Map([['other-session.ts', 'changed concurrently']]);
+        scope.afterTool(request);
+
+        assert.deepEqual(scope.files('session-a', 'turn-a'), []);
+    });
+
+    it('limits shell output changes to the file targeted by the command', () => {
+        const directory = temporaryDirectory();
+        let current = new Map();
+        const scope = new HookScope({ directory, snapshot: () => new Map(current) });
+        const request = {
+            session_id: 'session-a',
+            turn_id: 'turn-a',
+            tool_use_id: 'tool-a',
+            tool_name: 'Bash',
+            tool_input: { command: 'cat > packages/p/src/current.ts' }
+        };
+
+        scope.beforeTool(request);
+        current = new Map([
+            ['other-session.ts', 'changed concurrently'],
+            ['packages/p/src/current.ts', 'written by this command']
+        ]);
+        scope.afterTool(request);
+
+        assert.deepEqual(scope.files('session-a', 'turn-a'), ['packages/p/src/current.ts']);
+    });
+
     it('detects edits to files that were already dirty before the tool call', () => {
         const directory = temporaryDirectory();
         let current = new Map([['packages/p/src/shared.ts', 'previous edit']]);
@@ -50,7 +91,9 @@ describe('Codex hook scope', () => {
         const request = {
             session_id: 'session-a',
             turn_id: 'turn-a',
-            tool_use_id: 'tool-a'
+            tool_use_id: 'tool-a',
+            tool_name: 'Edit',
+            tool_input: { path: 'packages/p/src/shared.ts' }
         };
 
         scope.beforeTool(request);
