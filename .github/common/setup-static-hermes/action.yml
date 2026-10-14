@@ -1,5 +1,5 @@
 name: Setup Static Hermes
-description: Cache the configured WASI SDK, wit-bindgen and Static Hermes toolchain
+description: Set up pinned host tools and cache the configured wit-bindgen and Static Hermes build
 
 inputs:
     toolchain-config-root:
@@ -11,6 +11,12 @@ outputs:
     hermes-cache-key:
         description: Cache key to use when saving the prepared Static Hermes build
         value: ${{ steps.hermes-workspace-cache.outputs.cache-primary-key }}
+    cmake-version:
+        description: Pinned CMake version for Static Hermes builds
+        value: ${{ steps.versions.outputs.cmake-version }}
+    ninja-version:
+        description: Pinned Ninja version for Static Hermes builds
+        value: ${{ steps.versions.outputs.ninja-version }}
 
 runs:
     using: composite
@@ -26,10 +32,72 @@ runs:
               wit_bindgen_version="$(jq -er '.tools["wit-bindgen"]' "$config/toolchain-versions.json")"
               rust_toolchain_version="$(jq -er '.tools.rust' "$config/toolchain-versions.json")"
               {
+                  echo "cmake-version=4.4.4"
+                  echo "ninja-version=1.13.2"
                   echo "wasi-sdk-version=$wasi_sdk_version"
                   echo "wit-bindgen-version=$wit_bindgen_version"
                   echo "rust-toolchain-version=$rust_toolchain_version"
               } >> "$GITHUB_OUTPUT"
+
+        - name: 🐍 Setup Python for pinned host tools
+          uses: actions/setup-python@v6.1.0
+          with:
+              python-version: '3.13'
+
+        - name: 🔎 Resolve host Python version
+          id: host-python
+          shell: bash
+          run: |
+              python_version="$(python -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+              echo "version=$python_version" >> "$GITHUB_OUTPUT"
+
+        - name: 💾 Cache pinned CMake and Ninja
+          id: host-tools-cache
+          uses: actions/cache@v6.1.0
+          with:
+              path: ${{ runner.temp }}/host-tools
+              key: static-hermes-host-tools-v1-cmake-${{ steps.versions.outputs.cmake-version }}-ninja-${{ steps.versions.outputs.ninja-version }}-python-${{ steps.host-python.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
+
+        - name: 📦 Install pinned CMake and Ninja
+          if: steps.host-tools-cache.outputs.cache-hit != 'true' && runner.os != 'Windows'
+          shell: bash
+          env:
+              CMAKE_VERSION: ${{ steps.versions.outputs.cmake-version }}
+              NINJA_VERSION: ${{ steps.versions.outputs.ninja-version }}
+          run: |
+              host_tools="$RUNNER_TEMP/host-tools"
+              python -m pip install --disable-pip-version-check --target "$host_tools" \
+                  "cmake==$CMAKE_VERSION" "ninja==$NINJA_VERSION"
+
+        - name: 📦 Install pinned CMake and Ninja
+          if: steps.host-tools-cache.outputs.cache-hit != 'true' && runner.os == 'Windows'
+          shell: pwsh
+          env:
+              CMAKE_VERSION: ${{ steps.versions.outputs.cmake-version }}
+              NINJA_VERSION: ${{ steps.versions.outputs.ninja-version }}
+          run: |
+              $hostTools = Join-Path $env:RUNNER_TEMP 'host-tools'
+              $cmakePackage = "cmake==$env:CMAKE_VERSION"
+              $ninjaPackage = "ninja==$env:NINJA_VERSION"
+              python -m pip install --disable-pip-version-check --target $hostTools $cmakePackage $ninjaPackage
+
+        - name: 🔧 Export pinned host tool paths
+          if: runner.os != 'Windows'
+          shell: bash
+          run: |
+              host_tools="$RUNNER_TEMP/host-tools"
+              {
+                  echo "$host_tools/bin"
+                  echo "$host_tools/cmake/data/bin"
+              } >> "$GITHUB_PATH"
+
+        - name: 🔧 Export pinned host tool paths
+          if: runner.os == 'Windows'
+          shell: pwsh
+          run: |
+              $hostTools = Join-Path $env:RUNNER_TEMP 'host-tools'
+              Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $hostTools 'bin')
+              Add-Content -Path $env:GITHUB_PATH -Value (Join-Path $hostTools 'cmake/data/bin')
 
         - name: 💾 Cache wit-bindgen ${{ steps.versions.outputs.wit-bindgen-version }}
           id: wit-bindgen-cache
@@ -61,7 +129,7 @@ runs:
           uses: actions/cache/restore@v6.1.0
           with:
               path: ${{ github.workspace }}/.cache/hermes
-              key: static-hermes-workspace-cache-v5-wasi-sdk-${{ steps.versions.outputs.wasi-sdk-version }}-wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}-rust-${{ steps.versions.outputs.rust-toolchain-version }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(format('{0}/wasi-sdk.lock.json', inputs['toolchain-config-root']), format('{0}/toolchain-versions.json', inputs['toolchain-config-root'])) }}-${{ hashFiles(format('{0}/hermes-source.lock.json', inputs['toolchain-config-root']), format('{0}/hermes-patches/*.patch', inputs['toolchain-config-root']), format('{0}/cmake/**', inputs['toolchain-config-root']), format('{0}/src/hermes/**', inputs['toolchain-config-root']), format('{0}/src/cli.ts', inputs['toolchain-config-root'])) }}
+              key: static-hermes-workspace-cache-v6-cmake-${{ steps.versions.outputs.cmake-version }}-ninja-${{ steps.versions.outputs.ninja-version }}-wasi-sdk-${{ steps.versions.outputs.wasi-sdk-version }}-wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}-rust-${{ steps.versions.outputs.rust-toolchain-version }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(format('{0}/wasi-sdk.lock.json', inputs['toolchain-config-root']), format('{0}/toolchain-versions.json', inputs['toolchain-config-root'])) }}-${{ hashFiles(format('{0}/hermes-source.lock.json', inputs['toolchain-config-root']), format('{0}/hermes-patches/*.patch', inputs['toolchain-config-root']), format('{0}/cmake/**', inputs['toolchain-config-root']), format('{0}/src/hermes/**', inputs['toolchain-config-root']), format('{0}/src/cli.ts', inputs['toolchain-config-root'])) }}
 
         - name: 🔧 Export Static Hermes toolchain paths
           shell: bash
