@@ -53,7 +53,15 @@ jobs:
                   ENGINE_COMPARISON_VARIANT: ${{ matrix.variant }}
                   ENGINE_COMPARISON_RESULT_PATH: ${{ runner.temp }}/engine-comparison-results/${{ matrix.variant }}.json
                   PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/engine-comparison-logs
+                  GITHUB_STEP_SUMMARY: ${{ runner.temp }}/engine-comparison-vitest-summary-${{ matrix.variant }}.md
               run: pnpm --filter @pumpkin-plugins/engine-comparison compare-engines
+
+            - name: 📝 Append test failure report to summary
+              if: failure()
+              run: |
+                  if [ -f "${{ runner.temp }}/engine-comparison-vitest-summary-${{ matrix.variant }}.md" ]; then
+                      cat "${{ runner.temp }}/engine-comparison-vitest-summary-${{ matrix.variant }}.md" >> "$GITHUB_STEP_SUMMARY"
+                  fi
 
             - name: 📤 Upload benchmark result
               if: matrix.kind == 'benchmark'
