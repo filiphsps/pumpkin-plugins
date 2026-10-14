@@ -1,11 +1,10 @@
 /** Fetches and decodes JSON from a URL before returning. */
 export type JsonRequest = (url: string, headers?: Record<string, string>) => unknown;
 
-/** Describes whether a newer version exists and where to find it. */
+/** Describes whether a newer version is available. */
 export interface UpdateCheck {
     currentVersion: string;
     latestVersion: string | null;
-    releaseUrl?: string;
     updateAvailable: boolean;
 }
 
