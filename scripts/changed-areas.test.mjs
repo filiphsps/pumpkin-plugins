@@ -68,10 +68,12 @@ function run(dir, ...args) {
 describe('changed-areas', () => {
     it('classifies changes without installed workspace dependencies', () => {
         const dir = repo({
-            'changed-areas.mjs': fs.readFileSync(path.join(scripts, 'changed-areas.mjs'), 'utf8'),
+            'scripts/changed-areas.mjs': fs.readFileSync(path.join(scripts, 'changed-areas.mjs'), 'utf8'),
+            'scripts/ignored-commits.mjs': fs.readFileSync(path.join(scripts, 'ignored-commits.mjs'), 'utf8'),
+            '.git-blame-ignore-revs': fs.readFileSync(path.join(scripts, '../.git-blame-ignore-revs'), 'utf8'),
             'docs/guide.md': '# Guide\n',
         });
-        const script = path.join(dir, 'changed-areas.mjs');
+        const script = path.join(dir, 'scripts/changed-areas.mjs');
         const base = change(dir, { 'docs/guide.md': '# Guide\n\nMore.\n' });
         const result = spawnSync('node', [script, base, 'HEAD'], {
             cwd: dir,

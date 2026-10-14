@@ -3,6 +3,7 @@
 // See the Jobs table in docs/ci-and-releases.md.
 import { spawnSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
+import { ignoredCommitShas } from './ignored-commits.mjs';
 
 /** A changed file matching any of these is documentation, which nothing that builds or tests reads. */
 const DOCS = [/\.md$/, /^docs\//, /^LICENSE$/, /^(packages|tools|actions)\/[^/]+\/docs(?:\/|$)/];
@@ -32,13 +33,31 @@ if (diff.status !== 0) {
     process.exit(1);
 }
 
-const changed = diff.stdout.split('\n').filter((file) => file.length > 0);
-const commitLog = spawnSync('git', ['log', '--format=%s', `${base}..${head}`], { encoding: 'utf8' });
+const commitLog = spawnSync(
+    'git',
+    ['log', '--format=%H%x09%s', '--name-only', '--no-renames', '--diff-merges=first-parent', `${base}..${head}`],
+    { encoding: 'utf8' },
+);
 if (commitLog.status !== 0) {
     console.error(`Could not read commits between ${base} and ${head}: ${commitLog.stderr.trim()}`);
     process.exit(1);
 }
-const generatedReadmes = commitLog.stdout.split('\n').includes('docs: update generated READMEs');
+const changedByNonIgnoredCommits = new Set();
+let currentSha;
+let generatedReadmes = false;
+for (const line of commitLog.stdout.split('\n')) {
+    const separator = line.indexOf('\t');
+    if (separator !== -1 && /^[a-f\d]{40}$/.test(line.slice(0, separator))) {
+        currentSha = line.slice(0, separator);
+        const subject = line.slice(separator + 1);
+        if (!ignoredCommitShas.has(currentSha) && subject === 'docs: update generated READMEs') {
+            generatedReadmes = true;
+        }
+        continue;
+    }
+    if (currentSha && !ignoredCommitShas.has(currentSha) && line) changedByNonIgnoredCommits.add(line);
+}
+const changed = diff.stdout.split('\n').filter((file) => file.length > 0 && changedByNonIgnoredCommits.has(file));
 const isDocs = (file) => DOCS.some((pattern) => pattern.test(file));
 const actionPaths = changed.filter((file) => !isDocs(file) && /^actions\/[^/]+\//.test(file));
 const actions = [...new Set(actionPaths.map((file) => file.split('/')[1]))].filter((name) => name !== 'common').sort();

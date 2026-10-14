@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
+import { ignoredCommitShas } from './ignored-commits.mjs';
 import { PUBLIC_TOOL_PACKAGE_PATHS } from './tool-packages.mjs';
 
 /** Reads workspace package manifests for identifying code bundled into each plugin. */
@@ -57,6 +58,7 @@ export function releaseCommits(commits, paths, lastReleaseSha, component) {
     if (boundary === -1) throw new Error(`Release commit ${lastReleaseSha} is missing from the fetched history`);
     const seen = new Set();
     return commits.slice(0, boundary).filter((commit) => {
+        if (ignoredCommitShas.has(commit.sha)) return false;
         if (!Array.isArray(commit.files)) throw new Error(`Commit ${commit.sha} has no changed-file list`);
         if (seen.has(commit.sha)) return false;
         seen.add(commit.sha);
@@ -68,7 +70,12 @@ export function releaseCommits(commits, paths, lastReleaseSha, component) {
 function commitShasSinceRelease(commits, lastReleaseSha) {
     const boundary = commits.findIndex((commit) => commit.sha === lastReleaseSha);
     if (boundary === -1) throw new Error(`Release commit ${lastReleaseSha} is missing from the fetched history`);
-    return new Set(commits.slice(0, boundary).map((commit) => commit.sha));
+    return new Set(
+        commits
+            .slice(0, boundary)
+            .filter((commit) => !ignoredCommitShas.has(commit.sha))
+            .map((commit) => commit.sha),
+    );
 }
 
 async function previousPublishedRelease(github, currentTag) {
@@ -119,8 +126,8 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
             const actionPaths = Object.keys(strategies).filter((path) => path.startsWith('actions/'));
             for (const path of actionPaths) {
                 const component = path.split('/').at(-1);
-                commitsByPath[path] = (commitsByPath[path] ?? []).filter((commit) =>
-                    releaseAsTargetsComponent(commit, component),
+                commitsByPath[path] = (commitsByPath[path] ?? []).filter(
+                    (commit) => !ignoredCommitShas.has(commit.sha) && releaseAsTargetsComponent(commit, component),
                 );
             }
             const pluginPaths = Object.keys(strategies).filter((path) => path.startsWith('packages/'));

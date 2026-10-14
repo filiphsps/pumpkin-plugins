@@ -1,0 +1,3 @@
+# chore(biome): sort package metadata and format repository (#107)
+# Formatting-only repository-wide sweep; omit its changes from release history and CI classification.
+26a20e192e76e4a826b1198137636f0be4168b42

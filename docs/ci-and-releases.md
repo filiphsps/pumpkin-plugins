@@ -50,11 +50,14 @@ after one day instead of being deleted by the workflows.
 ## Running only what a change needs
 
 `scripts/changed-areas.mjs` diffs the change against what came before it (the pull request base or
-the push's `before` commit). Markdown, `docs/`, component-level `docs/` folders and `LICENSE`
-changes are documentation. Changes under `actions/{name}/` are reported separately from plugin and repository code. An action-only
-change skips the plugin build, integration suites and repository test jobs; CI calls the reusable
-Actions workflow, which
-tests that action when its code changes; common helper changes test common and all four public consumers.
+the push's `before` commit). Both it and `scripts/release-commits.mjs` exclude commits listed in
+`.git-blame-ignore-revs`; that file is also GitHub's blame ignore list. Add a short reason comment
+above each SHA so future entries retain their context. Markdown, `docs/`,
+component-level `docs/` folders and `LICENSE` changes are documentation. Changes under
+`actions/{name}/` are reported separately from plugin and repository code. An action-only change
+skips the plugin build, integration suites and repository test jobs; CI calls the reusable Actions
+workflow, which tests that action when its code changes; common helper changes test common and all
+four public consumers.
 Common is excluded from release selection. Action tests live beside their implementation in
 `actions/{name}/src/*.test.mjs`; shared helper tests live in `actions/common/src/*.test.mjs`. README,
 changelog and version-file-only changes skip action tests.
