@@ -80,6 +80,7 @@ const TOOL_FILE_ALLOWLISTS = {
         'LICENSE',
     ],
     'tools/create-pumpkin-plugin': ['bin/create-pumpkin-plugin.ts', 'dist', 'templates', 'README.md'],
+    'tools/codemod': ['dist', 'README.md', 'docs', 'LICENSE'],
     'tools/static-hermes-runtime': [
         'src/**/*.ts',
         '!src/**/*.test.ts',

@@ -448,6 +448,7 @@ describe('check-release-config', () => {
         'tools/create-pumpkin-plugin': 'create-pumpkin-plugin',
         'tools/pumpkin-api': '@pumpkin-plugins/pumpkin-api',
         'tools/static-hermes-runtime': '@pumpkin-plugins/static-hermes-runtime',
+        'tools/codemod': '@pumpkin-plugins/codemod',
     };
     const files = ({ manifest = '0.0.0', releaseAs = '0.0.1', version = '0.0.0' } = {}) => ({
         'packages/plug/package.json': { name: 'plug', version },
@@ -507,7 +508,7 @@ describe('check-release-config', () => {
     it('passes for an unreleased plugin that is set to release 0.0.1', () => {
         const result = run('check-release-config.mjs', repo(files()));
         assert.ok(result.ok, result.out);
-        assert.match(result.out, /4 public tools/);
+        assert.match(result.out, /5 public tools/);
     });
 
     it('requires the public tool release pin and package version to match its first 0.1.0 release', () => {
@@ -541,7 +542,7 @@ describe('check-release-config', () => {
         assert.ok(result.ok, result.out);
         assert.match(
             result.out,
-            /1 plugin, 0 actions, and 4 public tools: .*packages\/plug.*; 1 paused: packages\/not-ready/,
+            /1 plugin, 0 actions, and 5 public tools: .*packages\/plug.*; 1 paused: packages\/not-ready/,
         );
     });
 
@@ -599,7 +600,7 @@ describe('check-release-config', () => {
     it('registers actions as simple release components with matching version.txt entries', () => {
         const result = run('check-release-config.mjs', repo(withAction()));
         assert.ok(result.ok, result.out);
-        assert.match(result.out, /1 plugin, 1 action, and 4 public tools/);
+        assert.match(result.out, /1 plugin, 1 action, and 5 public tools/);
 
         const wrongType = run('check-release-config.mjs', repo(withAction(files(), { releaseType: 'node' })));
         assert.match(wrongType.out, /needs "release-type": "simple"/);

@@ -111,6 +111,13 @@ test('preserves each published tool package file allowlist when metadata is fixe
             bin: { 'create-pumpkin-plugin': 'dist/create-pumpkin-plugin.js' },
             files: ['bin/create-pumpkin-plugin.ts', 'dist', 'templates', 'README.md'],
         },
+        'tools/codemod': {
+            name: '@pumpkin-plugins/codemod',
+            description: 'Codemod runner for Pumpkin plugins',
+            exports: { '.': { types: './dist/src/index.d.ts', import: './dist/src/index.js' } },
+            bin: { 'pumpkin-codemod': 'dist/bin/pumpkin-codemod.js' },
+            files: ['dist', 'README.md', 'docs', 'LICENSE'],
+        },
         'tools/static-hermes-runtime': {
             name: '@pumpkin-plugins/static-hermes-runtime',
             description: 'Static Hermes Runtime shim for plugin components',

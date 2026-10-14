@@ -24,7 +24,7 @@ shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
 | 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
-| 📦 External consumer | code changes | Packs public tools and their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters outside the repository on Linux, macOS arm64 and Windows x64 with the pinned Node and pnpm versions |
+| 📦 External consumer | code changes | Packs public tools and their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters and runs `pumpkin-codemod list` outside the repository on Linux, macOS arm64 and Windows x64 with the pinned Node and pnpm versions |
 | 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or common plus all four public consumers for shared helper changes, then uploads c8 coverage to Codecov |
 | 🛡️ Action test gate | every CI run, after classification and action tests | Requires every selected action suite to pass; accepts skipped tests only for an empty matrix |
 | 📝 Docs and config | code, action, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
@@ -136,8 +136,8 @@ Actions import shared runtime helpers from `actions/common/src/`. Each action ta
 snapshot of those files, so changes to a shared helper must also include releasable changes under
 each consuming action directory to publish the updated helper with those actions.
 
-Public tools are registered at `tools/build`, `tools/create-pumpkin-plugin`, `tools/pumpkin-api`,
-and `tools/static-hermes-runtime`. Their first npm release is `0.1.0`; the manifest uses `0.0.0`
+Public tools are registered at `tools/build`, `tools/codemod`, `tools/create-pumpkin-plugin`,
+`tools/pumpkin-api`, and `tools/static-hermes-runtime`. Their first npm release is `0.1.0`; the manifest uses `0.0.0`
 until each first release, and the repository check enforces the first-release pins. Tool tags use
 their component name, such as `build-v0.1.0`. The `📦 Publish npm` job checks out the exact tagged
 commit, runs pnpm's package pack command so pnpm resolves `catalog:` and `workspace:` specs in the published
@@ -146,13 +146,20 @@ version is accepted only when its tarball integrity matches. Builder releases in
 the public API and Static Hermes runtime because those packages are builder dependencies. Release PR
 preparation syncs both creator templates to the API and builder versions on the release branch.
 
-Before the first npm release, configure a GitHub Actions trusted publisher on each of the four npm
+Before the first npm release, configure a GitHub Actions trusted publisher on each of the five npm
 packages. Use organization or user `filiphsps`, repository `pumpkin-plugins`, workflow filename
 `ci.yml`, and no environment name. npm validates the caller workflow filename when a reusable
 workflow publishes, and OIDC needs `id-token: write` in both the caller job and reusable publish
 job. The workflows use Node `24.21.0` with npm `11.5.1` or newer; no npm write token is stored in
 GitHub Actions. See [npm trusted publishers](https://docs.npmjs.com/trusted-publishers/) for the npm
 side setup.
+
+To register a new public tool, add its publishable package under `tools/` and run
+`pnpm register:tool tools/<name>`. The command validates the canonical package name, public access
+and first version, then updates both Release Please files. It sets a missing first-release pin on an
+existing entry and rejects a conflicting one. Add the package to the public-tool metadata, pack and
+external-consumer checks when it has files or commands those checks should verify. The existing
+unscoped `create-pumpkin-plugin` package name remains supported.
 
 The merge of a release PR is its own commit, so its push can start a run while the previous commit's
 run is still active. The older run may create the tag and release first, using an artifact built from

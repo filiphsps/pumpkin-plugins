@@ -28,6 +28,7 @@ describe('public tool release fanout', () => {
                 { path: 'tools/pumpkin-api' },
                 { path: 'tools/static-hermes-runtime' },
                 { path: 'tools/create-pumpkin-plugin' },
+                { path: 'tools/codemod' },
             ]),
             {
                 pluginPaths: ['packages/waypoints'],
@@ -37,6 +38,7 @@ describe('public tool release fanout', () => {
                     'tools/pumpkin-api',
                     'tools/static-hermes-runtime',
                     'tools/create-pumpkin-plugin',
+                    'tools/codemod',
                 ],
             },
         );
@@ -153,6 +155,26 @@ describe('packed public tool contents', () => {
             assertPublicToolPackageContents(
                 entries.filter((entry) => !entry.endsWith('.test.ts')),
                 'tools/create-pumpkin-plugin',
+            ),
+        );
+    });
+
+    it('keeps the codemod CLI and framework declarations in the packed package', () => {
+        const entries = [
+            'package/dist/bin/pumpkin-codemod.js',
+            'package/dist/src/index.js',
+            'package/dist/src/index.d.ts',
+            'package/README.md',
+            'package/docs/using-codemods.md',
+            'package/docs/authoring-codemods.md',
+            'package/src/runner.test.ts',
+        ];
+
+        assert.throws(() => assertPublicToolPackageContents(entries, 'tools/codemod'), /development test source/);
+        assert.doesNotThrow(() =>
+            assertPublicToolPackageContents(
+                entries.filter((entry) => !entry.endsWith('.test.ts')),
+                'tools/codemod',
             ),
         );
     });
