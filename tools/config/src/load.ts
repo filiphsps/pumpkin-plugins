@@ -48,6 +48,7 @@ export interface LoadResult<V> {
  * @param options - Rendering options.
  * @returns The values and a report of what changed.
  * @throws {ConfigSyntaxError} When the file isn't valid TOML. The file is not modified.
+ * @throws When a schema default contains unsupported data, a cycle, or an unsupported object type.
  */
 export function loadConfig<S extends ConfigSchema>(
     schema: S,

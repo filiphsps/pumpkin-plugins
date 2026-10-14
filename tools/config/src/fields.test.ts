@@ -33,6 +33,29 @@ describe('int', () => {
         expect(int({ description: 'd', default: 1, max: 9 }).expected).toBe('a whole number of at most 9');
         expect(int({ description: 'd', default: 1 }).expected).toBe('a whole number');
     });
+
+    it('rejects bounds that are not safe integers', () => {
+        expect(() => int({ description: 'd', min: 1.5 })).toThrow('int() min must be a safe integer');
+        expect(() => int({ description: 'd', max: 2.5 })).toThrow('int() max must be a safe integer');
+    });
+
+    it('rejects an inverted range', () => {
+        expect(() => int({ description: 'd', min: 2, max: 1 })).toThrow('int() min must not exceed max');
+    });
+
+    it('rejects defaults that cannot be parsed under the declared range', () => {
+        expect(() => int({ description: 'd', default: 1.5 })).toThrow('int() default must be a safe integer');
+        expect(() => int({ description: 'd', default: 0, min: 1 })).toThrow(
+            'int() default must be within the declared bounds',
+        );
+    });
+
+    it('rejects examples that cannot be parsed under the declared range', () => {
+        expect(() => int({ description: 'd', example: 1.5 })).toThrow('int() example must be a safe integer');
+        expect(() => int({ description: 'd', example: 0, min: 1 })).toThrow(
+            'int() example must be within the declared bounds',
+        );
+    });
 });
 
 describe('str', () => {
@@ -50,6 +73,29 @@ describe('str', () => {
         expect(f.parse('NO')).toEqual({ ok: false });
         expect(f.parse(1)).toEqual({ ok: false });
         expect(f.expected).toBe('lowercase');
+    });
+
+    it('rejects defaults and examples that do not pass their check', () => {
+        const check = { expected: 'lowercase', test: (value: string) => value === value.toLowerCase() };
+
+        expect(() => str({ description: 'd', default: 'INVALID', check })).toThrow('str() default must be lowercase');
+        expect(() => str({ description: 'd', example: 'INVALID', check })).toThrow('str() example must be lowercase');
+    });
+
+    it('normalizes accepted defaults and examples when the field is declared', () => {
+        const f = str({
+            description: 'd',
+            default: ' https://example.test/// ',
+            example: ' https://sample.test/// ',
+            check: {
+                expected: 'an http URL',
+                test: (value) => value.startsWith(' https://') && value.endsWith(' '),
+                normalize: (value) => value.trim().replace(/\/+$/, ''),
+            },
+        });
+
+        expect(f.default).toBe('https://example.test');
+        expect(f.example).toBe('"https://sample.test"');
     });
 
     it('formats its example as a TOML literal', () => {

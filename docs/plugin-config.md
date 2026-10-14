@@ -44,10 +44,20 @@ export type Config = ConfigValues<typeof configSchema>;
 
 | Piece | |
 | --- | --- |
-| `bool`, `int`, `str` | Settings. Give a `default`, or leave it out to make the setting optional (its value is then `undefined` when unset). `int` takes `min` and `max`; `str` takes a `check` with its own `test` and `normalize`. Any field can use `migrateFrom: ['section', 'old_key']` to seed a newly added setting from an older value when its new key is absent. Multiple fields can read the same old key. |
+| `bool`, `int`, `str` | Settings. Give a `default`, or leave it out to make the setting optional (its value is then `undefined` when unset). `int` takes safe-integer `min` and `max` bounds, with `min` no greater than `max`; its default and example must be safe integers within those bounds. `str` takes a `check` with its own `test` and `normalize`; configured defaults and examples must pass the check and are stored in normalized form. Any field can use `migrateFrom: ['section', 'old_key']` to seed a newly added setting from an older value when its new key is absent. Multiple fields can read the same old key. |
 | `section` | A fixed group of settings, written as `[name]`. |
-| `table` | Named entries that share optional settings, written as `[name."entry"]`. Entries are user data and are kept as they are. |
+| `table` | Named entries that share optional settings, written as `[name."entry"]`. |
 | `ConfigValues` | The typed object `loadConfig` returns, inferred from the schema. |
+
+Entries supplied through `table({ defaults })` seed fresh config files. Omitted fields in a seeded
+entry are filled from their field defaults; fields without defaults stay absent. Users can remove
+an entry or the whole table later, and reading an existing file does not restore removed table
+defaults.
+
+Defaults with structured values are copied recursively each time config values are created, so
+changing one result cannot mutate a later result. Custom fields should use TOML-compatible plain
+tables, arrays, and `Date` values; cycles and other JavaScript object types are rejected by the
+config value copier.
 
 Domain-specific checks (a URL, an IPv4 address, a folder inside the data folder) are small wrappers
 around `str` in the plugin itself. See `packages/bedrock-addon-manager/src/config/fields.ts`.
