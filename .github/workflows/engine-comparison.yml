@@ -53,7 +53,19 @@ jobs:
                   ENGINE_COMPARISON_VARIANT: ${{ matrix.variant }}
                   ENGINE_COMPARISON_RESULT_PATH: ${{ runner.temp }}/engine-comparison-results/${{ matrix.variant }}.json
                   PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/engine-comparison-logs
-              run: pnpm --filter @pumpkin-plugins/engine-comparison compare-engines
+              run: |
+                  vitest_summary_path="$(mktemp "$RUNNER_TEMP/engine-comparison-vitest-summary.XXXXXX")"
+                  if GITHUB_STEP_SUMMARY="$vitest_summary_path" pnpm --filter @pumpkin-plugins/engine-comparison compare-engines; then
+                      exit 0
+                  else
+                      status=$?
+                  fi
+
+                  if [ -s "$vitest_summary_path" ]; then
+                      cat "$vitest_summary_path" >> "$GITHUB_STEP_SUMMARY"
+                  fi
+
+                  exit "$status"
 
             - name: 📤 Upload benchmark result
               if: matrix.kind == 'benchmark'
