@@ -51,18 +51,18 @@
         "types": "pumpkin-plugins-build --types-only"
     },
     "dependencies": {
+        "@pumpkin-plugins/config": "workspace:*",
+        "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/pumpkin-api": "catalog:",
+        "@pumpkin-plugins/upnpumpkin-api": "workspace:*",
         "fflate": "catalog:"
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",
-        "@pumpkin-plugins/config": "workspace:*",
-        "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/port-mapping": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
-        "@pumpkin-plugins/upnpumpkin-api": "workspace:*",
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",
         "smol-toml": "1.9.0",

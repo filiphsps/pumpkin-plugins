@@ -50,6 +50,7 @@
     },
     "dependencies": {
         "@pumpkin-plugins/config": "workspace:*",
+        "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@pumpkin-plugins/pumpkin-pie-api": "workspace:*",
@@ -57,7 +58,6 @@
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",
-        "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",

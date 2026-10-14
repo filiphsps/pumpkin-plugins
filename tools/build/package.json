@@ -56,6 +56,7 @@
         "@bytecodealliance/jco": "catalog:",
         "@commander-js/extra-typings": "catalog:",
         "@di-framework/componentize-qjs": "0.4.4-di.3",
+        "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@pumpkin-plugins/static-hermes-runtime": "workspace:*",
         "commander": "catalog:",
@@ -63,7 +64,6 @@
         "typescript": "catalog:"
     },
     "devDependencies": {
-        "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",
         "vitest": "catalog:"

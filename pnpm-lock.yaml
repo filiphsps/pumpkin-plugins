@@ -356,6 +356,12 @@ importers:
 
   packages/bedrock-addon-manager:
     dependencies:
+      '@pumpkin-plugins/config':
+        specifier: workspace:*
+        version: link:../../tools/config
+      '@pumpkin-plugins/docs':
+        specifier: workspace:*
+        version: link:../../tools/docs
       '@pumpkin-plugins/minecraft-colors':
         specifier: workspace:*
         version: link:../../tools/minecraft-colors
@@ -365,6 +371,9 @@ importers:
       '@pumpkin-plugins/pumpkin-api':
         specifier: 'catalog:'
         version: link:../../tools/pumpkin-api
+      '@pumpkin-plugins/upnpumpkin-api':
+        specifier: workspace:*
+        version: link:../../tools/apis/upnpumpkin-api
       fflate:
         specifier: 'catalog:'
         version: 0.8.3
@@ -372,21 +381,12 @@ importers:
       '@pumpkin-plugins/build':
         specifier: workspace:*
         version: link:../../tools/build
-      '@pumpkin-plugins/config':
-        specifier: workspace:*
-        version: link:../../tools/config
-      '@pumpkin-plugins/docs':
-        specifier: workspace:*
-        version: link:../../tools/docs
       '@pumpkin-plugins/port-mapping':
         specifier: workspace:*
         version: link:../../tools/port-mapping
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../../tools/test-harness
-      '@pumpkin-plugins/upnpumpkin-api':
-        specifier: workspace:*
-        version: link:../../tools/apis/upnpumpkin-api
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
@@ -405,6 +405,12 @@ importers:
 
   packages/distant-horizons-support-pumpkin:
     dependencies:
+      '@pumpkin-plugins/config':
+        specifier: workspace:*
+        version: link:../../tools/config
+      '@pumpkin-plugins/docs':
+        specifier: workspace:*
+        version: link:../../tools/docs
       '@pumpkin-plugins/minecraft-colors':
         specifier: workspace:*
         version: link:../../tools/minecraft-colors
@@ -424,12 +430,6 @@ importers:
       '@pumpkin-plugins/build':
         specifier: workspace:*
         version: link:../../tools/build
-      '@pumpkin-plugins/config':
-        specifier: workspace:*
-        version: link:../../tools/config
-      '@pumpkin-plugins/docs':
-        specifier: workspace:*
-        version: link:../../tools/docs
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../../tools/test-harness
@@ -451,6 +451,9 @@ importers:
       '@pumpkin-plugins/config':
         specifier: workspace:*
         version: link:../../tools/config
+      '@pumpkin-plugins/docs':
+        specifier: workspace:*
+        version: link:../../tools/docs
       '@pumpkin-plugins/minecraft-colors':
         specifier: workspace:*
         version: link:../../tools/minecraft-colors
@@ -467,9 +470,6 @@ importers:
       '@pumpkin-plugins/build':
         specifier: workspace:*
         version: link:../../tools/build
-      '@pumpkin-plugins/docs':
-        specifier: workspace:*
-        version: link:../../tools/docs
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../../tools/test-harness
@@ -491,6 +491,9 @@ importers:
       '@pumpkin-plugins/config':
         specifier: workspace:*
         version: link:../../tools/config
+      '@pumpkin-plugins/docs':
+        specifier: workspace:*
+        version: link:../../tools/docs
       '@pumpkin-plugins/plugin-kit':
         specifier: workspace:*
         version: link:../../tools/plugin-kit
@@ -507,9 +510,6 @@ importers:
       '@pumpkin-plugins/build':
         specifier: workspace:*
         version: link:../../tools/build
-      '@pumpkin-plugins/docs':
-        specifier: workspace:*
-        version: link:../../tools/docs
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../../tools/test-harness
@@ -531,6 +531,9 @@ importers:
       '@pumpkin-plugins/config':
         specifier: workspace:*
         version: link:../../tools/config
+      '@pumpkin-plugins/docs':
+        specifier: workspace:*
+        version: link:../../tools/docs
       '@pumpkin-plugins/minecraft-colors':
         specifier: workspace:*
         version: link:../../tools/minecraft-colors
@@ -553,9 +556,6 @@ importers:
       '@pumpkin-plugins/build':
         specifier: workspace:*
         version: link:../../tools/build
-      '@pumpkin-plugins/docs':
-        specifier: workspace:*
-        version: link:../../tools/docs
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../../tools/test-harness
@@ -577,6 +577,9 @@ importers:
 
   packages/waypoints:
     dependencies:
+      '@pumpkin-plugins/docs':
+        specifier: workspace:*
+        version: link:../../tools/docs
       '@pumpkin-plugins/plugin-kit':
         specifier: workspace:*
         version: link:../../tools/plugin-kit
@@ -590,9 +593,6 @@ importers:
       '@pumpkin-plugins/build':
         specifier: workspace:*
         version: link:../../tools/build
-      '@pumpkin-plugins/docs':
-        specifier: workspace:*
-        version: link:../../tools/docs
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../../tools/test-harness
@@ -670,6 +670,9 @@ importers:
       '@di-framework/componentize-qjs':
         specifier: 0.4.4-di.3
         version: 0.4.4-di.3
+      '@pumpkin-plugins/minecraft-colors':
+        specifier: workspace:*
+        version: link:../minecraft-colors
       '@pumpkin-plugins/pumpkin-api':
         specifier: 'catalog:'
         version: link:../pumpkin-api
@@ -686,9 +689,6 @@ importers:
         specifier: 'catalog:'
         version: 6.0.3
     devDependencies:
-      '@pumpkin-plugins/minecraft-colors':
-        specifier: workspace:*
-        version: link:../minecraft-colors
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1

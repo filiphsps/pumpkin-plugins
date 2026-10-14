@@ -50,6 +50,7 @@
     },
     "dependencies": {
         "@pumpkin-plugins/config": "workspace:*",
+        "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/port-mapping": "workspace:*",
@@ -59,7 +60,6 @@
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",
-        "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",

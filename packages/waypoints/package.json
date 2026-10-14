@@ -49,13 +49,13 @@
         "types": "pumpkin-plugins-build --types-only"
     },
     "dependencies": {
+        "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/pumpkin-api": "catalog:",
         "fflate": "catalog:"
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",
-        "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",
