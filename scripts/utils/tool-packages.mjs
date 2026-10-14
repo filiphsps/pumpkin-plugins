@@ -4,6 +4,7 @@ import * as path from 'node:path';
 /** Public npm packages that make up the standalone Pumpkin plugin toolchain. */
 export const PUBLIC_TOOL_PACKAGE_PATHS = Object.freeze({
     'tools/create-pumpkin-plugin': 'create-pumpkin-plugin',
+    'tools/codemod': '@pumpkin-plugins/codemod',
     'tools/pumpkin-api': '@pumpkin-plugins/pumpkin-api',
     'tools/build': '@pumpkin-plugins/build',
     'tools/static-hermes-runtime': '@pumpkin-plugins/static-hermes-runtime',
@@ -37,6 +38,14 @@ const PACKED_TOOL_CONTENTS = Object.freeze({
         'package/hermes-patches/0001-wasi-p2-configure-platform.patch',
     ],
     'tools/build': ['package/dist/cli.js', 'package/runtime/quickjs-runtime-bigint.wasm', 'package/wasi-wit.lock.json'],
+    'tools/codemod': [
+        'package/dist/bin/pumpkin-codemod.js',
+        'package/dist/src/index.js',
+        'package/dist/src/index.d.ts',
+        'package/README.md',
+        'package/docs/using-codemods.md',
+        'package/docs/authoring-codemods.md',
+    ],
 });
 const TEMPLATE_LANGUAGES = ['typescript', 'javascript'];
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;

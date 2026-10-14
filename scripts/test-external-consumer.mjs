@@ -32,6 +32,7 @@ const packagePaths = buildCliOnly
           'tools/update-check',
           'tools/plugin-kit',
           'tools/create-pumpkin-plugin',
+          'tools/codemod',
       ];
 const requiredNodeVersion = 'v24.21.0';
 const requiredPnpmVersion = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8')).devEngines
@@ -225,6 +226,16 @@ try {
             throw new Error(`Temporary consumer registry is not active: ${effectiveRegistry.trim()}`);
         }
         await run(packageManager.command, [...packageManager.args, 'install'], consumerDirectory, environment);
+
+        const codemodList = await capture(
+            packageManager.command,
+            [...packageManager.args, 'exec', 'pumpkin-codemod', 'list'],
+            consumerDirectory,
+            environment,
+        );
+        if (!codemodList.includes('migrate-pumpkin-api-ts')) {
+            throw new Error(`Packed codemod CLI did not list the Pumpkin API migration: ${codemodList}`);
+        }
 
         for (const name of packedPackages.keys()) {
             const installedPath = path.join(consumerDirectory, 'node_modules', ...name.split('/'));
