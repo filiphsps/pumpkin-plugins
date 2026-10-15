@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/plugin-kit-v0.1.0...plugin-kit-v0.1.1) (2026-10-15)
+
+
+### Features
+
+* **docs:** group site pages by source structure ([2a476f8](https://github.com/filiphsps/pumpkin-plugins/commit/2a476f820f8db2b11379764e8da5c871908fdd3e))
+
 ## 0.1.0 (2026-10-15)
 
 
