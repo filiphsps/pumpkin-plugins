@@ -69,8 +69,9 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [UPnPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/index.md): Opens router ports for Pumpkin with UPnP and NAT-PMP
 - [UPnPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/README.md): Additional component overview and usage details.
 - [UPnPumpkin: Troubleshoot port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/troubleshooting.md): Confirm UPnP or NAT-PMP is enabled in the router settings and that the server host shares the router's local network.
-- [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/index.md): Server-managed waypoints with access rules and a Java HUD
+- [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/index.md): Waypoints with access rules, a Java HUD, and PumpkinPIE placeholders
 - [Waypoints README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/README.md): Additional component overview and usage details.
+- [Waypoints: PumpkinPIE placeholders](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/placeholders.md): Waypoints optionally registers the waypoints namespace with PumpkinPIE.
 
 ## Shared tools
 
@@ -136,7 +137,7 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [DynamicLightsPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/dynamic-lights-pumpkin/): Server-side dynamic lights for held light sources
 - [TabDisplay API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/tab-display/): Formats Java row names and headers/footers; no Bedrock list changes.
 - [UPnPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/upnpumpkin/): Opens router ports for Pumpkin with UPnP and NAT-PMP
-- [Waypoints API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/waypoints/): Server-managed waypoints with access rules and a Java HUD
+- [Waypoints API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/waypoints/): Waypoints with access rules, a Java HUD, and PumpkinPIE placeholders
 - [PumpkinPIE API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/pumpkin-pie-api/): Validated PumpkinPIE client, expansions and provider lifecycle
 - [UPnPumpkin plugin API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/upnpumpkin-api/): Asks UPnPumpkin to open a port
 - [Plugin build tool API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/build/): Shared build tool for the plugins
