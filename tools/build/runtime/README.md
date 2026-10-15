@@ -1,34 +1,65 @@
 # BigInt QuickJS runtime
 
-`quickjs-runtime-bigint.wasm` is the `componentize-qjs-runtime` built from the
-upstream `componentize-qjs` 0.4.5 at commit
-`e563c6d6ae50b087980414015663ca9c948c09bb`, with
-`componentize-qjs-bigint.patch` applied. The patch converts WIT `u64` and `s64`
-values to JavaScript `bigint` on push and reads them from JavaScript `bigint` on
-pop. The runtime is Apache-2.0; its license is included as
-`LICENSE.componentize-qjs`.
+`quickjs-runtime-bigint.wasm` is built from the pinned upstream
+`componentize-qjs` source with `componentize-qjs-bigint.patch` applied. The patch
+converts WIT `u64` and `s64` values to JavaScript `bigint` on push and reads them
+from JavaScript `bigint` on pop. The runtime is Apache-2.0; its license is
+included as `LICENSE.componentize-qjs`.
 
-The 0.4.5 runtime tracks imported resource ownership, provides `drop()` and
+The runtime tracks imported resource ownership, provides `drop()` and
 `Symbol.dispose`, and releases unreachable owned handles after QuickJS evaluation.
-Earlier runtimes leaked those handles even when plugins requested disposal,
-eventually exhausting the component resource table. Event resources returned to
-Pumpkin must remain alive until the return transfers their ownership to the host.
+Without those releases, handles can exhaust the component resource table even
+when plugins request disposal. Event resources returned to Pumpkin must remain
+alive until the return transfers ownership to the host.
 
-The build tool still uses the Wasmtime 48 componentizer fork and passes this
-runtime to the componentizer through `--runtime`.
-That option cannot be combined with the componentizer's `--opt-size` mode, so
-the runtime itself is compiled with size optimization flags.
+The [build tool](../README.md) passes this runtime to its componentizer through
+`--runtime`. That option cannot be combined with the componentizer's `--opt-size`
+mode, so the runtime itself is compiled with the size optimization flags listed
+in its generated provenance below.
+
+## Pinned build provenance
+
+The build script validates the source, patch, lockfile and toolchain against this
+manifest before building. It reads the target, feature and compiler flags from
+the same manifest, so the values below describe the inputs used by the script.
+
+<!-- docs:begin provenance -->
+<!-- Generated from runtime/provenance.json, runtime/build.sh, and package.json. Run `pnpm --filter @pumpkin-plugins/build readme`. -->
+
+| Input | Pinned value |
+| --- | --- |
+| Node.js engine | `>=24.21.0` |
+| QuickJS source | [`e563c6d6ae50b087980414015663ca9c948c09bb`](https://github.com/andreiltd/componentize-qjs/tree/e563c6d6ae50b087980414015663ca9c948c09bb) |
+| Source repository | `https://github.com/andreiltd/componentize-qjs.git` |
+| BigInt patch SHA-256 | `515a06e47c3c8eb819fb1ec464560cb66dfb9fe25c51ff560534da8de99b4a43` |
+| Cargo.lock SHA-256 | `03e153b621bf6b830064d6b0931ebe98e28aa93bc833913397fb48720843d656` |
+| Rust compiler | `rustc 1.99.0 (b940084d7 2026-09-28)` |
+| Cargo | `cargo 1.99.0 (5f94df478 2026-08-27)` |
+| WASI SDK | `34.0` (build script requires major `34`) |
+| Clang | `clang version 23.1.0-wasi-sdk (https://github.com/llvm/llvm-project 895aa2c896ada719451be2e3673c83da8ddf1141)` |
+| Target and feature | `wasm32-wasip2` / `component-model-async` |
+| Rust flags | `-Clink-arg=--shared -Clink-arg=--no-entry -Clink-arg=--allow-undefined -Clto=fat -Copt-level=z` |
+| C flags | `-fPIC -Oz` |
+| Shipped runtime SHA-256 | `75219b89307011c7cd2bd6212e18a7d0ff1ba16d560c130d5173ccacb1880988` |
+<!-- docs:end provenance -->
 
 ## Rebuild
 
-Requirements: Node.js 24 or newer, Rust 1.99.0 with the `wasm32-wasip2` target,
-and wasi-sdk 34. Put the pinned Rust toolchain first on `PATH`.
+Use the Node.js range and toolchain values shown above. Install the listed Rust
+target and put the pinned Rust toolchain first on `PATH`.
+
+<!-- docs:begin source-checkout -->
+<!-- Generated from runtime/provenance.json, runtime/build.sh, and package.json. Run `pnpm --filter @pumpkin-plugins/build readme`. -->
 
 ```sh
 git clone https://github.com/andreiltd/componentize-qjs.git /tmp/componentize-qjs
 git -C /tmp/componentize-qjs checkout --detach e563c6d6ae50b087980414015663ca9c948c09bb
+```
+<!-- docs:end source-checkout -->
+
+```sh
 QJS_SOURCE_DIR=/tmp/componentize-qjs \
-WASI_SDK_PATH=/path/to/wasi-sdk-34 \
+WASI_SDK_PATH=/path/to/wasi-sdk \
 CARGO_TARGET_DIR=/tmp/componentize-qjs-target \
 RUNTIME_OUTPUT_DIR=/tmp/componentize-qjs-candidate \
   ./tools/build/runtime/build.sh
@@ -47,18 +78,16 @@ node tools/build/runtime/provenance.mjs verify-candidate /tmp/componentize-qjs-c
 node tools/build/runtime/provenance.mjs verify tools/build/runtime
 ```
 
-The checked-in manifest pins the source commit, patch and Cargo lock hashes,
-compiler/SDK versions, build flags and shipped runtime hash. Candidate verification
-checks those build inputs against the checked-in manifest and the artifact against
-its candidate hash. Shipped verification checks the artifact against the pinned
-hash. Verification does not independently rebuild source.
+The build script checks source and build inputs against the checked-in manifest
+before building. `verify-candidate` checks the candidate manifest against the
+pinned values and the artifact against its recorded hash. `verify` checks the
+shipped artifact against the pinned hash. Neither command independently rebuilds
+source.
 
-Two isolated local builds on macOS arm64 with Rust 1.99.0 and wasi-sdk 34 matched
-the vendored runtime hash (`75219b89307011c7cd2bd6212e18a7d0ff1ba16d560c130d5173ccacb1880988`).
-GitHub's macOS 15 runner produced a different hash, so CI compares two isolated
-builds on the same runner and loads that candidate in real Pumpkin integration
-tests before permitting a code release. This verifies same-runner repeatability
-and behavior; it does not claim that bytes match across macOS environments.
+CI compares two isolated builds on the same runner and loads the candidate in
+real Pumpkin integration tests before permitting a code release. This checks
+same-runner repeatability and runtime behavior; it does not guarantee matching
+bytes across build environments.
 
 Future runtime updates must review the source patch/license, refresh the manifest
 and repeat clean builds plus bundle and real-server checks. Replacing the shipped
