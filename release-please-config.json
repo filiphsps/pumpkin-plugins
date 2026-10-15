@@ -56,8 +56,7 @@
             "component": "codemod"
         },
         "tools/config": {
-            "component": "config",
-            "release-as": "0.1.0"
+            "component": "config"
         },
         "tools/create-pumpkin-plugin": {
             "component": "create-pumpkin-plugin",
