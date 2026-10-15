@@ -46,6 +46,8 @@ jobs:
             - name: 🕶️ Checkout repository
               id: checkout-repository
               uses: actions/checkout@v7.0.1
+              with:
+                  fetch-depth: 0
 
             - name: 🚀 Bootstrap
               id: bootstrap
@@ -222,6 +224,11 @@ jobs:
                       jq -e --arg key "${release_path}--tag_name" 'has($key) and (.[$key] | type == "string" and length > 0)' \
                           <<< "$RELEASE_METADATA" >/dev/null || {
                           echo "::error::Missing tag metadata for $release_path."
+                          exit 1
+                      }
+                      jq -e --arg key "${release_path}--sha" 'has($key) and (.[$key] | type == "string" and test("^[0-9a-f]{40}$"))' \
+                          <<< "$RELEASE_METADATA" >/dev/null || {
+                          echo "::error::Missing or invalid target SHA metadata for $release_path."
                           exit 1
                       }
                   done < <(jq --raw-output '.[]' <<< "$PLUGIN_PATHS"; jq --raw-output '.[]' <<< "$ACTION_PATHS"; jq --raw-output '.[]' <<< "$TOOL_PATHS"; jq --raw-output '.[]' <<< "$EXTENSION_PATHS")
@@ -438,7 +445,7 @@ jobs:
         name: 📎 Attach ${{ matrix.path }}
         needs: [release, release-fanout-check]
         if: ${{ needs.release.outputs.paths_released != '[]' }}
-        timeout-minutes: 10
+        timeout-minutes: 90
         runs-on: ubuntu-26.04
         permissions:
             contents: write
@@ -450,48 +457,108 @@ jobs:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             GH_REPO: ${{ github.repository }}
             TAG: ${{ fromJSON(needs.release.outputs.release_metadata)[format('{0}--tag_name', matrix.path)] }}
+            RELEASE_SHA: ${{ fromJSON(needs.release.outputs.release_metadata)[format('{0}--sha', matrix.path)] }}
             PLUGIN_DIRECTORY: ${{ matrix.path }}
+            SOURCE_ROOT: ${{ fromJSON(needs.release.outputs.release_metadata)[format('{0}--sha', matrix.path)] == github.sha && github.workspace || format('{0}/release-source', github.workspace) }}
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
 
-            # Resolve the same canonical plugin name the Market job uses.
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
+            - name: 🕶️ Checkout released source
+              if: env.RELEASE_SHA != github.sha
+              uses: actions/checkout@v7.0.1
+              with:
+                  ref: ${{ env.TAG }}
+                  path: release-source
+                  persist-credentials: false
+
+            - name: 📦 Setup pnpm for released source
+              if: env.RELEASE_SHA != github.sha
+              uses: pnpm/action-setup@v6.1.0
+
+            - name: 🟢 Setup Node for released source
+              if: env.RELEASE_SHA != github.sha
+              uses: actions/setup-node@v7.1.0
+              with:
+                  node-version-file: release-source/.node-version
+                  cache: pnpm
+                  cache-dependency-path: release-source/pnpm-lock.yaml
+
+            - name: 📥 Install released source dependencies
+              if: env.RELEASE_SHA != github.sha
+              run: pnpm --dir release-source install --frozen-lockfile
+
             - name: 📥 Download build artifact
+              if: env.RELEASE_SHA == github.sha
               uses: actions/download-artifact@v8.0.2
               with:
                   name: plugins
                   path: dist/
 
-            # A master push from before the release PR merged can still be running when its
-            # release job creates the tag, and it would attach the build of that older commit. The
-            # tag says which commit it releases, so only the run for that commit may attach.
-            - name: 🔒 Check the tag is the commit this run built
-              run: |
-                  ref="$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')"
-                  sha="${ref##* }"
-                  if [ "${ref%% *}" = tag ]; then
-                      sha="$(gh api "repos/$GH_REPO/git/tags/$sha" --jq '.object.sha')"
-                  fi
-                  if [ "$sha" != "$GITHUB_SHA" ]; then
-                      echo "::error::$TAG releases $sha, but this run built $GITHUB_SHA. Not attaching anything."
-                      exit 1
-                  fi
-
-            - name: 🧾 Resolve signing inputs
-              id: plugin
-              env:
-                  RELEASE_TAG: ${{ env.TAG }}
+            - name: 🔒 Verify the tag commit
               run: |
                   set -euo pipefail
-                  plugin_name="$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")"
-                  {
-                      printf 'plugin_name=%s\n' "$plugin_name"
-                      printf 'version=%s\n' "${RELEASE_TAG##*-v}"
-                      printf 'wasm_file=dist/%s.wasm\n' "$(basename "$PLUGIN_DIRECTORY")"
-                  } >> "$GITHUB_OUTPUT"
+                  ref="$(gh api "repos/$GH_REPO/git/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')"
+                  read -r object_type object_sha <<< "$ref"
+                  for _ in 1 2 3 4 5; do
+                      [[ "$object_type" == tag ]] || break
+                      ref="$(gh api "repos/$GH_REPO/git/tags/$object_sha" --jq '.object.type + " " + .object.sha')"
+                      read -r object_type object_sha <<< "$ref"
+                  done
+                  if [[ "$object_type" != commit || "$object_sha" != "$RELEASE_SHA" ]]; then
+                      echo "::error::$TAG resolves to $object_type $object_sha, but release metadata points to $RELEASE_SHA. Not attaching anything."
+                      exit 1
+                  fi
+                  if [[ "$RELEASE_SHA" != "$GITHUB_SHA" ]]; then
+                      source_sha="$(git -C "$SOURCE_ROOT" rev-parse 'HEAD^{commit}')"
+                      if [[ "$source_sha" != "$RELEASE_SHA" ]]; then
+                          echo "::error::Checked out $source_sha for $TAG, but release metadata points to $RELEASE_SHA."
+                          exit 1
+                      fi
+                  fi
+
+            - name: 🧾 Resolve plugin release inputs
+              id: plugin
+              run: node scripts/resolve-plugin-release.mjs "$TAG" "$SOURCE_ROOT"
+
+            - name: 🔧 Setup Static Hermes toolchain
+              id: setup-hermes
+              if: env.RELEASE_SHA != github.sha && steps.plugin.outputs.engine == 'static-hermes'
+              uses: ./.github/common/setup-static-hermes
+              with:
+                  toolchain-config-root: release-source/tools/static-hermes-runtime
+
+            - name: 🏗️ Prepare Static Hermes
+              id: prepare-hermes
+              if: env.RELEASE_SHA != github.sha && steps.plugin.outputs.engine == 'static-hermes'
+              working-directory: release-source
+              run: pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
+
+            - name: 💾 Save Static Hermes build cache
+              if: steps.prepare-hermes.outcome == 'success'
+              uses: actions/cache/save@v6.1.0
+              with:
+                  path: ${{ github.workspace }}/.cache/hermes
+                  key: ${{ steps.setup-hermes.outputs.hermes-cache-key }}
+
+            - name: 🔨 Build released plugin sources
+              if: env.RELEASE_SHA != github.sha
+              working-directory: release-source
+              run: |
+                  set -euo pipefail
+                  pnpm run build
+                  node scripts/collect-plugins.mjs
+                  mkdir -p "$GITHUB_WORKSPACE/dist"
+                  cp "$SOURCE_ROOT/${{ steps.plugin.outputs.wasm_file }}" "$GITHUB_WORKSPACE/${{ steps.plugin.outputs.wasm_file }}"
+                  cp "$SOURCE_ROOT/${{ steps.plugin.outputs.wasm_file }}.sha256" "$GITHUB_WORKSPACE/${{ steps.plugin.outputs.wasm_file }}.sha256"
+
+            - name: 🔎 Generate Market listing metadata from released source
+              env:
+                  PLUGIN_SOURCE_DIRECTORY: ${{ format('{0}/{1}', env.SOURCE_ROOT, steps.plugin.outputs.path) }}
+              run: node scripts/market-plugin-metadata.mjs "$PLUGIN_SOURCE_DIRECTORY" > market-listing-metadata.json
 
             - name: 🔏 Sign release artifact
               uses: ./actions/sign-pumpkin-plugin
@@ -505,10 +572,22 @@ jobs:
             - name: 📦 Prepare signed release artifact
               env:
                   WASM_FILE: ${{ steps.plugin.outputs.wasm_file }}
+                  PLUGIN_NAME: ${{ steps.plugin.outputs.plugin_name }}
+                  PLUGIN_VERSION: ${{ steps.plugin.outputs.version }}
               run: |
                   mkdir -p signed
                   cp "$WASM_FILE" signed/
                   cp "$WASM_FILE.sha256" signed/
+                  cp market-listing-metadata.json signed/
+                  node --input-type=module <<'NODE'
+                  import { writeFileSync } from 'node:fs';
+
+                  writeFileSync('signed/release-metadata.json', `${JSON.stringify({
+                      plugin_name: process.env.PLUGIN_NAME,
+                      version: process.env.PLUGIN_VERSION,
+                      wasm_file: process.env.WASM_FILE,
+                  }, null, 2)}\n`);
+                  NODE
 
             - name: 📤 Upload signed release artifact
               uses: actions/upload-artifact@v7.0.2
@@ -542,7 +621,7 @@ jobs:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
 
-            # The publisher resolves the canonical plugin name from the package's info module.
+            # This metadata was produced from the tagged plugin source by the asset job.
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
@@ -554,16 +633,12 @@ jobs:
 
             - name: 🧾 Resolve Market action inputs
               id: market
-              env:
-                  PLUGIN_DIRECTORY: ${{ matrix.path }}
-                  RELEASE_TAG: ${{ env.TAG }}
               run: |
                   set -euo pipefail
-                  plugin_name="$(node scripts/market-plugin-name.mjs "$PLUGIN_DIRECTORY")"
                   {
-                      printf 'plugin_name=%s\n' "$plugin_name"
-                      printf 'version=%s\n' "${RELEASE_TAG##*-v}"
-                      printf 'wasm_file=dist/%s.wasm\n' "$(basename "$PLUGIN_DIRECTORY")"
+                      printf 'plugin_name=%s\n' "$(jq -er '.plugin_name' dist/release-metadata.json)"
+                      printf 'version=%s\n' "$(jq -er '.version' dist/release-metadata.json)"
+                      printf 'wasm_file=%s\n' "$(jq -er '.wasm_file' dist/release-metadata.json)"
                   } >> "$GITHUB_OUTPUT"
 
             # The GitHub release keeps its publisher signature. Market signs each public download,
@@ -588,18 +663,11 @@ jobs:
                   release-notes: ${{ env.MARKET_RELEASE_NOTES }}
                   warn: true
 
-            - name: 🧾 Generate Market description and commands
-              if: steps.publish.outputs.status == 'success'
-              env:
-                  PLUGIN_DIRECTORY: ${{ matrix.path }}
-                  METADATA_FILE: ${{ runner.temp }}/market-listing-metadata.json
-              run: node scripts/market-plugin-metadata.mjs "$PLUGIN_DIRECTORY" > "$METADATA_FILE"
-
             - name: 📝 Update Pumpkin Market listing metadata
               if: steps.publish.outputs.status == 'success'
               uses: ./actions/update-pumpkin-market-listing
               with:
                   plugin-id: ${{ steps.publish.outputs.listing-id }}
-                  metadata-file: ${{ runner.temp }}/market-listing-metadata.json
+                  metadata-file: dist/market-listing-metadata.json
                   api-token: ${{ secrets.MARKET_API_TOKEN }}
                   update-mode: patch

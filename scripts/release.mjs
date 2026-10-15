@@ -1,5 +1,6 @@
 // Run with the pinned release-please runtime supplied by pnpm dlx. --dry-run makes no GitHub writes.
 
+import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -93,14 +94,22 @@ if (!dryRun && !pullRequestsOnly) {
     });
     const createReleasesForPullRequest = manifest.createReleasesForPullRequest.bind(manifest);
     let existingReleasesByTag;
-    async function existingRelease(tagName) {
+    async function getExistingReleases() {
         if (!existingReleasesByTag) {
             existingReleasesByTag = new Map();
             for await (const release of github.releaseIterator()) {
                 existingReleasesByTag.set(release.tagName, release);
             }
         }
+        return [...existingReleasesByTag.values()];
+    }
+    async function existingRelease(tagName) {
+        await getExistingReleases();
         return existingReleasesByTag.get(tagName);
+    }
+    async function getReleaseAssets(tagName) {
+        const { data } = await github.getGitHubApi().octokit.repos.getReleaseByTag({ owner, repo, tag: tagName });
+        return { assets: data.assets.map(({ name }) => name), immutable: data.immutable };
     }
 
     manifest.createReleasesForPullRequest = async (...releaseArgs) => {
@@ -128,12 +137,25 @@ if (!dryRun && !pullRequestsOnly) {
         }
     };
     const createdReleases = toolOnly ? [] : (await manifest.createReleases()).filter(Boolean);
+    const firstParentShas = toolOnly
+        ? new Set([currentSha])
+        : new Set(
+              execFileSync('git', ['rev-list', '--first-parent', currentSha], {
+                  cwd: repositoryRoot,
+                  encoding: 'utf8',
+              })
+                  .split(/\r?\n/)
+                  .filter(Boolean),
+          );
     const { releases, paths: releasePaths } = await collectReleaseFanout({
         createdReleases,
         repositoryConfig: manifest.repositoryConfig,
         releasedVersions: manifest.releasedVersions,
         currentSha,
         findRelease: existingRelease,
+        existingReleases: toolOnly ? [] : await getExistingReleases(),
+        firstParentShas,
+        getReleaseAssets,
         root: repositoryRoot,
         toolOnly,
     });
@@ -150,7 +172,7 @@ if (!dryRun && !pullRequestsOnly) {
         for (const [name, value] of Object.entries(release)) {
             const key = { tagName: 'tag_name', uploadUrl: 'upload_url', notes: 'body', url: 'html_url' }[name] ?? name;
             outputs[`${release.path}--${key}`] = value;
-            if (key === 'tag_name') releaseMetadata[`${release.path}--${key}`] = value;
+            if (key === 'tag_name' || key === 'sha') releaseMetadata[`${release.path}--${key}`] = value;
             if (key === 'body') releaseNotes[`${release.path}--${key}`] = value;
         }
     }

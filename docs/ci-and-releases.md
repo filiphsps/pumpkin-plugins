@@ -189,9 +189,12 @@ built the tagged commit. The runner changes the release PR label from pending to
 Other release PRs in the same run can still publish; other API errors remain failures.
 The matching run also recovers already-created releases for the configured component versions at
 its exact commit, even after another run marks their PRs as tagged. Recovered releases and newly
-created releases share the same fan-out, with each tag included once. This also lets a retry resume
-npm publishing after GitHub release creation; existing npm versions must pass the publisher's
-integrity check.
+created releases share the same fan-out, with each tag included once. Each successful release run
+also scans plugin releases on its first-parent history and catches up releases that have neither
+plugin asset. It rebuilds those plugins from their tag commits, then attaches the signed assets and
+publishes the release to Pumpkin Market with metadata from that tagged source. This also lets a
+retry resume npm publishing after GitHub release creation; existing npm versions must pass the
+publisher's integrity check.
 
 Merging an action release PR updates its `version.txt` and `CHANGELOG.md`, tags it
 `<folder>-v<version>`, and creates a GitHub release. Action releases do not run plugin packaging,
@@ -227,8 +230,9 @@ needs coverage.
 
 The merge of a release PR is its own commit, so its push can start a run while the previous commit's
 run is still active. The older run may create the tag and release first, using an artifact built from
-the previous commit. The attach job checks that the tag points to the commit built by its run. It
-skips the older run's artifact, leaving the released commit's run to upload the files.
+the previous commit. The attach job checks that the tag points to the commit built by its run and
+skips a mismatched artifact. The matching run, or a later successful run if it was skipped, builds
+the tagged source and uploads the release files.
 
 For push runs, GitHub keeps one run active and one pending in each concurrency group; a newer push
 can replace the pending run. The npm publisher scans tool releases on the target commit's
@@ -300,16 +304,12 @@ pnpm --package=release-please@17.11.2 dlx -c 'node scripts/release.mjs --dry-run
 Add `--component=<name>` to preview one plugin or action. `--pull-requests-only` updates release PRs without
 creating tags or GitHub releases.
 
-To finish a plugin release whose GitHub release exists but has no plugin assets, run the
-`Recover plugin release` workflow from `master` and pass its existing tag (for example,
-`upnpumpkin-v0.0.8`). It builds the source at that tag, signs and verifies the plugin with
-`PLUGIN_SIGNING_KEY`, uploads the `.wasm` and `.sha256` assets, then publishes the verified plugin
-and listing metadata to Pumpkin Market using `MARKET_API_TOKEN`. When the tagged plugin's release
-engine is Static Hermes, it also prepares that source's pinned Hermes toolchain before rebuilding. It
-reuses and verifies a complete existing asset pair; a partial pair fails so it cannot silently replace
-release files.
-If the workflow reports a partial pair, remove the lone asset from the release and rerun it.
-A release marked immutable without its asset pair cannot be recovered through this workflow.
+Plugin releases whose GitHub release exists without either plugin asset are caught up by the next
+successful release run on `master`; it rebuilds the source at the tag, signs and verifies the plugin,
+uploads the `.wasm` and `.sha256` assets, then publishes it and its tagged listing metadata to Pumpkin
+Market. It also prepares the tag's pinned Hermes toolchain when Static Hermes is selected. A partial
+asset pair or an immutable release is skipped with a warning because the existing files cannot be
+replaced automatically.
 
 ## Signing
 

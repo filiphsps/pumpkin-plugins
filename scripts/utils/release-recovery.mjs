@@ -1,3 +1,6 @@
+const PLUGIN_PATH_PATTERN = /^packages\/[^/]+$/;
+const RELEASE_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
 /**
  * Adds existing releases for configured component versions when they target the current commit.
  *
@@ -35,6 +38,98 @@ export async function recoverExistingReleases({
     }
 
     return recoveredReleases;
+}
+
+/**
+ * Finds plugin releases on this branch that still need their GitHub asset pair.
+ *
+ * @param {object} options - Existing release state and asset inspection operations.
+ * @param {Array<object>} options.releases - Releases already selected for this run.
+ * @param {Array<object>} options.existingReleases - GitHub releases found in repository history.
+ * @param {Record<string, object>} options.repositoryConfig - Release Please configuration by component path.
+ * @param {Set<string>} options.firstParentShas - Commit SHAs on the target's first-parent history.
+ * @param {(tagName: string) => Promise<{ assets: string[], immutable?: boolean }>} options.getReleaseAssets - Reads assets and mutability for a published release.
+ * @param {(message: string) => void} [options.log] - Receives catch-up messages.
+ * @returns {Promise<Array<object>>} Incomplete plugin releases that can be rebuilt from their own tags.
+ * @throws {Error} When a plugin tag is ambiguous or its release assets cannot be inspected.
+ */
+export async function recoverIncompletePluginReleases({
+    releases,
+    existingReleases,
+    repositoryConfig,
+    firstParentShas,
+    getReleaseAssets,
+    log = console.log,
+}) {
+    const knownTags = new Set(releases.map(({ tagName }) => tagName));
+    const recovered = [];
+
+    for (const release of existingReleases) {
+        if (!release.tagName || !release.sha || knownTags.has(release.tagName) || !firstParentShas.has(release.sha)) {
+            continue;
+        }
+
+        const matches = [];
+        for (const [path, config] of Object.entries(repositoryConfig)) {
+            if (!PLUGIN_PATH_PATTERN.test(path) || config.skipGithubRelease) continue;
+            if (config.includeComponentInTag !== false && typeof config.component !== 'string') continue;
+
+            const component = config.includeComponentInTag === false ? '' : config.component;
+            const prefix =
+                (component ? component + (config.tagSeparator ?? '-') : '') +
+                (config.includeVInTag === false ? '' : 'v');
+            if (!release.tagName.startsWith(prefix)) continue;
+
+            const version = release.tagName.slice(prefix.length);
+            if (RELEASE_VERSION_PATTERN.test(version)) matches.push({ path, version, prefix });
+        }
+
+        if (matches.length === 0) continue;
+        matches.sort((left, right) => right.prefix.length - left.prefix.length);
+        if (matches[1]?.prefix.length === matches[0].prefix.length) {
+            throw new Error(`Plugin release tag ${release.tagName} matches multiple configured plugins`);
+        }
+
+        const { path, version } = matches[0];
+        const details = await getReleaseAssets(release.tagName);
+        if (!Array.isArray(details.assets)) {
+            throw new Error(`Could not inspect GitHub assets for plugin release ${release.tagName}`);
+        }
+
+        const pluginName = path.slice('packages/'.length);
+        const wasmName = `${pluginName}.wasm`;
+        const checksumName = `${wasmName}.sha256`;
+        const hasWasm = details.assets.includes(wasmName);
+        const hasChecksum = details.assets.includes(checksumName);
+
+        if (hasWasm !== hasChecksum) {
+            log(
+                `Warning: Skipping ${release.tagName}; it has only one of ${wasmName} and ${checksumName}. ` +
+                    'Repair the partial asset pair before retrying.',
+            );
+            continue;
+        }
+        if (hasWasm) {
+            knownTags.add(release.tagName);
+            continue;
+        }
+        if (details.immutable) {
+            log(`Warning: Skipping ${release.tagName}; the immutable release cannot accept its missing plugin assets.`);
+            continue;
+        }
+
+        recovered.push({
+            ...release,
+            path,
+            version,
+            recovered: true,
+            rebuildFromTag: true,
+        });
+        log(`Recovering incomplete plugin release ${release.tagName} from its tagged commit ${release.sha}`);
+        knownTags.add(release.tagName);
+    }
+
+    return recovered;
 }
 
 function isImmutableReleaseConflict(error) {
