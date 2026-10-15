@@ -27,8 +27,7 @@
             "release-type": "simple"
         },
         "extensions/minecraft-terms": {
-            "component": "minecraft-terms",
-            "release-as": "0.0.1"
+            "component": "minecraft-terms"
         },
         "packages/apple-skin-pumpkin": {
             "component": "apple-skin-pumpkin"
