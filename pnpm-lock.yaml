@@ -435,6 +435,9 @@ importers:
       '@pumpkin-plugins/pumpkin-api':
         specifier: 'catalog:'
         version: link:../../tools/pumpkin-api
+      '@pumpkin-plugins/pumpkin-pie-api':
+        specifier: 'catalog:'
+        version: link:../../tools/apis/pumpkin-pie-api
       '@pumpkin-plugins/terrain':
         specifier: workspace:*
         version: link:../../tools/terrain
