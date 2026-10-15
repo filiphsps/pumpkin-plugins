@@ -13,7 +13,8 @@ See the [API reference](https://filiphsps.github.io/pumpkin-plugins/api/extensio
 
 Install Code Spell Checker and this extension. It registers the packaged dictionary when VS Code
 starts. For `cspell` in npm projects, install `@pumpkin-plugins/cspell-dict-minecraft` and import its
-`cspell-ext.json` in your CSpell configuration.
+`cspell-ext.json` in your CSpell configuration. See the [dictionary package's install instructions](../../tools/cspell-dict-minecraft/README.md#install)
+for the pnpm command and YAML example.
 
 This extension is distributed as a VSIX attached to its GitHub release. In VS Code, select
 **Extensions: Install from VSIX...** and choose the downloaded `.vsix` file.

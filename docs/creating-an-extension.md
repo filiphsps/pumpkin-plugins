@@ -32,7 +32,9 @@ CI sends changed extension packages through `.github/workflows/extensions.yml` o
 extension-only change does not run the plugin build or Pumpkin integration suites. Mixed changes
 run the extension checks and the checks for every other changed area.
 
-Extension READMEs are included in the generated root catalog and on the documentation site. Add
-the extension description and license to its `package.json`; `pnpm readme` refreshes the catalog and
-documentation links. Release Please updates the extension version and changelog, and the release
-workflow packages the tagged revision and attaches the VSIX to its release.
+The root README lists extensions in its generated catalog, and each extension README includes a
+generated link to its API reference. The documentation site publishes API references generated from
+extension source; it does not publish extension README pages. Add the extension description and
+license to its `package.json`; `pnpm readme` refreshes the catalog and API-reference links. Release
+Please updates the extension version and changelog, and the release workflow packages the tagged
+revision and attaches the VSIX to its release.
