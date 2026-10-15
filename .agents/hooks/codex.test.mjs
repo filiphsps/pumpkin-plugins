@@ -42,13 +42,25 @@ describe('Codex hook adapter', () => {
 
         assert.deepEqual(first, {
             decision: 'block',
-            reason: 'Repository checks failed. Preserve unrelated changes and fix the reported failures before finishing.\n\n### Repo checks failed: `pnpm check`\n\nmissing link',
+            reason: 'Turn-scoped repository checks failed. Fix failures tied to this turn’s changed files; if a failure is pre-existing, environment-specific, or unrelated, report it without editing unrelated files.\n\n### Repo checks failed: `pnpm check`\n\nmissing link',
         });
         assert.deepEqual(retry, {
             continue: false,
             systemMessage:
-                'Repository checks still fail after one continuation attempt. Preserve unrelated changes; resolve these failures or report why they remain.\n\n### Repo checks failed: `pnpm check`\n\nmissing link',
+                'Turn-scoped checks still fail after one continuation attempt. Preserve unrelated changes; report any failure that cannot be fixed within this turn’s changes.\n\n### Repo checks failed: `pnpm check`\n\nmissing link',
         });
+    });
+
+    it('caps the failure report included in a continuation prompt', async () => {
+        const report = `### Test failed: first diagnostic\n\n${'x'.repeat(9000)}`;
+        const result = await handleCodexHook(
+            { hook_event_name: 'Stop', session_id: 'session-1', turn_id: 'turn-1' },
+            async () => ({ ok: false, report }),
+        );
+
+        assert.match(result.reason, /first diagnostic/);
+        assert.match(result.reason, /report truncated/);
+        assert.ok(result.reason.length < 7000);
     });
 
     it('allows a clean completion check to finish', async () => {
@@ -141,7 +153,7 @@ describe('Codex hook adapter', () => {
         assert.equal(ran, false);
         assert.deepEqual(result, {
             decision: 'block',
-            reason: 'Repository checks failed. Preserve unrelated changes and fix the reported failures before finishing.\n\nCodex did not provide session_id and turn_id; repository checks cannot be scoped safely.',
+            reason: 'Turn-scoped repository checks failed. Fix failures tied to this turn’s changed files; if a failure is pre-existing, environment-specific, or unrelated, report it without editing unrelated files.\n\nCodex did not provide session_id and turn_id; repository checks cannot be scoped safely.',
         });
     });
 

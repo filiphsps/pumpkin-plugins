@@ -28,8 +28,9 @@ pnpm run lint:actions
 ```
 
 `--plan` prints JSON with the files and commands without executing them. With no paths, the runner
-checks all staged, unstaged and untracked files. Explicit paths scope the run to your work and may
-include deleted files. Checks never apply lint fixes. Use scoped `pnpm exec biome check --write` and
+checks all staged, unstaged and untracked files, including repository-wide metadata and generated-doc
+checks. Explicit paths run file and package-scoped checks, may include deleted files, and omit those
+repository-wide checks. Checks never apply lint fixes. Use scoped `pnpm exec biome check --write` and
 `pnpm exec eslint --fix` only on files you own when fixes are needed.
 
 | Change | Checks |
@@ -41,7 +42,7 @@ include deleted files. Checks never apply lint fixes. Use scoped `pnpm exec biom
 | Shared root build inputs or lockfile | Typecheck and unit tests for all packages |
 | Deleted package | All package typechecks and unit tests, to catch remaining imports |
 | Scripts or hook code | `pnpm test:scripts` |
-| Any relevant file | `pnpm check` and `pnpm readme:check` |
+| Full checkout (no paths) | `pnpm check` and `pnpm readme:check` |
 | Only generated output | No checks |
 
 Markdown-only package edits skip package tests. `tools/build/src/` is source, not generated output.
@@ -65,7 +66,9 @@ working tree around each tool call, then record only changed files explicitly ta
 `Write`, `apply_patch` or a shell output redirection. Shell commands with implicit file side effects
 have no attributable file scope. Root agents and subagents get separate scopes, so unrelated work in
 the same checkout does not enter another agent's completion report. Passing these fast checks does
-not prove runtime behavior, correct prose or the full CI workflow.
+not prove runtime behavior, correct prose or the full CI workflow. Completion checks use explicit
+paths, so they omit repository-wide metadata and generated-doc checks; those remain available through
+the no-path runner and CI.
 
 ## Portable hook protocol
 
@@ -79,6 +82,9 @@ A request's `cwd` only resolves its relative file paths and defaults to the repo
 | `before-tool` | `tool`, `input`, optional `cwd` | `ok`, replacement `input` when allowed, or `reason` when refused |
 | `plan` | Optional `files` array and `cwd` | `ok`, `files`, `steps`; executes no checks |
 | `check` | Optional `files` array and `cwd` | `ok`, `files`, `failures`, readable `report` |
+
+Explicit `files` keep checks scoped to those paths. Omit `files` to discover all dirty files and add
+the repository-wide metadata and generated-doc checks.
 
 For example, stdin can contain:
 

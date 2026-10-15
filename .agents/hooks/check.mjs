@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// The checks CI would fail on, scoped to the files that changed: Biome and the JSDoc lint on those
-// files, typecheck and unit tests of the packages they belong to (and of the packages that depend on
-// a changed package), and the repo checks. Integration tests are left out because they need a server.
+// Checks for changed files: Biome and JSDoc on those files, plus typecheck and unit tests for their
+// packages and workspace dependents. No-path runs also check repository metadata and generated docs.
+// Integration tests are left out because they need a server.
 //
 //   node .agents/hooks/check.mjs            check the files git reports as changed
 //   node .agents/hooks/check.mjs <file>...  check these files
@@ -56,9 +56,10 @@ function packageDirectory(file, packageName) {
  * @param {string[]} files Changed paths relative to the repo root, including deleted ones.
  * @param {(file: string) => boolean} [exists] Whether a path exists (deleted files aren't linted).
  * @param {(dir: string) => string | undefined} [packageName] The `name` in `<dir>/package.json`.
+ * @param {{ includeRepositoryChecks?: boolean }} [options] Include full-repository metadata and generated-doc checks.
  * @returns {Step[]}
  */
-export function planChecks(files, exists = defaultExists, packageName = defaultPackageName) {
+export function planChecks(files, exists = defaultExists, packageName = defaultPackageName, options = {}) {
     const relevant = [...new Set(files)].filter((f) => !isGeneratedPath(f));
     if (relevant.length === 0) return [];
 
@@ -106,8 +107,10 @@ export function planChecks(files, exists = defaultExists, packageName = defaultP
     if (relevant.some((f) => /^(scripts|\.agents\/hooks)\/|^package\.json$/.test(f))) {
         steps.push({ name: 'Script tests', args: ['test:scripts'] });
     }
-    steps.push({ name: 'Repo checks', args: ['check'] });
-    steps.push({ name: 'Generated READMEs', args: ['readme:check'] });
+    if (options.includeRepositoryChecks !== false) {
+        steps.push({ name: 'Repo checks', args: ['check'] });
+        steps.push({ name: 'Generated READMEs', args: ['readme:check'] });
+    }
     return steps;
 }
 
@@ -223,7 +226,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
                   return rel;
               })
             : await changedFiles();
-    const steps = planChecks(files);
+    const steps = planChecks(files, undefined, undefined, { includeRepositoryChecks: args.length === 0 });
     if (preview) {
         console.log(JSON.stringify({ files, steps }, null, 2));
         process.exit(0);

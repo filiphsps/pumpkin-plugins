@@ -56,6 +56,58 @@ describe('portable hook protocol', () => {
         assert.equal(result.ok, true);
         assert.deepEqual(result.files, ['packages/upnpumpkin/src/plugin.ts']);
         assert.ok(result.steps.some((s) => s.args.includes('--filter=...@pumpkin-plugins/upnpumpkin')));
+        assert.equal(
+            result.steps.some((s) => s.name === 'Repo checks'),
+            false,
+        );
+        assert.equal(
+            result.steps.some((s) => s.name === 'Generated READMEs'),
+            false,
+        );
+    });
+
+    it('keeps repo-wide checks out of explicitly scoped checks', async () => {
+        let checkedSteps;
+        const result = await handle(
+            { event: 'check', files: ['packages/upnpumpkin/src/plugin.ts'] },
+            {
+                changedFiles: () => assert.fail('must not read git'),
+                runChecks: async (steps) => {
+                    checkedSteps = steps;
+                    return [];
+                },
+            },
+        );
+
+        assert.equal(result.ok, true);
+        assert.ok(checkedSteps.some((step) => step.name === 'Typecheck and unit tests'));
+        assert.equal(
+            checkedSteps.some((step) => step.name === 'Repo checks'),
+            false,
+        );
+        assert.equal(
+            checkedSteps.some((step) => step.name === 'Generated READMEs'),
+            false,
+        );
+    });
+
+    it('omits repo-wide checks from explicit CLI paths', () => {
+        const result = spawnSync(
+            process.execPath,
+            [path.join(ROOT, '.agents/hooks/check.mjs'), '--plan', '.agents/hooks/run.mjs'],
+            { cwd: ROOT, encoding: 'utf8' },
+        );
+        assert.equal(result.status, 0, result.stderr);
+        const plan = JSON.parse(result.stdout);
+
+        assert.equal(
+            plan.steps.some((step) => step.name === 'Repo checks'),
+            false,
+        );
+        assert.equal(
+            plan.steps.some((step) => step.name === 'Generated READMEs'),
+            false,
+        );
     });
 
     it('checks git-discovered files and returns useful failure output', async () => {

@@ -4,6 +4,8 @@ import * as path from 'node:path';
 import { handle } from './run.mjs';
 import { hookScope } from './scope.mjs';
 
+const MAX_FAILURE_REPORT_LENGTH = 6000;
+
 /** Convert a Codex tool name to the portable runner's aliases. */
 function portableTool(name) {
     if (name === 'Bash') return 'bash';
@@ -25,17 +27,25 @@ function deny(reason) {
 
 /** Describe a check failure in the continuation or visible final hook response. */
 function checkFailure(report, retrying) {
-    const details = report || 'The repository hook returned no check report.';
+    const details = conciseReport(report || 'The repository hook returned no check report.');
     if (retrying) {
         return {
             continue: false,
-            systemMessage: `Repository checks still fail after one continuation attempt. Preserve unrelated changes; resolve these failures or report why they remain.\n\n${details}`,
+            systemMessage: `Turn-scoped checks still fail after one continuation attempt. Preserve unrelated changes; report any failure that cannot be fixed within this turn’s changes.\n\n${details}`,
         };
     }
     return {
         decision: 'block',
-        reason: `Repository checks failed. Preserve unrelated changes and fix the reported failures before finishing.\n\n${details}`,
+        reason: `Turn-scoped repository checks failed. Fix failures tied to this turn’s changed files; if a failure is pre-existing, environment-specific, or unrelated, report it without editing unrelated files.\n\n${details}`,
     };
+}
+
+/** Keep continuation feedback focused while retaining the first diagnostics. */
+function conciseReport(report) {
+    if (report.length <= MAX_FAILURE_REPORT_LENGTH) return report;
+
+    const suffix = '\n\n… report truncated; rerun the listed command for full output.';
+    return `${report.slice(0, MAX_FAILURE_REPORT_LENGTH - suffix.length).trimEnd()}${suffix}`;
 }
 
 /**

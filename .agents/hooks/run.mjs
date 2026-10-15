@@ -71,7 +71,7 @@ export async function handle(request, checks = { changedFiles, runChecks }) {
     }
     const files =
         request.files === undefined ? await checks.changedFiles() : request.files.map((f) => repoPath(f, cwd));
-    const steps = planChecks(files);
+    const steps = planChecks(files, undefined, undefined, { includeRepositoryChecks: request.files === undefined });
     if (request.event === 'plan') return { ok: true, files, steps };
     const failures = await checks.runChecks(steps);
     return { ok: failures.length === 0, files, failures, report: formatFailures(failures) };
