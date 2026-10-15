@@ -70,6 +70,7 @@ jobs:
         runs-on: ubuntu-26.04
         outputs:
             code: ${{ steps.classify.outputs.code }}
+            skip_expensive_checks: ${{ steps.release-commits.outputs.skip_expensive_checks }}
             actions: ${{ steps.classify.outputs.actions }}
             actions_to_test: ${{ steps.classify.outputs.actions_to_test }}
             extensions: ${{ steps.classify.outputs.extensions }}
@@ -92,6 +93,41 @@ jobs:
               env:
                   BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
               run: git fetch --no-tags origin "$BASE"
+
+            - name: 🧮 Identify release-only push commits
+              id: release-commits
+              env:
+                  EVENT_NAME: ${{ github.event_name }}
+                  REF: ${{ github.ref }}
+                  BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+                  HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+              run: |
+                  set -euo pipefail
+                  skip_expensive_checks=false
+                  if [[ "$EVENT_NAME" == 'push' && "$REF" == 'refs/heads/master' ]]; then
+                      subjects="$(git log --format=%s "$BASE..$HEAD")"
+                      if [[ -n "$subjects" ]]; then
+                          skip_expensive_checks=true
+                          has_release_commit=false
+                          while IFS= read -r subject; do
+                              case "$subject" in
+                                  'chore(master): release '*|'chore: retire first-release pins')
+                                      has_release_commit=true
+                                      ;;
+                                  'docs: update generated READMEs')
+                                      ;;
+                                  *)
+                                      skip_expensive_checks=false
+                                      break
+                                      ;;
+                              esac
+                          done <<< "$subjects"
+                          if [[ "$has_release_commit" != true ]]; then
+                              skip_expensive_checks=false
+                          fi
+                      fi
+                  fi
+                  printf 'skip_expensive_checks=%s\n' "$skip_expensive_checks" >> "$GITHUB_OUTPUT"
 
             # Everything else keys off this: a change that touches only documentation can't break a
             # build, a test or a plugin, so it skips the jobs that would tell us otherwise.
@@ -197,7 +233,11 @@ jobs:
     test:
         name: 🧪 Test
         needs: [changes]
-        if: needs.changes.outputs.code == 'true'
+        if: >-
+            ${{
+              needs.changes.outputs.code == 'true' &&
+              needs.changes.outputs.skip_expensive_checks != 'true'
+            }}
         timeout-minutes: 15
         runs-on: ubuntu-26.04
         steps:
@@ -485,19 +525,34 @@ jobs:
     external-consumer:
         name: 📦 External consumer
         needs: [changes]
-        if: needs.changes.outputs.code == 'true'
+        if: >-
+            ${{
+              needs.changes.outputs.code == 'true' &&
+              needs.changes.outputs.skip_expensive_checks != 'true'
+            }}
         uses: ./.github/workflows/external-consumer.yml
 
     engine-comparison:
         name: 📊 Engine comparison
         needs: [changes, build]
-        if: needs.changes.outputs.code == 'true'
+        if: >-
+            ${{
+              needs.changes.outputs.code == 'true' &&
+              needs.changes.outputs.skip_expensive_checks != 'true'
+            }}
         uses: ./.github/workflows/engine-comparison.yml
 
     integration:
         name: 🎃 Integration (real Pumpkin)
         needs: [changes, build]
-        if: needs.changes.outputs.integration_scope == 'affected' || needs.changes.outputs.integration_scope == 'all'
+        if: >-
+            ${{
+              needs.changes.outputs.skip_expensive_checks != 'true' &&
+              (
+                needs.changes.outputs.integration_scope == 'affected' ||
+                needs.changes.outputs.integration_scope == 'all'
+              )
+            }}
         timeout-minutes: 60
         runs-on: ubuntu-26.04
         steps:
@@ -594,11 +649,15 @@ jobs:
               env:
                   CHANGES_RESULT: ${{ needs.changes.result }}
                   INTEGRATION_SCOPE: ${{ needs.changes.outputs.integration_scope }}
+                  SKIP_EXPENSIVE_CHECKS: ${{ needs.changes.outputs.skip_expensive_checks }}
                   INTEGRATION_RESULT: ${{ needs.integration.result }}
               run: |
                   if [[ "$CHANGES_RESULT" != 'success' ]]; then
                       echo 'Change classification failed.' >&2
                       exit 1
+                  fi
+                  if [[ "$SKIP_EXPENSIVE_CHECKS" == 'true' && "$INTEGRATION_RESULT" == 'skipped' ]]; then
+                      exit 0
                   fi
                   if [[ "$INTEGRATION_SCOPE" == 'none' || "$INTEGRATION_SCOPE" == 'benchmark' ]]; then
                       if [[ "$INTEGRATION_RESULT" == 'skipped' ]]; then
@@ -615,7 +674,11 @@ jobs:
         name: 🧬 Generator
         # Build saves the prepared Static Hermes cache that this job restores.
         needs: [changes, lint, build]
-        if: needs.changes.outputs.generator == 'true'
+        if: >-
+            ${{
+              needs.changes.outputs.generator == 'true' &&
+              needs.changes.outputs.skip_expensive_checks != 'true'
+            }}
         timeout-minutes: 60
         runs-on: ubuntu-26.04
         steps:
@@ -708,11 +771,15 @@ jobs:
               env:
                   CHANGES_RESULT: ${{ needs.changes.result }}
                   GENERATOR: ${{ needs.changes.outputs.generator }}
+                  SKIP_EXPENSIVE_CHECKS: ${{ needs.changes.outputs.skip_expensive_checks }}
                   GENERATOR_RESULT: ${{ needs.generator.result }}
               run: |
                   if [[ "$CHANGES_RESULT" != 'success' ]]; then
                       echo 'Change classification failed.' >&2
                       exit 1
+                  fi
+                  if [[ "$SKIP_EXPENSIVE_CHECKS" == 'true' && "$GENERATOR_RESULT" == 'skipped' ]]; then
+                      exit 0
                   fi
                   if [[ "$GENERATOR" != 'true' && "$GENERATOR_RESULT" == 'skipped' ]]; then
                       exit 0
@@ -749,8 +816,20 @@ jobs:
                       needs.lint.result == 'success' &&
                       needs.typecheck.result == 'success' &&
                       needs.build.result == 'success' &&
-                      needs['external-consumer'].result == 'success' &&
-                      needs.test.result == 'success'
+                      (
+                        needs['external-consumer'].result == 'success' ||
+                        (
+                          needs.changes.outputs.skip_expensive_checks == 'true' &&
+                          needs['external-consumer'].result == 'skipped'
+                        )
+                      ) &&
+                      (
+                        needs.test.result == 'success' ||
+                        (
+                          needs.changes.outputs.skip_expensive_checks == 'true' &&
+                          needs.test.result == 'skipped'
+                        )
+                      )
                     ) ||
                     (
                       needs.changes.outputs.code != 'true' &&

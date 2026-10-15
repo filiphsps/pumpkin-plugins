@@ -125,9 +125,17 @@ branch updates, but their jobs skip those branches; the associated source commit
 validation, and the release workflow prepares generated READMEs and pins. The benchmark comment
 workflow also skips those CI runs. Ordinary docs-only PRs skip the main CI workflow entirely.
 
+On `master`, pushes containing only `chore(master): release ...`,
+`chore: retire first-release pins` and generated README commits skip the unit and script tests,
+external-consumer tests, real-server integration, generator smoke tests and Engine comparison. The
+integration and generator gates accept these intentional skips; Build, lint, typecheck, Docs and
+config checks, and release processing still run as needed.
+
 On a push, the release job waits for the action, extension, integration and generator gates and
-docs/config checks. Plugin/repository changes also require lint, typecheck, build, external-consumer
-and unit test jobs. The integration gate requires the real-server suite only for relevant changes.
+docs/config checks. Plugin/repository changes normally require lint, typecheck, build,
+external-consumer and unit test jobs; the release and pin-retirement commits above still require
+lint, typecheck and build. The integration gate requires the real-server suite only for relevant
+changes.
 Engine comparison runs separately and does not gate releases.
 Empty action and extension matrices pass their gates without running component tests, including version-only release changes.
 Release Please only releases a component with
