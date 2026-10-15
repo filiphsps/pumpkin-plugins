@@ -156,6 +156,7 @@ export function catalogValue(
             const visibleCandidates = accessible.filter(
                 (waypoint) => waypoint.dimension === viewer.dimension && waypoint.visibilityRange !== undefined,
             );
+            // Fail closed on nonfinite distances; the visibility projector would silently filter them out.
             for (const waypoint of visibleCandidates) geometry(viewer.position, waypoint.position);
             return String(projectWaypointsForViewer(accessible, viewer).length);
         }
