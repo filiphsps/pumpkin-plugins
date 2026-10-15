@@ -46,8 +46,7 @@
             "component": "waypoints"
         },
         "tools/apis/pumpkin-pie-api": {
-            "component": "pumpkin-pie-api",
-            "release-as": "0.1.0"
+            "component": "pumpkin-pie-api"
         },
         "tools/build": {
             "component": "build"
