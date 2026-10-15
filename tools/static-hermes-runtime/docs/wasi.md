@@ -6,9 +6,11 @@ through imported WASI interfaces. The build tool combines the plugin's WIT world
 JavaScript facades, WIT-to-C bindings, and a native JSI adapter so JavaScript can call those
 interfaces.
 
-This page describes the WASI path implemented by this repository. It focuses on the pinned WASI
-0.2.3 interfaces and the Static Hermes adapter. It is not a reference for every WASI proposal or
-for every service the Pumpkin server may expose. For the general plugin build flow, see
+This page describes the WASI path this repository builds from the version and files pinned in
+[`wasi-wit.lock.json`](../../build/wasi-wit.lock.json). The capability table below lists the
+interfaces it imports. The guide does not cover every WASI proposal or every service a Pumpkin
+server may expose. This runtime does not implement WASI 0.3's native
+`async`, `future<T>`, or `stream<T>` features.[^wasi-03] For the general plugin build flow, see
 [Building](../../../docs/building.md); for the engine comparison, see
 [Benchmarking](../../../docs/benchmarking.md).
 
@@ -33,11 +35,9 @@ In this repository there are two distinct interface families:
   sockets.
 
 Both use WIT contracts, but they have different owners and host implementations. The build obtains
-Pumpkin WIT from the pinned `@pumpkin-plugins/pumpkin-api` dependency. WASI WIT is separately pinned by
-[`wasi-wit.lock.json`](../../build/wasi-wit.lock.json). The lock currently selects WASI 0.2.3; the
-[WASI 0.2.3 interface definitions][^wasi-023] are locked by file hash. The [WASI HTTP
-definitions][^wasi-http] come from the corresponding `wasi-http` 0.2.3 release. The plugin API
-version and the WASI version are separate compatibility inputs.
+Pumpkin WIT from the pinned `@pumpkin-plugins/pumpkin-api` dependency. The WASI lock records its
+version, each file's SHA-256 digest, and any alternate source URLs. The plugin API version and WASI
+version are separate compatibility inputs.
 
 WIT is an interface-definition language for the WebAssembly Component Model. It describes
 interfaces, functions, data types, resources, and the component's imports and exports. Generated
@@ -52,7 +52,7 @@ The build has several steps. The first four determine the component's declared W
 last step leaves those imports for the Pumpkin runtime to resolve.
 
 1. **The plugin opts into a capability bundle.** `pumpkinPlugin.wasi` in the plugin's
-   `package.json` accepts the names `http`, `filesystem`, `sockets`, and `udp`. An omitted list
+   `package.json` accepts the names in the [capability table](#capability-bundles). An omitted list
    means no WASI interfaces are added.
 2. **The build retrieves pinned WIT definitions.** `@pumpkin-plugins/build` reads the API package's
    `wit.lock.json` and [`wasi-wit.lock.json`](../../build/wasi-wit.lock.json). It fetches the
@@ -70,8 +70,8 @@ last step leaves those imports for the Pumpkin runtime to resolve.
    a temporary directory and removes it afterward; it leaves no combined snapshot under
    `build/wit/`. Those declarations let the editor and TypeScript check imported WASI modules and
    resource methods against the same WIT used for the component.
-5. **esbuild replaces the external imports with facades.** Imports such as
-   `wasi:http/outgoing-handler@0.2.3` remain external to the ordinary JavaScript bundle. For
+5. **esbuild replaces the external imports with facades.** Versioned imports such as
+   `wasi:http/outgoing-handler@<version>` remain external to the ordinary JavaScript bundle. For
    Static Hermes, an esbuild plugin checks that each imported interface is present in the prepared
    WIT world and generates an ES module facade from its declarations. TypeScript call analysis
    identifies which declared operations the plugin uses.
@@ -93,42 +93,37 @@ the imported WIT interface. The component's world still declares each selected i
 functions and types in that interface. The Pumpkin runtime must resolve that component import.
 Adapter selection is a build detail, not a per-method permission boundary.
 
-The key source files are [`capabilities.ts`](../../build/src/capabilities.ts),
-[`wasi-wit.ts`](../../build/src/wasi-wit.ts), [`wit.ts`](../../build/src/wit.ts),
-[`bundle.ts`](../../build/src/bundle.ts), and the Static Hermes typed
-[`WIT parser`](../src/wit/parser.ts), [`resolver`](../src/wit/resolver.ts),
-[`analysis`](../src/wit/analysis.ts), and [`generation`](../src/wit/generation.ts). The interfaces
-and WIT imports follow the [Component Model][^component-model], rather than the older WASI Preview
-1 module ABI.
+The component uses the [WebAssembly Component Model][^component-model], including WIT imports and
+the Canonical ABI. Runtime maintainers who change supported imports or adapters should follow the
+[WASI maintenance guide](maintaining-wasi.md).
 
 ## Capability bundles
 
-`pumpkinPlugin.wasi` uses a small set of repository-level names. Each name expands to the following
-WASI 0.2.3 interfaces:
+`pumpkinPlugin.wasi` uses a small set of repository-level names. The table and shared imports below
+are generated from the build tool's capability map and the locked WASI version.
+
+<!-- docs:begin capability-bundles -->
+<!-- Generated from tools/build/src/capabilities.ts and tools/build/wasi-wit.lock.json. Run `pnpm readme`. -->
 
 | Capability | Interfaces imported by the build |
 | --- | --- |
-| `http` | `wasi:http/types`, `wasi:http/outgoing-handler` |
-| `filesystem` | `wasi:filesystem/types`, `wasi:filesystem/preopens` |
-| `sockets` | `wasi:sockets/network`, `wasi:sockets/instance-network`, `wasi:sockets/tcp`, `wasi:sockets/tcp-create-socket` |
-| `udp` | `wasi:sockets/network`, `wasi:sockets/instance-network`, `wasi:sockets/udp`, `wasi:sockets/udp-create-socket` |
+| `http` | `wasi:http/types@0.2.3`<br>`wasi:http/outgoing-handler@0.2.3` |
+| `filesystem` | `wasi:filesystem/types@0.2.3`<br>`wasi:filesystem/preopens@0.2.3` |
+| `sockets` | `wasi:sockets/network@0.2.3`<br>`wasi:sockets/instance-network@0.2.3`<br>`wasi:sockets/tcp@0.2.3`<br>`wasi:sockets/tcp-create-socket@0.2.3` |
+| `udp` | `wasi:sockets/network@0.2.3`<br>`wasi:sockets/instance-network@0.2.3`<br>`wasi:sockets/udp@0.2.3`<br>`wasi:sockets/udp-create-socket@0.2.3` |
 
-When any capability is selected, the build also imports `wasi:io/poll`, `wasi:io/streams`, and
-`wasi:clocks/monotonic-clock`. These are support interfaces shared by the current HTTP, filesystem,
-and socket APIs. Selecting both `sockets` and `udp` deduplicates the shared network interfaces.
+Every selected capability also imports these support interfaces at version `0.2.3`:
+`wasi:io/poll@0.2.3`, `wasi:io/streams@0.2.3`, `wasi:clocks/monotonic-clock@0.2.3`.
+The build deduplicates shared imports when bundles overlap.
+<!-- docs:end capability-bundles -->
 
-These names are bundles maintained by this repository, not every interface in the WASI standard.
-The list is closed: a package cannot add an arbitrary capability string. An interface also brings
-its WIT dependencies into the prepared world, but the build copies only the files listed in the
-lock. After a component build with WASI imports, the exact imports are visible in the inspection
-snapshot at `build/wit/plugin.wit`.
+These bundles are maintained by this repository; a package cannot add an arbitrary capability name.
+An interface also brings its WIT dependencies into the prepared world, but the build copies only the
+files listed in the lock. After a component build with WASI imports, inspect the exact imports in
+`build/wit/plugin.wit`.
 
-For the currently locked WIT, the
-[`wit-api-coverage` test](../test/wit-api-coverage.test.mjs) enumerates every function and resource
-method in the four capability bundles and checks that the adapter generator can plan and emit each
-operation. That is generator coverage for the checked-in WIT surface; it does not execute every
-operation or prove that a particular Pumpkin release provides it. The lock and generated
-declarations are the precise signature catalog.
+The lock and generated declarations define the precise signatures available to plugin code. Adapter
+coverage and implementation details are documented in the [WASI maintenance guide](maintaining-wasi.md).
 
 For example, a plugin that makes outgoing HTTP requests declares:
 
@@ -144,10 +139,14 @@ For example, a plugin that makes outgoing HTTP requests declares:
 
 It can then import the generated WASI bindings by their versioned interface names:
 
+<!-- docs:begin versioned-http-imports -->
+<!-- Generated from tools/build/src/capabilities.ts and tools/build/wasi-wit.lock.json. Run `pnpm readme`. -->
+
 ```ts
 import { handle } from 'wasi:http/outgoing-handler@0.2.3';
 import { Fields, OutgoingRequest, RequestOptions } from 'wasi:http/types@0.2.3';
 ```
+<!-- docs:end versioned-http-imports -->
 
 The repository's [HTTP request helper](../../../tools/update-check/src/http-request.ts) shows the
 resource lifecycle, timeout setup, response polling, and stream-reading pattern used by a real
@@ -193,11 +192,19 @@ facade as a JavaScript `Error`; nested result/variant data is represented as tag
 wrappers guard use after disposal or ownership transfer. Drop resources when finished, including
 error paths; `Symbol.dispose` is available for WASI resources that have a generated drop operation.
 
-WASI 0.2.3 I/O commonly uses resource objects such as pollables, streams, and HTTP response
-futures. In this API version, those named `future-*` resources are part of the WIT interface. They
-are distinct from the Component Model's native `future<T>`, `stream<T>`, and `async` features
-introduced for WASI 0.3.[^wasi-03] Code may need to advance operations through polling or other explicit
-steps; the build does not turn them into browser `fetch` calls or JavaScript promises. The
+Value conversion adds work at the boundary: byte lists are copied into typed arrays, and records or
+lists can allocate JavaScript objects or arrays. A plugin making many small WASI calls can be more
+sensitive to that cost than one that batches data; long-running operations also include host and I/O
+time. The repository's [engine comparison](../../../docs/benchmarking.md) measures guest-side
+JavaScript workloads and selected Pumpkin API behavior, not WASI calls. Its engine ratios do not
+describe WASI throughput. Measure a representative plugin against the target host before drawing a
+performance conclusion.
+
+I/O through the imported interfaces commonly uses resource objects such as pollables, streams, and
+HTTP response futures. Named `future-*` resources are part of the WIT interface. They are distinct
+from the Component Model's native `future<T>`, `stream<T>`, and `async` features in WASI 0.3.[^wasi-03]
+Code may need to advance operations through polling or other explicit steps; the build does not
+turn them into browser `fetch` calls or JavaScript promises. The
 [update-check HTTP helper](../../../tools/update-check/src/http-request.ts) uses a generator to yield
 pollables to the plugin scheduler. It constructs a request, subscribes to the response future,
 yields the resulting pollable, retrieves the response, consumes its body, reads the input stream in
@@ -226,123 +233,21 @@ matching `pumpkinPlugin.wasi` build capability. These are separate requirements.
 configuration does not pin a minimum Pumpkin server version for each `wasi:*` host import, so
 verify the import and permission behavior on the server version you deploy.
 
-This is a useful security boundary: WASI capabilities are explicit, and resource handles represent
-specific host-provided resources rather than a global filesystem or network namespace. It also
-means a plugin must handle absent mounts, permission denials, and host errors.
-
-The Component Model and WASI specifications define the interface and capability model. They do not
-make every host expose every interface or guarantee identical host behavior. Runtime support and
-permissions must be verified against the Pumpkin server version used for deployment.
+WASI imports and resource handles refer to specific host-provided resources. Plugins still need to
+handle missing mounts, denied permissions, and host errors. Standards define the interfaces; Pumpkin
+server releases determine which imports they resolve and which permissions they grant. Verify both
+on the server version you deploy.
 
 ## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
-| Build reports an unknown WASI capability | `pumpkinPlugin.wasi` accepts only `http`, `filesystem`, `sockets`, and `udp`. |
+| Build reports an unknown WASI capability | Choose a name from the [capability table](#capability-bundles). |
 | TypeScript cannot resolve a `wasi:*` import | Confirm the matching capability is declared and regenerate guest declarations with the plugin's typecheck/build workflow. |
 | Build says an interface is not imported by the plugin WIT world | The module import does not match the selected capability bundle or its locked WIT dependencies. |
-| Build reports no Static Hermes adapter for an operation | Check the selected method's resolved WIT input/result types and adapter plan in `src/wit/analysis.ts`; add adapter support and coverage if the interface is being extended. |
-| First build cannot download WIT files | The first build needs network access unless the verified WASI 0.2.3 files are already cached. Check the URL and SHA-256 entry in the lock. |
+| First build cannot download WIT files | The first build needs network access unless the pinned files are already cached. Check their URLs and SHA-256 entries in the lock. |
 | Component builds but fails when loaded or called | Check that the Pumpkin server resolves the imported interface and that `info.permissions` grants the matching operation. Inspect the server's error for a denied host capability. |
 | A WASI resource throws after use | Check ownership transfer and disposal paths. Do not reuse a consumed resource; release resources on success and error paths. |
-
-## Benefits and trade-offs
-
-### Benefits
-
-- **A standard contract.** WIT gives the plugin, binding generator, and component host one typed
-  interface description. The same contract is used to generate declarations, C bindings, and the
-  Static Hermes JavaScript facade.
-- **Explicit host access.** A component declares the interfaces it imports. WASI's capability
-  design uses imported services and resource handles instead of ambient access.
-- **Resource-aware APIs.** Files, sockets, streams, and HTTP request/response objects have explicit
-  WIT resource lifetimes. The generated wrapper tracks drops and ownership transfers.
-- **Pinned inputs.** Every WASI WIT file used by the build is versioned and hash-checked, so an
-  upstream change cannot silently alter the contract on a later build.
-- **Selective native glue.** When TypeScript usage analysis identifies the calls, Static Hermes
-  generates adapters for the used WASI operations and the native linker can discard unreferenced
-  sections.
-
-### Trade-offs and limits
-
-- **The supported surface is deliberately finite.** The build currently exposes four capability
-  bundles and pins WASI 0.2.3. An interface or operation outside that surface needs build support,
-  WIT inputs, and a Static Hermes adapter before plugin code can use it. The runtime README says
-  “WASI 3 support is deferred”; the build path documented here remains pinned to 0.2.3, so that
-  repository statement is not evidence that the runtime supports the now-released WASI 0.3
-  interfaces.[^wasi-03]
-- **The host remains part of the system.** A component can build successfully yet fail to link or
-  run if the deployed Pumpkin host does not provide a compatible import or grant the required
-  permission. WIT compatibility is necessary, not a host support guarantee.
-- **The boundary has conversion work.** Calls pass through a JavaScript facade, JSI host function,
-  native adapter, generated WIT binding, and component ABI. Strings and aggregate values require
-  conversion; byte lists are copied into JavaScript typed arrays; records and lists can allocate
-  JavaScript objects or arrays. Those are costs implied by the code path, not measured timings.
-- **Small calls can expose fixed overhead.** A plugin that makes many tiny WASI calls may be more
-  sensitive to boundary and conversion work than one that batches data. Long-running filesystem or
-  network operations also include host and I/O time. Measure a representative plugin before
-  drawing a performance conclusion.
-- **Portability is interface-specific.** A standardized WIT surface does not mean every host
-  implements every capability. Filesystem, socket, and HTTP behavior can depend on host support and
-  permissions. WASI's own design documentation treats API availability and portability as
-  interface-specific.[^wasi-principles]
-- **I/O has explicit lifecycle requirements.** WASI resources must be released, and some operations
-  advance through pollables or streams. Plugins need to manage partial progress, error cases, and
-  cleanup rather than assuming a browser-style global API.
-
-There are no WASI-call timing numbers in this guide. The repository's
-[engine comparison](../../../docs/benchmarking.md) measures guest-side JavaScript workloads and selected Pumpkin
-API behavior; it does not measure a WASI operation. Its engine ratios therefore cannot be used as
-WASI boundary-throughput results. Performance statements above are implementation-based reasoning,
-not benchmark findings.
-
-## Runtime and CI maintainer guide
-
-The build and adapter have separate sources of truth:
-
-| Concern | Source |
-| --- | --- |
-| User-facing capability names and interface expansion | [`tools/build/src/capabilities.ts`](../../build/src/capabilities.ts) |
-| WASI release, file list, hashes, alternate sources, generated WIT files | [`tools/build/wasi-wit.lock.json`](../../build/wasi-wit.lock.json) |
-| Download, SHA-256 verification, and versioned cache | [`tools/build/src/wasi-wit.ts`](../../build/src/wasi-wit.ts) |
-| Plugin-world imports and exact WIT file preparation | [`tools/build/src/wit.ts`](../../build/src/wit.ts) |
-| TypeScript declarations from the prepared world | [`tools/build/src/types.ts`](../../build/src/types.ts) |
-| TypeScript call analysis for used Pumpkin/WASI methods | [`tools/build/src/wit-method-usage.ts`](../../build/src/wit-method-usage.ts) |
-| Pinned `wasm-tools` JSON input and plugin import/declaration order | [`tools/static-hermes-runtime/src/wit/parser.ts`](../src/wit/parser.ts) |
-| Dependency aliases and resolved WIT types | [`tools/static-hermes-runtime/src/wit/resolver.ts`](../src/wit/resolver.ts) |
-| Used methods, feature closure, event fields, and WASI adapter plans | [`tools/static-hermes-runtime/src/wit/analysis.ts`](../src/wit/analysis.ts) |
-| Pumpkin/WASI JavaScript facades and native adapter emission | [`tools/static-hermes-runtime/src/wit/emitters.ts`](../src/wit/emitters.ts) |
-| Runtime shim and API enum generation | [`tools/static-hermes-runtime/src/wit/generation.ts`](../src/wit/generation.ts) |
-| Hermes source checkout, ordered patches, build profiles, cache and artifacts | [`tools/static-hermes-runtime/src/hermes/prepare.ts`](../src/hermes/prepare.ts) |
-| Component analysis, C binding, bytecode compilation, native compile and link | [`tools/static-hermes-runtime/src/component/build.ts`](../src/component/build.ts) |
-| Commander CLI source and package binary | [`tools/static-hermes-runtime/src/cli.ts`](../src/cli.ts), compiled to `dist/cli.js` and registered in [`package.json`](../package.json) |
-
-When adding or upgrading an interface:
-
-1. Confirm that the target Pumpkin runtime can provide the interface and that its WIT/API version is
-   compatible.
-2. Add or update only the pinned WIT files in `wasi-wit.lock.json`; preserve the upstream version
-   and SHA-256 checks. The WASI HTTP package's files use the `wasi-http` source URL recorded in the
-   lock.
-3. Add the interface to a capability bundle in `capabilities.ts` and include its dependencies. Keep
-   shared imports deduplicated.
-4. Check that WIT feature-gated operations select their required `wit-bindgen` feature when used.
-   The build derives these features from the selected operations.
-5. Confirm that the Static Hermes converter supports the WIT parameter and result types. Unsupported
-   operations fail the build with a missing-adapter diagnostic; extend the converter and ownership
-   cleanup where required.
-6. Update adapter fixtures and coverage. The
-   [`wit-api-coverage` test](../test/wit-api-coverage.test.mjs) enumerates operations across the
-   currently locked interfaces and verifies that the generator can plan and emit an adapter for
-   each. The WASI WIT tests also cover imports, dependency resolution, resource handling, and feature
-   selection.
-7. Test actual host behavior on the target Pumpkin runtime. Adapter-generation tests prove that the
-   build can generate bindings; they do not prove the server supplies an import, grants a
-   permission, or implements an operation with the expected host behavior.
-
-Keep the pinned `@pumpkin-plugins/pumpkin-api` version aligned with the Pumpkin server plugin ABI as
-documented in [Building](../../../docs/building.md). WASI versions have their own lock and host
-compatibility requirements.
 
 ## References
 
@@ -354,6 +259,7 @@ compatibility requirements.
 - [WASI HTTP request helper](../../../tools/update-check/src/http-request.ts)
 - [WASI filesystem data helper](../../../tools/plugin-kit/src/data-dir.ts)
 - [Pinned WASI WIT lock](../../build/wasi-wit.lock.json)
+- [WASI maintenance guide](maintaining-wasi.md)
 
 [^wasi-capabilities]: WebAssembly/WASI, [Capabilities](https://github.com/WebAssembly/WASI/blob/main/docs/Capabilities.md),
     on imported interfaces and capability-based access.
@@ -364,7 +270,5 @@ compatibility requirements.
     describing how component values cross the ABI boundary.
 [^component-model]: WebAssembly Component Model, [design and overview](https://github.com/WebAssembly/component-model),
     including its component interface model.
-[^wasi-023]: WebAssembly/WASI, [WASI 0.2.3 interface definitions](https://github.com/WebAssembly/WASI/tree/v0.2.3/wasip2).
-[^wasi-http]: WebAssembly/wasi-http, [WASI HTTP 0.2.3 WIT definitions](https://github.com/WebAssembly/wasi-http/tree/v0.2.3/wit).
-[^wasi-03]: WASI.dev, [WASI 0.3 release notes](https://wasi.dev/docs/releases/wasi-p3),
-    describing native `async`, `future<T>`, and `stream<T>` support in the Component Model.
+[^wasi-03]: WASI.dev, [WASI 0.3 release notes](https://wasi.dev/releases/wasi-p3), describing native
+    `async`, `future<T>`, and `stream<T>` support in the Component Model.
