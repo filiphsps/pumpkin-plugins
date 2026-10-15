@@ -941,31 +941,32 @@ describe('action release prerequisites', () => {
         fs.writeFileSync(pnpm, '#!/usr/bin/env bash\nprintf "%s\\n" "$@" > "$CAPTURED_ARGS"\n');
         fs.chmodSync(pnpm, 0o755);
 
-        for (const [scope, extra, expected] of [
+        for (const [scope, extra, packages, expected] of [
             [
                 'affected',
                 '@pumpkin-plugins/bedrock-addon-manager',
+                '["@pumpkin-plugins/upnpumpkin"]',
                 [
                     'turbo',
                     'run',
                     'test:integration',
                     '--concurrency=2',
                     '--only',
-                    '--filter=...[base-sha]',
+                    '--filter=...@pumpkin-plugins/upnpumpkin',
                     '--filter=@pumpkin-plugins/bedrock-addon-manager',
                 ],
             ],
-            ['all', '', ['turbo', 'run', 'test:integration', '--concurrency=2', '--only']],
+            ['all', '', '[]', ['turbo', 'run', 'test:integration', '--concurrency=2', '--only']],
         ]) {
             const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', integrationCommand.run], {
                 encoding: 'utf8',
                 env: {
                     ...process.env,
                     PATH: `${directory}:${process.env.PATH}`,
-                    BASE_SHA: 'base-sha',
                     CAPTURED_ARGS: argsFile,
                     INTEGRATION_SCOPE: scope,
                     INTEGRATION_EXTRA: extra,
+                    INTEGRATION_PACKAGES: packages,
                 },
             });
             assert.equal(result.status, 0, `${scope}: ${result.stderr}`);

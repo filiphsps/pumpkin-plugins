@@ -202,7 +202,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\nintegration_packages=["@test/plug"]\n',
         );
         assert.match(result.log, /Code: packages\/plug\/src\/index\.ts/);
     });
@@ -260,7 +260,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\nintegration_packages=["@test/colors"]\n',
         );
     });
 
@@ -279,7 +279,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\nintegration_packages=["@test/harness"]\n',
         );
     });
 
@@ -308,6 +308,110 @@ describe('changed-areas', () => {
         );
     });
 
+    it('limits a lockfile importer change to the changed package and its dependents', () => {
+        const dir = repo({
+            'packages/waypoints/package.json': JSON.stringify({
+                name: '@test/waypoints',
+                scripts: { 'test:integration': 'vitest run' },
+            }),
+            'packages/upnpumpkin/package.json': JSON.stringify({
+                name: '@test/upnpumpkin',
+                scripts: { 'test:integration': 'vitest run' },
+            }),
+            'pnpm-lock.yaml': [
+                'lockfileVersion: "9.0"',
+                'importers:',
+                '  packages/waypoints: {}',
+                '  packages/upnpumpkin: {}',
+                '',
+            ].join('\n'),
+        });
+        const base = change(dir, {
+            'pnpm-lock.yaml': [
+                'lockfileVersion: "9.0"',
+                'importers:',
+                '  packages/waypoints:',
+                '    dependencies:',
+                '      some-dependency:',
+                '        specifier: 1.0.0',
+                '        version: 1.0.0',
+                '  packages/upnpumpkin: {}',
+                '',
+            ].join('\n'),
+        });
+        const result = run(dir, base, 'HEAD');
+
+        assert.ok(result.ok, result.log);
+        assert.match(result.outputs, /integration_scope=affected\n/);
+        assert.match(result.outputs, /integration_packages=\["@test\/waypoints"\]\n/);
+        assert.doesNotMatch(result.outputs, /@test\/upnpumpkin/);
+    });
+
+    it('runs all integration suites when the root lockfile importer changes', () => {
+        const dir = repo({
+            'packages/plug/src/index.ts': 'export {};\n',
+            'pnpm-lock.yaml': 'importers:\n  .: {}\n  packages/plug: {}\n',
+        });
+        const base = change(dir, { 'pnpm-lock.yaml': 'importers:\n  .:\n    dependencies: {}\n  packages/plug: {}\n' });
+        const result = run(dir, base, 'HEAD');
+
+        assert.ok(result.ok, result.log);
+        assert.match(result.outputs, /integration_scope=all\n/);
+        assert.doesNotMatch(result.outputs, /integration_packages=/);
+    });
+
+    it('limits catalog and lockfile importer changes to the affected integration packages', () => {
+        const dir = repo({
+            'packages/waypoints/package.json': JSON.stringify({
+                name: '@test/waypoints',
+                scripts: { 'test:integration': 'vitest run' },
+                dependencies: { '@test/pumpkin-pie-api': 'workspace:*' },
+            }),
+            'packages/upnpumpkin/package.json': JSON.stringify({
+                name: '@test/upnpumpkin',
+                scripts: { 'test:integration': 'vitest run' },
+            }),
+            'pnpm-workspace.yaml': 'packages:\n  - "packages/*"\ncatalog:\n  "@test/pumpkin-pie-api": workspace:*\n',
+            'pnpm-lock.yaml': [
+                'lockfileVersion: "9.0"',
+                'importers:',
+                '  packages/waypoints:',
+                '    dependencies:',
+                '      "@test/pumpkin-pie-api":',
+                '        specifier: workspace:*',
+                '        version: link:../../tools/apis/pumpkin-pie-api',
+                '  packages/upnpumpkin: {}',
+                '',
+            ].join('\n'),
+        });
+        const base = change(dir, {
+            'packages/waypoints/package.json': JSON.stringify({
+                name: '@test/waypoints',
+                scripts: { 'test:integration': 'vitest run' },
+                dependencies: { '@test/pumpkin-pie-api': 'catalog:' },
+            }),
+            'pnpm-workspace.yaml':
+                'packages:\n  - "packages/*"\ncatalog:\n  "@test/pumpkin-pie-api": workspace:*\n  "@test/new-catalog-entry": workspace:*\n',
+            'pnpm-lock.yaml': [
+                'lockfileVersion: "9.0"',
+                'importers:',
+                '  packages/waypoints:',
+                '    dependencies:',
+                '      "@test/pumpkin-pie-api":',
+                '        specifier: catalog:',
+                '        version: link:../../tools/apis/pumpkin-pie-api',
+                '  packages/upnpumpkin: {}',
+                '',
+            ].join('\n'),
+        });
+        const result = run(dir, base, 'HEAD');
+
+        assert.ok(result.ok, result.log);
+        assert.match(result.outputs, /integration_scope=affected\n/);
+        assert.match(result.outputs, /integration_packages=\["@test\/waypoints"\]\n/);
+        assert.doesNotMatch(result.outputs, /@test\/upnpumpkin/);
+    });
+
     it('includes bedrock-addon-manager when UPnPumpkin changes', () => {
         const dir = repo({ 'packages/upnpumpkin/src/plugin.ts': 'export {};\n' });
         const base = change(dir, { 'packages/upnpumpkin/src/plugin.ts': 'export const changed = true;\n' });
@@ -315,7 +419,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=@pumpkin-plugins/bedrock-addon-manager\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=@pumpkin-plugins/bedrock-addon-manager\nintegration_packages=["@test/upnpumpkin"]\n',
         );
     });
 
@@ -352,7 +456,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\nintegration_packages=["@test/plug"]\n',
         );
     });
 
@@ -377,7 +481,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\n',
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\nintegration_packages=["@test/plug"]\n',
         );
     });
 
@@ -419,7 +523,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=["two"]\nactions_to_test=["two"]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\n',
+            'code=true\nactions=["two"]\nactions_to_test=["two"]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\nintegration_packages=["@test/plug"]\n',
         );
     });
 
@@ -477,7 +581,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=true\nactions=["sign-pumpkin-plugin"]\nactions_to_test=["common","publish-to-pumpkin-market","sign-pumpkin-plugin","update-pumpkin-market-listing","verify-pumpkin-plugin"]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\n',
+            'code=true\nactions=["sign-pumpkin-plugin"]\nactions_to_test=["common","publish-to-pumpkin-market","sign-pumpkin-plugin","update-pumpkin-market-listing","verify-pumpkin-plugin"]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\nintegration_packages=["@test/plug"]\n',
         );
     });
 

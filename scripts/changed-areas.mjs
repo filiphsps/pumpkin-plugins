@@ -172,9 +172,12 @@ function integrationInputs() {
     const turboConfig = readJson(turboConfigFile);
     const globalFiles = new Set([turboConfigFile]);
     for (const file of files.filter((entry) => !entry.includes('/'))) {
-        if (file === 'package.json' || /(?:lock|workspace)/i.test(file)) globalFiles.add(file);
+        if (file === 'package.json') globalFiles.add(file);
     }
-    for (const input of turboConfig.globalDependencies) globalFiles.add(path.posix.normalize(input));
+    for (const input of turboConfig.globalDependencies) {
+        const normalized = path.posix.normalize(input);
+        if (normalized !== 'pnpm-workspace.yaml') globalFiles.add(normalized);
+    }
 
     const directories = new Set();
     const visitedPackages = new Set();
@@ -234,7 +237,84 @@ function integrationInputs() {
         }
         break;
     }
-    return { directories, globalFiles, allDirectories };
+    const packageByDirectory = new Map(
+        [...packageByName].map(([name, workspacePackage]) => [
+            workspacePackage.directory,
+            { name, ...workspacePackage },
+        ]),
+    );
+    return { directories, globalFiles, allDirectories, packageByDirectory };
+}
+
+/** Reads a tracked file at a revision, returning undefined when that revision has no such file. */
+function readGitFile(revision, file) {
+    const result = spawnSync('git', ['show', `${revision}:${file}`], {
+        cwd: repositoryRoot,
+        encoding: 'utf8',
+    });
+    if (result.status === 0) return result.stdout;
+    return undefined;
+}
+
+/** Reads each workspace importer block from a pnpm lockfile. */
+function lockfileImporters(contents) {
+    const importers = new Map();
+    let inImporters = false;
+    let currentImporter;
+    for (const line of contents.split('\n')) {
+        if (!inImporters) {
+            if (line === 'importers:') inImporters = true;
+            continue;
+        }
+        if (line && !line.startsWith(' ')) {
+            inImporters = false;
+            currentImporter = undefined;
+            continue;
+        }
+        const entry = line.match(/^ {2}([^ ].*?):(?:\s*(.*))?$/);
+        if (entry) {
+            currentImporter = entry[1].replace(/^['"]|['"]$/g, '');
+            importers.set(currentImporter, [line]);
+        } else if (currentImporter) {
+            importers.get(currentImporter).push(line);
+        }
+    }
+    return new Map([...importers].map(([key, lines]) => [key, lines.join('\n')]));
+}
+
+/** Returns the importer directories whose lockfile entries changed between two revisions. */
+function changedLockfileImporters(base, head) {
+    const before = readGitFile(base, 'pnpm-lock.yaml');
+    const after = readGitFile(head, 'pnpm-lock.yaml');
+    if (before === undefined || after === undefined) return undefined;
+    const previousImporters = lockfileImporters(before);
+    const currentImporters = lockfileImporters(after);
+    const changedImporters = new Set([...previousImporters.keys(), ...currentImporters.keys()]);
+    return [...changedImporters]
+        .filter((importer) => previousImporters.get(importer) !== currentImporters.get(importer))
+        .map((importer) => (importer === '.' ? importer : path.posix.normalize(importer)));
+}
+
+/** Returns workspace configuration with catalog entries removed. */
+function workspaceLayout(contents) {
+    let insideCatalogs = false;
+    const retainedLines = [];
+    for (const line of contents.split('\n')) {
+        if (/^catalogs?:\s*$/.test(line)) {
+            insideCatalogs = true;
+            continue;
+        }
+        if (insideCatalogs && line && !line.startsWith(' ')) insideCatalogs = false;
+        if (!insideCatalogs) retainedLines.push(line);
+    }
+    return retainedLines.join('\n').trim();
+}
+
+/** Checks whether workspace configuration changed outside its catalogs. */
+function workspaceLayoutChanged(base, head) {
+    const before = readGitFile(base, 'pnpm-workspace.yaml');
+    const after = readGitFile(head, 'pnpm-workspace.yaml');
+    return before === undefined || after === undefined || workspaceLayout(before) !== workspaceLayout(after);
 }
 
 const COMMON_CONSUMERS = [
@@ -317,21 +397,35 @@ const generator = Boolean(
         ),
 );
 const integrationRelevant = code.length > 0 ? integrationInputs() : undefined;
+const lockfileChanged = code.includes('pnpm-lock.yaml');
+const workspaceConfigChanged = code.includes('pnpm-workspace.yaml');
+const lockfileImporterDirectories = lockfileChanged ? changedLockfileImporters(base, head) : [];
+const lockfileWideChanged =
+    lockfileChanged &&
+    (!lockfileImporterDirectories ||
+        lockfileImporterDirectories.length === 0 ||
+        lockfileImporterDirectories.includes('.'));
+const workspaceLayoutChangedForIntegration = workspaceConfigChanged && workspaceLayoutChanged(base, head);
 /** Keep the benchmark comparison scoped to its dedicated real-server workflow. */
 const benchmarkOnly = code.length > 0 && code.every((file) => file.startsWith('benchmarks/engine-comparison/'));
 const integrationRuntimeChanged = Boolean(
     integrationRelevant &&
-        code.some((file) => [...integrationRelevant.directories].some((directory) => file.startsWith(`${directory}/`))),
+        (code.some((file) =>
+            [...integrationRelevant.directories].some((directory) => file.startsWith(`${directory}/`)),
+        ) ||
+            lockfileImporterDirectories?.some((directory) => integrationRelevant.directories.has(directory))),
 );
 const integrationAllChanged = Boolean(
     integrationRelevant &&
-        code.some(
-            (file) =>
-                integrationRelevant.globalFiles.has(file) ||
-                [...integrationRelevant.allDirectories].some((directory) => file.startsWith(`${directory}/`)),
-        ),
+        (workspaceLayoutChangedForIntegration ||
+            lockfileWideChanged ||
+            code.some(
+                (file) =>
+                    integrationRelevant.globalFiles.has(file) ||
+                    [...integrationRelevant.allDirectories].some((directory) => file.startsWith(`${directory}/`)),
+            )),
 );
-const integrationScope = benchmarkOnly
+let integrationScope = benchmarkOnly
     ? 'benchmark'
     : integrationAllChanged
       ? 'all'
@@ -341,6 +435,25 @@ const integrationScope = benchmarkOnly
 const integrationExtra = code.some((file) => file.startsWith('packages/upnpumpkin/'))
     ? '@pumpkin-plugins/bedrock-addon-manager'
     : '';
+const integrationPackages = new Set();
+if (integrationScope === 'affected') {
+    for (const directory of integrationRelevant.directories) {
+        const changedPackage = code.some((file) => file.startsWith(`${directory}/`));
+        const changedImporter = lockfileImporterDirectories?.includes(directory);
+        if (!changedPackage && !changedImporter) continue;
+        let name = integrationRelevant.packageByDirectory.get(directory)?.name;
+        if (!name && changedImporter) {
+            const previousManifest = readGitFile(base, `${directory}/package.json`);
+            try {
+                name = JSON.parse(previousManifest ?? '').name;
+            } catch {
+                name = undefined;
+            }
+        }
+        if (name) integrationPackages.add(name);
+    }
+    if (integrationPackages.size === 0) integrationScope = 'all';
+}
 
 console.log(`${changed.length} changed file(s) between ${base} and ${head}`);
 if (code.length) console.log(`Code: ${code.join(', ')}`);
@@ -353,10 +466,11 @@ console.log(`Generator smoke test: ${generator ? 'selected' : 'skipped'}`);
 console.log(`Integration scope: ${integrationScope}`);
 if (generatedReadmes) console.log('Generated README update commit detected.');
 if (integrationExtra) console.log(`Additional integration package: ${integrationExtra}`);
+if (integrationPackages.size) console.log(`Integration packages: ${[...integrationPackages].sort().join(', ')}`);
 
 if (process.env.GITHUB_OUTPUT) {
     appendFileSync(
         process.env.GITHUB_OUTPUT,
-        `code=${code.length > 0}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\nextensions=${JSON.stringify(extensions)}\nextensions_to_test=${JSON.stringify(extensionsToTest)}\ngenerated_readmes=${generatedReadmes}\ngenerator=${generator}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n`,
+        `code=${code.length > 0}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\nextensions=${JSON.stringify(extensions)}\nextensions_to_test=${JSON.stringify(extensionsToTest)}\ngenerated_readmes=${generatedReadmes}\ngenerator=${generator}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n${integrationPackages.size ? `integration_packages=${JSON.stringify([...integrationPackages].sort())}\n` : ''}`,
     );
 }

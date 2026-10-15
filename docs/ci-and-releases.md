@@ -80,11 +80,13 @@ relevant code or action checks.
 Everything else outside `actions/` is a change to repository code and runs the code jobs, including
 changes under `tools/`, `scripts/` and `.github/`, and deletions. Real-server integration runs only for
 plugin or integration-suite dependency changes, plus workspace-wide build configuration and shared
-integration setup changes. Package and suite dependency changes select the affected packages and their
-dependents; workspace-wide changes run the full suite. Changes to the integration workflow and its
-local actions run the full suite. Unrelated scripts and workflow files skip this job. Benchmark-only
-changes use Engine comparison. Biome, the type checker and the tests read none of the documentation
-files, so a docs-only change cannot fail them.
+integration setup changes. Package changes select the affected integration suites and their dependents.
+Lockfile importer changes select the importer packages and their dependents; catalog-only workspace
+changes use the same importer scope. Other workspace-wide changes, lockfile changes without
+importer-level changes, and changes to the integration workflow or its local actions run the full suite.
+Unrelated scripts and workflow files skip this job. Benchmark-only changes use Engine comparison.
+Biome, the type checker and the tests read none of the documentation files, so a docs-only change
+cannot fail them.
 
 The main CI `📝 Docs and config` job runs for code, action and extension changes, and for the automatic
 `docs: update generated READMEs` commit. GitHub may trigger CI, Docs and Actionlint for Release Please

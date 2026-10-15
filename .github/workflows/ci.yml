@@ -72,6 +72,7 @@ jobs:
             generator: ${{ steps.classify.outputs.generator }}
             integration_scope: ${{ steps.classify.outputs.integration_scope }}
             integration_extra: ${{ steps.classify.outputs.integration_extra }}
+            integration_packages: ${{ steps.classify.outputs.integration_packages }}
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -450,13 +451,20 @@ jobs:
 
             - name: 🎃 Integration tests
               env:
-                  BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
                   INTEGRATION_SCOPE: ${{ needs.changes.outputs.integration_scope }}
                   INTEGRATION_EXTRA: ${{ needs.changes.outputs.integration_extra }}
+                  INTEGRATION_PACKAGES: ${{ needs.changes.outputs.integration_packages || '[]' }}
                   PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/pumpkin-logs
               run: |
                   if [ "$INTEGRATION_SCOPE" = affected ]; then
-                      filters=(--filter="...[$BASE_SHA]")
+                      if [ "$INTEGRATION_PACKAGES" = '[]' ]; then
+                          echo 'Affected integration scope has no package filters.' >&2
+                          exit 1
+                      fi
+                      filters=()
+                      while IFS= read -r package; do
+                          filters+=(--filter="...$package")
+                      done < <(node -e 'for (const name of JSON.parse(process.env.INTEGRATION_PACKAGES)) console.log(name)')
                       if [ -n "$INTEGRATION_EXTRA" ]; then
                           filters+=(--filter="$INTEGRATION_EXTRA")
                       fi
