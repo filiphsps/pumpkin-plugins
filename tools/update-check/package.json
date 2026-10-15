@@ -48,6 +48,8 @@
     ],
     "scripts": {
         "build": "pumpkin-plugins-build",
+        "readme": "pumpkin-plugins-docs generate docs.ts",
+        "readme:check": "pumpkin-plugins-docs generate docs.ts --check",
         "test": "vitest run --project unit",
         "test:coverage": "vitest run --project unit --coverage",
         "test:integration": "vitest run --project integration",

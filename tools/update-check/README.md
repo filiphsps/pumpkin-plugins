@@ -16,8 +16,15 @@ registerPluginWithUpdates(plugin, info, { schedule });
 The plugin must request the `http` WASI capability and the server must grant `http.outbound`. The
 scheduler defers the initial request and dispatches follow-up polls through the plugin's task
 handler. The scheduler must run callbacks in a later task, never inline. Automatic checks do not
-block plugin startup or server ticks. Asynchronous requests stop after 15 seconds and reject bodies
-larger than 64 KiB. A failed update request is logged and does not interrupt plugin loading. `checkMarketUpdate` remains available for direct
+block plugin startup or server ticks.
+
+<!-- docs:begin http-limits -->
+<!-- Generated from src/http-limits.ts. Run `pnpm readme`. -->
+
+Asynchronous requests time out after 15 seconds. Response bodies larger than 64 KiB are rejected.
+<!-- docs:end http-limits -->
+
+A failed update request is logged and does not interrupt plugin loading. `checkMarketUpdate` remains available for direct
 checks with an injected synchronous JSON request function, which is useful for deterministic tests.
 `requestMarketJsonAsync` exposes the same non-blocking transport for direct use. The synchronous
 `requestMarketJson` transport blocks and must not be called during plugin loading or server ticks.

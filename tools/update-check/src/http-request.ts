@@ -2,8 +2,8 @@ import { handle } from 'wasi:http/outgoing-handler@0.2.3';
 import { Fields, OutgoingRequest, RequestOptions } from 'wasi:http/types@0.2.3';
 import type { Pollable } from 'wasi:io/poll@0.2.3';
 import { strFromU8, strToU8 } from 'fflate';
+import { MAX_RESPONSE_BYTES } from './http-limits.ts';
 
-const MAX_RESPONSE_BYTES = 64 * 1024;
 const READ_CHUNK_BYTES = 4096n;
 
 type Resource = { [Symbol.dispose]?: () => void; drop?: () => void };

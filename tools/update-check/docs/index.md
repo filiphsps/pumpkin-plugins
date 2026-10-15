@@ -19,8 +19,15 @@ handler as part of the plugin entry point so follow-up polling can proceed.
 ## Failure behavior and direct checks
 
 Automatic checks do not block plugin startup. A failed request is logged and does not prevent the
-plugin from loading. Requests stop after 15 seconds and response bodies larger than 64 KiB are
-rejected. `marketplaceUrl` can override the Market base URL for tests or alternate environments.
+plugin from loading.
+
+<!-- docs:begin http-limits -->
+<!-- Generated from src/http-limits.ts. Run `pnpm readme`. -->
+
+Asynchronous requests time out after 15 seconds. Response bodies larger than 64 KiB are rejected.
+<!-- docs:end http-limits -->
+
+`marketplaceUrl` can override the Market base URL for tests or alternate environments.
 
 `checkMarketUpdate` supports a synchronous injected JSON requester for deterministic code and tests.
 `requestMarketJsonAsync` exposes the non-blocking transport directly. The synchronous

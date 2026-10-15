@@ -1,7 +1,6 @@
 import { now } from 'wasi:clocks/monotonic-clock@0.2.3';
+import { REQUEST_TIMEOUT_NS } from './http-limits.ts';
 import { marketJsonRequest } from './http-request.ts';
-
-const REQUEST_TIMEOUT_NS = 15_000_000_000n;
 
 /** Sends a blocking HTTP GET through Pumpkin's WASI host. Use only outside server ticks. */
 export function requestMarketJson(url: string): unknown {
