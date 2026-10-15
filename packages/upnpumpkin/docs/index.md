@@ -4,9 +4,9 @@ UPnPumpkin asks a home router to forward the server's Java TCP and Bedrock UDP p
 NAT-PMP. This lets players outside the local network connect without manually adding router rules
 when the network supports automatic mapping.
 
-Install `upnpumpkin.wasm` in the Pumpkin server's `plugins/` folder and restart. By default it
-requests Java port `25565` and Bedrock port `19132`. Router leases are renewed halfway through
-their configured lifetime and are closed when the server stops.
+Install `upnpumpkin.wasm` in the Pumpkin server's `plugins/` folder and restart. See the
+[configuration reference](../README.md#configuration) for port defaults and other settings. Router
+leases are renewed halfway through their configured lifetime and are closed when the server stops.
 
 ## Check the mapping
 
@@ -14,9 +14,11 @@ Operators can run `/upnp status` to see the discovered router, public address, a
 Run `/upnp reload` after changing `plugins/data/UPnPumpkin/config.toml` to re-read settings and
 update the mappings. A server that already has a public address does not need a router mapping.
 
-UPnPumpkin can also accept port requests from other plugins. Requests are enabled by default and
-limited to 16 open ports per plugin. A requesting plugin must stop its watcher when it no longer
-needs a port; unused requests expire after five minutes.
+UPnPumpkin can also accept port requests from other plugins. The `plugins.allow_requests` and
+`plugins.max_requests_per_plugin` settings control whether requests are accepted and the per-plugin
+limit; see the [configuration reference](../README.md#configuration). A requesting plugin should
+stop its watcher when it no longer needs a port. The server drops requests that stop being refreshed;
+`REQUEST_TTL_MS` in the [forwarder](../src/forwarder.ts) controls the inactivity window.
 
 ## Network requirements
 

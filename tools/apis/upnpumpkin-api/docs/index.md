@@ -16,6 +16,9 @@ only when the reported state contains a usable public address. When UPnPumpkin i
 has not loaded yet, the watcher reports an unavailable state; callers should handle it without
 blocking their own service from starting.
 
-Unused requests expire after five minutes. UPnPumpkin also applies a per-plugin mapping limit, so
-stop watchers promptly. The API package does not perform router discovery itself; the server-side
-plugin owns that network work.
+When a watcher stops refreshing, UPnPumpkin eventually drops the request and closes its mapping.
+The server's `REQUEST_TTL_MS` constant in the [forwarder](../../../../packages/upnpumpkin/src/forwarder.ts)
+sets the inactivity window. UPnPumpkin also enforces the per-plugin limit configured by
+[`plugins.max_requests_per_plugin`](../../../../packages/upnpumpkin/README.md#configuration). Stop
+watchers when the port is no longer needed. The API package does not perform router discovery itself;
+the server-side plugin owns that network work.
