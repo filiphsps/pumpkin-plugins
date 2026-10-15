@@ -40,16 +40,27 @@ inputs, and follow the dependency and cache rules in [Building](docs/building.md
 - Do not hardcode values that can be inferred from the codebase. Derive them from their source of
   truth (manifests, config, declarations or repository layout) so duplicated lists cannot drift.
 
+## Design principles
+
+- Understand the real constraint and honor the request. Choose the simplest durable design that
+  fully meets current requirements; avoid unnecessary scope, speculative machinery and stopgaps
+  that will need replacement.
+- Keep components modular and concerns clearly separated. Prefer established, well-maintained
+  libraries when they reduce overall complexity or improve reliability.
+- Use tests to protect meaningful behavior and regression risks; do not optimize test counts or
+  coverage for their own sake. Optimize effort, not rigor: trace dependencies, assess impact and
+  validate the change.
+
 ## Verify before finishing
 
-1. Run `node .agents/hooks/check.mjs` from the repo root. Use `--plan` to inspect its scope; pass
-   explicit file paths when unrelated changes are present. The runner checks without applying fixes.
-   See [Agent tooling](docs/agent-tooling.md) for its scope, limitations and diagnostics.
+1. The configured completion hook checks your scoped changes and blocks completion on failure.
+   Resolve any reported failures before finishing. See [Agent tooling](docs/agent-tooling.md) for its
+   scope, limitations and diagnostics.
 2. Runtime changes also need affected integration tests against a real Pumpkin server; the fast
    runner does not start one. Use the testing skill to include shared-library dependents and
    cross-plugin scenarios.
-3. Read your diff, shared callers and affected docs. Check behavior and failure paths; bug fixes need
-   regression coverage. Unit tests sit beside code; server tests go in `test/`; generate fixtures in
-   code.
+3. Trace affected callers, workspace dependents and runtime variants. Read your diff and affected
+   docs; check behavior and failure paths. Bug fixes need regression coverage. Unit tests sit beside
+   code; server tests go in `test/`; generate fixtures in code.
 4. Report what changed, what checks ran, and anything that failed or could not be checked. A
    configured automatic check is not evidence that it passed.
