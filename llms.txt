@@ -71,7 +71,7 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [UPnPumpkin: Troubleshoot port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/troubleshooting.md): Confirm UPnP or NAT-PMP is enabled in the router settings and that the server host shares the router's local network.
 - [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/index.md): Waypoints with access rules, a Java HUD, and PumpkinPIE placeholders
 - [Waypoints README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/README.md): Additional component overview and usage details.
-- [Waypoints: PumpkinPIE placeholders](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/placeholders.md): Waypoints optionally registers the waypoints namespace with PumpkinPIE.
+- [Waypoints: PumpkinPIE placeholders](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/placeholders.md): <!-- docs:begin placeholders -- <!-- Generated from src/placeholders/definitions.ts and the PumpkinPIE session timing constants.
 
 ## Shared tools
 
