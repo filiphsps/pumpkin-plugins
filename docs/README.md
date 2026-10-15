@@ -27,6 +27,9 @@
 | [Benchmarking](benchmarking.md) | QuickJS and the Static Hermes profile, collector and parser matrix |
 | [Port forwarding](port-forwarding.md) | UPnP and NAT-PMP for plugins: the engine, UPnPumpkin, its API and how to test them |
 | [CI and releases](ci-and-releases.md) | The CI workflow, release-please, rebase-only merging and the market stub |
+| [Agent domain docs](agents/domain.md) | How engineering skills use glossary and ADR documentation |
+| [Issue tracker](agents/issue-tracker.md) | GitHub issue commands and repository conventions |
+| [Triage labels](agents/triage-labels.md) | Mapping triage roles to the labels used in this repository |
 | [Publishing public npm tools](npm-publishing.md) | Placeholder setup and Release Please publishing for public npm tools |
 | [Trusted publishing for npm tools](npm-trusted-publishing.md) | npm OIDC setup, workflow identity, validation window, provenance and recovery |
 | [Agent tooling](agent-tooling.md) | Agent guidance, skills, portable hooks and scoped check diagnostics |
