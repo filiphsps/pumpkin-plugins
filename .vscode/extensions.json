@@ -2,6 +2,7 @@
     "recommendations": [
         "bierner.comment-tagged-templates",
         "biomejs.biome",
+        "TypeScriptTeam.native-preview",
         "redhat.vscode-yaml",
         "tamasfe.even-better-toml",
         "chdsbd.github-code-owners",

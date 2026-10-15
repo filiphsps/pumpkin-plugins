@@ -8,6 +8,7 @@ saveExact: true
 allowBuilds:
   esbuild: true
   "@vscode/vsce-sign": true
+  tsc-rs: true
 minimumReleaseAge: 0
 catalog:
   # API package version 0.1.0 carries Pumpkin WIT ABI 0.1.0 for release 0.2.0+26.3-26.51.
@@ -23,6 +24,7 @@ catalog:
   "@vscode/vsce": 4.0.0
   "@vitest/coverage-v8": 5.0.4
   fflate: 0.8.3
+  tsc-rs: 0.7.0
   "@badisi/latest-version": 9.0.2
   vitest: 5.0.4
   typescript: 6.0.3
