@@ -6,51 +6,54 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 
 ## Getting started
 
-- [Documentation index](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/README.md): Catalog of guides and documentation pages.
-- [Creating a plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-a-plugin.md): This runs the plugin generator (a Turborepo generator, defined in turbo/generators/).
-- [Creating an action](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-action.md): This runs the action Turborepo generator in turbo/generators/.
-- [Documentation site](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/documentation-site.md): The VitePress site combines the hand-written guides in docs/, component READMEs, component-level guides, and generated API references.
+- [Creating a plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-a-plugin.md): The `pnpm gen` generator, what it creates, and what to do next
+- [Creating an action](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-action.md): The `pnpm gen:action` generator, generated input/output docs, and release setup
+- [Documentation site](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/documentation-site.md): Adding component guides, generated API reference, local preview, and publishing
 
 ## CI and releases
 
-- [Publishing public npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-publishing.md): Public npm tools are discovered from package manifests under tools/ that declare publishConfig.access: "public" and are not private.
-- [Trusted publishing for npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-trusted-publishing.md): The release workflow publishes the public tools with npm trusted publishing. npm authenticates the GitHub Actions workflow through OpenID Connect (OIDC); no npm write token is…
+- [Publishing public npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-publishing.md): Placeholder setup and Release Please publishing for public npm tools
+- [Trusted publishing for npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-trusted-publishing.md): npm OIDC setup, workflow identity, validation window, provenance and recovery
 
 ## Guides
 
-- [Domain Docs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/domain.md): How the engineering skills should consume this repo's domain documentation when exploring the codebase.
-- [Issue tracker: GitHub](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/issue-tracker.md): Issues and specs for this repo live as GitHub issues.
-- [Triage Labels](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/triage-labels.md): The skills speak in terms of five canonical triage roles.
-- [Benchmarking QuickJS and Static Hermes](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/benchmarking.md): This guide explains what the engine comparison measures, how to read its report, and what conclusions its results support.
-- [Creating a VS Code extension](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-extension.md): Create an extension package with the Turbo generator.
-
-## Plugin API
-
-- [ABI and runtime support](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/abi-and-runtime.md): The npm package version identifies the TypeScript facade release.
-- [API evolution and migration](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/api-evolution-and-migration.md): The v0.1.1 @pumpkinmc/pumpkin-api-ts API is the compatibility baseline.
-- [Host API areas](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/host-api.md): The pinned pumpkin:plugin@0.1.0 WIT package groups host operations into interfaces for commands, events, server access, worlds, entities, inventory, networking, scheduling, IPC…
-- [Lifecycle and registration](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/lifecycle-and-registration.md): Extend Plugin, provide metadata(), implement onLoad(context) for startup registration, and optionally implement onUnload(context) to save state and release resources.
-- [Setup and build](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/setup-and-build.md): Standalone plugin projects use @pumpkin-plugins/pumpkin-api for the runtime facade and @pumpkin-plugins/build for the pumpkin-plugins-build command.
+- [Benchmarking](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/benchmarking.md): QuickJS and the Static Hermes profile, collector and parser matrix
+- [Creating a VS Code extension](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-extension.md): The `pnpm gen:extension` generator, extension checks, and VSIX releases
 
 ## Plugin development
 
-- [Building](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/building.md): From the workspace root, run pnpm build to build all plugin packages or pnpm build --filter=@pumpkin-plugins/<folder to build one.
-- [Code style](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/code-style.md): pnpm lint runs two linters, and CI runs the same command.
-- [Plugin config](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-config.md): Plugins that need settings use @pumpkin-plugins/config (tools/config).
-- [Plugin info and READMEs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-info-and-readmes.md): Each plugin describes itself in one small module that exports info.
-- [Testing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/testing.md): Each plugin has two vitest projects, set up by definePluginVitestConfig() from @pumpkin-plugins/test-harness/vitest.
-- [Turborepo commands](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/turborepo.md): Run direct Turbo tasks through the root pnpm turbo command.
+- [Building](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/building.md): The shared build tool, Turborepo setup, and runtime caveats
+- [Code style](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/code-style.md): Biome, the JSDoc rule, and how code is organized and tested
+- [Plugin config](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-config.md): Declaring settings as a schema: the file, validation, upgrades and docs all come from it
+- [Plugin info and READMEs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-info-and-readmes.md): How a plugin describes itself in `src/info.ts` and how the READMEs are generated
+- [Testing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/testing.md): Unit tests and integration tests against a real Pumpkin server
+- [Turborepo commands](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/turborepo.md): The pnpm Turbo wrapper, log defaults, and flag overrides
 
 ## Repository maintenance
 
-- [Agent tooling](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agent-tooling.md): The repo keeps agent instructions, skills and executable checks separate.
-- [CI and releases](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/ci-and-releases.md): Plugin, action, extension and public tool checks are in .github/workflows/ci.yml; the external-consumer matrix is in the reusable .github/workflows/external-consumer.yml.
+- [Agent tooling](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agent-tooling.md): Agent guidance, skills, portable hooks and scoped check diagnostics
+- [CI and releases](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/ci-and-releases.md): The CI workflow, release-please, rebase-only merging and the market stub
 
 ## Server operations
 
-- [Checking for plugin updates](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-updates.md): Every plugin in this repository checks Pumpkin Market after it loads.
-- [Port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/port-forwarding.md): Players can only reach a server behind a home router when the router forwards the server's ports.
-- [Pumpkin Market API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/pumpkin-market-api.md): This page records the Market API behavior used by this repository's publish action, the Market frontend, and PPM.
+- [Checking for plugin updates](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-updates.md): Checking plugin versions against Pumpkin Market
+- [Port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/port-forwarding.md): UPnP and NAT-PMP for plugins: the engine, UPnPumpkin, its API and how to test them
+- [Pumpkin Market API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/pumpkin-market-api.md): Market listing lookup, metadata updates, current publisher behavior and API findings
+
+## Docs
+
+- [Documentation index](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/README.md): Catalog of guides and documentation pages.
+- [Agent domain docs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/domain.md): How engineering skills use glossary and ADR documentation
+- [Issue tracker](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/issue-tracker.md): GitHub issue commands and repository conventions
+- [Triage labels](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/triage-labels.md): Mapping triage roles to the labels used in this repository
+- [Plugin API: ABI and runtime support](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/abi-and-runtime.md): Package versions, WIT ABI alignment and runtime support notes
+- [Plugin API: evolution and migration](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/api-evolution-and-migration.md): Compatibility decisions, migration and SemVer policy
+- [Plugin API: host API areas](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/host-api.md): Pumpkin WIT interfaces and WASI capability distinction
+- [Plugin API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/index.md): Standalone API setup, lifecycle, host interfaces, ABI support and migration
+- [Plugin API: lifecycle and registration](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/lifecycle-and-registration.md): Plugin lifecycle callbacks and handler registration
+- [Plugin API: setup and build](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/setup-and-build.md): Install the API and build packages and generate WIT declarations
+- [Adding codemods](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/docs/authoring-codemods.md): Add, register, test, and package a Pumpkin codemod
+- [Using codemods](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/docs/using-codemods.md): Run the Pumpkin API migration, preview changes, and finish the manual review
 
 ## Plugins
 
@@ -87,8 +90,8 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [Plugin build tool README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/build/README.md): Additional component overview and usage details.
 - [Pumpkin codemods](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/docs/index.md): Codemod runner for Pumpkin plugins
 - [Pumpkin codemods README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/README.md): Additional component overview and usage details.
-- [Pumpkin codemods: Adding codemods](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/docs/authoring-codemods.md): Codemods in @pumpkin-plugins/codemod use a small per-file contract.
-- [Pumpkin codemods: Using codemods](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/docs/using-codemods.md): @pumpkin-plugins/codemod provides named, repeatable migrations for Pumpkin plugin projects.
+- [Pumpkin codemods: Adding codemods](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/docs/authoring-codemods.md): Add, register, test, and package a Pumpkin codemod
+- [Pumpkin codemods: Using codemods](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/docs/using-codemods.md): Run the Pumpkin API migration, preview changes, and finish the manual review
 - [Plugin configuration library](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/config/docs/index.md): Schema-driven TOML config for plugins
 - [Plugin configuration library README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/config/README.md): Additional component overview and usage details.
 - [create-pumpkin-plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/create-pumpkin-plugin/README.md): Create a minimal Pumpkin plugin project
