@@ -65,8 +65,7 @@
             "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
         "tools/create-pumpkin-plugin": {
-            "component": "create-pumpkin-plugin",
-            "release-as": "0.1.0"
+            "component": "create-pumpkin-plugin"
         },
         "tools/cspell-dict-minecraft": {
             "component": "cspell-dict-minecraft",
