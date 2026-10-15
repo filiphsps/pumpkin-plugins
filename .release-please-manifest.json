@@ -2,7 +2,7 @@
     "actions/publish-to-pumpkin-market": "0.0.6",
     "actions/sign-pumpkin-plugin": "0.0.3",
     "actions/update-pumpkin-market-listing": "0.0.3",
-    "actions/verify-pumpkin-plugin": "0.0.4",
+    "actions/verify-pumpkin-plugin": "0.0.5",
     "extensions/minecraft-terms": "0.0.1",
     "packages/apple-skin-pumpkin": "0.0.7",
     "packages/distant-horizons-support-pumpkin": "0.0.13",
