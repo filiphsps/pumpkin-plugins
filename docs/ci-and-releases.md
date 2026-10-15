@@ -185,8 +185,8 @@ plugin READMEs, generates every action README's input/output tables from its `ac
 updates the versioned example tag from that action's Release Please manifest entry. For an action
 that has not had its first release, the README uses its `release-as` version instead of `0.0.0`. The
 job pushes a `docs: update generated READMEs` commit to the PR branch, so examples are current when
-the release merges. The same run retires the `release-as` pin of any plugin or action the PR releases
-(see below).
+the release merges. The same run retires the `release-as` pin for any plugin, action, extension or
+public npm tool whose first release PR advances its manifest version (see below).
 release-please rewrites its branch on every update, so those commits are re-added each time.
 
 Release PRs refresh on every release run, even when their release notes are unchanged.

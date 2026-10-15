@@ -169,10 +169,27 @@ describe('upstream pin workflow', () => {
         assert.equal(publish['timeout-minutes'], 60);
         assert.equal(publish['runs-on'], 'ubuntu-26.04');
         assert.equal(
+            releaseWorkflow.jobs.release.outputs.release_metadata,
+            ['$', '{{ steps.release.outputs.release_metadata }}'].join(''),
+        );
+        assert.equal(
+            releaseWorkflow.jobs.release.outputs.release_notes,
+            ['$', '{{ steps.release.outputs.release_notes }}'].join(''),
+        );
+        assert.equal(releaseWorkflow.jobs.release.outputs.all, undefined);
+        assert.equal(
+            releaseWorkflow.jobs['release-fanout-check'].env.RELEASE_METADATA,
+            ['$', '{{ needs.release.outputs.release_metadata }}'].join(''),
+        );
+        assert.equal(
             publish.env.RELEASED_TOOL_PATHS,
             ['$', '{{ needs.release.outputs.tool_paths_released }}'].join(''),
         );
-        assert.equal(publish.env.RELEASE_METADATA, ['$', '{{ needs.release.outputs.all }}'].join(''));
+        assert.equal(publish.env.RELEASE_METADATA, ['$', '{{ needs.release.outputs.release_metadata }}'].join(''));
+        assert.equal(
+            releaseWorkflow.jobs.market.env.MARKET_RELEASE_NOTES,
+            ['$', "{{ fromJSON(needs.release.outputs.release_notes)[format('{0}--body', matrix.path)] }}"].join(''),
+        );
         const steps = publish.steps;
         const tagCheck = steps.find((step) => step.name === '🔒 Check each tag is the commit this run built');
         assert.match(tagCheck.run, /git\/ref\/tags\/\$RELEASE_TAG/);

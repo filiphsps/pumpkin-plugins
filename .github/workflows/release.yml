@@ -25,7 +25,8 @@ jobs:
             release_count: ${{ steps.release.outputs.release_count }}
             prepared_pr_count: ${{ steps.release.outputs.pr_count }}
             open_pr_count: ${{ steps.release-prs.outputs.open_pr_count }}
-            all: ${{ toJSON(steps.release.outputs) }}
+            release_metadata: ${{ steps.release.outputs.release_metadata }}
+            release_notes: ${{ steps.release.outputs.release_notes }}
             prs: ${{ steps.release-prs.outputs.prs }}
         steps:
             - name: 🕶️ Checkout repository
@@ -99,7 +100,7 @@ jobs:
             ACTION_PATHS: ${{ needs.release.outputs.action_paths_released }}
             TOOL_PATHS: ${{ needs.release.outputs.tool_paths_released }}
             EXTENSION_PATHS: ${{ needs.release.outputs.extension_paths_released }}
-            RELEASE_METADATA: ${{ needs.release.outputs.all }}
+            RELEASE_METADATA: ${{ needs.release.outputs.release_metadata }}
         steps:
             - name: 🧮 Require complete release outputs
               run: |
@@ -226,7 +227,7 @@ jobs:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             GH_REPO: ${{ github.repository }}
             RELEASED_TOOL_PATHS: ${{ needs.release.outputs.tool_paths_released }}
-            RELEASE_METADATA: ${{ needs.release.outputs.all }}
+            RELEASE_METADATA: ${{ needs.release.outputs.release_metadata }}
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
@@ -290,7 +291,7 @@ jobs:
         env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             GH_REPO: ${{ github.repository }}
-            TAG: ${{ fromJSON(needs.release.outputs.all)[format('{0}--tag_name', matrix.path)] }}
+            TAG: ${{ fromJSON(needs.release.outputs.release_metadata)[format('{0}--tag_name', matrix.path)] }}
             EXTENSION_DIRECTORY: ${{ matrix.path }}
         steps:
             - name: 🕶️ Checkout repository
@@ -335,7 +336,7 @@ jobs:
         env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             GH_REPO: ${{ github.repository }}
-            TAG: ${{ fromJSON(needs.release.outputs.all)[format('{0}--tag_name', matrix.path)] }}
+            TAG: ${{ fromJSON(needs.release.outputs.release_metadata)[format('{0}--tag_name', matrix.path)] }}
             PLUGIN_DIRECTORY: ${{ matrix.path }}
         steps:
             - name: 🕶️ Checkout repository
@@ -422,8 +423,8 @@ jobs:
             matrix:
                 path: ${{ fromJSON(needs.release.outputs.paths_released) }}
         env:
-            TAG: ${{ fromJSON(needs.release.outputs.all)[format('{0}--tag_name', matrix.path)] }}
-            MARKET_RELEASE_NOTES: ${{ fromJSON(needs.release.outputs.all)[format('{0}--body', matrix.path)] }}
+            TAG: ${{ fromJSON(needs.release.outputs.release_metadata)[format('{0}--tag_name', matrix.path)] }}
+            MARKET_RELEASE_NOTES: ${{ fromJSON(needs.release.outputs.release_notes)[format('{0}--body', matrix.path)] }}
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1

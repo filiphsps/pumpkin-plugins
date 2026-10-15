@@ -208,6 +208,18 @@ it('preserves workflow tag and multiline release-note outputs for assets and Mar
     assert.match(result.output, /actions\/publish-action--body<<[^\n]+\nFeatures\n\n\* Add warning mode\n/);
     assert.match(result.output, /release_count<<[^\n]+\n2\n/);
     assert.match(result.output, /pr_count<<[^\n]+\n1\n/);
+    const metadata = result.output.match(/release_metadata<<([^\n]+)\n([^\n]+)\n\1\n/);
+    assert.ok(metadata, 'release tag metadata should be a compact separate workflow output');
+    assert.deepEqual(JSON.parse(metadata[2]), {
+        'packages/plugin--tag_name': 'plugin-v1.0.0',
+        'actions/publish-action--tag_name': 'publish-action-v0.0.1',
+    });
+    const releaseNotes = result.output.match(/release_notes<<([^\n]+)\n([^\n]+)\n\1\n/);
+    assert.ok(releaseNotes, 'release notes should be published separately from tag metadata');
+    assert.deepEqual(JSON.parse(releaseNotes[2]), {
+        'packages/plugin--body': 'Features\n\n* Added update checks',
+        'actions/publish-action--body': 'Features\n\n* Add warning mode',
+    });
     assert.match(
         result.stdout,
         /Release fan-out: plugin paths=\["packages\/plugin"\], action paths=\["actions\/publish-action"\], tool paths=\[\], extension paths=\[\], release PR count=1/,
