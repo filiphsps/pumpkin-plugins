@@ -63,8 +63,10 @@ so that job can be retried. Per-release handoff artifacts are deleted only after
 release workflow succeeds; a failed release keeps them available for a failed-job rerun. Failure
 logs remain available for diagnosis. The Docs workflow deletes its `docs-site` and `github-pages`
 artifacts after publishing succeeds or is skipped, and keeps them if publishing fails so it can be
-retried. Fork and Dependabot pull requests use read-only tokens, so their temporary artifacts expire
-after one day instead of being deleted by the workflows.
+retried. The benchmark comment workflow keeps the combined report artifact for its post-CI run and
+stores chart SVGs on the `benchmark-charts` branch, outside Actions artifact cleanup. Fork and
+Dependabot pull requests use read-only tokens, so their temporary artifacts expire after one day
+instead of being deleted by the workflows.
 
 ## Reading CI results
 

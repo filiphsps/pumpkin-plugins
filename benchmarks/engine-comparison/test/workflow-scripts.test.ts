@@ -97,7 +97,7 @@ it('writes a PR comment and SVG from current and baseline result artifacts', () 
         const chartPath = path.join(temporaryDirectory, 'changes.svg');
         fs.writeFileSync(headResultsPath, JSON.stringify([createSingleWorkloadEngine('quickjs', 125)]));
         fs.writeFileSync(baselineResultsPath, JSON.stringify([createSingleWorkloadEngine('quickjs', 100)]));
-        const chartUrl = 'https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000';
+        const chartUrl = 'https://raw.githubusercontent.com/example/repo/benchmark-charts/engine-comparison/456.svg';
 
         const result = runScript('build-benchmark-comment.ts', {
             ENGINE_COMPARISON_HEAD_RESULTS: headResultsPath,

@@ -54,7 +54,7 @@ it('shows warning, celebration, and regular outcomes in the PR comment', () => {
 });
 
 it('embeds the SVG chart and links directly to it from the PR comment', () => {
-    const chartUrl = 'https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000';
+    const chartUrl = 'https://raw.githubusercontent.com/example/repo/benchmark-charts/engine-comparison/123.svg';
     const comparison = compareBenchmarkResults(
         [engine('quickjs', [workload('slower', [125])])],
         [engine('quickjs', [workload('slower', [100])])],

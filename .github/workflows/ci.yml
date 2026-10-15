@@ -807,7 +807,8 @@ jobs:
                   while IFS=$'\t' read -r artifact_id artifact_name; do
                       [ -z "$artifact_id" ] && continue
                       case "$artifact_name" in
-                          plugins|engine-comparison-report|engine-comparison-change-chart|engine-comparison-change.svg)
+                          # The workflow_run commenter reads the report after CI finishes. SVGs live on the chart branch.
+                          plugins|engine-comparison-report)
                               echo "Keeping $artifact_name for run history or benchmark comments"
                               continue
                               ;;

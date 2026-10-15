@@ -91,14 +91,17 @@ jobs:
                   NO_BASELINE_REASON: No successful benchmark artifact was found on the default branch at or before base ${{ steps.discover.outputs.pr_base_sha }}.
               run: node benchmarks/engine-comparison/scripts/build-benchmark-comment.ts
 
-            - name: 🖼️ Publish benchmark chart attachment
+            - name: 🖼️ Publish benchmark chart
               id: publish-chart
               if: steps.discover.outputs.has_report == 'true'
               env:
                   GH_TOKEN: ${{ steps.app-token.outputs.token }}
-                  GITHUB_REPOSITORY_ID: ${{ github.event.repository.id }}
+                  GITHUB_API_URL: ${{ github.api_url }}
+                  GITHUB_REPOSITORY: ${{ github.repository }}
                   GITHUB_SERVER_URL: ${{ github.server_url }}
                   BENCHMARK_CHANGE_SVG: ${{ runner.temp }}/engine-comparison-change.svg
+                  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+                  SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
               run: node scripts/engine-comparison-chart.mjs publish
 
             - name: 📝 Build benchmark comment

@@ -13,10 +13,16 @@ it('uses the GitHub App token for artifact access and PR comments', () => {
     );
 
     assert.match(workflow, /uses: actions\/create-github-app-token@v3\.2\.0/);
+    assert.match(workflow, /permission-contents: write/);
     assert.match(workflow, /GITHUB_TOKEN: \$\{\{ steps\.app-token\.outputs\.token \}\}/);
+    assert.match(workflow, /GH_TOKEN: \$\{\{ steps\.app-token\.outputs\.token \}\}/);
     assert.equal((workflow.match(/github-token: \$\{\{ steps\.app-token\.outputs\.token \}\}/g) ?? []).length, 2);
     assert.match(workflow, /node scripts\/engine-comparison-comment\.mjs discover/);
     assert.match(workflow, /node scripts\/engine-comparison-chart\.mjs publish/);
+    assert.match(workflow, /GITHUB_API_URL: \$\{\{ github\.api_url \}\}/);
+    assert.match(workflow, /DEFAULT_BRANCH: \$\{\{ github\.event\.repository\.default_branch \}\}/);
+    assert.match(workflow, /SOURCE_RUN_ID: \$\{\{ github\.event\.workflow_run\.id \}\}/);
+    assert.match(workflow, /BENCHMARK_CHANGE_SVG_URL: \$\{\{ steps\.publish-chart\.outputs\.chart_url \}\}/);
     assert.ok(
         workflow.indexOf('name: 🕶️ Checkout trusted default-branch scripts') <
             workflow.indexOf('run: node scripts/engine-comparison-comment.mjs discover'),
@@ -171,27 +177,52 @@ it('skips runs without an unexpired benchmark report artifact', async () => {
     assert.deepEqual(outputs, [['has_report', 'false']]);
 });
 
-it('uploads the SVG and exposes the durable attachment URL as a workflow output', async () => {
-    const directory = mkdtempSync(join(tmpdir(), 'engine-comparison-attachment-'));
+it('publishes the SVG to a retained chart branch and exposes its raw URL', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'engine-comparison-chart-'));
     try {
         const chartPath = join(directory, 'changes.svg');
         const svg = '<svg xmlns="http://www.w3.org/2000/svg"><text>chart</text></svg>';
         writeFileSync(chartPath, svg);
-        let request;
+        const requests = [];
         const outputs = [];
-        const chartUrl = 'https://github.com/user-attachments/assets/123e4567-e89b-12d3-a456-426614174000';
+        const chartUrl = 'https://raw.githubusercontent.com/example/project/benchmark-charts/engine-comparison/456.svg';
 
         const result = await uploadBenchmarkChart(
             {
+                apiUrl: 'https://api.github.com',
                 chartPath,
-                repositoryId: '12345',
+                defaultBranch: 'main',
+                repository: 'example/project',
                 serverUrl: 'https://github.com',
+                sourceRunId: '456',
                 token: 'app-token',
             },
             {
                 fetchImpl: async (url, options) => {
-                    request = { url: String(url), options };
-                    return jsonResponse({ url: chartUrl }, 201);
+                    requests.push({ url: String(url), options });
+                    const requestUrl = new URL(url);
+                    if (requestUrl.pathname === '/repos/example/project/git/ref/heads/benchmark-charts') {
+                        return jsonResponse({ message: 'Not Found' }, 404);
+                    }
+                    if (requestUrl.pathname === '/repos/example/project/git/ref/heads/main') {
+                        return jsonResponse({ object: { sha: 'mainsha' } });
+                    }
+                    if (requestUrl.pathname === '/repos/example/project/git/refs') {
+                        return jsonResponse({ ref: 'refs/heads/benchmark-charts' }, 201);
+                    }
+                    if (requestUrl.pathname === '/repos/example/project/contents/engine-comparison/456.svg') {
+                        if (options.method !== 'PUT') return jsonResponse({ message: 'Not Found' }, 404);
+                        return jsonResponse(
+                            {
+                                content: {
+                                    download_url: chartUrl,
+                                    path: 'engine-comparison/456.svg',
+                                },
+                            },
+                            201,
+                        );
+                    }
+                    assert.fail(`Unexpected GitHub API request: ${requestUrl.pathname}`);
                 },
                 writeOutput: (name, value) => outputs.push([name, value]),
             },
@@ -199,17 +230,98 @@ it('uploads the SVG and exposes the durable attachment URL as a workflow output'
 
         assert.equal(result, chartUrl);
         assert.deepEqual(outputs, [['chart_url', chartUrl]]);
-        assert.equal(request.options.method, 'POST');
-        assert.equal(request.options.headers.Authorization, 'Bearer app-token');
-        assert.equal(request.options.headers['Content-Type'], 'application/octet-stream');
-        assert.equal(request.options.headers.Accept, 'application/vnd.github+json');
-        assert.deepEqual(Buffer.from(request.options.body), Buffer.from(svg));
-        const uploadUrl = new URL(request.url);
-        assert.equal(uploadUrl.host, 'uploads.github.com');
-        assert.equal(uploadUrl.pathname, '/user-attachments/assets');
-        assert.equal(uploadUrl.searchParams.get('name'), 'engine-comparison-change.svg');
-        assert.equal(uploadUrl.searchParams.get('content_type'), 'image/svg+xml');
-        assert.equal(uploadUrl.searchParams.get('repository_id'), '12345');
+        assert.deepEqual(
+            requests.map(({ options }) => options.method ?? 'GET'),
+            ['GET', 'GET', 'POST', 'GET', 'PUT'],
+        );
+        assert.ok(requests.every(({ options }) => options.headers.Authorization === 'Bearer app-token'));
+
+        const createBranch = requests[2];
+        assert.equal(createBranch.options.headers['Content-Type'], 'application/json');
+        assert.deepEqual(JSON.parse(createBranch.options.body), {
+            ref: 'refs/heads/benchmark-charts',
+            sha: 'mainsha',
+        });
+
+        assert.equal(new URL(requests[3].url).searchParams.get('ref'), 'benchmark-charts');
+
+        const publishChart = requests[4];
+        assert.equal(publishChart.options.headers.Accept, 'application/vnd.github+json');
+        assert.deepEqual(JSON.parse(publishChart.options.body), {
+            message: 'ci(benchmarks): publish chart for run 456',
+            content: Buffer.from(svg).toString('base64'),
+            branch: 'benchmark-charts',
+        });
+    } finally {
+        rmSync(directory, { recursive: true, force: true });
+    }
+});
+
+it('updates the chart file when GitHub reruns a workflow', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'engine-comparison-chart-existing-'));
+    try {
+        const chartPath = join(directory, 'changes.svg');
+        writeFileSync(chartPath, '<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+        const requests = [];
+        const chartUrl = 'https://raw.githubusercontent.com/example/project/benchmark-charts/engine-comparison/789.svg';
+
+        const result = await uploadBenchmarkChart(
+            {
+                apiUrl: 'https://api.github.com',
+                chartPath,
+                defaultBranch: 'main',
+                repository: 'example/project',
+                serverUrl: 'https://github.com',
+                sourceRunId: '789',
+                token: 'app-token',
+            },
+            {
+                fetchImpl: async (url, options) => {
+                    requests.push({ url: String(url), options });
+                    const requestUrl = new URL(url);
+                    if (requestUrl.pathname === '/repos/example/project/git/ref/heads/benchmark-charts') {
+                        return jsonResponse({ ref: 'refs/heads/benchmark-charts' });
+                    }
+                    if (requestUrl.pathname === '/repos/example/project/contents/engine-comparison/789.svg') {
+                        if (options.method !== 'PUT') {
+                            return jsonResponse({
+                                _links: {
+                                    git: 'https://api.github.com/repos/example/project/git/blobs/oldsha',
+                                    html: 'https://github.com/example/project/blob/benchmark-charts/engine-comparison/789.svg',
+                                    self: 'https://api.github.com/repos/example/project/contents/engine-comparison/789.svg',
+                                },
+                                download_url: chartUrl,
+                                encoding: 'base64',
+                                name: '789.svg',
+                                path: 'engine-comparison/789.svg',
+                                sha: 'oldsha',
+                                size: 34,
+                                type: 'file',
+                                url: 'https://api.github.com/repos/example/project/contents/engine-comparison/789.svg',
+                            });
+                        }
+                        return jsonResponse(
+                            { content: { download_url: chartUrl, path: 'engine-comparison/789.svg' } },
+                            201,
+                        );
+                    }
+                    assert.fail(`Unexpected GitHub API request: ${requestUrl.pathname}`);
+                },
+                writeOutput: () => {},
+            },
+        );
+
+        assert.equal(result, chartUrl);
+        assert.deepEqual(
+            requests.map(({ options }) => options.method ?? 'GET'),
+            ['GET', 'GET', 'PUT'],
+        );
+        assert.deepEqual(JSON.parse(requests[2].options.body), {
+            message: 'ci(benchmarks): publish chart for run 789',
+            content: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>').toString('base64'),
+            branch: 'benchmark-charts',
+            sha: 'oldsha',
+        });
     } finally {
         rmSync(directory, { recursive: true, force: true });
     }
