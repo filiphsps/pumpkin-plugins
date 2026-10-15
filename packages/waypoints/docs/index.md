@@ -6,6 +6,8 @@ default; operators can make them public or grant access to specific players, per
 permission-marker groups. Players can find and teleport to enabled waypoints they can access. Records
 have no creator ownership.
 
+Optional PumpkinPIE placeholders expose live, access-filtered waypoint data. See the [placeholder guide](placeholders.md) for the complete contract.
+
 Install `waypoints.wasm` in the Pumpkin server's `plugins/` directory and restart. The plugin has
 no config file. It stores versioned records in `plugins/data/Waypoints/waypoints.json`. A v1
 migration copies `locatorBar.color` to the waypoint's v2 `color`. The Java adapter's

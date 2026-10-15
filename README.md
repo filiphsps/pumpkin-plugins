@@ -37,7 +37,7 @@ Browse the [public documentation site](https://filiphsps.github.io/pumpkin-plugi
 | [DynamicLightsPumpkin](packages/dynamic-lights-pumpkin) | Server-driven dynamic lights for held items and nearby entities | MIT |
 | [TabDisplay](packages/tab-display) | Formats Java row names and headers/footers; no Bedrock list changes. | MIT |
 | [UPnPumpkin](packages/upnpumpkin) | Port forward ports on the router with UPnP or NAT-PMP so players can connect from the internet. Other plugins can request port mappings through UPnPumpkin. | MIT |
-| [Waypoints](packages/waypoints) | Server-managed waypoints with access rules and a Java HUD | MIT |
+| [Waypoints](packages/waypoints) | Waypoints with access rules, a Java HUD, and PumpkinPIE placeholders | MIT |
 
 **Tools**
 
