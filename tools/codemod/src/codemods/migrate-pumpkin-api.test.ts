@@ -89,7 +89,7 @@ describe('migratePumpkinApiTs', () => {
         expect(manifest.pumpkinPlugin).toEqual({
             entry: 'src/plugin.ts',
             output: 'build/plugin.wasm',
-            engine: 'quickjs',
+            engine: 'static-hermes',
             wasi: [],
         });
         expect(result.messages).toContain('Review pumpkinPlugin.wasi and add the capabilities used by this plugin.');

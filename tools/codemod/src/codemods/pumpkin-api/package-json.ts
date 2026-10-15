@@ -77,7 +77,7 @@ export function migratePackageJson(source: string): TransformResult {
     if (configCanBeWritten) {
         const config = recordOf(parseJsonObject(migrated).value?.pumpkinPlugin);
         if (config && !Object.hasOwn(config, 'engine')) {
-            migrated = setJsonValue(migrated, ['pumpkinPlugin', 'engine'], 'quickjs', source);
+            migrated = setJsonValue(migrated, ['pumpkinPlugin', 'engine'], 'static-hermes', source);
         }
         if (config && !Object.hasOwn(config, 'wasi')) {
             migrated = setJsonValue(migrated, ['pumpkinPlugin', 'wasi'], [], source);
