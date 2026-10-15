@@ -16,6 +16,13 @@ shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
 `.github/common/bootstrap`. Most CI jobs use
 `ubuntu-26.04`; the external-consumer matrix also runs on `macos-15` and `windows-2025`.
 
+Turborepo cache keys separate runner OS, architecture and job. Engine comparison also supplies its
+matrix variant as the bootstrap's `cache-suffix`, so parallel variants keep their own build outputs.
+Restores prefer the same job and variant across commits before falling back to shared task caches;
+Turbo still validates each task's inputs. The benchmark always runs its real-server tests, including
+on a build-cache hit. Malloc variants separately cache their WASI archives and prepared-build
+fingerprint under the pinned Static Hermes cache key, preserving the shared Hades snapshot.
+
 Release Please branches (`release-please--branches--...`) skip CI, Docs, Actionlint and benchmark
 comment jobs. The code they release has already passed validation on its associated commit; release
 PR updates carry the generated version and changelog, while the release workflow prepares generated

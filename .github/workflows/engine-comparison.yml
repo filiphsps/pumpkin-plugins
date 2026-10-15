@@ -39,10 +39,24 @@ jobs:
 
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
+              with:
+                  cache-suffix: -${{ matrix.variant }}
 
             - name: 🔧 Restore Static Hermes toolchain
+              id: setup-hermes
               if: startsWith(matrix.variant, 'static-hermes-')
               uses: ./.github/common/setup-static-hermes
+
+            # The shared snapshot contains Hades. Keep malloc's separate archives and fingerprint
+            # so each variant can reuse compilation without replacing that immutable snapshot.
+            - name: 💾 Cache malloc Static Hermes build
+              if: contains(matrix.variant, '-malloc-')
+              uses: actions/cache@v6.1.0
+              with:
+                  path: |
+                      .cache/hermes/build-wasip2-malloc
+                      .cache/hermes/prepared-build-malloc.json
+                  key: ${{ steps.setup-hermes.outputs.hermes-cache-key }}-benchmark-malloc-v1
 
             - name: 🏗️ Verify Static Hermes is prepared
               if: startsWith(matrix.variant, 'static-hermes-')

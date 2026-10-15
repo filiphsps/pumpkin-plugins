@@ -1,6 +1,12 @@
 name: Bootstrap
 description: Install pnpm and Node, restore and share pnpm and Turborepo caches, then install dependencies
 
+inputs:
+    cache-suffix:
+        description: Stable matrix identity to keep parallel Turborepo cache writers separate
+        required: false
+        default: ''
+
 runs:
     using: composite
     steps:
@@ -21,9 +27,9 @@ runs:
           uses: actions/cache@v6.1.0
           with:
               path: .turbo
-              key: turbo-${{ runner.os }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+              key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ inputs.cache-suffix }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
               restore-keys: |
-                  turbo-${{ runner.os }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-build
-                  turbo-${{ runner.os }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-
-                  turbo-${{ runner.os }}-${{ github.sha }}-
-                  turbo-${{ runner.os }}-
+                  turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ inputs.cache-suffix }}-${{ github.sha }}-
+                  turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ inputs.cache-suffix }}-
+                  turbo-v2-${{ runner.os }}-${{ runner.arch }}-build-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+                  turbo-v2-${{ runner.os }}-${{ runner.arch }}-
