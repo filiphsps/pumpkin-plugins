@@ -2,34 +2,150 @@
 // Plugin code jobs, action tests, extension tests, and the generator smoke test have separate gates.
 // See the Jobs table in docs/ci-and-releases.md.
 import { spawnSync } from 'node:child_process';
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { ignoredCommitShas } from './utils/ignored-commits.mjs';
 
 /** A changed file matching any of these is documentation, which nothing that builds or tests reads. */
 const DOCS = [/\.md$/, /^docs\//, /^LICENSE$/, /^(packages|tools|actions|extensions)\/[^/]+\/docs(?:\/|$)/];
-const GENERATOR_RELEVANT_DIRECTORIES = [
-    'turbo/generators/',
-    'tools/apis/',
-    'tools/build/',
-    'tools/docs/',
-    'tools/plugin-kit/',
-    'tools/pumpkin-api/',
-    'tools/static-hermes-runtime/',
-    'tools/test-harness/',
-    '.github/common/bootstrap/',
-    '.github/common/setup-static-hermes/',
-];
-const GENERATOR_RELEVANT_FILES = new Set([
-    '.github/workflows/ci.yml',
-    '.node-version',
-    'package.json',
-    'pnpm-lock.yaml',
-    'pnpm-workspace.yaml',
-    'scripts/turbo.mjs',
-    'tsconfig.base.json',
-    'turbo.json',
-]);
+const repositoryRoot = path.resolve(import.meta.dirname, '..');
+
+/** Resolves the generator smoke test's inputs from the checked-out repository. */
+function generatorInputs() {
+    const tracked = spawnSync('git', ['ls-files', '-z'], { cwd: repositoryRoot, encoding: 'utf8' });
+    if (tracked.status !== 0) {
+        throw new Error(`Could not list repository files for generator selection: ${tracked.stderr.trim()}`);
+    }
+    const files = tracked.stdout.split('\0').filter(Boolean);
+    const relevantFiles = new Set();
+    const relevantDirectories = new Set();
+    const addPattern = (pattern) => {
+        const normalized = path.posix.normalize(pattern.replace(/^\.\//, ''));
+        if (!/[*?]/.test(normalized)) {
+            relevantFiles.add(normalized);
+            return;
+        }
+        let expression = '^';
+        for (let index = 0; index < normalized.length; index += 1) {
+            const character = normalized[index];
+            if (character === '*' && normalized[index + 1] === '*') {
+                expression += '.*';
+                index += 1;
+            } else if (character === '*') expression += '[^/]*';
+            else if (character === '?') expression += '[^/]';
+            else expression += character.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+        }
+        const matches = new RegExp(`${expression}$`);
+        for (const file of files) if (matches.test(file)) relevantFiles.add(file);
+    };
+    const readJson = (file) => JSON.parse(readFileSync(path.join(repositoryRoot, file), 'utf8'));
+    const packageByName = new Map();
+    for (const file of files.filter((entry) => entry.endsWith('/package.json'))) {
+        const manifest = readJson(file);
+        if (typeof manifest.name === 'string') {
+            packageByName.set(manifest.name, { directory: path.posix.dirname(file), manifest });
+        }
+    }
+
+    const generatorConfigs = files.filter((file) => {
+        if (!/\.(?:c|m)?(?:j|t)s$/.test(file)) return false;
+        return /^\s*[\w$]+\.setGenerator\(/m.test(readFileSync(path.join(repositoryRoot, file), 'utf8'));
+    });
+    for (const file of generatorConfigs) relevantDirectories.add(path.posix.dirname(file));
+
+    const generatedPackageDependencies = new Set();
+    for (const directory of relevantDirectories) {
+        for (const file of files.filter(
+            (entry) => entry.startsWith(`${directory}/`) && entry.endsWith('/package.json.hbs'),
+        )) {
+            const source = readFileSync(path.join(repositoryRoot, file), 'utf8');
+            for (const section of source.matchAll(
+                /"(?:dependencies|devDependencies|optionalDependencies|peerDependencies)"\s*:\s*\{([\s\S]*?)\}/g,
+            )) {
+                for (const [, name] of section[1].matchAll(/"([^"]+)"\s*:/g)) {
+                    if (packageByName.has(name)) generatedPackageDependencies.add(name);
+                }
+            }
+        }
+    }
+    const rootManifest = readJson('package.json');
+    for (const dependencies of [rootManifest.dependencies, rootManifest.devDependencies]) {
+        for (const name of Object.keys(dependencies ?? {})) {
+            if (packageByName.has(name)) generatedPackageDependencies.add(name);
+        }
+    }
+    const pendingPackages = [...generatedPackageDependencies];
+    const visitedPackages = new Set();
+    while (pendingPackages.length) {
+        const name = pendingPackages.pop();
+        if (visitedPackages.has(name)) continue;
+        visitedPackages.add(name);
+        const workspacePackage = packageByName.get(name);
+        if (!workspacePackage) continue;
+        relevantDirectories.add(workspacePackage.directory);
+        for (const dependencies of [
+            workspacePackage.manifest.dependencies,
+            workspacePackage.manifest.devDependencies,
+            workspacePackage.manifest.optionalDependencies,
+            workspacePackage.manifest.peerDependencies,
+        ]) {
+            for (const dependency of Object.keys(dependencies ?? {})) {
+                if (packageByName.has(dependency)) pendingPackages.push(dependency);
+            }
+        }
+    }
+
+    for (const file of files.filter((entry) => !entry.includes('/'))) {
+        if (file === 'package.json' || /(?:lock|workspace)/i.test(file)) relevantFiles.add(file);
+    }
+    const turboConfig = files.find((file) => {
+        if (file.includes('/') || !file.endsWith('.json')) return false;
+        const config = readJson(file);
+        return config.tasks && Array.isArray(config.globalDependencies);
+    });
+    if (turboConfig) {
+        relevantFiles.add(turboConfig);
+        for (const input of readJson(turboConfig).globalDependencies) addPattern(input);
+    }
+
+    const workflowFiles = files.filter((file) => file.startsWith('.github/workflows/') && /\.ya?ml$/.test(file));
+    let generatorWorkflow;
+    let generatorJob;
+    for (const file of workflowFiles) {
+        const lines = readFileSync(path.join(repositoryRoot, file), 'utf8').split('\n');
+        const start = lines.findIndex((line) => /^ {4}generator:\s*$/.test(line));
+        if (start === -1) continue;
+        const nextJob = lines.findIndex((line, index) => index > start && /^ {4}[\w-]+:\s*$/.test(line));
+        generatorWorkflow = file;
+        generatorJob = lines.slice(start, nextJob === -1 ? undefined : nextJob).join('\n');
+        break;
+    }
+    if (!generatorWorkflow) throw new Error('Could not find the generator job in a GitHub workflow.');
+    relevantFiles.add(generatorWorkflow);
+    for (const [, localPath] of generatorJob.matchAll(/^\s+uses:\s+\.\/([^#\s@]+)/gm)) {
+        relevantDirectories.add(path.posix.normalize(localPath));
+    }
+
+    const scripts = rootManifest.scripts ?? {};
+    const pendingScripts = Object.keys(scripts).filter((name) => {
+        const escapedName = name.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
+        return new RegExp(`\\bpnpm\\s+(?:run\\s+)?${escapedName}(?=\\s|$)`).test(generatorJob);
+    });
+    const visitedScripts = new Set();
+    while (pendingScripts.length) {
+        const name = pendingScripts.pop();
+        if (visitedScripts.has(name)) continue;
+        visitedScripts.add(name);
+        const command = scripts[name];
+        for (const [, scriptPath] of command.matchAll(/\bnode\s+([^\s"'`]+\.mjs)/g)) addPattern(scriptPath);
+        for (const [, nestedName] of command.matchAll(/\bpnpm\s+(?:run\s+)?([\w:-]+)/g)) {
+            if (Object.hasOwn(scripts, nestedName)) pendingScripts.push(nestedName);
+        }
+    }
+
+    if (generatorConfigs.length === 0) throw new Error('Could not find the repository generator configuration.');
+    return { files: relevantFiles, directories: relevantDirectories };
+}
 
 const COMMON_CONSUMERS = [
     'publish-to-pumpkin-market',
@@ -100,10 +216,15 @@ const extensionsToTest = [
 const code = changed.filter(
     (file) => !isDocs(file) && !/^actions\/[^/]+\//.test(file) && !/^extensions\/[^/]+\//.test(file),
 );
-const generator = changed.some(
-    (file) =>
-        !isDocs(file) &&
-        (GENERATOR_RELEVANT_FILES.has(file) || GENERATOR_RELEVANT_DIRECTORIES.some((dir) => file.startsWith(dir))),
+const generatorRelevant = code.length > 0 ? generatorInputs() : undefined;
+const generator = Boolean(
+    generatorRelevant &&
+        changed.some(
+            (file) =>
+                !isDocs(file) &&
+                (generatorRelevant.files.has(file) ||
+                    [...generatorRelevant.directories].some((directory) => file.startsWith(`${directory}/`))),
+        ),
 );
 /** Keep the benchmark comparison scoped to its dedicated real-server workflow. */
 const benchmarkOnly = code.length > 0 && code.every((file) => file.startsWith('benchmarks/engine-comparison/'));

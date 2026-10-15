@@ -37,6 +37,8 @@ inputs, and follow the dependency and cache rules in [Building](docs/building.md
 - Treat generated files as output: edit their source and run the owning generator (usually
   `pnpm readme`). Let owning tools update `pnpm-lock.yaml`, changelogs,
   `.release-please-manifest.json` and build output.
+- Do not hardcode values that can be inferred from the codebase. Derive them from their source of
+  truth (manifests, config, declarations or repository layout) so duplicated lists cannot drift.
 
 ## Verify before finishing
 
