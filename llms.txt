@@ -53,7 +53,7 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 
 - [AppleSkinPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/apple-skin-pumpkin/docs/index.md): AppleSkin server-side support
 - [AppleSkinPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/apple-skin-pumpkin/README.md): Additional component overview and usage details.
-- [BedrockAddonManager](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/index.md): Serves Bedrock packs over HTTP; Pumpkin can't send them to players yet
+- [BedrockAddonManager](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/index.md): Hosts Bedrock packs over HTTP; it does not offer them to players
 - [BedrockAddonManager README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/README.md): Additional component overview and usage details.
 - [BedrockAddonManager: Set up Bedrock packs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/setup.md): The folder is scanned at startup and on /baddon reload; new files are not detected automatically.
 - [BedrockAddonManager: Troubleshoot Bedrock pack hosting](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/troubleshooting.md): Check that web.enabled is true, the pack appears in /baddon list, and the configured bind address and port are reachable through the server firewall.
@@ -64,12 +64,12 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [DynamicLightsPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/docs/index.md): Server-side dynamic lights for held light sources
 - [DynamicLightsPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/README.md): Additional component overview and usage details.
 - [DynamicLightsPumpkin: Configure light sources](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/docs/configuration.md): Settings live in plugins/data/DynamicLightsPumpkin/config.toml.
-- [TabDisplay](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/tab-display/docs/index.md): Customizes Java tab displays with native Bedrock capability gates
+- [TabDisplay](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/tab-display/docs/index.md): Formats Java row names and headers/footers; no Bedrock list changes.
 - [TabDisplay README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/tab-display/README.md): Additional component overview and usage details.
 - [UPnPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/index.md): Opens router ports for Pumpkin with UPnP and NAT-PMP
 - [UPnPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/README.md): Additional component overview and usage details.
 - [UPnPumpkin: Troubleshoot port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/troubleshooting.md): Confirm UPnP or NAT-PMP is enabled in the router settings and that the server host shares the router's local network.
-- [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/index.md): Server-managed waypoints with access rules and a Java 26.3 HUD
+- [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/index.md): Server-managed waypoints with access rules and a Java HUD
 - [Waypoints README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/README.md): Additional component overview and usage details.
 
 ## Shared tools
@@ -103,6 +103,7 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [Pumpkin plugin signing README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/README.md): Additional component overview and usage details.
 - [Static Hermes Runtime](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/index.md): Static Hermes Runtime shim for Pumpkin plugin components
 - [Static Hermes Runtime README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/README.md): Additional component overview and usage details.
+- [Static Hermes Runtime: Maintaining Static Hermes WASI support](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/maintaining-wasi.md): This guide is for maintainers who change the locked WASI definitions, capability bundles, or native adapters.
 - [Static Hermes Runtime: WASI in Static Hermes](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/wasi.md): Static Hermes plugins run as WebAssembly components.
 - [Terrain capture](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/docs/index.md): Shared terrain capture and access contracts
 - [Terrain capture README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/README.md): Additional component overview and usage details.
@@ -130,12 +131,12 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [Actions reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/): Generated API and action contract documentation.
 - [Scripts reference](https://filiphsps.github.io/pumpkin-plugins/api/scripts/): Generated API and action contract documentation.
 - [AppleSkinPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/apple-skin-pumpkin/): AppleSkin server-side support
-- [BedrockAddonManager API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/bedrock-addon-manager/): Serves Bedrock packs over HTTP; Pumpkin can't send them to players yet
+- [BedrockAddonManager API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/bedrock-addon-manager/): Hosts Bedrock packs over HTTP; it does not offer them to players
 - [Distant Horizons Support Pumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/distant-horizons-support-pumpkin/): Unofficial Distant Horizons server support for Pumpkin
 - [DynamicLightsPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/dynamic-lights-pumpkin/): Server-side dynamic lights for held light sources
-- [TabDisplay API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/tab-display/): Customizes Java tab displays with native Bedrock capability gates
+- [TabDisplay API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/tab-display/): Formats Java row names and headers/footers; no Bedrock list changes.
 - [UPnPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/upnpumpkin/): Opens router ports for Pumpkin with UPnP and NAT-PMP
-- [Waypoints API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/waypoints/): Server-managed waypoints with access rules and a Java 26.3 HUD
+- [Waypoints API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/waypoints/): Server-managed waypoints with access rules and a Java HUD
 - [PumpkinPIE API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/pumpkin-pie-api/): Validated PumpkinPIE client, expansions and provider lifecycle
 - [UPnPumpkin plugin API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/upnpumpkin-api/): Asks UPnPumpkin to open a port
 - [Plugin build tool API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/build/): Shared build tool for the plugins
