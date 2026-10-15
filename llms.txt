@@ -18,6 +18,9 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 
 ## Guides
 
+- [Domain Docs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/domain.md): How the engineering skills should consume this repo's domain documentation when exploring the codebase.
+- [Issue tracker: GitHub](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/issue-tracker.md): Issues and specs for this repo live as GitHub issues.
+- [Triage Labels](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/triage-labels.md): The skills speak in terms of five canonical triage roles.
 - [Benchmarking QuickJS and Static Hermes](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/benchmarking.md): This guide explains what the engine comparison measures, how to read its report, and what conclusions its results support.
 - [Creating a VS Code extension](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-extension.md): Create an extension package with the Turbo generator.
 
@@ -31,7 +34,7 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 
 ## Plugin development
 
-- [Building](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/building.md): pumpkin-plugins-build (tools/build) turns a plugin into a .wasm component.
+- [Building](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/building.md): From the workspace root, run pnpm build to build all plugin packages or pnpm build --filter=@pumpkin-plugins/<folder to build one.
 - [Code style](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/code-style.md): pnpm lint runs two linters, and CI runs the same command.
 - [Plugin config](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-config.md): Plugins that need settings use @pumpkin-plugins/config (tools/config).
 - [Plugin info and READMEs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-info-and-readmes.md): Each plugin describes itself in one small module that exports info.
