@@ -72,8 +72,7 @@
             "component": "minecraft-colors"
         },
         "tools/plugin-kit": {
-            "component": "plugin-kit",
-            "release-as": "0.1.0"
+            "component": "plugin-kit"
         },
         "tools/pumpkin-api": {
             "component": "pumpkin-api"
