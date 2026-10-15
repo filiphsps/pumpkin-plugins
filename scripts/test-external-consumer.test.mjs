@@ -9,7 +9,7 @@ const script = path.resolve(import.meta.dirname, 'test-external-consumer.mjs');
 const requiredPnpmVersion = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '..', 'package.json'), 'utf8'))
     .devEngines.packageManager.version;
 
-test('removes the temporary workspace when package packing fails', (t) => {
+test('accepts a later Node version before handling a package packing failure', (t) => {
     const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-external-consumer-test-'));
     t.after(() => fs.rmSync(fixtureRoot, { recursive: true, force: true }));
     const tempDirectory = path.join(fixtureRoot, 'tmp');
@@ -23,7 +23,7 @@ else if (process.argv[2] === 'pack') { console.error('forced pack failure'); pro
 else process.exit(2);\n`,
     );
     const nodeVersionOverridePath = path.join(fixtureRoot, 'node-version.cjs');
-    fs.writeFileSync(nodeVersionOverridePath, "Object.defineProperty(process, 'version', { value: 'v24.21.0' });\n");
+    fs.writeFileSync(nodeVersionOverridePath, "Object.defineProperty(process, 'version', { value: 'v25.7.0' });\n");
 
     const result = spawnSync(process.execPath, ['--require', nodeVersionOverridePath, script], {
         cwd: path.resolve(import.meta.dirname, '..'),

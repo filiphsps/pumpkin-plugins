@@ -35,7 +35,7 @@ if (!buildCliOnly && (!creatorTool || !codemodTool || !pumpkinApiTool)) {
     throw new Error('Public tool manifests must declare the creator, codemod, and Pumpkin API capabilities');
 }
 const packagePaths = buildCliOnly ? dependencyClosure([buildTool], publicTools) : publicTools.map(({ path }) => path);
-const requiredNodeVersion = `v${nodeVersion(repositoryRoot)}`;
+const requiredNodeVersion = nodeVersion(repositoryRoot);
 const requiredPnpmVersion = JSON.parse(fs.readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8')).devEngines
     ?.packageManager?.version;
 
@@ -43,8 +43,8 @@ if (typeof requiredPnpmVersion !== 'string') {
     throw new Error('Root package.json must set devEngines.packageManager.version');
 }
 
-if (process.version !== requiredNodeVersion) {
-    throw new Error(`External consumer requires Node ${requiredNodeVersion}; received ${process.version}`);
+if (compareSemver(process.version, requiredNodeVersion) < 0) {
+    throw new Error(`External consumer requires Node v${requiredNodeVersion} or later; received ${process.version}`);
 }
 
 const packageManager = packageManagerInvocation();
@@ -403,6 +403,39 @@ function isWithin(parent, child) {
     return (
         relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))
     );
+}
+
+function compareSemver(left, right) {
+    const parse = (version) => {
+        const match = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(version);
+        if (!match) throw new Error(`Invalid Node version: ${version}`);
+        return { core: match.slice(1, 4).map(Number), prerelease: match[4]?.split('.') };
+    };
+
+    const leftVersion = parse(left);
+    const rightVersion = parse(right);
+    for (let index = 0; index < leftVersion.core.length; index++) {
+        const difference = leftVersion.core[index] - rightVersion.core[index];
+        if (difference !== 0) return difference;
+    }
+
+    if (!leftVersion.prerelease) return rightVersion.prerelease ? 1 : 0;
+    if (!rightVersion.prerelease) return -1;
+    for (let index = 0; index < Math.max(leftVersion.prerelease.length, rightVersion.prerelease.length); index++) {
+        const leftIdentifier = leftVersion.prerelease[index];
+        const rightIdentifier = rightVersion.prerelease[index];
+        if (leftIdentifier === undefined) return -1;
+        if (rightIdentifier === undefined) return 1;
+        if (leftIdentifier === rightIdentifier) continue;
+
+        const leftIsNumeric = /^\d+$/.test(leftIdentifier);
+        const rightIsNumeric = /^\d+$/.test(rightIdentifier);
+        if (leftIsNumeric && rightIsNumeric) return Number(leftIdentifier) - Number(rightIdentifier);
+        if (leftIsNumeric) return -1;
+        if (rightIsNumeric) return 1;
+        return leftIdentifier < rightIdentifier ? -1 : 1;
+    }
+    return 0;
 }
 
 function packageManagerInvocation() {
