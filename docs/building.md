@@ -7,8 +7,10 @@ navigation:
 
 ## The build tool
 
-`pumpkin-plugins-build` (`tools/build`) turns a plugin into a `.wasm` component. It is configured
-by the `pumpkinPlugin` key in each plugin's `package.json`:
+From the workspace root, run `pnpm build` to build all plugin packages or
+`pnpm build --filter=@pumpkin-plugins/<folder>` to build one. Each package uses
+`pumpkin-plugins-build` (`tools/build`) to turn a plugin into a `.wasm` component. Configure it with
+the `pumpkinPlugin` key in the plugin's `package.json`:
 
 ```json
 "pumpkinPlugin": { "entry": "src/plugin.ts", "output": "build/my-plugin.wasm", "wasi": [] }
@@ -132,7 +134,6 @@ Turbo restores the compiled files when those builds come from cache.
 Run `pnpm clean` to remove workspace `node_modules`, root and workspace `build/` and `dist/` output,
 and `.turbo/cache/`. It preserves `.cache/`.
 
-Run one plugin with `pnpm build --filter=@pumpkin-plugins/<folder>`.
 `pnpm build` checks the selected Turbo task graph and prepares Static Hermes once before plugin
 builds start. QuickJS-only filters skip that setup. Direct package builds still prepare Hermes when
 needed.

@@ -218,11 +218,11 @@ reviews:
         - path: tools/static-hermes-runtime/**
           instructions: >-
               Check the pinned Hermes revision, toolchain pins, WIT ABI, and WASI compatibility. For
-              native code directly using Hermes GC internals, follow
-              .agents/skills/hermes-gc-safe-coding/SKILL.md: root live GC values across safepoints,
-              validate CallResult before use, and respect handle lifetimes. Do not apply
-              Hermes-internal rooting rules to TypeScript values or ordinary JSI wrappers. Check
-              both Static Hermes behavior and QuickJS compatibility where shared interfaces change.
+              native code directly using Hermes GC internals, follow:
+              root live GC values across safepoints, validate CallResult before use,
+              and respect handle lifetimes. Do not apply Hermes-internal rooting rules to TypeScript
+              values or ordinary JSI wrappers. Check both Static Hermes behavior and QuickJS
+              compatibility where shared interfaces change.
         - path: tools/**
           instructions: >-
               Changes to shared libraries can affect several plugins and packed external consumers.

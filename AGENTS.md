@@ -1,10 +1,18 @@
-# AGENTS.md
+# `pumpkin-plugins`
 
-This pnpm and Turborepo monorepo builds TypeScript plugins for
-[Pumpkin](https://github.com/Pumpkin-MC/Pumpkin) as WebAssembly components. Plugins use Pumpkin's
-Static Hermes/WASI runtime by default. QuickJS remains supported.
-Plugins live in `packages/`; shared libraries and tooling live in
-`tools/`. User instructions take precedence over this file.
+`pumpkin-plugins` is a collection of plugins for PumpkinMC and an extensive developer toolkit for
+building, testing, documenting, and releasing them. Plugin packages live in `packages/`; shared
+libraries and developer tools live in `tools/`, re-usable GitHub actions live in `actions/`.
+
+## Questions are read-only
+
+- A question is a request for an answer, not for changes. If the message opens with "how hard would it be", "what are your thoughts", "why does", "should we", "is it possible", or otherwise asks rather than instructs: answer it, and do not edit files.
+- If the answer to the question is obvious and the change is trivially easy, still answer first and then offer to change it.
+
+## Match effort and orchestration to the task
+
+- Do not spawn subagents (or multi-agent fleets) for work a single agent can finish in one pass. Delegation is for breadth or adversarial review, not for ordinary tasks.
+- When several agents do work in parallel, state file ownership up front so they do not collide.
 
 ## Before you work
 
@@ -21,8 +29,7 @@ Plugins live in `packages/`; shared libraries and tooling live in
 - For every code-writing task, read [JSDoc TypeScript Documentation](.agents/skills/jsdoc-typescript-docs/SKILL.md)
   before editing and follow the repo-specific JSDoc contract in [Code style](docs/code-style.md).
 - Before any work on a plugin in [packages](packages/) or a shared plugin library in [tools](tools/)
-  (writing, reviewing, debugging, or testing), read
-  [Hermes GC Safe Coding](.agents/skills/hermes-gc-safe-coding/SKILL.md).
+  (writing, reviewing, debugging, or testing).
 - Before changing an area, read its relevant guide from [docs/README.md](docs/README.md) and load
   any skill whose description matches the task. Project skill files live in `.agents/skills/`.
 
@@ -64,3 +71,17 @@ inputs, and follow the dependency and cache rules in [Building](docs/building.md
    code; server tests go in `test/`; generate fixtures in code.
 4. Report what changed, what checks ran, and anything that failed or could not be checked. A
    configured automatic check is not evidence that it passed.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in this repo’s GitHub Issues; use the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+`needs-triage` maps to `status: needs triage`; `needs-info` to `status: needs info`; `ready-for-agent` and `ready-for-human` use their default names; `wontfix` maps to `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+single-context. See `docs/agents/domain.md`.

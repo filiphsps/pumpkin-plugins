@@ -1,6 +1,6 @@
 ---
 name: commit-discipline
-description: Use when creating or updating commits in Pumpkin Plugins to keep them small, self-contained, single-domain, and preserve branch history safely.
+description: Use when creating or updating commits to keep them small, self-contained, single-domain, and preserve branch history safely.
 ---
 
 # Commit discipline
