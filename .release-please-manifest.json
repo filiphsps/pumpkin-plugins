@@ -17,7 +17,7 @@
     "tools/cspell-dict-minecraft": "0.1.0",
     "tools/docs": "0.1.1",
     "tools/minecraft-colors": "0.1.0",
-    "tools/plugin-kit": "0.1.0",
+    "tools/plugin-kit": "0.1.1",
     "tools/pumpkin-api": "0.1.0",
     "tools/static-hermes-runtime": "0.1.0",
     "tools/update-check": "0.1.1"
