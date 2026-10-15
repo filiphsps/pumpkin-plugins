@@ -11,7 +11,7 @@ See the [action guide](https://filiphsps.github.io/pumpkin-plugins/actions/updat
 
 ```yaml
 steps:
-  - uses: filiphsps/pumpkin-plugins/actions/update-pumpkin-market-listing@update-pumpkin-market-listing-v0.0.2
+  - uses: filiphsps/pumpkin-plugins/actions/update-pumpkin-market-listing@update-pumpkin-market-listing-v0.0.3
     with:
       plugin-id: ${{ vars.PUMPKIN_MARKET_PLUGIN_ID }}
       metadata-file: .github/market-metadata.json
