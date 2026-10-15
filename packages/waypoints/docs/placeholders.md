@@ -1,3 +1,6 @@
+<!-- docs:begin placeholders -->
+<!-- Generated from src/placeholders/definitions.ts and the PumpkinPIE session timing constants. Run `pnpm readme`. -->
+
 # PumpkinPIE placeholders
 
 Waypoints optionally registers the `waypoints` namespace with [PumpkinPIE](https://github.com/Rennex07/PumpkinPIE).
@@ -20,7 +23,7 @@ node or `Waypoints:group.<slug>` marker. Operators bypass those grants, but disa
 excluded. ACL changes, permission changes, movement and catalog edits affect the next lookup; the
 namespace uses no value cache.
 
-“Here” means the viewer's exact current world key. Waypoints never scale or compare coordinates
+“Here” means the viewer's exact current world key. Waypoints does not scale or compare coordinates
 between dimensions. Closest and nearest use accessible waypoints in that same world, regardless of
 HUD visibility range. Visible means eligible for the existing HUD projection: enabled, accessible,
 same world and inside the waypoint's optional 3D visibility range. It does not mean that a client
@@ -34,45 +37,57 @@ metadata from another world, but cross-world distances and directions are unreso
 
 ## Catalog values
 
-| Token | Value |
+| Token | Description |
 | --- | --- |
-| `%waypoints_count%` | Accessible enabled records across all worlds |
-| `%waypoints_count_here%` | Accessible enabled records in the viewer's current world |
-| `%waypoints_count_world:world%` | Accessible enabled records in the exact argument world |
-| `%waypoints_public_count%` | Accessible public records across all worlds |
-| `%waypoints_restricted_count%` | Accessible restricted records across all worlds |
-| `%waypoints_visible_count%` | Same-world records eligible for HUD display range |
-| `%waypoints_nearby_count:128%` | Accessible same-world records at 3D distance at most the radius, in blocks |
-| `%waypoints_names%` | Accessible names across worlds, joined by `, ` |
-| `%waypoints_names_here%` | Accessible same-world names, joined by `, ` |
+| `%waypoints_count%` | Accessible enabled waypoint count across all worlds. |
+| `%waypoints_count_here%` | Accessible enabled waypoint count in the current world. |
+| `%waypoints_count_world:world%` | Accessible enabled waypoint count in the exact argument world. |
+| `%waypoints_public_count%` | Accessible public-record count across all worlds. |
+| `%waypoints_restricted_count%` | Accessible restricted-record count across all worlds. |
+| `%waypoints_visible_count%` | Same-world count eligible for the HUD visibility range. |
+| `%waypoints_nearby_count:128%` | Same-world count within the 3D radius in blocks. |
+| `%waypoints_names%` | Accessible waypoint names across worlds, joined by comma and space. |
+| `%waypoints_names_here%` | Accessible same-world waypoint names, joined by comma and space. |
 
 Name lists sort by Waypoints' normalized, case-insensitive name key, then UUID. They are display
 text, not escaped identifiers; waypoint names can contain commas. Disabled, denied and
 hidden-by-ACL records do not affect counts, names, existence checks or rank positions. A known empty
 name list resolves to an empty string.
 
+## Existence lookups
+
+| Token | Description |
+| --- | --- |
+| `%waypoints_closest_exists%` | Whether an accessible same-world closest waypoint exists. |
+| `%waypoints_nearest_exists:2%` | Whether the requested accessible same-world rank exists. |
+| `%waypoints_waypoint_exists:11111111-1111-4111-8111-111111111111%` | Whether the enabled UUID is accessible to the viewer. |
+
 ## Waypoint fields
 
 Substitute any field below in a closest, nearest or explicit UUID token. The same field rules apply
 to all three families.
 
-| Field | Value |
+| Field | Meaning | Output |
 | --- | --- |
-| `id` | Canonical lowercase UUID |
-| `name` | Complete saved waypoint name |
-| `label` | Saved display label, falling back to the name |
-| `description` | Saved description, or an empty string |
-| `world` | Exact saved world key |
-| `color` | Canonical uppercase `#RRGGBB` |
-| `icon` | Canonical item ID, or an empty string |
-| `x`, `y`, `z` | Saved coordinates using locale-independent number formatting; negative zero is `0` |
-| `distance` | Raw 3D distance in blocks, to one decimal, no suffix |
-| `distance_horizontal` | X/Z distance in blocks, to one decimal, no suffix |
-| `distance_formatted` | Rounded integer meters below 1000 blocks; otherwise one decimal kilometer |
-| `delta_x`, `delta_y`, `delta_z` | Destination minus viewer coordinate, in blocks to one decimal |
-| `bearing` | Horizontal compass bearing: north `0`, east `90`, south `180`, west `270`; one decimal |
-| `direction` | `N`, `NE`, `E`, `SE`, `S`, `SW`, `W`, `NW`, `UP`, `DOWN` or `HERE` |
-| `relative_direction` | `front`, `front_right`, `right`, `back_right`, `back`, `back_left`, `left`, `front_left`, `UP`, `DOWN` or `HERE` |
+| `id` | Canonical waypoint UUID. | canonical lowercase UUID |
+| `name` | Complete saved waypoint name. | text |
+| `label` | Saved display label, falling back to the name. | text |
+| `description` | Saved description, or an empty string. | text |
+| `world` | Exact saved world key. | text |
+| `color` | Canonical waypoint color. | uppercase #RRGGBB |
+| `icon` | Canonical item ID, or an empty string. | item ID or empty |
+| `x` | Saved X coordinate. | locale-independent number; negative zero is 0 |
+| `y` | Saved Y coordinate. | locale-independent number; negative zero is 0 |
+| `z` | Saved Z coordinate. | locale-independent number; negative zero is 0 |
+| `distance` | Raw three-dimensional distance. | blocks to one decimal, no suffix |
+| `distance_horizontal` | Raw X/Z distance. | blocks to one decimal, no suffix |
+| `distance_formatted` | Human-readable distance. | rounded integer meters below 1000 blocks; otherwise one decimal kilometer |
+| `delta_x` | Destination X minus viewer X. | blocks to one decimal |
+| `delta_y` | Destination Y minus viewer Y. | blocks to one decimal |
+| `delta_z` | Destination Z minus viewer Z. | blocks to one decimal |
+| `bearing` | Horizontal compass bearing, north at zero. | degrees to one decimal |
+| `direction` | Eight-point compass direction. | N, NE, E, SE, S, SW, W, NW, UP, DOWN, or HERE |
+| `relative_direction` | Eight-point direction relative to the viewer yaw. | front, front_right, right, back_right, back, back_left, left, front_left, UP, DOWN, or HERE |
 
 Compass sectors are 45 degrees wide; a boundary belongs to the clockwise sector. Relative direction
 uses the viewer's Minecraft yaw convention, where yaw zero faces south. If horizontal displacement
@@ -82,17 +97,19 @@ is zero, bearing is a known empty string. Direction fields return `HERE` at the 
 ## Token forms and arguments
 
 ```text
-%waypoints_closest_<field>%
-%waypoints_nearest_<field>:2%
-%waypoints_waypoint_<field>:11111111-1111-4111-8111-111111111111%
+%waypoints_closest_id%
+%waypoints_nearest_id:2%
+%waypoints_waypoint_id:11111111-1111-4111-8111-111111111111%
 %waypoints_closest_exists%
 %waypoints_nearest_exists:2%
 %waypoints_waypoint_exists:11111111-1111-4111-8111-111111111111%
+%waypoints_count_world:world%
+%waypoints_nearby_count:128%
 ```
 
 Closest has no argument. Nearest requires a decimal integer rank from 1 through 100. UUID arguments
 must use the canonical hyphenated UUID shape; letter case is normalized. Unknown, disabled and
-inaccessible UUIDs all return `false` for `waypoint_exists` and leave metadata fields unresolved.
+inaccessible UUIDs all return `false` for `waypoint_exists`; metadata fields remain unresolved.
 
 Catalog arguments:
 
@@ -133,3 +150,9 @@ misleading zero or partial result.
 The callback returns plain text only. It does not resolve nested tokens, escape markup, build text
 components or truncate oversized names. Waypoints logs a bounded identifier and reason once while a
 query failure remains active; stored waypoint text and host errors are never logged.
+
+PumpkinPIE is optional. Provider retries use bounded exponential backoff capped at 5 minutes;
+after reaching the cap, probes are no more frequent than once every 5 minutes. A ready
+integration sends its registration heartbeat every 30 seconds and recovers automatically when
+PumpkinPIE becomes available.
+<!-- docs:end placeholders -->
