@@ -806,8 +806,17 @@ describe('action release prerequisites', () => {
     const ci = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/ci.yml'), 'utf8'));
     const actions = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/actions.yml'), 'utf8'));
     const extensions = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/extensions.yml'), 'utf8'));
+    const startsWith = (searchString, searchValue) =>
+        String(searchString ?? '')
+            .toLowerCase()
+            .startsWith(String(searchValue ?? '').toLowerCase());
     const evaluate = (expression, context) =>
-        runInNewContext(expression.trim().replace(/^\$\{\{|\}\}$/g, ''), { always: () => true, ...context });
+        runInNewContext(expression.trim().replace(/^\$\{\{|\}\}$/g, ''), {
+            always: () => true,
+            startsWith,
+            github: { head_ref: 'feature/test' },
+            ...context,
+        });
 
     it('starts Static Hermes preparation as soon as changes are classified', () => {
         assert.deepEqual(ci.jobs.build.needs, ['changes']);
@@ -829,6 +838,15 @@ describe('action release prerequisites', () => {
         ]);
         assert.match(ci.jobs.release.if, /needs\.lint\.result == 'success'/);
         assert.match(ci.jobs.release.if, /needs\.typecheck\.result == 'success'/);
+    });
+
+    it('skips redundant workflow jobs on Release Please branches', () => {
+        const condition = ci.jobs.changes.if;
+        assert.equal(
+            evaluate(condition, { github: { head_ref: 'RELEASE-PLEASE--BRANCHES--MASTER--COMPONENTS--WAYPOINTS' } }),
+            false,
+        );
+        assert.equal(evaluate(condition, { github: { head_ref: 'dev/waypoints-placeholders' } }), true);
     });
 
     it('awaits action verification alongside every existing plugin prerequisite', () => {
