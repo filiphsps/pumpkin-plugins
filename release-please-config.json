@@ -85,8 +85,7 @@
             "component": "static-hermes-runtime"
         },
         "tools/update-check": {
-            "component": "update-check",
-            "release-as": "0.1.0"
+            "component": "update-check"
         }
     },
     "changelog-sections": [
