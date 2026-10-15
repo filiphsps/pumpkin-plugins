@@ -245,6 +245,7 @@ reviews:
             - "DRAFT:"
             - DO NOT MERGE
             - "chore(master): release"
+            - ": update upstream pin"
     finishing_touches:
         unit_tests:
             enabled: false
