@@ -1,6 +1,6 @@
 # @pumpkin-plugins/cspell-dict-minecraft
 
-[![npm downloads](https://img.shields.io/npm/d18m/%40pumpkin-plugins%2Fcspell-dict-minecraft?label=downloads%20%2818m%29)](https://www.npmjs.com/package/@pumpkin-plugins/cspell-dict-minecraft)
+[![npm downloads](https://img.shields.io/npm/dt/%40pumpkin-plugins%2Fcspell-dict-minecraft)](https://www.npmjs.com/package/@pumpkin-plugins/cspell-dict-minecraft)
 [![latest npm release](https://img.shields.io/npm/v/%40pumpkin-plugins%2Fcspell-dict-minecraft?label=latest%20release)](https://www.npmjs.com/package/@pumpkin-plugins/cspell-dict-minecraft)
 [![npm license](https://img.shields.io/npm/l/%40pumpkin-plugins%2Fcspell-dict-minecraft)](https://www.npmjs.com/package/@pumpkin-plugins/cspell-dict-minecraft)
 

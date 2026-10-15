@@ -1,6 +1,6 @@
 # create-pumpkin-plugin
 
-[![npm downloads](https://img.shields.io/npm/d18m/create-pumpkin-plugin?label=downloads%20%2818m%29)](https://www.npmjs.com/package/create-pumpkin-plugin)
+[![npm downloads](https://img.shields.io/npm/dt/create-pumpkin-plugin)](https://www.npmjs.com/package/create-pumpkin-plugin)
 [![latest npm release](https://img.shields.io/npm/v/create-pumpkin-plugin?label=latest%20release)](https://www.npmjs.com/package/create-pumpkin-plugin)
 [![npm license](https://img.shields.io/npm/l/create-pumpkin-plugin)](https://www.npmjs.com/package/create-pumpkin-plugin)
 

@@ -1,6 +1,6 @@
 # Static Hermes Runtime
 
-[![npm downloads](https://img.shields.io/npm/d18m/%40pumpkin-plugins%2Fstatic-hermes-runtime?label=downloads%20%2818m%29)](https://www.npmjs.com/package/@pumpkin-plugins/static-hermes-runtime)
+[![npm downloads](https://img.shields.io/npm/dt/%40pumpkin-plugins%2Fstatic-hermes-runtime)](https://www.npmjs.com/package/@pumpkin-plugins/static-hermes-runtime)
 [![latest npm release](https://img.shields.io/npm/v/%40pumpkin-plugins%2Fstatic-hermes-runtime?label=latest%20release)](https://www.npmjs.com/package/@pumpkin-plugins/static-hermes-runtime)
 [![npm license](https://img.shields.io/npm/l/%40pumpkin-plugins%2Fstatic-hermes-runtime)](https://www.npmjs.com/package/@pumpkin-plugins/static-hermes-runtime)
 

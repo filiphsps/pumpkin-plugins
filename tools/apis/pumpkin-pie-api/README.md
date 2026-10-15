@@ -1,6 +1,6 @@
 # @pumpkin-plugins/pumpkin-pie-api
 
-[![npm downloads](https://img.shields.io/npm/d18m/%40pumpkin-plugins%2Fpumpkin-pie-api?label=downloads%20%2818m%29)](https://www.npmjs.com/package/@pumpkin-plugins/pumpkin-pie-api)
+[![npm downloads](https://img.shields.io/npm/dt/%40pumpkin-plugins%2Fpumpkin-pie-api)](https://www.npmjs.com/package/@pumpkin-plugins/pumpkin-pie-api)
 [![latest npm release](https://img.shields.io/npm/v/%40pumpkin-plugins%2Fpumpkin-pie-api?label=latest%20release)](https://www.npmjs.com/package/@pumpkin-plugins/pumpkin-pie-api)
 [![npm license](https://img.shields.io/npm/l/%40pumpkin-plugins%2Fpumpkin-pie-api)](https://www.npmjs.com/package/@pumpkin-plugins/pumpkin-pie-api)
 
