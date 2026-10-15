@@ -59,6 +59,7 @@ permissions:
 jobs:
     changes:
         name: 🔍 Changed files
+        if: ${{ !startsWith(github.head_ref, 'release-please--branches--') }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04
         outputs:
@@ -192,7 +193,7 @@ jobs:
     action-gate:
         name: 🛡️ Action test gate
         needs: [changes, action-tests]
-        if: ${{ always() }}
+        if: ${{ always() && !startsWith(github.head_ref, 'release-please--branches--') }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04
         steps:
@@ -226,7 +227,7 @@ jobs:
     extension-gate:
         name: 🛡️ Extension test gate
         needs: [changes, extension-tests]
-        if: ${{ always() }}
+        if: ${{ always() && !startsWith(github.head_ref, 'release-please--branches--') }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04
         steps:
@@ -476,7 +477,7 @@ jobs:
     integration-gate:
         name: 🛡️ Integration gate
         needs: [changes, integration]
-        if: ${{ always() }}
+        if: ${{ always() && !startsWith(github.head_ref, 'release-please--branches--') }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04
         steps:
@@ -565,7 +566,7 @@ jobs:
     generator-gate:
         name: 🛡️ Generator gate
         needs: [changes, generator]
-        if: ${{ always() }}
+        if: ${{ always() && !startsWith(github.head_ref, 'release-please--branches--') }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04
         steps:
@@ -631,6 +632,7 @@ jobs:
         if: >-
             ${{
               always() &&
+              !startsWith(github.head_ref, 'release-please--branches--') &&
               (
                 github.event_name != 'pull_request' ||
                 (

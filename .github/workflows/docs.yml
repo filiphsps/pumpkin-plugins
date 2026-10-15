@@ -70,6 +70,7 @@ permissions:
 jobs:
     build:
         name: 📚 Build and check docs
+        if: ${{ !startsWith(github.head_ref, 'release-please--branches--') }}
         timeout-minutes: 20
         runs-on: ubuntu-26.04
         steps:
@@ -173,6 +174,7 @@ jobs:
         if: >-
             ${{
               always() &&
+              !startsWith(github.head_ref, 'release-please--branches--') &&
               (needs.publish.result == 'success' || needs.publish.result == 'skipped') &&
               (
                 github.event_name != 'pull_request' ||

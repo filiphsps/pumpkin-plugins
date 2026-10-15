@@ -18,6 +18,7 @@ permissions:
 jobs:
     lint:
         name: 🔍 Lint GitHub workflows
+        if: ${{ !startsWith(github.head_ref, 'release-please--branches--') }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04
         steps:

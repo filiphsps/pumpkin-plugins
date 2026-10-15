@@ -16,11 +16,17 @@ shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
 `.github/common/bootstrap`. Most CI jobs use
 `ubuntu-26.04`; the external-consumer matrix also runs on `macos-15` and `windows-2025`.
 
+Release Please branches (`release-please--branches--...`) skip CI, Docs, Actionlint and benchmark
+comment jobs. The code they release has already passed validation on its associated commit; release
+PR updates carry the generated version and changelog, while the release workflow prepares generated
+READMEs and pins.
+
 ## Jobs
 
 | Job | Runs | What |
 | --- | --- | --- |
 | 🔍 Changed files | CI-triggering changes | Separates plugin/repository code, action directories, extension directories and documentation; selects integration suites for plugin and suite dependency changes, the generator smoke test for scaffold-related changes, and detects generated README refresh commits |
+| 🔍 Lint GitHub workflows | pull requests, default-branch pushes, and manual runs | `actionlint` validates workflow files; skipped on Release Please branches |
 | 💬 Commit messages | code, action, extension, or generated README changes on PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
@@ -81,10 +87,10 @@ changes use Engine comparison. Biome, the type checker and the tests read none o
 files, so a docs-only change cannot fail them.
 
 The main CI `📝 Docs and config` job runs for code, action and extension changes, and for the automatic
-`docs: update generated READMEs` commit. Release PRs also change version and changelog files, so
-GitHub continues to trigger CI as the README refresh commit is added. The classifier recognizes that
-commit and reruns the repository checks that validate the generated README. Ordinary docs-only PRs
-skip the main CI workflow entirely.
+`docs: update generated READMEs` commit. GitHub may trigger CI, Docs and Actionlint for Release Please
+branch updates, but their jobs skip those branches; the associated source commit already passed
+validation, and the release workflow prepares generated READMEs and pins. The benchmark comment
+workflow also skips those CI runs. Ordinary docs-only PRs skip the main CI workflow entirely.
 
 On a push, the release job waits for the action, extension, integration and generator gates and
 docs/config checks. Plugin/repository changes also require lint, typecheck, build, external-consumer
