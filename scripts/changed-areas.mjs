@@ -1,5 +1,5 @@
 // Classifies changed files for CI: plugin/repo code, action directories, extension directories, and documentation.
-// Plugin code jobs, action tests, and extension tests have separate gates.
+// Plugin code jobs, action tests, extension tests, and the generator smoke test have separate gates.
 // See the Jobs table in docs/ci-and-releases.md.
 import { spawnSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
@@ -8,6 +8,28 @@ import { ignoredCommitShas } from './utils/ignored-commits.mjs';
 
 /** A changed file matching any of these is documentation, which nothing that builds or tests reads. */
 const DOCS = [/\.md$/, /^docs\//, /^LICENSE$/, /^(packages|tools|actions|extensions)\/[^/]+\/docs(?:\/|$)/];
+const GENERATOR_RELEVANT_DIRECTORIES = [
+    'turbo/generators/',
+    'tools/apis/',
+    'tools/build/',
+    'tools/docs/',
+    'tools/plugin-kit/',
+    'tools/pumpkin-api/',
+    'tools/static-hermes-runtime/',
+    'tools/test-harness/',
+    '.github/common/bootstrap/',
+    '.github/common/setup-static-hermes/',
+];
+const GENERATOR_RELEVANT_FILES = new Set([
+    '.github/workflows/ci.yml',
+    '.node-version',
+    'package.json',
+    'pnpm-lock.yaml',
+    'pnpm-workspace.yaml',
+    'scripts/turbo.mjs',
+    'tsconfig.base.json',
+    'turbo.json',
+]);
 
 const COMMON_CONSUMERS = [
     'publish-to-pumpkin-market',
@@ -78,6 +100,11 @@ const extensionsToTest = [
 const code = changed.filter(
     (file) => !isDocs(file) && !/^actions\/[^/]+\//.test(file) && !/^extensions\/[^/]+\//.test(file),
 );
+const generator = changed.some(
+    (file) =>
+        !isDocs(file) &&
+        (GENERATOR_RELEVANT_FILES.has(file) || GENERATOR_RELEVANT_DIRECTORIES.some((dir) => file.startsWith(dir))),
+);
 /** Keep the benchmark comparison scoped to its dedicated real-server workflow. */
 const benchmarkOnly = code.length > 0 && code.every((file) => file.startsWith('benchmarks/engine-comparison/'));
 const integrationScope = benchmarkOnly
@@ -101,6 +128,7 @@ if (actions.length) console.log(`Changed actions: ${actions.join(', ')}`);
 if (actionsToTest.length) console.log(`Actions to test: ${actionsToTest.join(', ')}`);
 if (extensions.length) console.log(`Changed extensions: ${extensions.join(', ')}`);
 if (extensionsToTest.length) console.log(`Extensions to test: ${extensionsToTest.join(', ')}`);
+console.log(`Generator smoke test: ${generator ? 'selected' : 'skipped'}`);
 console.log(`Integration scope: ${integrationScope}`);
 if (generatedReadmes) console.log('Generated README update commit detected.');
 if (integrationExtra) console.log(`Additional integration package: ${integrationExtra}`);
@@ -108,6 +136,6 @@ if (integrationExtra) console.log(`Additional integration package: ${integration
 if (process.env.GITHUB_OUTPUT) {
     appendFileSync(
         process.env.GITHUB_OUTPUT,
-        `code=${code.length > 0}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\nextensions=${JSON.stringify(extensions)}\nextensions_to_test=${JSON.stringify(extensionsToTest)}\ngenerated_readmes=${generatedReadmes}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n`,
+        `code=${code.length > 0}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\nextensions=${JSON.stringify(extensions)}\nextensions_to_test=${JSON.stringify(extensionsToTest)}\ngenerated_readmes=${generatedReadmes}\ngenerator=${generator}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n`,
     );
 }

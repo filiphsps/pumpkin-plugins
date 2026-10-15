@@ -42,8 +42,9 @@ pnpm gen --args my-plugin MyPlugin "Does a thing"
    reference links from repository metadata, and adds the plugin to the root README.
 4. Formats the new files with Biome.
 
-It doesn't commit anything. A CI job (`🧬 Generator`) generates a throwaway plugin on every run
-and typechecks, builds and integration-tests it, so the templates can't silently rot.
+It doesn't commit anything. CI's `🧬 Generator` job generates a throwaway plugin when its scaffold,
+generation setup or generated plugin dependencies change, then typechecks, builds and
+integration-tests it so the templates can't silently rot.
 
 ## Next steps
 

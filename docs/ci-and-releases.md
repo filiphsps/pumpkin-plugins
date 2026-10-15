@@ -20,7 +20,7 @@ shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
 
 | Job | Runs | What |
 | --- | --- | --- |
-| 🔍 Changed files | CI-triggering changes | Separates plugin/repository code, action directories, extension directories and documentation; detects generated README refresh commits |
+| 🔍 Changed files | CI-triggering changes | Separates plugin/repository code, action directories, extension directories and documentation; selects the generator smoke test for scaffold-related changes and detects generated README refresh commits |
 | 💬 Commit messages | code, action, extension, or generated README changes on PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
@@ -35,7 +35,8 @@ shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
 | 📊 Engine comparison | code changes, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`; nine engine configurations run as parallel matrix jobs, then a report job validates and combines their real-Pumpkin results |
 | 📈 Engine comparison comment | successful PR CI runs with a benchmark report | `.github/workflows/engine-comparison-comment.yml` compares with the latest matching default-branch report, updates one PR comment, and embeds an SVG timing-change chart |
 | 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
-| 🧬 Generator | code changes, after lint and build | Reuses the Static Hermes cache saved by Build, then generates a throwaway plugin, action and extension; checks release registration and READMEs; tests the action and extension; and typechecks, builds and integration-tests the plugin |
+| 🧬 Generator | scaffold, generator setup or generated plugin dependency changes, after lint and build | Reuses the Static Hermes cache saved by Build, then generates a throwaway plugin, action and extension; checks release registration and READMEs; tests the action and extension; and typechecks, builds and integration-tests the plugin |
+| 🛡️ Generator gate | every CI run, after classification and the generator smoke test | Requires the smoke test when a scaffold, generator setup or generated plugin dependency changes; accepts a skipped test when none changed |
 | 🚢 Release | plugin, action, extension or public tool release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; actions create GitHub releases, extensions attach VSIX packages, public tools publish npm tarballs, and plugins produce signed artifacts and Market listings |
 | 📝 Prepare release PR | all open release PRs on release runs | Keeps plugin and extension READMEs, action README examples, starter dependency ranges and first-release pins current |
 | 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs and uploads the exact build artifact, publishes it to an existing Market listing, then syncs its description and commands |

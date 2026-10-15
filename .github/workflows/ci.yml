@@ -68,6 +68,7 @@ jobs:
             extensions: ${{ steps.classify.outputs.extensions }}
             extensions_to_test: ${{ steps.classify.outputs.extensions_to_test }}
             generated_readmes: ${{ steps.classify.outputs.generated_readmes }}
+            generator: ${{ steps.classify.outputs.generator }}
             integration_scope: ${{ steps.classify.outputs.integration_scope }}
             integration_extra: ${{ steps.classify.outputs.integration_extra }}
         steps:
@@ -476,7 +477,7 @@ jobs:
         name: 🧬 Generator
         # Build saves the prepared Static Hermes cache that this job restores.
         needs: [changes, lint, build]
-        if: needs.changes.outputs.code == 'true'
+        if: needs.changes.outputs.generator == 'true'
         timeout-minutes: 60
         runs-on: ubuntu-26.04
         steps:
@@ -533,9 +534,35 @@ jobs:
                   path: ${{ runner.temp }}/pumpkin-logs
                   if-no-files-found: ignore
 
+    generator-gate:
+        name: 🛡️ Generator gate
+        needs: [changes, generator]
+        if: ${{ always() }}
+        timeout-minutes: 5
+        runs-on: ubuntu-26.04
+        steps:
+            - name: 🛡️ Require the generator smoke test when selected
+              env:
+                  CHANGES_RESULT: ${{ needs.changes.result }}
+                  GENERATOR: ${{ needs.changes.outputs.generator }}
+                  GENERATOR_RESULT: ${{ needs.generator.result }}
+              run: |
+                  if [[ "$CHANGES_RESULT" != 'success' ]]; then
+                      echo 'Change classification failed.' >&2
+                      exit 1
+                  fi
+                  if [[ "$GENERATOR" != 'true' && "$GENERATOR_RESULT" == 'skipped' ]]; then
+                      exit 0
+                  fi
+                  if [[ "$GENERATOR" == 'true' && "$GENERATOR_RESULT" == 'success' ]]; then
+                      exit 0
+                  fi
+                  echo "Required generator verification did not pass: $GENERATOR_RESULT" >&2
+                  exit 1
+
     release:
         name: 🚢 Release
-        needs: [changes, lint, typecheck, build, external-consumer, test, docs, integration, action-gate, extension-gate]
+        needs: [changes, lint, typecheck, build, external-consumer, test, docs, integration, action-gate, extension-gate, generator-gate]
         if: >-
             ${{
               always() &&
@@ -544,6 +571,7 @@ jobs:
               needs.docs.result == 'success' &&
               needs['action-gate'].result == 'success' &&
               needs['extension-gate'].result == 'success' &&
+              needs['generator-gate'].result == 'success' &&
               (
                 (
                   needs.changes.outputs.code == 'true' &&

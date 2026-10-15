@@ -825,6 +825,7 @@ describe('action release prerequisites', () => {
             'integration',
             'action-gate',
             'extension-gate',
+            'generator-gate',
         ]);
         assert.match(ci.jobs.release.if, /needs\.lint\.result == 'success'/);
         assert.match(ci.jobs.release.if, /needs\.typecheck\.result == 'success'/);
@@ -842,9 +843,45 @@ describe('action release prerequisites', () => {
             'integration',
             'action-gate',
             'extension-gate',
+            'generator-gate',
         ]);
         assert.deepEqual(ci.jobs['action-gate'].needs, ['changes', 'action-tests']);
         assert.equal(evaluate(ci.jobs['action-gate'].if, {}), true);
+    });
+
+    it('requires the generator smoke test only when the classifier selects it', () => {
+        const generator = ci.jobs.generator;
+        assert.equal(generator.if, "needs.changes.outputs.generator == 'true'");
+        const gate = ci.jobs['generator-gate'];
+        assert.ok(gate, 'Generator result gate is missing');
+        assert.deepEqual(gate.needs, ['changes', 'generator']);
+        assert.equal(evaluate(gate.if, {}), true);
+        assert.ok(ci.jobs.release.needs.includes('generator-gate'));
+        assert.match(ci.jobs.release.if, /needs\['generator-gate'\]\.result == 'success'/);
+
+        const step = gate.steps.find((entry) => entry.env?.GENERATOR_RESULT);
+        assert.ok(step, 'Generator result gate has no generator result input');
+        for (const [selected, result, changes, expected] of [
+            ['true', 'success', 'success', 0],
+            ['true', 'failure', 'success', 1],
+            ['true', 'cancelled', 'success', 1],
+            ['true', 'skipped', 'success', 1],
+            ['false', 'skipped', 'success', 0],
+            ['false', 'success', 'success', 1],
+            ['false', 'failure', 'success', 1],
+            ['false', 'skipped', 'failure', 1],
+        ]) {
+            const outcome = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
+                encoding: 'utf8',
+                env: {
+                    ...process.env,
+                    GENERATOR: selected,
+                    GENERATOR_RESULT: result,
+                    CHANGES_RESULT: changes,
+                },
+            });
+            assert.equal(outcome.status, expected, `${selected}/${result}/${changes}: ${outcome.stderr}`);
+        }
     });
 
     it('runs engine comparison through its own reusable workflow', () => {
@@ -880,6 +917,7 @@ describe('action release prerequisites', () => {
             integration: { result: 'skipped' },
             'action-gate': { result: 'success' },
             'extension-gate': { result: 'success' },
+            'generator-gate': { result: 'success' },
         };
         assert.equal(evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }), true);
     });
@@ -946,6 +984,7 @@ describe('action release prerequisites', () => {
                     integration: { result: code === 'true' ? 'success' : 'skipped' },
                     'action-gate': { result },
                     'extension-gate': { result: 'success' },
+                    'generator-gate': { result: 'success' },
                 };
                 assert.equal(
                     evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }),
@@ -1004,6 +1043,7 @@ describe('action release prerequisites', () => {
                 docs: { result: 'success' },
                 'action-gate': { result: 'success' },
                 'extension-gate': { result },
+                'generator-gate': { result: 'success' },
             };
             assert.equal(
                 evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }),
@@ -1031,6 +1071,7 @@ describe('action release prerequisites', () => {
                 integration: { result: 'success' },
                 'action-gate': { result: 'success' },
                 'extension-gate': { result: 'success' },
+                'generator-gate': { result: 'success' },
             };
             assert.equal(evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }), expected);
             if (code === 'true') {
@@ -1043,6 +1084,7 @@ describe('action release prerequisites', () => {
                     'test',
                     'docs',
                     'integration',
+                    'generator-gate',
                 ]) {
                     const failing = { ...needs, [required]: { ...needs[required], result: 'failure' } };
                     assert.equal(
