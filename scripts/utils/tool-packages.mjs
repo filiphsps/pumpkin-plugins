@@ -258,7 +258,14 @@ export function syncStarterToolDependencies(root) {
     return changed;
 }
 
-function sourcePrerequisitePaths(root, packagePath, pathsByName) {
+/** Finds workspace tool dependencies declared by a package or its packed templates.
+ *
+ * @param {string} root - Workspace root containing the package.
+ * @param {string} packagePath - Workspace path of the package to inspect.
+ * @param {Map<string, string>} pathsByName - Workspace paths indexed by package name.
+ * @returns {Set<string>} Workspace paths of declared dependencies present in the workspace.
+ */
+export function sourcePrerequisitePaths(root, packagePath, pathsByName) {
     const packageDirectory = path.join(root, packagePath);
     const packageJson = readPackageJson(path.join(packageDirectory, 'package.json'));
     const manifests = [packageJson, ...nestedPackageJsonFiles(packageDirectory, packageJson).map(readPackageJson)];

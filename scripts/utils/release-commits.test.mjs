@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { bundledChangesPlugin, bundledPaths, releaseCommits, workspacePackages } from './release-commits.mjs';
 
@@ -63,6 +63,14 @@ const packages = new Map([
 ]);
 const releaseConfig = JSON.parse(readFileSync(new URL('../../release-please-config.json', import.meta.url), 'utf8'));
 const commit = (sha, files, message = 'fix: ship a change') => ({ sha, files, message });
+
+function writeToolPackages(root, packages) {
+    for (const [name, pkg] of packages) {
+        const directory = join(root, pkg.path);
+        mkdirSync(directory, { recursive: true });
+        writeFileSync(join(directory, 'package.json'), JSON.stringify({ name, ...pkg.manifest }));
+    }
+}
 
 class TestTagName {
     constructor(version, component = 'plugin') {
@@ -231,19 +239,25 @@ describe('bundled release commits', () => {
             ...dependencyPaths.map((packagePath) => [packagePath, '0.1.0']),
         ]);
 
-        for (const packagePath of dependencyPaths) {
-            const versions = { ...readyVersions, [packagePath]: '0.0.0' };
-            const plugin = bundledChangesPlugin({}, 'master', toolPackages, versions, 500, () => {});
+        const root = mkdtempSync(join(tmpdir(), 'release-public-tool-dependencies-'));
+        try {
+            writeToolPackages(root, toolPackages);
+            for (const packagePath of dependencyPaths) {
+                const versions = { ...readyVersions, [packagePath]: '0.0.0' };
+                const plugin = bundledChangesPlugin({}, 'master', toolPackages, versions, 500, () => {}, root);
 
-            assert.deepEqual(
-                await plugin.run([candidate, unrelatedCandidate]),
-                [unrelatedCandidate],
-                `${packagePath} should block only the build release`,
-            );
+                assert.deepEqual(
+                    await plugin.run([candidate, unrelatedCandidate]),
+                    [unrelatedCandidate],
+                    `${packagePath} should block only the build release`,
+                );
+            }
+
+            const readyPlugin = bundledChangesPlugin({}, 'master', toolPackages, readyVersions, 500, () => {}, root);
+            assert.deepEqual(await readyPlugin.run([candidate, unrelatedCandidate]), [candidate, unrelatedCandidate]);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
         }
-
-        const readyPlugin = bundledChangesPlugin({}, 'master', toolPackages, readyVersions, 500, () => {});
-        assert.deepEqual(await readyPlugin.run([candidate, unrelatedCandidate]), [candidate, unrelatedCandidate]);
     });
 
     it('checks transitive public package dependencies before allowing a release candidate', async () => {
@@ -256,16 +270,88 @@ describe('bundled release commits', () => {
             ['@pumpkin-plugins/build', publicTool('tools/build', { '@pumpkin-plugins/colors': '^0.1.0' })],
             ['@pumpkin-plugins/colors', publicTool('tools/colors')],
         ]);
-        const plugin = bundledChangesPlugin(
-            {},
-            'master',
-            toolPackages,
-            { 'tools/consumer': '0.1.0', 'tools/build': '0.1.0', 'tools/colors': '0.0.0' },
-            500,
-            () => {},
-        );
+        const root = mkdtempSync(join(tmpdir(), 'release-transitive-tool-dependencies-'));
+        try {
+            writeToolPackages(root, toolPackages);
+            const plugin = bundledChangesPlugin(
+                {},
+                'master',
+                toolPackages,
+                { 'tools/consumer': '0.1.0', 'tools/build': '0.1.0', 'tools/colors': '0.0.0' },
+                500,
+                () => {},
+                root,
+            );
 
-        assert.deepEqual(await plugin.run([{ path: 'tools/consumer' }]), []);
+            assert.deepEqual(await plugin.run([{ path: 'tools/consumer' }]), []);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
+    it('defers a public tool until dependencies declared by its packed templates have released', async () => {
+        const root = mkdtempSync(join(tmpdir(), 'release-template-dependencies-'));
+        try {
+            const publicTool = (packagePath, dependencies = {}) => ({
+                path: packagePath,
+                manifest: { publishConfig: { access: 'public' }, dependencies },
+            });
+            const toolPackages = new Map([
+                [
+                    'create-pumpkin-plugin',
+                    {
+                        path: 'tools/create-pumpkin-plugin',
+                        manifest: { files: ['templates'], publishConfig: { access: 'public' }, dependencies: {} },
+                    },
+                ],
+                ['@pumpkin-plugins/build', publicTool('tools/build')],
+                ['@pumpkin-plugins/pumpkin-api', publicTool('tools/pumpkin-api')],
+            ]);
+            writeToolPackages(root, toolPackages);
+            const templateManifest = join(root, 'tools/create-pumpkin-plugin/templates/typescript/package.json');
+            mkdirSync(dirname(templateManifest), { recursive: true });
+            writeFileSync(
+                templateManifest,
+                JSON.stringify({
+                    dependencies: {
+                        '@pumpkin-plugins/build': '^0.1.0',
+                        '@pumpkin-plugins/pumpkin-api': '^0.1.0',
+                    },
+                }),
+            );
+            const candidate = { path: 'tools/create-pumpkin-plugin' };
+            const blockedPlugin = bundledChangesPlugin(
+                {},
+                'master',
+                toolPackages,
+                {
+                    'tools/create-pumpkin-plugin': '0.0.0',
+                    'tools/build': '0.1.0',
+                    'tools/pumpkin-api': '0.0.0',
+                },
+                500,
+                () => {},
+                root,
+            );
+            const readyPlugin = bundledChangesPlugin(
+                {},
+                'master',
+                toolPackages,
+                {
+                    'tools/create-pumpkin-plugin': '0.0.0',
+                    'tools/build': '0.1.0',
+                    'tools/pumpkin-api': '0.1.0',
+                },
+                500,
+                () => {},
+                root,
+            );
+
+            assert.deepEqual(await blockedPlugin.run([candidate]), []);
+            assert.deepEqual(await readyPlugin.run([candidate]), [candidate]);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
     });
 
     it('releases the public builder when its API or Static Hermes dependency changes', async () => {

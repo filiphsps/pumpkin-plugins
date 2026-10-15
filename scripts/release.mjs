@@ -170,7 +170,15 @@ if (!dryRun && !pullRequestsOnly) {
 }
 const manifest = await load();
 manifest.plugins.push(
-    bundledChangesPlugin(github, branch, packages, manifest.releasedVersions, manifest.commitSearchDepth),
+    bundledChangesPlugin(
+        github,
+        branch,
+        packages,
+        manifest.releasedVersions,
+        manifest.commitSearchDepth,
+        console.error,
+        repositoryRoot,
+    ),
 );
 if (component) {
     manifest.plugins.push({

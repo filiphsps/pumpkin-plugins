@@ -1,6 +1,10 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
 import { ignoredCommitShas } from './ignored-commits.mjs';
+import { sourcePrerequisitePaths } from './tool-packages.mjs';
+
+const DEFAULT_WORKSPACE_ROOT = resolve(import.meta.dirname, '../..');
 
 /** Reads workspace package manifests for identifying code bundled into each plugin. */
 export function workspacePackages(root) {
@@ -121,7 +125,9 @@ async function firstPackageCommitSha(github, branch, path) {
 
 /** Adds bundled dependency commits and defers tools until their public dependencies have released.
  *
- * @param log - Receives messages when a public tool release candidate is deferred.
+ * @param {number} [maxCommits=500] - Maximum release-history commits to inspect.
+ * @param {(message: string) => void} [log=console.error] - Receives deferred-candidate messages.
+ * @param {string} [root=DEFAULT_WORKSPACE_ROOT] - Workspace root for reading package and template dependencies.
  */
 export function bundledChangesPlugin(
     github,
@@ -130,6 +136,7 @@ export function bundledChangesPlugin(
     releasedVersions,
     maxCommits = 500,
     log = console.error,
+    root = DEFAULT_WORKSPACE_ROOT,
 ) {
     const publicToolDependencies = new Map();
     for (const pkg of packages.values()) {
@@ -141,14 +148,11 @@ export function bundledChangesPlugin(
             publicToolDependencies.set(pkg.path, new Set());
         }
     }
+    const pathsByName = new Map([...packages].map(([name, pkg]) => [name, pkg.path]));
     for (const pkg of packages.values()) {
         if (!publicToolDependencies.has(pkg.path)) continue;
-        const dependencies = new Set([
-            ...Object.keys(pkg.manifest.dependencies ?? {}),
-            ...Object.keys(pkg.manifest.optionalDependencies ?? {}),
-        ]);
-        for (const dependencyName of dependencies) {
-            const dependencyPath = packages.get(dependencyName)?.path;
+        const prerequisites = sourcePrerequisitePaths(root, pkg.path, pathsByName);
+        for (const dependencyPath of prerequisites) {
             if (publicToolDependencies.has(dependencyPath)) publicToolDependencies.get(pkg.path).add(dependencyPath);
         }
     }
