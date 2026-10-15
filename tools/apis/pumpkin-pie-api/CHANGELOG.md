@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/pumpkin-pie-api-v0.1.0...pumpkin-pie-api-v0.1.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **pumpkin-pie-api:** cap unavailable retries at five minutes ([92b8a2f](https://github.com/filiphsps/pumpkin-plugins/commit/92b8a2f9ff818cffe4294c0e8e358029f4c8a349))
+
 ## 0.1.0 (2026-10-15)
 
 
