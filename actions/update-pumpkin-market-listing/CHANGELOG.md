@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.3](https://github.com/filiphsps/pumpkin-plugins/compare/update-pumpkin-market-listing-v0.0.2...update-pumpkin-market-listing-v0.0.3) (2026-10-15)
+
+
+### Features
+
+* add VS Code extension support ([2ea3984](https://github.com/filiphsps/pumpkin-plugins/commit/2ea39842a917d1cac6ddc149619d54bc5267f8b9))
+
+
+### Bug Fixes
+
+* **actions:** bound API responses and escape outputs ([adc6cb6](https://github.com/filiphsps/pumpkin-plugins/commit/adc6cb6d18abb3e7eeecd0a90700f46eeeed417a))
+
 ## [0.0.2](https://github.com/filiphsps/pumpkin-plugins/compare/update-pumpkin-market-listing-v0.0.1...update-pumpkin-market-listing-v0.0.2) (2026-10-07)
 
 
