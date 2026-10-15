@@ -5,7 +5,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { getNpmRegistryIntegrity, publishNpmTarball, publishToolPackages } from './publish-tool-packages.mjs';
+import { getNpmRegistryIntegrity, publishToolPackages } from './publish-tool-packages.mjs';
 import { nodeEngineRange } from './utils/tool-packages.mjs';
 
 const roots = [];
