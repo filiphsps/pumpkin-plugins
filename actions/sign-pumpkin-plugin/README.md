@@ -11,7 +11,7 @@ See the [action guide](https://filiphsps.github.io/pumpkin-plugins/actions/sign-
 
 ```yaml
 steps:
-  - uses: filiphsps/pumpkin-plugins/actions/sign-pumpkin-plugin@sign-pumpkin-plugin-v0.0.3
+  - uses: filiphsps/pumpkin-plugins/actions/sign-pumpkin-plugin@sign-pumpkin-plugin-v0.0.4
     with:
       plugin-name: MyPlugin
       version: 1.2.3
