@@ -190,7 +190,7 @@ Coordinate ownership centrally rather than letting independent components unregi
 <!-- Generated from protocol/session constants, test/provider.ts and package.json. Run `pnpm readme`. -->
 
 The session starts unavailable. Call `tick()` explicitly with a monotonic millisecond clock; there
-are no global timers. Failed attempts use exponential backoff (1000–30000 ms).
+are no global timers. Failed attempts use exponential backoff (1000–300000 ms).
 Successful sessions ping and renew desired registrations every
 30000 ms by default (`pingIntervalMs`: 1000–30000 ms).
 <!-- docs:end scheduling -->

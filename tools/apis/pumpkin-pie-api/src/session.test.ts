@@ -1,6 +1,7 @@
 import { strFromU8, strToU8 } from 'fflate';
 import { expect, it } from 'vitest';
 import * as api from './index.ts';
+import { SESSION_TIMING } from './session-timing.ts';
 
 function setup() {
     expect(api.PieSession).toBeTypeOf('function');
@@ -100,12 +101,51 @@ it('retries with bounded backoff, warns on transitions and recovers desired expa
         f.session.tick();
     }
     const n = f.ops.length;
-    f.time(187999);
+    f.time(221999);
     f.session.tick();
     expect(f.ops).toHaveLength(n);
-    f.time(188000);
+    f.time(222000);
     f.session.tick();
     expect(f.ops).toHaveLength(n + 1);
+});
+it('spaces unavailable-provider probes up to five minutes and recovers when due', () => {
+    const f = setup();
+    const attempts = [0, 1000, 3000, 7000, 15000, 31000, 63000, 127000, 255000, 511000, 811000];
+
+    for (const [index, time] of attempts.entries()) {
+        f.time(time);
+        f.session.tick();
+        expect(f.ops.filter((op) => op === 'ping')).toHaveLength(index + 1);
+        const nextAttempt = attempts[index + 1];
+        if (nextAttempt !== undefined) {
+            f.time(nextAttempt - 1);
+            f.session.tick();
+            expect(f.ops.filter((op) => op === 'ping')).toHaveLength(index + 1);
+        }
+    }
+
+    f.online(true);
+    f.time(1110999);
+    f.session.tick();
+    expect(f.ops.filter((op) => op === 'ping')).toHaveLength(attempts.length);
+    f.time(1111000);
+    f.session.tick();
+    expect(f.session.state.kind).toBe('ready');
+    expect(f.ops.filter((op) => op === 'ping')).toHaveLength(attempts.length + 1);
+});
+it('keeps the successful-session heartbeat at thirty seconds', () => {
+    const f = setup();
+    f.online(true);
+    f.session.registerExpansion('ranks', { prefix: () => 'Admin' });
+    f.session.tick();
+
+    f.time(29999);
+    f.session.tick();
+    expect(f.ops).toEqual(['ping', 'register_expansion']);
+    f.time(30000);
+    f.session.tick();
+    expect(f.ops).toEqual(['ping', 'register_expansion', 'ping', 'register_expansion']);
+    expect(SESSION_TIMING.defaultPingMs).toBe(30000);
 });
 it('negotiates incompatible providers without registering and recovers protocol 0', () => {
     const f = setup();
