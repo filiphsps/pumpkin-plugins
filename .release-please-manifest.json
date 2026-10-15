@@ -12,7 +12,7 @@
     "tools/apis/pumpkin-pie-api": "0.0.0",
     "tools/build": "0.1.0",
     "tools/codemod": "0.1.0",
-    "tools/config": "0.0.0",
+    "tools/config": "0.1.0",
     "tools/create-pumpkin-plugin": "0.0.0",
     "tools/cspell-dict-minecraft": "0.0.0",
     "tools/docs": "0.1.0",
