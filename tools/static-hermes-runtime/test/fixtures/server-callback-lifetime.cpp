@@ -1,41 +1,11 @@
 #include <cassert>
 #include <cstdint>
-#include <functional>
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
-class Runtime {};
-Runtime *jsRuntime = nullptr;
-
-class HostObject {
-  public:
-    virtual ~HostObject() = default;
-};
-class Object;
-struct Value {
-    enum class Kind { Undefined, Number, Object };
-    Kind kind = Kind::Undefined;
-    double number = 0;
-    std::shared_ptr<HostObject> hostObject;
-    Value() = default;
-    explicit Value(double number) : kind(Kind::Number), number(number) {}
-    Value(Object object);
-};
-class Object {
-  public:
-    Object() = default;
-    explicit Object(Runtime &) {}
-    static Object createFromHostObject(Runtime &, std::shared_ptr<HostObject> hostObject) {
-        Object object;
-        object.hostObject = std::move(hostObject);
-        return object;
-    }
-    std::shared_ptr<HostObject> hostObject;
-};
-Value::Value(Object object) : kind(Kind::Object), hostObject(std::move(object.hostObject)) {}
+#include "runtime-contract-support.hpp"
 
 enum class ResourceKind { Context, Server, Player, World, JavaPlayer, Command, CommandNode, CommandSender, ConsumedArgs, Text, Wit };
 struct plugin_own_server_instance_t { std::int32_t __handle; };
@@ -73,33 +43,18 @@ class ServerObject final : public ResourceObject {
 Object wrapResourceObject(Runtime &runtime, std::shared_ptr<ResourceObject> resource) {
     return Object::createFromHostObject(runtime, std::move(resource));
 }
-std::shared_ptr<HostObject> nativeResource(Runtime &, const Value &value) {
-    return value.hostObject;
+std::shared_ptr<HostObject> nativeResource(Runtime &runtime, const Value &value) {
+    return value.asObject(runtime).getHostObject(runtime);
 }
 std::pair<std::string, std::string> resourceIdentity(const ResourceState &state) {
     if (state.kind == ResourceKind::Server) return {"server", "server"};
     return {};
 }
-class JSError : public std::runtime_error {
-  public:
-    JSError(Runtime &, const std::string &message) : std::runtime_error(message) {}
-};
-
 std::shared_ptr<ResourceState> getWitResourceState(Runtime &runtime, const Value &value,
                                                    const std::string &interfaceName,
                                                    const std::string &resourceName,
                                                    const std::string &packageName);
 /* GENERATED_GET_WIT_RESOURCE_STATE */
-
-class WitScopeGuard {
-  public:
-    template <typename Callback> explicit WitScopeGuard(Callback callback) : callback_(callback) {}
-    ~WitScopeGuard() { if (active_) callback_(); }
-    void release() { active_ = false; }
-  private:
-    std::function<void()> callback_;
-    bool active_ = true;
-};
 
 struct plugin_event_t { std::int32_t value; };
 Object makeEvent(Runtime &runtime, plugin_event_t *, std::vector<std::shared_ptr<ResourceState>> *) {
@@ -115,7 +70,8 @@ Value callExport(const char *, const Value *args, std::size_t count) {
     assert(count >= 2);
     retainedServer = args[1];
     if (dropDuringCallback) {
-        const auto server = std::dynamic_pointer_cast<ServerObject>(retainedServer.hostObject);
+        const auto server = std::dynamic_pointer_cast<ServerObject>(
+            retainedServer.asObject(*jsRuntime).getHostObject(*jsRuntime));
         assert(server);
         server->state()->drop();
     }
