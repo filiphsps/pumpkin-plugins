@@ -118,6 +118,70 @@ function readSessionConfig(bytes: Uint8Array) {
     return result;
 }
 
+describe('DH placeholder session snapshots', () => {
+    it('reports scalar counters and matches active client names exactly', () => {
+        const f = fixture();
+
+        expect(f.sessions.placeholderSnapshot()).toEqual({
+            clients: 1,
+            pendingRequests: 0,
+            workerTicks: 0,
+            served: 0,
+            rejected: 0,
+            cancelled: 0,
+            packetBytesSent: 0,
+            cacheRefreshes: 0,
+        });
+        expect(f.sessions.hasClient('Alice')).toBe(true);
+        expect(f.sessions.hasClient('alice')).toBe(false);
+
+        f.sessions.receive(f.peer, f.request(1));
+        expect(f.sessions.placeholderSnapshot().pendingRequests).toBe(1);
+        f.sessions.receive(f.peer, packet(5).int(1).finish());
+        f.sessions.receive(f.peer, f.request(2, 'another-world'));
+        f.sessions.tick(f.peers);
+
+        expect(f.sessions.placeholderSnapshot()).toEqual({
+            clients: 1,
+            pendingRequests: 0,
+            workerTicks: 1,
+            served: 0,
+            rejected: 1,
+            cancelled: 1,
+            packetBytesSent: 0,
+            cacheRefreshes: 0,
+        });
+
+        f.sessions.playerLeft('Alice');
+        expect(f.sessions.hasClient('Alice')).toBe(false);
+    });
+
+    it('reports served packets, bytes sent and active background refreshes', () => {
+        const f = fixture();
+        f.settings.refresh_seconds = 0;
+        f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
+        f.sessions.receive(f.peer, f.request(7));
+        expect(f.sessions.placeholderSnapshot().pendingRequests).toBe(1);
+
+        f.sessions.tick(f.peers);
+
+        const snapshot = f.sessions.placeholderSnapshot();
+        const sentBytes = f.sent.reduce((total, bytes) => total + bytes.length, 0);
+        expect(f.ids()).toEqual([10, 8]);
+        expect(snapshot).toMatchObject({
+            clients: 1,
+            pendingRequests: 0,
+            workerTicks: 1,
+            served: 1,
+            rejected: 0,
+            cancelled: 0,
+            cacheRefreshes: 1,
+        });
+        expect(sentBytes).toBeGreaterThan(0);
+        expect(snapshot.packetBytesSent).toBe(sentBytes);
+    });
+});
+
 describe('DH protocol contracts', () => {
     it('acknowledges client configuration updates with negotiated request classes', () => {
         const f = fixture();

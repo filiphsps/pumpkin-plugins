@@ -46,6 +46,17 @@ export interface Peer extends ForcedLodPeer {
 export interface Peers {
     withPeer(name: string, use: (peer: Peer) => void): boolean;
 }
+/** Scalar live-session values for placeholder callbacks, excluding client queues and identities. */
+export interface SessionPlaceholderSnapshot {
+    readonly clients: number;
+    readonly pendingRequests: number;
+    readonly workerTicks: number;
+    readonly served: number;
+    readonly rejected: number;
+    readonly cancelled: number;
+    readonly packetBytesSent: number;
+    readonly cacheRefreshes: number;
+}
 interface Client {
     activeTransfer?: QueuedPacket;
     byteCredit: ByteCredit;
@@ -131,6 +142,23 @@ export class Sessions {
     /** Backs up and rebuilds one explicitly selected cached section from loaded terrain. */
     forceRecover(peer: Peer, blockX: number, blockZ: number): ForcedLodRecovery {
         return this.forcedGeneration.recover(peer, blockX, blockZ);
+    }
+    /** Returns scalar live counters without traversing per-client packet queues. */
+    placeholderSnapshot(): SessionPlaceholderSnapshot {
+        return Object.freeze({
+            clients: this.clients.size,
+            pendingRequests: this.requests.length,
+            workerTicks: this.ticks,
+            served: this.served,
+            rejected: this.rejected,
+            cancelled: this.cancelled,
+            packetBytesSent: this.dhPacketBytesSent,
+            cacheRefreshes: this.refreshes.size,
+        });
+    }
+    /** Checks whether an exact current player name has an active DH session. */
+    hasClient(name: string): boolean {
+        return this.clients.has(name);
     }
     /** Accepts and validates a DH packet from a Java player. */
     receive(peer: Peer, bytes: Uint8Array): void {
