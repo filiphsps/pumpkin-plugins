@@ -5,6 +5,7 @@ import { appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { Command } from 'commander';
+import { installCommitFilesCache } from './utils/commit-files-cache.mjs';
 import { bundledChangesPlugin, workspacePackages } from './utils/release-commits.mjs';
 import { partitionReleasePaths } from './utils/release-fanout.mjs';
 
@@ -26,6 +27,9 @@ if (VERSION !== '17.11.2') throw new Error(`Expected release-please 17.11.2, rec
 const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? '').split('/');
 if (!owner || !repo || !process.env.GITHUB_TOKEN) throw new Error('GITHUB_REPOSITORY and GITHUB_TOKEN are required');
 const github = await GitHub.create({ owner, repo, token: process.env.GITHUB_TOKEN });
+const commitFilesCache = process.env.RELEASE_COMMIT_FILES_CACHE
+    ? installCommitFilesCache(github, process.env.RELEASE_COMMIT_FILES_CACHE)
+    : undefined;
 const branch = github.repository.defaultBranch;
 const repositoryRoot = resolve(import.meta.dirname, '..');
 const packages = workspacePackages(repositoryRoot);
@@ -195,3 +199,4 @@ if (dryRun) {
         `Release fan-out: plugin paths=${outputs.paths_released}, action paths=${outputs.action_paths_released}, tool paths=${outputs.tool_paths_released}, extension paths=${outputs.extension_paths_released}, release PR count=${prs.length}`,
     );
 }
+commitFilesCache?.save();

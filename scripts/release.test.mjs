@@ -17,21 +17,26 @@ function run(args, overrides = {}) {
             const record = (call) => appendFileSync(process.env.CALLS_FILE, call + '\\n');
             const recordVersioning = (config) => appendFileSync(process.env.VERSIONING_FILE, JSON.stringify(config) + '\\n');
             let published = false;
+            const github = {
+                repository: { defaultBranch: 'master' },
+                getCommitFiles: async (sha) => {
+                    record('backfill:' + sha);
+                    return sha === 'empty-file-list-sha' ? [] : ['packages/plugin/src/plugin.ts'];
+                },
+                removeIssueLabels: async (labels, number) => record('remove:' + labels.join(',') + ':' + number),
+                addIssueLabels: async (labels, number) => record('add:' + labels.join(',') + ':' + number),
+                releaseIterator: async function* () {
+                    yield {
+                        tagName: 'plugin-v1.0.0', sha: process.env.EXISTING_RELEASE_SHA ?? 'release-sha',
+                        notes: 'Features\\n\\n* Added update checks',
+                        url: 'https://example.com/release', uploadUrl: 'https://example.com/upload'
+                    };
+                }
+            };
             module.exports = {
                 VERSION: '17.11.2',
-                GitHub: { create: async () => ({
-                    repository: { defaultBranch: 'master' },
-                    removeIssueLabels: async (labels, number) => record('remove:' + labels.join(',') + ':' + number),
-                    addIssueLabels: async (labels, number) => record('add:' + labels.join(',') + ':' + number),
-                    releaseIterator: async function* () {
-                        yield {
-                            tagName: 'plugin-v1.0.0', sha: process.env.EXISTING_RELEASE_SHA ?? 'release-sha',
-                            notes: 'Features\\n\\n* Added update checks',
-                            url: 'https://example.com/release', uploadUrl: 'https://example.com/upload'
-                        };
-                    }
-                }) },
-                Manifest: { fromManifest: async () => {
+                GitHub: { create: async () => github },
+                Manifest: { fromManifest: async (github) => {
                     const latestReleasePublished = published;
                     const repositoryConfig = {
                         'packages/plugin': { bumpMinorPreMajor: false, bumpPatchForMinorPreMajor: false },
@@ -116,6 +121,13 @@ function run(args, overrides = {}) {
                     buildPullRequests: async function () {
                         recordVersioning(this.repositoryConfig);
                         record('preview');
+                        if (process.env.EXERCISE_BACKFILL_CACHE === 'true') {
+                            await github.getCommitFiles('history-sha');
+                            await github.getCommitFiles('empty-file-list-sha');
+                            if (process.env.EXTRA_BACKFILL_SHA) {
+                                await github.getCommitFiles(process.env.EXTRA_BACKFILL_SHA);
+                            }
+                        }
                         return [{ title: 'Release', body: 'Update checks', headRefName: 'release-branch' }];
                     }
                 }; } }
@@ -167,6 +179,46 @@ it('previews without publishing releases, modifying PRs or setting workflow outp
     assert.deepEqual(result.calls, ['preview']);
     assert.equal(JSON.parse(result.stdout)[0].body, 'Update checks');
     assert.equal(result.output, '');
+});
+
+it('reuses backfilled commit file lists across runs, including empty lists', () => {
+    const cacheRoot = mkdtempSync(join(tmpdir(), 'release-commit-files-'));
+    const cachePath = join(cacheRoot, 'commit-files.json');
+    try {
+        const cold = run(['--dry-run'], {
+            EXERCISE_BACKFILL_CACHE: 'true',
+            RELEASE_COMMIT_FILES_CACHE: cachePath,
+        });
+        assert.equal(cold.status, 0, cold.stderr);
+        assert.deepEqual(
+            cold.calls.filter((call) => call.startsWith('backfill:')),
+            ['backfill:history-sha', 'backfill:empty-file-list-sha'],
+        );
+
+        const incremental = run(['--dry-run'], {
+            EXERCISE_BACKFILL_CACHE: 'true',
+            RELEASE_COMMIT_FILES_CACHE: cachePath,
+            EXTRA_BACKFILL_SHA: 'new-sha',
+        });
+        assert.equal(incremental.status, 0, incremental.stderr);
+        assert.deepEqual(
+            incremental.calls.filter((call) => call.startsWith('backfill:')),
+            ['backfill:new-sha'],
+        );
+
+        const warm = run(['--dry-run'], {
+            EXERCISE_BACKFILL_CACHE: 'true',
+            RELEASE_COMMIT_FILES_CACHE: cachePath,
+            EXTRA_BACKFILL_SHA: 'new-sha',
+        });
+        assert.equal(warm.status, 0, warm.stderr);
+        assert.deepEqual(
+            warm.calls.filter((call) => call.startsWith('backfill:')),
+            [],
+        );
+    } finally {
+        rmSync(cacheRoot, { recursive: true, force: true });
+    }
 });
 
 it('prints Commander help before requiring the release-please executable', () => {

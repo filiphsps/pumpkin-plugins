@@ -35,6 +35,15 @@ jobs:
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
+            - name: 💾 Restore Release Please commit file cache
+              continue-on-error: true
+              uses: actions/cache/restore@v6.1.0
+              with:
+                  path: .cache/release-commit-files.json
+                  key: release-commit-files-v1-${{ github.run_id }}-${{ github.run_attempt }}
+                  restore-keys: |
+                      release-commit-files-v1-
+
             - name: 🔑 Create release token
               id: app-token
               uses: actions/create-github-app-token@v3.2.0
@@ -50,7 +59,16 @@ jobs:
               env:
                   # App-token-created PRs trigger CI; GITHUB_TOKEN-created PRs do not.
                   GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+                  RELEASE_COMMIT_FILES_CACHE: .cache/release-commit-files.json
               run: pnpm --package=release-please@17.11.2 dlx -c 'node scripts/release.mjs "$(command -v release-please)"'
+
+            - name: 💾 Save Release Please commit file cache
+              if: steps.release.outcome == 'success'
+              continue-on-error: true
+              uses: actions/cache/save@v6.1.0
+              with:
+                  path: .cache/release-commit-files.json
+                  key: release-commit-files-v1-${{ github.run_id }}-${{ github.run_attempt }}
 
             - name: 📋 Find open release PRs to prepare
               id: release-prs
