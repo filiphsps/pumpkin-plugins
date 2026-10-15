@@ -17,6 +17,8 @@
         "benchmark:build": "node scripts/build-engine-comparison.ts",
         "benchmark:collect": "node scripts/collect-engine-comparison.ts",
         "compare-engines": "pnpm --dir ../.. turbo run benchmark:build --filter=@pumpkin-plugins/engine-comparison && vitest run test/engine-comparison.test.ts",
+        "readme": "pnpm --dir ../.. exec pumpkin-plugins-docs generate benchmarks/engine-comparison/docs.ts",
+        "readme:check": "pnpm --dir ../.. exec pumpkin-plugins-docs generate benchmarks/engine-comparison/docs.ts --check",
         "test": "vitest run test/engine-comparison-report.test.ts test/engine-variants.test.ts test/benchmark-workloads.test.ts test/engine-variant-cache.test.ts test/benchmark-regression.test.ts test/workflow-scripts.test.ts",
         "typecheck": "pnpm types && tsc --noEmit",
         "types": "node ../../tools/pumpkin-api/scripts/gen-types.mjs build/types"
@@ -24,10 +26,12 @@
     "devDependencies": {
         "@bytecodealliance/jco": "catalog:",
         "@pumpkin-plugins/build": "workspace:*",
+        "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@pumpkin-plugins/static-hermes-runtime": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
+        "typescript": "catalog:",
         "vega": "6.4.0",
         "vitest": "catalog:"
     }

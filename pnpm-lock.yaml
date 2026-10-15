@@ -286,6 +286,9 @@ importers:
       '@pumpkin-plugins/build':
         specifier: workspace:*
         version: link:../../tools/build
+      '@pumpkin-plugins/docs':
+        specifier: workspace:*
+        version: link:../../tools/docs
       '@pumpkin-plugins/pumpkin-api':
         specifier: 'catalog:'
         version: link:../../tools/pumpkin-api
@@ -298,6 +301,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
       vega:
         specifier: 6.4.0
         version: 6.4.0

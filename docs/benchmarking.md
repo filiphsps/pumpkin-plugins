@@ -64,47 +64,62 @@ Each configuration receives the same workload source and input count. The integr
 
 Workload timing uses JavaScript `Date.now()`, so samples are reported as integer milliseconds; the clock may be coarser in practice. For each workload, the report shows the median and the minimum-to-maximum range of the five samples. The timer covers the workload body; it does not include component compilation, server startup, plugin loading, or dispatching the outer benchmark command.
 
-There are 29 timed workloads: 28 deterministic guest-side fixtures and one real Pumpkin API call. The fixture algorithms are representative examples written for this benchmark; they are not executions of the named plugins or Pumpkin’s own command router. Player-directory and other player-oriented fixture workloads use in-memory test data, not connected players.
+<!-- docs:begin workload-summary -->
+<!-- Generated from benchmark-workloads.ts and benchmark-plugin.ts. Run `pnpm readme`. -->
 
-The local comparison test runs configurations serially: QuickJS first, then each Static Hermes profile, collector, and parser-mode combination, each with a newly started server. CI runs those configurations independently in parallel. The real API workload calls `server.getAllPlayers()` 10,000 times per sample, or 60,000 calls per configuration including the warm-up and five measured samples. The test server has no connected players, so the returned list is empty. The test separately registers and dispatches one real `server.command()` command, along with event and scheduled-task behavior checks. That command dispatch is API behavior coverage, not a timed command-routing workload.
+There are 34 timed workloads: 33 deterministic guest-side fixtures and 1 real Pumpkin API call.
+<!-- docs:end workload-summary -->
+
+The fixture algorithms are representative examples written for this benchmark; they are not executions of the named plugins or Pumpkin’s own command router. Player-oriented fixtures use in-memory test data, not connected players.
+
+The local comparison test runs configurations serially: QuickJS first, then each Static Hermes profile, collector, and parser-mode combination, each with a newly started server. CI runs those configurations independently in parallel. The real API workload calls `server.getAllPlayers()` in each sample. The test server has no connected players, so the returned list is empty. The test separately registers and dispatches one real `server.command()` command, along with event and scheduled-task behavior checks. That command dispatch is API behavior coverage, not a timed command-routing workload.
 
 ### Workload inventory
 
-“Inputs per sample” is the fixture’s configured loop or request count. It describes work within that particular row; it is not a common unit that makes different rows directly comparable. For `string-join`, the count is array-element visits across all 64 joins in one sample.
+“Inputs per sample” is the configured count of items or requests processed. Some workloads multiply that count across repeated operations, as `string-join` does across its joins. Counts differ by workload, so they are not a common unit for comparing unlike operations. The inventory is generated from the benchmark registry and API workload definition.
+
+<!-- docs:begin workload-inventory -->
+<!-- Generated from benchmark-workloads.ts and benchmark-plugin.ts. Run `pnpm readme`. -->
 
 | Kind | Workload | Inputs per sample | What it represents |
-| --- | --- | ---: | --- |
+| --- | --- | --- | --- |
 | Synthetic | `numeric` | 1,000,000 | Numeric arithmetic baseline |
 | Synthetic | `objects` | 50,000 | Object allocation and traversal |
-| Synthetic | `strings` | 25,000 | String construction followed by joining |
-| Synthetic | `string-construction` | 25,000 | Construction of string parts |
-| Synthetic | `string-join` | 1,600,000 | 64 joins of the same prebuilt dense array of 25,000 ASCII strings |
-| Synthetic | `string-radix-integer` | 25,000 | Converting integers from 0 through 24,999 to base 36 |
-| Synthetic | `string-join-unicode` | 7 | Joining sparse and mixed-Unicode values with a non-ASCII separator |
-| Synthetic | `string-repeat-ascii` | 4,000 | Repeating a 4-character ASCII string 128 times per operation |
-| Synthetic | `string-pad-ascii` | 8,000 | Padding a 7-character ASCII string to 256 code units at both ends |
-| Synthetic | `array-to-locale-string-ascii` | 32,000 | Converting arrays of four prebuilt ASCII strings to locale strings |
-| Synthetic | `config-validation` | 1,000 | JSON parsing and configuration validation |
-| Synthetic | `command-routing` | 4,000 | Guest-side tokenization, alias resolution, and route-map lookup |
-| Synthetic | `command-tokenization` | 4,000 | Command tokenization in isolation |
-| Synthetic | `command-route-lookup` | 4,000 | Alias and route-map lookup in isolation |
+| Synthetic | `strings` | 25,000 | String construction and joining |
+| Synthetic | `string-construction` | 25,000 | String part construction |
+| Synthetic | `string-join` | 1,600,000 | Batched dense ASCII array joining |
+| Synthetic | `string-radix-integer` | 25,000 | Integer radix formatting |
+| Synthetic | `string-join-unicode` | 7 | Unicode join correctness and code-unit behavior |
+| Synthetic | `string-repeat-ascii` | 4,000 | Repeated ASCII string construction |
+| Synthetic | `string-pad-ascii` | 8,000 | ASCII string padding at both ends |
+| Synthetic | `array-to-locale-string-ascii` | 32,000 | Locale string conversion for ASCII array elements |
+| Synthetic | `string-case-ascii` | 16,000 | ASCII string case conversion |
+| Synthetic | `typed-array-join-ascii` | 128,000 | ASCII typed array joining |
+| Synthetic | `typed-array-locale-ascii` | 64,000 | ASCII typed array locale conversion |
+| Synthetic | `string-from-char-code-ascii` | 8,000 | ASCII multi-argument character code conversion |
+| Synthetic | `string-replace-ascii` | 16,000 | ASCII string replace and replaceAll |
+| Synthetic | `config-validation` | 1,000 | Configuration parsing and validation |
+| Synthetic | `command-routing` | 4,000 | Command tokenization, alias resolution and route-map lookup |
+| Synthetic | `command-tokenization` | 4,000 | Command tokenization |
+| Synthetic | `command-route-lookup` | 4,000 | Command alias and route-map lookup |
 | Synthetic | `permission-resolution` | 12,000 | Permission inheritance and context lookup |
-| Synthetic | `player-directory` | 18,000 | Player and home lookups against fixtures |
+| Synthetic | `player-directory` | 18,000 | Player and home lookups |
 | Synthetic | `event-cache` | 20,000 | Lifecycle cache updates |
-| Synthetic | `chat-formatting` | 3,000 | Chat-template formatting and filtering |
+| Synthetic | `chat-formatting` | 3,000 | Chat template formatting and filtering |
 | Synthetic | `scoreboard-rendering` | 12,000 | Scoreboard text rendering |
 | Synthetic | `region-protection` | 20,000 | Region containment and access checks |
 | Synthetic | `world-edit-plan` | 55,296 | Block-edit plan generation |
 | Synthetic | `economy-transfers` | 12,000 | Balance transfer processing |
 | Synthetic | `inventory-stacking` | 2,500 | Inventory stack allocation |
 | Synthetic | `cooldown-rate-limit` | 20,000 | Cooldown and rate-limit checks |
-| Synthetic | `tick-scheduler` | 6,000 | Scheduled-task processing |
-| Synthetic | `audit-history` | 13,000 | Audit-history filtering |
+| Synthetic | `tick-scheduler` | 6,000 | Scheduled task processing |
+| Synthetic | `audit-history` | 13,000 | Audit history filtering |
 | Synthetic | `player-state-json` | 1,200 | Player-state JSON round trip |
 | Synthetic | `custom-payload` | 16,384 | Custom payload encoding |
-| Real API | `pumpkin-api` | 10,000 | Calls to `server.getAllPlayers()` |
+| Real API | `pumpkin-api` | 10,000 | Pumpkin server.getAllPlayers() |
+<!-- docs:end workload-inventory -->
 
-The string and command rows deliberately separate composite work from selected sub-operations. The composite string workload constructs and joins 25,000 parts; `string-construction` and `string-join` isolate construction and batched joining. The join repeats the same dense ASCII array 64 times per sample to make its timing easier to resolve with the millisecond clock. `string-radix-integer` uses the same 25,000-number range as the construction fixture and checks radix boundaries, negative and maximum safe integers, negative zero, fractional fallback, and an integer above the safe range. `string-join-unicode` checks a non-ASCII separator, ASCII/BMP/supplementary characters, holes, `null`, `undefined`, and a `toString` side effect that mutates an earlier array entry. `string-repeat-ascii`, `string-pad-ascii`, and `array-to-locale-string-ascii` isolate three ASCII-heavy built-ins; each also checks a Unicode result to guard the mixed-encoding path. JavaScript strings remain UTF-16 code-unit sequences, so the supplementary character contributes two to `String.length`. Command routing combines tokenization, alias resolution, and route lookup; the standalone tokenization and lookup rows help show which portion may account for a difference.
+String and command workloads include combined cases and narrower sub-operations. The string cases cover construction, joining, radix formatting, Unicode behavior and ASCII-heavy built-ins. Command routing combines tokenization, alias resolution and lookup; separate rows measure tokenization and lookup.
 
 ## Reading the report
 
@@ -113,7 +128,7 @@ The current report contains production component sizes, per-workload timings and
 - **Component sizes** are final production component byte counts. Size differences use QuickJS as the baseline: negative means smaller than QuickJS, positive means larger.
 - **Per-workload timings** show each engine’s median and sample range in milliseconds. Lower time means that engine completed that particular workload sooner in that run.
 - **QuickJS/engine** is the QuickJS median divided by that Static Hermes configuration's median. A ratio above 1 means Hermes was lower; below 1 means QuickJS was lower. A ratio shown as 1.00x can be a rounded tie, especially for workloads close to the timer’s one-millisecond resolution.
-- **Average benchmark median** is the arithmetic mean of the 29 per-workload medians. Every workload contributes equally, despite different input counts and different kinds of work. Treat it as a compact report statistic, not a representative plugin or server-performance score.
+- **Average benchmark median** is the arithmetic mean of the per-workload medians. Every workload contributes equally, despite different input counts and kinds of work. Treat it as a compact report statistic, not a representative plugin or server-performance score.
 
 The integration test has no timing thresholds. Timing results are diagnostic evidence, while checksum, API behavior, and component-size checks provide pass/fail assertions.
 
@@ -185,7 +200,7 @@ For engine or plugin decisions, benchmark the plugin’s actual hot path with re
 - Five samples with integer-millisecond timing can expose large differences in these workloads, but cannot resolve small differences reliably. A zero-millisecond sample is possible; ratios are unavailable when the denominator median is zero.
 - The local comparison runs engines serially in a fixed order. CI gives each configuration its own matrix job, but runner-to-runner differences can affect timings; each job does not repeat on multiple runners.
 - Input counts differ by design. A million arithmetic iterations and 1,000 config validations are not equivalent units. Do not average or compare rows as if they were normalized operations.
-- The arithmetic mean weights all 29 workload medians equally. A single slower row can move it substantially, and changing the workload set changes its meaning.
+- The arithmetic mean weights every workload median equally. A single slower row can move it substantially, and changing the workload set changes its meaning.
 - The real API case is narrow. It measures one API method with an empty result and does not represent all Pumpkin calls or guest-to-host conversion costs.
 - Component size is the benchmark plugin’s final component size. Plugin imports, bundled dependencies, API usage, and build profile change the result.
 
