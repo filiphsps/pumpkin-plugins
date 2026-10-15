@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 import { Command } from 'commander';
 import { installCommitFilesCache } from './utils/commit-files-cache.mjs';
 import { bundledChangesPlugin, workspacePackages } from './utils/release-commits.mjs';
-import { partitionReleasePaths } from './utils/release-fanout.mjs';
+import { collectReleaseFanout } from './utils/release-fanout.mjs';
 
 const program = new Command()
     .name('release')
@@ -128,32 +128,14 @@ if (!dryRun && !pullRequestsOnly) {
         }
     };
     const createdReleases = (await manifest.createReleases()).filter(Boolean);
-    const knownTags = new Set(createdReleases.map((release) => release.tagName));
-    // Another run can create and label a release before the run for its tagged commit gets here.
-    // Release Please no longer returns it, so recover the configured version for this exact commit.
-    for (const [path, config] of Object.entries(manifest.repositoryConfig)) {
-        const version = manifest.releasedVersions[path]?.toString();
-        if (!version || config.skipGithubRelease) continue;
-        const component = config.includeComponentInTag === false ? '' : config.component;
-        if (component === undefined) continue;
-        const prefix = component ? `${component}${config.tagSeparator ?? '-'}` : '';
-        const tagName = `${prefix}${config.includeVInTag === false ? '' : 'v'}${version}`;
-        if (knownTags.has(tagName)) continue;
-        const release = await existingRelease(tagName);
-        if (!process.env.GITHUB_SHA || release?.sha !== process.env.GITHUB_SHA) continue;
-        createdReleases.push({ ...release, path, version, recovered: true });
-        knownTags.add(tagName);
-        console.log(`Recovering ${tagName} for artifact fan-out at ${release.sha}`);
-    }
-    const releases = createdReleases.filter((release) => {
-        if (!release.sha) throw new Error(`Release ${release.tagName} has no target commit SHA`);
-        if (release.sha === process.env.GITHUB_SHA) return true;
-        console.log(
-            `Deferring ${release.tagName} from artifact fan-out: tag targets ${release.sha}, but this run built ${process.env.GITHUB_SHA}`,
-        );
-        return false;
+    const { releases, paths: releasePaths } = await collectReleaseFanout({
+        createdReleases,
+        repositoryConfig: manifest.repositoryConfig,
+        releasedVersions: manifest.releasedVersions,
+        currentSha: process.env.GITHUB_SHA,
+        findRelease: existingRelease,
+        root: repositoryRoot,
     });
-    const releasePaths = partitionReleasePaths(releases, repositoryRoot);
     outputs.paths_released = JSON.stringify(releasePaths.pluginPaths);
     outputs.action_paths_released = JSON.stringify(releasePaths.actionPaths);
     outputs.tool_paths_released = JSON.stringify(releasePaths.toolPaths);
