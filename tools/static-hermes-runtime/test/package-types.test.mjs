@@ -54,7 +54,7 @@ it('resolves public package types in a pnpm consumer without declaring Node type
             `import { buildHermesArtifacts, setupHermesToolchainEnvironment, staticHermesImportsPlugin } from '${runtimeManifest.name}';\n\nvoid buildHermesArtifacts;\nvoid setupHermesToolchainEnvironment;\nvoid staticHermesImportsPlugin;\n`,
         );
 
-        execFileSync('pnpm', ['install', '--offline', '--ignore-scripts'], {
+        execFileSync('pnpm', ['install', '--prefer-offline', '--ignore-scripts'], {
             cwd: consumerDirectory,
             stdio: 'pipe',
         });
