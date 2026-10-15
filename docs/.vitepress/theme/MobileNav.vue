@@ -1,6 +1,7 @@
 <script setup lang="ts">
     import { useData, withBase } from 'vitepress';
     import { computed } from 'vue';
+    import MenuTree from './MenuTree.vue';
     import type { ThemeConfigWithMegaMenus } from './types';
 
     const { theme } = useData<ThemeConfigWithMegaMenus>();
@@ -43,37 +44,46 @@
                         class="site-mobile-nav__section"
                         :class="section.gridArea ? `site-mobile-nav__section--${section.gridArea}` : ''"
                     >
-                        <h2>{{ section.text }}</h2>
-                        <a
-                            v-for="item in section.items"
-                            :key="item.link"
-                            class="site-mobile-nav__link"
-                            :class="[
+                        <h2>
+                            <a v-if="section.link" :href="withBase(section.link)">{{ section.text }}</a>
+                            <span v-else>{{ section.text }}</span>
+                        </h2>
+                        <p v-if="section.description" class="site-mobile-nav__section-description">
+                            {{ section.description }}
+                        </p>
+                        <MenuTree v-if="menu.hierarchical" :items="section.items" variant="mobile" />
+                        <template v-else>
+                            <a
+                                v-for="item in section.items"
+                                :key="item.link ?? item.text"
+                                class="site-mobile-nav__link"
+                                :class="[
                                 `site-mobile-nav__link--${item.type ?? 'link'}`,
                                 { 'has-icon': item.icon }
                             ]"
-                            :href="withBase(item.link)"
-                        >
-                            <img
-                                v-if="item.icon"
-                                class="site-mobile-nav__icon"
-                                :src="withBase(item.icon)"
-                                alt=""
-                                aria-hidden="true"
+                                :href="withBase(item.link ?? '/')"
                             >
-                            <span class="site-mobile-nav__link-copy">
-                                <span class="site-mobile-nav__link-title">{{ item.text }}</span>
-                                <span v-if="item.description" class="site-mobile-nav__link-description">
-                                    {{ item.description }}
-                                </span>
-                                <span
-                                    v-if="item.type === 'card' || item.type === 'spotlight'"
-                                    class="site-mobile-nav__link-action"
+                                <img
+                                    v-if="item.icon"
+                                    class="site-mobile-nav__icon"
+                                    :src="withBase(item.icon)"
+                                    alt=""
+                                    aria-hidden="true"
                                 >
-                                    Open documentation
+                                <span class="site-mobile-nav__link-copy">
+                                    <span class="site-mobile-nav__link-title">{{ item.text }}</span>
+                                    <span v-if="item.description" class="site-mobile-nav__link-description">
+                                        {{ item.description }}
+                                    </span>
+                                    <span
+                                        v-if="item.type === 'card' || item.type === 'spotlight'"
+                                        class="site-mobile-nav__link-action"
+                                    >
+                                        Open documentation
+                                    </span>
                                 </span>
-                            </span>
-                        </a>
+                            </a>
+                        </template>
                     </section>
                 </div>
             </details>

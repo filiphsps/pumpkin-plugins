@@ -1,15 +1,18 @@
 ---
 navigation:
     category: Getting started
+title: "Documentation site"
+description: "Adding component guides, generated API reference, local preview, and publishing"
 ---
 
 # Documentation site
 
-The VitePress site combines the hand-written guides in `docs/`, component READMEs, component-level
-guides, and generated API references. It discovers plugins, tools and actions from package manifests
-and action metadata, then builds their navigation and reference links from those sources. Names and
-descriptions come from package manifests, plugin metadata, action metadata and guide introductions.
-On phones, the same sections open as compact accordions in the navigation screen.
+The VitePress site separates hand-written guides from folder-based docs. Direct-child Markdown pages
+in `docs/` render under `/guides/` and use their `navigation.category`; pages in `docs/<folder>/...`
+render under `/docs/` and follow their nested folder structure. A nested `index.md` is the folder's
+landing page. The site also includes component READMEs, component-level guides, and generated API
+references. It discovers plugins, tools and actions from package manifests and action metadata. On
+phones, the same menus open as compact accordions in the navigation screen.
 
 ## Add a component guide
 
@@ -38,14 +41,22 @@ explicit `icon`, the site automatically uses `icon.svg`, `icon.png`, `icon.webp`
 are included in the built site automatically and appear beside the title on the component's landing
 page as well as in navigation. Items without artwork keep the same alignment.
 
-Add a category to a hand-written guide's frontmatter with `navigation.category`; `navigation.type`
-can also select `card` or `spotlight`. These categories are editorial labels and belong beside their
-docs, not in a second list in the site configuration.
+Frontmatter `title` overrides the first H1 for menu and sidebar labels. Put a page's short summary in
+frontmatter `description`; the README catalog and site menus use the same value. Direct-child guides
+use `navigation.category` to choose their guide group. Nested docs use their folders for grouping;
+their `navigation.category` can label a folder when the pages in it share a category. `navigation.type`
+can select `card` or `spotlight` for an individual page. Set `navigation.catalog: true` on a component
+doc to include that page in the repository-level Docs menu as well; it stays under its component
+menu and sidebar. These labels belong beside their docs, not in a second list in the site configuration.
+
+The generated `docs/README.md` catalog keeps its introduction hand-written and its Guides and Docs
+menus generated from page metadata and folders. Site root pages such as Home and Team are not listed.
+Run `pnpm readme` to refresh it or `pnpm readme:check` to check it without writing.
 
 To feature a component in the desktop Plugins menu, add `navigation.featured: true` to the frontmatter
 of its `docs/index.md`. It also remains a regular link in its category. A featured item defaults to
 the card treatment, and can use `navigation.type: spotlight` to show as a wide row instead. The title
-and description still come from the page heading and package manifest.
+comes from frontmatter `title` or the first H1; its description comes from the package manifest.
 
 The component README is the overview when no custom `docs/index.md` exists. If a custom
 index exists, it becomes the component landing page and the README remains available as a separate

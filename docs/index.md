@@ -7,7 +7,10 @@ hero:
     actions:
         - theme: brand
           text: Browse the guides
-          link: /guides/
+          link: /guides/creating-a-plugin
+        - theme: alt
+          text: Browse the docs
+          link: /docs/plugin-api/
         - theme: alt
           text: Browse the API reference
           link: /api/

@@ -1,6 +1,8 @@
 ---
 navigation:
     category: CI and releases
+title: "Publishing public npm tools"
+description: "Placeholder setup and Release Please publishing for public npm tools"
 ---
 
 # Publishing public npm tools

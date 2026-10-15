@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Plugin API
+title: "Plugin API"
+description: "Standalone API setup, lifecycle, host interfaces, ABI support and migration"
 ---
 
 # Plugin API

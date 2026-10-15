@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Plugin development
+title: "Plugin info and READMEs"
+description: "How a plugin describes itself in `src/info.ts` and how the READMEs are generated"
 ---
 
 # Plugin info and READMEs

@@ -1,3 +1,11 @@
+---
+title: "Using codemods"
+description: "Run the Pumpkin API migration, preview changes, and finish the manual review"
+navigation:
+    category: Codemods
+    catalog: true
+---
+
 # Using codemods
 
 `@pumpkin-plugins/codemod` provides named, repeatable migrations for Pumpkin plugin projects. The

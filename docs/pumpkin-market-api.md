@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Server operations
+title: "Pumpkin Market API"
+description: "Market listing lookup, metadata updates, current publisher behavior and API findings"
 ---
 
 # Pumpkin Market API

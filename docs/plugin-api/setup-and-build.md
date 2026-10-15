@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Plugin API
+title: "Plugin API: setup and build"
+description: "Install the API and build packages and generate WIT declarations"
 ---
 
 # Setup and build

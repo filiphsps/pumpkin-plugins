@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Plugin API
+title: "Plugin API: ABI and runtime support"
+description: "Package versions, WIT ABI alignment and runtime support notes"
 ---
 
 # ABI and runtime support

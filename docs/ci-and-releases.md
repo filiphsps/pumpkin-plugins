@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Repository maintenance
+title: "CI and releases"
+description: "The CI workflow, release-please, rebase-only merging and the market stub"
 ---
 
 # CI and releases

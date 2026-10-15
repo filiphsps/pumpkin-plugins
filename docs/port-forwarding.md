@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Server operations
+title: "Port forwarding"
+description: "UPnP and NAT-PMP for plugins: the engine, UPnPumpkin, its API and how to test them"
 ---
 
 # Port forwarding

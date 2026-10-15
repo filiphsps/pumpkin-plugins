@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Getting started
+title: "Creating a plugin"
+description: "The `pnpm gen` generator, what it creates, and what to do next"
 ---
 
 # Creating a plugin

@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Getting started
+title: "Creating an action"
+description: "The `pnpm gen:action` generator, generated input/output docs, and release setup"
 ---
 
 # Creating an action

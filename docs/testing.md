@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Plugin development
+title: "Testing"
+description: "Unit tests and integration tests against a real Pumpkin server"
 ---
 
 # Testing

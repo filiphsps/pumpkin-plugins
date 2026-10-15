@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Repository maintenance
+title: "Agent tooling"
+description: "Agent guidance, skills, portable hooks and scoped check diagnostics"
 ---
 
 # Agent tooling

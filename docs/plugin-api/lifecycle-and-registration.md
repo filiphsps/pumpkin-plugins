@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Plugin API
+title: "Plugin API: lifecycle and registration"
+description: "Plugin lifecycle callbacks and handler registration"
 ---
 
 # Lifecycle and registration

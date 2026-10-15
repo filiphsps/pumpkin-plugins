@@ -2,6 +2,8 @@
 navigation:
     category: Plugin development
     type: spotlight
+title: "Code style"
+description: "Biome, the JSDoc rule, and how code is organized and tested"
 ---
 
 # Code style

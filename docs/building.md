@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Plugin development
+title: "Building"
+description: "The shared build tool, Turborepo setup, and runtime caveats"
 ---
 
 # Building

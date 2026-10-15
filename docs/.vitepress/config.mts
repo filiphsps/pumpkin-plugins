@@ -2,17 +2,21 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+    buildDocumentationTree,
     type ComponentGroup,
     componentApiRoute,
+    type DocumentationTreeNode,
     discoverComponents,
+    discoverHandwrittenDocs,
     githubPagesUrl,
     githubRepositoryUrl,
     readActionMetadata,
+    rootPageRewrites,
     walkMarkdown,
 } from '@pumpkin-plugins/docs/node';
 import { type DefaultTheme, defineConfig } from 'vitepress';
 import { parse as parseYaml } from 'yaml';
-import type { MegaMenu, MenuCard, MenuSection, ThemeConfigWithMegaMenus } from './theme/types.ts';
+import type { MegaMenu, MenuCard, MenuItem, MenuSection, ThemeConfigWithMegaMenus } from './theme/types.ts';
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const repository = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).repository;
@@ -22,31 +26,29 @@ const siteUrl = githubPagesUrl(repository);
 const siteBase = siteUrl?.pathname ?? '/';
 
 function titleOf(file: string, fallback: string): string {
+    const title = frontmatterOf(file).title;
+    if (typeof title === 'string' && title.trim()) return title.trim();
     const heading = fs
         .readFileSync(file, 'utf8')
         .match(/^#\s+(.+)$/m)?.[1]
         ?.trim();
-    const title = frontmatterOf(file).title;
-    return heading?.replace(/\s+#*$/, '') || (typeof title === 'string' ? title : fallback);
+    return heading?.replace(/\s+#*$/, '') || fallback;
 }
 
+const handwrittenDocs = discoverHandwrittenDocs(repoRoot);
+const docsTree = buildDocumentationTree(handwrittenDocs);
 const rewrites: Record<string, string> = {
-    'docs/index.md': 'index.md',
+    ...rootPageRewrites,
     'docs/README.md': 'guides/index.md',
-    'docs/team.md': 'team.md',
 };
-const sourcePathsByRoute = new Map(Object.entries(rewrites).map(([source, route]) => [route, source]));
 const navigationAssets = new Map<string, string>();
 
-for (const file of walkMarkdown(path.join(repoRoot, 'docs'))) {
+for (const page of handwrittenDocs) rewrites[page.repositoryPath] = page.rewritePath;
+for (const file of walkMarkdown(path.join(repoRoot, 'docs/api'))) {
     const relative = path.relative(repoRoot, file).split(path.sep).join('/');
-    if (relative in rewrites) continue;
-    if (relative.startsWith('docs/api/')) {
-        rewrites[relative] = relative.slice('docs/'.length);
-        continue;
-    }
-    rewrites[relative] = `guides/${relative.slice('docs/'.length)}`;
+    rewrites[relative] = relative.slice('docs/'.length);
 }
+const sourcePathsByRoute = new Map(Object.entries(rewrites).map(([source, route]) => [route, source]));
 
 interface Component {
     apiReference?: string;
@@ -232,23 +234,16 @@ for (const [group, items] of [
     }
 }
 
-const guidePages = walkMarkdown(path.join(repoRoot, 'docs'))
-    .filter(
-        (file) =>
-            !file.startsWith(path.join(repoRoot, 'docs/api') + path.sep) &&
-            !['README.md', 'index.md', 'team.md'].includes(path.basename(file)),
-    )
-    .map((file) => {
-        const relative = path.relative(path.join(repoRoot, 'docs'), file).split(path.sep).join('/');
-        return {
-            file,
-            text: titleOf(file, path.basename(file, '.md')),
-            description: descriptionOf(file),
-            link: `/guides/${relative.replace(/\.md$/, '')}`,
-            category: categoryOf(frontmatterOf(file)),
-            type: menuItemTypeOf(frontmatterOf(file)),
-        };
-    });
+const guidePages = handwrittenDocs
+    .filter(({ section }) => section === 'guides')
+    .map((page) => ({
+        file: page.file,
+        text: page.title,
+        description: page.description,
+        link: page.siteRoute,
+        category: page.category,
+        type: page.type,
+    }));
 
 interface LlmsEntry {
     description?: string;
@@ -327,6 +322,13 @@ function generateLlmsText(): string {
         entries.push({ text: guide.text, url: markdownSourceUrl(guide.file), description: guide.description });
         guideGroups.set(category, entries);
     }
+    const docsEntries: LlmsEntry[] = handwrittenDocs
+        .filter(({ section }) => section === 'docs')
+        .map((page) => ({
+            text: page.title,
+            url: markdownSourceUrl(page.file),
+            description: page.description,
+        }));
 
     const docsIndex: LlmsEntry = {
         text: 'Documentation index',
@@ -336,10 +338,11 @@ function generateLlmsText(): string {
     const categories = [...guideGroups.entries()].sort(([left], [right]) => left.localeCompare(right));
     const gettingStarted = guideGroups.get('Getting started') ?? [];
     const sections = [
-        llmsSection('Getting started', [docsIndex, ...gettingStarted]),
+        llmsSection('Getting started', gettingStarted),
         ...categories
             .filter(([category]) => category !== 'Getting started')
             .map(([category, entries]) => llmsSection(category, entries)),
+        llmsSection('Docs', [docsIndex, ...docsEntries]),
         llmsSection('Plugins', plugins.flatMap(componentLlmsEntries)),
         llmsSection('Shared tools', tools.flatMap(componentLlmsEntries)),
         llmsSection('GitHub Actions', actions.flatMap(componentLlmsEntries)),
@@ -412,6 +415,49 @@ function groupMenuItems(items: MenuCard[], defaultCategory: string): MenuSection
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([text, groupedItems]) => ({ text, items: groupedItems }));
 }
+
+function documentationMenuItem(node: DocumentationTreeNode): MenuItem {
+    if (node.kind === 'page') {
+        return {
+            text: node.text,
+            description: node.description,
+            link: node.link,
+            ...(node.type ? { type: node.type } : {}),
+        };
+    }
+    return {
+        text: node.text,
+        ...(node.link ? { link: node.link } : {}),
+        ...(node.description ? { description: node.description } : {}),
+        items: node.items.map(documentationMenuItem),
+    };
+}
+
+function documentationSidebarItem(node: DocumentationTreeNode, depth = 0): SidebarItem {
+    if (node.kind === 'page') return { text: node.text, link: node.link };
+    const items = node.items.map((child) => documentationSidebarItem(child, depth + 1));
+    return {
+        text: node.text,
+        ...(node.link ? { link: node.link } : {}),
+        ...(items.length ? { collapsed: depth > 0, items } : {}),
+    };
+}
+
+function documentationNavItem(node: DocumentationTreeNode): DefaultTheme.NavItem {
+    if (node.kind === 'page') return { text: node.text, link: node.link };
+    return {
+        text: node.text,
+        ...(node.link ? { link: node.link } : {}),
+        ...(node.items.length ? { items: node.items.map(documentationNavItem) } : {}),
+    };
+}
+
+const docsMenuSections: MenuSection[] = docsTree.map((folder) => ({
+    text: folder.text,
+    ...(folder.link ? { link: folder.link } : {}),
+    ...(folder.description ? { description: folder.description } : {}),
+    items: folder.items.map(documentationMenuItem),
+}));
 
 function referenceItems(items: Component[]): DefaultTheme.SidebarItem[] {
     return items.flatMap((item) => (item.apiReference ? [{ text: item.title, link: item.apiReference }] : []));
@@ -556,6 +602,12 @@ const megaMenus: MegaMenu[] = [
         sections: groupMenuItems(guidePages, 'Guides'),
     },
     {
+        text: 'Docs',
+        description: 'Technical documentation grouped by its folder structure.',
+        hierarchical: true,
+        sections: docsMenuSections,
+    },
+    {
         text: 'Reference',
         description: 'Browse the generated API and action contract references.',
         overview: { text: 'Reference overview', description: 'Browse all generated references.', link: '/api/' },
@@ -585,6 +637,7 @@ const mobileNav: DefaultTheme.NavItem[] = [
     { text: 'Tools', items: tools.map((item) => ({ text: item.title, link: item.overview })) },
     { text: 'Actions', items: actions.map((item) => ({ text: item.title, link: item.overview })) },
     { text: 'Guides', items: guidePages.map(({ text, link }) => ({ text, link })) },
+    { text: 'Docs', items: docsTree.map(documentationNavItem) },
     { text: 'Reference', items: apiNav },
     { text: 'Team', link: '/team' },
 ];
@@ -616,6 +669,7 @@ const themeConfig = {
         '/tools/': tools.map((item) => ({ text: item.title, link: item.overview })),
         '/actions/': actions.map((item) => ({ text: item.title, link: item.overview })),
         '/guides/': guideSidebar,
+        '/docs/': docsTree.map((folder) => documentationSidebarItem(folder)),
         '/api/': [{ text: 'Reference', link: '/api/', items: apiSidebar }],
         '/api/plugins/': [{ text: 'Plugins', link: '/api/plugins/', items: typedApiMenus.plugins }],
         '/api/tools/': [{ text: 'Tools', link: '/api/tools/', items: typedApiMenus.tools }],
@@ -664,7 +718,14 @@ export default defineConfig({
                     const sourceTarget = path.posix.extname(target) ? target : `${target}.md`;
                     const route = rewrites[sourceTarget];
                     if (route) {
-                        token.attrSet('href', `/${route.replace(/\.md$/, '')}${match[2] ?? ''}`);
+                        const routeWithoutExtension = route.replace(/\.md$/, '');
+                        const publicRoute =
+                            routeWithoutExtension === 'index'
+                                ? '/'
+                                : routeWithoutExtension.endsWith('/index')
+                                  ? `/${routeWithoutExtension.slice(0, -'index'.length)}`
+                                  : `/${routeWithoutExtension}`;
+                        token.attrSet('href', `${publicRoute}${match[2] ?? ''}`);
                     }
                 }
             });

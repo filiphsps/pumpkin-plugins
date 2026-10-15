@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Plugin API
+title: "Plugin API: host API areas"
+description: "Pumpkin WIT interfaces and WASI capability distinction"
 ---
 
 # Host API areas

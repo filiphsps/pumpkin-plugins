@@ -1,3 +1,11 @@
+---
+title: "Adding codemods"
+description: "Add, register, test, and package a Pumpkin codemod"
+navigation:
+    category: Codemods
+    catalog: true
+---
+
 # Adding codemods
 
 Codemods in `@pumpkin-plugins/codemod` use a small per-file contract. A codemod selects supported

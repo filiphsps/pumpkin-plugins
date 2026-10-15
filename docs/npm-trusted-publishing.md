@@ -1,6 +1,8 @@
 ---
 navigation:
     category: CI and releases
+title: "Trusted publishing for npm tools"
+description: "npm OIDC setup, workflow identity, validation window, provenance and recovery"
 ---
 
 # Trusted publishing for npm tools

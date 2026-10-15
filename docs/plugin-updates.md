@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Server operations
+title: "Checking for plugin updates"
+description: "Checking plugin versions against Pumpkin Market"
 ---
 
 # Checking for plugin updates

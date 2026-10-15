@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Plugin development
+title: "Plugin config"
+description: "Declaring settings as a schema: the file, validation, upgrades and docs all come from it"
 ---
 
 # Plugin config

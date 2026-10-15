@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Plugin development
+title: "Turborepo commands"
+description: "The pnpm Turbo wrapper, log defaults, and flag overrides"
 ---
 
 # Turborepo commands

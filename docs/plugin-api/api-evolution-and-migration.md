@@ -1,6 +1,8 @@
 ---
 navigation:
     category: Plugin API
+title: "Plugin API: evolution and migration"
+description: "Compatibility decisions, migration and SemVer policy"
 ---
 
 # API evolution and migration

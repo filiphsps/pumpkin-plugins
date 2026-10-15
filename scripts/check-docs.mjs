@@ -4,7 +4,12 @@
 // READMEs are checked by `pnpm readme:check`. See "Docs match the code" in docs/code-style.md.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { discoverComponents, walkMarkdown } from '@pumpkin-plugins/docs/node';
+import {
+    discoverComponents,
+    discoverHandwrittenDocs,
+    generateDocsIndex,
+    walkMarkdown,
+} from '@pumpkin-plugins/docs/node';
 
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
 const exists = (...parts) => fs.existsSync(path.join(root, ...parts));
@@ -36,6 +41,10 @@ const generatedPackageOutputs = new Set(
 );
 const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
 const extensions = discoverComponents(root, 'extensions').map(({ slug }) => `extensions/${slug}`);
+const handwrittenDocs = discoverHandwrittenDocs(root);
+const docPagesBySiteRoute = new Map(
+    handwrittenDocs.map((page) => [page.siteRoute.replace(/^\//, '').replace(/\/$/, ''), page.repositoryPath]),
+);
 /** Include the private engine-comparison package when checking documentation links and paths. */
 const benchmarkDocs = exists('benchmarks/engine-comparison/README.md')
     ? ['benchmarks/engine-comparison/README.md', ...markdownFiles('benchmarks/engine-comparison')]
@@ -102,7 +111,10 @@ const prose = (text) => text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g
  */
 function resolveSiteRoute(href) {
     const route = href.replace(/^\//, '');
+    const discoveredPage = docPagesBySiteRoute.get(route.replace(/\/$/, ''));
+    if (discoveredPage) return discoveredPage;
     if (route.startsWith('guides/')) {
+        if (route === 'guides/' || route === 'guides/index') return 'docs/README.md';
         const source = path.posix.join('docs', route.slice('guides/'.length));
         return source.endsWith('/') ? `${source}index.md` : /\.md$/.test(source) ? source : `${source}.md`;
     }
@@ -201,12 +213,10 @@ for (const script of rootScripts) {
     }
 }
 
-// 6. The docs index lists every page, and every page it lists exists.
+// 6. The docs index is generated from the guide categories and nested source folders.
 if (exists('docs', 'README.md')) {
-    const index = read('docs', 'README.md');
-    for (const page of markdownFiles('docs').filter((f) => f !== 'docs/README.md')) {
-        const rel = page.slice('docs/'.length);
-        if (!index.includes(`](${rel})`)) problems.push(`docs/README.md does not list ${page}`);
+    if (generateDocsIndex(root, true) === 'stale') {
+        problems.push('docs/README.md has stale guide and docs menus; run `pnpm readme`');
     }
 }
 

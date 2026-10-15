@@ -1,3 +1,8 @@
+---
+title: "Creating a VS Code extension"
+description: "The `pnpm gen:extension` generator, extension checks, and VSIX releases"
+---
+
 # Creating a VS Code extension
 
 Create an extension package with the Turbo generator:

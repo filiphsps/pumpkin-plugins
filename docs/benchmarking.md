@@ -1,3 +1,8 @@
+---
+title: "Benchmarking"
+description: "QuickJS and the Static Hermes profile, collector and parser matrix"
+---
+
 # Benchmarking QuickJS and Static Hermes
 
 This guide explains what the engine comparison measures, how to read its report, and what conclusions its results support. It is intended for plugin authors, Pumpkin developers, runtime and CI contributors, and readers curious about the trade-offs.

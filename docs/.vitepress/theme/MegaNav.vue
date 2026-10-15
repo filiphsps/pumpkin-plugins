@@ -1,6 +1,7 @@
 <script setup lang="ts">
     import { useData, useRoute, withBase } from 'vitepress';
     import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+    import MenuTree from './MenuTree.vue';
     import type { ThemeConfigWithMegaMenus } from './types';
 
     const root = ref<HTMLElement | null>(null);
@@ -12,7 +13,7 @@
     const menuSections = computed(() =>
         (activeMenu.value?.sections ?? [])
             .map((section) => ({ ...section, items: section.items.filter((item) => item.type !== 'spotlight') }))
-            .filter((section) => section.items.length),
+            .filter((section) => section.items.length || section.link),
     );
     const spotlightItems = computed(() =>
         (activeMenu.value?.sections ?? []).flatMap((section) =>
@@ -185,17 +186,24 @@
                             ]"
                             :style="section.gridArea ? { gridArea: section.gridArea } : undefined"
                         >
-                            <h2>{{ section.text }}</h2>
-                            <div class="site-mega-nav__links">
+                            <h2>
+                                <a v-if="section.link" :href="withBase(section.link)">{{ section.text }}</a>
+                                <span v-else>{{ section.text }}</span>
+                            </h2>
+                            <p v-if="section.description" class="site-mega-nav__section-description">
+                                {{ section.description }}
+                            </p>
+                            <MenuTree v-if="activeMenu.hierarchical" :items="section.items" variant="desktop" />
+                            <div v-else class="site-mega-nav__links">
                                 <a
                                     v-for="item in section.items"
-                                    :key="item.link"
+                                    :key="item.link ?? item.text"
                                     class="site-mega-nav__link"
                                     :class="[
                                         `site-mega-nav__link--${item.type ?? 'link'}`,
                                         { 'has-icon': item.icon }
                                     ]"
-                                    :href="withBase(item.link)"
+                                    :href="withBase(item.link ?? '/')"
                                 >
                                     <img
                                         v-if="item.icon"
@@ -223,7 +231,7 @@
                             :key="item.link"
                             class="site-mega-nav__link site-mega-nav__link--spotlight"
                             :class="{ 'has-icon': item.icon }"
-                            :href="withBase(item.link)"
+                            :href="withBase(item.link ?? '/')"
                         >
                             <img
                                 v-if="item.icon"

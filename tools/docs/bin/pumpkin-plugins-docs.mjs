@@ -6,6 +6,7 @@ import { Argument, Command } from 'commander';
 import {
     generateActionReadmes,
     generateActionVersions,
+    generateDocsIndex,
     generateDocuments,
     generatePluginReadme,
     generateRootReadme,
@@ -16,7 +17,7 @@ const program = new Command()
     .description('Generate or check plugin, action, and repository documentation.')
     .addArgument(
         new Argument('[command]', 'Documentation target')
-            .choices(['plugin', 'root', 'generate', 'actions', 'action-versions'])
+            .choices(['plugin', 'root', 'docs-index', 'generate', 'actions', 'action-versions'])
             .default('plugin'),
     )
     .addArgument(new Argument('[module]', 'Custom documents module; used with generate'))
@@ -48,6 +49,9 @@ try {
     } else if (command === 'root') {
         status = await generateRootReadme(cwd, check);
         where = 'README.md and component references';
+    } else if (command === 'docs-index') {
+        status = generateDocsIndex(cwd, check);
+        where = 'docs/README.md';
     } else {
         status = await generatePluginReadme(cwd, check);
         where = 'README.md';
