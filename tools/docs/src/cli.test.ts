@@ -291,7 +291,7 @@ describe('root README', { timeout: 15000 }, () => {
     });
 });
 
-describe('custom document CLI', () => {
+describe('custom document CLI', { timeout: 15000 }, () => {
     it('loads a typed document module, checks drift, and rejects unsupported arguments', () => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'docs-custom-cli-'));
         try {
