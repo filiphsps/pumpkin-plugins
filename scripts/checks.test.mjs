@@ -160,6 +160,8 @@ describe('upstream pin workflow', () => {
         const ciWorkflow = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/ci.yml'), 'utf8'));
         const callerPermissions = ciWorkflow.jobs.release.permissions;
         const publish = releaseWorkflow.jobs['publish-tools'];
+        assert.equal(ciWorkflow.on.workflow_dispatch.inputs.release_commit.required, true);
+        assert.equal(ciWorkflow.jobs.release.with.release_commit, ['$', "{{ inputs.release_commit || '' }}"].join(''));
         assert.ok(releaseWorkflow.jobs.release.outputs.tool_paths_released);
         assert.equal(callerPermissions['id-token'], 'write');
         assert.ok(publish, 'release workflow needs a separate npm publish job for tools');
@@ -194,7 +196,7 @@ describe('upstream pin workflow', () => {
         const tagCheck = steps.find((step) => step.name === '🔒 Check each tag is the commit this run built');
         assert.match(tagCheck.run, /git\/ref\/tags\/\$RELEASE_TAG/);
         assert.match(tagCheck.run, /git\/tags\/\$sha/);
-        assert.match(tagCheck.run, /\[ "\$sha" != "\$GITHUB_SHA" \]/);
+        assert.equal(publish.env.RELEASE_TARGET_SHA, ['$', '{{ inputs.release_commit || github.sha }}'].join(''));
         const nodeSetup = steps.find((step) => step.uses === 'actions/setup-node@v7.0.0');
         assert.equal(nodeSetup.with['node-version'], '24.21.0');
         const publishScript = steps.find((step) => step.name === '📤 Publish verified public npm packages');
@@ -211,6 +213,43 @@ describe('upstream pin workflow', () => {
         assert.match(implementation, /if \(!response\.ok\)/);
         assert.match(implementation, /existingIntegrity !== packed\.integrity/);
         assert.match(implementation, /assertPrerequisiteAvailable/);
+    });
+
+    it('checks the release tag against its requested commit when a newer workflow commit exists', () => {
+        const tagCheck = releaseWorkflow.jobs['publish-tools'].steps.find(
+            (step) => step.name === '🔒 Check each tag is the commit this run built',
+        );
+        const directory = repo({
+            'bin/gh': '#!/bin/sh\nprintf "commit %s\\n" "$TAG_SHA"\n',
+            'bin/jq': '#!/bin/sh\nprintf "%s\\n" "$TAG_NAME"\n',
+        });
+        fs.chmodSync(path.join(directory, 'bin/gh'), 0o755);
+        fs.chmodSync(path.join(directory, 'bin/jq'), 0o755);
+        const releaseSha = 'b'.repeat(40);
+        const fasterWorkflowSha = 'a'.repeat(40);
+        const runGuard = (releaseTargetSha) =>
+            spawnSync('bash', ['-e', '-o', 'pipefail', '-c', tagCheck.run], {
+                cwd: scripts,
+                env: {
+                    ...process.env,
+                    PATH: `${path.join(directory, 'bin')}:${process.env.PATH}`,
+                    GH_REPO: 'filiphsps/pumpkin-plugins',
+                    RELEASED_TOOL_PATHS: '["tools/codemod"]',
+                    RELEASE_METADATA: '{}',
+                    RELEASE_TARGET_SHA: releaseTargetSha,
+                    TAG_NAME: 'codemod-v0.1.0',
+                    TAG_SHA: releaseSha,
+                    GITHUB_SHA: fasterWorkflowSha,
+                },
+                encoding: 'utf8',
+            });
+
+        const exactTarget = runGuard(releaseSha);
+        assert.equal(exactTarget.status, 0, exactTarget.stderr);
+
+        const fasterCommitTarget = runGuard(fasterWorkflowSha);
+        assert.equal(fasterCommitTarget.status, 1);
+        assert.match(fasterCommitTarget.stdout, /requested release commit/);
     });
 
     it('packages released extensions and attaches VSIX files to GitHub releases', () => {

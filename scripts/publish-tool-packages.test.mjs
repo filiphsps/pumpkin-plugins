@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
-import { getNpmRegistryIntegrity, publishToolPackages } from './publish-tool-packages.mjs';
+import { fileURLToPath } from 'node:url';
+import { getNpmRegistryIntegrity, publishNpmTarball, publishToolPackages } from './publish-tool-packages.mjs';
 import { nodeEngineRange } from './utils/tool-packages.mjs';
 
 const roots = [];
@@ -112,6 +114,39 @@ function createPackAdapter(root, order = []) {
 }
 
 describe('publishToolPackages', () => {
+    it('runs npm publish from the tarball directory outside the repository root', () => {
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'npm-publish-cwd-'));
+        roots.push(directory);
+        const tarballDirectory = path.join(directory, 'tarball');
+        const binaryDirectory = path.join(directory, 'bin');
+        const tarballPath = path.join(tarballDirectory, 'package.tgz');
+        const recordPath = path.join(directory, 'npm-publish-record');
+        fs.mkdirSync(tarballDirectory);
+        fs.mkdirSync(binaryDirectory);
+        const npmPath = path.join(binaryDirectory, 'npm');
+        fs.writeFileSync(
+            npmPath,
+            '#!/bin/sh\n{ printf "%s\\n" "$PWD"; printf "%s\\n" "$@"; } > "$NPM_PUBLISH_RECORD"\n',
+        );
+        fs.chmodSync(npmPath, 0o755);
+
+        const moduleUrl = new URL('./publish-tool-packages.mjs', import.meta.url).href;
+        const call = `import { publishNpmTarball } from ${JSON.stringify(moduleUrl)};\npublishNpmTarball(${JSON.stringify({ tarballPath })});`;
+        const result = spawnSync(process.execPath, ['--input-type=module', '--eval', call], {
+            encoding: 'utf8',
+            env: {
+                ...process.env,
+                PATH: `${binaryDirectory}${path.delimiter}${process.env.PATH}`,
+                NPM_PUBLISH_RECORD: recordPath,
+            },
+        });
+
+        assert.equal(result.status, 0, result.stderr);
+        const [workingDirectory, ...args] = fs.readFileSync(recordPath, 'utf8').trimEnd().split('\n');
+        assert.equal(fs.realpathSync(workingDirectory), fs.realpathSync(tarballDirectory));
+        assert.deepEqual(args, ['publish', tarballPath, '--access', 'public', '--provenance']);
+    });
+
     it('returns missing only for an exact-version 404 after confirming the npm package exists', async () => {
         const packageName = API_NAME;
         const packageUrl = 'https://registry.npmjs.org/%40example%2Fapi';
@@ -229,6 +264,26 @@ describe('publishToolPackages', () => {
             /tools\/api.*build-v1\.2\.3.*component/i,
         );
         assert.equal(packed, false);
+    });
+
+    it('validates packages from an explicitly selected release source checkout', () => {
+        const root = createRoot();
+        const result = spawnSync(
+            process.execPath,
+            [fileURLToPath(new URL('./publish-tool-packages.mjs', import.meta.url))],
+            {
+                encoding: 'utf8',
+                env: {
+                    ...process.env,
+                    PUMPKIN_PUBLIC_TOOL_ROOT: root,
+                    RELEASED_TOOL_PATHS: JSON.stringify([API_PATH]),
+                    RELEASE_METADATA: JSON.stringify(createReleaseMetadata([API_PATH], { [API_PATH]: 'build-v1.2.3' })),
+                },
+            },
+        );
+
+        assert.equal(result.status, 1, result.stderr);
+        assert.match(result.stderr, /tools\/api release tag build-v1\.2\.3 must use component api/);
     });
 
     it('rejects a Release Please tag version that differs from the source manifest', async () => {

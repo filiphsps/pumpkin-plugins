@@ -312,15 +312,26 @@ function readPackedJson(tarballPath, entry) {
     return JSON.parse(contents);
 }
 
-function publishNpmTarball({ tarballPath }) {
-    execFileSync('npm', ['publish', tarballPath, '--access', 'public', '--provenance'], { stdio: 'inherit' });
+/**
+ * Publishes a verified npm tarball with provenance from its temporary directory.
+ *
+ * @param {object} release - Verified package tarball.
+ * @param {string} release.tarballPath - Path to the package tarball.
+ * @returns {void} Completes after npm accepts the publish.
+ * @throws {Error} When npm fails to publish the tarball.
+ */
+export function publishNpmTarball({ tarballPath }) {
+    execFileSync('npm', ['publish', tarballPath, '--access', 'public', '--provenance'], {
+        cwd: path.dirname(tarballPath),
+        stdio: 'inherit',
+    });
 }
 
 async function main() {
     const selectedPaths = JSON.parse(process.env.RELEASED_TOOL_PATHS ?? '[]');
     const releaseMetadata = JSON.parse(process.env.RELEASE_METADATA ?? '{}');
     await publishToolPackages({
-        root: rootDirectory,
+        root: process.env.PUMPKIN_PUBLIC_TOOL_ROOT ?? rootDirectory,
         selectedPaths,
         releaseMetadata,
     });

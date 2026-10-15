@@ -200,6 +200,57 @@ it('shows cached or skipped work honestly and indexes downloadable plugin artifa
     assert.doesNotMatch(markdown, /0 passed/);
 });
 
+it('keeps large Release Please outputs out of the release summary process environment', () => {
+    const { summary, env } = fixture();
+    const workflow = parse(fs.readFileSync(path.join(import.meta.dirname, '../.github/workflows/release.yml'), 'utf8'));
+    const summaryStep = workflow.jobs.release.steps.find((step) => step.id === 'release-summary');
+    const summaryIndex = workflow.jobs.release.steps.indexOf(summaryStep);
+    const stepContext = Object.fromEntries(
+        workflow.jobs.release.steps
+            .slice(0, summaryIndex)
+            .map(({ id }) => [id, { outcome: 'success', conclusion: 'success' }]),
+    );
+    stepContext.release = {
+        outputs: { release_notes: 'x'.repeat(512 * 1024) },
+        outcome: 'failure',
+        conclusion: 'failure',
+    };
+    const stepInput = summaryStep.with.steps;
+    const stepsJson = stepInput.replace(/\$\{\{\s*toJSON\((steps(?:\.[\w-]+)*)\)\s*\}\}/g, (_match, contextPath) =>
+        JSON.stringify(
+            contextPath
+                .split('.')
+                .slice(1)
+                .reduce((value, key) => value[key], stepContext),
+        ),
+    );
+    assert.deepEqual(JSON.parse(stepsJson).release, { outcome: 'failure', conclusion: 'failure' });
+    assert.equal(Buffer.byteLength(stepsJson) < 128 * 1024, true);
+    const action = parse(
+        fs.readFileSync(path.join(import.meta.dirname, '../.github/common/job-summary/action.yml'), 'utf8'),
+    );
+    const result = spawnSync('bash', ['-euo', 'pipefail', '-c', action.runs.steps[0].run], {
+        env: {
+            ...env,
+            CI_SUMMARY_TITLE: 'Release orchestration',
+            CI_SUMMARY_TESTS: 'false',
+            CI_STEPS_JSON: stepsJson,
+            CI_JOB_STATUS: 'success',
+            CI_ARTIFACT_URL: '',
+            CI_LINK_LABEL: 'Browse published releases and downloads',
+            CI_SUMMARY_NOTE: '',
+            CI_PLUGINS_MANIFEST: '',
+            CI_SUMMARY_FACTS: '{}',
+            GITHUB_ACTION_PATH: path.resolve(import.meta.dirname, '../.github/common/job-summary'),
+        },
+        encoding: 'utf8',
+    });
+    assert.equal(result.error, undefined, result.error?.message);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.statSync(summary).size > 0, true);
+    assert.match(fs.readFileSync(summary, 'utf8'), /\| release \| failure \|/);
+});
+
 it('renders the deployment summary after the Pages mirror replaces the checkout', () => {
     const { directory, summary, env } = fixture();
     const workspace = path.join(directory, 'checkout');

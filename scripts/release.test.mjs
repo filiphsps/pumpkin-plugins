@@ -47,6 +47,35 @@ it('routes a previously created codemod release for its commit to npm publishing
     });
 });
 
+it('limits a manual release replay to npm packages at the requested release commit', async () => {
+    const pluginRelease = { tagName: 'sample-plugin-v1.2.3', sha: 'release-sha' };
+    const result = await collect({
+        toolOnly: true,
+        repositoryConfig: {
+            ...baseOptions.repositoryConfig,
+            'packages/sample-plugin': { component: 'sample-plugin' },
+        },
+        releasedVersions: { ...codemodVersions, 'packages/sample-plugin': '1.2.3' },
+        findRelease: async (tagName) =>
+            tagName === codemod.tagName ? codemod : tagName === pluginRelease.tagName ? pluginRelease : undefined,
+    });
+
+    assert.deepEqual(
+        result.releases.map(({ path }) => path),
+        ['tools/codemod'],
+    );
+    assert.deepEqual(result.paths, {
+        pluginPaths: [],
+        actionPaths: [],
+        toolPaths: ['tools/codemod'],
+        extensionPaths: [],
+    });
+});
+
+it('fails a manual release replay when no npm tag targets the requested commit', async () => {
+    await assert.rejects(collect({ toolOnly: true, currentSha: 'later-commit' }), /No npm tool release targets/);
+});
+
 it('does not recover a release that targets a different commit', async () => {
     const result = await collect({ currentSha: 'later-commit' });
 

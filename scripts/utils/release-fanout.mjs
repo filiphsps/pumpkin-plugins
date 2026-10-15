@@ -32,9 +32,10 @@ export function partitionReleasePaths(releases, root) {
  * @param {string | undefined} options.currentSha - Commit built by this workflow run.
  * @param {(tagName: string) => Promise<object | undefined>} options.findRelease - Looks up a GitHub release by tag.
  * @param {string} options.root - Workspace root used to find public npm packages.
+ * @param {boolean} [options.toolOnly] - Whether to include only npm tool releases for an explicit recovery run.
  * @param {(message: string) => void} [options.log] - Receives recovery and deferral messages.
  * @returns {Promise<{ releases: object[], paths: ReturnType<typeof partitionReleasePaths> }>} Releases and publisher paths for this commit.
- * @throws {Error} When a release has no target commit SHA.
+ * @throws {Error} When a release has no target commit SHA or a tool-only replay finds no matching tool release.
  */
 export async function collectReleaseFanout({
     createdReleases,
@@ -43,6 +44,7 @@ export async function collectReleaseFanout({
     currentSha,
     findRelease,
     root,
+    toolOnly = false,
     log = console.log,
 }) {
     const candidates = await recoverExistingReleases({
@@ -65,5 +67,21 @@ export async function collectReleaseFanout({
         );
     }
 
-    return { releases, paths: partitionReleasePaths(releases, root) };
+    const paths = partitionReleasePaths(releases, root);
+    if (!toolOnly) return { releases, paths };
+
+    const toolPaths = new Set(paths.toolPaths);
+    const toolReleases = releases.filter(({ path }) => toolPaths.has(path));
+    if (toolReleases.length === 0) {
+        throw new Error(`No npm tool release targets requested commit ${currentSha}`);
+    }
+    return {
+        releases: toolReleases,
+        paths: {
+            pluginPaths: [],
+            actionPaths: [],
+            toolPaths: toolReleases.map(({ path }) => path),
+            extensionPaths: [],
+        },
+    };
 }

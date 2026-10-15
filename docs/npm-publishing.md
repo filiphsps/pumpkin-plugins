@@ -47,6 +47,19 @@ those packages sequentially, checks exact dependency versions and registry integ
 missing versions with npm trusted publishing and provenance. See
 [Trusted publishing for npm tools](npm-trusted-publishing.md) for setup and recovery.
 
+If a GitHub release exists but its npm job was skipped, dispatch the `ci.yml` caller with the full
+commit SHA that the release tag targets. For codemod, resolve its tag before dispatching:
+
+```sh
+release_commit="$(git rev-parse 'codemod-v0.1.0^{commit}')"
+gh workflow run ci.yml --ref master -f release_commit="$release_commit"
+```
+
+This recovery reads existing GitHub releases without creating release tags or PRs, selects only npm
+tools whose tags point to that exact SHA, then checks out the same source commit for packing. Normal
+push releases remain pinned to the commit built by their own workflow run. Replace the tag with the
+target tool's release tag when recovering another package.
+
 Configure trust for a package only after its placeholder exists and its real Release Please release
 is ready. The first successful OIDC publish must complete within two days of creating the
 relationship. Publishing the existing `0.0.0` placeholder again does not validate OIDC.

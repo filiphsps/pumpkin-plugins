@@ -8,6 +8,7 @@ import { Command } from 'commander';
 import { installCommitFilesCache } from './utils/commit-files-cache.mjs';
 import { bundledChangesPlugin, workspacePackages } from './utils/release-commits.mjs';
 import { collectReleaseFanout } from './utils/release-fanout.mjs';
+import { resolveReleaseTargetSha } from './utils/release-target.mjs';
 
 const program = new Command()
     .name('release')
@@ -19,6 +20,10 @@ const program = new Command()
     .parse(process.argv);
 const [cliPath] = program.args;
 const { dryRun, pullRequestsOnly, component } = program.opts();
+const toolOnly = process.env.RELEASE_TOOL_ONLY === 'true';
+if (process.env.RELEASE_TOOL_ONLY && !['true', 'false'].includes(process.env.RELEASE_TOOL_ONLY)) {
+    throw new Error('RELEASE_TOOL_ONLY must be true or false');
+}
 if (component && !dryRun && !pullRequestsOnly)
     throw new Error('--component requires --dry-run or --pull-requests-only');
 const requireRuntime = createRequire(resolve(cliPath));
@@ -71,6 +76,12 @@ function isImmutableReleaseConflict(error) {
 
 if (!dryRun && !pullRequestsOnly) {
     const manifest = await load();
+    const currentSha = resolveReleaseTargetSha({
+        eventName: process.env.GITHUB_EVENT_NAME,
+        workflowSha: process.env.GITHUB_SHA,
+        requestedSha: process.env.RELEASE_TARGET_SHA,
+        toolOnly,
+    });
     const createReleasesForPullRequest = manifest.createReleasesForPullRequest.bind(manifest);
     let existingReleasesByTag;
     async function existingRelease(tagName) {
@@ -127,14 +138,15 @@ if (!dryRun && !pullRequestsOnly) {
             return recovered;
         }
     };
-    const createdReleases = (await manifest.createReleases()).filter(Boolean);
+    const createdReleases = toolOnly ? [] : (await manifest.createReleases()).filter(Boolean);
     const { releases, paths: releasePaths } = await collectReleaseFanout({
         createdReleases,
         repositoryConfig: manifest.repositoryConfig,
         releasedVersions: manifest.releasedVersions,
-        currentSha: process.env.GITHUB_SHA,
+        currentSha,
         findRelease: existingRelease,
         root: repositoryRoot,
+        toolOnly,
     });
     outputs.paths_released = JSON.stringify(releasePaths.pluginPaths);
     outputs.action_paths_released = JSON.stringify(releasePaths.actionPaths);
@@ -181,7 +193,7 @@ if (dryRun) {
         ),
     );
 } else {
-    const prs = (await manifest.createPullRequests()).filter(Boolean);
+    const prs = toolOnly ? [] : (await manifest.createPullRequests()).filter(Boolean);
     outputs.prs = JSON.stringify(prs);
     outputs.pr_count = String(prs.length);
     if (process.env.GITHUB_OUTPUT) {

@@ -42,6 +42,12 @@ on:
             - 'packages/*/README.md'
             - 'actions/*/README.md'
             - 'extensions/*/README.md'
+    workflow_dispatch:
+        inputs:
+            release_commit:
+                description: Full commit SHA of an existing release to recover for npm publication
+                required: true
+                type: string
 
 concurrency:
     group: ci-${{ github.ref }}
@@ -84,7 +90,7 @@ jobs:
             - name: 📥 Fetch comparison base
               id: fetch-comparison-base
               env:
-                  BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+                  BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
               run: git fetch --no-tags origin "$BASE"
 
             # Everything else keys off this: a change that touches only documentation can't break a
@@ -92,7 +98,7 @@ jobs:
             - name: 🔍 What the change touches
               id: classify
               env:
-                  BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+                  BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
                   HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
               run: node scripts/changed-areas.mjs "$BASE" "$HEAD"
 
@@ -723,27 +729,36 @@ jobs:
         if: >-
             ${{
               always() &&
-              github.event_name == 'push' &&
-              needs.changes.result == 'success' &&
-              needs.docs.result == 'success' &&
-              needs['action-gate'].result == 'success' &&
-              needs['extension-gate'].result == 'success' &&
-              needs['integration-gate'].result == 'success' &&
-              needs['generator-gate'].result == 'success' &&
               (
                 (
-                  needs.changes.outputs.code == 'true' &&
-                  needs.lint.result == 'success' &&
-                  needs.typecheck.result == 'success' &&
-                  needs.build.result == 'success' &&
-                  needs['external-consumer'].result == 'success' &&
-                  needs.test.result == 'success'
+                  github.event_name == 'workflow_dispatch' &&
+                  github.ref == 'refs/heads/master' &&
+                  inputs.release_commit != ''
                 ) ||
                 (
-                  needs.changes.outputs.code != 'true' &&
+                  github.event_name == 'push' &&
+                  needs.changes.result == 'success' &&
+                  needs.docs.result == 'success' &&
+                  needs['action-gate'].result == 'success' &&
+                  needs['extension-gate'].result == 'success' &&
+                  needs['integration-gate'].result == 'success' &&
+                  needs['generator-gate'].result == 'success' &&
                   (
-                    needs.changes.outputs.actions != '[]' ||
-                    needs.changes.outputs.extensions != '[]'
+                    (
+                      needs.changes.outputs.code == 'true' &&
+                      needs.lint.result == 'success' &&
+                      needs.typecheck.result == 'success' &&
+                      needs.build.result == 'success' &&
+                      needs['external-consumer'].result == 'success' &&
+                      needs.test.result == 'success'
+                    ) ||
+                    (
+                      needs.changes.outputs.code != 'true' &&
+                      (
+                        needs.changes.outputs.actions != '[]' ||
+                        needs.changes.outputs.extensions != '[]'
+                      )
+                    )
                   )
                 )
               )
@@ -752,6 +767,9 @@ jobs:
             contents: write
             id-token: write
         uses: ./.github/workflows/release.yml
+        with:
+            release_commit: ${{ inputs.release_commit || '' }}
+            tool_only: ${{ github.event_name == 'workflow_dispatch' }}
         secrets: inherit
 
     cleanup:
