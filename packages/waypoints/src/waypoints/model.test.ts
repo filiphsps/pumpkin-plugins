@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createWaypoint, type NewWaypoint, normalizeWaypointName, waypointNameKey } from './model.ts';
+import { createWaypoint, isWaypointId, type NewWaypoint, normalizeWaypointName, waypointNameKey } from './model.ts';
 
 const id = '11111111-1111-4111-8111-111111111111';
 
@@ -73,6 +73,12 @@ describe('waypoint model', () => {
     it('uses Unicode-normalized case-insensitive name keys', () => {
         expect(waypointNameKey(' Café ')).toBe(waypointNameKey('cafe\u0301'));
         expect(normalizeWaypointName('  Home Base  ')).toBe('Home Base');
+    });
+
+    it('accepts only the canonical UUID shape and permits case normalization by callers', () => {
+        expect(isWaypointId(id.toUpperCase())).toBe(true);
+        expect(isWaypointId('11111111-1111-4111-8111-11111111111')).toBe(false);
+        expect(isWaypointId('11111111111141118111111111111111')).toBe(false);
     });
 
     it.each(['', '  ', '\n', 'a'.repeat(65), 'bad\u0000name'])('rejects invalid waypoint name %j', (name) => {

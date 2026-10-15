@@ -592,6 +592,9 @@ importers:
       '@pumpkin-plugins/pumpkin-api':
         specifier: 'catalog:'
         version: link:../../tools/pumpkin-api
+      '@pumpkin-plugins/pumpkin-pie-api':
+        specifier: workspace:*
+        version: link:../../tools/apis/pumpkin-pie-api
       fflate:
         specifier: 'catalog:'
         version: 0.8.3

@@ -42,6 +42,11 @@ export interface Waypoint {
     readonly visibilityRange?: number;
 }
 
+/** Checks whether text uses the canonical hyphenated UUID shape accepted by waypoint records. */
+export function isWaypointId(value: string): boolean {
+    return UUID.test(value);
+}
+
 /** Input required to create a waypoint; defaults are applied to optional metadata and access. */
 export interface NewWaypoint {
     readonly access?: WaypointAccess;
@@ -98,7 +103,7 @@ export function normalizeItemIdentifier(value: string): string {
 
 /** Creates a validated waypoint with canonical metadata and restricted access by default. */
 export function createWaypoint(input: NewWaypoint): Waypoint {
-    if (!UUID.test(input.id)) throw new TypeError('Waypoint id must be a UUID.');
+    if (!isWaypointId(input.id)) throw new TypeError('Waypoint id must be a UUID.');
     const name = normalizeWaypointName(input.name);
     if (typeof input.dimension !== 'string' || input.dimension.trim() === '' || CONTROL.test(input.dimension)) {
         throw new TypeError('Waypoint dimension must not be empty or contain control characters.');
@@ -141,7 +146,7 @@ export function isWaypoint(value: unknown): value is Waypoint {
     if (!isRecord(value) || !hasOnlyKeys(value, waypointKeys)) return false;
     if (
         typeof value.id !== 'string' ||
-        !UUID.test(value.id) ||
+        !isWaypointId(value.id) ||
         typeof value.name !== 'string' ||
         typeof value.dimension !== 'string' ||
         value.dimension.trim() === '' ||

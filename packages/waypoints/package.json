@@ -2,7 +2,7 @@
     "name": "@pumpkin-plugins/waypoints",
     "version": "0.0.4",
     "private": true,
-    "description": "Server-managed waypoints with access rules and a Java HUD",
+    "description": "Waypoints with access rules, a Java HUD, and PumpkinPIE placeholders",
     "keywords": [
         "minecraft",
         "pumpkin",
@@ -10,7 +10,9 @@
         "waypoints",
         "navigation",
         "hud",
-        "permissions"
+        "permissions",
+        "pumpkin-pie",
+        "placeholders"
     ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/packages/waypoints#readme",
     "bugs": {
@@ -52,6 +54,7 @@
         "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/pumpkin-api": "catalog:",
+        "@pumpkin-plugins/pumpkin-pie-api": "workspace:*",
         "fflate": "catalog:"
     },
     "devDependencies": {
