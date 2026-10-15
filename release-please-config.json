@@ -62,8 +62,7 @@
             "release-as": "0.1.0"
         },
         "tools/cspell-dict-minecraft": {
-            "component": "cspell-dict-minecraft",
-            "release-as": "0.1.0"
+            "component": "cspell-dict-minecraft"
         },
         "tools/docs": {
             "component": "docs"
