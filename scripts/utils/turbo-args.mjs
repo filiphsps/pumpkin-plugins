@@ -1,7 +1,7 @@
 const DEFAULT_TURBO_FLAGS = [
     ['--output-logs', '--output-logs=new-only'],
     ['--log-order', '--log-order=grouped'],
-    ['--log-prefix', '--log-prefix=task'],
+    ['--log-prefix', '--log-prefix=none'],
 ];
 
 /** Add default Turbo flags unless the caller supplied those options.
