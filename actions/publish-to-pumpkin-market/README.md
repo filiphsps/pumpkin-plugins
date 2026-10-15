@@ -12,7 +12,7 @@ See the [action guide](https://filiphsps.github.io/pumpkin-plugins/actions/publi
 
 ```yaml
 steps:
-  - uses: filiphsps/pumpkin-plugins/actions/publish-to-pumpkin-market@publish-to-pumpkin-market-v0.0.6
+  - uses: filiphsps/pumpkin-plugins/actions/publish-to-pumpkin-market@publish-to-pumpkin-market-v0.0.7
     with:
       plugin-name: MyPlugin
       version: 1.2.3
