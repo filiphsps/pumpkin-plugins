@@ -1,7 +1,7 @@
 {
     "name": "minecraft-terms",
     "displayName": "Minecraft Terms",
-    "version": "0.0.0",
+    "version": "0.0.1",
     "private": true,
     "description": "Minecraft terminology for Code Spell Checker",
     "categories": [
