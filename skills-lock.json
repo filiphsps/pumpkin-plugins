@@ -49,6 +49,12 @@
             "skillPath": "skills/engineering/implement/SKILL.md",
             "computedHash": "b6371a0a6723bad551f3adc721e3729a6a97acfc3670dc2bdea198bbe78408c0"
         },
+        "implement-spec": {
+            "source": "mattpocock/skills",
+            "sourceType": "github",
+            "skillPath": "skills/engineering/implement-spec/SKILL.md",
+            "computedHash": "f0db7dafd236fff9dc40da566cb72bbad6802674f64617b06959b00a436c7d5b"
+        },
         "improve-codebase-architecture": {
             "source": "mattpocock/skills",
             "sourceType": "github",
@@ -78,6 +84,12 @@
             "sourceType": "github",
             "skillPath": "skills/engineering/tdd/SKILL.md",
             "computedHash": "daf55026f456af104a72fa43247f7bcec89e5127316dc5b1b8d675d6a9d8ce94"
+        },
+        "to-spec": {
+            "source": "mattpocock/skills",
+            "sourceType": "github",
+            "skillPath": "skills/engineering/to-spec/SKILL.md",
+            "computedHash": "3fa1a0695d4ea242fae9e569e4d22aa1788623197abb33bfadafae7315789bbf"
         },
         "triage": {
             "source": "mattpocock/skills",
