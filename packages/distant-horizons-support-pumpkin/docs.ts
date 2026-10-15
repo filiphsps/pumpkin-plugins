@@ -17,9 +17,7 @@ function formatDuration(milliseconds: number): string {
 
 /** Builds the placeholder reference from the service's typed name and description table. */
 function renderPlaceholderGuide(): string {
-    const rows = dhsPlaceholderDefinitions.map(
-        ({ name, description }) => `| \`%dhs_${name}%\` | ${description} |`,
-    );
+    const rows = dhsPlaceholderDefinitions.map(({ name, description }) => `| \`%dhs_${name}%\` | ${description} |`);
     const table = ['| Placeholder | Meaning |', '| --- | --- |', ...rows].join('\n');
     const retryDelay = formatDuration(SESSION_TIMING.maxRetryMs);
     const heartbeat = formatDuration(SESSION_TIMING.defaultPingMs);

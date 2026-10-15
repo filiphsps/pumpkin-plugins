@@ -19,7 +19,10 @@ export const dhsPlaceholderDefinitions = [
     { name: 'packet_bytes_sent', description: 'Cumulative Distant Horizons packet bytes sent.' },
     { name: 'cache_refreshes', description: 'Number of current background cache refreshes.' },
     { name: 'memory_entries', description: 'Number of entries in the memory cache.' },
-    { name: 'memory_bytes', description: 'Cached LOD payload byte lengths in memory, excluding JavaScript object overhead.' },
+    {
+        name: 'memory_bytes',
+        description: 'Cached LOD payload byte lengths in memory, excluding JavaScript object overhead.',
+    },
     { name: 'memory_limit', description: 'Memory cache entry limit; -1 means unlimited and 0 means disabled.' },
     { name: 'disk_entries', description: 'Number of entries indexed in the disk cache.' },
     { name: 'disk_bytes', description: 'Bytes indexed in the disk cache.' },

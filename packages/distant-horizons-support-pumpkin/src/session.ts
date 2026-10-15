@@ -48,14 +48,14 @@ export interface Peers {
 }
 /** Scalar live-session values for placeholder callbacks, excluding client queues and identities. */
 export interface SessionPlaceholderSnapshot {
-    readonly clients: number;
-    readonly pendingRequests: number;
-    readonly workerTicks: number;
-    readonly served: number;
-    readonly rejected: number;
-    readonly cancelled: number;
-    readonly packetBytesSent: number;
     readonly cacheRefreshes: number;
+    readonly cancelled: number;
+    readonly clients: number;
+    readonly packetBytesSent: number;
+    readonly pendingRequests: number;
+    readonly rejected: number;
+    readonly served: number;
+    readonly workerTicks: number;
 }
 interface Client {
     activeTransfer?: QueuedPacket;
