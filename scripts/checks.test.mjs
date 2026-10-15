@@ -934,7 +934,22 @@ describe('action release prerequisites', () => {
 
     it('requires the generator smoke test only when the classifier selects it', () => {
         const generator = ci.jobs.generator;
-        assert.equal(generator.if, "needs.changes.outputs.generator == 'true'");
+        for (const [selected, skipExpensiveChecks, expected] of [
+            ['true', 'false', true],
+            ['false', 'false', false],
+            ['true', 'true', false],
+        ]) {
+            assert.equal(
+                evaluate(generator.if, {
+                    needs: {
+                        changes: {
+                            outputs: { generator: selected, skip_expensive_checks: skipExpensiveChecks },
+                        },
+                    },
+                }),
+                expected,
+            );
+        }
         const gate = ci.jobs['generator-gate'];
         assert.ok(gate, 'Generator result gate is missing');
         assert.deepEqual(gate.needs, ['changes', 'generator']);
@@ -944,21 +959,24 @@ describe('action release prerequisites', () => {
 
         const step = gate.steps.find((entry) => entry.env?.GENERATOR_RESULT);
         assert.ok(step, 'Generator result gate has no generator result input');
-        for (const [selected, result, changes, expected] of [
-            ['true', 'success', 'success', 0],
-            ['true', 'failure', 'success', 1],
-            ['true', 'cancelled', 'success', 1],
-            ['true', 'skipped', 'success', 1],
-            ['false', 'skipped', 'success', 0],
-            ['false', 'success', 'success', 1],
-            ['false', 'failure', 'success', 1],
-            ['false', 'skipped', 'failure', 1],
+        for (const [selected, skipExpensiveChecks, result, changes, expected] of [
+            ['true', 'false', 'success', 'success', 0],
+            ['true', 'false', 'failure', 'success', 1],
+            ['true', 'false', 'cancelled', 'success', 1],
+            ['true', 'false', 'skipped', 'success', 1],
+            ['false', 'false', 'skipped', 'success', 0],
+            ['false', 'false', 'success', 'success', 1],
+            ['false', 'false', 'failure', 'success', 1],
+            ['false', 'false', 'skipped', 'failure', 1],
+            ['true', 'true', 'skipped', 'success', 0],
+            ['true', 'true', 'failure', 'success', 1],
         ]) {
             const outcome = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
                 encoding: 'utf8',
                 env: {
                     ...process.env,
                     GENERATOR: selected,
+                    SKIP_EXPENSIVE_CHECKS: skipExpensiveChecks,
                     GENERATOR_RESULT: result,
                     CHANGES_RESULT: changes,
                 },
@@ -975,7 +993,22 @@ describe('action release prerequisites', () => {
         assert.ok(Object.hasOwn(comparison.on, 'workflow_call'));
         assert.equal(job.uses, './.github/workflows/engine-comparison.yml');
         assert.deepEqual(job.needs, ['changes', 'build']);
-        assert.equal(job.if, "needs.changes.outputs.code == 'true'");
+        for (const [codeChanged, skipExpensiveChecks, expected] of [
+            ['true', 'false', true],
+            ['false', 'false', false],
+            ['true', 'true', false],
+        ]) {
+            assert.equal(
+                evaluate(job.if, {
+                    needs: {
+                        changes: {
+                            outputs: { code: codeChanged, skip_expensive_checks: skipExpensiveChecks },
+                        },
+                    },
+                }),
+                expected,
+            );
+        }
         assert.ok(
             Object.values(comparison.jobs).some((job) =>
                 job.steps?.some((step) => step.run?.includes('compare-engines')),
