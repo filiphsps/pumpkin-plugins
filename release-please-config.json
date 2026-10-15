@@ -69,8 +69,7 @@
             "release-as": "0.1.0"
         },
         "tools/docs": {
-            "component": "docs",
-            "release-as": "0.1.0"
+            "component": "docs"
         },
         "tools/minecraft-colors": {
             "component": "minecraft-colors",
