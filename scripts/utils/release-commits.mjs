@@ -119,20 +119,59 @@ async function firstPackageCommitSha(github, branch, path) {
     return firstCommit.sha;
 }
 
-/** Adds bundled dependency commits before Release Please computes versions, PR bodies and changelogs. */
-export function bundledChangesPlugin(github, branch, packages, releasedVersions, maxCommits = 500) {
+/** Adds bundled dependency commits and defers tools until their public dependencies have released.
+ *
+ * @param log - Receives messages when a public tool release candidate is deferred.
+ */
+export function bundledChangesPlugin(
+    github,
+    branch,
+    packages,
+    releasedVersions,
+    maxCommits = 500,
+    log = console.error,
+) {
+    const publicToolDependencies = new Map();
+    for (const pkg of packages.values()) {
+        if (
+            pkg.path.startsWith('tools/') &&
+            pkg.manifest.private !== true &&
+            pkg.manifest.publishConfig?.access === 'public'
+        ) {
+            publicToolDependencies.set(pkg.path, new Set());
+        }
+    }
+    for (const pkg of packages.values()) {
+        if (!publicToolDependencies.has(pkg.path)) continue;
+        const dependencies = new Set([
+            ...Object.keys(pkg.manifest.dependencies ?? {}),
+            ...Object.keys(pkg.manifest.optionalDependencies ?? {}),
+        ]);
+        for (const dependencyName of dependencies) {
+            const dependencyPath = packages.get(dependencyName)?.path;
+            if (publicToolDependencies.has(dependencyPath)) publicToolDependencies.get(pkg.path).add(dependencyPath);
+        }
+    }
+
+    function unreleasedDependencies(packagePath) {
+        const unreleased = [];
+        const visited = new Set();
+        const visit = (currentPath) => {
+            for (const dependencyPath of publicToolDependencies.get(currentPath) ?? []) {
+                if (visited.has(dependencyPath)) continue;
+                visited.add(dependencyPath);
+                const version = releasedVersions[dependencyPath]?.toString();
+                if (!version || version === '0.0.0') unreleased.push(dependencyPath);
+                else visit(dependencyPath);
+            }
+        };
+        visit(packagePath);
+        return unreleased;
+    }
+
     return {
         async preconfigure(strategies, commitsByPath, releasesByPath) {
-            const publicToolPaths = new Set(
-                [...packages.values()]
-                    .filter(
-                        ({ path, manifest }) =>
-                            path.startsWith('tools/') &&
-                            manifest.private !== true &&
-                            manifest.publishConfig?.access === 'public',
-                    )
-                    .map(({ path }) => path),
-            );
+            const publicToolPaths = new Set(publicToolDependencies.keys());
             const actionPaths = Object.keys(strategies).filter((path) => path.startsWith('actions/'));
             for (const path of actionPaths) {
                 const component = path.split('/').at(-1);
@@ -192,6 +231,15 @@ export function bundledChangesPlugin(github, branch, packages, releasedVersions,
             return strategies;
         },
         processCommits: (commits) => commits,
-        run: async (candidates) => candidates,
+        run: async (candidates) =>
+            candidates.filter((candidate) => {
+                if (!publicToolDependencies.has(candidate.path)) return true;
+                const unreleased = unreleasedDependencies(candidate.path);
+                if (unreleased.length === 0) return true;
+                log(
+                    `Deferring ${candidate.path} release PR until public dependencies release: ${unreleased.join(', ')}`,
+                );
+                return false;
+            }),
     };
 }

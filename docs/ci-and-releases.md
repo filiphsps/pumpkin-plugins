@@ -172,7 +172,8 @@ Changes to the dependency catalog or shared TypeScript configuration count for e
 
 On `master`, once the checks pass, [release-please](https://github.com/googleapis/release-please)
 keeps an independent release PR up to date for each plugin, action, VS Code extension, and public npm tool with
-releasable conventional commits. Merging a plugin release PR:
+releasable conventional commits. Public npm tool PRs wait until their transitive public production
+dependencies have functional releases. Merging a plugin release PR:
 
 - bumps each changed plugin's version and changelog,
 - tags it `<folder>-v<version>` and creates its GitHub release,

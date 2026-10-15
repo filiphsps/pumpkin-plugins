@@ -205,6 +205,69 @@ describe('bundled release commits', () => {
         assert.deepEqual(scoped['packages/plugin'], [history[0]]);
     });
 
+    it('defers a public tool release candidate until each public package dependency has released', async () => {
+        const packageManifest = (packagePath, dependencies = {}) => ({
+            path: packagePath,
+            manifest: { publishConfig: { access: 'public' }, dependencies },
+        });
+        const toolPackages = new Map([
+            [
+                '@pumpkin-plugins/build',
+                packageManifest('tools/build', {
+                    '@pumpkin-plugins/minecraft-colors': 'workspace:*',
+                    '@pumpkin-plugins/pumpkin-api': 'catalog:',
+                    '@pumpkin-plugins/static-hermes-runtime': 'workspace:*',
+                }),
+            ],
+            ['@pumpkin-plugins/minecraft-colors', packageManifest('tools/minecraft-colors')],
+            ['@pumpkin-plugins/pumpkin-api', packageManifest('tools/pumpkin-api')],
+            ['@pumpkin-plugins/static-hermes-runtime', packageManifest('tools/static-hermes-runtime')],
+        ]);
+        const candidate = { path: 'tools/build' };
+        const unrelatedCandidate = { path: 'packages/example' };
+        const dependencyPaths = ['tools/minecraft-colors', 'tools/pumpkin-api', 'tools/static-hermes-runtime'];
+        const readyVersions = Object.fromEntries([
+            ['tools/build', '0.1.0'],
+            ...dependencyPaths.map((packagePath) => [packagePath, '0.1.0']),
+        ]);
+
+        for (const packagePath of dependencyPaths) {
+            const versions = { ...readyVersions, [packagePath]: '0.0.0' };
+            const plugin = bundledChangesPlugin({}, 'master', toolPackages, versions, 500, () => {});
+
+            assert.deepEqual(
+                await plugin.run([candidate, unrelatedCandidate]),
+                [unrelatedCandidate],
+                `${packagePath} should block only the build release`,
+            );
+        }
+
+        const readyPlugin = bundledChangesPlugin({}, 'master', toolPackages, readyVersions, 500, () => {});
+        assert.deepEqual(await readyPlugin.run([candidate, unrelatedCandidate]), [candidate, unrelatedCandidate]);
+    });
+
+    it('checks transitive public package dependencies before allowing a release candidate', async () => {
+        const publicTool = (packagePath, dependencies = {}) => ({
+            path: packagePath,
+            manifest: { publishConfig: { access: 'public' }, dependencies },
+        });
+        const toolPackages = new Map([
+            ['@pumpkin-plugins/consumer', publicTool('tools/consumer', { '@pumpkin-plugins/build': '^0.1.0' })],
+            ['@pumpkin-plugins/build', publicTool('tools/build', { '@pumpkin-plugins/colors': '^0.1.0' })],
+            ['@pumpkin-plugins/colors', publicTool('tools/colors')],
+        ]);
+        const plugin = bundledChangesPlugin(
+            {},
+            'master',
+            toolPackages,
+            { 'tools/consumer': '0.1.0', 'tools/build': '0.1.0', 'tools/colors': '0.0.0' },
+            500,
+            () => {},
+        );
+
+        assert.deepEqual(await plugin.run([{ path: 'tools/consumer' }]), []);
+    });
+
     it('releases the public builder when its API or Static Hermes dependency changes', async () => {
         const history = [
             commit('builder-change', ['tools/build/src/cli.ts']),

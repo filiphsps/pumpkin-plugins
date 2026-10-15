@@ -36,10 +36,10 @@ npm versions are immutable.
 
 ## Publish functional releases
 
-Release Please creates the first functional release PR for each registered tool. The configured
-first functional version is `0.1.0`. The publish job orders selected tools from their declared
-production dependencies and packed project templates, so each consumer's required public
-dependencies are available before its publish job runs.
+Release Please creates a tool's release PR only after its transitive public production dependencies
+have functional releases. The configured first functional version is `0.1.0`. The publish job orders
+selected tools from their declared production dependencies and packed project templates, so each
+consumer's required public dependencies are available before its publish job runs.
 
 Release PR titles use the full `@pumpkin-plugins/<name>` package name for scoped tools, while tags
 keep using the folder component. The unscoped `create-pumpkin-plugin` title stays unscoped.
