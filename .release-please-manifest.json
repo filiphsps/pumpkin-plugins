@@ -1,6 +1,6 @@
 {
     "actions/publish-to-pumpkin-market": "0.0.6",
-    "actions/sign-pumpkin-plugin": "0.0.3",
+    "actions/sign-pumpkin-plugin": "0.0.4",
     "actions/update-pumpkin-market-listing": "0.0.3",
     "actions/verify-pumpkin-plugin": "0.0.4",
     "extensions/minecraft-terms": "0.0.1",
