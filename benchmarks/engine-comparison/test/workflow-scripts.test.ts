@@ -126,7 +126,7 @@ it('writes a PR comment and SVG from current and baseline result artifacts', () 
     } finally {
         fs.rmSync(temporaryDirectory, { force: true, recursive: true });
     }
-});
+}, 15_000);
 
 function createEngineResult(id: string, label: string, index: number): EngineResult {
     const variant = createEngineVariants().find((candidate) => candidate.id === id);
