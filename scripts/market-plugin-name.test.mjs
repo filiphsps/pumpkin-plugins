@@ -27,39 +27,66 @@ describe('market-plugin-name', () => {
         assert.equal(result.stdout.trim(), 'Published plugin');
     });
 
-    for (const { job, stepId } of [
-        { job: 'assets', stepId: 'plugin' },
-        { job: 'market', stepId: 'market' },
-    ]) {
-        it(`rejects line breaks before the ${job} job writes GitHub outputs`, () => {
-            const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'market-plugin-name-'));
-            dirs.push(dir);
-            fs.mkdirSync(path.join(dir, 'src'));
-            fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
-            fs.writeFileSync(
-                path.join(dir, 'src', 'info.ts'),
-                `export const info = { name: ${JSON.stringify('Published plugin\nplugin_name=Attacker')} };`,
-            );
+    it('validates the tagged plugin identity before writing asset job outputs', () => {
+        const sourceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'market-plugin-name-'));
+        dirs.push(sourceRoot);
+        fs.mkdirSync(path.join(sourceRoot, 'packages/plugin/src'), { recursive: true });
+        fs.writeFileSync(
+            path.join(sourceRoot, 'release-please-config.json'),
+            JSON.stringify({ packages: { 'packages/plugin': { component: 'plugin' } } }),
+        );
+        fs.writeFileSync(path.join(sourceRoot, '.release-please-manifest.json'), '{"packages/plugin":"1.2.3"}');
+        fs.writeFileSync(
+            path.join(sourceRoot, 'packages/plugin/package.json'),
+            JSON.stringify({
+                version: '1.2.3',
+                pumpkinPlugin: { info: 'src/info.mjs', output: 'build/plugin.wasm' },
+            }),
+        );
+        fs.writeFileSync(
+            path.join(sourceRoot, 'packages/plugin/src/info.mjs'),
+            `export const info = { name: ${JSON.stringify('Published plugin\nplugin_name=Attacker')} };`,
+        );
 
-            const step = releaseWorkflow.jobs[job].steps.find(({ id }) => id === stepId);
-            assert.ok(step?.run, `missing run block for ${job} job`);
+        const step = releaseWorkflow.jobs.assets.steps.find(({ id }) => id === 'plugin');
+        assert.ok(step?.run, 'missing asset input resolver run block');
 
-            const outputFile = path.join(dir, 'github-output');
-            fs.writeFileSync(outputFile, '');
-            const result = spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', step.run], {
-                cwd: root,
-                encoding: 'utf8',
-                env: {
-                    ...process.env,
-                    GITHUB_OUTPUT: outputFile,
-                    PLUGIN_DIRECTORY: dir,
-                    RELEASE_TAG: 'plugin-v1.2.3',
-                },
-            });
-
-            assert.notEqual(result.status, 0, result.stderr);
-            assert.match(result.stderr, /nonempty single-line name/);
-            assert.equal(fs.readFileSync(outputFile, 'utf8'), '');
+        const outputFile = path.join(sourceRoot, 'github-output');
+        fs.writeFileSync(outputFile, '');
+        const result = spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', step.run], {
+            cwd: root,
+            encoding: 'utf8',
+            env: { ...process.env, GITHUB_OUTPUT: outputFile, SOURCE_ROOT: sourceRoot, TAG: 'plugin-v1.2.3' },
         });
-    }
+
+        assert.notEqual(result.status, 0, result.stderr);
+        assert.match(result.stderr, /single-line name/);
+        assert.equal(fs.readFileSync(outputFile, 'utf8'), '');
+    });
+
+    it('uses the release artifact metadata for Market inputs', () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'market-plugin-name-'));
+        dirs.push(dir);
+        fs.mkdirSync(path.join(dir, 'dist'));
+        fs.writeFileSync(
+            path.join(dir, 'dist', 'release-metadata.json'),
+            JSON.stringify({ plugin_name: 'UPnPumpkin', version: '1.2.3', wasm_file: 'dist/plugin.wasm' }),
+        );
+
+        const step = releaseWorkflow.jobs.market.steps.find(({ id }) => id === 'market');
+        assert.ok(step?.run, 'missing Market input resolver run block');
+
+        const outputFile = path.join(dir, 'github-output');
+        const result = spawnSync('bash', ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', step.run], {
+            cwd: dir,
+            encoding: 'utf8',
+            env: { ...process.env, GITHUB_OUTPUT: outputFile },
+        });
+
+        assert.equal(result.status, 0, result.stderr);
+        assert.equal(
+            fs.readFileSync(outputFile, 'utf8'),
+            'plugin_name=UPnPumpkin\nversion=1.2.3\nwasm_file=dist/plugin.wasm\n',
+        );
+    });
 });

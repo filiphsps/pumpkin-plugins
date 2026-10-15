@@ -8,6 +8,17 @@ import { recoverImmutableReleaseConflict } from './utils/release-recovery.mjs';
 const root = resolve(import.meta.dirname, '..');
 const releaseConfig = JSON.parse(readFileSync(resolve(root, 'release-please-config.json'), 'utf8'));
 const releaseManifest = JSON.parse(readFileSync(resolve(root, '.release-please-manifest.json'), 'utf8'));
+const upnpumpkinConfig = {
+    ...releaseConfig.packages['packages/upnpumpkin'],
+    includeComponentInTag: releaseConfig['include-component-in-tag'],
+    includeVInTag: releaseConfig['include-v-in-tag'],
+    tagSeparator: releaseConfig['tag-separator'],
+};
+const upnpumpkinRelease = {
+    tagName: 'upnpumpkin-v0.0.8',
+    sha: 'plugin-release-sha',
+    notes: 'UPnPumpkin release notes',
+};
 const codemodConfig = {
     ...releaseConfig.packages['tools/codemod'],
     includeComponentInTag: releaseConfig['include-component-in-tag'],
@@ -203,6 +214,69 @@ it('routes a previously created codemod release for its commit to npm publishing
         toolPaths: ['tools/codemod'],
         extensionPaths: [],
     });
+});
+
+it('catches up a first-parent plugin release when both GitHub assets are missing', async () => {
+    const result = await collect({
+        repositoryConfig: { 'packages/upnpumpkin': upnpumpkinConfig },
+        releasedVersions: {},
+        existingReleases: [upnpumpkinRelease],
+        firstParentShas: new Set(['release-sha', upnpumpkinRelease.sha]),
+        getReleaseAssets: async () => ({ assets: [], immutable: false }),
+    });
+
+    assert.deepEqual(result.releases, [
+        {
+            ...upnpumpkinRelease,
+            path: 'packages/upnpumpkin',
+            version: '0.0.8',
+            recovered: true,
+            rebuildFromTag: true,
+        },
+    ]);
+    assert.deepEqual(result.paths.pluginPaths, ['packages/upnpumpkin']);
+});
+
+it('ignores off-branch plugin releases and leaves complete asset pairs alone', async () => {
+    const completeRelease = { ...upnpumpkinRelease, tagName: 'upnpumpkin-v0.0.7', sha: 'complete-release-sha' };
+    const inspectedTags = [];
+    const result = await collect({
+        repositoryConfig: { 'packages/upnpumpkin': upnpumpkinConfig },
+        releasedVersions: {},
+        existingReleases: [{ ...upnpumpkinRelease, sha: 'off-branch-sha' }, completeRelease],
+        firstParentShas: new Set(['release-sha', completeRelease.sha]),
+        getReleaseAssets: async (tagName) => {
+            inspectedTags.push(tagName);
+            return {
+                assets: ['upnpumpkin.wasm', 'upnpumpkin.wasm.sha256'],
+                immutable: false,
+            };
+        },
+    });
+
+    assert.deepEqual(result.releases, []);
+    assert.deepEqual(inspectedTags, [completeRelease.tagName]);
+});
+
+it('skips partial or immutable historical plugin releases with warnings', async () => {
+    const immutableRelease = { ...upnpumpkinRelease, tagName: 'upnpumpkin-v0.0.7', sha: 'immutable-release-sha' };
+    const warnings = [];
+    const result = await collect({
+        repositoryConfig: { 'packages/upnpumpkin': upnpumpkinConfig },
+        releasedVersions: {},
+        existingReleases: [upnpumpkinRelease, immutableRelease],
+        firstParentShas: new Set(['release-sha', upnpumpkinRelease.sha, immutableRelease.sha]),
+        getReleaseAssets: async (tagName) =>
+            tagName === upnpumpkinRelease.tagName
+                ? { assets: ['upnpumpkin.wasm'], immutable: false }
+                : { assets: [], immutable: true },
+        log: (message) => warnings.push(message),
+    });
+
+    assert.deepEqual(result.releases, []);
+    assert.equal(warnings.length, 2);
+    assert.match(warnings[0], /partial asset pair/);
+    assert.match(warnings[1], /immutable release/);
 });
 
 it('limits a manual release replay to npm packages at the requested release commit', async () => {
