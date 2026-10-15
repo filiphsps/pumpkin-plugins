@@ -162,7 +162,60 @@ describe('waypoint placeholder service', () => {
         ]);
 
         service.stop();
+        service.stop();
         expect(transport.messages).toHaveLength(3);
         expect(transitions).toEqual(['ready', 'unavailable']);
+    });
+
+    it('returns to unavailable if the provider rejects the namespace registration', () => {
+        const { catalog, server } = setup();
+        const clock = new FakeClock();
+        const transport = new FakeTransport();
+        const transitions: string[] = [];
+        const service = new WaypointPlaceholderService(server, catalog, {
+            now: clock.now,
+            send: transport.send,
+            onTransition: (state) => transitions.push(state.kind),
+        });
+
+        transport.enqueue({
+            ok: true,
+            ping: { protocol: 0, name: 'PumpkinPIE', version: '0.2.3', placeholders: 1, expansions: 0 },
+        });
+        transport.enqueue({
+            ok: true,
+            registered_expansion: {
+                namespace: 'waypoints',
+                placeholders: waypointPlaceholderNames,
+                cache: { kind: 'never' },
+            },
+        });
+        service.tick();
+        clock.advance(30_000);
+        transport.enqueue({
+            ok: true,
+            ping: { protocol: 0, name: 'PumpkinPIE', version: '0.2.3', placeholders: 1, expansions: 0 },
+        });
+        transport.enqueue({ ok: false, error: 'namespace already owned' });
+        service.tick();
+
+        expect(transitions).toEqual(['ready', 'unavailable']);
+        expect(transport.messages.map(({ request: sent }) => sent)).toEqual([
+            { op: 'ping' },
+            {
+                op: 'register_expansion',
+                namespace: 'waypoints',
+                placeholders: waypointPlaceholderNames,
+                cache: { kind: 'never' },
+            },
+            { op: 'ping' },
+            {
+                op: 'register_expansion',
+                namespace: 'waypoints',
+                placeholders: waypointPlaceholderNames,
+                cache: { kind: 'never' },
+            },
+        ]);
+        service.stop();
     });
 });
