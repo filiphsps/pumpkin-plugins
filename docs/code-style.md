@@ -42,13 +42,14 @@ for values in console log messages. It applies terminal colors using the same na
 `color.named`, which formats Minecraft codes for chat replies. Keep the surrounding message plain
 and do not add formatting codes directly at log call sites.
 
+<!-- These Pumpkin source links are generated from the test-harness pin. Run `pnpm readme`. -->
 Keep this palette aligned with the Pumpkin server version pinned in
 [`tools/test-harness/src/pumpkin-version.ts`](../tools/test-harness/src/pumpkin-version.ts). Pumpkin
 uses cyan for plugin names, green for versions and bold yellow for permissions in its
-[plugin permission prompt](https://github.com/Pumpkin-MC/Pumpkin/blob/0.2.0%2B26.3-26.51/crates/pumpkin/src/plugin/mod.rs#L493-L504).
-Its [rolling log file layer](https://github.com/Pumpkin-MC/Pumpkin/blob/0.2.0%2B26.3-26.51/crates/pumpkin/src/logging.rs#L281-L335)
-strips ANSI codes before writing saved logs. When the pinned server version changes, check both
-source references and update the named roles if its palette or log handling changes.
+[plugin permission prompt](https://github.com/Pumpkin-MC/Pumpkin/blob/0.2.0%2B26.3-26.51/crates/pumpkin/src/plugin/mod.rs).
+Its [rolling log file layer](https://github.com/Pumpkin-MC/Pumpkin/blob/0.2.0%2B26.3-26.51/crates/pumpkin/src/logging.rs)
+strips ANSI codes before writing saved logs. Review these sources when the pinned server changes;
+update the named roles if its palette or log handling changes.
 
 ## Structure
 

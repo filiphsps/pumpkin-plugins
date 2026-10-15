@@ -97,7 +97,8 @@ then recreate it. The new relationship must complete a successful OIDC publish w
 
 npm CLI `11.15.0` or newer is required to run the `npm trust` setup command. For the automated
 trusted-publish operation, npm CLI `11.5.1` or newer and Node `22.14.0` or newer are required. The
-repository's publish workflow uses Node `24.21.0` and checks the npm minimum before publishing.
+repository's [publish workflow](../.github/workflows/release.yml) sets its Node version and checks
+the npm minimum before publishing.
 The workflow publishes from GitHub-hosted runners in this public GitHub repository.
 
 npm automatically generates provenance for public packages published through trusted publishing

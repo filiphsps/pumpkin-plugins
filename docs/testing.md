@@ -52,7 +52,7 @@ await server.stop();
 | --- | --- |
 | `server.javaPort`, `server.bedrockPort` | The free ports the server listens on |
 | `server.logs()`, `server.lines` | Server output with color codes removed |
-| `server.errors()` | `ERROR` lines, minus one Pumpkin 0.2.0 logs on every fresh start (`Failed to save level.dat`) |
+| `server.errors()` | `ERROR` lines except the harness's baseline errors ([defined in `instance.ts`](../tools/test-harness/src/instance.ts)) |
 | `server.waitForLog(pattern, timeoutMs?, fromIndex?)` | Resolves with the first matching line |
 | `server.command(text)` | Runs a console command |
 | `server.pluginDataDir(name)` | Path of `plugins/data/<name>/` |
@@ -67,14 +67,14 @@ plugin build in the integration job.
 
 ## Packed standalone consumer
 
-Run `pnpm run test:external-consumer` with Node `24.21.0` and pnpm `12.11.2` to pack the internal
-production dependencies, install them from a temporary local registry, invoke the packed creator
+Run `pnpm run test:external-consumer` with the Node, pnpm and host-tool versions listed in the
+[Static Hermes Runtime guide](../tools/static-hermes-runtime/README.md). It packs the internal
+production dependencies, installs them from a temporary local registry, invokes the packed creator
 binary and both real `pnpm create pumpkin-plugin` language flows, then typecheck and build both
 starters. By default, the check uses a temporary pnpm store and Static Hermes cache outside the
 consumer and removes its temporary project when it finishes. Set
 `PUMPKIN_EXTERNAL_CONSUMER_PNPM_STORE_DIR` and `STATIC_HERMES_CACHE_DIR` to use persistent caches;
-the workflow saves and restores both per platform. CI runs on Linux x64, macOS arm64 and Windows x64;
-host-tool versions are pinned in the [Static Hermes Runtime guide](../tools/static-hermes-runtime/README.md).
+CI saves and restores both in the [external-consumer workflow](../.github/workflows/external-consumer.yml).
 
 The check also installs only the packed builder's production dependencies with pnpm hoisting disabled
 and runs its CLI without an ambient TypeScript installation. Run
@@ -91,7 +91,7 @@ with newly selected ports.
 
 ## The server binary
 
-The release is pinned in `tools/test-harness/src/pumpkin-version.ts`, and its plugin ABI should match
+The release is pinned in [`pumpkin-version.ts`](../tools/test-harness/src/pumpkin-version.ts), and its plugin ABI should match
 the WIT ABI carried by `@pumpkin-plugins/pumpkin-api` in `pnpm-workspace.yaml`. Which binary runs:
 
 1. `PUMPKIN_BIN`, if set.
