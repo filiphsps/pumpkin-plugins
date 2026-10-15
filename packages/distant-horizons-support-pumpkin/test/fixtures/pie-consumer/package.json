@@ -1,0 +1,21 @@
+{
+    "name": "dhs-pie-consumer-fixture",
+    "version": "0.0.0",
+    "private": true,
+    "keywords": [
+        "pumpkin",
+        "pumpkin-pie",
+        "plugin",
+        "test-fixture"
+    ],
+    "type": "module",
+    "dependencies": {
+        "@pumpkin-plugins/pumpkin-pie-api": "catalog:"
+    },
+    "pumpkinPlugin": {
+        "entry": "src/plugin.ts",
+        "output": "dhs-pie-consumer-fixture.wasm",
+        "engine": "quickjs",
+        "wasi": []
+    }
+}

@@ -31,7 +31,8 @@ export class DistantHorizonsPlaceholderService {
         });
         const handlers: Record<string, ExpansionHandler> = {};
         for (const { name } of dhsPlaceholderDefinitions) {
-            handlers[name] = ({ viewer, argument }) => this.resolve(name, viewer, argument);
+            handlers[name] = ({ name: requestedName, viewer, argument }) =>
+                this.resolve(requestedName, viewer, argument);
         }
         this.session.registerExpansion('dhs', handlers, { kind: 'never' });
     }
@@ -53,7 +54,8 @@ export class DistantHorizonsPlaceholderService {
 
     private resolve(name: string, viewer: string | undefined, argument: string | undefined): string | undefined {
         if (argument !== undefined) return undefined;
-        if (name === 'client_connected') return viewer === undefined ? undefined : String(this.options.sessions.hasClient(viewer));
+        if (name === 'client_connected')
+            return viewer === undefined ? undefined : String(this.options.sessions.hasClient(viewer));
 
         const snapshot = this.options.sessions.placeholderSnapshot();
         switch (name) {

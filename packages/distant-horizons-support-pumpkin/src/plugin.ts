@@ -7,6 +7,8 @@ import type {
     PlayerCustomPayloadEventData,
     PlayerLeaveEventData,
 } from 'pumpkin:plugin/event@0.1.0';
+import type { IpcMessage, PluginId } from 'pumpkin:plugin/ipc@0.1.0';
+import { now as monotonicNow } from 'wasi:clocks/monotonic-clock@0.2.3';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
 import { hostLogger } from '@pumpkin-plugins/plugin-kit/host';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
@@ -18,6 +20,7 @@ import { readSettings } from './config/load.ts';
 import { info } from './info.ts';
 import { LodCache } from './lod/cache.ts';
 import { PLUGIN_NAME } from './name.ts';
+import { DistantHorizonsPlaceholderService } from './placeholders/service.ts';
 import { serverPeers, withPlayer } from './platform/peers.ts';
 import { invalidateBlockGrow, invalidateBlockSpread } from './platform/world-mutations.ts';
 import { CHANNEL, PROTOCOL } from './protocol/messages.ts';
@@ -26,6 +29,7 @@ import { Sessions } from './session.ts';
 /** Serves Distant Horizons requests from loaded chunks and previously captured terrain. */
 class DistantHorizonsSupportPumpkin extends PluginBase {
     private dataDir: WasiDataDir | undefined;
+    private placeholders: DistantHorizonsPlaceholderService | undefined;
 
     constructor() {
         super(info, __PLUGIN_VERSION__);
@@ -38,6 +42,7 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
         try {
             this.initializePlugin(ctx, files);
         } catch (error) {
+            this.stopPlaceholders();
             this.disposeDataDir();
             throw error;
         }
@@ -47,6 +52,12 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
         const settings = readSettings(files, hostLogger);
         const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries);
         const sessions = new Sessions(settings, cache, hostLogger);
+        this.placeholders = new DistantHorizonsPlaceholderService({
+            sessions,
+            cache,
+            now: monotonicMilliseconds,
+            onTransition: (state) => hostLogger.info(`${PLUGIN_NAME}: PumpkinPIE provider is ${state.kind}`),
+        });
         registerCommands(ctx, commands, commandHandlers(sessions, cache, settings));
         this.registerEvent(ctx, 'player-custom-payload-event', (_server, event: PlayerCustomPayloadEventData) => {
             if (event.channel !== CHANNEL) return;
@@ -62,6 +73,11 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
         });
         this.registerEvent(ctx, 'server-tick-end-event', (server) => {
             sessions.tick(serverPeers(server, settings, hostLogger), server.getMspt());
+            try {
+                this.placeholders?.tick();
+            } catch {
+                hostLogger.warn(`${PLUGIN_NAME}: PumpkinPIE session tick failed`);
+            }
         });
         this.registerEvent(ctx, 'block-place-event', (_server, event: BlockPlaceEventData) => {
             if (event.cancelled) return;
@@ -93,7 +109,27 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
     }
 
     protected override onPluginUnload(_ctx: Context): void {
+        this.stopPlaceholders();
         this.disposeDataDir();
+    }
+
+    /** Releases the local PumpkinPIE session before the plugin's data directory. */
+    private stopPlaceholders(): void {
+        const placeholders = this.placeholders;
+        this.placeholders = undefined;
+        try {
+            placeholders?.stop();
+        } catch {
+            hostLogger.warn(`${PLUGIN_NAME}: failed to stop PumpkinPIE session`);
+        }
+    }
+
+    /** Routes authenticated provider callbacks to the active expansion router. */
+    override handleIpcMessage(sender: PluginId, message: IpcMessage): IpcMessage {
+        const placeholders = this.placeholders;
+        return placeholders === undefined
+            ? super.handleIpcMessage(sender, message)
+            : placeholders.handleIpcMessage(sender, message);
     }
 
     private disposeDataDir(): void {
@@ -102,6 +138,11 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
         files?.[Symbol.dispose]();
     }
 }
+
+function monotonicMilliseconds(): number {
+    return Number(monotonicNow() / 1_000_000n);
+}
+
 registerPlugin(new DistantHorizonsSupportPumpkin());
 
 export { handleCommand, handleTask } from '@pumpkin-plugins/plugin-kit/plugin';

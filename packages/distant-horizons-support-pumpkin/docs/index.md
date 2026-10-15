@@ -14,3 +14,4 @@ later requests.
 - Read the setup guide before installing to check client compatibility, permissions, and first-start
   settings.
 - Use the troubleshooting guide for unavailable terrain, stale cache entries, and server status.
+- See the [PumpkinPIE placeholder reference](placeholders.md) for DH status and cache values.

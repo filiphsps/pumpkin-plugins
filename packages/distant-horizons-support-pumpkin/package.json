@@ -39,8 +39,8 @@
     "scripts": {
         "build": "pumpkin-plugins-build",
         "build:parse-ts": "pumpkin-plugins-build --parse-ts",
-        "readme": "pumpkin-plugins-docs",
-        "readme:check": "pumpkin-plugins-docs --check",
+        "readme": "pumpkin-plugins-docs && pumpkin-plugins-docs generate docs.ts",
+        "readme:check": "pumpkin-plugins-docs --check && pumpkin-plugins-docs generate docs.ts --check",
         "test": "vitest run --project unit",
         "test:coverage": "vitest run --project unit --coverage",
         "test:integration": "vitest run --project integration",

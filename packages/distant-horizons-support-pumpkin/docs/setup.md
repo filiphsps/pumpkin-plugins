@@ -27,3 +27,8 @@ credit bucket holds at most one full DH fragment message. Zero is unlimited.
 
 Use the plugin's status and cache commands to check connected clients and cache usage after
 connecting.
+
+PumpkinPIE integration is optional. Distant Horizons Support continues to load if PumpkinPIE is
+absent and reconnects automatically if it becomes available later. The `dhs` expansion exposes
+session and cache values to PumpkinPIE consumers; it does not add a required host plugin dependency.
+See the [placeholder reference](placeholders.md) for identifiers, values and retry behavior.
