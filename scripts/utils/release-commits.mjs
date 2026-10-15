@@ -194,13 +194,18 @@ export function bundledChangesPlugin(
                     if (packagePaths.includes(path)) boundaries.add(await firstPackageCommitSha(github, branch, path));
                 } else {
                     const previousRelease = await previousPublishedRelease(github, release?.tag);
-                    if (!previousRelease?.sha) {
+                    if (previousRelease?.sha) {
+                        releasesByPath[path] = previousRelease;
+                        boundaries.add(previousRelease.sha);
+                    } else if (packagePaths.includes(path)) {
+                        const introductionSha = await firstPackageCommitSha(github, branch, path);
+                        releasesByPath[path] = { ...release, sha: introductionSha };
+                        boundaries.add(introductionSha);
+                    } else {
                         throw new Error(
                             `Cannot find a published release before ${release?.tag ?? releasedVersions[path]} for ${path}`,
                         );
                     }
-                    releasesByPath[path] = previousRelease;
-                    boundaries.add(previousRelease.sha);
                 }
             }
             // Fetch unfiltered history for plugin dependency commits and action release boundaries.

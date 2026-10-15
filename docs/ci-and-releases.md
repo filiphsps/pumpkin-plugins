@@ -281,10 +281,11 @@ before generating PRs. Each plugin's commits stop at its own latest release, and
 start at the commit that added the plugin's `package.json`.
 Action commits are trimmed to their latest release boundary, so first-release notes do not repeat in
 the next release. If a manifest version has no matching GitHub release or tag, the helper uses the
-latest published release for that component with a lower version as the history boundary. It fails
-if no such release or package introduction commit exists, or if it cannot fetch enough history,
-rather than publishing incomplete notes. Increase `commit-search-depth` in the release configuration
-if a component has more than that many commits since its boundary.
+latest published release for that component with a lower version as the history boundary. If none
+exists, package paths fall back to the commit that introduced their `package.json`. It fails if no
+release or package introduction boundary exists, or if it cannot fetch enough history, rather than
+publishing incomplete notes. Increase `commit-search-depth` in the release configuration if a
+component has more than that many commits since its boundary.
 Changelogs stay generated; do not edit them by hand. Empty version-only `Release-As` commits need a
 conventional-commit scope matching the component so only that release is affected.
 

@@ -326,6 +326,51 @@ describe('bundled release commits', () => {
         assert.deepEqual(scoped['packages/plugin'], history.slice(0, 2));
     });
 
+    it('uses the package introduction as a boundary when no earlier release is published', async () => {
+        const packagePath = 'tools/cspell-dict-minecraft';
+        const history = [
+            commit('after-introduction', [`${packagePath}/src/words.txt`]),
+            commit('introduction', [`${packagePath}/package.json`, `${packagePath}/src/words.txt`]),
+        ];
+        const github = {
+            getGitHubApi() {
+                return {
+                    repository: { owner: 'owner', repo: 'repo' },
+                    octokit: {
+                        rest: { repos: { listCommits: 'listCommits' } },
+                        async paginate(_endpoint, options) {
+                            assert.deepEqual(options, {
+                                owner: 'owner',
+                                repo: 'repo',
+                                sha: 'master',
+                                path: `${packagePath}/package.json`,
+                                per_page: 100,
+                            });
+                            return [{ sha: 'latest' }, { sha: 'introduction' }];
+                        },
+                    },
+                };
+            },
+            async *releaseIterator() {},
+            async *mergeCommitIterator() {
+                yield* history;
+            },
+        };
+        const plugin = bundledChangesPlugin(github, 'master', packages, { [packagePath]: '0.1.0' });
+        const commits = { [packagePath]: [] };
+        const releases = {
+            [packagePath]: { tag: new TestTagName('0.1.0', 'cspell-dict-minecraft'), sha: '' },
+        };
+
+        await plugin.preconfigure({ [packagePath]: {} }, commits, releases);
+
+        assert.equal(releases[packagePath].sha, 'introduction');
+        assert.deepEqual(
+            commits[packagePath].map((entry) => entry.sha),
+            ['after-introduction'],
+        );
+    });
+
     it('routes an empty Release-As commit only to its matching component', async () => {
         const history = [
             commit('plugin-release-as', [], 'chore(plugin): recover release\n\nRelease-As: 0.0.5'),

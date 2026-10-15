@@ -347,13 +347,15 @@ describe('publishToolPackages', () => {
                     requested.push(`${packageName}@${version}`);
                     return packageName === API_NAME ? 'sha512-api' : null;
                 },
+                waitForRegistry: async () => {},
                 publishPackage: async () => {},
                 log: () => {},
             }),
             /@example\/runtime@1\.3\.4.*required by @example\/build@2\.3\.4.*not found/i,
         );
 
-        assert.deepEqual(requested, expectedPrerequisites);
+        assert.deepEqual(requested[0], expectedPrerequisites[0]);
+        assert.deepEqual(requested.slice(1), Array(8).fill(expectedPrerequisites[1]));
     });
 
     it('checks each consumer against its declared public dependencies', async () => {
@@ -380,6 +382,46 @@ describe('publishToolPackages', () => {
 
             assert.deepEqual(requested, expectedPrerequisites);
         }
+    });
+
+    it('waits for a newly published prerequisite to appear before publishing its dependent', async () => {
+        const root = createRoot();
+        const packagePath = 'tools/kit';
+        const prerequisite = '@example/update@8.9.10';
+        const responses = new Map([
+            ['@example/docs@6.6.7', ['sha512-docs']],
+            [`${API_NAME}@1.2.3`, ['sha512-api']],
+            [prerequisite, [null, 'sha512-update']],
+            [`${toolNames[packagePath]}@${versions[packagePath]}`, [null]],
+        ]);
+        const requested = [];
+        const published = [];
+        const waits = [];
+
+        await publishToolPackages({
+            root,
+            selectedPaths: [packagePath],
+            releaseMetadata: createReleaseMetadata([packagePath]),
+            packPackage: createPackAdapter(root),
+            getRegistryIntegrity: async (packageName, version) => {
+                const key = `${packageName}@${version}`;
+                requested.push(key);
+                return responses.get(key)?.shift() ?? null;
+            },
+            waitForRegistry: async (delayMs) => waits.push(delayMs),
+            publishPackage: async ({ packageName, version }) => published.push(`${packageName}@${version}`),
+            log: () => {},
+        });
+
+        assert.deepEqual(requested, [
+            '@example/docs@6.6.7',
+            `${API_NAME}@1.2.3`,
+            prerequisite,
+            prerequisite,
+            `${toolNames[packagePath]}@${versions[packagePath]}`,
+        ]);
+        assert.deepEqual(published, [`${toolNames[packagePath]}@${versions[packagePath]}`]);
+        assert.deepEqual(waits, [2_000]);
     });
 
     it('checks each embedded project manifest before publishing its package', async () => {

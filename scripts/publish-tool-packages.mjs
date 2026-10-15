@@ -18,6 +18,11 @@ import {
 
 const rootDirectory = fileURLToPath(new URL('..', import.meta.url));
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const REGISTRY_VISIBILITY_RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000, 30_000, 30_000];
+
+function wait(milliseconds) {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
 
 /**
  * Publishes selected public tools sequentially after validating their release tags, packed files,
@@ -28,9 +33,10 @@ const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?
  * @param {string[]} options.selectedPaths - Released workspace paths from Release Please.
  * @param {Record<string, unknown>} options.releaseMetadata - Release Please outputs keyed by path and field.
  * @param {(packagePath: string, root: string) => Promise<object>} [options.packPackage] - Creates and inspects one package tarball.
- * @param {(packageName: string, version: string) => Promise<string | null>} [options.getRegistryIntegrity] - Reads one exact version; null means definitive not found.
+ * @param {(packageName: string, version: string) => Promise<string | null>} [options.getRegistryIntegrity] - Reads one exact version; null means it is not currently visible.
  * @param {(release: object) => Promise<void>} [options.publishPackage] - Publishes one verified tarball.
  * @param {(message: string) => void} [options.log] - Receives progress messages.
+ * @param options.waitForRegistry - Waits for a delay in milliseconds before retrying a missing prerequisite.
  * @returns {Promise<void>} Resolves after every selected package is published or verified as identical.
  * @throws {Error} When release metadata, package contents, dependencies, registry responses, or integrity disagree.
  */
@@ -42,6 +48,7 @@ export async function publishToolPackages({
     getRegistryIntegrity = getNpmRegistryIntegrity,
     publishPackage = publishNpmTarball,
     log = console.log,
+    waitForRegistry = wait,
 }) {
     if (!Array.isArray(selectedPaths)) throw new Error('released tool paths must be a JSON array');
     if (!releaseMetadata || typeof releaseMetadata !== 'object' || Array.isArray(releaseMetadata)) {
@@ -85,6 +92,7 @@ export async function publishToolPackages({
                     selectedPathSet,
                     completedVersions,
                     getRegistryIntegrity,
+                    waitForRegistry,
                 });
             }
 
@@ -182,6 +190,7 @@ async function assertPrerequisiteAvailable({
     selectedPathSet,
     completedVersions,
     getRegistryIntegrity,
+    waitForRegistry,
 }) {
     const prerequisitePath = packagePathByName.get(prerequisite.packageName);
     const requiredLabel = `${prerequisite.packageName}@${prerequisite.version}`;
@@ -200,8 +209,14 @@ async function assertPrerequisiteAvailable({
         return;
     }
 
-    const integrity = await getRegistryIntegrity(prerequisite.packageName, prerequisite.version);
+    let integrity = await getRegistryIntegrity(prerequisite.packageName, prerequisite.version);
     validateRegistryIntegrityResult(integrity, prerequisite.packageName, prerequisite.version);
+    for (const delayMs of REGISTRY_VISIBILITY_RETRY_DELAYS_MS) {
+        if (integrity !== null) return;
+        await waitForRegistry(delayMs);
+        integrity = await getRegistryIntegrity(prerequisite.packageName, prerequisite.version);
+        validateRegistryIntegrityResult(integrity, prerequisite.packageName, prerequisite.version);
+    }
     if (integrity === null) {
         throw new Error(`${requiredLabel} required by ${consumerLabel} was not found on npm`);
     }

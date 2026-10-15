@@ -49,9 +49,10 @@ job scans non-draft public-tool releases on the target commit's first-parent his
 run. It checks which historical versions are missing from npm, then packs and publishes them from
 their exact release commits, oldest first. It publishes the current commit's selected tools after
 catch-up, checking exact dependency versions and registry integrity before using npm trusted
-publishing and provenance. This recovers releases when a rapid series of pushes replaces an older
-pending CI run. See
-[Trusted publishing for npm tools](npm-trusted-publishing.md) for setup and recovery.
+publishing and provenance. When an exact-version prerequisite is not yet visible in npm, the
+publisher retries its lookup for up to about two minutes to allow registry propagation. This
+recovers releases when a rapid series of pushes replaces an older pending CI run. See [Trusted
+publishing for npm tools](npm-trusted-publishing.md) for setup and recovery.
 
 To recover immediately without another push, dispatch the `ci.yml` caller with the full commit SHA
 that the release tag targets. For codemod, resolve its tag before dispatching:
