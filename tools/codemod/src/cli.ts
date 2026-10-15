@@ -1,9 +1,8 @@
 import { Command } from '@commander-js/extra-typings';
+import { availableCodemods } from './codemods/available.js';
 import { codemods } from './codemods/index.js';
 import { runCodemod } from './runner.js';
 import { runUpdateBuild, type UpdateBuildOptions } from './update-build.js';
-
-const updateBuildDescription = 'Update @pumpkin-plugins/build and apply its release migrations.';
 
 /** Output functions and working directory used by the CLI. */
 export interface CliOptions {
@@ -40,13 +39,6 @@ export async function runCli(argv: string[] = process.argv, options: CliOptions 
         .action(async (codemodId, paths, flags) => {
             if (codemodId === 'list') {
                 if (paths.length > 0) throw new Error('The list command does not accept file paths.');
-                const availableCodemods = [
-                    ...codemods.map(({ id, description }) => ({ id, description })),
-                    {
-                        id: 'update-build',
-                        description: updateBuildDescription,
-                    },
-                ];
                 stdout(
                     `Available codemods:\n${availableCodemods.map(({ id, description }) => `  ${id}  ${description}`).join('\n')}\n`,
                 );

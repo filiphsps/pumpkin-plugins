@@ -1,8 +1,26 @@
 # Using codemods
 
 `@pumpkin-plugins/codemod` provides named, repeatable migrations for Pumpkin plugin projects. The
-CLI previews changes by default. It writes files only when you pass `--write`. The package requires
-Node.js `24.21.0` or newer.
+CLI previews changes by default. It writes files only when you pass `--write`.
+
+## Requirements
+
+<!-- docs:begin node-requirement -->
+<!-- Generated from package.json and the registered codemods. Run `pnpm readme`. -->
+
+Requires Node.js `>=24.21.0`.
+<!-- docs:end node-requirement -->
+
+## Available codemods
+
+<!-- docs:begin available-codemods -->
+<!-- Generated from package.json and the registered codemods. Run `pnpm readme`. -->
+
+| Codemod | Description |
+| --- | --- |
+| `migrate-pumpkin-api-ts` | Migrate a plugin from @pumpkinmc/pumpkin-api-ts to @pumpkin-plugins/pumpkin-api. |
+| `update-build` | Update @pumpkin-plugins/build and apply its release migrations. |
+<!-- docs:end available-codemods -->
 
 ## Run a migration
 

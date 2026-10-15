@@ -58,6 +58,8 @@
     "scripts": {
         "build": "tsc -p tsconfig.build.json",
         "prepack": "pnpm build",
+        "readme": "pumpkin-plugins-docs generate docs.ts",
+        "readme:check": "pumpkin-plugins-docs generate docs.ts --check",
         "test": "vitest run",
         "typecheck": "tsc --noEmit"
     },
@@ -70,6 +72,7 @@
         "typescript": "catalog:"
     },
     "devDependencies": {
+        "@pumpkin-plugins/docs": "workspace:*",
         "@types/node": "catalog:",
         "@types/semver": "7.8.0",
         "vitest": "catalog:"

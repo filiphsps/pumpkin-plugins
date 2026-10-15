@@ -2,8 +2,8 @@ import * as path from 'node:path';
 import { applyEdits, modify } from 'jsonc-parser';
 import * as ts from 'typescript';
 import type { TransformResult } from '../../types.js';
-import { GENERATED_TYPES_GLOB } from './constants.js';
-import { formattingOf, parseJsonObject } from './jsonc.js';
+import { GENERATED_TYPES_GLOB } from './constants.ts';
+import { formattingOf, parseJsonObject } from './jsonc.ts';
 
 /** Adds the generated declaration glob while preserving project roots and reporting exclusions.
  *

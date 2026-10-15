@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import * as ts from 'typescript';
 import type { TransformContext, TransformResult } from '../../types.js';
-import { API_PACKAGE, LEGACY_API_PACKAGE } from './constants.js';
+import { API_PACKAGE, LEGACY_API_PACKAGE } from './constants.ts';
 
 /** Replaces legacy package specifiers in parsed TypeScript and JavaScript syntax. */
 export function migrateSource(context: TransformContext): TransformResult {

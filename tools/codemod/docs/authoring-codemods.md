@@ -8,8 +8,8 @@ the transformed text with optional review notes.
 
 1. Write tests for the expected changes and failure cases in `src/codemods/<name>.test.ts`.
 2. Add the transform in `src/codemods/<name>.ts` using `CodemodDefinition` from `src/types.ts`.
-3. Register it in `src/codemods/index.ts`. The CLI list reads this registry.
-4. Add an entry to the user guide if the migration is ready for users.
+3. Register it in `src/codemods/index.ts`. The CLI list and generated documentation catalog read this registry.
+4. Add migration-specific usage and review guidance to the user guide when it is ready for users.
 
 A transform has this shape:
 
@@ -66,6 +66,10 @@ pnpm --filter @pumpkin-plugins/codemod test
 pnpm --filter @pumpkin-plugins/codemod typecheck
 pnpm --filter @pumpkin-plugins/codemod build
 ```
+
+After changing the codemod registry or `engines.node`, regenerate the README and user guide with
+`pnpm --filter @pumpkin-plugins/codemod readme`. Their codemod catalog and Node.js requirement are
+generated from the registry and `package.json`.
 
 The package exposes `runCodemod`, the `CodemodDefinition` types and the bundled `codemods` registry
 from its root entry point. The CLI accepts a codemod ID, paths, `--write` and `--print`. Keep the

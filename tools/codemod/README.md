@@ -5,7 +5,24 @@
 [![npm license](https://img.shields.io/npm/l/%40pumpkin-plugins%2Fcodemod)](https://www.npmjs.com/package/@pumpkin-plugins/codemod)
 
 Preview and apply source and project-file migrations for Pumpkin plugins. The `pumpkin-codemod` CLI
-currently includes a migration from `@pumpkinmc/pumpkin-api-ts` to `@pumpkin-plugins/pumpkin-api`.
+provides the following migrations:
+
+<!-- docs:begin available-codemods -->
+<!-- Generated from package.json and the registered codemods. Run `pnpm readme`. -->
+
+| Codemod | Description |
+| --- | --- |
+| `migrate-pumpkin-api-ts` | Migrate a plugin from @pumpkinmc/pumpkin-api-ts to @pumpkin-plugins/pumpkin-api. |
+| `update-build` | Update @pumpkin-plugins/build and apply its release migrations. |
+<!-- docs:end available-codemods -->
+
+## Requirements
+
+<!-- docs:begin node-requirement -->
+<!-- Generated from package.json and the registered codemods. Run `pnpm readme`. -->
+
+Requires Node.js `>=24.21.0`.
+<!-- docs:end node-requirement -->
 
 After the package is available from npm, use:
 
@@ -15,8 +32,7 @@ pnpm dlx @pumpkin-plugins/codemod migrate-pumpkin-api-ts .
 pnpm dlx @pumpkin-plugins/codemod migrate-pumpkin-api-ts . --write
 ```
 
-The migration previews changes by default. Pass `--write` to update files. Requires Node.js `24.21.0`
-or newer.
+The migration previews changes by default. Pass `--write` to update files.
 
 Before the first npm release, build and run the local CLI from the repository root:
 

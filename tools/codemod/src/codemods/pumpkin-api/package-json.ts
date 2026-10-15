@@ -9,8 +9,8 @@ import {
     LEGACY_API_PACKAGE,
     LEGACY_BUILD_COMMAND,
     MIGRATION_NOTES,
-} from './constants.js';
-import { parseJsonObject, recordOf, setJsonValue } from './jsonc.js';
+} from './constants.ts';
+import { parseJsonObject, recordOf, setJsonValue } from './jsonc.ts';
 
 /** Migrates dependencies and build settings while preserving JSONC comments and formatting. */
 export function migratePackageJson(source: string): TransformResult {

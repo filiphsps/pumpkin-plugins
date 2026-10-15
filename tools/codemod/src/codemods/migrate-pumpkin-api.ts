@@ -1,9 +1,9 @@
 import * as path from 'node:path';
 import type { CodemodDefinition } from '../types.js';
-import { SOURCE_EXTENSIONS } from './pumpkin-api/constants.js';
-import { migratePackageJson } from './pumpkin-api/package-json.js';
-import { migrateSource } from './pumpkin-api/source.js';
-import { migrateTsconfig } from './pumpkin-api/tsconfig.js';
+import { SOURCE_EXTENSIONS } from './pumpkin-api/constants.ts';
+import { migratePackageJson } from './pumpkin-api/package-json.ts';
+import { migrateSource } from './pumpkin-api/source.ts';
+import { migrateTsconfig } from './pumpkin-api/tsconfig.ts';
 
 /** Migrates `@pumpkinmc/pumpkin-api-ts` imports and project configuration to the Pumpkin API package. */
 export const migratePumpkinApiTs: CodemodDefinition = {
