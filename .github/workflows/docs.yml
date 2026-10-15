@@ -75,42 +75,60 @@ jobs:
         runs-on: ubuntu-26.04
         steps:
             - name: 🕶️ Checkout repository
+              id: checkout-repository
               uses: actions/checkout@v7.0.1
               with:
                   fetch-depth: 0
 
             - name: 🚀 Bootstrap
+              id: bootstrap
               uses: ./.github/common/bootstrap
 
             - name: 📝 Check generated READMEs
-              run: pnpm run readme:check
+              id: check-generated-readmes
+              run: node scripts/ci-run.mjs "Generated READMEs" -- pnpm run readme:check
 
             - name: 🧭 Check repository docs
-              run: pnpm run check
+              id: check-repository-docs
+              run: node scripts/ci-run.mjs "Repository documentation checks" -- pnpm run check
 
             - name: 🧪 Test documentation helpers
-              run: node --test docs/.vitepress/team.data.test.mjs docs/.vitepress/doc-links.test.mjs
+              id: test-documentation-helpers
+              run: node scripts/ci-run.mjs "Documentation helper tests" -- node --test docs/.vitepress/team.data.test.mjs docs/.vitepress/doc-links.test.mjs
 
             - name: 🔨 Build the plugin builder CLI
+              id: build-the-plugin-builder-cli
               run: pnpm turbo run build --filter=@pumpkin-plugins/build
 
             - name: 🏗️ Build the documentation site
-              run: pnpm run docs
+              id: build-the-documentation-site
+              run: node scripts/ci-run.mjs "Build API references and documentation site" -- pnpm run docs
               env:
                   GITHUB_TOKEN: ${{ github.token }}
 
             - name: 📦 Upload Pages artifact
+              id: upload-pages-artifact
               uses: actions/upload-pages-artifact@v5.0.0
               with:
                   path: docs/.vitepress/dist
 
             - name: 📦 Upload site for the gh-pages mirror
+              id: upload-site-for-the-gh-pages-mirror
               uses: actions/upload-artifact@v7.0.2
               with:
                   name: docs-site
                   path: docs/.vitepress/dist
                   if-no-files-found: error
                   retention-days: 1
+
+            - name: 📋 Job summary
+              id: job-summary
+              if: always()
+              uses: ./.github/common/job-summary
+              with:
+                  title: Documentation site verification
+                  steps: ${{ toJSON(steps) }}
+                  note: Pull requests validate the site; default-branch pushes also publish it.
 
     publish:
         name: 🚀 Publish GitHub Pages
@@ -128,15 +146,25 @@ jobs:
             url: ${{ steps.deployment.outputs.page_url }}
         steps:
             - name: 🕶️ Checkout repository
+              id: checkout-repository
               uses: actions/checkout@v7.0.1
 
             - name: 📥 Download built site
+              id: download-built-site
               uses: actions/download-artifact@v8.0.2
               with:
                   name: docs-site
                   path: ${{ runner.temp }}/docs-site
 
+            - name: 📋 Preserve deployment summary tools
+              id: preserve-deployment-summary-tools
+              run: |
+                  mkdir -p "$RUNNER_TEMP/docs-summary/utils"
+                  cp scripts/ci-summary.mjs "$RUNNER_TEMP/docs-summary/"
+                  cp scripts/utils/ci-output.mjs "$RUNNER_TEMP/docs-summary/utils/"
+
             - name: 🌿 Update gh-pages branch mirror
+              id: update-gh-pages-branch-mirror
               env:
                   SITE_DIRECTORY: ${{ runner.temp }}/docs-site
               run: |
@@ -162,11 +190,22 @@ jobs:
                   git push origin gh-pages
 
             - name: ⚙️ Configure Pages
+              id: configure-pages
               uses: actions/configure-pages@v6.0.0
 
             - name: 🚀 Deploy site to GitHub Pages
               id: deployment
               uses: actions/deploy-pages@v5.0.1
+
+            - name: 📋 Job summary
+              id: job-summary
+              if: always()
+              env:
+                  CI_JOB_STATUS: ${{ job.status }}
+                  CI_STEPS_JSON: ${{ toJSON(steps) }}
+                  CI_ARTIFACT_URL: ${{ steps.deployment.outputs.page_url }}
+                  CI_LINK_LABEL: Open the published documentation
+              run: node "$RUNNER_TEMP/docs-summary/ci-summary.mjs" --title "Documentation deployment"
 
     cleanup:
         name: 🧹 Cleanup docs artifacts

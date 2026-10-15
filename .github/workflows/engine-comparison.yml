@@ -35,9 +35,11 @@ jobs:
             matrix: ${{ fromJSON(needs.variants.outputs.jobs) }}
         steps:
             - name: 🕶️ Checkout repository
+              id: checkout-repository
               uses: actions/checkout@v7.0.1
 
             - name: 🚀 Bootstrap
+              id: bootstrap
               uses: ./.github/common/bootstrap
               with:
                   cache-suffix: -${{ matrix.variant }}
@@ -50,6 +52,7 @@ jobs:
             # The shared snapshot contains Hades. Keep malloc's separate archives and fingerprint
             # so each variant can reuse compilation without replacing that immutable snapshot.
             - name: 💾 Cache malloc Static Hermes build
+              id: cache-malloc-static-hermes-build
               if: contains(matrix.variant, '-malloc-')
               uses: actions/cache@v6.1.0
               with:
@@ -59,29 +62,21 @@ jobs:
                   key: ${{ steps.setup-hermes.outputs.hermes-cache-key }}-benchmark-malloc-v1
 
             - name: 🏗️ Verify Static Hermes is prepared
+              id: verify-static-hermes-is-prepared
               if: startsWith(matrix.variant, 'static-hermes-')
               run: pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
 
             - name: 📊 Run benchmark variant
+              id: run-benchmark-variant
               env:
                   ENGINE_COMPARISON_VARIANT: ${{ matrix.variant }}
                   ENGINE_COMPARISON_RESULT_PATH: ${{ runner.temp }}/engine-comparison-results/${{ matrix.variant }}.json
                   PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/engine-comparison-logs
               run: |
-                  vitest_summary_path="$(mktemp "$RUNNER_TEMP/engine-comparison-vitest-summary.XXXXXX")"
-                  if GITHUB_STEP_SUMMARY="$vitest_summary_path" pnpm --filter @pumpkin-plugins/engine-comparison compare-engines; then
-                      exit 0
-                  else
-                      status=$?
-                  fi
-
-                  if [ -s "$vitest_summary_path" ]; then
-                      cat "$vitest_summary_path" >> "$GITHUB_STEP_SUMMARY"
-                  fi
-
-                  exit "$status"
+                  node scripts/ci-run.mjs "Engine comparison ($ENGINE_COMPARISON_VARIANT)" -- pnpm --filter @pumpkin-plugins/engine-comparison compare-engines
 
             - name: 📤 Upload benchmark result
+              id: upload-benchmark-result
               if: matrix.kind == 'benchmark'
               uses: actions/upload-artifact@v7.0.2
               with:
@@ -91,6 +86,7 @@ jobs:
                   if-no-files-found: error
 
             - name: 📤 Upload engine comparison server logs
+              id: upload-engine-comparison-server-logs
               if: failure()
               uses: actions/upload-artifact@v7.0.2
               with:
@@ -98,6 +94,15 @@ jobs:
                   name: engine-comparison-pumpkin-logs-${{ matrix.variant }}
                   path: ${{ runner.temp }}/engine-comparison-logs
                   if-no-files-found: ignore
+
+            - name: 📋 Failed variant summary
+              id: failed-variant-summary
+              if: failure()
+              uses: ./.github/common/job-summary
+              with:
+                  title: Engine comparison (${{ matrix.variant }})
+                  tests: 'true'
+                  steps: ${{ toJSON(steps) }}
 
     report:
         name: 📋 Collect and display results

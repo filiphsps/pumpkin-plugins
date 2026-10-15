@@ -27,40 +27,60 @@ jobs:
                 extension: ${{ fromJSON(inputs.extensions) }}
         steps:
             - name: 🕶️ Checkout repository
+              id: checkout-repository
               uses: actions/checkout@v7.0.1
 
             - name: 🚀 Bootstrap
+              id: bootstrap
               uses: ./.github/common/bootstrap
 
             - name: 📋 Lint extension
+              id: lint-extension
               env:
                   EXTENSION: ${{ matrix.extension }}
-              run: pnpm exec biome check "extensions/$EXTENSION/"
+              run: node scripts/ci-run.mjs "Extension lint" -- pnpm exec biome check "extensions/$EXTENSION/"
 
             - name: ✅ Typecheck extension
+              id: typecheck-extension
               env:
                   EXTENSION: ${{ matrix.extension }}
-              run: pnpm --filter "./extensions/$EXTENSION" run typecheck
+              run: node scripts/ci-run.mjs "Extension typecheck" -- pnpm --filter "./extensions/$EXTENSION" run typecheck
 
             - name: 🧪 Test extension
+              id: test-extension
               env:
                   EXTENSION: ${{ matrix.extension }}
-              run: pnpm --filter "./extensions/$EXTENSION" run test
+              run: node scripts/ci-run.mjs "Extension tests" -- pnpm --filter "./extensions/$EXTENSION" run test
 
             - name: 🔨 Build extension
+              id: build-extension
               env:
                   EXTENSION: ${{ matrix.extension }}
-              run: pnpm --filter "./extensions/$EXTENSION" run build
+              run: node scripts/ci-run.mjs "Extension build" -- pnpm --filter "./extensions/$EXTENSION" run build
 
             - name: 📦 Package extension VSIX
+              id: package-extension-vsix
               env:
                   EXTENSION: ${{ matrix.extension }}
-              run: pnpm --filter "./extensions/$EXTENSION" run package -- --out "$RUNNER_TEMP/$EXTENSION.vsix"
+              run: node scripts/ci-run.mjs "Package VSIX" -- pnpm --filter "./extensions/$EXTENSION" run package -- --out "$RUNNER_TEMP/$EXTENSION.vsix"
 
             - name: 📦 Upload VSIX verification artifact
+              id: upload-vsix
               uses: actions/upload-artifact@v7.0.2
               with:
                   name: extension-${{ matrix.extension }}
                   path: ${{ runner.temp }}/${{ matrix.extension }}.vsix
                   if-no-files-found: error
                   retention-days: 1
+
+            - name: 📋 Job summary
+              id: job-summary
+              if: always()
+              uses: ./.github/common/job-summary
+              with:
+                  title: Extension verification (${{ matrix.extension }})
+                  steps: ${{ toJSON(steps) }}
+                  tests: 'true'
+                  artifact-url: ${{ steps.upload-vsix.outputs.artifact-url }}
+                  link-label: Download the verified VSIX
+                  note: Verification build; retained for one day.

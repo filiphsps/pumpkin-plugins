@@ -30,12 +30,15 @@ jobs:
             prs: ${{ steps.release-prs.outputs.prs }}
         steps:
             - name: 🕶️ Checkout repository
+              id: checkout-repository
               uses: actions/checkout@v7.0.1
 
             - name: 🚀 Bootstrap
+              id: bootstrap
               uses: ./.github/common/bootstrap
 
             - name: 💾 Restore Release Please commit file cache
+              id: restore-release-please-commit-file-cache
               continue-on-error: true
               uses: actions/cache/restore@v6.1.0
               with:
@@ -63,6 +66,7 @@ jobs:
               run: pnpm --package=release-please@17.11.2 dlx -c 'node scripts/release.mjs "$(command -v release-please)"'
 
             - name: 💾 Save Release Please commit file cache
+              id: save-release-please-commit-file-cache
               if: steps.release.outcome == 'success'
               continue-on-error: true
               uses: actions/cache/save@v6.1.0
@@ -103,6 +107,26 @@ jobs:
                   echo "Open release PR branches: $(jq --raw-output 'map(.headRefName) | join(", ")' <<< "$prs")"
                   echo "open_pr_count=$open_pr_count" >> "$GITHUB_OUTPUT"
                   echo "prs=$prs" >> "$GITHUB_OUTPUT"
+
+            - name: 📋 Release summary
+              id: release-summary
+              if: always()
+              uses: ./.github/common/job-summary
+              with:
+                  title: Release orchestration
+                  steps: ${{ toJSON(steps) }}
+                  artifact-url: ${{ github.server_url }}/${{ github.repository }}/releases
+                  link-label: Browse published releases and downloads
+                  facts: |
+                      {
+                        "Release records created": ${{ toJSON(steps.release.outputs.release_count) }},
+                        "Prepared release PRs": ${{ toJSON(steps.release.outputs.pr_count) }},
+                        "Open release PRs": ${{ toJSON(steps.release-prs.outputs.open_pr_count) }},
+                        "Plugin releases": ${{ toJSON(steps.release.outputs.paths_released) }},
+                        "Action releases": ${{ toJSON(steps.release.outputs.action_paths_released) }},
+                        "npm releases": ${{ toJSON(steps.release.outputs.tool_paths_released) }},
+                        "Extension releases": ${{ toJSON(steps.release.outputs.extension_paths_released) }}
+                      }
 
     release-fanout-check:
         name: 🧮 Validate release fan-out

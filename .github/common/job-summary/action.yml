@@ -1,0 +1,50 @@
+name: Job summary
+description: Summarize checks, combined test reports and downloadable artifacts without repeating package reports
+
+inputs:
+    title:
+        description: Heading describing this job's result
+        required: true
+    tests:
+        description: Include combined counts and flaky-test details from freshly executed Vitest suites
+        default: 'false'
+    steps:
+        description: JSON step outcomes, including failed or skipped actions
+        default: '{}'
+    artifact-url:
+        description: Download or deployment URL produced by this job
+        default: ''
+    link-label:
+        description: Description of the download or deployment link
+        default: Download artifacts
+    note:
+        description: Plain-text context such as signing mode or artifact retention
+        default: ''
+    plugins-manifest:
+        description: Optional collected plugin manifest for the build artifact index
+        default: ''
+    facts:
+        description: JSON object of selected checks, release counts or other job-specific facts
+        default: '{}'
+
+runs:
+    using: composite
+    steps:
+        - name: 📋 Write job summary
+          shell: bash
+          env:
+              CI_SUMMARY_TITLE: ${{ inputs.title }}
+              CI_SUMMARY_TESTS: ${{ inputs.tests }}
+              CI_STEPS_JSON: ${{ inputs.steps }}
+              CI_JOB_STATUS: ${{ job.status }}
+              CI_ARTIFACT_URL: ${{ inputs.artifact-url }}
+              CI_LINK_LABEL: ${{ inputs.link-label }}
+              CI_SUMMARY_NOTE: ${{ inputs.note }}
+              CI_PLUGINS_MANIFEST: ${{ inputs.plugins-manifest }}
+              CI_SUMMARY_FACTS: ${{ inputs.facts }}
+          run: |
+              options=(--title "$CI_SUMMARY_TITLE")
+              if [[ "$CI_SUMMARY_TESTS" == true ]]; then
+                  options+=(--tests)
+              fi
+              node "$GITHUB_ACTION_PATH/../../../scripts/ci-summary.mjs" "${options[@]}"

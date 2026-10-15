@@ -72,16 +72,19 @@ jobs:
                   permission-pull-requests: write
 
             - name: 🕶️ Checkout default branch
+              id: checkout-default-branch
               uses: actions/checkout@v7.0.1
               with:
                   ref: ${{ github.event.repository.default_branch }}
                   token: ${{ steps.app-token.outputs.token }}
 
             - name: 📦 Setup pnpm
+              id: setup-pnpm
               if: env.NEEDS_UPDATE == 'true'
               uses: pnpm/action-setup@v6.1.0
 
             - name: 🟢 Setup Node
+              id: setup-node
               if: env.NEEDS_UPDATE == 'true'
               uses: actions/setup-node@v7.1.0
               with:
@@ -89,10 +92,12 @@ jobs:
                   cache: pnpm
 
             - name: 📥 Install dependencies
+              id: install-dependencies
               if: env.NEEDS_UPDATE == 'true'
               run: pnpm install --frozen-lockfile
 
             - name: 📝 Update pinned source
+              id: update-pinned-source
               if: env.NEEDS_UPDATE == 'true'
               run: node scripts/upstream-pins.mjs apply "$SOURCE_ID" "$LATEST_COMMIT"
 
@@ -100,12 +105,30 @@ jobs:
               id: validate
               if: env.NEEDS_UPDATE == 'true'
               continue-on-error: true
-              run: node scripts/upstream-pins.mjs validate "$SOURCE_ID"
+              run: node scripts/ci-run.mjs "Upstream source validation" -- node scripts/upstream-pins.mjs validate "$SOURCE_ID"
 
             - name: 🔄 Reconcile upstream update PR or issue
+              id: reconcile-upstream-update-pr-or-issue
               if: always()
               env:
                   VALIDATION_RESULT: ${{ steps.validate.outcome }}
                   GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
                   GH_TOKEN: ${{ steps.app-token.outputs.token }}
               run: node scripts/upstream-pins.mjs reconcile
+
+            - name: 📋 Upstream pin summary
+              id: upstream-pin-summary
+              if: always()
+              uses: ./.github/common/job-summary
+              with:
+                  title: Upstream pin (${{ matrix.source.name }})
+                  steps: ${{ toJSON(steps) }}
+                  artifact-url: ${{ matrix.source.compareUrl }}
+                  link-label: Compare upstream changes
+                  facts: |
+                      {
+                        "Pin file": ${{ toJSON(matrix.source.pinFile) }},
+                        "Current commit": ${{ toJSON(matrix.source.current) }},
+                        "Latest commit": ${{ toJSON(matrix.source.latest) }},
+                        "Update needed": ${{ toJSON(matrix.source.needsUpdate) }}
+                      }

@@ -30,24 +30,37 @@ jobs:
                 action: ${{ fromJSON(inputs.actions) }}
         steps:
             - name: 🕶️ Checkout repository
+              id: checkout-repository
               uses: actions/checkout@v7.0.1
 
             - name: 🚀 Bootstrap
+              id: bootstrap
               uses: ./.github/common/bootstrap
 
             - name: 📋 Lint action code
+              id: lint-action-code
               env:
                   ACTION_NAME: ${{ matrix.action }}
-              run: pnpm exec biome check "actions/$ACTION_NAME/"
+              run: node scripts/ci-run.mjs "Action lint" -- pnpm exec biome check "actions/$ACTION_NAME/"
 
             - name: 🧪 Test action
+              id: test-action
               env:
                   ACTION_NAME: ${{ matrix.action }}
-              run: pnpm exec c8 --reporter=lcov --reporter=text --reports-dir=coverage/actions node --test actions/"$ACTION_NAME"/src/*.test.mjs
+              run: node scripts/ci-run.mjs "Action tests with coverage" -- pnpm exec c8 --reporter=lcov --reporter=text --reports-dir=coverage/actions node --test actions/"$ACTION_NAME"/src/*.test.mjs
 
             - name: ☂️ Upload action coverage
+              id: upload-action-coverage
               uses: codecov/codecov-action@v7.1.1
               with:
                   directory: .
                   flags: actions
                   token: ${{ secrets.CODECOV_TOKEN }}
+
+            - name: 📋 Job summary
+              id: job-summary
+              if: always()
+              uses: ./.github/common/job-summary
+              with:
+                  title: Action verification (${{ matrix.action }})
+                  steps: ${{ toJSON(steps) }}

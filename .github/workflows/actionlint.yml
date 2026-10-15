@@ -23,10 +23,20 @@ jobs:
         runs-on: ubuntu-26.04
         steps:
             - name: 🕶️ Checkout repository
+              id: checkout
               uses: actions/checkout@v7.0.1
 
             - name: 🔧 Setup actionlint
+              id: setup-actionlint
               uses: ./.github/common/setup-actionlint
 
             - name: 🔍 Lint GitHub workflows
-              run: actionlint -color
+              id: workflows
+              run: node scripts/ci-run.mjs "GitHub workflow validation" -- actionlint -color
+
+            - name: 📋 Job summary
+              if: always()
+              uses: ./.github/common/job-summary
+              with:
+                  title: Workflow validation
+                  steps: ${{ toJSON(steps) }}

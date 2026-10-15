@@ -27,17 +27,21 @@ jobs:
         runs-on: ${{ matrix.os }}
         steps:
             - name: 🕶️ Checkout repository
+              id: checkout-repository
               uses: actions/checkout@v7.0.1
 
             - name: 🚀 Bootstrap
+              id: bootstrap
               uses: ./.github/common/bootstrap
 
             - name: 🟢 Pin external consumer Node
+              id: pin-external-consumer-node
               uses: actions/setup-node@v7.1.0
               with:
                   node-version: 24.21.0
 
             - name: 📂 Prepare external consumer caches
+              id: prepare-external-consumer-caches
               shell: bash
               run: mkdir -p .cache/external-consumer/pnpm-store .cache/hermes
 
@@ -55,6 +59,7 @@ jobs:
               uses: ./.github/common/setup-static-hermes
 
             - name: 🪟 Setup MSVC 2022 toolset 14.44
+              id: setup-msvc-2022-toolset-14-44
               if: runner.os == 'Windows'
               uses: ilammy/msvc-dev-cmd@v1.13.0
               with:
@@ -62,6 +67,7 @@ jobs:
                   toolset: '14.44'
 
             - name: 🔎 Verify pinned Ninja executable on Windows
+              id: verify-pinned-ninja-executable-on-windows
               if: runner.os == 'Windows'
               shell: pwsh
               env:
@@ -80,6 +86,7 @@ jobs:
                   }
 
             - name: 🔎 Verify pinned host toolchain
+              id: verify-pinned-host-toolchain
               env:
                   CMAKE_VERSION: ${{ steps.setup-static-hermes.outputs.cmake-version }}
                   NINJA_VERSION: ${{ steps.setup-static-hermes.outputs.ninja-version }}
@@ -101,13 +108,14 @@ jobs:
 
             - name: 📦 Pack, install, create, typecheck and build outside the monorepo
               id: external-consumer
-              run: pnpm run test:external-consumer
+              run: node scripts/ci-run.mjs "Pack, install and build standalone consumers" -- pnpm run test:external-consumer
               env:
                   GITHUB_TOKEN: ${{ github.token }}
                   PUMPKIN_EXTERNAL_CONSUMER_PNPM_STORE_DIR: ${{ github.workspace }}/.cache/external-consumer/pnpm-store
                   PUMPKIN_PLUGINS_VERBOSE_BUILD: ${{ matrix.platform == 'Windows x64' && '1' || '0' }}
 
             - name: 💾 Save external consumer pnpm store
+              id: save-external-consumer-pnpm-store
               if: steps.external-consumer.outcome == 'success' && steps.external-consumer-pnpm-cache.outputs.cache-hit != 'true'
               uses: actions/cache/save@v6.1.0
               with:
@@ -115,8 +123,18 @@ jobs:
                   key: external-consumer-pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}-${{ github.sha }}
 
             - name: 💾 Save Static Hermes cache
+              id: save-static-hermes-cache
               if: steps.external-consumer.outcome == 'success'
               uses: actions/cache/save@v6.1.0
               with:
                   path: ${{ github.workspace }}/.cache/hermes
                   key: ${{ steps.setup-static-hermes.outputs.hermes-cache-key }}
+
+            - name: 📋 Job summary
+              id: job-summary
+              if: always()
+              uses: ./.github/common/job-summary
+              with:
+                  title: External consumers (${{ matrix.platform }})
+                  steps: ${{ toJSON(steps) }}
+                  note: Checks public package metadata, TypeScript and JavaScript starters, and the standalone codemod outside this repository.

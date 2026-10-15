@@ -66,6 +66,28 @@ artifacts after publishing succeeds or is skipped, and keeps them if publishing 
 retried. Fork and Dependabot pull requests use read-only tokens, so their temporary artifacts expire
 after one day instead of being deleted by the workflows.
 
+## Reading CI results
+
+Test jobs combine Vitest's package reports into one table with command outcomes, elapsed time and
+freshly executed test counts. Expected failures, skipped tests and todos stay separate from passes.
+Flaky-test links and unfamiliar reporter output appear in expandable details; failure annotations
+and full diagnostics remain in the step logs. Cached suites and Node test results are identified
+separately rather than counted as fresh Vitest passes.
+
+Build summarizes its component builds and runtime smoke check, then lists plugin names, versions,
+component sizes and the signed artifact download. The signing note distinguishes a CI-only key from
+the repository release key. Build's smoke test does not append a separate Vitest report.
+Extension checks link their VSIX download; documentation publishing links the live site; release
+orchestration lists released components and release PR counts; upstream pin jobs link the source diff.
+The selected-checks summary explains the job scope before expensive checks start. Expand workflow
+step outcomes to distinguish a failure, cancellation, skipped step or tolerated error.
+
+`scripts/ci-run.mjs` captures child-process summaries while preserving console output, annotations
+and command failures. `scripts/ci-summary.mjs` and `.github/common/job-summary` render the job result
+even after a failed command. This uses Vitest's built-in GitHub reporter, without another reporting
+action or additional token permissions. Documentation publishing preserves its summary tools before switching
+the checkout to the `gh-pages` mirror.
+
 ## Running only what a change needs
 
 `scripts/changed-areas.mjs` diffs the change against what came before it (the pull request base or

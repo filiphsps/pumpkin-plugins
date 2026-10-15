@@ -234,3 +234,19 @@ jobs:
                   metadata-file: ${{ runner.temp }}/market-listing-metadata.json
                   api-token: ${{ secrets.MARKET_API_TOKEN }}
                   update-mode: patch
+
+            - name: 📋 Recovery summary
+              if: always()
+              uses: ./.github/common/job-summary
+              with:
+                  title: Plugin release recovery
+                  steps: ${{ toJSON(steps) }}
+                  artifact-url: ${{ github.server_url }}/${{ github.repository }}/releases
+                  link-label: Browse release artifacts
+                  facts: |
+                      {
+                        "Tag": ${{ toJSON(inputs.tag) }},
+                        "Plugin": ${{ toJSON(steps.plugin.outputs.plugin_name) }},
+                        "Version": ${{ toJSON(steps.plugin.outputs.version) }},
+                        "Assets already present": ${{ toJSON(steps.release.outputs.assets_present) }}
+                      }
