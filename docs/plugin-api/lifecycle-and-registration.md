@@ -19,10 +19,9 @@ entity and chunk resources passed to these callbacks are disposed when the callb
 AI-goal callback throws, `canStart` and `shouldContinue` return `false`; errors from void callbacks
 are logged.
 
-Pumpkin `0.2.0+26.3-26.51` does not start custom WASM AI goals: its `canStart` and
-`shouldContinue` host methods return `false`, so gameplay does not reach the registered callbacks.
-This is a host limitation, separate from Static Hermes' implemented callback dispatch. See the
-[pinned Pumpkin host implementation](https://github.com/Pumpkin-MC/Pumpkin/blob/0.2.0%2B26.3-26.51/crates/pumpkin/src/plugin/loader/wasm/wasm_host/wit/v0_1/mob.rs#L291-L298).
+The pinned host's custom WASM AI-goal limitation is documented in the
+[Static Hermes Runtime guide](../../tools/static-hermes-runtime/docs/index.md). It is separate from
+Static Hermes' callback dispatch.
 
 The default IPC handler rejects messages. Override `handleIpcMessage(sender, message)` when the plugin accepts IPC. The [generated reference](/api/tools/@pumpkin-plugins/pumpkin-api/) documents the complete facade signatures.
 
