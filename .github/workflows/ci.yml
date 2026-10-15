@@ -535,7 +535,7 @@ jobs:
 
     release:
         name: 🚢 Release
-        needs: [changes, lint, typecheck, build, external-consumer, engine-comparison, test, docs, integration, action-gate, extension-gate]
+        needs: [changes, lint, typecheck, build, external-consumer, test, docs, integration, action-gate, extension-gate]
         if: >-
             ${{
               always() &&
@@ -551,7 +551,6 @@ jobs:
                   needs.typecheck.result == 'success' &&
                   needs.build.result == 'success' &&
                   needs['external-consumer'].result == 'success' &&
-                  needs['engine-comparison'].result == 'success' &&
                   needs.test.result == 'success' &&
                   (
                     needs.integration.result == 'success' ||

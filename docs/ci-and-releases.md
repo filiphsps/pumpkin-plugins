@@ -82,7 +82,8 @@ commit and reruns the repository checks that validate the generated README. Ordi
 skip the main CI workflow entirely.
 
 On a push, the release job waits for the action and extension test gates and docs/config checks. Plugin/repository
-changes also require build, engine comparison, unit test and integration jobs.
+changes also require lint, typecheck, build, external-consumer, unit test and integration jobs. Engine
+comparison runs separately and does not gate releases.
 Empty action and extension matrices pass their gates without running component tests, including version-only release changes.
 Release Please only releases a component with
 releasable changes, so running it for changed action code does not create an empty release.
