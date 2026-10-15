@@ -414,7 +414,7 @@ jobs:
     integration:
         name: 🎃 Integration (real Pumpkin)
         needs: [changes, build]
-        if: needs.changes.outputs.code == 'true' && needs.changes.outputs.integration_scope != 'benchmark'
+        if: needs.changes.outputs.integration_scope == 'affected' || needs.changes.outputs.integration_scope == 'all'
         timeout-minutes: 60
         runs-on: ubuntu-26.04
         steps:
@@ -472,6 +472,34 @@ jobs:
                   name: pumpkin-logs
                   path: ${{ runner.temp }}/pumpkin-logs
                   if-no-files-found: ignore
+
+    integration-gate:
+        name: 🛡️ Integration gate
+        needs: [changes, integration]
+        if: ${{ always() }}
+        timeout-minutes: 5
+        runs-on: ubuntu-26.04
+        steps:
+            - name: 🛡️ Require integration tests when relevant changes are selected
+              env:
+                  CHANGES_RESULT: ${{ needs.changes.result }}
+                  INTEGRATION_SCOPE: ${{ needs.changes.outputs.integration_scope }}
+                  INTEGRATION_RESULT: ${{ needs.integration.result }}
+              run: |
+                  if [[ "$CHANGES_RESULT" != 'success' ]]; then
+                      echo 'Change classification failed.' >&2
+                      exit 1
+                  fi
+                  if [[ "$INTEGRATION_SCOPE" == 'none' || "$INTEGRATION_SCOPE" == 'benchmark' ]]; then
+                      if [[ "$INTEGRATION_RESULT" == 'skipped' ]]; then
+                          exit 0
+                      fi
+                  fi
+                  if [[ ("$INTEGRATION_SCOPE" == 'affected' || "$INTEGRATION_SCOPE" == 'all') && "$INTEGRATION_RESULT" == 'success' ]]; then
+                      exit 0
+                  fi
+                  echo "Required integration verification for scope $INTEGRATION_SCOPE did not pass: $INTEGRATION_RESULT" >&2
+                  exit 1
 
     generator:
         name: 🧬 Generator
@@ -562,7 +590,7 @@ jobs:
 
     release:
         name: 🚢 Release
-        needs: [changes, lint, typecheck, build, external-consumer, test, docs, integration, action-gate, extension-gate, generator-gate]
+        needs: [changes, lint, typecheck, build, external-consumer, test, docs, integration-gate, action-gate, extension-gate, generator-gate]
         if: >-
             ${{
               always() &&
@@ -571,6 +599,7 @@ jobs:
               needs.docs.result == 'success' &&
               needs['action-gate'].result == 'success' &&
               needs['extension-gate'].result == 'success' &&
+              needs['integration-gate'].result == 'success' &&
               needs['generator-gate'].result == 'success' &&
               (
                 (
@@ -579,14 +608,7 @@ jobs:
                   needs.typecheck.result == 'success' &&
                   needs.build.result == 'success' &&
                   needs['external-consumer'].result == 'success' &&
-                  needs.test.result == 'success' &&
-                  (
-                    needs.integration.result == 'success' ||
-                    (
-                      needs.changes.outputs.integration_scope == 'benchmark' &&
-                      needs.integration.result == 'skipped'
-                    )
-                  )
+                  needs.test.result == 'success'
                 ) ||
                 (
                   needs.changes.outputs.code != 'true' &&

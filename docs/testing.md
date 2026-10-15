@@ -25,6 +25,11 @@ Run one plugin's integration tests with
 packages and their dependents locally, compare with the base branch, for example
 `pnpm turbo run test:integration --filter='...[origin/master]'`.
 
+CI runs real-server suites for changed plugins and the workspace packages their build or integration
+tests depend on, selecting affected packages and their dependents. Workspace-wide build configuration
+and shared integration setup changes run every suite; unrelated scripts and workflow files skip this
+job.
+
 ## Integration tests
 
 `@pumpkin-plugins/test-harness` starts the real server binary per test file, in a temp directory, on

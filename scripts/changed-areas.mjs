@@ -1,5 +1,5 @@
 // Classifies changed files for CI: plugin/repo code, action directories, extension directories, and documentation.
-// Plugin code jobs, action tests, extension tests, and the generator smoke test have separate gates.
+// Plugin code jobs, action tests, extension tests, integration suites, and the generator smoke test have separate gates.
 // See the Jobs table in docs/ci-and-releases.md.
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -122,7 +122,7 @@ function generatorInputs() {
     }
     if (!generatorWorkflow) throw new Error('Could not find the generator job in a GitHub workflow.');
     relevantFiles.add(generatorWorkflow);
-    for (const [, localPath] of generatorJob.matchAll(/^\s+uses:\s+\.\/([^#\s@]+)/gm)) {
+    for (const [, localPath] of generatorJob.matchAll(/^\s*(?:-\s*)?uses:\s+\.\/([^#\s@]+)/gm)) {
         relevantDirectories.add(path.posix.normalize(localPath));
     }
 
@@ -145,6 +145,96 @@ function generatorInputs() {
 
     if (generatorConfigs.length === 0) throw new Error('Could not find the repository generator configuration.');
     return { files: relevantFiles, directories: relevantDirectories };
+}
+
+/** Finds workspace inputs that participate in real-server tests and their build tasks. */
+function integrationInputs() {
+    const tracked = spawnSync('git', ['ls-files', '-z'], { cwd: repositoryRoot, encoding: 'utf8' });
+    if (tracked.status !== 0) {
+        throw new Error(`Could not list repository files for integration selection: ${tracked.stderr.trim()}`);
+    }
+    const files = tracked.stdout.split('\0').filter(Boolean);
+    const readJson = (file) => JSON.parse(readFileSync(path.join(repositoryRoot, file), 'utf8'));
+    const packageByName = new Map();
+    for (const file of files.filter((entry) => entry.endsWith('/package.json'))) {
+        const manifest = readJson(file);
+        if (typeof manifest.name === 'string') {
+            packageByName.set(manifest.name, { directory: path.posix.dirname(file), manifest });
+        }
+    }
+
+    const turboConfigFile = files.find((file) => {
+        if (file.includes('/') || !file.endsWith('.json')) return false;
+        const config = readJson(file);
+        return config.tasks && Array.isArray(config.globalDependencies);
+    });
+    if (!turboConfigFile) throw new Error('Could not find the Turborepo configuration for integration selection.');
+    const turboConfig = readJson(turboConfigFile);
+    const globalFiles = new Set([turboConfigFile]);
+    for (const file of files.filter((entry) => !entry.includes('/'))) {
+        if (file === 'package.json' || /(?:lock|workspace)/i.test(file)) globalFiles.add(file);
+    }
+    for (const input of turboConfig.globalDependencies) globalFiles.add(path.posix.normalize(input));
+
+    const directories = new Set();
+    const visitedPackages = new Set();
+    const packageDependencies = (manifest) =>
+        [manifest.dependencies, manifest.optionalDependencies, manifest.peerDependencies, manifest.devDependencies]
+            .flatMap((dependencies) => Object.keys(dependencies ?? {}))
+            .filter((name) => packageByName.has(name));
+    const addRuntimePackage = (name) => {
+        if (visitedPackages.has(name)) return;
+        visitedPackages.add(name);
+        const workspacePackage = packageByName.get(name);
+        if (!workspacePackage) return;
+        directories.add(workspacePackage.directory);
+        for (const dependency of packageDependencies(workspacePackage.manifest)) addRuntimePackage(dependency);
+    };
+    const visitedTasks = new Set();
+    const visitTask = (name, taskName) => {
+        const key = `${name}#${taskName}`;
+        if (visitedTasks.has(key)) return;
+        visitedTasks.add(key);
+        const workspacePackage = packageByName.get(name);
+        if (!workspacePackage) return;
+        if (workspacePackage.manifest.scripts?.[taskName]) directories.add(workspacePackage.directory);
+        const task = turboConfig.tasks[key] ?? turboConfig.tasks[taskName];
+        for (const dependency of task?.dependsOn ?? []) {
+            const separator = dependency.indexOf('#');
+            if (separator !== -1) {
+                visitTask(dependency.slice(0, separator), dependency.slice(separator + 1));
+            } else if (dependency.startsWith('^')) {
+                const dependencyTask = dependency.slice(1);
+                for (const child of packageDependencies(workspacePackage.manifest)) {
+                    if (packageByName.get(child).manifest.scripts?.[dependencyTask]) visitTask(child, dependencyTask);
+                }
+            } else {
+                visitTask(name, dependency);
+            }
+        }
+    };
+
+    for (const [name, workspacePackage] of packageByName) {
+        if (workspacePackage.manifest.scripts?.['test:integration']) {
+            addRuntimePackage(name);
+            visitTask(name, 'test:integration');
+        }
+    }
+
+    const allDirectories = new Set();
+    for (const file of files.filter((entry) => entry.startsWith('.github/workflows/') && /\.ya?ml$/.test(entry))) {
+        const lines = readFileSync(path.join(repositoryRoot, file), 'utf8').split('\n');
+        const start = lines.findIndex((line) => /^ {4}integration:\s*$/.test(line));
+        if (start === -1) continue;
+        globalFiles.add(file);
+        const nextJob = lines.findIndex((line, index) => index > start && /^ {4}[\w-]+:\s*$/.test(line));
+        const job = lines.slice(start, nextJob === -1 ? undefined : nextJob).join('\n');
+        for (const [, localPath] of job.matchAll(/^\s*(?:-\s*)?uses:\s+\.\/([^#\s@]+)/gm)) {
+            allDirectories.add(path.posix.normalize(localPath));
+        }
+        break;
+    }
+    return { directories, globalFiles, allDirectories };
 }
 
 const COMMON_CONSUMERS = [
@@ -226,18 +316,28 @@ const generator = Boolean(
                     [...generatorRelevant.directories].some((directory) => file.startsWith(`${directory}/`))),
         ),
 );
+const integrationRelevant = code.length > 0 ? integrationInputs() : undefined;
 /** Keep the benchmark comparison scoped to its dedicated real-server workflow. */
 const benchmarkOnly = code.length > 0 && code.every((file) => file.startsWith('benchmarks/engine-comparison/'));
+const integrationRuntimeChanged = Boolean(
+    integrationRelevant &&
+        code.some((file) => [...integrationRelevant.directories].some((directory) => file.startsWith(`${directory}/`))),
+);
+const integrationAllChanged = Boolean(
+    integrationRelevant &&
+        code.some(
+            (file) =>
+                integrationRelevant.globalFiles.has(file) ||
+                [...integrationRelevant.allDirectories].some((directory) => file.startsWith(`${directory}/`)),
+        ),
+);
 const integrationScope = benchmarkOnly
     ? 'benchmark'
-    : code.length > 0 &&
-        code.every((file) =>
-            /^(packages\/[^/]+|tools\/(build|config|plugin-kit|port-mapping|test-harness|apis\/upnpumpkin-api))(?:\/|$)/.test(
-                file,
-            ),
-        )
-      ? 'affected'
-      : 'all';
+    : integrationAllChanged
+      ? 'all'
+      : integrationRuntimeChanged
+        ? 'affected'
+        : 'none';
 const integrationExtra = code.some((file) => file.startsWith('packages/upnpumpkin/'))
     ? '@pumpkin-plugins/bedrock-addon-manager'
     : '';

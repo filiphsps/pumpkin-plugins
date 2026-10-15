@@ -46,14 +46,66 @@ function repo(files) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'changed-areas-'));
     dirs.push(dir);
     git(dir, 'init', '-q');
-    commit(dir, files);
+    const fixtures = {
+        '.git-blame-ignore-revs': fs.readFileSync(path.join(scripts, '../.git-blame-ignore-revs'), 'utf8'),
+        'package.json': '{"name":"changed-areas-test","scripts":{}}\n',
+        'pnpm-workspace.yaml': 'packages:\n  - "packages/*"\n  - "tools/*"\n',
+        'tsconfig.base.json': '{}\n',
+        'turbo.json': `${JSON.stringify(
+            {
+                globalDependencies: ['pnpm-workspace.yaml', 'tsconfig.base.json'],
+                tasks: {
+                    'test:integration': { dependsOn: ['build', '@test/build#build'] },
+                    build: { dependsOn: ['transit', '@test/build#build'] },
+                    transit: { dependsOn: ['^transit'] },
+                    '@test/build#build': { dependsOn: ['transit', '@test/runtime#build'] },
+                    '@test/runtime#build': { dependsOn: ['transit'] },
+                },
+            },
+            null,
+            4,
+        )}\n`,
+        '.github/workflows/ci.yml': [
+            'name: CI',
+            'jobs:',
+            '    integration:',
+            '        steps:',
+            '            - uses: ./.github/common/bootstrap',
+            '    generator:',
+            '        steps:',
+            '            - uses: ./.github/common/setup-static-hermes',
+            '',
+        ].join('\n'),
+        'scripts/changed-areas.mjs': fs.readFileSync(path.join(scripts, 'changed-areas.mjs'), 'utf8'),
+        'scripts/utils/ignored-commits.mjs': fs.readFileSync(path.join(scripts, 'utils/ignored-commits.mjs'), 'utf8'),
+        'turbo/generators/config.mjs': 'plugin.setGenerator(() => {});\n',
+        'turbo/generators/templates/plugin/package.json.hbs': '{}\n',
+        'tools/build/package.json':
+            '{"name":"@test/build","scripts":{"build":"true"},"dependencies":{"@test/runtime":"workspace:*"}}\n',
+        'tools/static-hermes-runtime/package.json': '{"name":"@test/runtime","scripts":{"build":"true"}}\n',
+    };
+    const packageDirectories = new Set(
+        Object.keys(files)
+            .filter((file) => file.startsWith('packages/') && file.split('/').length > 2)
+            .map((file) => file.split('/').slice(0, 2).join('/')),
+    );
+    for (const directory of packageDirectories) {
+        const manifest = `${directory}/package.json`;
+        if (!Object.hasOwn(files, manifest)) {
+            fixtures[manifest] = `${JSON.stringify({
+                name: `@test/${path.posix.basename(directory)}`,
+                scripts: { 'test:integration': 'vitest run' },
+            })}\n`;
+        }
+    }
+    commit(dir, { ...fixtures, ...files });
     return dir;
 }
 
 /** Runs the script in `dir` and returns whether it passed, what it logged and the outputs it wrote. */
 function run(dir, ...args) {
     const outputs = path.join(dir, 'github-output');
-    const result = spawnSync('node', [path.join(scripts, 'changed-areas.mjs'), ...args], {
+    const result = spawnSync('node', [path.join(dir, 'scripts/changed-areas.mjs'), ...args], {
         cwd: dir,
         env: { ...process.env, GITHUB_OUTPUT: outputs },
         encoding: 'utf8',
@@ -94,7 +146,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=none\nintegration_extra=\n',
         );
         assert.match(result.log, /No plugin or repository code/);
     });
@@ -106,7 +158,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=none\nintegration_extra=\n',
         );
     });
 
@@ -117,7 +169,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=none\nintegration_extra=\n',
         );
     });
 
@@ -128,7 +180,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=none\nintegration_extra=\n',
         );
     });
 
@@ -139,7 +191,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=none\nintegration_extra=\n',
         );
     });
 
@@ -158,6 +210,7 @@ describe('changed-areas', () => {
     it('selects the generator smoke test only for scaffold-related changes', () => {
         for (const [file, expected] of [
             ['turbo/generators/templates/plugin/src/plugin.ts.hbs', 'true'],
+            ['.github/common/setup-static-hermes/action.yml', 'true'],
             ['turbo/generators/README.md', 'false'],
             ['scripts/unrelated-check.mjs', 'false'],
         ]) {
@@ -181,14 +234,77 @@ describe('changed-areas', () => {
         assert.match(result.log, /Code: benchmarks\/engine-comparison\/src\/workload.ts/);
     });
 
-    it('runs all integration suites for changes outside plugin runtime packages', () => {
+    it('skips integration suites for unrelated repository script changes', () => {
         const dir = repo({ 'scripts/check.mjs': 'export {};\n' });
         const base = change(dir, { 'scripts/check.mjs': 'export const changed = true;\n' });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=none\nintegration_extra=\n',
+        );
+    });
+
+    it('selects affected plugin suites for a shared runtime dependency change', () => {
+        const dir = repo({
+            'packages/plug/package.json': JSON.stringify({
+                name: '@test/plug',
+                scripts: { 'test:integration': 'vitest run' },
+                dependencies: { '@test/colors': 'workspace:*' },
+            }),
+            'tools/minecraft-colors/package.json': '{"name":"@test/colors"}\n',
+            'tools/minecraft-colors/src/index.ts': 'export {};',
+        });
+        const base = change(dir, { 'tools/minecraft-colors/src/index.ts': 'export const changed = true;\n' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\n',
+        );
+    });
+
+    it('selects affected suites when a shared integration test dependency changes', () => {
+        const dir = repo({
+            'packages/plug/package.json': JSON.stringify({
+                name: '@test/plug',
+                scripts: { 'test:integration': 'vitest run' },
+                devDependencies: { '@test/harness': 'workspace:*' },
+            }),
+            'tools/test-harness/package.json': '{"name":"@test/harness"}\n',
+            'tools/test-harness/src/index.ts': 'export {};\n',
+        });
+        const base = change(dir, { 'tools/test-harness/src/index.ts': 'export const changed = true;\n' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=affected\nintegration_extra=\n',
+        );
+    });
+
+    it('selects all integration suites when their shared workflow action changes', () => {
+        const dir = repo({
+            '.github/common/bootstrap/action.yml': 'name: Bootstrap\n',
+            '.github/common/bootstrap/src/setup.sh': 'true\n',
+        });
+        const base = change(dir, { '.github/common/bootstrap/src/setup.sh': 'false\n' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
             'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=all\nintegration_extra=\n',
+        );
+    });
+
+    it('selects all plugin suites when workspace-wide build configuration changes', () => {
+        const dir = repo({ 'pnpm-workspace.yaml': 'packages:\n  - "packages/*"\n' });
+        const base = change(dir, { 'pnpm-workspace.yaml': 'packages:\n  - "packages/*"\n  - "tools/*"\n' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.equal(
+            result.outputs,
+            'code=true\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=true\nintegration_scope=all\nintegration_extra=\n',
         );
     });
 
@@ -204,10 +320,21 @@ describe('changed-areas', () => {
     });
 
     it('runs the code jobs when one file among documentation changes', () => {
-        const dir = repo({ 'docs/guide.md': '# Guide\n', '.github/workflows/ci.yml': 'name: CI\n' });
+        const workflow = [
+            'name: CI',
+            'jobs:',
+            '    integration:',
+            '        steps:',
+            '            - uses: ./.github/common/bootstrap',
+            '    generator:',
+            '        steps:',
+            '            - uses: ./.github/common/setup-static-hermes',
+            '',
+        ].join('\n');
+        const dir = repo({ 'docs/guide.md': '# Guide\n', '.github/workflows/ci.yml': workflow });
         const base = change(dir, {
             'docs/guide.md': '# Guide\n\nMore.\n',
-            '.github/workflows/ci.yml': 'name: CI\n\non: push\n',
+            '.github/workflows/ci.yml': workflow.replace('name: CI', 'name: CI updated'),
         });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
@@ -261,7 +388,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=["two"]\nactions_to_test=["two"]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=["two"]\nactions_to_test=["two"]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=none\nintegration_extra=\n',
         );
         assert.match(result.log, /Actions to test: two/);
     });
@@ -273,7 +400,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\nextensions=["one"]\nextensions_to_test=["one"]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=["one"]\nextensions_to_test=["one"]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=none\nintegration_extra=\n',
         );
         assert.match(result.log, /Extensions to test: one/);
     });
@@ -303,7 +430,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=["one"]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=["one"]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=none\nintegration_extra=\n',
         );
     });
 
@@ -317,7 +444,7 @@ describe('changed-areas', () => {
             assert.ok(result.ok, result.log);
             assert.equal(
                 result.outputs,
-                'code=false\nactions=[]\nactions_to_test=["common","publish-to-pumpkin-market","sign-pumpkin-plugin","update-pumpkin-market-listing","verify-pumpkin-plugin"]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=all\nintegration_extra=\n',
+                'code=false\nactions=[]\nactions_to_test=["common","publish-to-pumpkin-market","sign-pumpkin-plugin","update-pumpkin-market-listing","verify-pumpkin-plugin"]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=none\nintegration_extra=\n',
             );
         });
     }
@@ -332,16 +459,19 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=false\ngenerator=false\nintegration_scope=none\nintegration_extra=\n',
         );
     });
 
     it('expands common consumers alongside mixed plugin and public action changes', () => {
-        const dir = repo({ 'actions/common/src/input.mjs': 'export {};\n' });
+        const dir = repo({
+            'actions/common/src/input.mjs': 'export {};\n',
+            'packages/plug/src/plugin.ts': 'export {};\n',
+        });
         const base = change(dir, {
             'actions/common/src/input.mjs': 'export const changed = true;\n',
             'actions/sign-pumpkin-plugin/src/index.mjs': 'export {};\n',
-            'packages/plug/src/plugin.ts': 'export {};\n',
+            'packages/plug/src/plugin.ts': 'export const changed = true;\n',
         });
         const result = run(dir, base, 'HEAD');
         assert.ok(result.ok, result.log);
@@ -359,7 +489,7 @@ describe('changed-areas', () => {
         assert.ok(result.ok, result.log);
         assert.equal(
             result.outputs,
-            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=true\ngenerator=false\nintegration_scope=all\nintegration_extra=\n',
+            'code=false\nactions=[]\nactions_to_test=[]\nextensions=[]\nextensions_to_test=[]\ngenerated_readmes=true\ngenerator=false\nintegration_scope=none\nintegration_extra=\n',
         );
         assert.match(result.log, /Generated README update commit detected/);
     });

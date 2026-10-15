@@ -822,7 +822,7 @@ describe('action release prerequisites', () => {
             'external-consumer',
             'test',
             'docs',
-            'integration',
+            'integration-gate',
             'action-gate',
             'extension-gate',
             'generator-gate',
@@ -840,7 +840,7 @@ describe('action release prerequisites', () => {
             'external-consumer',
             'test',
             'docs',
-            'integration',
+            'integration-gate',
             'action-gate',
             'extension-gate',
             'generator-gate',
@@ -900,21 +900,101 @@ describe('action release prerequisites', () => {
         );
     });
 
-    it('skips general integration suites only for benchmark-only code changes', () => {
+    it('runs integration only for relevant scopes and gates releases on its result', () => {
         const integration = ci.jobs.integration;
-        assert.match(integration.if, /outputs\.integration_scope != 'benchmark'/);
-        assert.match(ci.jobs.release.if, /outputs\.integration_scope == 'benchmark'/);
-        const changes = { outputs: { code: 'true', integration_scope: 'benchmark' }, result: 'success' };
-        assert.equal(evaluate(integration.if, { needs: { changes } }), false);
+        assert.match(integration.if, /outputs\.integration_scope == 'affected'/);
+        assert.match(integration.if, /outputs\.integration_scope == 'all'/);
+        for (const [scope, expected] of [
+            ['none', false],
+            ['benchmark', false],
+            ['affected', true],
+            ['all', true],
+        ]) {
+            const changes = { outputs: { integration_scope: scope } };
+            assert.equal(evaluate(integration.if, { needs: { changes } }), expected, scope);
+        }
+
+        const integrationCommand = integration.steps.find((entry) => entry.name === '🎃 Integration tests');
+        assert.ok(integrationCommand, 'Integration job has no test command');
+        const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'integration-command-'));
+        dirs.push(directory);
+        const argsFile = path.join(directory, 'args');
+        const pnpm = path.join(directory, 'pnpm');
+        fs.writeFileSync(pnpm, '#!/usr/bin/env bash\nprintf "%s\\n" "$@" > "$CAPTURED_ARGS"\n');
+        fs.chmodSync(pnpm, 0o755);
+
+        for (const [scope, extra, expected] of [
+            [
+                'affected',
+                '@pumpkin-plugins/bedrock-addon-manager',
+                [
+                    'turbo',
+                    'run',
+                    'test:integration',
+                    '--concurrency=2',
+                    '--only',
+                    '--filter=...[base-sha]',
+                    '--filter=@pumpkin-plugins/bedrock-addon-manager',
+                ],
+            ],
+            ['all', '', ['turbo', 'run', 'test:integration', '--concurrency=2', '--only']],
+        ]) {
+            const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', integrationCommand.run], {
+                encoding: 'utf8',
+                env: {
+                    ...process.env,
+                    PATH: `${directory}:${process.env.PATH}`,
+                    BASE_SHA: 'base-sha',
+                    CAPTURED_ARGS: argsFile,
+                    INTEGRATION_SCOPE: scope,
+                    INTEGRATION_EXTRA: extra,
+                },
+            });
+            assert.equal(result.status, 0, `${scope}: ${result.stderr}`);
+            assert.deepEqual(fs.readFileSync(argsFile, 'utf8').trim().split('\n'), expected, scope);
+        }
+
+        const gate = ci.jobs['integration-gate'];
+        assert.ok(gate, 'Integration result gate is missing');
+        assert.deepEqual(gate.needs, ['changes', 'integration']);
+        assert.ok(ci.jobs.release.needs.includes('integration-gate'));
+        assert.match(ci.jobs.release.if, /needs\['integration-gate'\]\.result == 'success'/);
+
+        const step = gate.steps.find((entry) => entry.env?.INTEGRATION_RESULT);
+        assert.ok(step, 'Integration result gate has no integration result input');
+        for (const [scope, result, changes, expected] of [
+            ['none', 'skipped', 'success', 0],
+            ['benchmark', 'skipped', 'success', 0],
+            ['affected', 'success', 'success', 0],
+            ['all', 'success', 'success', 0],
+            ['affected', 'failure', 'success', 1],
+            ['affected', 'cancelled', 'success', 1],
+            ['affected', 'skipped', 'success', 1],
+            ['all', 'skipped', 'success', 1],
+            ['none', 'success', 'success', 1],
+            ['none', 'skipped', 'failure', 1],
+        ]) {
+            const outcome = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', step.run], {
+                encoding: 'utf8',
+                env: {
+                    ...process.env,
+                    INTEGRATION_SCOPE: scope,
+                    INTEGRATION_RESULT: result,
+                    CHANGES_RESULT: changes,
+                },
+            });
+            assert.equal(outcome.status, expected, `${scope}/${result}/${changes}: ${outcome.stderr}`);
+        }
+
         const needs = {
-            changes,
+            changes: { result: 'success', outputs: { code: 'true', integration_scope: 'benchmark' } },
             lint: { result: 'success' },
             typecheck: { result: 'success' },
             build: { result: 'success' },
             'external-consumer': { result: 'success' },
             test: { result: 'success' },
             docs: { result: 'success' },
-            integration: { result: 'skipped' },
+            'integration-gate': { result: 'success' },
             'action-gate': { result: 'success' },
             'extension-gate': { result: 'success' },
             'generator-gate': { result: 'success' },
@@ -981,7 +1061,7 @@ describe('action release prerequisites', () => {
                     build: { result: code === 'true' ? 'success' : 'skipped' },
                     'external-consumer': { result: code === 'true' ? 'success' : 'skipped' },
                     test: { result: code === 'true' ? 'success' : 'skipped' },
-                    integration: { result: code === 'true' ? 'success' : 'skipped' },
+                    'integration-gate': { result: 'success' },
                     'action-gate': { result },
                     'extension-gate': { result: 'success' },
                     'generator-gate': { result: 'success' },
@@ -1043,6 +1123,7 @@ describe('action release prerequisites', () => {
                 docs: { result: 'success' },
                 'action-gate': { result: 'success' },
                 'extension-gate': { result },
+                'integration-gate': { result: 'success' },
                 'generator-gate': { result: 'success' },
             };
             assert.equal(
@@ -1068,7 +1149,7 @@ describe('action release prerequisites', () => {
                 build: { result: 'success' },
                 'external-consumer': { result: code === 'true' ? 'success' : 'skipped' },
                 test: { result: 'success' },
-                integration: { result: 'success' },
+                'integration-gate': { result: 'success' },
                 'action-gate': { result: 'success' },
                 'extension-gate': { result: 'success' },
                 'generator-gate': { result: 'success' },
@@ -1083,7 +1164,7 @@ describe('action release prerequisites', () => {
                     'external-consumer',
                     'test',
                     'docs',
-                    'integration',
+                    'integration-gate',
                     'generator-gate',
                 ]) {
                     const failing = { ...needs, [required]: { ...needs[required], result: 'failure' } };

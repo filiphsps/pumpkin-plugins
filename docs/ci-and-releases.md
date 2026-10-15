@@ -20,7 +20,7 @@ shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
 
 | Job | Runs | What |
 | --- | --- | --- |
-| 🔍 Changed files | CI-triggering changes | Separates plugin/repository code, action directories, extension directories and documentation; selects the generator smoke test for scaffold-related changes and detects generated README refresh commits |
+| 🔍 Changed files | CI-triggering changes | Separates plugin/repository code, action directories, extension directories and documentation; selects integration suites for plugin and suite dependency changes, the generator smoke test for scaffold-related changes, and detects generated README refresh commits |
 | 💬 Commit messages | code, action, extension, or generated README changes on PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
@@ -34,7 +34,8 @@ shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
 | 🔨 Build | code changes, after change classification | Starts Static Hermes preparation while lint and typecheck run, then builds every production plugin with its configured engine (Static Hermes by default), runs integration checks, and rebuilds release artifacts with the same runtime before signing and verification |
 | 📊 Engine comparison | code changes, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`; nine engine configurations run as parallel matrix jobs, then a report job validates and combines their real-Pumpkin results |
 | 📈 Engine comparison comment | successful PR CI runs with a benchmark report | `.github/workflows/engine-comparison-comment.yml` compares with the latest matching default-branch report, updates one PR comment, and embeds an SVG timing-change chart |
-| 🎃 Integration | code changes, after build | Runs affected package suites against the pinned Pumpkin release, or the full suite for repo-level changes; reuses WASM files from the build job |
+| 🎃 Integration | plugin and suite dependency changes, workspace-wide build configuration or shared integration setup changes, after build | Runs changed packages and their dependents against the pinned Pumpkin release, or the full suite for workspace-wide and integration setup changes; reuses WASM files from the build job |
+| 🛡️ Integration gate | every CI run, after classification and integration tests | Requires selected integration suites to pass; accepts a skipped suite when no relevant changes occurred or benchmark changes use Engine comparison |
 | 🧬 Generator | scaffold, generator setup or generated plugin dependency changes, after lint and build | Reuses the Static Hermes cache saved by Build, then generates a throwaway plugin, action and extension; checks release registration and READMEs; tests the action and extension; and typechecks, builds and integration-tests the plugin |
 | 🛡️ Generator gate | every CI run, after classification and the generator smoke test | Requires the smoke test when a scaffold, generator setup or generated plugin dependency changes; accepts a skipped test when none changed |
 | 🚢 Release | plugin, action, extension or public tool release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; actions create GitHub releases, extensions attach VSIX packages, public tools publish npm tarballs, and plugins produce signed artifacts and Market listings |
@@ -71,10 +72,13 @@ GitHub's path filters skip the main CI workflow, so it does not call action test
 relevant code or action checks.
 
 Everything else outside `actions/` is a change to repository code and runs the code jobs, including
-changes under `tools/`, `scripts/` and `.github/`, and deletions. Integration tests narrow to changed plugin packages and
-their dependents when all code changes are within plugin or runtime-tool packages; repo-level
-changes run the full integration suite. Biome, the type checker and the tests read none of the
-documentation files, so a docs-only change cannot fail them.
+changes under `tools/`, `scripts/` and `.github/`, and deletions. Real-server integration runs only for
+plugin or integration-suite dependency changes, plus workspace-wide build configuration and shared
+integration setup changes. Package and suite dependency changes select the affected packages and their
+dependents; workspace-wide changes run the full suite. Changes to the integration workflow and its
+local actions run the full suite. Unrelated scripts and workflow files skip this job. Benchmark-only
+changes use Engine comparison. Biome, the type checker and the tests read none of the documentation
+files, so a docs-only change cannot fail them.
 
 The main CI `📝 Docs and config` job runs for code, action and extension changes, and for the automatic
 `docs: update generated READMEs` commit. Release PRs also change version and changelog files, so
@@ -82,9 +86,10 @@ GitHub continues to trigger CI as the README refresh commit is added. The classi
 commit and reruns the repository checks that validate the generated README. Ordinary docs-only PRs
 skip the main CI workflow entirely.
 
-On a push, the release job waits for the action and extension test gates and docs/config checks. Plugin/repository
-changes also require lint, typecheck, build, external-consumer, unit test and integration jobs. Engine
-comparison runs separately and does not gate releases.
+On a push, the release job waits for the action, extension, integration and generator gates and
+docs/config checks. Plugin/repository changes also require lint, typecheck, build, external-consumer
+and unit test jobs. The integration gate requires the real-server suite only for relevant changes.
+Engine comparison runs separately and does not gate releases.
 Empty action and extension matrices pass their gates without running component tests, including version-only release changes.
 Release Please only releases a component with
 releasable changes, so running it for changed action code does not create an empty release.
