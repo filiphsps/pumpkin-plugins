@@ -9,6 +9,7 @@ import { installCommitFilesCache } from './utils/commit-files-cache.mjs';
 import { bundledChangesPlugin, workspacePackages } from './utils/release-commits.mjs';
 import { collectReleaseFanout } from './utils/release-fanout.mjs';
 import { resolveReleaseTargetSha } from './utils/release-target.mjs';
+import { enableLegacyReleaseTitleParsing } from './utils/release-title-compat.mjs';
 
 const program = new Command()
     .name('release')
@@ -76,6 +77,7 @@ function isImmutableReleaseConflict(error) {
 
 if (!dryRun && !pullRequestsOnly) {
     const manifest = await load();
+    enableLegacyReleaseTitleParsing(manifest);
     const currentSha = resolveReleaseTargetSha({
         eventName: process.env.GITHUB_EVENT_NAME,
         workflowSha: process.env.GITHUB_SHA,
