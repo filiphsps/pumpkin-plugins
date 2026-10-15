@@ -80,8 +80,7 @@
             "release-as": "0.1.0"
         },
         "tools/pumpkin-api": {
-            "component": "pumpkin-api",
-            "release-as": "0.1.0"
+            "component": "pumpkin-api"
         },
         "tools/static-hermes-runtime": {
             "component": "static-hermes-runtime",
