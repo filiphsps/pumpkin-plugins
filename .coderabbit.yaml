@@ -90,8 +90,20 @@ reviews:
           instructions: Do not suggest for PRs; this is an issue-disposition label.
         - label: maintenance
           instructions: Internal upkeep or refactoring without a user-facing feature or bug fix.
+        - label: "plugin: Apple Skin"
+          instructions: Changes specifically related to packages/apple-skin-pumpkin/.
+        - label: "plugin: Bedrock Addon Manager"
+          instructions: Changes specifically related to packages/bedrock-addon-manager/.
         - label: "plugin: Distant Horizons Support"
           instructions: Changes specifically related to packages/distant-horizons-support-pumpkin/.
+        - label: "plugin: Dynamic Lights"
+          instructions: Changes specifically related to packages/dynamic-lights-pumpkin/.
+        - label: "plugin: Tab Display"
+          instructions: Changes specifically related to packages/tab-display/.
+        - label: "plugin: UPnPumpkin"
+          instructions: Changes specifically related to packages/upnpumpkin/.
+        - label: "plugin: Waypoints"
+          instructions: Changes specifically related to packages/waypoints/.
         - label: "priority: critical"
           instructions: >-
               Use only for a demonstrated severe issue blocking core use or a release; do not infer
