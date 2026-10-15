@@ -397,7 +397,7 @@ version with
 The action accepts the exact Pumpkin plugin name, version, `.wasm` path, optional track and release
 notes, a Market API token, and an optional API URL. It calls `PUT /api/plugins/<id>` with bearer
 authentication and multipart `wasm` and `metadata` fields, using the file it receives without
-rebuilding it. It runs directly on GitHub Actions' Node 24 runtime.
+rebuilding it. Its runner is declared in [`action.yml`](../actions/publish-to-pumpkin-market/action.yml).
 
 In this repo, the `market` job downloads the `.wasm` produced by the build job, resolves the plugin's
 canonical name from its info module, and passes the per-plugin Release Please version and changelog

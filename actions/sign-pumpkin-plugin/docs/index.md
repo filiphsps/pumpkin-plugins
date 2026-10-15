@@ -13,5 +13,5 @@ result before writing, and refreshes an adjacent `.sha256` file when one exists.
 
 Store the 32-byte Ed25519 seed as 64 hexadecimal characters in a protected GitHub secret. Set
 `warn: true` only when a missing key should intentionally leave files unsigned, such as a fork
-workflow. Malformed keys, missing files, and failed verification remain errors. The action runs on
-GitHub Actions' Node 24 runtime and needs no setup step.
+workflow. Malformed keys, missing files, and failed verification remain errors. See
+[action.yml](../action.yml) for the runtime and entry point; no setup step is needed.

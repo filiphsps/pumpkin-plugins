@@ -18,7 +18,7 @@ steps:
       api-token: ${{ secrets.MARKET_API_TOKEN }}
 ```
 
-The version reference above is this action's first Release Please tag. Action releases are
+Each example uses this action's current Release Please tag. Action releases are
 independent from plugin releases and other actions.
 
 ## Metadata sources
@@ -91,4 +91,4 @@ Add inputs and outputs in `action.yml`, implement the behavior in `src/index.mjs
 tests in `src/*.test.mjs`. Input and output tables are generated from `action.yml`; run `pnpm readme`
 after changing the action metadata. Read inputs with `getInput()` from
 `../../common/src/utils.mjs` so hyphenated input names keep matching GitHub's runner environment.
-The action runs on GitHub's Node 24 runtime and needs no separate build step.
+The action's runtime is declared in [`action.yml`](action.yml); it needs no separate build step.

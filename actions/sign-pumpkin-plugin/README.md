@@ -27,7 +27,7 @@ changes.
 The action uses the repository's tested `@pumpkin-plugins/signing` implementation and verifies its
 output before writing it. Existing signing sections are replaced. If a sibling
 `<wasm-file>.sha256` checksum file exists, the action updates it to match the signed bytes. Its
-`.mjs` entrypoint loads the shared TypeScript signer with Node 24's built-in type stripping, so it
+`.mjs` entrypoint loads the shared TypeScript signer with Node's built-in type stripping, so it
 does not need a separate build or bundle step.
 
 For CI jobs that need to sign multiple plugins, provide a JSON array manifest instead of the three
@@ -64,4 +64,4 @@ This action has no outputs.
 
 An empty key can be skipped with `warn: true`, which is useful for forks and repositories that
 release unsigned plugins. A malformed key, missing file, or failed signature verification always
-fails. The action runs on GitHub's Node 24 runtime and needs no extra runner setup.
+fails. The action's runtime is declared in [`action.yml`](action.yml); it needs no extra runner setup.

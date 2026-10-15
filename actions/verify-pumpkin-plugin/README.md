@@ -19,7 +19,7 @@ steps:
       version: 1.2.3
 ```
 
-The version reference above is this action's first Release Please tag. Action releases are
+Each example uses this action's current Release Please tag. Action releases are
 independent from plugin releases and other actions.
 
 The action checks the Pumpkin Ed25519 signature and can pin the public key to a trusted publisher.
@@ -73,4 +73,4 @@ tests in `src/*.test.mjs`. Input and output tables are generated from `action.ym
 after changing the action metadata. Read inputs with `getInput()` and write outputs with
 `setOutput()` from `../../common/src/utils.mjs` so values use GitHub's runner environment and
 output-file format. These helpers and their tests are shared by all actions.
-The action runs on GitHub's Node 24 runtime and needs no separate build step.
+The action's runtime is declared in [`action.yml`](action.yml); it needs no separate build step.
