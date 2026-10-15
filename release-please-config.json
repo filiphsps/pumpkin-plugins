@@ -83,8 +83,7 @@
             "component": "pumpkin-api"
         },
         "tools/static-hermes-runtime": {
-            "component": "static-hermes-runtime",
-            "release-as": "0.1.0"
+            "component": "static-hermes-runtime"
         },
         "tools/update-check": {
             "component": "update-check",
