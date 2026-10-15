@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/codemod-v0.1.0...codemod-v0.1.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **codemod:** default API migration to Static Hermes ([94baf0d](https://github.com/filiphsps/pumpkin-plugins/commit/94baf0d5226e17072df641e01eed93f5060565df))
+
 ## 0.1.0 (2026-10-15)
 
 
