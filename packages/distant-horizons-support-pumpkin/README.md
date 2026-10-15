@@ -228,6 +228,20 @@ can synchronize cached terrain on login. Delete the plugin's cache folder while 
 stopped after replacing a world or changing its height. Vanilla world heights are assumed unless
 an override is configured.
 
+### Terrain access limits
+
+The plugin can read only chunks Pumpkin has loaded. It cannot load saved chunks or ask Pumpkin's
+regular terrain generator to create missing chunks.
+
+Requests for uncached sections retry with exponential backoff while any of the 16 server chunks are
+unavailable. They can be captured once all 16 chunks are loaded. Completed cached sections can still
+be sent while their chunks are unloaded. `/dhs generate` captures loaded terrain and skips sections
+with unavailable chunks.
+
+To capture a new area, arrange for the server to load its chunks through normal play or a server
+chunk-loading tool. See [troubleshooting](docs/troubleshooting.md#requests-stay-pending-because-terrain-is-unavailable)
+if requests stay pending.
+
 ### Diagnosing pending requests
 
 `/dhs status` includes worker ticks, capture progress, the sample budget, reported MSPT, the last
@@ -263,9 +277,3 @@ encoder.
 The protocol format follows the Distant Horizons core linked in the generated compatibility
 section, Copyright (C) 2020 James Seibel, originally under [LGPL-3.0-only](LICENSE.LESSER.txt).
 The initial server-plugin reference revision is `56a01110579b94c9946130092500c00df7c31925`.
-
-## TODO
-
-- [ ] Connect the shared `ChunkLoader` and `TerrainGenerator` providers when Pumpkin exposes those
-  APIs. The current adapter reports loading and generation as unavailable, and waits when a future
-  provider reports pending work.

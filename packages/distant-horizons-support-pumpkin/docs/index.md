@@ -14,9 +14,3 @@ later requests.
 - Read the setup guide before installing to check client compatibility, permissions, and first-start
   settings.
 - Use the troubleshooting guide for unavailable terrain, stale cache entries, and server status.
-
-## Reference
-
-The plugin README is generated from the compatibility metadata, configuration schema, command
-declarations, and permission metadata. It stays in sync with the supported client protocol,
-terrain limits, settings, commands, and permissions.
