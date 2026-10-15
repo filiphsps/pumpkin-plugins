@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { publicToolReleaseTitleOptions } from './utils/release-pr-title.mjs';
 
 const FIRST_TOOL_VERSION = '0.1.0';
 const FIRST_MANIFEST_VERSION = '0.0.0';
@@ -31,6 +32,7 @@ export function registerPublicTool(root, toolDirectory) {
     if (packageJson.version !== FIRST_TOOL_VERSION) {
         throw new Error(`${packagePath} must start at ${FIRST_TOOL_VERSION} before its first public release.`);
     }
+    const releaseTitleOptions = publicToolReleaseTitleOptions(packageJson.name, component);
 
     const configPath = path.join(root, 'release-please-config.json');
     const manifestPath = path.join(root, '.release-please-manifest.json');
@@ -60,8 +62,12 @@ export function registerPublicTool(root, toolDirectory) {
         );
     }
 
-    if (!existingConfig) config.packages[toolDirectory] = { component, 'release-as': FIRST_TOOL_VERSION };
-    else if (existingConfig['release-as'] === undefined) existingConfig['release-as'] = FIRST_TOOL_VERSION;
+    if (!existingConfig)
+        config.packages[toolDirectory] = { component, ...releaseTitleOptions, 'release-as': FIRST_TOOL_VERSION };
+    else {
+        if (existingConfig['release-as'] === undefined) existingConfig['release-as'] = FIRST_TOOL_VERSION;
+        Object.assign(existingConfig, releaseTitleOptions);
+    }
     if (manifestVersion === undefined) manifest[toolDirectory] = FIRST_MANIFEST_VERSION;
     config.packages = Object.fromEntries(
         Object.entries(config.packages).sort(([left], [right]) => left.localeCompare(right)),

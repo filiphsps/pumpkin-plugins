@@ -41,6 +41,9 @@ first functional version is `0.1.0`. The publish job orders selected tools from 
 production dependencies and packed project templates, so each consumer's required public
 dependencies are available before its publish job runs.
 
+Release PR titles use the full `@pumpkin-plugins/<name>` package name for scoped tools, while tags
+keep using the folder component. The unscoped `create-pumpkin-plugin` title stays unscoped.
+
 The `ci.yml` caller invokes the reusable release workflow after CI gates pass. Its `publish-tools`
 job runs only when Release Please reports public tool paths to release. The job packs and validates
 those packages sequentially, checks exact dependency versions and registry integrity, then publishes

@@ -11,6 +11,9 @@ import { runInNewContext } from 'node:vm';
 import { parse } from 'yaml';
 
 const scripts = import.meta.dirname;
+const scopedReleaseTitlePattern = ['chore$', '{scope}: release @pumpkin-plugins/$', '{component} $', '{version}'].join(
+    '',
+);
 const dirs = [];
 afterEach(() => {
     for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
@@ -588,7 +591,7 @@ describe('package-metadata', () => {
 });
 
 describe('check-release-config', () => {
-    const publicTools = { 'tools/example-tool': '@example/tool' };
+    const publicTools = { 'tools/example-tool': '@pumpkin-plugins/example-tool' };
     const files = ({ manifest = '0.0.0', releaseAs = '0.0.1', version = '0.0.0' } = {}) => ({
         'packages/plug/package.json': { name: 'plug', version },
         ...Object.fromEntries(
@@ -612,7 +615,12 @@ describe('check-release-config', () => {
                 ...Object.fromEntries(
                     Object.keys(publicTools).map((directory) => [
                         directory,
-                        { component: path.basename(directory), 'release-as': '0.1.0' },
+                        {
+                            component: path.basename(directory),
+                            'component-no-space': true,
+                            'pull-request-title-pattern': scopedReleaseTitlePattern,
+                            'release-as': '0.1.0',
+                        },
                     ]),
                 ),
             },
@@ -685,6 +693,24 @@ describe('check-release-config', () => {
         assert.match(
             run('check-release-config.mjs', repo(mismatchedVersion)).out,
             /tools\/example-tool\/package\.json must be/,
+        );
+    });
+
+    it('requires scoped public tools to include their npm scope in parseable release titles', () => {
+        const missingTitlePattern = files();
+        missingTitlePattern['release-please-config.json'].packages['tools/example-tool']['pull-request-title-pattern'] =
+            undefined;
+        assert.match(
+            run('check-release-config.mjs', repo(missingTitlePattern)).out,
+            /tools\/example-tool needs "pull-request-title-pattern".*@pumpkin-plugins\//,
+        );
+
+        const spacedTitleComponent = files();
+        spacedTitleComponent['release-please-config.json'].packages['tools/example-tool']['component-no-space'] =
+            undefined;
+        assert.match(
+            run('check-release-config.mjs', repo(spacedTitleComponent)).out,
+            /tools\/example-tool needs "component-no-space": true/,
         );
     });
 

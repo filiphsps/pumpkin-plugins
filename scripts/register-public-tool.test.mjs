@@ -5,6 +5,9 @@ import { join } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { registerPublicTool } from './register-public-tool.mjs';
 
+const scopedReleaseTitlePattern = ['chore$', '{scope}: release @pumpkin-plugins/$', '{component} $', '{version}'].join(
+    '',
+);
 const temporaryDirectories = [];
 afterEach(() => {
     for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
@@ -34,7 +37,12 @@ describe('registerPublicTool', () => {
         registerPublicTool(root, 'tools/codemod');
 
         assert.deepEqual(JSON.parse(readFileSync(join(root, 'release-please-config.json'), 'utf8')).packages, {
-            'tools/codemod': { component: 'codemod', 'release-as': '0.1.0' },
+            'tools/codemod': {
+                component: 'codemod',
+                'component-no-space': true,
+                'pull-request-title-pattern': scopedReleaseTitlePattern,
+                'release-as': '0.1.0',
+            },
         });
         assert.deepEqual(JSON.parse(readFileSync(join(root, '.release-please-manifest.json'), 'utf8')), {
             'tools/codemod': '0.0.0',
@@ -98,6 +106,8 @@ describe('registerPublicTool', () => {
         assert.deepEqual(result, { configChanged: true, manifestChanged: false });
         assert.deepEqual(JSON.parse(readFileSync(configPath, 'utf8')).packages['tools/codemod'], {
             component: 'codemod',
+            'component-no-space': true,
+            'pull-request-title-pattern': scopedReleaseTitlePattern,
             'release-as': '0.1.0',
         });
     });

@@ -45,41 +45,63 @@
             "component": "waypoints"
         },
         "tools/apis/pumpkin-pie-api": {
-            "component": "pumpkin-pie-api"
+            "component": "pumpkin-pie-api",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
         "tools/build": {
-            "component": "build"
+            "component": "build",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
         "tools/codemod": {
-            "component": "codemod"
+            "component": "codemod",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
         "tools/config": {
-            "component": "config"
+            "component": "config",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
         "tools/create-pumpkin-plugin": {
             "component": "create-pumpkin-plugin",
             "release-as": "0.1.0"
         },
         "tools/cspell-dict-minecraft": {
-            "component": "cspell-dict-minecraft"
+            "component": "cspell-dict-minecraft",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
         "tools/docs": {
-            "component": "docs"
+            "component": "docs",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
         "tools/minecraft-colors": {
-            "component": "minecraft-colors"
+            "component": "minecraft-colors",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
         "tools/plugin-kit": {
-            "component": "plugin-kit"
+            "component": "plugin-kit",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
         "tools/pumpkin-api": {
-            "component": "pumpkin-api"
+            "component": "pumpkin-api",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
         "tools/static-hermes-runtime": {
-            "component": "static-hermes-runtime"
+            "component": "static-hermes-runtime",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
         "tools/update-check": {
-            "component": "update-check"
+            "component": "update-check",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         }
     },
     "changelog-sections": [

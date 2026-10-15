@@ -3,6 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
+import { publicToolReleaseTitleOptions } from './utils/release-pr-title.mjs';
 import { discoverPublicToolPackages } from './utils/tool-packages.mjs';
 
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
@@ -37,7 +38,8 @@ for (const [dir, reason] of pausedEntries) {
 const plugins = discoveredPlugins.filter((dir) => !pausedPlugins.has(dir));
 const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
 const extensions = discoverComponents(root, 'extensions').map(({ slug }) => `extensions/${slug}`);
-const tools = discoverPublicToolPackages(root).map(({ path: packagePath }) => packagePath);
+const publicTools = discoverPublicToolPackages(root);
+const tools = publicTools.map(({ path: packagePath }) => packagePath);
 for (const dir of actions) {
     for (const file of ['README.md', 'CHANGELOG.md', 'version.txt']) {
         if (!fs.existsSync(path.join(root, dir, file))) problems.push(`${dir}/${file} is missing`);
@@ -50,7 +52,10 @@ for (const dir of extensions) {
 }
 const components = new Map([
     ...plugins.map((dir) => [dir, { type: 'plugin', version: read(`${dir}/package.json`).version }]),
-    ...tools.map((dir) => [dir, { type: 'tool', version: read(`${dir}/package.json`).version }]),
+    ...publicTools.map(({ path: dir, name, packageJson }) => [
+        dir,
+        { type: 'tool', version: packageJson.version, packageName: name },
+    ]),
     ...extensions.map((dir) => [dir, { type: 'extension', version: read(`${dir}/package.json`).version }]),
     ...actions.map((dir) => [
         dir,
@@ -91,7 +96,7 @@ for (const [option, behavior] of [
         }
     }
 }
-for (const [dir, { type, version }] of components) {
+for (const [dir, { type, version, packageName }] of components) {
     const name = path.basename(dir);
 
     const entry = config.packages?.[dir];
@@ -106,6 +111,20 @@ for (const [dir, { type, version }] of components) {
     }
     if (type === 'action' && entry?.['release-type'] !== 'simple') {
         problems.push(`${dir} needs "release-type": "simple" in release-please-config.json`);
+    }
+    if (type === 'tool') {
+        try {
+            const titleOptions = publicToolReleaseTitleOptions(packageName, name);
+            for (const [option, expected] of Object.entries(titleOptions)) {
+                if (entry?.[option] !== expected) {
+                    problems.push(
+                        `${dir} needs "${option}": ${JSON.stringify(expected)} in release-please-config.json so its release PR title includes ${packageName}`,
+                    );
+                }
+            }
+        } catch (error) {
+            problems.push(`${dir}: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
 
     // Plugins and actions start at 0.0.0 and use 0.0.1 as their first release. Public tools retain
