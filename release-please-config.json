@@ -54,8 +54,7 @@
             "release-as": "0.1.0"
         },
         "tools/codemod": {
-            "component": "codemod",
-            "release-as": "0.1.0"
+            "component": "codemod"
         },
         "tools/config": {
             "component": "config",
