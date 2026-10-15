@@ -62,8 +62,9 @@ just to rerun setup.
 The repository uses a reusable workflow: `.github/workflows/ci.yml` calls
 `.github/workflows/release.yml`. npm matches the caller's workflow filename, so configure `ci.yml`,
 not `release.yml`. OIDC requires `id-token: write` in both the caller's `release` job and the
-reusable workflow's `publish-tools` job. The publish job is gated by Release Please's
-`tool_paths_released` output. A GitHub Actions npm write token is not needed.
+reusable workflow's `publish-tools` job. Normal release runs scan for missing npm versions from
+earlier tool releases; manual recovery runs publish only the tool releases selected for the exact
+requested commit. A GitHub Actions npm write token is not needed.
 
 ## Validate the relationship within two days
 

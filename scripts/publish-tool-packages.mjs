@@ -266,6 +266,37 @@ export async function getNpmRegistryIntegrity(packageName, version, fetchImpl = 
     return integrity;
 }
 
+/**
+ * Lists the versions already published for a public npm package.
+ *
+ * @param {string} packageName - npm package name, including its scope when present.
+ * @param {typeof fetch} [fetchImpl] - Fetch implementation used for the registry request.
+ * @returns {Promise<string[]>} Exact versions currently listed by the npm registry.
+ * @throws {Error} When the package is missing or the registry response is unsuccessful or malformed.
+ */
+export async function getNpmRegistryVersions(packageName, fetchImpl = fetch) {
+    const packageUrl = encodeURIComponent(packageName);
+    const response = await fetchImpl(`https://registry.npmjs.org/${packageUrl}`);
+    if (response.status === 404) {
+        throw new Error(
+            `npm registry returned HTTP 404: package ${packageName} was not found; refusing to publish its first version from the automated publisher`,
+        );
+    }
+    assertRegistryResponseOk(response);
+    const packageDocument = await readRegistryJson(response);
+    if (packageDocument?.name !== packageName) {
+        throw new Error(`npm registry package lookup did not identify ${packageName}`);
+    }
+    if (
+        !packageDocument.versions ||
+        typeof packageDocument.versions !== 'object' ||
+        Array.isArray(packageDocument.versions)
+    ) {
+        throw new Error(`npm registry response has no valid versions map for ${packageName}`);
+    }
+    return Object.keys(packageDocument.versions);
+}
+
 function assertRegistryResponseOk(response) {
     if (!response.ok) {
         throw new Error(`npm registry returned HTTP ${response.status} ${response.statusText}`);

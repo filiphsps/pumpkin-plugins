@@ -228,9 +228,11 @@ run is still active. The older run may create the tag and release first, using a
 the previous commit. The attach job checks that the tag points to the commit built by its run. It
 skips the older run's artifact, leaving the released commit's run to upload the files.
 
-Push workflow runs are not canceled when a newer commit arrives. This lets release-please finish
-creating a tag and updating its release PR before the next push run reads that state. Pull request
-runs are still canceled when superseded.
+For push runs, GitHub keeps one run active and one pending in each concurrency group; a newer push
+can replace the pending run. The npm publisher scans tool releases on the target commit's
+first-parent history and publishes missing versions from their exact tag commits, oldest first, so
+the latest successful run catches up releases from skipped pending runs. Pull request runs are
+canceled when superseded.
 
 Release Please creates a tag immediately, including while a GitHub release is a draft. Without that,
 a later release run can miss the previous release and recreate its changelog. The release config

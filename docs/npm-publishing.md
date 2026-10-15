@@ -45,13 +45,16 @@ Release PR titles use the full `@pumpkin-plugins/<name>` package name for scoped
 keep using the folder component. The unscoped `create-pumpkin-plugin` title stays unscoped.
 
 The `ci.yml` caller invokes the reusable release workflow after CI gates pass. Its `publish-tools`
-job runs only when Release Please reports public tool paths to release. The job packs and validates
-those packages sequentially, checks exact dependency versions and registry integrity, then publishes
-missing versions with npm trusted publishing and provenance. See
+job scans non-draft public-tool releases on the target commit's first-parent history on every normal
+run. It checks which historical versions are missing from npm, then packs and publishes them from
+their exact release commits, oldest first. It publishes the current commit's selected tools after
+catch-up, checking exact dependency versions and registry integrity before using npm trusted
+publishing and provenance. This recovers releases when a rapid series of pushes replaces an older
+pending CI run. See
 [Trusted publishing for npm tools](npm-trusted-publishing.md) for setup and recovery.
 
-If a GitHub release exists but its npm job was skipped, dispatch the `ci.yml` caller with the full
-commit SHA that the release tag targets. For codemod, resolve its tag before dispatching:
+To recover immediately without another push, dispatch the `ci.yml` caller with the full commit SHA
+that the release tag targets. For codemod, resolve its tag before dispatching:
 
 ```sh
 release_commit="$(git rev-parse 'codemod-v0.1.0^{commit}')"

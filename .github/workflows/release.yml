@@ -309,7 +309,7 @@ jobs:
     publish-tools:
         name: 📦 Publish npm packages
         needs: [release, release-fanout-check]
-        if: ${{ needs.release.outputs.tool_paths_released != '[]' }}
+        if: ${{ !inputs.tool_only || needs.release.outputs.tool_paths_released != '[]' }}
         timeout-minutes: 60
         runs-on: ubuntu-26.04
         permissions:
@@ -325,6 +325,8 @@ jobs:
         steps:
             - name: 🕶️ Checkout repository
               uses: actions/checkout@v7.0.1
+              with:
+                  fetch-depth: 0
 
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
@@ -376,6 +378,9 @@ jobs:
                       }
                   }
                   NODE
+                  if [[ "$RELEASE_TOOL_ONLY" != 'true' ]]; then
+                      pnpm exec node scripts/publish-pending-tool-releases.mjs
+                  fi
                   if [[ "$RELEASE_TOOL_ONLY" == 'true' ]]; then
                       pnpm --dir "$GITHUB_WORKSPACE/release-source" install --frozen-lockfile
                       PUMPKIN_PUBLIC_TOOL_ROOT="$GITHUB_WORKSPACE/release-source" \
