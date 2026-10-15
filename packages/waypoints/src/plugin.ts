@@ -7,10 +7,12 @@ import type {
     PlayerLeaveEventData,
     ServerCommandEventData,
 } from 'pumpkin:plugin/event@0.1.0';
+import type { IpcMessage, PluginId } from 'pumpkin:plugin/ipc@0.1.0';
 import { ItemStack } from 'pumpkin:plugin/item-stack@0.1.0';
 import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import * as uuid from 'pumpkin:plugin/uuid@0.1.0';
+import { now as monotonicNow } from 'wasi:clocks/monotonic-clock@0.2.3';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
 import { cancelTask, runCommand, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
@@ -26,6 +28,7 @@ import {
 import { itemIconInputFromCommand } from './commands/item-input.ts';
 import { commands } from './commands/spec.ts';
 import { info } from './info.ts';
+import { WaypointPlaceholderService } from './placeholders/service.ts';
 import { WaypointHudService } from './rendering/pumpkin-hud.ts';
 import { WaypointCatalog } from './waypoints/catalog.ts';
 import { normalizeItemIdentifier } from './waypoints/model.ts';
@@ -36,7 +39,8 @@ class Waypoints extends PluginBase {
     private server: Server | undefined;
     private files: WasiDataDir | undefined;
     private hud: WaypointHudService | undefined;
-    private hudTaskId: number | undefined;
+    private placeholders: WaypointPlaceholderService | undefined;
+    private tickTaskId: number | undefined;
     private readonly pendingItemIconInputs = new Map<string, string>();
     private pendingServerItemIconInput: string | undefined;
 
@@ -65,8 +69,14 @@ class Waypoints extends PluginBase {
                 logging.log('warn', `${info.name}: waypoint HUD update failed for ${viewerId}: ${String(error)}`),
         });
         this.hud = hud;
+        this.placeholders = new WaypointPlaceholderService(server, catalog, {
+            now: monotonicMilliseconds,
+            onTransition: (state) => logging.log('info', `${info.name}: PumpkinPIE provider is ${state.kind}`),
+            onFailure: (identifier, reason) =>
+                logging.log('warn', `${info.name}: waypoint placeholder ${identifier} declined (${reason})`),
+        });
         // Pumpkin disables scheduled plugin tasks before shutting down the WASM store.
-        this.hudTaskId = scheduleRepeating(1, () => hud.tick());
+        this.tickTaskId = scheduleRepeating(1, () => this.tick());
 
         this.registerEvent(ctx, 'player-join-event', (_server, event: PlayerJoinEventData) => {
             hud.joined(event.player);
@@ -132,28 +142,71 @@ class Waypoints extends PluginBase {
     protected override onPluginUnload(_ctx: Context): void {
         this.pendingItemIconInputs.clear();
         this.pendingServerItemIconInput = undefined;
-        const hudTaskId = this.hudTaskId;
-        this.hudTaskId = undefined;
-        if (hudTaskId !== undefined) {
+        const tickTaskId = this.tickTaskId;
+        this.tickTaskId = undefined;
+        if (tickTaskId !== undefined) {
             try {
-                cancelTask(hudTaskId);
+                cancelTask(tickTaskId);
             } catch (error) {
-                logging.log('warn', `${info.name}: failed to cancel HUD update task: ${String(error)}`);
+                logging.log('warn', `${info.name}: failed to cancel update task: ${String(error)}`);
             }
         }
+
+        const placeholders = this.placeholders;
+        this.placeholders = undefined;
         try {
-            this.hud?.unload();
-        } finally {
-            this.hud = undefined;
-            disposeWasiResource(this.server);
-            this.server = undefined;
-            disposeWasiResource(this.files);
-            this.files = undefined;
+            placeholders?.stop();
+        } catch {
+            logging.log('warn', `${info.name}: failed to stop PumpkinPIE session`);
+        }
+
+        const hud = this.hud;
+        this.hud = undefined;
+        try {
+            hud?.unload();
+        } catch {
+            logging.log('warn', `${info.name}: failed to unload waypoint HUD`);
+        }
+
+        const resources = [this.server, this.files];
+        this.server = undefined;
+        this.files = undefined;
+        for (const resource of resources) {
+            try {
+                disposeWasiResource(resource);
+            } catch {
+                logging.log('warn', `${info.name}: failed to release a host resource during unload`);
+            }
+        }
+    }
+
+    /** Routes PumpkinPIE callbacks through the session's authenticated expansion router. */
+    override handleIpcMessage(sender: PluginId, message: IpcMessage): IpcMessage {
+        const placeholders = this.placeholders;
+        return placeholders === undefined
+            ? super.handleIpcMessage(sender, message)
+            : placeholders.handleIpcMessage(sender, message);
+    }
+
+    private tick(): void {
+        try {
+            this.placeholders?.tick();
+        } catch {
+            logging.log('warn', `${info.name}: PumpkinPIE session tick failed`);
+        }
+        try {
+            this.hud?.tick();
+        } catch {
+            logging.log('warn', `${info.name}: waypoint HUD tick failed`);
         }
     }
 }
 
 registerPlugin(new Waypoints());
+
+function monotonicMilliseconds(): number {
+    return Number(monotonicNow() / 1_000_000n);
+}
 
 export { handleTask } from '@pumpkin-plugins/plugin-kit/plugin';
 
