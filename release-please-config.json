@@ -50,8 +50,7 @@
             "release-as": "0.1.0"
         },
         "tools/build": {
-            "component": "build",
-            "release-as": "0.1.0"
+            "component": "build"
         },
         "tools/codemod": {
             "component": "codemod"
