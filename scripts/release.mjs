@@ -8,6 +8,7 @@ import { Command } from 'commander';
 import { installCommitFilesCache } from './utils/commit-files-cache.mjs';
 import { bundledChangesPlugin, workspacePackages } from './utils/release-commits.mjs';
 import { collectReleaseFanout } from './utils/release-fanout.mjs';
+import { recoverImmutableReleaseConflict } from './utils/release-recovery.mjs';
 import { resolveReleaseTargetSha } from './utils/release-target.mjs';
 import { enableLegacyReleaseTitleParsing } from './utils/release-title-compat.mjs';
 
@@ -64,15 +65,21 @@ const outputs = {
     pr_count: '0',
 };
 
-function isImmutableReleaseConflict(error) {
-    return (
-        error?.status === 422 &&
-        Array.isArray(error.body?.errors) &&
-        error.body.errors.some(
-            (problem) =>
-                problem.field === 'tag_name' && problem.message?.includes('tag_name was used by an immutable release'),
-        )
-    );
+function normalizeImmutableReleaseCandidates(candidates) {
+    if (!Array.isArray(candidates)) return candidates;
+    return candidates.map((candidate) => {
+        const { tag } = candidate;
+        const version = tag.version;
+        return {
+            tagName: tag.toString(),
+            sha: candidate.sha,
+            path: candidate.path,
+            version: version.toString(),
+            major: version.major,
+            minor: version.minor,
+            patch: version.patch,
+        };
+    });
 }
 
 if (!dryRun && !pullRequestsOnly) {
@@ -100,38 +107,18 @@ if (!dryRun && !pullRequestsOnly) {
         try {
             return await createReleasesForPullRequest(...releaseArgs);
         } catch (error) {
-            if (!isImmutableReleaseConflict(error)) throw error;
             const pullRequest = releaseArgs[1];
-            const candidates = releaseArgs[0];
-            if (!Array.isArray(candidates)) throw new Error('Could not resolve release candidates for an existing tag');
-
-            const recovered = [];
-            for (const candidate of candidates) {
-                const tagName = candidate.tag.toString();
-                const release = await existingRelease(tagName);
-                if (!release)
-                    throw new Error(`GitHub rejected ${tagName} as a duplicate, but no existing release was found`);
-                if (release.sha !== candidate.sha) {
-                    throw new Error(
-                        `GitHub release ${tagName} points to ${release.sha}, but Release Please expects ${candidate.sha}`,
-                    );
-                }
-                recovered.push({
-                    ...release,
-                    path: candidate.path,
-                    version: candidate.tag.version.toString(),
-                    major: candidate.tag.version.major,
-                    minor: candidate.tag.version.minor,
-                    patch: candidate.tag.version.patch,
-                    prNumber: pullRequest?.number,
-                    recovered: true,
-                });
-            }
-
-            if (pullRequest?.number && !manifest.skipLabeling) {
-                await github.removeIssueLabels(manifest.labels, pullRequest.number);
-                await github.addIssueLabels(manifest.releaseLabels, pullRequest.number);
-            }
+            const recovered = await recoverImmutableReleaseConflict({
+                error,
+                getCandidates: () => normalizeImmutableReleaseCandidates(releaseArgs[0]),
+                pullRequestNumber: pullRequest?.number,
+                labelingEnabled: !manifest.skipLabeling,
+                findRelease: existingRelease,
+                restoreLabels: async (pullRequestNumber) => {
+                    await github.removeIssueLabels(manifest.labels, pullRequestNumber);
+                    await github.addIssueLabels(manifest.releaseLabels, pullRequestNumber);
+                },
+            });
             console.warn(
                 `GitHub already has this release tag; reusing its metadata for the release run: ${recovered
                     .map((release) => release.tagName)
