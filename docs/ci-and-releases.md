@@ -174,6 +174,11 @@ runner reuses the existing release metadata only when its target commit matches 
 That lets the matching run attach the artifact; an older run defers the artifact to the run that
 built the tagged commit. The runner changes the release PR label from pending to tagged either way.
 Other release PRs in the same run can still publish; other API errors remain failures.
+The matching run also recovers already-created releases for the configured component versions at
+its exact commit, even after another run marks their PRs as tagged. Recovered releases and newly
+created releases share the same fan-out, with each tag included once. This also lets a retry resume
+npm publishing after GitHub release creation; existing npm versions must pass the publisher's
+integrity check.
 
 Merging an action release PR updates its `version.txt` and `CHANGELOG.md`, tags it
 `<folder>-v<version>`, and creates a GitHub release. Action releases do not run plugin packaging,

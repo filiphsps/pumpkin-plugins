@@ -26,6 +26,10 @@ function run(args, overrides = {}) {
                 removeIssueLabels: async (labels, number) => record('remove:' + labels.join(',') + ':' + number),
                 addIssueLabels: async (labels, number) => record('add:' + labels.join(',') + ':' + number),
                 releaseIterator: async function* () {
+                    if (process.env.EXISTING_RELEASES) {
+                        yield* JSON.parse(process.env.EXISTING_RELEASES);
+                        return;
+                    }
                     yield {
                         tagName: 'plugin-v1.0.0', sha: process.env.EXISTING_RELEASE_SHA ?? 'release-sha',
                         notes: 'Features\\n\\n* Added update checks',
@@ -39,7 +43,8 @@ function run(args, overrides = {}) {
                 Manifest: { fromManifest: async (github) => {
                     const latestReleasePublished = published;
                     const repositoryConfig = {
-                        'packages/plugin': { bumpMinorPreMajor: false, bumpPatchForMinorPreMajor: false },
+                        'packages/plugin': { component: 'plugin', bumpMinorPreMajor: false, bumpPatchForMinorPreMajor: false },
+                        'tools/codemod': { component: 'codemod', includeComponentInTag: true, includeVInTag: true },
                         'actions/publish-action': { bumpMinorPreMajor: false, bumpPatchForMinorPreMajor: false }
                     };
                     const candidate = (path, tagName, notes, version) => ({
@@ -63,12 +68,13 @@ function run(args, overrides = {}) {
                           ? [{ error: 'immutable', releases: [plugin] }, { releases: [action] }]
                           : [{ error: process.env.RELEASE_ERROR, releases: releaseItems }];
                     return {
-                    plugins: [], releasedVersions: {}, commitSearchDepth: 500, repositoryConfig,
+                    plugins: [], releasedVersions: { 'packages/plugin': '1.0.0', 'tools/codemod': '0.1.0' }, commitSearchDepth: 500, repositoryConfig,
                     labels: ['autorelease: pending'], releaseLabels: ['autorelease: tagged'],
                     createReleases: async function () {
                         recordVersioning(this.repositoryConfig);
                         record('release');
                         const releases = [];
+                        if (process.env.NO_NEW_RELEASES === 'true') return releases;
                         for (const group of releaseGroups) {
                             releases.push(
                                 ...await this.createReleasesForPullRequest(group.releases, {
@@ -233,7 +239,14 @@ it('uses pre-major versioning for every component when creating releases and PRs
     const result = run([]);
     assert.equal(result.status, 0, result.stderr);
     const policy = {
-        'packages/plugin': { bumpMinorPreMajor: true, bumpPatchForMinorPreMajor: true },
+        'packages/plugin': { component: 'plugin', bumpMinorPreMajor: true, bumpPatchForMinorPreMajor: true },
+        'tools/codemod': {
+            component: 'codemod',
+            includeComponentInTag: true,
+            includeVInTag: true,
+            bumpMinorPreMajor: true,
+            bumpPatchForMinorPreMajor: true,
+        },
         'actions/publish-action': { bumpMinorPreMajor: true, bumpPatchForMinorPreMajor: true },
     };
     assert.deepEqual(result.versioning, [policy, policy]);
@@ -340,4 +353,53 @@ it('rejects misspelled modes before making any GitHub changes', () => {
     const result = run(['--dryrun']);
     assert.notEqual(result.status, 0);
     assert.deepEqual(result.calls, []);
+});
+
+const existingCodemodRelease = {
+    tagName: 'codemod-v0.1.0',
+    sha: 'release-sha',
+    notes: 'Features\n\n* Add codemods',
+    url: 'https://example.com/codemod-release',
+    uploadUrl: 'https://example.com/codemod-upload',
+};
+
+it('fans out an already tagged npm release when the matching commit runs later', () => {
+    const result = run([], {
+        NO_NEW_RELEASES: 'true',
+        EXISTING_RELEASES: JSON.stringify([existingCodemodRelease]),
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.output, /tool_paths_released<<[^\n]+\n\["tools\/codemod"\]\n/);
+    assert.match(result.output, /tools\/codemod--tag_name<<[^\n]+\ncodemod-v0\.1\.0\n/);
+    assert.match(result.output, /tools\/codemod--release_recovered<<[^\n]+\ntrue\n/);
+    assert.match(result.output, /release_count<<[^\n]+\n1\n/);
+    const metadata = result.output.match(/release_metadata<<([^\n]+)\n([^\n]+)\n\1\n/);
+    assert.deepEqual(JSON.parse(metadata[2]), { 'tools/codemod--tag_name': 'codemod-v0.1.0' });
+    const notes = result.output.match(/release_notes<<([^\n]+)\n([^\n]+)\n\1\n/);
+    assert.deepEqual(JSON.parse(notes[2]), { 'tools/codemod--body': 'Features\n\n* Add codemods' });
+});
+
+it('combines previously tagged releases with new releases without duplicate fan-out', () => {
+    const result = run([], {
+        EXISTING_RELEASES: JSON.stringify([existingCodemodRelease, { tagName: 'plugin-v1.0.0', sha: 'release-sha' }]),
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.output, /release_count<<[^\n]+\n3\n/);
+    assert.match(result.output, /paths_released<<[^\n]+\n\["packages\/plugin"\]\n/);
+    assert.match(result.output, /tool_paths_released<<[^\n]+\n\["tools\/codemod"\]\n/);
+    assert.match(result.output, /packages\/plugin--release_created<<[^\n]+\ntrue\n/);
+});
+
+it('ignores existing releases for other commits, versions and unregistered components', () => {
+    const result = run([], {
+        NO_NEW_RELEASES: 'true',
+        EXISTING_RELEASES: JSON.stringify([
+            { ...existingCodemodRelease, sha: 'other-sha' },
+            { ...existingCodemodRelease, tagName: 'codemod-v0.0.0' },
+            { ...existingCodemodRelease, tagName: 'unknown-v0.1.0' },
+        ]),
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.output, /tool_paths_released<<[^\n]+\n\[\]\n/);
+    assert.match(result.output, /release_count<<[^\n]+\n0\n/);
 });

@@ -128,6 +128,23 @@ if (!dryRun && !pullRequestsOnly) {
         }
     };
     const createdReleases = (await manifest.createReleases()).filter(Boolean);
+    const knownTags = new Set(createdReleases.map((release) => release.tagName));
+    // Another run can create and label a release before the run for its tagged commit gets here.
+    // Release Please no longer returns it, so recover the configured version for this exact commit.
+    for (const [path, config] of Object.entries(manifest.repositoryConfig)) {
+        const version = manifest.releasedVersions[path]?.toString();
+        if (!version || config.skipGithubRelease) continue;
+        const component = config.includeComponentInTag === false ? '' : config.component;
+        if (component === undefined) continue;
+        const prefix = component ? `${component}${config.tagSeparator ?? '-'}` : '';
+        const tagName = `${prefix}${config.includeVInTag === false ? '' : 'v'}${version}`;
+        if (knownTags.has(tagName)) continue;
+        const release = await existingRelease(tagName);
+        if (!process.env.GITHUB_SHA || release?.sha !== process.env.GITHUB_SHA) continue;
+        createdReleases.push({ ...release, path, version, recovered: true });
+        knownTags.add(tagName);
+        console.log(`Recovering ${tagName} for artifact fan-out at ${release.sha}`);
+    }
     const releases = createdReleases.filter((release) => {
         if (!release.sha) throw new Error(`Release ${release.tagName} has no target commit SHA`);
         if (release.sha === process.env.GITHUB_SHA) return true;
