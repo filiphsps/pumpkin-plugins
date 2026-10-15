@@ -13,7 +13,7 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 
 ## CI and releases
 
-- [Publishing public npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-publishing.md): The public npm package set and dependency order are defined in tool-packages.mjs.
+- [Publishing public npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-publishing.md): Public npm tools are discovered from package manifests under tools/ that declare publishConfig.access: "public" and are not private.
 - [Trusted publishing for npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-trusted-publishing.md): The release workflow publishes the public tools with npm trusted publishing. npm authenticates the GitHub Actions workflow through OpenID Connect (OIDC); no npm write token is…
 
 ## Guides
