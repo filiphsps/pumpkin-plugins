@@ -55,7 +55,7 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
             }),
             force: bool({
                 description:
-                    'Make pack downloads required before players can join. This currently has no effect because Pumpkin does not support pack delivery.',
+                    'Require pack downloads before players can join. This setting has no effect because BedrockAddonManager does not send pack offers to players.',
                 default: false,
             }),
         },

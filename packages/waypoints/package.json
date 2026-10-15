@@ -2,7 +2,7 @@
     "name": "@pumpkin-plugins/waypoints",
     "version": "0.0.4",
     "private": true,
-    "description": "Server-managed waypoints with access rules and a Java 26.3 HUD",
+    "description": "Server-managed waypoints with access rules and a Java HUD",
     "keywords": [
         "minecraft",
         "pumpkin",
@@ -40,8 +40,8 @@
     "scripts": {
         "build": "pumpkin-plugins-build",
         "build:parse-ts": "pumpkin-plugins-build --parse-ts",
-        "readme": "pumpkin-plugins-docs",
-        "readme:check": "pumpkin-plugins-docs --check",
+        "readme": "pumpkin-plugins-docs && pumpkin-plugins-docs generate docs.ts",
+        "readme:check": "pumpkin-plugins-docs --check && pumpkin-plugins-docs generate docs.ts --check",
         "test": "vitest run --project unit",
         "test:coverage": "vitest run --project unit --coverage",
         "test:integration": "vitest run --project integration",

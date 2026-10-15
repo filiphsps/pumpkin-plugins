@@ -24,7 +24,7 @@ describe('pumpkin.toml', () => {
                 ),
             },
         });
-        await r.server.waitForLog(/Offering 2 Bedrock packs to players/);
+        await r.server.waitForLog(/This plugin does not send pack offers to players\./);
 
         const toml = fs.readFileSync(path.join(r.server.dir, 'pumpkin.toml'), 'utf8');
         expect(toml).not.toContain(SAMPLE_UUID);
@@ -39,6 +39,6 @@ describe('pumpkin.toml', () => {
             files: { 'packs/a.mcpack': makeMcpack(), 'packs/b.mcpack': makeMcpack() },
         });
         await r.server.waitForLog(/b\.mcpack has the same UUID as a\.mcpack; skipping it/);
-        await r.server.waitForLog(/Offering 1 Bedrock pack to players/);
+        await r.server.waitForLog(/This plugin does not send pack offers to players\./);
     });
 });

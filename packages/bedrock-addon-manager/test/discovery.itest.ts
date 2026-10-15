@@ -20,7 +20,7 @@ describe('pack discovery', () => {
         const from = r.server.lines.length;
         r.server.command('baddon reload');
         await r.server.waitForLog(/Found 1 Bedrock pack: late\.mcpack/, 15_000, from);
-        await r.server.waitForLog(/Offering 1 Bedrock pack to players/, 15_000, from);
+        await r.server.waitForLog(/This plugin does not send pack offers to players\./, 15_000, from);
 
         const res = await fetch(r.url('/packs/late.mcpack'));
         expect(new Uint8Array(await res.arrayBuffer())).toEqual(bigPack);
@@ -49,7 +49,7 @@ describe('pack discovery', () => {
         });
         await r.server.waitForLog(/Found 1 Bedrock pack: Cool Addon\.mcpack/);
         await r.server.waitForLog(/Cool Addon\.mcaddon: left out BP \(data, not a resource pack\)/);
-        await r.server.waitForLog(/Offering 1 Bedrock pack to players/);
+        await r.server.waitForLog(/This plugin does not send pack offers to players\./);
 
         const res = await fetch(r.url('/packs/Cool%20Addon.mcpack'));
         expect(res.status).toBe(200);

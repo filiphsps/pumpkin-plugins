@@ -2,7 +2,7 @@
     "name": "@pumpkin-plugins/tab-display",
     "version": "0.0.0",
     "private": true,
-    "description": "Customizes Java tab displays with native Bedrock capability gates",
+    "description": "Formats Java row names and headers/footers; no Bedrock list changes.",
     "keywords": [
         "minecraft",
         "pumpkin",
@@ -40,8 +40,8 @@
     "scripts": {
         "build": "pumpkin-plugins-build",
         "build:parse-ts": "pumpkin-plugins-build --parse-ts",
-        "readme": "pumpkin-plugins-docs",
-        "readme:check": "pumpkin-plugins-docs --check",
+        "readme": "pumpkin-plugins-docs && pumpkin-plugins-docs generate docs.ts",
+        "readme:check": "pumpkin-plugins-docs --check && pumpkin-plugins-docs generate docs.ts --check",
         "test": "vitest run --project unit",
         "test:coverage": "vitest run --project unit --coverage",
         "test:integration": "vitest run --project integration",

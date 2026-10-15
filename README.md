@@ -32,12 +32,12 @@ Browse the [public documentation site](https://filiphsps.github.io/pumpkin-plugi
 | Plugin | Description | License |
 | --- | --- | --- |
 | [AppleSkinPumpkin](packages/apple-skin-pumpkin) | AppleSkin server-side support | MIT |
-| [BedrockAddonManager](packages/bedrock-addon-manager) | Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and reads their manifests. Pumpkin does not yet expose an API for sending packs to players. | MIT |
+| [BedrockAddonManager](packages/bedrock-addon-manager) | Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and reads their manifests. It does not currently send pack offers to players. | MIT |
 | [DistantHorizonsSupportPumpkin](packages/distant-horizons-support-pumpkin) | Unofficial Distant Horizons server-side support for Pumpkin | [GPL-3.0-or-later](packages/distant-horizons-support-pumpkin/LICENSE) |
 | [DynamicLightsPumpkin](packages/dynamic-lights-pumpkin) | Server-driven dynamic lights for held items and nearby entities | MIT |
-| [TabDisplay](packages/tab-display) | Customizes Java tab displays with native Bedrock capability gates | MIT |
+| [TabDisplay](packages/tab-display) | Formats Java row names and headers/footers; no Bedrock list changes. | MIT |
 | [UPnPumpkin](packages/upnpumpkin) | Port forward ports on the router with UPnP or NAT-PMP so players can connect from the internet. Other plugins can request port mappings through UPnPumpkin. | MIT |
-| [Waypoints](packages/waypoints) | Server-managed waypoints with access rules and a Java 26.3 HUD | MIT |
+| [Waypoints](packages/waypoints) | Server-managed waypoints with access rules and a Java HUD | MIT |
 
 **Tools**
 
@@ -70,7 +70,7 @@ Browse the [public documentation site](https://filiphsps.github.io/pumpkin-plugi
 
 ## Getting started
 
-Needs Node 24 or newer and pnpm (the version is pinned in `package.json`).
+Install the pinned Node.js and pnpm versions from [`.node-version`](.node-version) and [`package.json`](package.json).
 
 ```sh
 pnpm install

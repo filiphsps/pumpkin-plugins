@@ -5,6 +5,7 @@ import * as uuid from 'pumpkin:plugin/uuid@0.1.0';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import type { WaypointCatalog } from '../waypoints/catalog.ts';
 import type { Waypoint } from '../waypoints/model.ts';
+import { JAVA_DISPLAY_VERSION } from './java-version.ts';
 import { WaypointHudRenderer } from './renderer.ts';
 
 /** Error reporting for a viewer whose host resource or packet send failed. */
@@ -26,7 +27,7 @@ export class WaypointHudService {
         this.renderer = new WaypointHudRenderer({ onError: this.onError });
     }
 
-    /** Reconciles every online Java 26.3 viewer once per server tick. */
+    /** Reconciles every online Java viewer once per server tick. */
     tick(): void {
         const waypoints = this.groupByDimension(this.catalog.list());
         let opManager: OpManager | undefined;
@@ -141,7 +142,7 @@ export class WaypointHudService {
                 this.renderer.forgetViewer(id);
                 return;
             }
-            if (java.getVersion() !== 'v-26-3') {
+            if (java.getVersion() !== JAVA_DISPLAY_VERSION) {
                 this.renderer.removeViewer(id, (packet) => java?.sendPacket(packet));
                 return;
             }

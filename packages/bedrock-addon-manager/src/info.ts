@@ -7,7 +7,7 @@ import { PLUGIN_NAME } from './name.ts';
 export const info = {
     name: PLUGIN_NAME,
     description:
-        'Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and reads their manifests. Pumpkin does not yet expose an API for sending packs to players.',
+        'Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and reads their manifests. It does not currently send pack offers to players.',
     permissions: [
         { name: 'fs.read.data', reason: 'Read the packs folder and the plugin config in its data folder.' },
         {

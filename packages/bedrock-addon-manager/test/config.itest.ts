@@ -11,7 +11,7 @@ describe('first start', () => {
         const r = await start({ name: 'first-start' });
         await r.server.waitForLog(/Created config\.toml with the default settings/);
         await r.server.waitForLog(/No packs in packs\//);
-        await r.server.waitForLog(/Offering 0 Bedrock packs to players/);
+        await r.server.waitForLog(/This plugin does not send pack offers to players\./);
 
         const config = r.read('config.toml');
         expect(config).toContain('[web]');

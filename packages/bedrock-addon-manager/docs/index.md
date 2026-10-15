@@ -1,11 +1,10 @@
 # BedrockAddonManager
 
 BedrockAddonManager scans Bedrock `.mcpack` and `.mcaddon` files, reads pack manifests, and serves
-the selected resource packs over HTTP. Use it to prepare pack downloads for Bedrock players.
+the selected resource packs over HTTP. Use it to host packs at URLs that Bedrock clients can reach.
 
-Pumpkin does not currently expose an API for sending resource-pack offers to players. The plugin
-can host and describe packs, but it cannot make clients download or require them; the `packs.force`
-setting has no effect until Pumpkin supports delivery.
+BedrockAddonManager does not send resource-pack offers to players. Clients are not prompted to
+download packs, and `packs.force` has no effect.
 
 ## Typical setup
 

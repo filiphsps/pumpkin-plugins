@@ -24,6 +24,5 @@ the plugin config take effect on reload or restart. The plugin never edits `pump
 
 ## Packs are not offered to joining players
 
-This is a current Pumpkin API limitation: Pumpkin does not provide a resource-pack delivery API.
-BedrockAddonManager can scan and serve files, but cannot send a pack offer or enforce downloads.
-Accordingly, `packs.force` currently has no effect.
+BedrockAddonManager does not send resource-pack offers to joining players. It hosts the files.
+Clients are not prompted to download them, and `packs.force` has no effect.

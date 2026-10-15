@@ -46,6 +46,6 @@ export function listLines(entries: readonly PackEntry[]): string[] {
  */
 export function reloadLines(count: number): string[] {
     return [
-        `Reloaded the config and rescanned the packs folder: ${count} pack${count === 1 ? '' : 's'} listed. Players who are already connected get them when they rejoin.`,
+        `Reloaded the config and rescanned the packs folder: ${count} pack${count === 1 ? '' : 's'} listed. BedrockAddonManager does not send pack offers to players.`,
     ];
 }

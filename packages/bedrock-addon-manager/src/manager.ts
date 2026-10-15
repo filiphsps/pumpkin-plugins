@@ -188,11 +188,11 @@ export class PackManager {
         this.announce();
     }
 
-    /** Stand-in for handing the packs to the server. Pumpkin has no plugin API for that yet, so it only says what would be offered. */
+    /** Logs the selected pack count. This plugin does not send pack offers to players. */
     private announce(): void {
         const count = this.index.entries.length;
         this.log.info(
-            `Offering ${ansi.named.number(count)} Bedrock pack${count === 1 ? '' : 's'} to players who join from now on (not connected to the server yet, so players are not sent them).`,
+            `Found ${ansi.named.number(count)} Bedrock pack${count === 1 ? '' : 's'}. This plugin does not send pack offers to players.`,
         );
     }
 

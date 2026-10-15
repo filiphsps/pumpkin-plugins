@@ -29,11 +29,19 @@ members.
 
 ## Java waypoint HUD
 
-Minecraft Java 26.3 players see each enabled waypoint they can access in the same dimension and
-within its optional visibility range. Private display packets keep restricted names and personalized
-distances off other clients. Names reveal after a settled look and stay visible near the destination;
-distant peripheral markers show just their distance and icon. Labels use the waypoint color, a
-shadow, and a subtle backdrop independent of world lighting. Iconless waypoints use a colored diamond.
+Only Java clients whose reported version exactly matches the gate below receive HUD updates:
+
+<!-- docs:begin java-display-version -->
+<!-- Generated from src/rendering/java-version.ts. Run `pnpm readme`. -->
+
+Required Java version: `v-26-3`.
+<!-- docs:end java-display-version -->
+
+Players see each enabled waypoint they can access in the same dimension and within the optional
+visibility range. Private display packets keep restricted names and personalized distances off other
+clients. Names reveal after a settled look and stay visible near the destination; distant peripheral
+markers show just their distance and icon. Labels use the waypoint color, a shadow, and a subtle
+backdrop independent of world lighting. Iconless waypoints use a colored diamond.
 
 The HUD uses client-only TextDisplay entities along each waypoint's world direction. A smooth depth
 curve approaches a maximum of 24 blocks from the player's eyes, reducing the apparent movement
@@ -57,9 +65,9 @@ unchanged text is not resent for appearance-only updates.
 This approximates a first-person HUD: network latency, client view bobbing, and third-person camera
 offsets can still affect alignment. The server cannot read client FOV or reliably detect Java item-use
 state, so spyglass and modded zoom enlarge the labels. Other Java protocol versions do not receive the
-HUD. Bedrock support depends on the Pumpkin API and will be added when the API makes it possible.
-Icons use vanilla 26.3 atlas textures; block items use a representative model texture, and custom item
-IDs require the corresponding `item/<path>` sprite in the client's resource pack.
+HUD. This HUD supports Java clients only. Waypoints does not currently render Bedrock HUDs.
+Icons use vanilla atlas textures; block items use a representative model texture, and custom item IDs
+require the corresponding `item/<path>` sprite in the client's resource pack.
 
 Malformed or unsupported storage is preserved and disables writes. Fix the file before expecting
 changes to persist.

@@ -15,8 +15,8 @@ the normal Pumpkin Market update check also requests `http.outbound`.
 
 ## Current capability boundary
 
-The Java adapter currently makes tab-name and header/footer calls only for Java protocol
-`v-26-3`. It leaves other Java versions unchanged and reports them as unsupported in
+The Java adapter makes tab-name and header/footer calls only for the protocol version listed in the
+capability table below. It leaves other Java versions unchanged and reports them as unsupported in
 `/tabdisplay status`. These adapter calls have not been verified with a live Java client in this
 environment. Status and documentation do not claim that a live client displayed the result.
 
@@ -24,6 +24,9 @@ Native sorting is disabled. Non-empty `sorting.rules` values fail config validat
 client's ordering direction has not been verified. Numeric objectives are also rejected until their
 player-list display behavior is verified. The Bedrock adapter does not send Java tab fields or
 modify names, scores, identities, skins or roster membership.
+
+<!-- docs:begin capabilities -->
+<!-- Generated from src/model.ts and docs.ts. Run `pnpm readme`. -->
 
 | Surface | Current behavior |
 | --- | --- |
@@ -33,6 +36,7 @@ modify names, scores, identities, skins or roster membership.
 | Java numeric objective | Disabled; config rejects `objective.enabled = true` |
 | Bedrock roster | Left unchanged; objective and row formatting unsupported |
 | Per-viewer row names, fake rows and fixed slots | Not implemented |
+<!-- docs:end capabilities -->
 
 ## PumpkinPIE placeholders
 

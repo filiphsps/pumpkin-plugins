@@ -278,18 +278,18 @@ describe('PackManager', () => {
         expect(manager.entries.map((e) => e.fileName)).toEqual(['late.mcpack']);
     });
 
-    it('tells how many packs it offers on start and on reload', () => {
+    it('reports discovered packs without implying that it sends them to players', () => {
         const { files, log, manager } = setup();
         files.put('packs/a.mcpack', pack(1));
         manager.start();
         expect(log.of('info')).toContain(
-            `Offering ${ansi.named.number('1')} Bedrock pack to players who join from now on (not connected to the server yet, so players are not sent them).`,
+            `Found ${ansi.named.number('1')} Bedrock pack. This plugin does not send pack offers to players.`,
         );
 
         files.put('packs/b.mcpack', pack(2));
         manager.reload();
         expect(log.of('info')).toContain(
-            `Offering ${ansi.named.number('2')} Bedrock packs to players who join from now on (not connected to the server yet, so players are not sent them).`,
+            `Found ${ansi.named.number('2')} Bedrock packs. This plugin does not send pack offers to players.`,
         );
     });
 
