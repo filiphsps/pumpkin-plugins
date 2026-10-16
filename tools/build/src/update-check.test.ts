@@ -50,8 +50,8 @@ describe('build update check', () => {
 
         const lines = output.join('').trimEnd().split('\n');
         const boxWidth = lines[0]?.length ?? 0;
-        expect(lines[0]).toMatch(/^┌─+┐$/);
-        expect(lines.at(-1)).toBe(`└${'─'.repeat(boxWidth - 2)}┘`);
+        expect(lines[0]).toMatch(/^╭─+╮$/);
+        expect(lines.at(-1)).toBe(`╰${'─'.repeat(boxWidth - 2)}╯`);
         expect(lines.slice(1, -1).length).toBeGreaterThan(0);
         for (const line of lines.slice(1, -1)) {
             expect(line).toMatch(/^│.*│$/);
