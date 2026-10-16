@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
@@ -43,6 +43,21 @@ it('discovers sorted components by metadata and walks Markdown with explicit exc
             join(root, 'docs/index.md'),
             join(root, 'docs/nested/guide.md'),
         ]);
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
+
+it('discovers component folders linked into a temporary workspace', () => {
+    const root = mkdtempSync(join(tmpdir(), 'docs-discovery-symlink-'));
+    try {
+        const component = join(root, 'component');
+        mkdirSync(component);
+        writeFileSync(join(component, 'package.json'), '{}\n');
+        mkdirSync(join(root, 'tools'));
+        symlinkSync(component, join(root, 'tools/linked'), process.platform === 'win32' ? 'junction' : 'dir');
+
+        expect(discoverComponents(root, 'tools').map((item) => item.slug)).toEqual(['linked']);
     } finally {
         rmSync(root, { recursive: true, force: true });
     }

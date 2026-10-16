@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { type Dirent, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
 /** Repository component kinds with package or GitHub Action metadata. */
@@ -9,6 +9,17 @@ export interface SourceComponent {
     directory: string;
     metadataFile: string;
     slug: string;
+}
+
+/** Treat symlinked directories as directories while ignoring broken links. */
+function isDirectoryEntry(directory: string, entry: Dirent): boolean {
+    if (entry.isDirectory()) return true;
+    if (!entry.isSymbolicLink()) return false;
+    try {
+        return statSync(join(directory, entry.name)).isDirectory();
+    } catch {
+        return false;
+    }
 }
 
 /** Discover sorted component folders by metadata, including grouped tool packages. */
@@ -23,14 +34,14 @@ export function discoverComponents(root: string, group: ComponentGroup): SourceC
             : undefined;
     };
     const folders = readdirSync(base, { withFileTypes: true })
-        .filter((entry) => entry.isDirectory() && !entry.name.startsWith('_'))
+        .filter((entry) => !entry.name.startsWith('_') && isDirectoryEntry(base, entry))
         .map((entry) => join(base, entry.name));
     return folders
         .flatMap((directory) => {
             const component = componentIn(directory);
             if (component || group !== 'tools') return component ? [component] : [];
             return readdirSync(directory, { withFileTypes: true })
-                .filter((entry) => entry.isDirectory() && !entry.name.startsWith('_'))
+                .filter((entry) => !entry.name.startsWith('_') && isDirectoryEntry(directory, entry))
                 .map((entry) => componentIn(join(directory, entry.name)))
                 .filter((nested): nested is SourceComponent => nested !== undefined);
         })

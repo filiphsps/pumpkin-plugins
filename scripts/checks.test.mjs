@@ -8,6 +8,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { runInNewContext } from 'node:vm';
+import { generateDocsIndex } from '@pumpkin-plugins/docs/node';
 import { parse } from 'yaml';
 
 const scripts = import.meta.dirname;
@@ -30,6 +31,12 @@ function repo(files) {
             typeof content === 'string' ? content : `${JSON.stringify(content, null, 4)}\n`,
         );
     }
+    return dir;
+}
+
+function repoWithCurrentDocsIndex(files) {
+    const dir = repo(files);
+    generateDocsIndex(dir);
     return dir;
 }
 
@@ -283,10 +290,10 @@ const metadata = (dir) => ({
 
 describe('check-docs', () => {
     const good = {
-        'package.json': { name: 'root', scripts: { test: 'x' } },
+        'package.json': { name: 'root', scripts: { test: 'x', readme: 'x' } },
         'README.md':
             '# Root\n\nRun `pnpm test`. See [docs](docs/README.md) and [the guide](docs/guide.md#getting-started).\n',
-        'docs/README.md': '# Docs\n\n| [Guide](guide.md) | the guide |\n',
+        'docs/README.md': '# Docs\n\n<!-- docs:begin site-index -->\n<!-- docs:end site-index -->\n',
         'docs/guide.md': '# Guide\n\n## Getting started\n\nSee `tools/kit/src/a.ts`.\n',
         'tools/kit/package.json': { name: '@x/kit', scripts: {} },
         'tools/kit/README.md': '# @x/kit\n\nA kit.\n',
@@ -294,27 +301,33 @@ describe('check-docs', () => {
     };
 
     it('passes for a repo whose docs match', () => {
-        const result = run('check-docs.mjs', repo(good));
+        const result = run('check-docs.mjs', repoWithCurrentDocsIndex(good));
         assert.ok(result.ok, result.out);
     });
 
     it('fails for a package without a README, and for one that does not name itself', () => {
         const { 'tools/kit/README.md': _, ...without } = good;
-        assert.match(run('check-docs.mjs', repo(without)).out, /tools\/kit\/README\.md is missing/);
-        const result = run('check-docs.mjs', repo({ ...good, 'tools/kit/README.md': '# Something\n' }));
+        assert.match(run('check-docs.mjs', repoWithCurrentDocsIndex(without)).out, /tools\/kit\/README\.md is missing/);
+        const result = run(
+            'check-docs.mjs',
+            repoWithCurrentDocsIndex({ ...good, 'tools/kit/README.md': '# Something\n' }),
+        );
         assert.match(result.out, /should mention @x\/kit/);
     });
 
     it('fails for links to files or headings that do not exist, but not for links in code', () => {
         const broken = run(
             'check-docs.mjs',
-            repo({ ...good, 'docs/guide.md': '# Guide\n\n[x](missing.md) [y](README.md#nope)\n' }),
+            repoWithCurrentDocsIndex({ ...good, 'docs/guide.md': '# Guide\n\n[x](missing.md) [y](README.md#nope)\n' }),
         );
         assert.match(broken.out, /links to missing\.md, which does not exist/);
         assert.match(broken.out, /links to README\.md#nope, but docs\/README\.md has no such heading/);
         const inCode = run(
             'check-docs.mjs',
-            repo({ ...good, 'docs/guide.md': '# Guide\n\n## Getting started\n\n`[x](missing.md)`\n' }),
+            repoWithCurrentDocsIndex({
+                ...good,
+                'docs/guide.md': '# Guide\n\n## Getting started\n\n`[x](missing.md)`\n',
+            }),
         );
         assert.ok(inCode.ok, inCode.out);
     });
@@ -322,7 +335,7 @@ describe('check-docs', () => {
     it('validates agent guidance and skill links and commands too', () => {
         const result = run(
             'check-docs.mjs',
-            repo({
+            repoWithCurrentDocsIndex({
                 ...good,
                 'AGENTS.md': '# Agents\n\n[missing](.agents/skills/missing/SKILL.md)\n',
                 '.agents/skills/example/SKILL.md':
@@ -346,7 +359,7 @@ describe('check-docs', () => {
     it('accepts a documented plugin build output declared by its package', () => {
         const result = run(
             'check-docs.mjs',
-            repo({
+            repoWithCurrentDocsIndex({
                 ...good,
                 'packages/waypoints/package.json': {
                     name: '@x/waypoints',
@@ -361,7 +374,7 @@ describe('check-docs', () => {
     it('validates private benchmark Markdown and repository paths without treating it as a public component', () => {
         const result = run(
             'check-docs.mjs',
-            repo({
+            repoWithCurrentDocsIndex({
                 ...good,
                 'benchmarks/engine-comparison/README.md':
                     '# Engine comparison\n\nSee [the guide](../../docs/guide.md) and `benchmarks/engine-comparison/src/workload.ts`.\n',
@@ -371,7 +384,7 @@ describe('check-docs', () => {
         assert.ok(result.ok, result.out);
         const broken = run(
             'check-docs.mjs',
-            repo({
+            repoWithCurrentDocsIndex({
                 ...good,
                 'benchmarks/engine-comparison/README.md':
                     '# Engine comparison\n\n`benchmarks/engine-comparison/src/missing.ts`\n',
@@ -385,7 +398,7 @@ describe('check-docs', () => {
         assert.match(bad.out, /runs `pnpm nonsense`/);
         const builtin = run(
             'check-docs.mjs',
-            repo({
+            repoWithCurrentDocsIndex({
                 ...good,
                 'docs/guide.md': '# Guide\n\n## Getting started\n\n```sh\npnpm install\npnpm exec foo\n```\n',
             }),
@@ -396,14 +409,19 @@ describe('check-docs', () => {
     it('fails for a root script that no doc mentions', () => {
         const result = run(
             'check-docs.mjs',
-            repo({ ...good, 'package.json': { name: 'root', scripts: { test: 'x', deploy: 'y' } } }),
+            repoWithCurrentDocsIndex({
+                ...good,
+                'package.json': { name: 'root', scripts: { test: 'x', deploy: 'y' } },
+            }),
         );
         assert.match(result.out, /the script "deploy"/);
     });
 
     it('fails for a doc page the index does not list', () => {
-        const result = run('check-docs.mjs', repo({ ...good, 'docs/extra.md': '# Extra\n' }));
-        assert.match(result.out, /docs\/README\.md does not list docs\/extra\.md/);
+        const dir = repoWithCurrentDocsIndex(good);
+        fs.writeFileSync(path.join(dir, 'docs/extra.md'), '# Extra\n');
+        const result = run('check-docs.mjs', dir);
+        assert.match(result.out, /docs\/README\.md has stale guide and docs menus/);
     });
 
     it('fails for a CI job the CI doc does not list', () => {
@@ -420,11 +438,10 @@ describe('check-docs', () => {
         const docs = { 'docs/ci-and-releases.md': '# CI\n\n| 📋 Lint | always |\n' };
         const result = run(
             'check-docs.mjs',
-            repo({
+            repoWithCurrentDocsIndex({
                 ...good,
                 ...ci,
                 ...docs,
-                'docs/README.md': '# Docs\n\n[Guide](guide.md) [CI](ci-and-releases.md)\n',
             }),
         );
         assert.match(result.out, /does not list the CI job "🚀 Ship"/);
@@ -432,7 +449,10 @@ describe('check-docs', () => {
     });
 
     it('ignores scratch folders that start with an underscore', () => {
-        const result = run('check-docs.mjs', repo({ ...good, 'tools/_scratch/package.json': { name: 'scratch' } }));
+        const result = run(
+            'check-docs.mjs',
+            repoWithCurrentDocsIndex({ ...good, 'tools/_scratch/package.json': { name: 'scratch' } }),
+        );
         assert.ok(result.ok, result.out);
     });
 });
