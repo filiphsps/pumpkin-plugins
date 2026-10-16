@@ -900,6 +900,7 @@ describe('action release prerequisites', () => {
             always: () => true,
             startsWith,
             github: { head_ref: 'feature/test' },
+            needs: { changes: { outputs: { config_only: 'false' } } },
             ...context,
         });
 
@@ -950,6 +951,13 @@ describe('action release prerequisites', () => {
         ]);
         assert.deepEqual(ci.jobs['action-gate'].needs, ['changes', 'action-tests']);
         assert.equal(evaluate(ci.jobs['action-gate'].if, {}), true);
+    });
+
+    it('skips result gates for label configuration changes', () => {
+        const context = { needs: { changes: { outputs: { config_only: 'true' } } } };
+        for (const job of ['action-gate', 'extension-gate', 'integration-gate', 'generator-gate']) {
+            assert.equal(evaluate(ci.jobs[job].if, context), false, `${job} should skip config-only changes`);
+        }
     });
 
     it('requires the generator smoke test only when the classifier selects it', () => {
