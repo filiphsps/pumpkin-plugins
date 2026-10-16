@@ -1,9 +1,16 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
-import { bundledChangesPlugin, bundledPaths, releaseCommits, workspacePackages } from './release-commits.mjs';
+import {
+    bundledChangesPlugin,
+    bundledPaths,
+    pluginReleaseInputs,
+    releaseCommits,
+    workspacePackages,
+} from './release-commits.mjs';
 
 const packages = new Map([
     [
@@ -73,6 +80,7 @@ const packages = new Map([
     ['harness', { path: 'tools/test-harness', manifest: {} }],
 ]);
 const releaseConfig = JSON.parse(readFileSync(new URL('../../release-please-config.json', import.meta.url), 'utf8'));
+const repositoryRoot = resolve(import.meta.dirname, '../..');
 const commit = (sha, files, message = 'fix: ship a change') => ({ sha, files, message });
 
 function writeToolPackages(root, packages) {
@@ -144,6 +152,146 @@ describe('bundled release commits', () => {
             ),
             ['plugin-kit'],
         );
+    });
+
+    it('selects plugin releases from imported runtime modules, builder source, and relevant catalogs', () => {
+        const inputs = pluginReleaseInputs(
+            workspacePackages(repositoryRoot),
+            'packages/apple-skin-pumpkin',
+            repositoryRoot,
+        );
+        const history = [
+            commit('extension-support', [
+                'pnpm-workspace.yaml',
+                'extensions/minecraft-terms/package.json',
+                'packages/apple-skin-pumpkin/README.md',
+                'tools/docs/src/discovery.ts',
+                'tools/docs/src/node.ts',
+                'tools/docs/src/packages.ts',
+                'tools/build/package.json',
+            ]),
+            commit('docs-discovery', ['tools/docs/src/discovery.ts']),
+            commit('docs-metadata', ['tools/docs/src/info.ts']),
+            commit('docs-command-model', ['tools/docs/src/commands.ts']),
+            commit('builder', ['tools/build/src/update-check.ts']),
+            commit('plugin-kit', ['tools/plugin-kit/src/plugin.ts']),
+            commit('plugin-source', ['packages/apple-skin-pumpkin/src/plugin.ts']),
+            commit('typescript-catalog', ['pnpm-workspace.yaml']),
+            commit('vscode-catalog', ['pnpm-workspace.yaml']),
+            commit('tsconfig', ['tsconfig.base.json']),
+            commit('boundary', ['packages/apple-skin-pumpkin/package.json']),
+        ];
+        const catalogChangesByCommit = new Map([
+            ['extension-support', []],
+            ['typescript-catalog', ['default:typescript']],
+            ['vscode-catalog', ['default:@types/vscode']],
+        ]);
+
+        assert.ok(inputs.catalogs.has('default:typescript'));
+        assert.ok(!inputs.catalogs.has('default:@types/vscode'));
+        assert.deepEqual(
+            releaseCommits(history, inputs, 'boundary', 'apple-skin-pumpkin', catalogChangesByCommit).map(
+                (entry) => entry.sha,
+            ),
+            [
+                'docs-metadata',
+                'docs-command-model',
+                'builder',
+                'plugin-kit',
+                'plugin-source',
+                'typescript-catalog',
+                'tsconfig',
+            ],
+        );
+    });
+
+    it('reads catalog changes from each commit before selecting plugin releases', async () => {
+        const root = mkdtempSync(join(tmpdir(), 'release-catalog-changes-'));
+        const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+        try {
+            git('init', '-q');
+            git('config', 'user.name', 'Release test');
+            git('config', 'user.email', 'release-test@example.com');
+            mkdirSync(join(root, 'packages/plugin/src'), { recursive: true });
+            writeFileSync(
+                join(root, 'packages/plugin/package.json'),
+                JSON.stringify({
+                    name: 'plugin',
+                    pumpkinPlugin: { entry: 'src/plugin.ts' },
+                    devDependencies: { typescript: 'catalog:' },
+                }),
+            );
+            writeFileSync(join(root, 'packages/plugin/src/plugin.ts'), "import type { Plugin } from 'typescript';\n");
+            writeFileSync(join(root, 'tsconfig.base.json'), JSON.stringify({ compilerOptions: {} }));
+            writeFileSync(
+                join(root, 'pnpm-workspace.yaml'),
+                'catalog:\n  typescript: 5.5.0\n  "@types/vscode": 1.95.0\n',
+            );
+            git('add', '.');
+            git('commit', '-qm', 'chore: establish release fixture');
+            const boundary = git('rev-parse', 'HEAD');
+
+            writeFileSync(
+                join(root, 'pnpm-workspace.yaml'),
+                'catalog:\n  typescript: 5.5.0\n  "@types/vscode": 1.96.0\n',
+            );
+            git('add', 'pnpm-workspace.yaml');
+            git('commit', '-qm', 'chore: update extension catalog');
+            const extensionCatalog = git('rev-parse', 'HEAD');
+
+            writeFileSync(
+                join(root, 'pnpm-workspace.yaml'),
+                'catalog:\n  typescript: 5.6.0\n  "@types/vscode": 1.96.0\n',
+            );
+            git('add', 'pnpm-workspace.yaml');
+            git('commit', '-qm', 'chore: update TypeScript catalog');
+            const typescriptCatalog = git('rev-parse', 'HEAD');
+
+            const history = [
+                commit(typescriptCatalog, ['pnpm-workspace.yaml']),
+                commit(extensionCatalog, ['pnpm-workspace.yaml']),
+                commit(boundary, ['packages/plugin/package.json']),
+            ];
+            const github = {
+                async *mergeCommitIterator() {
+                    yield* history;
+                },
+            };
+            const fixturePackages = new Map([
+                [
+                    'plugin',
+                    {
+                        path: 'packages/plugin',
+                        manifest: {
+                            name: 'plugin',
+                            pumpkinPlugin: { entry: 'src/plugin.ts' },
+                            devDependencies: { typescript: 'catalog:' },
+                        },
+                    },
+                ],
+            ]);
+            const inputs = pluginReleaseInputs(fixturePackages, 'packages/plugin', root);
+            assert.deepEqual([...inputs.catalogs], ['default:typescript'], [...inputs.paths].join(', '));
+            assert.ok(inputs.paths.has('packages/plugin/src/plugin.ts'));
+            const release = bundledChangesPlugin(
+                github,
+                'master',
+                fixturePackages,
+                { 'packages/plugin': '0.1.0' },
+                500,
+                () => {},
+                root,
+            );
+            const commits = { 'packages/plugin': [] };
+            await release.preconfigure({ 'packages/plugin': {} }, commits, { 'packages/plugin': { sha: boundary } });
+
+            assert.deepEqual(
+                commits['packages/plugin'].map((entry) => entry.sha),
+                [typescriptCatalog],
+            );
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
     });
 
     it('includes declared bundled assets when selecting extension release commits', () => {

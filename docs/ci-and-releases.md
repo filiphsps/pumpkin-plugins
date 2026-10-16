@@ -179,11 +179,11 @@ Pull requests are **rebase-merged**, never squashed. Every commit lands on `mast
 release-please reads each one, so every commit message must be a conventional commit:
 `feat(scope): ...`, `fix: ...`, `feat!: ...` for breaking changes. The commit lint enforces it.
 
-Commits touching a plugin or its bundled workspace dependencies release that plugin. This includes
-transitive runtime dependencies such as `plugin-kit` and `update-check`, and the workspace build
-tool. A shared fix appears in each affected plugin's changelog, starting at that plugin's own last
-release. Tests, test helpers, generated build output and documentation do not count as shipped code.
-Changes to the dependency catalog or shared TypeScript configuration count for every plugin.
+Plugin releases follow source modules reachable from each plugin entry and the workspace build tool,
+plus explicitly bundled assets. A shared fix appears in each affected plugin's changelog, starting
+at that plugin's own last release. Tests, test helpers, generated build output and documentation do
+not count as shipped code. A dependency catalog change counts only when it changes a catalog entry
+used by those source modules; changes to the shared TypeScript configuration count for every plugin.
 
 ## Releases
 

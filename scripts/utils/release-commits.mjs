@@ -1,6 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { relative, resolve, sep } from 'node:path';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
+import ts from 'typescript';
+import { parse as parseYaml } from 'yaml';
 import { ignoredCommitShas } from './ignored-commits.mjs';
 import { sourcePrerequisitePaths } from './tool-packages.mjs';
 
@@ -44,15 +47,270 @@ export function bundledPaths(packages, releasePath) {
     return paths;
 }
 
-function shippedFile(file, paths) {
+const SOURCE_EXTENSIONS = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
+const SOURCE_IGNORED_DIRECTORIES = new Set(['__tests__', 'build', 'dist', 'node_modules', 'test', 'testing']);
+const SOURCE_TEST_PATTERN = /\.(?:spec|test|itest)\.[cm]?[jt]sx?$/;
+
+function workspacePath(file, root) {
+    const absolutePath = existsSync(file) ? realpathSync(file) : resolve(file);
+    const relativePath = relative(realpathSync(root), absolutePath);
+    if (relativePath === '..' || relativePath.startsWith(`..${sep}`)) return undefined;
+    return relativePath.split(sep).join('/');
+}
+
+function packageForWorkspacePath(path, packages) {
+    return [...packages.values()]
+        .filter((pkg) => path.startsWith(`${pkg.path}/`))
+        .sort((left, right) => right.path.length - left.path.length)[0];
+}
+
+function sourceFilesIn(directory) {
+    if (!existsSync(directory)) return [];
+    const files = [];
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const file = resolve(directory, entry.name);
+        if (entry.isDirectory()) {
+            if (!SOURCE_IGNORED_DIRECTORIES.has(entry.name)) files.push(...sourceFilesIn(file));
+            continue;
+        }
+        if (
+            entry.isFile() &&
+            SOURCE_EXTENSIONS.has(`.${entry.name.split('.').at(-1)}`) &&
+            !SOURCE_TEST_PATTERN.test(entry.name)
+        ) {
+            files.push(file);
+        }
+    }
+    return files;
+}
+
+function packageNameFromSpecifier(specifier) {
+    if (
+        specifier.startsWith('.') ||
+        specifier.startsWith('#') ||
+        specifier.startsWith('node:') ||
+        specifier.startsWith('/')
+    )
+        return undefined;
+    const parts = specifier.split('/');
+    return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+}
+
+function catalogEntryFor(importer, packageName) {
+    for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies', 'devDependencies']) {
+        const specifier = importer.manifest[field]?.[packageName];
+        if (typeof specifier !== 'string' || !specifier.startsWith('catalog:')) continue;
+        const catalog = specifier.slice('catalog:'.length) || 'default';
+        return `${catalog}:${packageName}`;
+    }
+    return undefined;
+}
+
+function sourceModuleSpecifiers(file, contents) {
+    const source = ts.createSourceFile(file, contents, ts.ScriptTarget.Latest, true);
+    const specifiers = new Set();
+    const add = (specifier) => {
+        if (specifier && ts.isStringLiteralLike(specifier)) specifiers.add(specifier.text);
+    };
+    const visit = (node) => {
+        if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) add(node.moduleSpecifier);
+        if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) add(node.argument.literal);
+        if (
+            ts.isCallExpression(node) &&
+            (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+                (ts.isIdentifier(node.expression) && node.expression.text === 'require') ||
+                (ts.isPropertyAccessExpression(node.expression) &&
+                    ts.isIdentifier(node.expression.expression) &&
+                    node.expression.expression.text === 'require' &&
+                    node.expression.name.text === 'resolve'))
+        ) {
+            add(node.arguments[0]);
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(source);
+    return specifiers;
+}
+
+function sourceModuleOptions(root) {
+    const config = ts.readConfigFile(resolve(root, 'tsconfig.base.json'), ts.sys.readFile);
+    if (config.error)
+        throw new Error(
+            `Cannot read tsconfig.base.json: ${ts.flattenDiagnosticMessageText(config.error.messageText, '\n')}`,
+        );
+    return ts.parseJsonConfigFileContent(config.config, ts.sys, root).options;
+}
+
+function collectSourceImports(file, packages, root, compilerOptions, inputs, visited, followWorkspaceImports) {
+    const relativeFile = workspacePath(file, root);
+    const importer = relativeFile && packageForWorkspacePath(relativeFile, packages);
+    if (!relativeFile || !importer || visited.has(relativeFile)) return;
+    visited.add(relativeFile);
+    inputs.paths.add(relativeFile);
+
+    if (!SOURCE_EXTENSIONS.has(`.${relativeFile.split('.').at(-1)}`)) return;
+    const contents = readFileSync(resolve(root, relativeFile), 'utf8');
+    for (const specifier of sourceModuleSpecifiers(relativeFile, contents)) {
+        const packageName = packageNameFromSpecifier(specifier);
+        if (packageName) {
+            const catalogEntry = catalogEntryFor(importer, packageName);
+            if (catalogEntry) inputs.catalogs.add(catalogEntry);
+        }
+        if (specifier.startsWith('node:')) continue;
+
+        const resolution = ts.resolveModuleName(
+            specifier,
+            resolve(root, relativeFile),
+            compilerOptions,
+            ts.sys,
+        ).resolvedModule;
+        if (!resolution) {
+            if (packages.has(packageName)) {
+                throw new Error(`Cannot resolve workspace import ${specifier} from ${relativeFile}`);
+            }
+            continue;
+        }
+        const dependencyPath = workspacePath(resolution.resolvedFileName, root);
+        if (
+            !dependencyPath ||
+            dependencyPath.endsWith('/package.json') ||
+            !packageForWorkspacePath(dependencyPath, packages)
+        )
+            continue;
+        if (followWorkspaceImports) {
+            collectSourceImports(resolution.resolvedFileName, packages, root, compilerOptions, inputs, visited, true);
+        }
+    }
+}
+
+function parseWorkspaceCatalogs(contents) {
+    const workspace = parseYaml(contents) ?? {};
+    const entries = new Map();
+    for (const [packageName, version] of Object.entries(workspace.catalog ?? {})) {
+        entries.set(`default:${packageName}`, version);
+    }
+    for (const [catalog, dependencies] of Object.entries(workspace.catalogs ?? {})) {
+        for (const [packageName, version] of Object.entries(dependencies ?? {})) {
+            entries.set(`${catalog}:${packageName}`, version);
+        }
+    }
+    return entries;
+}
+
+function workspaceCatalogChanges(root, sha) {
+    try {
+        const parent = execFileSync('git', ['rev-parse', `${sha}^1`], { cwd: root, encoding: 'utf8' }).trim();
+        const beforeText = execFileSync('git', ['show', `${parent}:pnpm-workspace.yaml`], {
+            cwd: root,
+            encoding: 'utf8',
+        });
+        const afterText = execFileSync('git', ['show', `${sha}:pnpm-workspace.yaml`], {
+            cwd: root,
+            encoding: 'utf8',
+        });
+        const before = parseWorkspaceCatalogs(beforeText);
+        const after = parseWorkspaceCatalogs(afterText);
+        return new Set(
+            [...new Set([...before.keys(), ...after.keys()])].filter((key) => before.get(key) !== after.get(key)),
+        );
+    } catch {
+        // A missing parent or unavailable history must not silently hide a possible release input.
+        return undefined;
+    }
+}
+
+/** Finds source modules and shared inputs that can change a plugin's built artifact. */
+export function pluginReleaseInputs(packages, releasePath, root = DEFAULT_WORKSPACE_ROOT) {
+    const plugin = [...packages.values()].find((pkg) => pkg.path === releasePath);
+    if (!plugin) throw new Error(`Unknown release package: ${releasePath}`);
+    const entry = plugin.manifest.pumpkinPlugin?.entry;
+    if (typeof entry !== 'string') throw new Error(`Plugin entry is missing from ${releasePath}/package.json`);
+
+    const inputs = {
+        paths: new Set([releasePath]),
+        catalogs: new Set(),
+        sharedFiles: new Set(['tsconfig.base.json']),
+    };
+    const compilerOptions = sourceModuleOptions(root);
+    const visited = new Set();
+    collectSourceImports(resolve(root, releasePath, entry), packages, root, compilerOptions, inputs, visited, true);
+
+    const build = packages.get('@pumpkin-plugins/build');
+    if (build && plugin.manifest.devDependencies?.[build.manifest.name]) {
+        inputs.paths.add(`${build.path}/src`);
+        inputs.paths.add(`${build.path}/runtime`);
+        inputs.paths.add(`${build.path}/wasi-wit.lock.json`);
+        for (const file of sourceFilesIn(resolve(root, build.path, 'src'))) {
+            collectSourceImports(file, packages, root, compilerOptions, inputs, visited, true);
+        }
+    }
+    for (const name of plugin.manifest.pumpkinBundleDependencies ?? []) {
+        const dependency = packages.get(name);
+        if (!dependency) throw new Error(`Unknown bundled dependency ${name} in ${releasePath}/package.json`);
+        inputs.paths.add(dependency.path);
+    }
+    return inputs;
+}
+
+function packageReleaseInputs(packages, releasePath, root) {
+    if (releasePath.startsWith('packages/')) {
+        const plugin = [...packages.values()].find((pkg) => pkg.path === releasePath);
+        if (!plugin) throw new Error(`Unknown release package: ${releasePath}`);
+        if (plugin.manifest.pumpkinPlugin?.entry) return pluginReleaseInputs(packages, releasePath, root);
+        if (existsSync(resolve(root, releasePath, 'package.json'))) {
+            throw new Error(`Plugin entry is missing from ${releasePath}/package.json`);
+        }
+        // Preserve conservative dependency selection when the package source is outside this checkout.
+        return bundledPaths(packages, releasePath);
+    }
+
+    if (releasePath.startsWith('tools/')) {
+        const pkg = [...packages.values()].find((entry) => entry.path === releasePath);
+        if (!pkg) throw new Error(`Unknown release package: ${releasePath}`);
+        const inputs = { paths: new Set([releasePath]), catalogs: new Set(), sharedFiles: new Set() };
+        const compilerOptions = sourceModuleOptions(root);
+        const visited = new Set();
+        for (const file of sourceFilesIn(resolve(root, releasePath))) {
+            collectSourceImports(file, packages, root, compilerOptions, inputs, visited, false);
+        }
+        return inputs;
+    }
+
+    const paths = bundledPaths(packages, releasePath);
+    const inputs = {
+        paths,
+        catalogs: new Set(),
+        sharedFiles: new Set(['tsconfig.base.json']),
+    };
+    for (const pkg of packages.values()) {
+        if (!paths.has(pkg.path) || pkg.path !== releasePath) continue;
+        for (const field of ['dependencies', 'optionalDependencies', 'peerDependencies', 'devDependencies']) {
+            for (const [name, specifier] of Object.entries(pkg.manifest[field] ?? {})) {
+                if (typeof specifier === 'string' && specifier.startsWith('catalog:')) {
+                    const catalog = specifier.slice('catalog:'.length) || 'default';
+                    inputs.catalogs.add(`${catalog}:${name}`);
+                }
+            }
+        }
+    }
+    return inputs;
+}
+
+function shippedFile(file, inputs, commit, catalogChangesByCommit) {
     if (
         /\.md$|(?:^|\/)(?:test|testing|__tests__)\/|^(?:packages|tools|extensions)\/[^/]+\/(?:build|dist|node_modules)\/|\.(?:spec|test|itest)\.[cm]?[jt]s$/.test(
             file,
         )
     )
         return false;
-    if (file === 'pnpm-workspace.yaml' || file === 'tsconfig.base.json') return true;
-    return [...paths].some((path) => file.startsWith(`${path}/`));
+    const { paths, catalogs = new Set(), sharedFiles = new Set() } = inputs instanceof Set ? { paths: inputs } : inputs;
+    if (sharedFiles.has(file)) return true;
+    if (file === 'pnpm-workspace.yaml') {
+        const changedCatalogs = catalogChangesByCommit?.get(commit.sha);
+        if (changedCatalogs === undefined) return true;
+        return [...changedCatalogs].some((entry) => catalogs.has(entry));
+    }
+    return [...paths].some((path) => file === path || file.startsWith(`${path}/`));
 }
 
 function hasReleaseAs(commit) {
@@ -66,7 +324,7 @@ function releaseAsTargetsComponent(commit, component) {
 }
 
 /** Selects relevant commits in newest-first order, stopping at this plugin's own previous release. */
-export function releaseCommits(commits, paths, lastReleaseSha, component) {
+export function releaseCommits(commits, inputs, lastReleaseSha, component, catalogChangesByCommit) {
     const boundary = lastReleaseSha ? commits.findIndex((commit) => commit.sha === lastReleaseSha) : commits.length;
     if (boundary === -1) throw new Error(`Release commit ${lastReleaseSha} is missing from the fetched history`);
     const seen = new Set();
@@ -76,7 +334,10 @@ export function releaseCommits(commits, paths, lastReleaseSha, component) {
         if (seen.has(commit.sha)) return false;
         seen.add(commit.sha);
         if (commit.files.length === 0) return hasReleaseAs(commit) && releaseAsTargetsComponent(commit, component);
-        return releaseAsTargetsComponent(commit, component) && commit.files.some((file) => shippedFile(file, paths));
+        return (
+            releaseAsTargetsComponent(commit, component) &&
+            commit.files.some((file) => shippedFile(file, inputs, commit, catalogChangesByCommit))
+        );
     });
 }
 
@@ -232,12 +493,19 @@ export function bundledChangesPlugin(
                 boundaries.delete(commit.sha);
                 if (boundaries.size === 0) break;
             }
+            const catalogChangesByCommit = new Map();
+            for (const commit of commits) {
+                if (commit.files?.includes('pnpm-workspace.yaml')) {
+                    catalogChangesByCommit.set(commit.sha, workspaceCatalogChanges(root, commit.sha));
+                }
+            }
             for (const path of packagePaths) {
                 commitsByPath[path] = releaseCommits(
                     commits,
-                    bundledPaths(packages, path),
+                    packageReleaseInputs(packages, path, root),
                     releasesByPath[path]?.sha,
                     path.split('/').at(-1),
+                    catalogChangesByCommit,
                 );
             }
             for (const path of actionPaths) {
