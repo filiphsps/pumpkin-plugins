@@ -7,10 +7,13 @@ import * as esbuild from 'esbuild';
 import { runtimeBuildError } from './errors.ts';
 import type { BuildOutputMessage } from './output.ts';
 import type { PluginEngine, StaticHermesGc, StaticHermesRuntime } from './plugin-config.ts';
+import { findRepoRoot } from './repo.ts';
 import { generateTypes } from './types.ts';
 import { findUsedWitMethods } from './wit-method-usage.ts';
 
 const require = createRequire(import.meta.url);
+const buildPackageJsonPath = require.resolve('../package.json');
+const buildPackageRepositoryUrl = packageRepositoryUrl(require(buildPackageJsonPath));
 const MAX_PRODUCTION_COMPONENT_BYTES = 5 * 1024 * 1024;
 const TEMPORARY_DIRECTORY_PREFIX = '.pumpkin-build-';
 const LEGACY_TEMPORARY_DIRECTORY_MAX_AGE_MS = 60 * 60 * 1000;
@@ -24,7 +27,7 @@ export interface BundleOptions {
     engine?: PluginEngine;
     /** Source file to bundle. */
     entry: string;
-    /** Receives runtime progress messages for formatting by the build command. */
+    /** Receives build messages for formatting by the build command. */
     onOutput?: (message: BuildOutputMessage) => void;
     /** Where to write the `.wasm`. */
     output: string;
@@ -47,6 +50,7 @@ export interface BundleOptions {
 /**
  * Bundles a plugin with esbuild and turns it into a WebAssembly component, leaving
  * `pumpkin:plugin/*` and `wasi:*` as imports.
+ * Oversized production builds fail inside this repository and warn from external projects.
  * @param options - What to build.
  * @returns The size of the component in bytes.
  */
@@ -191,9 +195,9 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
         }
         const size = fs.statSync(component).size;
         if (!options.developmentMode && size > MAX_PRODUCTION_COMPONENT_BYTES) {
-            throw new Error(
-                `Production WebAssembly component is ${size} bytes; maximum is ${MAX_PRODUCTION_COMPONENT_BYTES} bytes (5 MiB)`,
-            );
+            const message = `Production WebAssembly component is ${size} bytes; maximum is ${MAX_PRODUCTION_COMPONENT_BYTES} bytes (5 MiB)`;
+            if (isRepositoryProject(projectRoot)) throw new Error(message);
+            options.onOutput?.({ type: 'warning', message });
         }
         publishComponent(component, output, temporaryDir, () => {
             preserveTemporaryDir = true;
@@ -203,6 +207,39 @@ export async function bundlePlugin(options: BundleOptions): Promise<number> {
         activeTemporaryDirectories.delete(temporaryDir);
         if (!preserveTemporaryDir) fs.rmSync(temporaryDir, { recursive: true, force: true });
     }
+}
+
+function isRepositoryProject(projectRoot: string): boolean {
+    if (buildPackageRepositoryUrl === undefined) return false;
+
+    let projectManifest: unknown;
+    try {
+        projectManifest = JSON.parse(fs.readFileSync(path.join(findRepoRoot(projectRoot), 'package.json'), 'utf8'));
+    } catch {
+        return false;
+    }
+
+    const projectRepositoryUrl = packageRepositoryUrl(projectManifest);
+    return (
+        projectRepositoryUrl !== undefined &&
+        normalizeRepositoryUrl(projectRepositoryUrl) === normalizeRepositoryUrl(buildPackageRepositoryUrl)
+    );
+}
+
+function packageRepositoryUrl(manifest: unknown): string | undefined {
+    if (typeof manifest !== 'object' || manifest === null || Array.isArray(manifest)) return undefined;
+    const repository = (manifest as { repository?: unknown }).repository;
+    if (typeof repository === 'string') return repository;
+    if (typeof repository !== 'object' || repository === null || Array.isArray(repository)) return undefined;
+    const url = (repository as { url?: unknown }).url;
+    return typeof url === 'string' ? url : undefined;
+}
+
+function normalizeRepositoryUrl(url: string): string {
+    return url
+        .replace(/^git\+/, '')
+        .replace(/\.git$/, '')
+        .replace(/\/$/, '');
 }
 
 function removeAbandonedTemporaryDirectories(outputDir: string): void {

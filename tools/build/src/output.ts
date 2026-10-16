@@ -3,6 +3,7 @@ import type { PluginEngine, StaticHermesGc, StaticHermesRuntime } from './plugin
 
 /** A message emitted by the shared plugin build output formatter. */
 export type BuildOutputMessage =
+    | { type: 'warning'; message: string }
     | {
           type: 'bundle';
           entry: string;
@@ -29,12 +30,13 @@ export type BuildOutputMessage =
 
 /** Render a build event in the common console format. */
 export function formatBuildOutput(message: BuildOutputMessage): string {
-    if (message.type === 'error') {
+    if (message.type === 'error' || message.type === 'warning') {
+        const formatLine = message.type === 'error' ? ansi.named.error : ansi.named.value;
         return message.message
             .split(/\r?\n/)
             .map((line, index) => {
-                const prefix = index === 0 ? 'Error: ' : '  ';
-                return `[build] ${prefix}${ansi.named.error(line)}`;
+                const prefix = index === 0 ? `${message.type === 'error' ? 'Error' : 'Warning'}: ` : '  ';
+                return `[build] ${prefix}${formatLine(line)}`;
             })
             .join('\n');
     }
@@ -64,6 +66,7 @@ export function formatBuildOutput(message: BuildOutputMessage): string {
 export function printBuildOutput(message: BuildOutputMessage): void {
     const formatted = formatBuildOutput(message);
     if (message.type === 'error') console.error(formatted);
+    else if (message.type === 'warning') console.warn(formatted);
     else console.log(formatted);
 }
 

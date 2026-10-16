@@ -132,7 +132,9 @@ Static Hermes builds prepare the toolchain automatically when required.
 Production builds minify the JavaScript bundle, compile it to optimized Hermes bytecode with
 function names and debug information stripped, and compile the native WASI code with `-Oz`.
 Function/data sections allow unused code to be removed at link time. The linker strips symbols from
-the production component. Each production component must be no larger than 5 MiB (5,242,880 bytes).
+the production component. For plugins built inside this repository, the shared build tool enforces
+a 5 MiB (5,242,880-byte) threshold. When external projects use the published package, it warns
+above that threshold but still writes the component.
 
 Development builds keep the JavaScript bundle readable and retain Hermes source locations and native
 line tables for backtraces. Native code remains size optimized. The specific compiler and linker
