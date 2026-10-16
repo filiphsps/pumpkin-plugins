@@ -1,6 +1,6 @@
 {
     "name": "@pumpkin-plugins/plugin-kit",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Host helpers shared by plugins",
     "keywords": [
         "minecraft",

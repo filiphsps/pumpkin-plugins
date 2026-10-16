@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.2](https://github.com/filiphsps/pumpkin-plugins/compare/plugin-kit-v0.1.1...plugin-kit-v0.1.2) (2026-10-16)
+
+
+### Features
+
+* **build:** add release and follow links to update notice ([79d982b](https://github.com/filiphsps/pumpkin-plugins/commit/79d982b79a215bbc977e29731d7ea301d34ff59e))
+
+
+### Bug Fixes
+
+* **build:** analyze consumers without tsconfig ([a42e939](https://github.com/filiphsps/pumpkin-plugins/commit/a42e939f9510ee59a44f9720cae3fc6e9d48d248))
+* **build:** warn on oversized external components ([0ec0559](https://github.com/filiphsps/pumpkin-plugins/commit/0ec0559c53bf95e81855954ab06d9815238bb3be))
+* **docs:** discover symlinked components ([0356c46](https://github.com/filiphsps/pumpkin-plugins/commit/0356c468512e16f24acef29c775a34d9f3fb4e6e))
+
 ## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/plugin-kit-v0.1.0...plugin-kit-v0.1.1) (2026-10-15)
 
 
