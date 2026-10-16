@@ -7,6 +7,13 @@ import { bundledChangesPlugin, bundledPaths, releaseCommits, workspacePackages }
 
 const packages = new Map([
     [
+        '@pumpkin-plugins/docs',
+        {
+            path: 'tools/docs',
+            manifest: { dependencies: {} },
+        },
+    ],
+    [
         'plugin',
         {
             path: 'packages/plugin',
@@ -20,7 +27,11 @@ const packages = new Map([
         'kit',
         {
             path: 'tools/plugin-kit',
-            manifest: { publishConfig: { access: 'public' }, dependencies: { updates: 'workspace:*' } },
+            manifest: {
+                publishConfig: { access: 'public' },
+                dependencies: { '@pumpkin-plugins/docs': 'workspace:*', updates: 'workspace:*' },
+                devDependencies: { '@pumpkin-plugins/build': 'workspace:*' },
+            },
         },
     ],
     [
@@ -110,12 +121,29 @@ describe('bundled release commits', () => {
         assert.deepEqual([...bundledPaths(packages, 'packages/plugin')].sort(), [
             'packages/plugin',
             'tools/build',
+            'tools/docs',
             'tools/plugin-kit',
             'tools/pumpkin-api',
             'tools/static-hermes-runtime',
             'tools/update-check',
         ]);
         assert.throws(() => bundledPaths(packages, 'packages/missing'), /Unknown release package/);
+    });
+
+    it('keeps public npm tool releases scoped to their own shipped files', () => {
+        const history = [
+            commit('docs-dependency', ['tools/docs/src/discovery.ts']),
+            commit('build-dev-dependency', ['tools/build/src/bundle.ts']),
+            commit('plugin-kit', ['tools/plugin-kit/src/plugin.ts']),
+            commit('release-boundary', ['tools/plugin-kit/package.json']),
+        ];
+
+        assert.deepEqual(
+            releaseCommits(history, bundledPaths(packages, 'tools/plugin-kit'), 'release-boundary', 'plugin-kit').map(
+                (entry) => entry.sha,
+            ),
+            ['plugin-kit'],
+        );
     });
 
     it('includes declared bundled assets when selecting extension release commits', () => {
@@ -354,7 +382,7 @@ describe('bundled release commits', () => {
         }
     });
 
-    it('releases the public builder when its API or Static Hermes dependency changes', async () => {
+    it('keeps public tool releases scoped to their own source files', async () => {
         const history = [
             commit('builder-change', ['tools/build/src/cli.ts']),
             commit('api-change', ['tools/pumpkin-api/src/core.ts']),
@@ -376,7 +404,7 @@ describe('bundled release commits', () => {
 
         assert.deepEqual(
             commits['tools/build'].map((entry) => entry.sha),
-            ['builder-change', 'api-change', 'runtime-change'],
+            ['builder-change'],
         );
     });
 

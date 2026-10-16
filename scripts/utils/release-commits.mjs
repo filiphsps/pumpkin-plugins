@@ -19,19 +19,28 @@ export function workspacePackages(root) {
     return packages;
 }
 
-/** Finds a plugin's transitive runtime packages and its build tool, excluding test-only dependencies. */
-export function bundledPaths(packages, pluginPath) {
+/** Finds workspace paths whose source is shipped with a release package. */
+export function bundledPaths(packages, releasePath) {
     const paths = new Set();
+    const isPublicTool = releasePath.startsWith('tools/');
     const visit = (pkg) => {
         if (!pkg || paths.has(pkg.path)) return;
         paths.add(pkg.path);
-        for (const name of Object.keys(pkg.manifest.dependencies ?? {})) visit(packages.get(name));
-        for (const name of pkg.manifest.pumpkinBundleDependencies ?? []) visit(packages.get(name));
-        // The build tool changes shipped WASM, while other dev dependencies only run checks.
-        if (pkg.manifest.devDependencies?.['@pumpkin-plugins/build']) visit(packages.get('@pumpkin-plugins/build'));
+        if (!isPublicTool) {
+            for (const name of Object.keys(pkg.manifest.dependencies ?? {})) visit(packages.get(name));
+            for (const name of pkg.manifest.pumpkinBundleDependencies ?? []) visit(packages.get(name));
+        }
+        // Only a plugin's own build tool affects its WASM; npm tools release dependencies separately.
+        if (
+            pkg.path === releasePath &&
+            releasePath.startsWith('packages/') &&
+            pkg.manifest.devDependencies?.['@pumpkin-plugins/build']
+        ) {
+            visit(packages.get('@pumpkin-plugins/build'));
+        }
     };
-    visit([...packages.values()].find((pkg) => pkg.path === pluginPath));
-    if (!paths.has(pluginPath)) throw new Error(`Unknown release package: ${pluginPath}`);
+    visit([...packages.values()].find((pkg) => pkg.path === releasePath));
+    if (!paths.has(releasePath)) throw new Error(`Unknown release package: ${releasePath}`);
     return paths;
 }
 
