@@ -1,0 +1,180 @@
+# Complete GitHub label catalog. `ai_apply_when` is consumed by CodeRabbit only.
+- name: "area: actions"
+  color: 006b75
+  description: Changes to reusable GitHub Actions
+  ai_apply_when: Changes to reusable GitHub Actions under actions/.
+- name: "area: ci"
+  color: 006b75
+  description: GitHub Actions workflows and continuous integration
+  ai_apply_when: Changes to GitHub Actions workflows or CI configuration.
+- name: "area: docs"
+  color: 006b75
+  description: Documentation, guides, and generated references
+  ai_apply_when: Documentation, guides, or generated references are a primary part of the change.
+- name: "area: extension"
+  color: 006b75
+  description: Visual Studio Code extensions.
+  ai_apply_when: Changes to a Visual Studio Code extension or its tooling.
+- name: "area: plugins"
+  color: 006b75
+  description: Changes to plugins under packages/
+  ai_apply_when: Changes to one or more plugins under packages/.
+- name: "area: runtime"
+  color: 006b75
+  description: Pumpkin runtime, API, WASI, or WebAssembly compatibility
+  ai_apply_when: Changes to Pumpkin API/WIT, WASI, WebAssembly, or runtime compatibility.
+- name: "area: tooling"
+  color: 006b75
+  description: Changes to shared tools, scripts, generators, and repository tooling
+  ai_apply_when: Changes to shared tools, scripts, generators, or repository tooling.
+- name: "autorelease: pending"
+  color: ededed
+- name: "autorelease: tagged"
+  color: ededed
+- name: bug
+  color: ff0000
+  description: Something isn't working
+  ai_apply_when: Apply to changes that fix incorrect or broken behavior; pair with the most specific bug subtype when one applies.
+- name: "bug: build/release"
+  color: ff0000
+  description: "Bug: compilation, packaging, signing, or release artifact fails; pair with bug."
+  ai_apply_when: Compilation, packaging, signing, or release artifact failures; pair with bug.
+- name: "bug: compatibility"
+  color: ff0000
+  description: "Bug: breaks with a supported Pumpkin, API, platform, or plugin version; pair with bug."
+  ai_apply_when: Breaks a supported Pumpkin, API, platform, or plugin version; pair with bug.
+- name: "bug: configuration"
+  color: ff0000
+  description: "Bug: plugin configuration is rejected, ignored, or applied incorrectly; pair with bug."
+  ai_apply_when: Plugin configuration is rejected, ignored, or applied incorrectly; pair with bug.
+- name: "bug: crash"
+  color: ff0000
+  description: "Bug: plugin or server crashes, or the plugin fails to load or start; pair with bug."
+  ai_apply_when: The plugin or server crashes, or the plugin fails to load or start; pair with bug.
+- name: "bug: data loss"
+  color: ff0000
+  description: "Bug: user or server data is lost, corrupted, or not persisted; pair with bug."
+  ai_apply_when: User or server data is lost, corrupted, or not persisted; pair with bug.
+- name: "bug: incorrect behavior"
+  color: ff0000
+  description: "Bug: output or behavior is incorrect; pair with bug."
+  ai_apply_when: Output or behavior is incorrect; pair with bug.
+- name: "bug: performance"
+  color: ff0000
+  description: "Bug: excessive lag, CPU or memory use, or slow response; pair with bug."
+  ai_apply_when: Excessive lag, CPU or memory use, or slow response; pair with bug.
+- name: "bug: regression"
+  color: ff0000
+  description: "Bug: behavior that worked before is broken in a later change; pair with bug."
+  ai_apply_when: Behavior that worked before is broken in a later change; pair with bug.
+- name: "bug: security"
+  color: ff0000
+  description: "Bug: vulnerability, unsafe access, or integrity weakness; pair with bug."
+  ai_apply_when: A vulnerability, unsafe access, or integrity weakness; pair with bug.
+- name: dependencies
+  color: 0366d6
+  description: Dependency updates and dependency management
+  ai_apply_when: Dependency additions, upgrades, removals, or workspace catalog changes.
+- name: documentation
+  color: 0075ca
+  description: Improvements or additions to documentation
+  ai_apply_when: "Use for documentation-focused PRs; pair with area: docs when appropriate."
+- name: duplicate
+  color: cfd3d7
+  description: This issue or pull request already exists
+- name: enhancement
+  color: a2eeef
+  description: New feature or request
+  ai_apply_when: Adds a user-facing feature or capability.
+- name: good first issue
+  color: 7057ff
+  description: Good for newcomers
+- name: help wanted
+  color: "008672"
+  description: Extra attention is needed
+- name: invalid
+  color: e4e669
+  description: This doesn't seem right
+- name: maintenance
+  color: fbca04
+  description: Refactoring, upkeep, or internal improvements
+  ai_apply_when: Internal upkeep or refactoring without a user-facing feature or bug fix.
+- name: "plugin: Apple Skin"
+  color: 8633aa
+  description: Changes to the `packages/apple-skin-pumpkin/` plugin.
+  ai_apply_when: Changes specifically related to packages/apple-skin-pumpkin/.
+- name: "plugin: Bedrock Addon Manager"
+  color: 8633aa
+  description: Changes to the `packages/bedrock-addon-manager/` plugin.
+  ai_apply_when: Changes specifically related to packages/bedrock-addon-manager/.
+- name: "plugin: Distant Horizons Support"
+  color: 8633aa
+  description: Related to the `distant-horizons-support-pumpkin` plugin.
+  ai_apply_when: Changes specifically related to packages/distant-horizons-support-pumpkin/.
+- name: "plugin: Dynamic Lights"
+  color: 8633aa
+  description: Changes to the `packages/dynamic-lights-pumpkin/` plugin.
+  ai_apply_when: Changes specifically related to packages/dynamic-lights-pumpkin/.
+- name: "plugin: Tab Display"
+  color: 8633aa
+  description: Changes to the `packages/tab-display/` plugin.
+  ai_apply_when: Changes specifically related to packages/tab-display/.
+- name: "plugin: UPnPumpkin"
+  color: 8633aa
+  description: Changes to the `packages/upnpumpkin/` plugin.
+  ai_apply_when: Changes specifically related to packages/upnpumpkin/.
+- name: "plugin: Waypoints"
+  color: 8633aa
+  ai_apply_when: Changes specifically related to packages/waypoints/.
+- name: "priority: critical"
+  color: b60205
+  description: Severe issue blocking core use or release
+  ai_apply_when: Use only for a demonstrated severe issue blocking core use or a release; do not infer urgency from the diff alone.
+- name: "priority: high"
+  color: d93f0b
+  description: Should be addressed soon
+  ai_apply_when: Use only when clear urgency or substantial user impact is established.
+- name: "priority: low"
+  color: cfd3d7
+  description: Minor or low-impact work
+  ai_apply_when: Use only when low priority is explicitly established; do not infer it for routine changes.
+- name: "priority: medium"
+  color: fbca04
+  description: Normal planned work
+  ai_apply_when: Use only when a normal-priority issue or milestone is explicitly established.
+- name: question
+  color: d876e3
+  description: Further information is requested
+- name: ready-for-agent
+  color: 0E8A16
+  description: Fully specified, ready for an AFK agent
+- name: ready-for-human
+  color: 006B75
+  description: Requires human implementation
+- name: "runtime: quickjs"
+  color: 2BB673
+  description: When using or working with the `quickjs` runtime.
+  ai_apply_when: Apply when the change specifically concerns QuickJS behavior or compatibility.
+- name: "runtime: static-hermes"
+  color: 2BB673
+  description: When using or working with the `static-hermes`runtime.
+  ai_apply_when: Apply when the change specifically concerns Static Hermes behavior or compatibility.
+- name: slop
+  color: ff0000
+  description: AI slop
+  ai_apply_when: Managed by slop_detection; do not suggest from style or wording alone.
+- name: "status: blocked"
+  color: b60205
+  description: Cannot proceed until a dependency or decision is resolved
+  ai_apply_when: Use only when the PR is explicitly blocked by an unresolved decision or dependency.
+- name: "status: needs info"
+  color: d876e3
+  description: Waiting for details from the reporter or author
+  ai_apply_when: Use only when the PR explicitly needs information from its author or reporter.
+- name: "status: needs triage"
+  color: ededed
+  description: Needs classification, owner, or priority
+  ai_apply_when: Use only when the PR is explicitly awaiting owner, classification, or priority.
+- name: wontfix
+  color: ffffff
+  description: This will not be worked on

@@ -70,6 +70,7 @@ jobs:
         runs-on: ubuntu-26.04
         outputs:
             code: ${{ steps.classify.outputs.code }}
+            config_only: ${{ steps.label-config-scope.outputs.config_only }}
             skip_expensive_checks: ${{ steps.release-commits.outputs.skip_expensive_checks }}
             actions: ${{ steps.classify.outputs.actions }}
             actions_to_test: ${{ steps.classify.outputs.actions_to_test }}
@@ -93,6 +94,13 @@ jobs:
               env:
                   BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
               run: git fetch --no-tags origin "$BASE"
+
+            - name: 🧭 Check whether the change only updates label configuration
+              id: label-config-scope
+              env:
+                  BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+                  HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+              run: node scripts/changed-areas.mjs --config-only "$BASE" "$HEAD"
 
             - name: 🧮 Identify release-only push commits
               id: release-commits
@@ -288,7 +296,12 @@ jobs:
     action-gate:
         name: 🛡️ Action test gate
         needs: [changes, action-tests]
-        if: ${{ always() && !startsWith(github.head_ref, 'release-please--branches--') }}
+        if: >-
+            ${{
+              always() &&
+              needs.changes.outputs.config_only != 'true' &&
+              !startsWith(github.head_ref, 'release-please--branches--')
+            }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04
         steps:
@@ -322,7 +335,12 @@ jobs:
     extension-gate:
         name: 🛡️ Extension test gate
         needs: [changes, extension-tests]
-        if: ${{ always() && !startsWith(github.head_ref, 'release-please--branches--') }}
+        if: >-
+            ${{
+              always() &&
+              needs.changes.outputs.config_only != 'true' &&
+              !startsWith(github.head_ref, 'release-please--branches--')
+            }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04
         steps:
@@ -641,7 +659,12 @@ jobs:
     integration-gate:
         name: 🛡️ Integration gate
         needs: [changes, integration]
-        if: ${{ always() && !startsWith(github.head_ref, 'release-please--branches--') }}
+        if: >-
+            ${{
+              always() &&
+              needs.changes.outputs.config_only != 'true' &&
+              !startsWith(github.head_ref, 'release-please--branches--')
+            }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04
         steps:
@@ -763,7 +786,12 @@ jobs:
     generator-gate:
         name: 🛡️ Generator gate
         needs: [changes, generator]
-        if: ${{ always() && !startsWith(github.head_ref, 'release-please--branches--') }}
+        if: >-
+            ${{
+              always() &&
+              needs.changes.outputs.config_only != 'true' &&
+              !startsWith(github.head_ref, 'release-please--branches--')
+            }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04
         steps:
@@ -853,10 +881,11 @@ jobs:
 
     cleanup:
         name: 🧹 Cleanup artifacts
-        needs: [build, engine-comparison, integration, release]
+        needs: [changes, build, engine-comparison, integration, release]
         if: >-
             ${{
               always() &&
+              needs.changes.outputs.config_only != 'true' &&
               !startsWith(github.head_ref, 'release-please--branches--') &&
               (
                 github.event_name != 'pull_request' ||

@@ -8,6 +8,8 @@ import { ignoredCommitShas } from './utils/ignored-commits.mjs';
 
 /** A changed file matching any of these is documentation, which nothing that builds or tests reads. */
 const DOCS = [/\.md$/, /^docs\//, /^LICENSE$/, /^(packages|tools|actions|extensions)\/[^/]+\/docs(?:\/|$)/];
+/** Label and CodeRabbit settings affect automation configuration, not plugin or repository code. */
+const LABEL_CONFIGURATION = new Set(['.github/labels.yml', '.coderabbit.yaml']);
 const repositoryRoot = path.resolve(import.meta.dirname, '..');
 
 /** Resolves the generator smoke test's inputs from the checked-out repository. */
@@ -325,11 +327,13 @@ const COMMON_CONSUMERS = [
 ];
 
 const args = process.argv.slice(2);
-if (args.includes('--help') || args.includes('-h')) {
+const configOnlyMode = args[0] === '--config-only';
+const positionalArgs = configOnlyMode ? args.slice(1) : args;
+if (positionalArgs.includes('--help') || positionalArgs.includes('-h')) {
     console.log('Usage: changed-areas.mjs <base> [head]');
     process.exit(0);
 }
-const [base, head = 'HEAD'] = args;
+const [base, head = 'HEAD'] = positionalArgs;
 if (!base) {
     console.error('Usage: changed-areas.mjs <base> [head]');
     process.exit(1);
@@ -340,6 +344,13 @@ if (diff.status !== 0) {
     // Failing here rather than reporting no changes: the code jobs must not be skipped by accident.
     console.error(`Could not diff ${base}...${head}: ${diff.stderr.trim()}`);
     process.exit(1);
+}
+if (configOnlyMode) {
+    const changedFiles = diff.stdout.split('\n').filter(Boolean);
+    const configOnly = changedFiles.length > 0 && changedFiles.every((file) => LABEL_CONFIGURATION.has(file));
+    console.log(`Label configuration only: ${configOnly}`);
+    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `config_only=${configOnly}\n`);
+    process.exit(0);
 }
 
 const commitLog = spawnSync(
@@ -384,7 +395,11 @@ const extensionsToTest = [
     ),
 ].sort();
 const code = changed.filter(
-    (file) => !isDocs(file) && !/^actions\/[^/]+\//.test(file) && !/^extensions\/[^/]+\//.test(file),
+    (file) =>
+        !isDocs(file) &&
+        !LABEL_CONFIGURATION.has(file) &&
+        !/^actions\/[^/]+\//.test(file) &&
+        !/^extensions\/[^/]+\//.test(file),
 );
 const generatorRelevant = code.length > 0 ? generatorInputs() : undefined;
 const generator = Boolean(

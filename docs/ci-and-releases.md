@@ -34,29 +34,29 @@ READMEs and pins.
 
 | Job | Runs | What |
 | --- | --- | --- |
-| 🔍 Changed files | CI-triggering changes | Separates plugin/repository code, action directories, extension directories and documentation; selects integration suites for plugin and suite dependency changes, the generator smoke test for scaffold-related changes, and detects generated README refresh commits |
-| 🔍 Lint GitHub workflows | pull requests, default-branch pushes, and manual runs | `actionlint` validates workflow files; skipped on Release Please branches |
+| 🔍 Changed files | CI-triggering changes | Separates plugin/repository code, action directories, extension directories, documentation and label configuration; selects integration suites for plugin and suite dependency changes, the generator smoke test for scaffold-related changes, and detects generated README refresh commits |
+| 🔍 Lint GitHub workflows | pull requests, default-branch pushes, and manual runs | `actionlint` validates workflow files; skipped for Release Please branches and changes limited to label configuration |
 | 💬 Commit messages | code, action, extension, or generated README changes on PRs | Lints every commit with `commitlint.config.mjs` |
 | 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
 | ✅ Typecheck | code changes | `pnpm typecheck` |
 | 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
 | 📦 External consumer | code changes | Packs public tools and their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters and runs `pumpkin-codemod list` outside the repository on Linux, macOS arm64 and Windows x64 with the pinned Node and pnpm versions |
 | 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or common plus all four public consumers for shared helper changes, then uploads c8 coverage to Codecov |
-| 🛡️ Action test gate | every CI run, after classification and action tests | Requires every selected action suite to pass; accepts skipped tests only for an empty matrix |
+| 🛡️ Action test gate | every non-config-only CI run, after classification and action tests | Requires every selected action suite to pass; accepts skipped tests only for an empty matrix |
 | 🧪 Extension tests | extension implementation changes | `.github/workflows/extensions.yml` lints, typechecks, tests and packages each changed extension |
-| 🛡️ Extension test gate | every CI run, after classification and extension tests | Requires every selected extension suite to pass; accepts skipped tests only for an empty matrix |
+| 🛡️ Extension test gate | every non-config-only CI run, after classification and extension tests | Requires every selected extension suite to pass; accepts skipped tests only for an empty matrix |
 | 📝 Docs and config | code, action, extension, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
 | 🔨 Build | code changes, after change classification | Starts Static Hermes preparation while lint and typecheck run, then builds every production plugin with its configured engine (Static Hermes by default), runs integration checks, and rebuilds release artifacts with the same runtime before signing and verification |
 | 📊 Engine comparison | code changes, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`; nine engine configurations run as parallel matrix jobs, then a report job validates and combines their real-Pumpkin results |
 | 📈 Engine comparison comment | successful PR CI runs with a benchmark report | `.github/workflows/engine-comparison-comment.yml` compares with the latest matching default-branch report, updates one PR comment, and embeds an SVG timing-change chart |
 | 🎃 Integration | plugin and suite dependency changes, workspace-wide build configuration or shared integration setup changes, after build | Runs changed packages and their dependents against the pinned Pumpkin release, or the full suite for workspace-wide and integration setup changes; reuses WASM files from the build job |
-| 🛡️ Integration gate | every CI run, after classification and integration tests | Requires selected integration suites to pass; accepts a skipped suite when no relevant changes occurred or benchmark changes use Engine comparison |
+| 🛡️ Integration gate | every non-config-only CI run, after classification and integration tests | Requires selected integration suites to pass; accepts a skipped suite when no relevant changes occurred or benchmark changes use Engine comparison |
 | 🧬 Generator | scaffold, generator setup or generated plugin dependency changes, after lint and build | Reuses the Static Hermes cache saved by Build, then generates a throwaway plugin, action and extension; checks release registration and READMEs; tests the action and extension; and typechecks, builds and integration-tests the plugin |
-| 🛡️ Generator gate | every CI run, after classification and the generator smoke test | Requires the smoke test when a scaffold, generator setup or generated plugin dependency changes; accepts a skipped test when none changed |
+| 🛡️ Generator gate | every non-config-only CI run, after classification and the generator smoke test | Requires the smoke test when a scaffold, generator setup or generated plugin dependency changes; accepts a skipped test when none changed |
 | 🚢 Release | plugin, action, extension or public tool release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; actions create GitHub releases, extensions attach VSIX packages, public tools publish npm tarballs, and plugins produce signed artifacts and Market listings |
 | 📝 Prepare release PR | all open release PRs on release runs | Keeps plugin and extension READMEs, action README examples, starter dependency ranges and first-release pins current |
 | 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs and uploads the exact build artifact, publishes it to an existing Market listing, then syncs its description and commands |
-| 🧹 Cleanup artifacts | after artifact consumers finish | Deletes handoffs whose consumers succeeded or were skipped, even if another job failed; retains artifacts needed to rerun failed consumers |
+| 🧹 Cleanup artifacts | after artifact consumers finish, except for config-only changes | Deletes handoffs whose consumers succeeded or were skipped, even if another job failed; retains artifacts needed to rerun failed consumers |
 
 The signed `plugins` build artifact remains available in the run summary, with a direct download
 link in the build job summary, for one day. CI deletes the integration WASM files and fixture after
@@ -111,9 +111,12 @@ GitHub's path filters skip the main CI workflow, so it does not call action test
 relevant code or action checks.
 
 Everything else outside `actions/` is a change to repository code and runs the code jobs, including
-changes under `tools/`, `scripts/` and `.github/`, and deletions. Real-server integration runs only for
-plugin or integration-suite dependency changes, plus workspace-wide build configuration and shared
-integration setup changes. Package changes select the affected integration suites and their dependents.
+changes under `tools/`, `scripts/` and `.github/`, and deletions, except `.github/labels.yml` and
+`.coderabbit.yaml`. Changes limited to those two files still start CI and Actionlint so they can
+report successful skips; if a code or workflow file also changes, the relevant checks run.
+Real-server integration runs only for plugin or integration-suite dependency changes, plus
+workspace-wide build configuration and shared integration setup changes. Package changes select the
+affected integration suites and their dependents.
 Lockfile importer changes select the importer packages and their dependents; catalog-only workspace
 changes use the same importer scope. Other workspace-wide changes, lockfile changes without
 importer-level changes, and changes to the integration workflow or its local actions run the full suite.
@@ -146,6 +149,15 @@ releasable changes, so running it for changed action code does not create an emp
 Know this before narrowing a job further: a skipped job takes every job that needs it with it, so no
 job can be gated on less than the jobs below it. Gating `📋 Lint` without `🔨 Build` would leave a
 release with no artifact to attach, and nothing would say so.
+
+## Label management
+
+`.github/labels.yml` is the complete repository label catalog. Add `ai_apply_when` only to labels
+CodeRabbit may apply; the label-sync workflow removes that custom field before syncing labels and
+leaves labels outside the catalog untouched. After the catalog changes on `master`, the workflow
+updates the CodeRabbit label instructions and commits `.coderabbit.yaml` directly with the Release
+GitHub App token. CodeRabbit applies labels automatically using those instructions. `ready-for-agent`
+and `ready-for-human` stay outside its eligible label set.
 
 ## Updating upstream runtime pins
 

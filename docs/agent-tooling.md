@@ -51,8 +51,10 @@ Markdown-only package edits skip package tests. `tools/build/src/` is source, no
 Real-server tests are deliberately separate; see [Testing](testing.md) and
 [the testing skill](https://github.com/filiphsps/pumpkin-plugins/blob/master/.agents/skills/pumpkin-testing/SKILL.md).
 
-The Actionlint workflow installs actionlint `1.7.12` and lints every workflow. To run the same check
-locally, install that version using the [upstream installation guide](https://github.com/rhysd/actionlint/blob/v1.7.12/docs/install.md).
+The Actionlint workflow installs actionlint `1.7.12` and lints every workflow except when a change
+contains only `.github/labels.yml` and/or `.coderabbit.yaml`. To run the same check locally, install
+that version using the
+[upstream installation guide](https://github.com/rhysd/actionlint/blob/v1.7.12/docs/install.md).
 With Go installed, run:
 
 ```sh

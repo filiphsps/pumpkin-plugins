@@ -25,13 +25,30 @@ jobs:
             - name: 🕶️ Checkout repository
               id: checkout
               uses: actions/checkout@v7.0.1
+              with:
+                  fetch-depth: 0
+
+            - name: 🧭 Check whether workflow lint is needed
+              id: scope
+              env:
+                  BASE: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
+                  HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+              run: |
+                  set -euo pipefail
+                  if [[ -z "$BASE" || "$BASE" == '0000000000000000000000000000000000000000' ]]; then
+                      printf 'config_only=false\n' >> "$GITHUB_OUTPUT"
+                  else
+                      node scripts/changed-areas.mjs --config-only "$BASE" "$HEAD"
+                  fi
 
             - name: 🔧 Setup actionlint
               id: setup-actionlint
+              if: steps.scope.outputs.config_only != 'true'
               uses: ./.github/common/setup-actionlint
 
             - name: 🔍 Lint GitHub workflows
               id: workflows
+              if: steps.scope.outputs.config_only != 'true'
               run: node scripts/ci-run.mjs "GitHub workflow validation" -- actionlint -color
 
             - name: 📋 Job summary
