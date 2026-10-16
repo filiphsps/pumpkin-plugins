@@ -1,0 +1,32 @@
+name: Usage question
+description: Ask for help using a plugin or repository tool.
+labels: [question, "status: needs triage"]
+body:
+    - type: textarea
+      id: question
+      attributes:
+          label: What is your question?
+          description: Ask the question you need help with.
+      validations:
+          required: true
+    - type: textarea
+      id: context
+      attributes:
+          label: What were you doing?
+          description: Share the context needed to understand your question.
+      validations:
+          required: true
+    - type: input
+      id: affected-component
+      attributes:
+          label: Affected plugin, tool, action, or path (optional)
+          description: Name the affected component or repository path, if known.
+      validations:
+          required: false
+    - type: textarea
+      id: troubleshooting
+      attributes:
+          label: What have you tried? (optional)
+          description: Include troubleshooting steps or environment details if relevant.
+      validations:
+          required: false

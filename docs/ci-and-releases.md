@@ -13,8 +13,11 @@ in the reusable `.github/workflows/external-consumer.yml`. Release orchestration
 the reusable `.github/workflows/actions.yml`, scoped to action code. Extension checks run through
 `.github/workflows/extensions.yml`, scoped to changed extensions. The documentation site has its own
 `.github/workflows/docs.yml`, which checks and publishes the VitePress site and mirrors it to
-`gh-pages`. GitHub workflow validation runs independently in `.github/workflows/actionlint.yml`. The
-shared setup (pnpm, Node, install, Turborepo cache) is the composite action in
+`gh-pages`. GitHub workflow validation runs independently in `.github/workflows/actionlint.yml`.
+`.github/workflows/issue-forms.yml` validates the chooser configuration and required form fields;
+`.github/workflows/issue-intake.yml` checks new and edited issue bodies, managing `status: needs info`
+and `status: needs triage` for incomplete submissions. The shared setup (pnpm, Node, install,
+Turborepo cache) is the composite action in
 `.github/common/bootstrap`. Most CI jobs use
 `ubuntu-26.04`; the external-consumer matrix also runs on `macos-15` and `windows-2025`.
 

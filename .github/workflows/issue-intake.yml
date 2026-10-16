@@ -1,0 +1,36 @@
+name: Issue intake
+
+on:
+    issues:
+        types:
+            - opened
+            - edited
+
+permissions:
+    contents: read
+    issues: write
+
+concurrency:
+    group: issue-intake-${{ github.event.issue.number }}
+    cancel-in-progress: false
+
+jobs:
+    validate:
+        name: 🧾 Check issue intake
+        timeout-minutes: 5
+        runs-on: ubuntu-26.04
+        steps:
+            - name: 🕶️ Checkout repository
+              uses: actions/checkout@v7.0.1
+              with:
+                  persist-credentials: false
+
+            - name: 🔧 Setup Node.js
+              uses: actions/setup-node@v7.1.0
+              with:
+                  node-version-file: .node-version
+
+            - name: 📝 Validate issue details
+              run: node .github/scripts/issue-intake.mjs
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}

@@ -1,0 +1,68 @@
+name: Bug report
+description: Report behavior that is broken or incorrect.
+labels: [bug, "status: needs triage"]
+body:
+    - type: markdown
+      attributes:
+          value: >-
+              Do not include security-sensitive details in a public issue. Report vulnerabilities through
+              [private vulnerability reporting](https://github.com/filiphsps/pumpkin-plugins/security/advisories/new).
+    - type: textarea
+      id: what-happened
+      attributes:
+          label: What happened?
+          description: Describe the behavior you encountered.
+      validations:
+          required: true
+    - type: textarea
+      id: expected-behavior
+      attributes:
+          label: What did you expect to happen?
+          description: Describe the behavior you expected instead.
+      validations:
+          required: true
+    - type: textarea
+      id: reproduction-steps
+      attributes:
+          label: Steps to reproduce
+          description: If you cannot reproduce it reliably, explain what led to the problem.
+          placeholder: |
+              1. Start with this setup...
+              2. Do this...
+              3. Observe the problem...
+      validations:
+          required: true
+    - type: input
+      id: affected-component
+      attributes:
+          label: Affected plugin, tool, action, or path (optional)
+          description: Name the affected component or repository path, if known.
+      validations:
+          required: false
+    - type: input
+      id: pumpkin-version
+      attributes:
+          label: Pumpkin version (optional)
+          description: Include the server version if it may be relevant.
+      validations:
+          required: false
+    - type: input
+      id: plugin-version
+      attributes:
+          label: Plugin or tool version (optional)
+      validations:
+          required: false
+    - type: input
+      id: runtime-platform
+      attributes:
+          label: Runtime or platform (optional)
+          description: Include the runtime or operating system if relevant.
+      validations:
+          required: false
+    - type: textarea
+      id: logs-context
+      attributes:
+          label: Logs or other context (optional)
+          description: Remove tokens, passwords, and other sensitive data before posting logs.
+      validations:
+          required: false

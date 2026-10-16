@@ -1,0 +1,32 @@
+name: Maintenance task
+description: Propose repository upkeep or internal improvements.
+labels: [maintenance, "status: needs triage"]
+body:
+    - type: textarea
+      id: desired-outcome
+      attributes:
+          label: What outcome should this task achieve?
+          description: State the concrete result this task should produce.
+      validations:
+          required: true
+    - type: textarea
+      id: why-it-matters
+      attributes:
+          label: Why does this matter?
+          description: Explain the maintenance need or benefit.
+      validations:
+          required: true
+    - type: input
+      id: affected-component
+      attributes:
+          label: Affected plugin, tool, action, or path (optional)
+          description: Name the affected component or repository path, if known.
+      validations:
+          required: false
+    - type: textarea
+      id: acceptance-criteria
+      attributes:
+          label: Acceptance criteria or implementation notes (optional)
+          description: Add completion criteria or implementation context if useful.
+      validations:
+          required: false

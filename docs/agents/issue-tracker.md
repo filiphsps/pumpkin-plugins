@@ -9,7 +9,17 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 ## Conventions
 
-- **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
+- Public issues should use a form in `.github/ISSUE_TEMPLATE/`. Use the private vulnerability
+  reporting link in the issue chooser for security reports; do not include vulnerability details in a
+  public issue.
+- Required form sections must be complete before an issue enters triage. If an issue has no
+  recognizable form or is missing required sections, the Issue intake workflow removes
+  `status: needs triage` and applies `status: needs info`. Editing the issue with the required
+  headings and details returns it to triage. Upstream pin issues are exempt.
+- The optional affected-component field does not apply `area:*` labels; maintainers choose those
+  during triage.
+- **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line
+  bodies and include the required headings from the matching form so the workflow can validate it.
 - **Read an issue**: `gh issue view <number> --json number,title,body,labels,comments`.
 - **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
 - **Make an issue a sub-issue of a parent**: `gh issue create --parent <parent> ...`, or `gh issue edit <parent> --add-sub-issue <child>` afterwards (`gh` 2.94+). Older `gh`: `gh api --method POST repos/<owner>/<repo>/issues/<parent>/sub_issues -F sub_issue_id=<child-db-id>` (database id, as in **Blocking** below). Without sub-issues, put `Part of #<parent>` at the top of the child body.

@@ -1,0 +1,32 @@
+name: Documentation issue
+description: Report missing, incorrect, or confusing documentation.
+labels: [documentation, "status: needs triage"]
+body:
+    - type: input
+      id: page-path
+      attributes:
+          label: Page or path
+          description: Link the page or name the repository path, if known.
+      validations:
+          required: true
+    - type: textarea
+      id: documentation-gap
+      attributes:
+          label: What is missing, incorrect, or confusing?
+          description: Explain what a reader cannot find or understand.
+      validations:
+          required: true
+    - type: input
+      id: affected-component
+      attributes:
+          label: Related plugin, tool, action, or path (optional)
+          description: Name a related component, if known.
+      validations:
+          required: false
+    - type: textarea
+      id: suggested-fix
+      attributes:
+          label: Suggested fix (optional)
+          description: Suggest wording or a correction if you have one.
+      validations:
+          required: false

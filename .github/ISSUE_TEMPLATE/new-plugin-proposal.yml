@@ -1,0 +1,45 @@
+name: New plugin proposal
+description: Propose a plugin for the Pumpkin ecosystem.
+labels: [enhancement, "status: needs triage"]
+body:
+    - type: textarea
+      id: intended-users
+      attributes:
+          label: Who would use this plugin?
+          description: Describe the users or server communities it would serve.
+      validations:
+          required: true
+    - type: textarea
+      id: plugin-use-case
+      attributes:
+          label: What problem or use case would it solve?
+          description: Describe the need this plugin would address.
+      validations:
+          required: true
+    - type: textarea
+      id: ecosystem-fit
+      attributes:
+          label: Why should it be part of the Pumpkin ecosystem?
+          description: Explain how it fits with Pumpkin and this repository.
+      validations:
+          required: true
+    - type: input
+      id: affected-component
+      attributes:
+          label: Related plugin, tool, action, or path (optional)
+          description: Mention related repository components, if any.
+      validations:
+          required: false
+    - type: input
+      id: plugin-name
+      attributes:
+          label: Possible plugin name (optional)
+      validations:
+          required: false
+    - type: textarea
+      id: plugin-design
+      attributes:
+          label: Possible design or features (optional)
+          description: Share ideas if you have them; a full specification is not required.
+      validations:
+          required: false

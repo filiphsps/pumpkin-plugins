@@ -1,0 +1,32 @@
+name: Feature or improvement request
+description: Propose an improvement to an existing plugin or tool.
+labels: [enhancement, "status: needs triage"]
+body:
+    - type: textarea
+      id: problem-use-case
+      attributes:
+          label: What problem or use case should this address?
+          description: Describe the need or opportunity.
+      validations:
+          required: true
+    - type: textarea
+      id: desired-outcome
+      attributes:
+          label: What outcome would you like?
+          description: Describe what would improve for users.
+      validations:
+          required: true
+    - type: input
+      id: affected-component
+      attributes:
+          label: Affected plugin, tool, action, or path (optional)
+          description: Name the affected component or repository path, if known.
+      validations:
+          required: false
+    - type: textarea
+      id: implementation-ideas
+      attributes:
+          label: Possible implementation or alternatives (optional)
+          description: Share design ideas or alternatives if you have them.
+      validations:
+          required: false
