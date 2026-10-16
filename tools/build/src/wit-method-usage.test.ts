@@ -391,6 +391,21 @@ class RuntimePlugin extends Plugin {
         expect(findUsedPumpkinWitMethods(excludedEntry)).toContain('player.player.get-world');
     });
 
+    it('analyzes a plugin entry without tsconfig using generated WIT declarations', () => {
+        const entry = fixture();
+        fs.rmSync(path.join(path.dirname(entry), 'tsconfig.json'));
+        fs.writeFileSync(
+            entry,
+            'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; player.getPosition();',
+        );
+
+        expect(findUsedWitMethods(entry, path.join(path.dirname(entry), 'build/types/bindings'))).toEqual({
+            pumpkinMethods: ['player.player.get-position'],
+            wasiMethods: [],
+            eventTypes: [],
+        });
+    });
+
     it('scans imported JavaScript implementations even when allowJs is disabled', () => {
         const entry = fixture();
         fs.writeFileSync(

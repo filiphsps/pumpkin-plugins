@@ -53,11 +53,14 @@ export function findUsedWitMethods(entry: string, additionalTypesDir?: string): 
     const absoluteEntry = path.resolve(entry);
     if (!fs.existsSync(absoluteEntry)) return undefined;
     const configPath = ts.findConfigFile(path.dirname(absoluteEntry), ts.sys.fileExists, 'tsconfig.json');
-    if (!configPath) return undefined;
-
-    const config = ts.readConfigFile(configPath, ts.sys.readFile);
-    if (config.error) throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
-    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath));
+    let parsed: ts.ParsedCommandLine;
+    if (configPath) {
+        const config = ts.readConfigFile(configPath, ts.sys.readFile);
+        if (config.error) throw new Error(ts.flattenDiagnosticMessageText(config.error.messageText, '\n'));
+        parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, path.dirname(configPath));
+    } else {
+        parsed = ts.parseJsonConfigFileContent({}, ts.sys, path.dirname(absoluteEntry));
+    }
     if (parsed.errors.length) {
         throw new Error(
             parsed.errors.map((error) => ts.flattenDiagnosticMessageText(error.messageText, '\n')).join('\n'),
@@ -67,7 +70,19 @@ export function findUsedWitMethods(entry: string, additionalTypesDir?: string): 
     const additionalTypeFiles = additionalTypesDir
         ? ts.sys.readDirectory(additionalTypesDir, ['.d.ts'], undefined, ['**/*.d.ts'])
         : [];
-    const options = { ...parsed.options, allowJs: true, maxNodeModuleJsDepth: 100 };
+    const options = {
+        ...(configPath
+            ? {}
+            : {
+                  target: ts.ScriptTarget.ES2022,
+                  module: ts.ModuleKind.ESNext,
+                  moduleResolution: ts.ModuleResolutionKind.Bundler,
+                  strict: true,
+              }),
+        ...parsed.options,
+        allowJs: true,
+        maxNodeModuleJsDepth: 100,
+    };
     const implementationFiles = new Set<string>();
     const runtimeHost: ts.ModuleResolutionHost = {
         ...ts.sys,
