@@ -1,6 +1,6 @@
 {
     "name": "@pumpkin-plugins/docs",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Generates component READMEs, doc links, and repository catalogs",
     "keywords": [
         "minecraft",

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/filiphsps/pumpkin-plugins/compare/docs-v0.1.1...docs-v0.1.2) (2026-10-16)
+
+
+### Bug Fixes
+
+* **docs:** discover symlinked components ([0356c46](https://github.com/filiphsps/pumpkin-plugins/commit/0356c468512e16f24acef29c775a34d9f3fb4e6e))
+
 ## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/docs-v0.1.0...docs-v0.1.1) (2026-10-15)
 
 
