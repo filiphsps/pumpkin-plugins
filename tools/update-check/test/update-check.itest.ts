@@ -1,5 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { builtPluginPath, startPumpkin } from '@pumpkin-plugins/test-harness';
 import { describe, expect, it } from 'vitest';
+
+const { version: currentVersion } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+    version: string;
+};
 
 describe('update-check in Pumpkin', () => {
     it('bundles and runs the Market checker from a real plugin', async () => {
@@ -10,7 +15,7 @@ describe('update-check in Pumpkin', () => {
         try {
             await server.waitForLog(/Loaded UpdateCheckFixture/, 10_000);
             const result = await server.waitForLog(/UpdateCheckFixture update available:/, 5000);
-            expect(result).toContain('0.1.0 -> 1.3.0');
+            expect(result).toContain(`${currentVersion} -> 1.3.0`);
             expect(server.errors()).toEqual([]);
         } finally {
             await server.stop();
