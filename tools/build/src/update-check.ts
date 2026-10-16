@@ -1,6 +1,13 @@
+import { createRequire } from 'node:module';
 import { type LatestVersionOptions, type LatestVersionPackage, latestVersion, ONE_DAY } from '@badisi/latest-version';
 
-const packageName = '@pumpkin-plugins/build';
+const packageMetadata = createRequire(import.meta.url)('../package.json') as {
+    name: string;
+    repository: { url: string };
+};
+const packageName = packageMetadata.name;
+const repositoryUrl = packageMetadata.repository.url.replace(/^git\+/, '').replace(/\.git$/, '');
+const releaseComponent = packageName.split('/').at(-1) ?? packageName;
 const requestTimeout = 5_000;
 
 /** Registry lookup signature used by the build notice. */
@@ -72,12 +79,20 @@ export async function startBuildUpdateCheck(args: readonly string[], options: Bu
 
 function formatBuildUpdateNotice(currentVersion: string, latestVersion: string): string {
     const content = [
-        `[build] Update available: ${packageName} ${currentVersion} → ${latestVersion}.`,
-        'Review the migration with:',
-        '  pnpm dlx @pumpkin-plugins/codemod update-build .',
+        '',
+        `Update available v${currentVersion} ≫ v${latestVersion}`,
+        `Changelog: ${new URL(`releases/tag/${releaseComponent}-v${latestVersion}`, `${repositoryUrl}/`).href}`,
+        'Run "pnpm dlx @pumpkin-plugins/codemod update-build ." to update',
+        '',
+        'Follow Filiph Sandström for updates: https://x.com/filiphsandstrom',
+        '',
     ];
     const contentWidth = Math.max(...content.map((line) => line.length));
     const border = '─'.repeat(contentWidth + 2);
-    const body = content.map((line) => `│ ${line.padEnd(contentWidth)} │`);
-    return [`┌${border}┐`, ...body, `└${border}┘`, ''].join('\n');
+    const body = content.map((line) => {
+        const leftPadding = Math.floor((contentWidth - line.length) / 2);
+        const centeredLine = `${' '.repeat(leftPadding)}${line}${' '.repeat(contentWidth - line.length - leftPadding)}`;
+        return `│ ${centeredLine} │`;
+    });
+    return [`╭${border}╮`, ...body, `╰${border}╯`, ''].join('\n');
 }
