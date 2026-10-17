@@ -50,7 +50,11 @@ it.each([
 
     expect(result.status).toBe(0);
     const readme = fs.readFileSync(path.join(destination, 'README.md'), 'utf8');
-    expect(readme).toContain('first `typecheck` or `build`');
+    const setupGuidance =
+        language === 'TypeScript'
+            ? 'On a fresh project, these commands may need network access.'
+            : 'The first `typecheck` fetches the Pumpkin WIT revision pinned by the API package';
+    expect(readme).toContain(setupGuidance);
     expect(readme).toContain('https://filiphsps.github.io/pumpkin-plugins/guides/building');
     expect(readme).toContain('https://filiphsps.github.io/pumpkin-plugins/tools/static-hermes-runtime/README');
     expect(fs.existsSync(path.join(destination, 'pnpm-workspace.yaml'))).toBe(true);
