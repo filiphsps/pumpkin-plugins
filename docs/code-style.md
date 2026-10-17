@@ -79,8 +79,10 @@ update the named roles if its palette or log handling changes.
 `node scripts/package-metadata.mjs` checks the license, homepage, repository, bugs and a
 description of at most 70 characters. It derives workspace links from the root repository URL.
 `--fix` writes derived values but leaves descriptions and package-specific fields alone. Public npm
-tools set `engines.node` from the version in `.node-version`. Importable tools also set
-`sideEffects`, `module` and `types`; each tool owns its `files` and `publishConfig` settings.
+tools set `engines.node` from the version in `.node-version`. Importable tools set `sideEffects`.
+Tools with a package-root entry also set top-level `module` and `types`; tools with subpath-only APIs
+declare `types` and runtime conditions on each public entry in `exports`. Each tool owns its `files`
+and `publishConfig` settings.
 `pnpm gen` generates plugins that pass. The homepage of a package is its folder's README on
 `master`. Packages use MIT by default. A package with its own `LICENSE`, `LICENSE.md` or
 `LICENSE.txt` file keeps the license declared in its `package.json`, including when metadata is
