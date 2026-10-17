@@ -46,6 +46,7 @@ Browse the [public documentation site](https://filiphsps.github.io/pumpkin-plugi
 | Package | Description | License |
 | --- | --- | --- |
 | [@pumpkin-plugins/pumpkin-pie-api](tools/apis/pumpkin-pie-api) | PumpkinPIE client for protocol checks and placeholder expansion | MIT |
+| [@pumpkin-plugins/pumpkin-plus-plus-api](tools/apis/pumpkin-plus-plus-api) | Typed TypeScript client for Pumpkin++ native extensions | MIT |
 | [@pumpkin-plugins/upnpumpkin-api](tools/apis/upnpumpkin-api) | Request and release router port mappings through UPnPumpkin | MIT |
 | [@pumpkin-plugins/build](tools/build) | Shared build tool for the plugins | MIT |
 | [@pumpkin-plugins/codemod](tools/codemod) | Codemod runner for Pumpkin plugins | [MIT](tools/codemod/LICENSE) |
