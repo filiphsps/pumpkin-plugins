@@ -92,6 +92,12 @@
             "component-no-space": true,
             "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
+        "tools/static-analysis": {
+            "component": "static-analysis",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}",
+            "release-as": "0.1.0"
+        },
         "tools/static-hermes-runtime": {
             "component": "static-hermes-runtime",
             "component-no-space": true,

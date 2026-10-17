@@ -56,6 +56,7 @@ Browse the [public documentation site](https://filiphsps.github.io/pumpkin-plugi
 | [@pumpkin-plugins/port-mapping](tools/port-mapping) | UPnP and NAT-PMP port mapping | MIT |
 | [@pumpkin-plugins/pumpkin-api](tools/pumpkin-api) | TypeScript API for PumpkinMC plugins | [MIT](tools/pumpkin-api/LICENSE) |
 | [@pumpkin-plugins/signing](tools/signing) | Ed25519 signing for plugin builds | MIT |
+| [@pumpkin-plugins/static-analysis](tools/static-analysis) | Static JavaScript and TypeScript module graph analysis | [MIT](tools/static-analysis/LICENSE) |
 | [@pumpkin-plugins/static-hermes-runtime](tools/static-hermes-runtime) | Static Hermes Runtime shim for Pumpkin plugin components | MIT |
 | [@pumpkin-plugins/terrain](tools/terrain) | Shared terrain capture and access contracts | MIT |
 | [@pumpkin-plugins/test-harness](tools/test-harness) | Runs plugins on a real Pumpkin in vitest | MIT |
