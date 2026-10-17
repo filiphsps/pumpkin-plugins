@@ -100,9 +100,10 @@ The `migrate-pumpkin-api-ts` codemod follows the repository's
 - A recognized `pumpkin-plugin-build <entry> <output>` command to
   `pumpkin-plugins-build`, moving the two paths into `pumpkinPlugin.entry` and
   `pumpkinPlugin.output`.
-- Missing `pumpkinPlugin.engine` and `pumpkinPlugin.wasi` settings to `static-hermes` and `[]` when it
-  can infer the builder paths or update an object-valued `pumpkinPlugin` config. This selects the
-  default runtime and initializes the capabilities list for manual review; existing values are kept.
+- Missing `pumpkinPlugin.engine` and `pumpkinPlugin.wasi` settings to `static-hermes` and the
+  capabilities it can infer from the production entry. This selects the default runtime and keeps
+  capabilities aligned with reachable WASI imports; existing entries are preserved. If entry
+  inference is skipped, the current `wasi` value stays unchanged and the preview explains why.
 - `scripts.typecheck` as `pumpkin-plugins-build --types-only && tsc --noEmit` when the codemod has
   both builder paths and the field is missing or exactly `tsc --noEmit`.
 - `build/types/bindings/**/*.d.ts` in an explicit `tsconfig.json` `include` array. If the project
@@ -118,7 +119,18 @@ string values alone. Existing custom build and typecheck commands are kept and r
 review. The build command is recognized only as `pumpkin-plugin-build <entry> <output>` or
 `pnpm exec pumpkin-plugin-build <entry> <output>`, with optional simple quotes around either path.
 Flags, extra arguments, command chaining, shell variable expansions and other launchers are left for
-manual review. The codemod does not update lockfiles or run package manager commands.
+manual review. A string `pumpkinPlugin.entry` takes precedence over a parsed legacy entry; when both
+are set and differ, the preview reports the mismatch and analyzes the configured entry.
+
+Capability inference follows only the selected production entry and its reachable modules. It
+includes runtime and type-only imports, re-exports, and statically resolvable literal `require()` and
+`import()` calls, including transitive package dependencies. It does not execute project code or
+start from tests and unrelated source files. The migration adds a capability only when the
+builder's interface mapping identifies one capability unambiguously. Unresolved or computed imports,
+shared interfaces, and support interfaces produce review notes without guessed capabilities; other
+confident findings are still merged. If no configured or supported legacy entry resolves, inference
+is skipped and the existing `wasi` value is preserved. The codemod does not update lockfiles or run
+package manager commands.
 
 ## Review and finish the migration
 
@@ -131,10 +143,11 @@ git diff
 Then complete the project-specific steps:
 
 1. Run your package manager's install command to refresh the lockfile.
-2. Check `pumpkinPlugin.wasi` and add the WASI capabilities the plugin uses. Use the
+2. Review `pumpkinPlugin.wasi` and the preview's inference notes. The codemod follows the selected
+   production entry and reachable imports, but computed or unresolved imports and interfaces without
+   a unique capability mapping still need manual review. Use the
    [capability reference](../../../docs/creating-a-plugin.md#files-and-network-access) to identify
-   capability names and related permissions. The codemod initializes a missing list as `[]`; it
-   cannot determine capability use from arbitrary plugin code.
+   capability names and related permissions.
 3. Confirm `tsconfig.json` includes the generated declaration glob. When there is no effective
    `include`, a local or inherited `files` list stays in place and only generated declarations are
    added. If neither `include` nor `files` is defined, TypeScript uses its default file inclusion.
