@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { type LatestVersionOptions, type LatestVersionPackage, latestVersion, ONE_DAY } from '@badisi/latest-version';
+import { type LatestVersionOptions, type LatestVersionPackage, latestVersion } from '@badisi/latest-version';
 
 const packageMetadata = createRequire(import.meta.url)('../package.json') as {
     name: string;
@@ -9,6 +9,7 @@ const packageName = packageMetadata.name;
 const repositoryUrl = packageMetadata.repository.url.replace(/^git\+/, '').replace(/\.git$/, '');
 const releaseComponent = packageName.split('/').at(-1) ?? packageName;
 const requestTimeout = 5_000;
+const cacheMaxAge = 3 * 60 * 60 * 1_000;
 
 /** Registry lookup signature used by the build notice. */
 export type BuildVersionLookup = (packageName: string, options?: LatestVersionOptions) => Promise<LatestVersionPackage>;
@@ -60,8 +61,8 @@ export async function startBuildUpdateCheck(args: readonly string[], options: Bu
 
     try {
         const result = await (options.lookup ?? latestVersion)(packageName, {
-            useCache: true,
-            cacheMaxAge: ONE_DAY,
+            useCache: !args.includes('--no-update-cache'),
+            cacheMaxAge,
             requestOptions: { timeout: requestTimeout },
         } satisfies LatestVersionOptions);
         const currentVersion = result.local;

@@ -145,7 +145,8 @@ pnpm --filter @pumpkin-plugins/build build
 ```
 
 An interactive build may show a notice when a newer `@pumpkin-plugins/build` release is available
-on npm. The lookup is skipped for help and version commands, CI, development mode
+on npm. Results are cached for three hours. Pass `--no-update-cache` to check npm without reading or
+writing the cache. The lookup is skipped for help and version commands, CI, development mode
 (`PUMPKIN_DEV_MODE=1`), and non-interactive output. Registry failures don't affect the build. To
 disable notices, use `--no-update-notifier` or set `PUMPKIN_PLUGINS_NO_UPDATE_NOTIFIER=1`. To preview
 a suggested migration, run this from a plugin's root:

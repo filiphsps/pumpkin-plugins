@@ -43,9 +43,10 @@ output from the QuickJS and Static Hermes toolchains; if a tool fails, its captu
 in the build output.
 
 In an interactive terminal, the executable checks npm for a newer builder release in the background
-and may print an update notice. Results are cached for one day, and registry errors do not affect the
-build. The check is skipped for help and version output, CI, development mode (`PUMPKIN_DEV_MODE=1`),
-and non-interactive output. To opt out, pass `--no-update-notifier` or set
+and may print an update notice. Results are cached for three hours, and registry errors do not affect
+the build. Pass `--no-update-cache` to check npm without reading or writing the cache. The check is
+skipped for help and version output, CI, development mode (`PUMPKIN_DEV_MODE=1`), and non-interactive
+output. To opt out, pass `--no-update-notifier` or set
 `PUMPKIN_PLUGINS_NO_UPDATE_NOTIFIER=1`. If you see an update notice, preview the migration from the
 plugin directory with `pnpm dlx @pumpkin-plugins/codemod update-build .`.
 

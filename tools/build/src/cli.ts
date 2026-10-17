@@ -32,6 +32,7 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
         .option('--types-only', 'Generate guest declarations without building a component')
         .option('--parse-ts', 'Use Hermes TypeScript parsing for the component bundle')
         .option('--no-update-notifier', 'Skip the npm update check')
+        .option('--no-update-cache', 'Skip the npm update check cache')
         .configureOutput({ outputError: () => {} })
         .exitOverride();
     try {

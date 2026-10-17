@@ -59,7 +59,7 @@ describe('build update check', () => {
         }
     });
 
-    it('uses a one-day cache and a bounded npm request timeout', async () => {
+    it('uses a three-hour cache and a bounded npm request timeout', async () => {
         const lookup = vi.fn(async (_packageName: string, _options?: LatestVersionOptions) => ({
             name: '@pumpkin-plugins/build',
             local: '0.1.0',
@@ -76,7 +76,7 @@ describe('build update check', () => {
 
         const options = lookup.mock.calls[0]?.[1];
         expect(options?.useCache).toBe(true);
-        expect(options?.cacheMaxAge).toBe(86_400_000);
+        expect(options?.cacheMaxAge).toBe(10_800_000);
         expect(options?.requestOptions?.timeout).toBeGreaterThan(0);
     });
 
