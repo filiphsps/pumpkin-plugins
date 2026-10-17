@@ -10,8 +10,8 @@ steps:
   - uses: filiphsps/pumpkin-plugins/actions/{{ name }}@{{ name }}-v0.0.1
 ```
 
-The version reference above is this action's first Release Please tag. Action releases are
-independent from plugin releases and other actions.
+The version in this example is the first tag created by Release Please for this action. Each action
+has its own release history, separate from plugins and other actions.
 
 ## Inputs
 
@@ -25,9 +25,11 @@ independent from plugin releases and other actions.
 
 ## Development
 
-Add inputs and outputs in `action.yml`, implement the behavior in `src/index.mjs`, and cover it with
-tests in `src/*.test.mjs`. Input and output tables are generated from `action.yml`; run `pnpm readme`
-after changing the action metadata. Read inputs with `getInput()` and write outputs with
-`setOutput()` from `../../common/src/utils.mjs` so values use GitHub's runner environment and
-output-file format. These helpers and their tests are shared by all actions.
-The action runs on GitHub's Node 24 runtime and needs no separate build step.
+Define the action's inputs and outputs in `action.yml`, then implement its behavior in
+`src/index.mjs` and cover it with tests in `src/*.test.mjs`. The input and output tables in this
+README come from `action.yml`; after changing that metadata, run `pnpm readme` to update them.
+
+Use `getInput()` to read inputs and `setOutput()` to write outputs. Both helpers are in
+`../../common/src/utils.mjs` and format values for GitHub's runner environment and output files.
+All actions share these helpers and their tests. GitHub runs the action on Node 24, so you don't
+need a separate build step.
