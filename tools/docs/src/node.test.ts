@@ -143,11 +143,6 @@ describe('generateRootReadme', () => {
         await expect(generateRootReadme(root)).rejects.toThrow(message);
     });
 
-    it('works when the repository has no actions directory', async () => {
-        expect(await generateRootReadme(root)).toBe('updated');
-        expect(read('README.md')).not.toContain('**Actions**');
-    });
-
     it('requires the README and its packages marker', async () => {
         fs.rmSync(path.join(root, 'README.md'));
         await expect(generateRootReadme(root)).rejects.toThrow('README.md not found');

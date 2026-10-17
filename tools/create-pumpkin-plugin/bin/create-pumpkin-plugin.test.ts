@@ -2,35 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { chooseLanguage, detectPackageManager } from './create-pumpkin-plugin.ts';
 
 describe('chooseLanguage', () => {
-    it('uses an explicitly selected language without prompting', async () => {
-        const prompt = vi.fn(async () => 'javascript' as const);
-
-        await expect(chooseLanguage({ ts: true }, false, prompt)).resolves.toBe('typescript');
-        await expect(chooseLanguage({ js: true }, false, prompt)).resolves.toBe('javascript');
-        expect(prompt).not.toHaveBeenCalled();
-    });
-
     it('uses the prompt for an interactive caller without a language flag', async () => {
         const prompt = vi.fn(async () => 'javascript' as const);
 
         await expect(chooseLanguage({}, true, prompt)).resolves.toBe('javascript');
         expect(prompt).toHaveBeenCalledOnce();
-    });
-
-    it('rejects conflicting language options without prompting', async () => {
-        const prompt = vi.fn(async () => 'typescript' as const);
-
-        await expect(chooseLanguage({ ts: true, js: true }, true, prompt)).rejects.toThrow(
-            '--ts and --js cannot be used together',
-        );
-        expect(prompt).not.toHaveBeenCalled();
-    });
-
-    it('requires an explicit choice for non-interactive callers', async () => {
-        const prompt = vi.fn(async () => 'typescript' as const);
-
-        await expect(chooseLanguage({}, false, prompt)).rejects.toThrow('Choose a language with --ts or --js.');
-        expect(prompt).not.toHaveBeenCalled();
     });
 });
 

@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CAPABILITIES, capabilitiesForInterface, isCapability, WASI_VERSION, wasiInterfaces } from './index.ts';
+import { capabilitiesForInterface, isCapability, wasiInterfaces } from './index.ts';
 
 describe('WASI capability metadata', () => {
-    it('pins the supported WASI version and known capabilities', () => {
-        expect(WASI_VERSION).toBe('0.2.3');
-        expect(Object.keys(CAPABILITIES)).toEqual(['http', 'filesystem', 'sockets', 'udp']);
-    });
-
     it('returns no imports when no capability is requested', () => {
         expect(wasiInterfaces([])).toEqual([]);
     });

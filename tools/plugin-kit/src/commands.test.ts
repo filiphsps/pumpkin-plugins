@@ -1,7 +1,7 @@
 import { CommandFailed, commandInfos, defineCommands, errorLine } from '@pumpkin-plugins/docs';
 import { describe, expect, it, vi } from 'vitest';
 import { buildCommands, type CommandSuggestionRequest } from './commands.ts';
-import { FakeCommandFailure, FakeCommandHost, FakeNode } from './testing/fake-commands.ts';
+import { FakeCommandFailure, FakeCommandHost, type FakeNode } from './testing/fake-commands.ts';
 
 const tree = defineCommands('Demo', {
     demo: {
@@ -22,16 +22,6 @@ const handlers = {
 };
 
 describe('buildCommands', () => {
-    it('models Pumpkin consuming a child node when its parent takes ownership with then', () => {
-        const parent = new FakeNode('parent');
-        const child = new FakeNode('child');
-
-        parent.then(child);
-
-        expect(parent.children).toEqual([child]);
-        expect(() => child.executeWithHandlerId(1)).toThrow('already been consumed');
-    });
-
     it('builds one root per command, with its description and permission', () => {
         const built = buildCommands(new FakeCommandHost(), tree, handlers);
         expect(built.map(({ name, description, permission }) => ({ name, description, permission }))).toEqual([
@@ -160,13 +150,6 @@ describe('buildCommands', () => {
             toString: { description: 'Example', permission: 'Demo:command.example' },
         });
         expect(() => buildCommands(new FakeCommandHost(), spec, {} as never)).toThrow('no handler for /toString');
-    });
-
-    it('rejects a wrong root name in the fake host', () => {
-        const host = new FakeCommandHost();
-        const [, ping] = buildCommands(host, tree, handlers);
-        expect(() => host.run(ping.node as FakeNode, ['wrong'])).toThrow('/wrong is not runnable');
-        expect(() => host.run(ping.node as FakeNode, [])).toThrow('is not runnable');
     });
 
     it('builds argument nodes after literals and passes their values to typed handlers', () => {

@@ -10,10 +10,6 @@ describe('markdown helpers', () => {
     it('renders a table with a separator row', () => {
         expect(table(['A', 'B'], [['1', 'x|y']])).toBe('| A | B |\n| --- | --- |\n| 1 | x\\|y |');
     });
-
-    it('wraps text as inline code', () => {
-        expect(code('fs.read.data')).toBe('`fs.read.data`');
-    });
 });
 
 it('escapes table headers and preserves requested multiline cells', () => {

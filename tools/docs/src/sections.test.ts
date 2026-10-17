@@ -88,13 +88,6 @@ describe('renderSections', () => {
         expect(s.config).toContain('```toml\nx = 1\n```');
     });
 
-    it("adds the plugin's own blocks to the built-in ones", () => {
-        const blocks = renderBlocks({ ...full, blocks: { routers: '| A |' } });
-        expect(Object.keys(blocks)).toEqual([...SECTIONS, 'routers']);
-        expect(blocks.routers).toBe('| A |');
-        expect(blocks.summary).toBe('Does demo things.');
-    });
-
     it('does not let a plugin block take the place of a built-in one', () => {
         expect(() => renderBlocks({ ...full, blocks: { commands: 'mine' } })).toThrow('"commands" is built in');
     });

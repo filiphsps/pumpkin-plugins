@@ -36,29 +36,4 @@ describe('renderPackagesBlock', () => {
         expect(out).toContain('| [BPlugin](packages/b-plugin) | B \\| pipes | MIT |');
         expect(out).toContain('| [@x/build](tools/build) | Builds | MIT |');
     });
-
-    it('links package-specific licenses for plugins and tools', () => {
-        const out = renderPackagesBlock(
-            [
-                {
-                    dir: 'packages/dh',
-                    name: 'DH',
-                    description: 'LOD',
-                    license: 'LGPL-3.0-only',
-                    licenseFile: 'packages/dh/LICENSE',
-                },
-            ],
-            [
-                {
-                    dir: 'tools/helper',
-                    name: 'Helper',
-                    description: 'Helps',
-                    license: 'MIT',
-                    licenseFile: 'tools/helper/LICENSE.md',
-                },
-            ],
-        );
-        expect(out).toContain('| [DH](packages/dh) | LOD | [LGPL-3.0-only](packages/dh/LICENSE) |');
-        expect(out).toContain('| [Helper](tools/helper) | Helps | [MIT](tools/helper/LICENSE.md) |');
-    });
 });

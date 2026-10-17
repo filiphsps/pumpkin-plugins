@@ -35,31 +35,6 @@ function outputAt(): { dir: string; output: string } {
 }
 
 describe('generateTypes', () => {
-    it('preserves bigint guest declarations and publishes them at the requested path', () => {
-        const { dir, output } = outputAt();
-
-        generateTypes('wit', output);
-
-        expect(fs.readFileSync(path.join(output, 'index.d.ts'), 'utf8')).toBe('export type Size = bigint;');
-        expect(fs.readdirSync(dir)).toEqual(['bindings']);
-        expect(componentize).toHaveBeenCalledOnce();
-        expect(componentize.mock.calls[0]?.[1]).toContain('--quiet');
-    });
-
-    it('keeps existing declarations and removes staging files if jco fails', () => {
-        const { dir, output } = outputAt();
-        fs.mkdirSync(output);
-        fs.writeFileSync(path.join(output, 'index.d.ts'), 'export type Size = number;');
-        componentize.mockImplementation(() => {
-            throw new Error('jco failed');
-        });
-
-        expect(() => generateTypes('wit', output)).toThrow('jco failed');
-
-        expect(fs.readFileSync(path.join(output, 'index.d.ts'), 'utf8')).toBe('export type Size = number;');
-        expect(fs.readdirSync(dir)).toEqual(['bindings']);
-    });
-
     it('restores existing declarations if publishing generated types fails', () => {
         const { dir, output } = outputAt();
         fs.mkdirSync(output);

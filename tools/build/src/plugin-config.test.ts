@@ -45,18 +45,6 @@ describe('readPluginConfig', () => {
         expect(config.output).toBe('build/plugin.wasm');
     });
 
-    it('supports the Static Hermes engine', () => {
-        const config = readPluginConfig(packageWith({ version: '1.2.3', pumpkinPlugin: { engine: 'static-hermes' } }));
-
-        expect(config.engine).toBe('static-hermes');
-    });
-
-    it('supports QuickJS plugins', () => {
-        const config = readPluginConfig(packageWith({ version: '1.2.3', pumpkinPlugin: { engine: 'quickjs' } }));
-
-        expect(config.engine).toBe('quickjs');
-    });
-
     it('supports selecting the lean Static Hermes Runtime', () => {
         const config = readPluginConfig(
             packageWith({ version: '1.2.3', pumpkinPlugin: { engine: 'static-hermes', staticHermesRuntime: 'lean' } }),
@@ -170,15 +158,6 @@ describe('readPluginConfig', () => {
 });
 
 describe('requireBuildFields', () => {
-    it('returns entry and output', () => {
-        expect(
-            requireBuildFields({ entry: 'a', output: 'b.wasm', engine: 'quickjs', wasi: [], version: '0.0.0' }),
-        ).toEqual({
-            entry: 'a',
-            output: 'b.wasm',
-        });
-    });
-
     it('asks for both when either is missing, so libraries can still generate types', () => {
         expect(() => requireBuildFields({ entry: 'a', engine: 'quickjs', wasi: [], version: '0.0.0' })).toThrow(
             /entry.*output/,

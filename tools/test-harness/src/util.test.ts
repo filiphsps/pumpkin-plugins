@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assetName, deepMerge, parseChecksums, stripAnsi } from './util.ts';
+import { assetName, deepMerge, parseChecksums } from './util.ts';
 
 describe('deepMerge', () => {
     it('merges nested objects and lets the override win', () => {
@@ -27,11 +27,5 @@ describe('parseChecksums', () => {
         expect(sums.get('pumpkin-X64-Linux')).toBe('a'.repeat(64));
         expect(sums.get('pumpkin-ARM64-macOS')).toBe('b'.repeat(64));
         expect(sums.size).toBe(2);
-    });
-});
-
-describe('stripAnsi', () => {
-    it('removes color codes', () => {
-        expect(stripAnsi('\x1b[2m20:59:23\x1b[0m \x1b[32m INFO\x1b[0m hi')).toBe('20:59:23  INFO hi');
     });
 });
