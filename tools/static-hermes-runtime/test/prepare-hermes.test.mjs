@@ -8,6 +8,7 @@ import { expect, it } from 'vitest';
 const runtimeDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workspaceRoot = path.resolve(runtimeDir, '../..');
 const runtimeCli = path.join(runtimeDir, 'dist/cli.js');
+const pinnedHermesCommit = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'hermes-source.lock.json'), 'utf8')).commit;
 
 it('routes the prepare-hermes package script through the compiled CLI', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'package.json'), 'utf8'));
@@ -131,7 +132,7 @@ patch_contents=
 case "$args" in *" apply "*) patch_contents=$(cat) ;; esac
 case "$args" in
   *" rev-parse --git-dir "*) printf '.git\\n' ;;
-  *" rev-parse HEAD "*) printf '820aa0d4b5fe5d3ed7900e1274211ef561081b3f\\n' ;;
+  *" rev-parse HEAD "*) printf '${pinnedHermesCommit}\\n' ;;
   *" status --porcelain"*) printf ' M cmake/modules/Hermes.cmake\\0' ;;
   *" apply --check --reverse "*)
     case "$patch_contents" in
@@ -265,7 +266,7 @@ case "$args" in
     case "$target" in *source.rebuild-*) touch "$STATIC_HERMES_TEST_FRESH_SOURCE" ;; esac
     ;;
   *" rev-parse --git-dir "*) printf '.git\\n' ;;
-  *" rev-parse HEAD "*) printf '820aa0d4b5fe5d3ed7900e1274211ef561081b3f\\n' ;;
+  *" rev-parse HEAD "*) printf '${pinnedHermesCommit}\\n' ;;
   *" status --porcelain"*)
     case "$repo" in *source.rebuild-*) exit 0 ;; esac
     printf ' M cmake/modules/Hermes.cmake\\0'
@@ -365,7 +366,7 @@ case "$args" in
   *" rev-parse --git-dir "*) printf '.git\\n' ;;
   *" rev-parse HEAD "*)
     if [ -f "$repo/.hermes-pinned" ]; then
-      printf '820aa0d4b5fe5d3ed7900e1274211ef561081b3f\\n'
+      printf '${pinnedHermesCommit}\\n'
     else
       printf '1111111111111111111111111111111111111111\\n'
     fi
