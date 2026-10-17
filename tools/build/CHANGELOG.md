@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/filiphsps/pumpkin-plugins/compare/build-v0.1.3...build-v0.1.4) (2026-10-17)
+
+
+### Bug Fixes
+
+* **build:** remove duplicate update check ([06eb3d5](https://github.com/filiphsps/pumpkin-plugins/commit/06eb3d52807d146dcf3acdac5fa6a90d517b7db9))
+
 ## [0.1.3](https://github.com/filiphsps/pumpkin-plugins/compare/build-v0.1.2...build-v0.1.3) (2026-10-17)
 
 
