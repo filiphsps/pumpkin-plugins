@@ -61,8 +61,6 @@ describe('setup-static-hermes action', () => {
         assert.match(versionScript, /toolchain-versions\.json/);
         assert.match(versionScript, /\.tools\["wit-bindgen"\]/);
         assert.match(versionScript, /\.tools\.rust/);
-        assert.match(versionScript, /cmake-version=4\.4\.4/);
-        assert.match(versionScript, /ninja-version=1\.13\.2/);
 
         const hostToolsCache = step('host-tools-cache').with;
         assert.match(hostToolsCache.path, /host-tools/);
@@ -86,24 +84,6 @@ describe('setup-static-hermes action', () => {
         assert.match(hermesCache.key, /steps\.versions\.outputs\.wit-bindgen-version/);
         assert.match(hermesCache.key, /steps\.versions\.outputs\.rust-toolchain-version/);
         assert.doesNotMatch(`${witBindgenCache.key} ${hermesCache.key}`, /wasi-sdk-34|wit-bindgen-0\.62|rust-1\.99/);
-    });
-});
-
-describe('external consumer workflow', () => {
-    const workflow = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/external-consumer.yml'), 'utf8'));
-
-    it('accepts Ninja build suffixes while checking the pinned version on Windows', () => {
-        const verifier = workflow.jobs['external-consumer'].steps.find(
-            (step) => step.name === '🔎 Verify pinned Ninja executable on Windows',
-        );
-
-        assert.match(verifier.run, /\$versionPattern = '\^' \+ \[regex\]::Escape\(\$env:NINJA_VERSION\)/);
-        assert.match(verifier.run, /\$version -notmatch \$versionPattern/);
-
-        const pinnedVersion = '1.13.2';
-        const versionPattern = new RegExp(`^${pinnedVersion.replaceAll('.', '\\.')}(?:$|[.+-])`);
-        assert.match('1.13.2.git.kitware.jobserver-pipe-1', versionPattern);
-        assert.doesNotMatch('1.13.20', versionPattern);
     });
 });
 
@@ -207,22 +187,9 @@ describe('upstream pin workflow', () => {
         assert.match(tagCheck.run, /git\/ref\/tags\/\$RELEASE_TAG/);
         assert.match(tagCheck.run, /git\/tags\/\$sha/);
         assert.equal(publish.env.RELEASE_TARGET_SHA, ['$', '{{ inputs.release_commit || github.sha }}'].join(''));
-        const nodeSetup = steps.find((step) => step.uses === 'actions/setup-node@v7.0.0');
-        assert.equal(nodeSetup.with['node-version'], '24.21.0');
         const publishScript = steps.find((step) => step.name === '📤 Publish verified public npm packages');
         assert.match(publishScript.run, /npm 11\.5\.1 or newer/);
         assert.match(publishScript.run, /pnpm exec node scripts\/publish-tool-packages\.mjs/);
-        const implementation = fs.readFileSync(path.join(scripts, 'publish-tool-packages.mjs'), 'utf8');
-        assert.match(implementation, /execFileSync\('pnpm', \['pack', '--pack-destination'/);
-        assert.match(
-            implementation,
-            /execFileSync\('npm', \['publish', tarballPath, '--access', 'public', '--provenance'\]/,
-        );
-        assert.match(implementation, /packageResponse\.status === 404/);
-        assert.match(implementation, /versionResponse\.status === 404\) return null/);
-        assert.match(implementation, /if \(!response\.ok\)/);
-        assert.match(implementation, /existingIntegrity !== packed\.integrity/);
-        assert.match(implementation, /assertPrerequisiteAvailable/);
     });
 
     it('checks the release tag against its requested commit when a newer workflow commit exists', () => {

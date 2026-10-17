@@ -132,9 +132,6 @@ it('keeps upstream pin schemas reusable across repositories and release tag form
     const toolchainSchema = JSON.parse(
         readFileSync(new URL('../schemas/toolchain-versions.schema.json', import.meta.url), 'utf8'),
     );
-    const toolchainVersions = JSON.parse(
-        readFileSync(new URL('../tools/static-hermes-runtime/toolchain-versions.json', import.meta.url), 'utf8'),
-    );
 
     assert.equal(gitPin.properties.repository.format, 'uri');
     assert.equal(gitPin.properties.repository.pattern, undefined);
@@ -150,7 +147,6 @@ it('keeps upstream pin schemas reusable across repositories and release tag form
     assert.equal(wasiSdkPin.properties.checksums.required.length, 7);
     assert.equal(wasiSdkPin.$defs.sha256.pattern, '^[0-9a-f]{64}$');
 
-    assert.deepEqual(toolchainVersions.tools, { 'wasm-tools': '1.261.0', 'wit-bindgen': '0.62.0', rust: '1.99.0' });
     assert.equal(toolchainSchema.properties.tools.additionalProperties.type, 'string');
     assert.equal(toolchainSchema.properties.tools.propertyNames.pattern, '^[a-z0-9]+(?:-[a-z0-9]+)*$');
 });

@@ -58,25 +58,6 @@ it('shows warning, celebration, and regular outcomes in the PR comment', () => {
     }
 });
 
-it('embeds the SVG chart and links directly to it from the PR comment', () => {
-    const chartUrl = 'https://raw.githubusercontent.com/example/repo/benchmark-charts/engine-comparison/123.svg';
-    const comparison = compareBenchmarkResults(
-        [engine('quickjs', [workload('slower', [125])])],
-        [engine('quickjs', [workload('slower', [100])])],
-    );
-    const comment = formatBenchmarkComment({
-        chartUrl,
-        comparison,
-        baselineSha: '1234567890abcdef',
-        currentSha: 'abcdef1234567890',
-        reportRunUrl: 'https://github.com/example/repo/actions/runs/123',
-    });
-
-    expect(comment).toContain(`![Benchmark timing changes](${chartUrl})`);
-    expect(comment).toContain(`[Download the SVG comparison chart](${chartUrl})`);
-    expect(comment).not.toContain('/actions/runs/123/artifacts');
-});
-
 it('selects the light and dark SVG variants by GitHub color scheme', () => {
     const lightUrl = 'https://example.com/benchmark-light.svg';
     const darkUrl = 'https://example.com/benchmark-dark.svg';

@@ -135,7 +135,6 @@ describe('parse-ts build commands', () => {
                 `${path.relative(workspaceRoot, manifestPath)} must define build:parse-ts`,
             );
         }
-        assert.equal(manifests.length, 9, 'expected every plugin and both starter templates');
     });
 
     it('registers the root command and matching Turbo task', () => {

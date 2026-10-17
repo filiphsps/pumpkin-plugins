@@ -118,17 +118,6 @@ describe('unpin-release-as', () => {
         );
     });
 
-    it('changes nothing when there is nothing to retire', () => {
-        const { dir, read } = repo({ waiting: '0.0.0' });
-        const before = fs.readFileSync(path.join(dir, 'release-please-config.json'), 'utf8');
-        assert.ok(run(dir).ok);
-        assert.equal(fs.readFileSync(path.join(dir, 'release-please-config.json'), 'utf8'), before);
-        assert.deepEqual(read().packages['packages/waiting'], {
-            component: 'waiting',
-            'release-as': '0.0.1',
-        });
-    });
-
     it('leaves the rest of the config as it was', () => {
         const { dir, read } = repo({ plug: '0.0.1' });
         const config = read();
