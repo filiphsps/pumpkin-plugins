@@ -1,17 +1,20 @@
-# Sign PumpkinMC Plugins
+# Sign Pumpkin plugins
 
-The signing action adds Pumpkin's Ed25519 signature and release metadata to one or more existing
-plugin `.wasm` files. It signs in place and does not build them. Run it on the exact artifact from
-the build job, before publishing or distributing that artifact.
+Use this action after building a plugin to add Pumpkin's Ed25519 signature and release metadata to
+its `.wasm` file. It signs the file in place; it does not build the plugin. Pass the action the
+artifact you plan to publish, then publish that same file.
 
-For a workflow example and the complete input list, see the [action README](../README.md).
+For one plugin, provide its name, version without a leading `v`, and `.wasm` path. To sign several
+plugins in one job, pass a JSON array of those values through `plugins-manifest`. The
+`developer-name` and signing key apply to every plugin. See the [action README](../README.md) for a
+workflow example and the complete input list.
 
-For one file, provide the plugin name, version without a leading `v`, and wasm path. For a release
-with several plugins, use `plugins-manifest`, a JSON array of those three values; the developer
-name and key apply to every item. The action replaces existing signing sections, verifies the
-result before writing, and refreshes an adjacent `.sha256` file when one exists.
+Store the 32-byte Ed25519 seed as 64 hexadecimal characters in a protected GitHub secret. If a
+workflow should leave plugins unsigned when the key is missing, such as a fork workflow, set
+`warn: true`. The action then warns and leaves the files unchanged. A malformed key, missing file,
+or failed signature verification still fails the job.
 
-Store the 32-byte Ed25519 seed as 64 hexadecimal characters in a protected GitHub secret. Set
-`warn: true` only when a missing key should intentionally leave files unsigned, such as a fork
-workflow. Malformed keys, missing files, and failed verification remain errors. See
-[action.yml](../action.yml) for the runtime and entry point; no setup step is needed.
+Before writing a signed file, the action replaces any existing signing section and verifies the
+result. If an adjacent `.sha256` file exists, it updates that checksum to match the signed file.
+The action runs on Node 24 and needs no setup step; see [action.yml](../action.yml) for its runtime
+and entry point.

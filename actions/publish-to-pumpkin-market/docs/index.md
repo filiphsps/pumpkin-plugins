@@ -1,15 +1,25 @@
 # Publish a plugin to Pumpkin Market
 
-The publish action uploads an already-built `.wasm` artifact to an existing Pumpkin Market
-listing. It does not build the plugin or create a listing. Run it after the build and signing steps
-have produced the release artifact you intend to distribute.
+## Before you run the action
 
-For a workflow example and the complete input list, see the [action README](../README.md). Set
-exactly one of `plugin-name` and `plugin-id`; the action resolves a name with bounded search and a
-case-insensitive exact-name match. The version is supplied without a leading `v`. You can also set
-the release track and release notes.
+The action uploads a `.wasm` artifact to a Pumpkin Market listing that already exists. Run it after
+your workflow has built and signed the artifact you want to distribute. The action won't build the
+plugin or create its Market listing.
 
-The token needs the Market scopes for updating plugins and uploading versions. By default, a
-missing token or unavailable listing fails the step. `warn: true` changes those cases to a warning
-and skipped upload; API errors still fail. The action exposes the resolved listing ID and name,
-operation status, and published version as step outputs.
+## Choose the listing and version
+
+For a workflow example and the complete input and output reference, see the
+[action README](../README.md). Set exactly one of `plugin-name` or `plugin-id` to choose the listing.
+When you use a name, the action searches a bounded set of results and requires a case-insensitive
+exact match. Supply `version` without a leading `v`; you can also set the release track and release
+notes.
+
+## Credentials and unavailable listings
+
+Give `api-token` the `plugins:update` and `plugins:versions:upload` scopes. An empty token, a missing
+listing, or a listing that hasn't been published before makes the action fail by default. Set
+`warn: true` to turn those cases into a warning and skip the upload. Lookup and upload errors still
+fail the action.
+
+After a successful upload, later workflow steps can use the resolved listing ID and name, operation
+status, and published version from the action's outputs.
