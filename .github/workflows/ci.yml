@@ -42,6 +42,15 @@ on:
             - 'packages/*/README.md'
             - 'actions/*/README.md'
             - 'extensions/*/README.md'
+            # Docs-only default-branch pushes still need release processing to refresh open release
+            # PRs and catch up any releases from an earlier run that did not finish.
+            - '**/*.md'
+            - 'docs/**'
+            - 'packages/*/docs/**'
+            - 'tools/**/docs/**'
+            - 'actions/*/docs/**'
+            - 'extensions/*/docs/**'
+            - 'LICENSE'
     workflow_dispatch:
         inputs:
             release_commit:
@@ -373,7 +382,16 @@ jobs:
               needs.changes.outputs.actions_to_test != '[]' ||
               needs.changes.outputs.extensions != '[]' ||
               needs.changes.outputs.extensions_to_test != '[]' ||
-              needs.changes.outputs.generated_readmes == 'true'
+              needs.changes.outputs.generated_readmes == 'true' ||
+              (
+                github.event_name == 'push' &&
+                needs.changes.outputs.code != 'true' &&
+                needs.changes.outputs.actions == '[]' &&
+                needs.changes.outputs.actions_to_test == '[]' &&
+                needs.changes.outputs.extensions == '[]' &&
+                needs.changes.outputs.extensions_to_test == '[]' &&
+                needs.changes.outputs.config_only != 'true'
+              )
             }}
         timeout-minutes: 10
         runs-on: ubuntu-26.04
@@ -863,7 +881,12 @@ jobs:
                       needs.changes.outputs.code != 'true' &&
                       (
                         needs.changes.outputs.actions != '[]' ||
-                        needs.changes.outputs.extensions != '[]'
+                        needs.changes.outputs.extensions != '[]' ||
+                        (
+                          needs.changes.outputs.actions_to_test == '[]' &&
+                          needs.changes.outputs.extensions_to_test == '[]' &&
+                          needs.changes.outputs.config_only != 'true'
+                        )
                       )
                     )
                   )

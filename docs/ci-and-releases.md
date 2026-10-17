@@ -53,7 +53,7 @@ pins.
 | 🛡️ Action test gate | Every non-config-only CI run outside Release Please branches, after classification and action tests | Requires each selected action suite to pass. It accepts skipped tests only when the matrix is empty. |
 | 🧪 Extension tests | Extension changes that need checks | The reusable workflow lints, typechecks, tests and packages each changed extension. |
 | 🛡️ Extension test gate | Every non-config-only CI run outside Release Please branches, after classification and extension tests | Requires each selected extension suite to pass. It accepts skipped tests only when the matrix is empty. |
-| 📝 Docs and config | Code, action, extension, or generated README changes | Checks that generated READMEs are current and runs `pnpm check` for release configuration, package metadata and docs-to-code links. |
+| 📝 Docs and config | Code, action, extension, generated README, or docs-only `master` pushes | Checks that generated READMEs are current and runs `pnpm check` for release configuration, package metadata and docs-to-code links. |
 | 🔨 Build | Code changes, after change classification | Prepares Static Hermes while lint and typecheck run, then builds each production plugin with its configured engine (Static Hermes by default). It runs integration checks and rebuilds release artifacts with the same runtime before signing and verification. |
 | 📊 Engine comparison | Code changes, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`. Nine engine configurations run in parallel; a report job validates and combines their results from real Pumpkin servers. |
 | 📈 Engine comparison comment | Successful PR CI runs with a benchmark report | Compares the report with the latest matching default-branch run, updates one PR comment, and embeds an SVG chart of timing changes. |
@@ -61,7 +61,7 @@ pins.
 | 🛡️ Integration gate | Every non-config-only CI run outside Release Please branches, after classification and integration tests | Requires the selected integration suites to pass. It accepts a skipped suite when no relevant changes occurred or benchmark changes use Engine comparison. |
 | 🧬 Generator | Scaffold, generator setup, or generated-plugin dependency changes; after lint and build | Reuses Build's Static Hermes cache, generates a throwaway plugin, action and extension, checks release registration and READMEs, tests the action and extension, and typechecks, builds and integration-tests the plugin. |
 | 🛡️ Generator gate | Every non-config-only CI run outside Release Please branches, after classification and the generator smoke test | Requires the smoke test when a scaffold, generator setup or generated-plugin dependency changes. Otherwise it accepts the skipped test. |
-| 🚢 Release | Release changes to plugins, actions, extensions or public tools, on `master` pushes | Calls the reusable release workflow after CI gates pass. Actions get GitHub releases, extensions get VSIX assets, public tools publish npm tarballs, and plugins get signed artifacts and Market listings. |
+| 🚢 Release | Eligible `master` pushes after CI gates pass, including docs-only pushes | Calls the reusable release workflow. It catches up pending releases and refreshes every open release PR; Actions get GitHub releases, extensions get VSIX assets, public tools publish npm tarballs, and plugins get signed artifacts and Market listings. |
 | 📝 Prepare release PR | Every open release PR on a release run | Refreshes plugin and extension READMEs, action README examples, starter dependency ranges and first-release pins. |
 | 🔏 Sign, 📎 Attach, 🛒 Market | Each released plugin | Confirms the tag points to the commit built in this run, signs and uploads that artifact, publishes it to an existing Market listing, and syncs its description and commands. |
 | 🧹 Cleanup artifacts | After artifact consumers finish, except for config-only changes and Release Please branches | Deletes handoff artifacts after their consumers succeed or are skipped, even if another job failed. It keeps artifacts needed to rerun failed consumers. |
@@ -114,11 +114,12 @@ The classifier scopes checks this way:
 
 - Markdown, files under `docs/`, component-level `docs/` folders and `LICENSE` changes count as
   documentation. A docs-only pull request runs the separate Docs workflow to check the docs and
-  build the site. The main CI path filter excludes ordinary Markdown and guide changes, but
-  re-includes root, package, action and extension README paths so generated README commits can run
-  the generated-content check. A README-only change can therefore start CI, but the classifier won't
-  select plugin builds, action tests or unit tests for it. Mixed changes run checks for their code or
-  action changes as well.
+  build the site. The main CI pull-request path filter excludes ordinary Markdown and guide changes,
+  but re-includes root, package, action and extension README paths so generated README commits can
+  run the generated-content check. On `master`, the push path filter also includes documentation
+  changes. The classifier skips code-dependent jobs, while Docs and config and the release workflow
+  run after their gates pass. That release run catches up pending merged releases and updates and
+  prepares every open release PR. Mixed changes run checks for their code or action changes as well.
 - Changes under `actions/{name}/` and `extensions/{name}/` are selected separately from plugin and
   repository code. An action-only or extension-only change skips the plugin build, integration
   suites and repository test jobs; CI calls the matching reusable workflow for each changed
@@ -141,18 +142,23 @@ its local actions run the full suite. Unrelated scripts and workflow files skip 
 Benchmark-only changes use Engine comparison. Biome, the type checker and unit tests don't read docs,
 so documentation-only changes cannot fail those checks.
 
-The main CI `📝 Docs and config` job runs for code, action and extension changes, and for the
-automatic `docs: update generated READMEs` commit. A Release Please branch update can trigger CI,
-Docs and Actionlint at the GitHub level, but their jobs skip those branches: the source commit has
-already passed validation, and the release workflow prepares generated READMEs and first-release
-pins. The benchmark-comment workflow skips them too. Pull requests that change only guide pages or
-other Markdown outside the included README paths skip the main CI workflow entirely.
+The main CI `📝 Docs and config` job runs for code, action and extension changes, the automatic
+`docs: update generated READMEs` commit, docs-only `master` pushes, and included README changes. A
+Release Please branch update can trigger CI, Docs and Actionlint at the GitHub level, but their jobs
+skip those branches: the source commit has already passed validation, and the release workflow
+prepares generated READMEs and first-release pins. The benchmark-comment workflow skips them too.
+Pull requests that change only guide pages or other Markdown outside the included README paths skip
+the main CI workflow entirely.
 
 On `master`, a push made up only of `chore(master): release ...`,
 `chore: retire first-release pins`, and generated README commits skips unit and script tests,
 external-consumer tests, real-server integration, generator smoke tests and Engine comparison. The
 integration and generator gates accept these intentional skips. Build, lint, typecheck, Docs and
 config checks, and release processing still run when needed.
+
+Docs-only pushes also run Docs and config plus the release workflow after the required gates pass.
+This lets a documentation fix trigger release catch-up and rebase the open Release Please PRs without
+running plugin builds or tests.
 
 Before a push can release, the action, extension, integration and generator gates and the Docs and
 config job must pass. Plugin and repository code changes also require lint, typecheck, build,
