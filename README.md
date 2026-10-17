@@ -84,6 +84,7 @@ pnpm test
 | --- | --- |
 | `pnpm gen` | Create a new plugin (see below) |
 | `pnpm gen:action` | Create a new GitHub Action (see [Creating an action](docs/creating-an-action.md)) |
+| `pnpm gen:extension` | Create a new VS Code extension (see [Creating an extension](docs/creating-an-extension.md)) |
 | `pnpm build` | Build every plugin to `packages/*/build/*.wasm` |
 | `pnpm lint` | Biome (lint, formatting, import order) and the JSDoc check (`pnpm lint:fix` applies fixes) |
 | `pnpm lint:commits` | Check the last commit message against Conventional Commits, the way CI does |
