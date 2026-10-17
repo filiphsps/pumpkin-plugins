@@ -90,10 +90,7 @@ export function mergeJsonStringArray(
                 }
             }
         }
-        migrated = applyEdits(
-            source,
-            edits.sort((left, right) => left.offset - right.offset),
-        );
+        migrated = applySortedEdits(source, edits);
     }
 
     if (values.length === 0) return migrated;
@@ -141,30 +138,42 @@ function appendJsonArrayValues(
         const firstLineStart = firstChild ? source.lastIndexOf('\n', firstChild.offset - 1) + 1 : -1;
         const firstPrefix = firstChild ? source.slice(firstLineStart, firstChild.offset) : '';
         const itemIndent = firstChild && /^[\t ]*$/.test(firstPrefix) ? firstPrefix : `${closeIndent}${indentUnit}`;
-        const edits: Edit[] = [];
-        if (lastChild && !trailingComma) {
-            edits.push({ offset: lastChild.offset + lastChild.length, length: 0, content: ',' });
-        }
-        edits.push({
-            offset: closeLineStart,
-            length: 0,
-            content: `${itemIndent}${values.map((value) => JSON.stringify(value)).join(`,${eol}${itemIndent}`)}${trailingComma ? ',' : ''}${eol}`,
-        });
-        return applyEdits(
+        return appendArrayContent(
             source,
-            edits.sort((left, right) => left.offset - right.offset),
+            lastChild ? lastChild.offset + lastChild.length : undefined,
+            trailingComma !== undefined,
+            closeLineStart,
+            `${itemIndent}${values.map((value) => JSON.stringify(value)).join(`,${eol}${itemIndent}`)}${trailingComma ? ',' : ''}${eol}`,
         );
     }
 
+    return appendArrayContent(
+        source,
+        lastChild ? lastChild.offset + lastChild.length : undefined,
+        trailingComma !== undefined,
+        closeOffset,
+        `${values.map((value) => JSON.stringify(value)).join(',')}${trailingComma ? ',' : ''}`,
+    );
+}
+
+/** Adds an array separator when needed and applies its append edits in source order. */
+function appendArrayContent(
+    source: string,
+    lastValueEnd: number | undefined,
+    hasTrailingComma: boolean,
+    insertionOffset: number,
+    content: string,
+): string {
     const edits: Edit[] = [];
-    if (lastChild && !trailingComma) {
-        edits.push({ offset: lastChild.offset + lastChild.length, length: 0, content: ',' });
+    if (lastValueEnd !== undefined && !hasTrailingComma) {
+        edits.push({ offset: lastValueEnd, length: 0, content: ',' });
     }
-    edits.push({
-        offset: closeOffset,
-        length: 0,
-        content: `${values.map((value) => JSON.stringify(value)).join(',')}${trailingComma ? ',' : ''}`,
-    });
+    edits.push({ offset: insertionOffset, length: 0, content });
+    return applySortedEdits(source, edits);
+}
+
+/** Applies nonoverlapping JSONC edits from the end of the document toward the start. */
+function applySortedEdits(source: string, edits: Edit[]): string {
     return applyEdits(
         source,
         edits.sort((left, right) => left.offset - right.offset),

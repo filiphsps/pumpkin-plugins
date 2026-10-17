@@ -75,7 +75,7 @@ describe('migratePumpkinApiTs', () => {
         );
     });
 
-    it('preserves JSONC comments and skips WASI inference when esbuild cannot resolve the manifest', async () => {
+    it('preserves JSONC comments and infers WASI capabilities from the manifest', async () => {
         const source = `{
     // Keep this project note.
     "name": "example-plugin",
@@ -91,7 +91,7 @@ describe('migratePumpkinApiTs', () => {
         const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
         try {
             await fs.mkdir(path.join(root, 'src'), { recursive: true });
-            await fs.writeFile(path.join(root, 'src/plugin.ts'), 'export {};');
+            await fs.writeFile(path.join(root, 'src/plugin.ts'), "import 'wasi:http/outgoing-handler@0.2.3';\n");
             await fs.writeFile(path.join(root, 'package.json'), source);
             const report = await runCodemod(migratePumpkinApiTs, [root], { cwd: root });
             const result = report.changedFiles.find(({ relativePath }) => relativePath === 'package.json');
@@ -116,8 +116,9 @@ describe('migratePumpkinApiTs', () => {
                 entry: 'src/plugin.ts',
                 output: 'build/plugin.wasm',
                 engine: 'static-hermes',
+                wasi: ['http'],
             });
-            expect(report.messages.map(({ text }) => text).join('\n')).toContain('JSON does not support comments');
+            expect(report.messages.map(({ text }) => text).join('\n')).not.toContain('JSON does not support comments');
             expect(report.messages.map(({ text }) => text)).toContain(
                 'Review inferred pumpkinPlugin.wasi capabilities and any static-analysis notes before building.',
             );
@@ -164,6 +165,7 @@ describe('migratePumpkinApiTs', () => {
                     "import '@fixture/wasi-helper';",
                     "const lazy = import('wasi:filesystem/preopens@0.2.3');",
                     "const preopens = require('wasi:filesystem/preopens@0.2.3');",
+                    "import 'wasi:sockets/udp@0.2.3';",
                     'export { handle, Descriptor, Fields, lazy, preopens };',
                 ].join('\n'),
             );
@@ -204,11 +206,42 @@ describe('migratePumpkinApiTs', () => {
                 'custom',
                 'filesystem',
                 'sockets',
+                'udp',
             ]);
             expect(report.messages).toContainEqual({
                 relativePath: 'package.json',
                 text: 'Existing pumpkinPlugin.entry differs from the path in scripts.build; confirm which entry is correct.',
             });
+        } finally {
+            await fs.rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('suppresses shared-interface notes when a matching capability is inferred elsewhere', async () => {
+        const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
+        try {
+            await fs.mkdir(path.join(root, 'src'), { recursive: true });
+            await fs.writeFile(
+                path.join(root, 'src/plugin.ts'),
+                [
+                    "import 'wasi:io/streams@0.2.3';",
+                    "import 'wasi:sockets/network@0.2.3';",
+                    "import 'wasi:http/types@0.2.3';",
+                    "import 'wasi:sockets/tcp@0.2.3';",
+                ].join('\n'),
+            );
+            await fs.writeFile(
+                path.join(root, 'package.json'),
+                JSON.stringify({
+                    dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
+                    pumpkinPlugin: { entry: 'src/plugin.ts', output: 'build/plugin.wasm' },
+                }),
+            );
+
+            const report = await runCodemod(migratePumpkinApiTs, [root], { cwd: root });
+            const packageChange = report.changedFiles.find(({ relativePath }) => relativePath === 'package.json');
+            expect(parse(packageChange?.after ?? '').pumpkinPlugin.wasi).toEqual(['http', 'sockets']);
+            expect(report.messages.some(({ text }) => text.includes('is shared by'))).toBe(false);
         } finally {
             await fs.rm(root, { recursive: true, force: true });
         }
@@ -400,6 +433,35 @@ describe('migratePumpkinApiTs', () => {
         });
     });
 
+    it('uses the legacy entry when an existing configured entry is not a string', async () => {
+        const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
+        try {
+            await fs.mkdir(path.join(root, 'src'), { recursive: true });
+            await fs.writeFile(path.join(root, 'src/legacy.ts'), "import 'wasi:http/types@0.2.3';\n");
+            await fs.writeFile(
+                path.join(root, 'package.json'),
+                JSON.stringify({
+                    scripts: { build: 'pumpkin-plugin-build src/legacy.ts build/plugin.wasm' },
+                    dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
+                    pumpkinPlugin: { entry: 42, wasi: ['custom'] },
+                }),
+            );
+
+            const report = await runCodemod(migratePumpkinApiTs, [root], { cwd: root });
+            const packageChange = report.changedFiles.find(({ relativePath }) => relativePath === 'package.json');
+            expect(parse(packageChange?.after ?? '').pumpkinPlugin).toMatchObject({
+                entry: 'src/legacy.ts',
+                wasi: ['custom', 'http'],
+            });
+            expect(report.messages).toContainEqual({
+                relativePath: 'package.json',
+                text: 'Existing pumpkinPlugin.entry is not a string; replaced it with the path from scripts.build.',
+            });
+        } finally {
+            await fs.rm(root, { recursive: true, force: true });
+        }
+    });
+
     it('keeps legacy build commands with unsupported paths for manual review', async () => {
         const commands = [
             'pumpkin-plugin-build /outside/plugin.ts build/plugin.wasm',
@@ -453,6 +515,11 @@ describe('migratePumpkinApiTs', () => {
     it('leaves shell expansions, command chains, flags and other launchers for manual review', async () => {
         const commands = [
             'pnpm exec pumpkin-plugin-build "$ENTRY" "$OUTPUT"',
+            'pnpm exec pumpkin-plugin-build src/*.ts build/plugin.wasm',
+            'pnpm exec pumpkin-plugin-build ~/plugin.ts build/plugin.wasm',
+            'pnpm exec pumpkin-plugin-build src/{plugin,main}.ts build/plugin.wasm',
+            'pnpm exec pumpkin-plugin-build src/!(test).ts build/plugin.wasm',
+            'pnpm exec pumpkin-plugin-build "src/`echo plugin`.ts" build/plugin.wasm',
             'pnpm exec pumpkin-plugin-build src/plugin.ts build/plugin.wasm && echo done',
             'pnpm exec pumpkin-plugin-build --entry src/plugin.ts build/plugin.wasm',
             'npx pumpkin-plugin-build src/plugin.ts build/plugin.wasm',
