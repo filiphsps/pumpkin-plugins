@@ -891,6 +891,14 @@ jobs:
                     (
                       needs.changes.outputs.code != 'true' &&
                       (
+                        needs.changes.outputs.actions_to_test == '[]' ||
+                        needs.test.result == 'success' ||
+                        (
+                          needs.changes.outputs.skip_expensive_checks == 'true' &&
+                          needs.test.result == 'skipped'
+                        )
+                      ) &&
+                      (
                         needs.changes.outputs.actions != '[]' ||
                         needs.changes.outputs.extensions != '[]' ||
                         (

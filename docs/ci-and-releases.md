@@ -121,9 +121,10 @@ The classifier scopes checks this way:
   run after their gates pass. That release run catches up pending merged releases and updates and
   prepares every open release PR. Mixed changes run checks for their code or action changes as well.
 - Changes under `actions/{name}/` and `extensions/{name}/` are selected separately from plugin and
-  repository code. An action-only or extension-only change skips the plugin build, integration
-  suites and repository test jobs; CI calls the matching reusable workflow for each changed
-  component. Changes to a shared action helper test `actions/common/` and all four public consumers.
+  repository code. Both skip the plugin build and integration suites; CI calls the matching reusable
+  workflow for each changed component. Action code changes also run the full coverage job so the
+  tooling gate receives a complete report; extension-only changes skip that job. Changes to a shared
+  action helper test `actions/common/` and all four public consumers.
   Action tests live beside the implementation in `actions/{name}/src/*.test.mjs`, and shared-helper
   tests live in `actions/common/src/*.test.mjs`. The `common` helper isn't a release component.
   README, changelog and version-file-only changes skip action tests.
@@ -162,7 +163,7 @@ running plugin builds or tests.
 
 Before a push can release, the action, extension, integration and generator gates and the Docs and
 config job must pass. Plugin and repository code changes also require lint, typecheck, build,
-external-consumer and unit test jobs. The release and pin-retirement commits above still require
+external-consumer and test jobs. Action code changes also require the coverage test job. The release and pin-retirement commits above still require
 lint, typecheck and build, while the integration gate requires the real-server suite only for
 relevant changes. Engine comparison runs separately and does not gate releases. Empty action and
 extension matrices pass their gates without running component tests, including for version-only

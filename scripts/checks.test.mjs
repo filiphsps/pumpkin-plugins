@@ -1172,7 +1172,7 @@ describe('action release prerequisites', () => {
                     docs: { result: 'success' },
                     build: { result: code === 'true' ? 'success' : 'skipped' },
                     'external-consumer': { result: code === 'true' ? 'success' : 'skipped' },
-                    test: { result: code === 'true' ? 'success' : 'skipped' },
+                    test: { result: 'success' },
                     'integration-gate': { result: 'success' },
                     'action-gate': { result },
                     'extension-gate': { result: 'success' },
@@ -1185,6 +1185,38 @@ describe('action release prerequisites', () => {
             });
         }
     }
+
+    // Failure inventory: action-only coverage can fail, cancel or skip while all other release
+    // gates pass; version-only action changes must still release without running coverage.
+    it('requires coverage for action-code releases and accepts version-only coverage skips', () => {
+        for (const result of ['success', 'failure', 'cancelled', 'skipped']) {
+            const needs = {
+                changes: {
+                    result: 'success',
+                    outputs: {
+                        code: 'false',
+                        actions: '["sign-pumpkin-plugin"]',
+                        actions_to_test: '["sign-pumpkin-plugin"]',
+                        extensions: '[]',
+                    },
+                },
+                test: { result },
+                docs: { result: 'success' },
+                'action-gate': { result: 'success' },
+                'extension-gate': { result: 'success' },
+                'integration-gate': { result: 'success' },
+                'generator-gate': { result: 'success' },
+            };
+            assert.equal(
+                evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }),
+                result === 'success',
+                result,
+            );
+            needs.changes.outputs.actions_to_test = '[]';
+            needs.test.result = 'skipped';
+            assert.equal(evaluate(ci.jobs.release.if, { github: { event_name: 'push' }, needs }), true);
+        }
+    });
 
     it('runs docs/config for version-only releases and common helper changes', () => {
         for (const [actions, actions_to_test] of [
@@ -1230,7 +1262,7 @@ describe('action release prerequisites', () => {
             const needs = {
                 changes: {
                     result: 'success',
-                    outputs: { code: 'false', actions: '[]', extensions: '["minecraft-terms"]' },
+                    outputs: { code: 'false', actions: '[]', actions_to_test: '[]', extensions: '["minecraft-terms"]' },
                 },
                 docs: { result: 'success' },
                 'action-gate': { result: 'success' },
