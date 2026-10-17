@@ -265,9 +265,6 @@ jobs:
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
-            - name: 📝 Regenerate READMEs
-              run: pnpm run readme
-
             # The first-release pin forces version 0.0.1, then must be removed before merge so the
             # release config check passes and Release Please can handle subsequent versions.
             - name: 🎉 Retire first-release pins
@@ -286,6 +283,9 @@ jobs:
             - name: 🔧 Sync starter API and builder ranges
               run: node scripts/sync-tool-template-versions.mjs
 
+            - name: 📝 Regenerate READMEs after syncing starter dependencies
+              run: pnpm run readme
+
             - name: 💾 Commit starter dependency range updates
               run: |
                   if git diff --quiet -- tools/create-pumpkin-plugin/templates; then
@@ -294,7 +294,10 @@ jobs:
                   fi
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git add -- tools/create-pumpkin-plugin/templates/typescript/package.json tools/create-pumpkin-plugin/templates/javascript/package.json
+                  git add -- \
+                      tools/create-pumpkin-plugin/templates/typescript/package.json \
+                      tools/create-pumpkin-plugin/templates/javascript/package.json \
+                      tools/create-pumpkin-plugin/README.md
                   git commit -m "fix(create-pumpkin-plugin): sync starter tool versions"
                   git push
 
@@ -309,7 +312,12 @@ jobs:
                   fi
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-                  git add -- README.md 'packages/*/README.md' 'actions/*/README.md' 'extensions/*/README.md'
+                  git add -- README.md \
+                      'packages/*/README.md' \
+                      'tools/*/README.md' \
+                      'tools/apis/*/README.md' \
+                      'actions/*/README.md' \
+                      'extensions/*/README.md'
                   git commit -m "docs: update generated READMEs"
                   git push
 
