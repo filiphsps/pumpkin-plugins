@@ -154,6 +154,80 @@ describe('bundled release commits', () => {
         );
     });
 
+    it('does not require built workspace dependency output when scanning public tool sources', async () => {
+        const root = mkdtempSync(join(tmpdir(), 'release-tool-imports-'));
+        try {
+            const codemodManifest = {
+                name: '@pumpkin-plugins/codemod',
+                publishConfig: { access: 'public' },
+                dependencies: { '@pumpkin-plugins/static-analysis': 'workspace:*' },
+            };
+            const analysisManifest = {
+                name: '@pumpkin-plugins/static-analysis',
+                publishConfig: { access: 'public' },
+                exports: {
+                    '.': { types: './dist/src/index.d.ts', import: './dist/src/index.js' },
+                },
+            };
+            const pluginManifest = {
+                name: 'plugin',
+                pumpkinPlugin: { entry: 'src/plugin.ts' },
+            };
+            mkdirSync(join(root, 'tools/codemod/src'), { recursive: true });
+            mkdirSync(join(root, 'tools/codemod/node_modules/@pumpkin-plugins/static-analysis'), {
+                recursive: true,
+            });
+            mkdirSync(join(root, 'tools/static-analysis'), { recursive: true });
+            mkdirSync(join(root, 'packages/plugin/src'), { recursive: true });
+            writeFileSync(
+                join(root, 'tsconfig.base.json'),
+                JSON.stringify({ compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler' } }),
+            );
+            writeFileSync(join(root, 'tools/codemod/package.json'), JSON.stringify(codemodManifest));
+            writeFileSync(join(root, 'tools/static-analysis/package.json'), JSON.stringify(analysisManifest));
+            writeFileSync(
+                join(root, 'tools/codemod/node_modules/@pumpkin-plugins/static-analysis/package.json'),
+                JSON.stringify(analysisManifest),
+            );
+            writeFileSync(
+                join(root, 'tools/codemod/src/entry.ts'),
+                "import { analyzeModuleGraph } from '@pumpkin-plugins/static-analysis';\n",
+            );
+            writeFileSync(join(root, 'packages/plugin/package.json'), JSON.stringify(pluginManifest));
+            writeFileSync(
+                join(root, 'packages/plugin/src/plugin.ts'),
+                "import { analyzeModuleGraph } from '@pumpkin-plugins/static-analysis';\n",
+            );
+
+            const fixturePackages = new Map([
+                ['@pumpkin-plugins/codemod', { path: 'tools/codemod', manifest: codemodManifest }],
+                ['@pumpkin-plugins/static-analysis', { path: 'tools/static-analysis', manifest: analysisManifest }],
+                ['plugin', { path: 'packages/plugin', manifest: pluginManifest }],
+            ]);
+            const boundary = commit('boundary', []);
+            const github = {
+                async *mergeCommitIterator() {
+                    yield boundary;
+                },
+            };
+            const release = bundledChangesPlugin(github, 'master', fixturePackages, {}, 500, () => {}, root);
+            const commitsByPath = { 'tools/codemod': [] };
+
+            await assert.doesNotReject(
+                release.preconfigure({ 'tools/codemod': {} }, commitsByPath, {
+                    'tools/codemod': { sha: boundary.sha },
+                }),
+            );
+            assert.deepEqual(commitsByPath['tools/codemod'], []);
+            assert.throws(
+                () => pluginReleaseInputs(fixturePackages, 'packages/plugin', root),
+                /Cannot resolve workspace import @pumpkin-plugins\/static-analysis from packages\/plugin\/src\/plugin.ts/,
+            );
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
     it('selects plugin releases from imported runtime modules, builder source, and relevant catalogs', () => {
         const inputs = pluginReleaseInputs(
             workspacePackages(repositoryRoot),

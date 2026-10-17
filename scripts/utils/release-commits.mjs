@@ -165,6 +165,7 @@ function collectSourceImports(file, packages, root, compilerOptions, inputs, vis
             if (catalogEntry) inputs.catalogs.add(catalogEntry);
         }
         if (specifier.startsWith('node:')) continue;
+        if (!followWorkspaceImports) continue;
 
         const resolution = ts.resolveModuleName(
             specifier,
