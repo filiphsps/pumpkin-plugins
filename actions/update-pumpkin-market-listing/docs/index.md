@@ -8,7 +8,7 @@ For a workflow example and the complete input list, see the [action README](../R
 
 Provide either `plugin-name` or `plugin-id`. The JSON metadata file uses Market field names; direct
 inputs can be layered over it and override the matching field. The `description` input sets the
-English description while preserving other translated descriptions. Use a metadata file when an
+`en-US` description while preserving other translated descriptions. Use a metadata file when an
 explicit empty value is needed because empty direct inputs are omitted.
 
 The default `patch` mode sends only supplied fields and leaves the rest of the listing unchanged.
