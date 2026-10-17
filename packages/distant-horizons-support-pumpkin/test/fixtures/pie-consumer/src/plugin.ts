@@ -3,7 +3,7 @@ import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import type { PluginMetadata } from 'pumpkin:plugin/metadata@0.1.0';
 import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
 import { Plugin, registerPlugin } from '@pumpkin-plugins/pumpkin-api';
-import { PieClient } from '@pumpkin-plugins/pumpkin-pie-api';
+import { PieClient, UnavailableError } from '@pumpkin-plugins/pumpkin-pie-api';
 
 const FIXTURE_NAME = 'DistantHorizonsPIEFixture';
 
@@ -75,6 +75,7 @@ class DistantHorizonsPieFixture extends Plugin {
             );
             this.stopVerification();
         } catch (error) {
+            if (error instanceof UnavailableError) return;
             logging.log('error', `${FIXTURE_NAME}: provider verification failed: ${String(error)}`);
             this.stopVerification();
         }
