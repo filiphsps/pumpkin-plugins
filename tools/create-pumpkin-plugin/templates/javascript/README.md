@@ -1,6 +1,9 @@
 # __PLUGIN_NAME__
 
-A minimal Pumpkin plugin written in JavaScript with TypeScript JSDoc checking.
+A minimal Pumpkin plugin written in JavaScript. JSDoc types let TypeScript check your code without
+changing the source language.
+
+Install the dependencies, check the plugin's types, then build its WebAssembly component:
 
 ```sh
 npm install
@@ -8,10 +11,11 @@ npm run typecheck
 npm run build
 ```
 
-On a fresh project, the first `typecheck` or `build` needs network access: `typecheck` fetches the API's
-pinned Pumpkin WIT with Git, and a Static Hermes build may also download pinned tools and prepare
-Hermes. See the [build guide](https://filiphsps.github.io/pumpkin-plugins/guides/building) and
-[Static Hermes Runtime guide](https://filiphsps.github.io/pumpkin-plugins/tools/static-hermes-runtime/README)
+The first `typecheck` fetches the Pumpkin WIT revision pinned by the API package, so Git and network
+access are needed unless that revision is already cached. The default Static Hermes build may also
+download its pinned tools and prepare Hermes. See the [build guide](https://filiphsps.github.io/pumpkin-plugins/guides/building)
+and [Static Hermes Runtime guide](https://filiphsps.github.io/pumpkin-plugins/tools/static-hermes-runtime/README)
 for prerequisites and cache options.
 
-The plugin targets the Pumpkin plugin WIT ABI `0.1.0`. Keep the API package and server ABI aligned when upgrading.
+The starter targets Pumpkin plugin WIT ABI `0.1.0`. The API package version and host ABI version are
+separate; when upgrading, choose an API package whose pinned ABI is supported by your Pumpkin server.

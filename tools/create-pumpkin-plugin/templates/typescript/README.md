@@ -1,6 +1,6 @@
 # __PLUGIN_NAME__
 
-A minimal Pumpkin plugin written in TypeScript.
+A minimal Pumpkin plugin written in TypeScript. Start here to check its types and build the WebAssembly component.
 
 ```sh
 npm install
@@ -8,10 +8,14 @@ npm run typecheck
 npm run build
 ```
 
-On a fresh project, the first `typecheck` or `build` needs network access: `typecheck` fetches the API's
-pinned Pumpkin WIT with Git, and a Static Hermes build may also download pinned tools and prepare
-Hermes. See the [build guide](https://filiphsps.github.io/pumpkin-plugins/guides/building) and
-[Static Hermes Runtime guide](https://filiphsps.github.io/pumpkin-plugins/tools/static-hermes-runtime/README)
+On a fresh project, these commands may need network access. `typecheck` fetches the Pumpkin WIT
+revision pinned by the API package. The first Static Hermes build may also download its pinned
+toolchain and prepare Hermes; later runs can reuse the cache. See the [build guide](https://filiphsps.github.io/pumpkin-plugins/guides/building)
+and [Static Hermes Runtime guide](https://filiphsps.github.io/pumpkin-plugins/tools/static-hermes-runtime/README)
 for prerequisites and cache options.
 
-The plugin targets the Pumpkin plugin WIT ABI `0.1.0`. Keep the API package and server ABI aligned when upgrading.
+This starter uses Pumpkin plugin WIT ABI `0.1.0`. The `@pumpkin-plugins/pumpkin-api` package
+provides that ABI's WIT definitions; when upgrading it, make sure the Pumpkin server you run uses
+the matching ABI. The API package version and WIT ABI version are separate. See the
+[ABI and runtime guide](https://filiphsps.github.io/pumpkin-plugins/plugin-api/abi-and-runtime) for
+compatibility details.

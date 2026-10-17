@@ -1,7 +1,7 @@
 {
     "name": "@pumpkin-plugins/pumpkin-pie-api",
     "version": "0.1.1",
-    "description": "Validated PumpkinPIE client, expansions and provider lifecycle",
+    "description": "PumpkinPIE client for protocol checks and placeholder expansion",
     "keywords": [
         "minecraft",
         "pumpkin",

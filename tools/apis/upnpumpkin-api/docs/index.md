@@ -1,24 +1,27 @@
 # UPnPumpkin plugin API
 
-`@pumpkin-plugins/upnpumpkin-api` lets one plugin request a leased port mapping from UPnPumpkin
-through Pumpkin plugin messages. It contains the message protocol, client, watcher, and helper for
-turning a successful mapping into a public URL.
+`@pumpkin-plugins/upnpumpkin-api` lets your plugin ask UPnPumpkin to make a local port reachable
+from the internet. It sends requests through Pumpkin plugin messages; UPnPumpkin handles router
+discovery and port mapping. The package provides the message protocol, a client, a watcher that
+keeps a request alive, and a helper for building a public URL when the port is open.
 
 ## Watch a mapping
 
-Create a `PortMapClient` with the plugin message sender, then create a `MappingWatcher` with a
-stable key, protocol, internal port, and description. Start the watcher after the plugin loads,
-call `tick()` from the plugin's task handler, and call `stop()` when unloading or when the web
-service no longer needs the port.
+Create a `PortMapClient` with your plugin's message sender, then pass it to a `MappingWatcher` along
+with a request, a state-change callback, and a clock. The request needs a key that stays the same
+for this mapping, the local port, its protocol (`tcp` or `udp`), and a description for the router.
+Start the watcher after your plugin loads and call `tick()` from its task handler. The first request
+happens immediately; later checks keep the request alive and report state changes through the
+callback.
 
-The watcher requests a mapping immediately and refreshes it while running. `openUrl` returns a URL
-only when the reported state contains a usable public address. When UPnPumpkin is not installed or
-has not loaded yet, the watcher reports an unavailable state; callers should handle it without
-blocking their own service from starting.
+Use `openUrl(state)` when you need an HTTP base URL for the mapped port. It returns a URL only for
+an `open` state; while the mapping is pending, failed, unknown, or UPnPumpkin is unavailable, it
+returns `undefined`. An unavailable state can mean UPnPumpkin isn't installed, hasn't loaded yet, or
+couldn't answer. Handle it without preventing your own service from starting, and use the state
+callback to update the URL when the mapping opens.
 
-When a watcher stops refreshing, UPnPumpkin eventually drops the request and closes its mapping.
-The server's `REQUEST_TTL_MS` constant in the [forwarder](../../../../packages/upnpumpkin/src/forwarder.ts)
-sets the inactivity window. UPnPumpkin also enforces the per-plugin limit configured by
-[`plugins.max_requests_per_plugin`](../../../../packages/upnpumpkin/README.md#configuration). Stop
-watchers when the port is no longer needed. The API package does not perform router discovery itself;
-the server-side plugin owns that network work.
+Call `stop()` when your plugin unloads or the service no longer needs the port. By default, this
+releases the mapping immediately; pass `{ releasePort: false }` only when you want UPnPumpkin to
+keep it temporarily. If your plugin stops unexpectedly, UPnPumpkin removes requests after five
+minutes without a refresh. It also limits how many ports each plugin can request, as configured by
+[`plugins.max_requests_per_plugin`](../../../../packages/upnpumpkin/README.md#configuration).

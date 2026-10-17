@@ -1,4 +1,5 @@
 # Minecraft terms
 
-The allay carries an amethyst shard to the smithing table. A creeper can explode near
-redstone, while a villager trades emeralds and a warden guards the ancient city.
+A villager traded an emerald for an amethyst shard. Nearby, a creeper exploded beside the
+redstone wiring, and the allay flew off with the dropped item as the warden approached from
+the ancient city.

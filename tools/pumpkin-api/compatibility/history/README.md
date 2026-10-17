@@ -1,9 +1,25 @@
 # Compatibility audit history
 
-The JSON files here preserve reviewed compatibility matrices that were active before a Pumpkin release or upstream WIT pin changed. Each snapshot is stored under its Pumpkin release and named with the upstream Git commit and the SHA-256 digest of the fetched WIT files:
+Use these snapshots to see which API compatibility decisions were reviewed for a particular
+Pumpkin release and upstream WIT revision. The refresh command keeps the previous reviewed matrix
+when the WIT revision changes, so you can compare it with the new candidate without losing the
+audit for the earlier revision.
+
+Each file is grouped by Pumpkin release and WIT package directory. Its name combines the upstream
+Git commit with the SHA-256 digest of the fetched WIT files:
 
 ```text
 <pumpkin-release>/<wit-subdirectory>/<commit>-<wit-sha256>.json
 ```
 
-Snapshots are immutable. The active matrix stays at `../v0.1.1.json` and may be updated while its Pumpkin release is current. Run `pnpm --filter @pumpkin-plugins/static-hermes-runtime compatibility:refresh` after changing `wit.lock.json`; the command archives the prior reviewed matrix before writing the new candidate.
+The commit identifies the pinned source revision; the digest identifies the exact WIT content used
+for the audit. Both are part of the path so snapshots remain distinguishable if content differs.
+Snapshots are immutable: refresh writes a new snapshot and refuses to replace an existing one with
+different content. The active matrix is `../v0.1.1.json`; it can be updated while that Pumpkin
+release is current.
+
+After changing `wit.lock.json`, run
+`pnpm --filter @pumpkin-plugins/static-hermes-runtime compatibility:refresh`. When the revision has
+changed, the command archives the previous matrix before writing the new candidate. It archives
+only a fully reviewed matrix, so resolve every pending compatibility decision and migration note
+before refreshing.

@@ -14,7 +14,7 @@ Minecraft terms and names, not PumpkinMC-specific terminology.
 pnpm add -D @pumpkin-plugins/cspell-dict-minecraft
 ```
 
-Add the package config to `cspell.config.yaml`:
+In your `cspell.config.yaml`, import the package config:
 
 ```yaml
 import:

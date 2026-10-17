@@ -2,7 +2,7 @@
     "name": "@pumpkin-plugins/upnpumpkin-api",
     "version": "0.1.0",
     "private": true,
-    "description": "Asks UPnPumpkin to open a port",
+    "description": "Request and release router port mappings through UPnPumpkin",
     "keywords": [
         "minecraft",
         "pumpkin",

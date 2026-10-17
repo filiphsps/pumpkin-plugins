@@ -1,27 +1,29 @@
 # Pumpkin plugin signing
 
-`@pumpkin-plugins/signing` signs and verifies Pumpkin `.wasm` components with Ed25519 metadata.
-Use `signWasm` and `verifyWasm` when integrating signing into repository tooling; the GitHub Actions
-provide a ready-made workflow step for release pipelines.
+`@pumpkin-plugins/signing` lets repository tooling sign and verify Pumpkin `.wasm` components with
+Ed25519. Call `signWasm` and `verifyWasm` directly when building your own tooling, or use the
+signing and verification GitHub Actions in a release workflow.
 
 ## Signed file contents
 
-Signing appends Pumpkin metadata and signature custom sections to the WebAssembly file. Verification
-checks the signature against the module bytes and embedded metadata and reports the signing key and
-release fields. Signing sections can be stripped or parsed when a tool needs to inspect or replace
-them. Existing signature sections are replaced when producing a new signature.
+Signing adds `pumpkin.metadata` and `wasm_signature` custom sections to the WebAssembly file. The
+signature covers the module bytes and embedded metadata. `verifyWasm` checks that signature and
+returns the public key and release metadata; compare that key with one you trust before accepting a
+file. Tools can inspect the sections or remove trailing signing sections, and signing replaces
+existing trailing signing sections before adding a new signature.
 
 ## Metadata IDs
 
-`signWasm` accepts `bigint` IDs across the host's signed 64-bit range. Safe integer `number` values
-are also accepted; unsafe numbers and values outside that range are rejected. `verifyWasm` returns
-`plugin_id`, `dev_id`, and `user_id` as `bigint` so their exact values survive JSON parsing. Convert
-them to `number` only when the value is within JavaScript's safe integer range.
+The metadata IDs `plugin_id`, `dev_id`, and `user_id` use the host's signed 64-bit range. Pass them
+to `signWasm` as `bigint`, or as `number` when they are safe integers; unsafe numbers and values
+outside that range are rejected. `verifyWasm` returns these IDs as `bigint` so JSON parsing preserves
+their exact values. Convert an ID to `number` only when it falls within JavaScript's safe integer
+range.
 
-The key is a 32-byte Ed25519 seed, represented in workflows as 64 hexadecimal characters. Keep the
-secret key in a protected secret store; publish the public key through a separately trusted channel
-so consumers can pin the expected signer. A valid signature proves the file matches its metadata,
-but trust depends on how the public key was obtained.
+The secret key is a 32-byte Ed25519 seed, written as 64 hexadecimal characters. Keep it in a
+protected secret store, and distribute the public key through a trusted channel so consumers can pin
+the expected signer. A valid signature shows that the file matches its embedded metadata; it does
+not establish that the signer is trusted.
 
-Use the action interface for one-file or manifest-based CI signing and verification. These helpers
-do not build plugins; sign the exact `.wasm` artifact produced by the build job.
+The actions support signing or verifying one file or a manifest of plugins in CI. They don't build
+plugins, so sign the exact `.wasm` artifact produced by your build job.

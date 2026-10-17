@@ -5,6 +5,9 @@ navigation:
 
 # Pumpkin codemods
 
-The `pumpkin-codemod` CLI previews and applies migrations to Pumpkin plugin source and project
-configuration. Review the [end-user guide](using-codemods.md) before migrating a plugin. To add a
-migration or change the runner, follow the [contributor and maintainer guide](authoring-codemods.md).
+Use `pumpkin-codemod` to preview migrations for a Pumpkin plugin's source and project
+configuration. It shows the proposed changes without writing files; pass `--write` to apply them.
+
+If you're updating a plugin, start with the [guide to using codemods](using-codemods.md). If you're
+adding a migration or changing how the CLI runs them, see the
+[contributor and maintainer guide](authoring-codemods.md).

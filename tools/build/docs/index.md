@@ -1,58 +1,66 @@
 # Plugin build tool
 
 `@pumpkin-plugins/build` turns a plugin's TypeScript entry point into a Pumpkin WebAssembly
-component. It bundles the plugin, adds the WASI imports declared by the package, componentizes the
-module with the repository's pinned toolchain, and can generate guest declarations for typechecking.
+component. It bundles the plugin, adds the WASI imports declared in the package configuration, and
+uses the selected engine to componentize the bundle with the repository's pinned toolchain. You can
+also use it to generate guest declarations for typechecking.
 
 ## Build a plugin
 
-Run `pnpm build` from a plugin package. The build configuration is the `pumpkinPlugin` object in
-that package's `package.json`; it identifies the entry point, output file, and requested WASI
-capabilities. The result is the configured `.wasm` file under the package's build directory.
-The optional `engine` setting defaults to `static-hermes`; set it to `quickjs` to build a QuickJS
-plugin. Both engines are supported, and current plugin packages use the Static Hermes default. Static
-Hermes is the WASI 2 backend described in the [runtime guide](../../static-hermes-runtime/README.md).
-It uses the lean runtime archive and Hades garbage collector by default. Set `staticHermesRuntime`
-to `"full"` to retain runtime source compilation, or set `STATIC_HERMES_ENABLE_LEAN_ARCHIVE=0` to
-disable the lean archive for builds. Set `staticHermesGc` to `"malloc"` to select malloc-managed GC.
+Run `pnpm build` from a plugin package. The `pumpkinPlugin` object in its `package.json` selects
+the entry point, output file, requested WASI capabilities, and optional engine. The output is the
+configured `.wasm` component under the package's build directory.
+
+The engine defaults to `static-hermes`; set it to `quickjs` to build with QuickJS. Both engines are
+supported, and current plugin packages use Static Hermes. Static Hermes is the WASI 2 backend
+described in the [runtime guide](../../static-hermes-runtime/README.md). It uses the lean runtime
+profile and Hades garbage collection by default. Set `staticHermesRuntime` to `"full"` to retain
+runtime source compilation, or set `STATIC_HERMES_ENABLE_LEAN_ARCHIVE=0` to select the full profile
+for builds. Set `staticHermesGc` to `"malloc"` to use malloc-managed garbage collection.
 
 The executable is compiled from TypeScript to `dist/cli.js`. Repository-wide build and typecheck
-commands compile it before consumers run. For a direct workspace package command after a fresh
-checkout, first run `pnpm --filter @pumpkin-plugins/static-hermes-runtime build` and
-`pnpm --filter @pumpkin-plugins/build build` from the repository root.
-Use `pumpkin-plugins-build --help` to list options and `--version` to show the installed tool version.
+commands compile it before consumers run. After a fresh checkout, build the runtime and CLI before
+running a direct workspace package command:
 
-Run the build command with `--types-only` to generate guest types without producing the component.
-Those declarations are consumed by TypeScript and the editor. They are build output, so edit the
-plugin source and package configuration rather than generated files.
+```sh
+pnpm --filter @pumpkin-plugins/static-hermes-runtime build
+pnpm --filter @pumpkin-plugins/build build
+```
+
+Run `pumpkin-plugins-build --help` to see the available options or `--version` to see the installed
+tool version.
+
+Run `pumpkin-plugins-build --types-only` to generate guest declarations without building the
+component. TypeScript and your editor consume these declarations. They are build output, so make
+changes in your plugin source and package configuration rather than editing the generated files.
 
 Pass `--parse-ts` to use Hermes's partial, unstable TypeScript parser when compiling a Static Hermes
-component bundle. The option is off by default and is unavailable with QuickJS.
+component bundle. The option is off by default and cannot be used with QuickJS.
 
-The build tool owns console output for both engines. It reports the entry point, selected runtime,
-componentization stage and final artifact size with a shared `[build]` prefix. Routine output from
-the QuickJS and Static Hermes toolchains is suppressed; failures include captured stderr diagnostics
-in the same format.
+The build tool reports progress for both engines with a shared `[build]` prefix, including the entry
+point, selected runtime, componentization stage, and final artifact size. It suppresses routine
+output from the QuickJS and Static Hermes toolchains; if a tool fails, its captured stderr appears
+in the build output.
 
-On an interactive terminal, the executable checks npm in the background and may print a notice when
-a newer builder release is available. The lookup uses a one-day cache; registry errors do not affect
-the build result. It is skipped for help and version output, CI, development mode
-(`PUMPKIN_DEV_MODE=1`), and non-interactive output. Pass `--no-update-notifier` or set
-`PUMPKIN_PLUGINS_NO_UPDATE_NOTIFIER=1` to opt out. When a notice appears, preview the release
-migration from the plugin directory with `pnpm dlx @pumpkin-plugins/codemod update-build .`.
+In an interactive terminal, the executable checks npm for a newer builder release in the background
+and may print an update notice. Results are cached for one day, and registry errors do not affect the
+build. The check is skipped for help and version output, CI, development mode (`PUMPKIN_DEV_MODE=1`),
+and non-interactive output. To opt out, pass `--no-update-notifier` or set
+`PUMPKIN_PLUGINS_NO_UPDATE_NOTIFIER=1`. If you see an update notice, preview the migration from the
+plugin directory with `pnpm dlx @pumpkin-plugins/codemod update-build .`.
 
 ## WASI capability metadata
 
 The builder and migration codemod use the shared, dependency-free
 [`@pumpkin-plugins/wasi-capabilities`](../../wasi-capabilities/README.md) package for capability names,
-WIT interfaces and the pinned WASI version. WASI capabilities describe required services; they do not
-infer Pumpkin permissions.
+WIT interfaces, and the pinned WASI version. These capabilities describe the services a plugin needs;
+they do not infer its Pumpkin permissions.
 
 ## Build constraints
 
 Static Hermes uses the pinned Pumpkin API WIT and WASI 2. Keep the workspace's Pumpkin API version
-aligned with the test harness server version. Requested WASI capabilities and Pumpkin permissions
-must match the APIs the plugin uses.
+aligned with the test harness server version. Declare the WASI capabilities and Pumpkin permissions
+required by the APIs your plugin uses.
 
-Identical source builds are not byte-for-byte reproducible. Signing or publishing workflows must
-use the exact artifact from the build job instead of rebuilding it later.
+Building the same source twice does not guarantee identical bytes. For signing or publishing, use
+the exact artifact produced by the build job instead of rebuilding it later.

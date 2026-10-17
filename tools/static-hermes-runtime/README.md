@@ -119,10 +119,10 @@ precompiled Hermes bytecode; full also retains runtime source compilation, inclu
 combined with QuickJS. The wasm32 WASI build has threads disabled, so Hades uses incremental
 collection.
 
-Build the plugin with:
+To build your plugin, replace `my-plugin` with its package name from `package.json`:
 
 ```sh
-pnpm --filter <plugin-package-name> build
+pnpm --filter @pumpkin-plugins/my-plugin build
 ```
 
 Static Hermes builds prepare the toolchain automatically when required.

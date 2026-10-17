@@ -8,16 +8,16 @@ navigation:
 
 # Adding codemods
 
-Codemods in `@pumpkin-plugins/codemod` use a small per-file contract. A codemod selects supported
-paths relative to the runner's working directory, receives each file's original text, and returns
-the transformed text with optional review notes.
+Codemods in `@pumpkin-plugins/codemod` follow a small per-file contract: each one selects the paths
+it understands, transforms a file's text, and can return notes for the person reviewing the result.
+Paths are relative to the directory where the runner starts.
 
 ## Add a migration
 
-1. Write tests for the expected changes and failure cases in `src/codemods/<name>.test.ts`.
-2. Add the transform in `src/codemods/<name>.ts` using `CodemodDefinition` from `src/types.ts`.
-3. Register it in `src/codemods/index.ts`. The CLI list and generated documentation catalog read this registry.
-4. Add migration-specific usage and review guidance to the user guide when it is ready for users.
+1. Add tests for the expected changes and failure cases in `src/codemods/<name>.test.ts`.
+2. Implement the transform in `src/codemods/<name>.ts` using `CodemodDefinition` from `src/types.ts`.
+3. Register it in `src/codemods/index.ts`. The CLI list and generated documentation catalog use this registry.
+4. When users can run the migration, add its usage and review guidance to the end-user guide.
 
 A transform has this shape:
 
@@ -36,34 +36,35 @@ This example is for plain-text files where `old-` at the start of a line is the 
 Raw replacements can also alter comments and string values in source code; use syntax-aware matching
 for JavaScript and TypeScript.
 
-Builder-release migrations are registered in `src/codemods/build-migrations.ts` with the first
-published builder version that requires each change. Add an entry only for a verified consumer
-change in that release, and add focused tests for its behavior and repeat-run idempotence. The
-`update-build` workflow selects entries in semver order only when their release version is newer
-than the installed builder and no newer than npm's target release. Keep the registry empty when no
-published release requires a migration; do not add placeholders.
+Builder-release migrations go in `src/codemods/build-migrations.ts`. Each entry names the first
+published builder version that requires the consumer change. Add an entry only when you have
+verified that release needs it, and test both the change and repeat-run idempotence. The
+`update-build` workflow selects migrations newer than the installed builder and no newer than the
+latest version fetched from npm, then applies them in version order. Leave the registry empty until
+a published release requires a migration; don't add placeholders.
 
 The ID becomes a CLI argument, so keep it unique and stable. `matchesFile` receives a slash-separated
-path relative to the runner's current working directory, which is where the CLI was invoked. For
-example, a source file is reported relative to the plugin directory when invoked there, or relative
-to its repository path when invoked from the monorepo root. A transform should return the original
-text when it has nothing to change. The runner treats identical output as unchanged.
+path relative to the runner's working directory—the directory where the CLI was invoked. A source
+file therefore has a plugin-relative path when you invoke the CLI from that plugin, and a
+repository-relative path when you invoke it from the monorepo root. Return the original text when
+there's nothing to change; the runner treats identical output as unchanged.
 
 ## Preserve source and make the transform safe to repeat
 
-Prefer syntax-aware matching for JavaScript and TypeScript. For text-preserving changes, use AST
-source spans and replace only the relevant text. The Pumpkin API migration uses the TypeScript
-parser for module specifiers and `jsonc-parser` edits for `package.json` and `tsconfig.json`.
+For JavaScript and TypeScript, prefer syntax-aware matching. When you need to preserve formatting,
+comments, and unrelated text, use AST source spans to replace only the relevant part. The Pumpkin
+API migration parses module specifiers with the TypeScript parser and edits `package.json` and
+`tsconfig.json` with `jsonc-parser`.
 
-Keep formatting, comments, unrelated settings and custom commands. Do not add dependencies or config
-fields unless the transform has enough information to set valid values. When a transform cannot
-finish safely, leave that file unchanged and return a `messages` entry explaining the manual step.
-Test that a second run makes no further changes.
+Preserve formatting, comments, unrelated settings, and custom commands. Only add dependencies or
+configuration fields when the transform has enough information to give them valid values. If it
+can't finish safely, leave the file unchanged and return a `messages` entry that explains what the
+user needs to do manually. Test that a second run makes no further changes.
 
-The runner discovers regular files recursively, skipping child directories named `.git`, `.cache`,
-`.turbo`, `build`, `coverage`, `dist`, and `node_modules`. An explicitly supplied directory is
-scanned even if its name is on that list. Symlinked files and directories are ignored. A transform
-can return notes through `TransformResult.messages`; the CLI prints them beside the file path.
+The runner finds regular files recursively. It skips child directories named `.git`, `.cache`,
+`.turbo`, `build`, `coverage`, `dist`, or `node_modules`, but scans a directory you explicitly pass
+even when its name is on that list. It ignores symlinks. Return review notes through
+`TransformResult.messages`; the CLI prints each note with its file path.
 
 ## Test and build
 
@@ -75,16 +76,17 @@ pnpm turbo run typecheck --filter=@pumpkin-plugins/codemod
 pnpm turbo run build --filter=@pumpkin-plugins/codemod
 ```
 
-After changing the codemod registry or `engines.node`, regenerate the README and user guide with
+After changing the codemod registry or `engines.node`, regenerate the README and end-user guide with
 `pnpm turbo run readme --filter=@pumpkin-plugins/codemod`. Their codemod catalog and Node.js
-requirement are generated from the registry and `package.json`.
+requirement come from the registry and `package.json`.
 
-The package exposes `runCodemod`, the `CodemodDefinition` types and the bundled `codemods` registry
-from its root entry point. The CLI accepts a codemod ID, paths, `--write` and `--print`. Keep the
-end-user guide, tests and package behavior in sync when changing these contracts.
+The package root exports `runCodemod`, the `CodemodDefinition` types, and the `codemods` registry.
+The CLI accepts a codemod ID and optional paths; `--write` applies changes, and `--print` displays
+the full transformed contents. Keep the end-user guide, tests, and package behavior in sync when
+you change these contracts.
 
-Public tool package changes also need `pnpm check` from the repository root to validate release
-registration, package metadata and documentation. Run `pnpm test:external-consumer` to pack the
-tools, install them outside the workspace and run `pumpkin-codemod list` to verify the published CLI
-entry point. The supported Node and pnpm versions and CI workflow are documented in
+For changes to this public tool package, run `pnpm check` from the repository root to validate
+release registration, package metadata, and documentation. Run `pnpm test:external-consumer` to
+pack the tools, install them outside the workspace, and run `pumpkin-codemod list` to verify the
+published CLI entry point. The supported Node and pnpm versions and CI workflow are documented in
 [CI and releases](../../../docs/ci-and-releases.md).

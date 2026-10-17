@@ -1,15 +1,17 @@
 # Pumpkin test harness
 
-`@pumpkin-plugins/test-harness` starts a real Pumpkin server in a temporary directory for Vitest
-integration tests. Use it to verify behavior that unit tests with fakes cannot establish, including
-plugin loading, permissions, commands, network bindings, and runtime compatibility.
+Use `@pumpkin-plugins/test-harness` when an integration test needs to exercise a plugin inside a real
+Pumpkin server. This can verify behavior that a unit test with fakes can't establish, such as plugin
+loading, permissions, commands, network bindings, and runtime compatibility. The harness creates a
+fresh temporary server directory for each instance, so tests don't share server state.
 
 ## Start a test server
 
-Build the plugin first, then point the harness at its `.wasm` artifact and start Pumpkin from the
-test. The harness resolves the pinned server release, creates a temporary server directory, waits
-for the ready log, and exposes ports, plugin data paths, command input, and captured logs through
-the returned instance.
+Build the plugin first. `builtPluginPath()` reads the artifact path from the package's
+`pumpkinPlugin.output` setting and gives you an error that points to `pnpm build` if the artifact is
+missing. Pass that path to `startPumpkin()`; the harness resolves the pinned Pumpkin release, creates
+a temporary server directory, and waits for the server's ready log before returning. The instance
+then gives you the server ports, plugin data paths, command input, and captured logs.
 
 ```ts
 import { builtPluginPath, startPumpkin } from '@pumpkin-plugins/test-harness';
@@ -27,7 +29,12 @@ try {
 }
 ```
 
-The exact `StartOptions` fields and log helpers are in the generated API reference. `stop()` asks
-Pumpkin to exit, saves logs when configured, and removes the temporary directory unless
-`PUMPKIN_KEEP_DIR` is set. `PUMPKIN_BIN` can select a local server binary; `PUMPKIN_TEST_LOG_DIR`
-can retain test logs outside the temporary server directory.
+Always stop the instance in a `finally` block so Pumpkin exits and the temporary directory is
+removed, even when an assertion fails. Set `PUMPKIN_KEEP_DIR` to keep that directory for debugging;
+set `PUMPKIN_TEST_LOG_DIR` to save a copy of each server log outside it. By default, the harness
+downloads the pinned server binary into `.cache/pumpkin` and verifies its checksum. Set
+`PUMPKIN_BIN` to use an existing local binary, or `PUMPKIN_CACHE_DIR` to change the download cache.
+
+See the [testing guide](../../../docs/testing.md) for the repository's integration-test setup, and
+the [generated API reference](/api/tools/@pumpkin-plugins/test-harness/) for `StartOptions` and the
+instance's log helpers.

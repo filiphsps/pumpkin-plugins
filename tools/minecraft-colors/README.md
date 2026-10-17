@@ -4,7 +4,7 @@
 [![latest npm release](https://img.shields.io/npm/v/%40pumpkin-plugins%2Fminecraft-colors?label=latest%20release)](https://www.npmjs.com/package/@pumpkin-plugins/minecraft-colors)
 [![npm license](https://img.shields.io/npm/l/%40pumpkin-plugins%2Fminecraft-colors)](https://www.npmjs.com/package/@pumpkin-plugins/minecraft-colors)
 
-Chalk-like formatting for Minecraft strings, with no runtime dependencies.
+Format Minecraft chat text and server-console output with familiar Chalk-style color chains. The package has no runtime dependencies.
 
 ```ts
 import { ansi, color, colorTable, minecraftColorTable } from '@pumpkin-plugins/minecraft-colors';

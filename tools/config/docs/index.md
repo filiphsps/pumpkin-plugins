@@ -1,19 +1,15 @@
 # Plugin configuration library
 
-`@pumpkin-plugins/config` lets a plugin declare settings once and derives typed values, a managed
-TOML file, validation, schema upgrades, and README configuration output from that schema.
+Use `@pumpkin-plugins/config` to describe a plugin's settings once. From that schema, the library
+builds typed values, manages a TOML file, validates changes, and produces the configuration section
+for the plugin's README. The library handles the config data; your plugin supplies the small storage
+adapter that reads and writes its data file.
 
 ## Declare settings
 
-Use `bool`, `int`, and `str` fields inside fixed `section` groups or named `table` entries. Defaults
-are written for fresh installs; fields without defaults are optional. Integer bounds, string checks,
-examples, and migrations from old keys belong on the field declaration. Integer bounds must be safe
-whole numbers in ascending order, and any integer default or example must fall within them.
-String defaults and examples must pass their check and are stored in normalized form.
-Default objects and arrays are copied recursively whenever config values are created. Custom fields
-can use TOML scalars (including `bigint`), plain tables, dense arrays, and `Date` values. Root
-`undefined` is reserved for the optional-default sentinel; nested `undefined`, `null`, functions,
-symbols, symbol-keyed table entries, cycles, and other JavaScript object types are rejected.
+Use `bool`, `int`, and `str` for individual settings. Put fixed groups of settings in `section` and
+use named `table` entries when users need to add their own groups, such as per-file overrides.
+Defaults apply to new files; omit a default to make a field optional.
 
 ```ts
 import { bool, defineConfig, int, section } from '@pumpkin-plugins/config';
@@ -29,19 +25,30 @@ export const configSchema = defineConfig('ExamplePlugin', {
 });
 ```
 
-Pass the schema and a small storage adapter to `loadConfig`. The library does not access the
-filesystem itself. Plugins normally adapt their data folder and use the returned typed values.
+Set integer bounds to safe whole numbers in ascending order; any integer default or example must
+fall within those bounds. String checks can validate values and normalize accepted input. Defaults,
+examples, and values read from the file all use the normalized form. You can also set `migrateFrom`
+on a field to copy a value from an older key when the new key is absent; the new field's validation
+still applies.
 
-## File and validation behavior
+For custom fields, defaults can use TOML values: scalars (including `bigint`), plain tables, dense
+arrays, and `Date` values. The library copies tables, arrays, and dates when it creates config
+values, so changing one result won't affect another. Root `undefined` marks an optional field;
+nested `undefined`, `null`, functions, symbols, symbol-keyed table entries, cycles, and other
+JavaScript object types aren't supported.
 
-On first load, the library writes defaults. It adds new settings, removes keys no longer in the
-schema, and preserves user values. Invalid values fall back to defaults with a warning while the
-file remains untouched. Invalid TOML raises `ConfigSyntaxError` with a location and does not
-rewrite the file. When a setting is renamed, `migrateFrom` can seed its new key from an old one.
+## Load and maintain the file
 
-The same schema can produce the README options table and a fresh-install TOML example, so plugin
-settings and their documentation share one source.
+Pass the schema and a storage adapter to `loadConfig`. The library doesn't access the filesystem
+itself; your plugin connects the adapter to its data folder and uses the returned typed values.
 
-Initial entries supplied through `table({ defaults })` include defaults for omitted fields. Fields
-without defaults remain absent. After the file is created, users can remove an entry or the whole
-table; reading an existing file does not restore removed table defaults.
+On first load, the library writes the defaults. On later loads, it keeps valid user values, fills
+in missing settings that have defaults, and removes keys the schema no longer recognizes. Invalid
+values use defaults where available, produce a warning, and leave the file untouched so users can
+correct it. Invalid TOML raises `ConfigSyntaxError` with a location and doesn't rewrite the file.
+
+The same schema can produce the README options table and a TOML example for a fresh install, keeping
+the documented settings in sync with the file. With `table({ defaults })`, initial entries and
+defaults for their omitted fields appear in a fresh file; fields without defaults stay absent.
+Users can remove an entry or the whole table later, and loading an existing file doesn't restore
+those table defaults.
