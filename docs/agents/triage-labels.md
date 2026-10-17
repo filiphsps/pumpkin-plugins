@@ -1,20 +1,18 @@
 ---
 title: "Triage labels"
-description: "Mapping triage roles to the labels used in this repository"
+description: "Maps triage skill labels to this repository's GitHub labels"
 ---
 
-# Triage Labels
+# Triage labels
 
-The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker.
+The `triage` skill uses the labels in the first column. When it asks you to apply one, choose the matching GitHub label from the second column.
 
-| Label in mattpocock/skills | Label in our tracker | Meaning                                  |
-| -------------------------- | -------------------- | ---------------------------------------- |
-| `needs-triage`             | `status: needs triage` | Maintainer needs to evaluate this issue  |
-| `needs-info`               | `status: needs info`   | Waiting on reporter for more information |
-| `ready-for-agent`          | `ready-for-agent`    | Fully specified, ready for an AFK agent  |
-| `ready-for-human`          | `ready-for-human`    | Requires human implementation            |
-| `wontfix`                  | `wontfix`            | Will not be actioned                     |
+| Skill label       | GitHub label         | Use it when                                      |
+| ----------------- | -------------------- | ------------------------------------------------ |
+| `needs-triage`    | `status: needs triage` | The issue still needs classification, an owner, or a priority. |
+| `needs-info`      | `status: needs info`   | You’re waiting for the reporter or author to provide details. |
+| `ready-for-agent` | `ready-for-agent`     | The issue is clear enough for an unattended agent. |
+| `ready-for-human` | `ready-for-human`     | The issue needs a person to implement it.        |
+| `wontfix`         | `wontfix`             | The team has decided not to work on it.          |
 
-When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
-
-Edit the "Label in our tracker" column to match whatever vocabulary you actually use.
+Use the exact spelling in the GitHub label column, including spaces and prefixes. The names come from [`.github/labels.yml`](../../.github/labels.yml). If a label changes, update this table and the mapping summary in `AGENTS.md`.

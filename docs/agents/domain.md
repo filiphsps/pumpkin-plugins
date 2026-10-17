@@ -1,56 +1,49 @@
 ---
 title: "Agent domain docs"
-description: "How engineering skills use glossary and ADR documentation"
+description: "How agents use glossaries and ADRs to keep terms and decisions aligned"
 ---
 
-# Domain Docs
+# Domain docs for agents
 
-How the engineering skills should consume this repo's domain documentation when exploring the codebase.
+Use the glossary to keep domain language consistent, and check relevant ADRs before proposing or changing an architectural decision.
 
-## Before exploring, read these
+## Before you explore
 
-- **`GLOSSARY.md`** at the repo root, or
-- **`GLOSSARY-MAP.md`** at the repo root if it exists: it points at one `GLOSSARY.md` per context. Read each one relevant to the topic.
-- **`docs/adr/`**: read ADRs that touch the area you're about to work in. In multi-context repos, also check `src/<context>/docs/adr/` for context-scoped decisions.
+1. Check the repository root for `GLOSSARY-MAP.md`. If it exists, read it and then read the glossary files for the contexts relevant to your work. Otherwise, read the root `GLOSSARY.md` if it exists.
+2. Read the ADRs in `docs/adr/` that cover the area you're working on. In a multi-context repository, also check `src/<context>/docs/adr/` for decisions scoped to the relevant contexts.
 
-If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
+Missing files don't block the work. Continue without calling out their absence or proposing their creation before there's a term or decision to record. The `/domain-modeling` skill, called by `/grill-with-docs` and `/improve-codebase-architecture`, creates a glossary when a term needs recording and offers an ADR only for a choice that's hard to reverse, surprising without context, and came from a real tradeoff.
 
-## File structure
+## Common layouts
 
-Single-context repo (most repos):
+In a single-context repository, the glossary and ADRs usually sit at the root:
 
-```
+```text
 /
 ├── GLOSSARY.md
-├── docs/adr/
-│   ├── 0001-event-sourced-orders.md
-│   └── 0002-postgres-for-write-model.md
+├── docs/
+│   └── adr/
 └── src/
 ```
 
-Multi-context repo (presence of `GLOSSARY-MAP.md` at the root):
+A root `GLOSSARY-MAP.md` signals a multi-context repository. It points to each context's glossary; ADRs can be system-wide or scoped to one context:
 
-```
+```text
 /
 ├── GLOSSARY-MAP.md
-├── docs/adr/                          ← system-wide decisions
+├── docs/adr/              # system-wide decisions
 └── src/
-    ├── ordering/
-    │   ├── GLOSSARY.md
-    │   └── docs/adr/                  ← context-specific decisions
-    └── billing/
+    └── <context>/
         ├── GLOSSARY.md
-        └── docs/adr/
+        └── docs/adr/      # context-specific decisions
 ```
 
-## Use the glossary's vocabulary
+## Use the glossary's terms
 
-When your output names a domain concept (in an issue title, a refactor proposal, a hypothesis, a test name), use the term as defined in `GLOSSARY.md`. Don't drift to synonyms the glossary explicitly avoids.
+When you name a domain concept in an issue title, refactor proposal, hypothesis, or test name, use the glossary's preferred term. Avoid synonyms it explicitly rules out.
 
-If the concept you need isn't in the glossary yet, that's a signal: either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
+If you need a concept the glossary doesn't define, check whether you're inventing a term the project doesn't use or documenting a genuine gap. Reconsider the invented term; note a real gap for the domain-modeling skill.
 
-## Flag ADR conflicts
+## Surface meaningful ADR conflicts
 
-If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
-
-> _Contradicts ADR-0007 (event-sourced orders), but worth reopening because…_
+If a proposed change conflicts with an ADR strongly enough to warrant revisiting it, name the ADR and explain why. Don't list theoretical alternatives that don't create real friction.
