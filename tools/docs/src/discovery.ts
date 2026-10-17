@@ -2,7 +2,7 @@ import { type Dirent, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
 /** Repository component kinds with package or GitHub Action metadata. */
-export type ComponentGroup = 'packages' | 'tools' | 'actions' | 'extensions';
+export type ComponentGroup = 'packages' | 'tools' | 'actions' | 'extensions' | 'native';
 
 /** A discovered component; callers decide whether they need source files, READMEs or other metadata. */
 export interface SourceComponent {
@@ -26,7 +26,8 @@ function isDirectoryEntry(directory: string, entry: Dirent): boolean {
 export function discoverComponents(root: string, group: ComponentGroup): SourceComponent[] {
     const base = resolve(root, group);
     if (!existsSync(base)) return [];
-    const names = group === 'actions' ? ['action.yml', 'action.yaml'] : ['package.json'];
+    const names =
+        group === 'actions' ? ['action.yml', 'action.yaml'] : group === 'native' ? ['Cargo.toml'] : ['package.json'];
     const componentIn = (directory: string): SourceComponent | undefined => {
         const metadataFile = names.map((name) => join(directory, name)).find((file) => existsSync(file));
         return metadataFile

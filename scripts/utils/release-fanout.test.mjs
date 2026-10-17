@@ -64,6 +64,7 @@ it('routes a previously created codemod release for its commit to npm publishing
         actionPaths: [],
         toolPaths: ['tools/codemod'],
         extensionPaths: [],
+        nativePaths: [],
     });
 });
 
@@ -152,6 +153,7 @@ it('limits a manual release replay to npm packages at the requested release comm
         actionPaths: [],
         toolPaths: ['tools/codemod'],
         extensionPaths: [],
+        nativePaths: [],
     });
 });
 
@@ -219,16 +221,32 @@ it('writes every release output that the release workflow reads', () => {
     assert.ok(readKeys.some(({ output, key }) => output === 'release_metadata' && key === 'tag_name'));
 
     const release = { ...upnpumpkinRelease, sha: 'a'.repeat(40), path: 'packages/upnpumpkin', version: '0.0.8' };
-    const outputs = releaseOutputs([release], {
+    const nativeRelease = {
+        tagName: 'pumpkin-plus-plus-v0.1.0',
+        sha: 'b'.repeat(40),
+        path: 'native/pumpkin-plus-plus',
+        version: '0.1.0',
+    };
+    const outputs = releaseOutputs([release, nativeRelease], {
         pluginPaths: ['packages/upnpumpkin'],
         actionPaths: [],
         toolPaths: [],
         extensionPaths: [],
+        nativePaths: ['native/pumpkin-plus-plus'],
     });
 
     for (const name of readOutputs) assert.equal(typeof outputs[name], 'string', `${name} must be a string output`);
     assert.deepEqual(JSON.parse(outputs.paths_released), ['packages/upnpumpkin']);
-    assert.equal(outputs.release_count, '1');
+    assert.deepEqual(JSON.parse(outputs.native_paths_released), ['native/pumpkin-plus-plus']);
+    assert.deepEqual(JSON.parse(outputs.native_releases), [
+        {
+            path: nativeRelease.path,
+            tagName: nativeRelease.tagName,
+            sha: nativeRelease.sha,
+            version: nativeRelease.version,
+        },
+    ]);
+    assert.equal(outputs.release_count, '2');
     for (const { output, key } of readKeys) {
         assert.ok(
             JSON.parse(outputs[output])[`${release.path}--${key}`],

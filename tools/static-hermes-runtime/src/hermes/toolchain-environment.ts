@@ -46,6 +46,7 @@ interface WasiSdkReleaseAsset {
 
 interface WasiSdkRelease {
     assets?: WasiSdkReleaseAsset[];
+    tag_name?: string;
 }
 
 /** Inputs for downloading, verifying, and installing a pinned WASI SDK archive. */
@@ -482,7 +483,8 @@ async function installPinnedWasmTools({
         fs.writeFileSync(archive, bytes);
         fs.mkdirSync(extraction, { recursive: true });
         fs.mkdirSync(path.join(staging, 'bin'), { recursive: true });
-        execFileSync('tar', ['-xf', archive, '--strip-components=1', '-C', extraction], { stdio: 'inherit' });
+        const tar = wasmToolsArchiveInvocation(installationDirectory, platform);
+        execFileSync(tar.executable, tar.args, { cwd: tar.cwd, stdio: 'inherit' });
         const binaryName = platform === 'win32' ? 'wasm-tools.exe' : 'wasm-tools';
         const extractedBinary = path.join(extraction, binaryName);
         if (!fs.existsSync(extractedBinary)) throw new Error(`${asset.name} did not contain ${binaryName}`);
@@ -502,6 +504,25 @@ async function installPinnedWasmTools({
     } finally {
         fs.rmSync(installationDirectory, { recursive: true, force: true });
     }
+}
+
+/**
+ * Builds a platform-specific wasm-tools archive extractor invocation.
+ *
+ * @param installationDirectory - Temporary directory used as the extractor working directory.
+ * @param platform - Selects the Windows system extractor or `tar` from `PATH`.
+ * @param systemRoot - Windows installation root used to locate `System32/tar.exe`.
+ */
+export function wasmToolsArchiveInvocation(
+    installationDirectory: string,
+    platform: NodeJS.Platform = process.platform,
+    systemRoot = process.env.SystemRoot,
+): { executable: string; args: string[]; cwd: string } {
+    return {
+        executable: platform === 'win32' ? path.win32.join(systemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar',
+        args: ['-xf', 'wasm-tools.archive', '--strip-components=1', '-C', 'extracted'],
+        cwd: installationDirectory,
+    };
 }
 
 /** Download, verify, and install the configured WASI SDK release. */
@@ -525,6 +546,7 @@ async function installPinnedWasiSdk({
             repository,
             version,
             token: env.GITHUB_TOKEN ?? env.GH_TOKEN,
+            metadataPath: env.PUMPKIN_WASI_SDK_RELEASE_METADATA_FILE,
             fetchImpl,
         });
         const asset = selectWasiSdkAsset(release, { version, platform, arch, expectedSha256: sha256 });
@@ -573,19 +595,21 @@ export function publishWasiSdkDirectory(
 /**
  * Fetch GitHub release metadata used to discover WASI SDK archives and their published digests.
  *
- * @param options - Repository URL, SDK version, optional GitHub token, and fetch implementation.
+ * @param options - Repository URL, SDK version, optional token or prefetched metadata path, and fetch implementation.
  * @returns GitHub release metadata for the pinned SDK version.
- * @throws {Error} If the repository is not hosted on GitHub or the release request fails.
+ * @throws {Error} If the repository is not hosted on GitHub, the request fails, or prefetched metadata has a different tag.
  */
 export async function fetchWasiSdkRelease({
     repository,
     version,
     token,
+    metadataPath,
     fetchImpl = globalThis.fetch,
 }: {
     repository: string;
     version: string;
     token?: string;
+    metadataPath?: string;
     fetchImpl?: typeof fetch;
 }): Promise<WasiSdkRelease> {
     const repositoryUrl = new URL(repository);
@@ -593,6 +617,13 @@ export async function fetchWasiSdkRelease({
         throw new Error(`WASI SDK release metadata must be hosted on GitHub: ${repository}`);
     }
     const repositoryPath = repositoryUrl.pathname.replace(/^\/+|\/+$/g, '').replace(/\.git$/, '');
+    if (metadataPath) {
+        const release = JSON.parse(fs.readFileSync(metadataPath, 'utf8')) as WasiSdkRelease;
+        if (release.tag_name !== `wasi-sdk-${version}`) {
+            throw new Error(`WASI SDK release metadata does not match the pinned version ${version}`);
+        }
+        return release;
+    }
     const url = `https://api.github.com/repos/${repositoryPath}/releases/tags/wasi-sdk-${version}`;
     const headers: Record<string, string> = {
         Accept: 'application/vnd.github+json',

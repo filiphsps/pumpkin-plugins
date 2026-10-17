@@ -24,7 +24,7 @@ is out of date.
 | Command | Run from | Writes |
 | --- | --- | --- |
 | `plugin` (the default) | A plugin folder | The generated blocks of that plugin's `README.md` |
-| `root` | The repository root | The action, plugin, tool and extension tables in `README.md`, and the `reference` block with guide and API links in each component README |
+| `root` | The repository root | The action, plugin, native plugin, tool, and extension tables in `README.md`, the `reference` block with guide and API links in each component README, and the `native-release` block in each native README |
 | `docs-index` | The repository root | The Guides and Docs catalog in `docs/README.md` |
 | `generate [module]` | A component folder | The blocks a document module declares; the module defaults to `docs.ts` |
 | `actions` | The repository root | The input and output tables in each action README |

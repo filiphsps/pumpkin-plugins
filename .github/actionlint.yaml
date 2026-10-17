@@ -2,6 +2,9 @@
 self-hosted-runner:
   labels:
     - ubuntu-26.04
+    - ubuntu-26.04-arm
+    - windows-11-arm
+    - macos-26
 
 paths:
   .github/workflows/release.yml:

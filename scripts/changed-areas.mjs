@@ -91,6 +91,24 @@ const code = changed.filter(
         !/^actions\/[^/]+\//.test(file) &&
         !/^extensions\/[^/]+\//.test(file),
 );
+const native = code.some(
+    (file) =>
+        file.startsWith('native/') ||
+        [
+            'scripts/native-release.mjs',
+            'scripts/utils/native-targets.mjs',
+            'scripts/utils/native-load-test.mjs',
+            'scripts/utils/native-release-config.mjs',
+            '.github/workflows/native.yml',
+            'pnpm-lock.yaml',
+            'package.json',
+            '.node-version',
+        ].includes(file) ||
+        /^(?:packages\/distant-horizons-support-pumpkin|tools\/(?:apis\/pumpkin-plus-plus-api|build|static-hermes-runtime|test-harness)|\.github\/common\/(?:bootstrap|setup-static-hermes))\//.test(
+            file,
+        ),
+);
+const nativeRuntime = code.some((file) => file.startsWith('native/'));
 // Discover the workspace once, and only when a check below reads it.
 const workspace = code.length > 0 || tests.has('common') ? discoverWorkspace(repositoryRoot) : undefined;
 if (tests.has('common')) for (const consumer of commonHelperConsumers(workspace)) tests.add(consumer);
@@ -130,7 +148,8 @@ const integrationRuntimeChanged = Boolean(
 );
 const integrationAllChanged = Boolean(
     integrationRelevant &&
-        (workspaceLayoutChangedForIntegration ||
+        (nativeRuntime ||
+            workspaceLayoutChangedForIntegration ||
             lockfileWideChanged ||
             code.some(
                 (file) =>
@@ -199,6 +218,6 @@ if (integrationPackages.size) console.log(`Integration packages: ${[...integrati
 if (process.env.GITHUB_OUTPUT) {
     appendFileSync(
         process.env.GITHUB_OUTPUT,
-        `code=${code.length > 0}\nconfig_only=${configOnly}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\nextensions=${JSON.stringify(extensions)}\nextensions_to_test=${JSON.stringify(extensionsToTest)}\ngenerated_readmes=${generatedReadmes}\ngenerator=${generator}\nintegration_scope=${integrationScope}\nskip_expensive_checks=${skipExpensiveChecks}\nbenchmark=${benchmark}\nexternal_consumer_full=${externalConsumerFull}\n${integrationPackages.size ? `integration_packages=${JSON.stringify([...integrationPackages].sort())}\n` : ''}`,
+        `code=${code.length > 0}\nnative=${native}\nconfig_only=${configOnly}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\nextensions=${JSON.stringify(extensions)}\nextensions_to_test=${JSON.stringify(extensionsToTest)}\ngenerated_readmes=${generatedReadmes}\ngenerator=${generator}\nintegration_scope=${integrationScope}\nskip_expensive_checks=${skipExpensiveChecks}\nbenchmark=${benchmark}\nexternal_consumer_full=${externalConsumerFull}\n${integrationPackages.size ? `integration_packages=${JSON.stringify([...integrationPackages].sort())}\n` : ''}`,
     );
 }

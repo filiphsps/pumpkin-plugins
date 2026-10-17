@@ -47,6 +47,8 @@ const outputs = {
     action_paths_released: '[]',
     tool_paths_released: '[]',
     extension_paths_released: '[]',
+    native_paths_released: '[]',
+    native_releases: '[]',
     release_metadata: '{}',
     release_count: '0',
     prs: '[]',
@@ -195,7 +197,7 @@ if (dryRun) {
     }
     console.log(`Prepared ${prs.length} release PR(s)`);
     console.log(
-        `Release fan-out: plugin paths=${outputs.paths_released}, action paths=${outputs.action_paths_released}, tool paths=${outputs.tool_paths_released}, extension paths=${outputs.extension_paths_released}, release PR count=${prs.length}`,
+        `Release fan-out: plugin paths=${outputs.paths_released}, action paths=${outputs.action_paths_released}, tool paths=${outputs.tool_paths_released}, extension paths=${outputs.extension_paths_released}, native releases=${outputs.native_releases}, release PR count=${prs.length}`,
     );
 }
 commitFilesCache?.save();

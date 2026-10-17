@@ -7,6 +7,7 @@ import {
     discoverHandwrittenDocs,
     githubPagesUrl,
     githubRepositoryUrl,
+    readNativeManifest,
     rootPageRewrites,
     walkMarkdown,
 } from '@pumpkin-plugins/docs/node';
@@ -41,13 +42,14 @@ const plugins = components(repoRoot, 'packages');
 const tools = components(repoRoot, 'tools');
 const actions = components(repoRoot, 'actions');
 const extensions = components(repoRoot, 'extensions');
-for (const item of [...plugins, ...tools, ...actions, ...extensions]) {
+const native = components(repoRoot, 'native');
+for (const item of [...plugins, ...tools, ...actions, ...extensions, ...native]) {
     if (item.icon && item.iconFile) navigationAssets.set(item.icon.slice(1), item.iconFile);
     // Component READMEs keep their path; listing them lets links from rewritten guides resolve.
     if (item.readme) rewrites[`${item.readme.slice(1)}.md`] = `${item.readme.slice(1)}.md`;
 }
 const componentLandingIcons = new Map(
-    [...plugins, ...tools, ...actions, ...extensions].flatMap((item) =>
+    [...plugins, ...tools, ...actions, ...extensions, ...native].flatMap((item) =>
         item.icon ? [[`${item.overview.slice(1)}.md`, item.icon] as const] : [],
     ),
 );
@@ -59,13 +61,23 @@ const componentVersions = new Map<string, { version: string; release?: string }>
 for (const [group, items] of [
     ['packages', plugins],
     ['actions', actions],
+    ['native', native],
 ] as const) {
     for (const item of items) {
         const directory = `${group}/${item.slug}`;
-        const versionFile = path.join(repoRoot, directory, group === 'packages' ? 'package.json' : 'version.txt');
+        const versionFile = path.join(
+            repoRoot,
+            directory,
+            group === 'packages' ? 'package.json' : group === 'native' ? 'Cargo.toml' : 'version.txt',
+        );
         if (!fs.existsSync(versionFile)) continue;
         const source = fs.readFileSync(versionFile, 'utf8');
-        const version: string = group === 'packages' ? JSON.parse(source).version : source.trim();
+        const version: string =
+            group === 'packages'
+                ? JSON.parse(source).version
+                : group === 'native'
+                  ? readNativeManifest(versionFile).version
+                  : source.trim();
         if (!version) continue;
         const component = releaseConfig.packages[directory]?.component;
         const tag = component ? `${component}-v${version}` : undefined;
@@ -279,7 +291,18 @@ for (const item of actions) {
 }
 
 const generateLlmsText = () =>
-    renderLlmsText({ repoRoot, repoUrl, siteUrl, handwrittenDocs, apiNav, plugins, tools, actions, extensions });
+    renderLlmsText({
+        repoRoot,
+        repoUrl,
+        siteUrl,
+        handwrittenDocs,
+        apiNav,
+        plugins,
+        tools,
+        actions,
+        extensions,
+        native,
+    });
 
 const featuredPlugin = plugins.find((item) => item.featured);
 const megaMenus: MegaMenu[] = [
@@ -294,6 +317,15 @@ const megaMenus: MegaMenu[] = [
             ? { featured: { ...card(featuredPlugin), type: featuredPlugin.menuItemType ?? 'card' } }
             : {}),
     },
+    ...(native.length
+        ? [
+              {
+                  text: 'Native plugins',
+                  description: 'Native libraries built for an exact Pumpkin host build.',
+                  sections: groupMenuItems(native.map(card), 'Native plugins'),
+              },
+          ]
+        : []),
     {
         text: 'Tools',
         description: 'Shared packages, utilities, and editor extensions for building and maintaining plugins.',
@@ -351,10 +383,18 @@ for (const item of actions) componentSidebars[`/actions/${item.slug}/`] = compon
 for (const item of extensions) {
     componentSidebars[`/extensions/${item.slug}/`] = componentSidebar(item, extensions, 'extensions');
 }
+for (const item of native) {
+    componentSidebars[`/native/${item.slug}/`] = componentSidebar(item, native, 'native plugins');
+}
 
 const guideSidebar: SidebarItem[] = [
     { text: 'Guides', collapsed: false, items: guidePages.map(({ text, link }) => ({ text, link })) },
     { text: 'Plugins', collapsed: true, items: plugins.map((item) => ({ text: item.title, link: item.overview })) },
+    {
+        text: 'Native plugins',
+        collapsed: true,
+        items: native.map((item) => ({ text: item.title, link: item.overview })),
+    },
     { text: 'Tools', collapsed: true, items: tools.map((item) => ({ text: item.title, link: item.overview })) },
     { text: 'Actions', collapsed: true, items: actions.map((item) => ({ text: item.title, link: item.overview })) },
     {
@@ -369,6 +409,7 @@ const themeConfig = {
     megaMenus,
     sidebar: {
         '/packages/': plugins.map((item) => ({ text: item.title, link: item.overview })),
+        '/native/': native.map((item) => ({ text: item.title, link: item.overview })),
         '/tools/': tools.map((item) => ({ text: item.title, link: item.overview })),
         '/actions/': actions.map((item) => ({ text: item.title, link: item.overview })),
         '/extensions/': extensions.map((item) => ({ text: item.title, link: item.overview })),

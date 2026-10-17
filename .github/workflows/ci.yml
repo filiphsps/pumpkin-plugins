@@ -20,6 +20,7 @@ on:
             - 'packages/*/README.md'
             - 'actions/*/README.md'
             - 'extensions/*/README.md'
+            - 'native/*/README.md'
     push:
         branches:
             - master
@@ -41,6 +42,7 @@ on:
             - 'packages/*/README.md'
             - 'actions/*/README.md'
             - 'extensions/*/README.md'
+            - 'native/*/README.md'
             # Docs-only default-branch pushes still need release processing to refresh open release
             # PRs and catch up any releases from an earlier run that did not finish.
             - '**/*.md'
@@ -78,6 +80,7 @@ jobs:
         runs-on: ubuntu-26.04
         outputs:
             code: ${{ steps.classify.outputs.code }}
+            native: ${{ steps.classify.outputs.native }}
             config_only: ${{ steps.classify.outputs.config_only }}
             skip_expensive_checks: ${{ steps.classify.outputs.skip_expensive_checks }}
             actions: ${{ steps.classify.outputs.actions }}
@@ -611,11 +614,19 @@ jobs:
                   title: Generator smoke tests
                   tests: 'true'
 
+    native:
+        name: 🦀 Native build and load tests
+        needs: [changes]
+        if: needs.changes.outputs.native == 'true' && needs.changes.outputs.skip_expensive_checks != 'true'
+        uses: ./.github/workflows/native.yml
+        permissions:
+            contents: read
+
     # CI result validates selected dependencies and catches dependency failures or cancellations.
     # Engine comparison runs separately and does not block release.
     ci-result:
         name: 🛡️ CI result
-        needs: [changes, commits, lint, typecheck, test, extension-tests, docs, build, external-consumer, integration, generator]
+        needs: [changes, commits, lint, typecheck, test, extension-tests, docs, build, external-consumer, native, integration, generator]
         if: ${{ always() && !startsWith(github.head_ref, 'release-please--branches--') }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04

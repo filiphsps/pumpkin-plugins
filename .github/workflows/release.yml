@@ -37,6 +37,8 @@ jobs:
             action_paths_released: ${{ steps.release.outputs.action_paths_released }}
             tool_paths_released: ${{ steps.release.outputs.tool_paths_released }}
             extension_paths_released: ${{ steps.release.outputs.extension_paths_released }}
+            native_paths_released: ${{ steps.release.outputs.native_paths_released }}
+            native_releases: ${{ steps.release.outputs.native_releases }}
             release_count: ${{ steps.release.outputs.release_count }}
             prepared_pr_count: ${{ steps.release.outputs.pr_count }}
             open_pr_count: ${{ steps.release-prs.outputs.open_pr_count }}
@@ -167,6 +169,8 @@ jobs:
             TOOL_PATHS: ${{ needs.release.outputs.tool_paths_released }}
             EXTENSION_PATHS: ${{ needs.release.outputs.extension_paths_released }}
             RELEASE_METADATA: ${{ needs.release.outputs.release_metadata }}
+            NATIVE_PATHS: ${{ needs.release.outputs.native_paths_released }}
+            NATIVE_RELEASES: ${{ needs.release.outputs.native_releases }}
         steps:
             - name: 🧮 Require complete release outputs
               run: |
@@ -182,8 +186,18 @@ jobs:
                   action_count="$(jq -er 'if type == "array" then length else error("expected a JSON array") end' <<< "$ACTION_PATHS")"
                   tool_count="$(jq -er 'if type == "array" then length else error("expected a JSON array") end' <<< "$TOOL_PATHS")"
                   extension_count="$(jq -er 'if type == "array" then length else error("expected a JSON array") end' <<< "$EXTENSION_PATHS")"
-                  if (( plugin_count + action_count + tool_count + extension_count != RELEASE_COUNT )); then
-                      echo "::error::Release output mismatch: count=$RELEASE_COUNT, plugin paths=$plugin_count, action paths=$action_count, tool paths=$tool_count, extension paths=$extension_count."
+                  native_count="$(jq -er 'if type == "array" then length else error("expected a JSON array") end' <<< "$NATIVE_PATHS")"
+                  jq -e --argjson paths "$NATIVE_PATHS" '
+                      type == "array" and length == ($paths | length) and
+                      (map(.path) == $paths) and
+                      (map(.tagName) | length == (unique | length)) and
+                      all(.[]; (.path | test("^native/[a-z0-9]+(-[a-z0-9]+)*$")) and
+                          (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$")) and
+                          (.tagName == ((.path | split("/") | last) + "-v" + .version)) and
+                          (.sha | test("^[0-9a-f]{40}$")))
+                  ' <<< "$NATIVE_RELEASES" >/dev/null
+                  if (( plugin_count + action_count + tool_count + extension_count + native_count != RELEASE_COUNT )); then
+                      echo "::error::Release output mismatch: count=$RELEASE_COUNT, plugin paths=$plugin_count, action paths=$action_count, tool paths=$tool_count, extension paths=$extension_count, native paths=$native_count."
                       exit 1
                   fi
                   if (( OPEN_PR_COUNT < PREPARED_PR_COUNT )); then
@@ -287,6 +301,9 @@ jobs:
                       'tools/apis/*/README.md' \
                       'actions/*/README.md' \
                       'extensions/*/README.md'
+                  if compgen -G 'native/*/README.md' >/dev/null; then
+                      git add -- 'native/*/README.md'
+                  fi
                   git commit -m "docs: update generated READMEs"
 
             # Push the preparation commits together so the branch triggers workflows once.
@@ -375,6 +392,62 @@ jobs:
                   else
                       pnpm exec node scripts/publish-tool-packages.mjs
                   fi
+
+    native:
+        name: 🦀 Native release assets
+        needs: [release, release-fanout-check]
+        if: ${{ needs.release.outputs.native_releases != '[]' }}
+        uses: ./.github/workflows/native.yml
+        permissions:
+            contents: read
+        with:
+            releases: ${{ needs.release.outputs.native_releases }}
+            attach: true
+
+    native-assets:
+        name: 📎 Native ${{ matrix.release.tagName }} / ${{ matrix.platform.target }}
+        needs: [release, release-fanout-check, native]
+        if: ${{ needs.release.outputs.native_releases != '[]' }}
+        runs-on: ubuntu-26.04
+        timeout-minutes: 15
+        permissions:
+            contents: write
+        strategy:
+            fail-fast: false
+            matrix:
+                release: ${{ fromJSON(needs.release.outputs.native_releases) }}
+                platform: ${{ fromJSON(needs.native.outputs.platforms).include }}
+        env:
+            GH_REPO: ${{ github.repository }}
+            TAG: ${{ matrix.release.tagName }}
+            RELEASE_SHA: ${{ matrix.release.sha }}
+            TARGET: ${{ matrix.platform.target }}
+        steps:
+            - uses: actions/checkout@v7.0.1
+              with:
+                  persist-credentials: false
+            - uses: ./.github/common/bootstrap
+            - name: Checkout exact native release source
+              uses: actions/checkout@v7.0.1
+              with:
+                  ref: refs/tags/${{ matrix.release.tagName }}
+                  path: release-source
+                  fetch-depth: 0
+                  persist-credentials: false
+            - name: Download tested native artifact
+              uses: actions/download-artifact@v8.0.2
+              with:
+                  name: native-${{ matrix.release.tagName }}-${{ matrix.platform.target }}
+                  path: native-assets
+            - name: Verify and attach native library to its release
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+                  node scripts/native-release.mjs attach --tag "$TAG" --sha "$RELEASE_SHA" \
+                      --target "$TARGET" --source-root release-source --repository "$GH_REPO" \
+                      --output native-assets
 
     publish-extensions:
         name: 🧩 Package extension ${{ matrix.path }}
