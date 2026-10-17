@@ -530,6 +530,57 @@ describe('bundled release commits', () => {
         }
     });
 
+    it('does not resolve imports inside packed tool templates as tool source dependencies', async () => {
+        const root = mkdtempSync(join(tmpdir(), 'release-template-source-'));
+        try {
+            const toolPackages = new Map([
+                [
+                    'create-pumpkin-plugin',
+                    {
+                        path: 'tools/create-pumpkin-plugin',
+                        manifest: { files: ['templates'], publishConfig: { access: 'public' } },
+                    },
+                ],
+                [
+                    '@pumpkin-plugins/pumpkin-api',
+                    {
+                        path: 'tools/pumpkin-api',
+                        manifest: { publishConfig: { access: 'public' } },
+                    },
+                ],
+            ]);
+            writeToolPackages(root, toolPackages);
+            writeFileSync(join(root, 'tsconfig.base.json'), JSON.stringify({ compilerOptions: {} }));
+
+            const templateEntry = join(root, 'tools/create-pumpkin-plugin/templates/javascript/src/plugin.js');
+            mkdirSync(dirname(templateEntry), { recursive: true });
+            writeFileSync(templateEntry, "import { Plugin } from '@pumpkin-plugins/pumpkin-api';\n");
+
+            const plugin = bundledChangesPlugin(
+                {
+                    async *mergeCommitIterator() {
+                        yield commit('base', []);
+                    },
+                },
+                'master',
+                toolPackages,
+                { 'tools/create-pumpkin-plugin': '0.1.0', 'tools/pumpkin-api': '0.1.0' },
+                500,
+                () => {},
+                root,
+            );
+            const commitsByPath = {};
+
+            await plugin.preconfigure({ 'tools/create-pumpkin-plugin': {} }, commitsByPath, {
+                'tools/create-pumpkin-plugin': { sha: 'base' },
+            });
+
+            assert.deepEqual(commitsByPath['tools/create-pumpkin-plugin'], []);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    });
+
     it('keeps public tool releases scoped to their own source files', async () => {
         const history = [
             commit('builder-change', ['tools/build/src/cli.ts']),

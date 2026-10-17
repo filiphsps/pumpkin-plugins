@@ -48,7 +48,15 @@ export function bundledPaths(packages, releasePath) {
 }
 
 const SOURCE_EXTENSIONS = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
-const SOURCE_IGNORED_DIRECTORIES = new Set(['__tests__', 'build', 'dist', 'node_modules', 'test', 'testing']);
+const SOURCE_IGNORED_DIRECTORIES = new Set([
+    '__tests__',
+    'build',
+    'dist',
+    'node_modules',
+    'templates',
+    'test',
+    'testing',
+]);
 const SOURCE_TEST_PATTERN = /\.(?:spec|test|itest)\.[cm]?[jt]sx?$/;
 
 function workspacePath(file, root) {
