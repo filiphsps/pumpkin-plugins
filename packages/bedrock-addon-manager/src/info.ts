@@ -7,7 +7,7 @@ import { PLUGIN_NAME } from './name.ts';
 export const info = {
     name: PLUGIN_NAME,
     description:
-        'Serves Bedrock `.mcpack` and `.mcaddon` resource packs over HTTP and reads their manifests. It does not currently send pack offers to players.',
+        'BedrockAddonManager hosts resource packs over HTTP and reads their manifests. Players still need another way to download the packs because the plugin does not send offers.',
     permissions: [
         { name: 'fs.read.data', reason: 'Read the packs folder and the plugin config in its data folder.' },
         {

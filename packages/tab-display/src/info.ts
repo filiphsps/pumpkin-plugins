@@ -10,7 +10,7 @@ import { PLUGIN_NAME } from './name.ts';
  */
 export const info = {
     name: PLUGIN_NAME,
-    description: 'Formats Java row names and headers/footers; no Bedrock list changes.',
+    description: 'TabDisplay formats Java player-list names, headers, and footers. It leaves Bedrock lists unchanged.',
     permissions: [
         { name: 'fs.read.data', reason: 'Read TabDisplay settings from the plugin data folder.' },
         { name: 'fs.write.data', reason: 'Create and update TabDisplay settings in the plugin data folder.' },

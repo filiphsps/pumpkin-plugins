@@ -8,7 +8,7 @@ import { PLUGIN_NAME } from './name.ts';
 export const info = {
     name: PLUGIN_NAME,
     description:
-        'Port forward ports on the router with UPnP or NAT-PMP so players can connect from the internet. Other plugins can request port mappings through UPnPumpkin.',
+        'UPnPumpkin asks UPnP or NAT-PMP routers to forward server ports so players outside your network can connect. Other plugins can request mappings too.',
     permissions: [
         { name: 'fs.read.data', reason: 'Read the plugin config in its data folder.' },
         { name: 'fs.write.data', reason: 'Create and update the config.' },

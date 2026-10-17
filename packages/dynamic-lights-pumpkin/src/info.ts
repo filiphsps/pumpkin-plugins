@@ -8,7 +8,7 @@ import { PLUGIN_NAME } from './name.ts';
  */
 export const info = {
     name: PLUGIN_NAME,
-    description: 'Server-driven dynamic lights for held items and nearby entities',
+    description: 'DynamicLightsPumpkin shows temporary light around supported items and nearby entities without changing the world.',
     permissions: [
         { name: 'fs.read.data', reason: 'Read its light-source settings, player preferences and old recovery data.' },
         {

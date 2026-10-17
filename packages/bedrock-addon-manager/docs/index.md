@@ -1,30 +1,32 @@
 # BedrockAddonManager
 
-BedrockAddonManager scans Bedrock `.mcpack` and `.mcaddon` files, reads pack manifests, and serves
-the selected resource packs over HTTP. Use it to host packs at URLs that Bedrock clients can reach.
+BedrockAddonManager scans Bedrock `.mcpack` and `.mcaddon` files, reads their manifests, and serves
+enabled resource packs over HTTP. Use it to give Bedrock clients a URL they can reach to download
+those packs.
 
 BedrockAddonManager does not send resource-pack offers to players. Clients are not prompted to
 download packs, and `packs.force` has no effect.
 
 ## Typical setup
 
-Install `bedrock-addon-manager.wasm` in the server's `plugins/` directory and restart. Put pack
-files in `plugins/data/BedrockAddonManager/packs/`, then run `/baddon reload` or restart again.
-`/baddon list` shows each discovered pack and its effective settings. The plugin does not modify
-`pumpkin.toml`.
+Install `bedrock-addon-manager.wasm` in the server's `plugins/` directory and start or restart the
+server. Put pack files in `plugins/data/BedrockAddonManager/packs/`, then run `/baddon reload` to
+scan them. Use `/baddon list` to see discovered packs and their effective settings. The plugin
+keeps its configuration in its own data folder and does not modify `pumpkin.toml`.
 
 Choose a URL Bedrock clients can reach. Set `web.public_url` when serving packs through a known
-address or reverse proxy. If it is empty and the server binds to `0.0.0.0`, the plugin can ask
-UPnPumpkin to forward `web.port`; without a successful mapping it falls back to a loopback address,
-which only works on the server machine. See the setup and troubleshooting pages in this section
-for network and pack-format details.
+address or reverse proxy. If it is empty, `web.bind` is `0.0.0.0`, and `web.port_forwarding` is on,
+the plugin asks UPnPumpkin to forward `web.port`. If forwarding does not succeed, it uses a loopback
+address that works only on the server machine. See [setup](setup.md) for network and pack-format
+details, or [troubleshooting](troubleshooting.md) if clients cannot download a pack.
 
 ## Pack selection
 
 The plugin reads each pack's `manifest.json` for its UUID, version, and flags. An `.mcaddon` may
-contain both behavior and resource packs; only its resource packs are extracted and served because
-Pumpkin cannot use behavior packs. Per-file overrides can disable a pack, set its order, or provide
-an external `download_url`. Overrides for extracted packs use the name shown by `/baddon list`.
+contain both behavior and resource packs; only the resource packs are extracted and served.
+Per-file overrides can disable a pack, change its order, or provide an external `download_url`.
+For packs extracted from an `.mcaddon`, use the effective name shown by `/baddon list` as the
+override key.
 
 The built-in server uses plain HTTP. Put a TLS reverse proxy in front of it when clients need an
 HTTPS URL, or host the files elsewhere and configure download URLs.

@@ -2,39 +2,38 @@
 
 ## The client disconnects or never opens a session
 
-Confirm the client uses the supported Distant Horizons release listed in the plugin README. A
-protocol mismatch closes the session. Distant Horizons sessions are only opened by Java Edition
-players.
+Check the plugin README for the supported Distant Horizons release and make sure the client is
+running it. If the protocol versions differ, the plugin closes the session. Only Java Edition
+players can open Distant Horizons sessions.
 
 ## Requests stay pending because terrain is unavailable
 
-The plugin cannot load or generate chunks. It needs Pumpkin to have the requested area loaded, or a
-previous capture available in its cache. Unavailable requests stay pending, and the plugin spaces
-availability checks with exponential backoff. Bring the area into range of a player or arrange for
-the server to load it; the client can cancel a request that is no longer needed. Pending requests
-count against the configured queue limit. The plugin README lists the current section size and
-capture requirements.
+The plugin can read only chunks Pumpkin has loaded; it cannot load or generate them. If the requested
+area isn't loaded and has no cached capture, the request stays pending while the plugin checks again
+with increasing delays. Bring the area within range of a player or use a server chunk-loading tool.
+The client can cancel a request it no longer needs, and each pending request uses space in the
+configured queue. See the plugin README for the section size and capture requirements.
 
 ## A client sees old terrain
 
-Cached captures are reused until they reach their configured refresh age and the server has the
-terrain loaded to rebuild them. Block placement and breaking invalidate affected captures. After
-replacing world data or changing a dimension's height, stop the server and remove this plugin's cache
-folder, then start the server again. The plugin README lists the current commands for clearing
-either cache tier or both.
+The plugin keeps serving a cached capture until it reaches its configured refresh age. It rebuilds
+an expired capture in the background when the server has the terrain loaded; otherwise, the older
+capture remains available. Block placement and breaking invalidate affected captures, while other
+world changes are picked up on a later refresh. If you replace world data or change a dimension's
+height, stop the server, remove this plugin's cache folder, and restart the server. The plugin README
+lists commands for clearing either cache tier or both.
 
 ## Requests stay queued or progress is slow
 
-Check the plugin's status command. Its output includes pending requests and responses, logical
-queued response bytes retained, DH packet bytes sent,
-capture progress, completed and rejected requests, and the last rejection reason. Pending requests
-for unavailable terrain retry with exponential backoff; `LOD request limit reached` means the
-bounded queue is full. Cached sections can still be delivered while a forced capture or sampling
-pause is active.
+Run `/dhs status` to see pending requests, queued responses and retained response bytes, DH packet
+bytes sent, capture progress, completed and rejected requests, and the last rejection reason.
+Requests for unavailable terrain retry with increasing delays. If the last rejection is `LOD request
+limit reached`, the bounded request queue is full. Cached sections can still be delivered while a
+forced capture pauses ordinary sampling.
 
-The client ETA includes time waiting since submission and does not measure network throughput. A
-nonzero client bandwidth limit applies to outgoing fragments; a fragment waits until its byte credit
-is available. The bucket burst is capped at one full DH fragment message; zero bandwidth is
-unlimited. Client configuration changes receive negotiated acknowledgements, with generation and
-sync settings handled independently. The plugin README lists the current queue and transfer
-settings. Those defaults remain provisional pending real-runtime measurements.
+The client's ETA includes time spent waiting since submission, so it doesn't measure network
+throughput. A nonzero client bandwidth limit controls outgoing fragments: each waits until enough
+byte credit is available, and the credit bucket can hold one full DH fragment message. A bandwidth
+limit of zero means unlimited. When the client changes its configuration, generation and sync
+settings are acknowledged independently. See the plugin README for current queue and transfer
+settings; their defaults remain provisional until real-runtime measurements are complete.

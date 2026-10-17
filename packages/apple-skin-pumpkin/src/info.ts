@@ -6,7 +6,7 @@ import { PLUGIN_NAME } from './name.ts';
  */
 export const info = {
     name: PLUGIN_NAME,
-    description: 'AppleSkin server-side support',
+    description: 'The plugin syncs saturation and exhaustion so AppleSkin can show accurate food stats.',
     permissions: [],
     commands: [],
 } satisfies PluginInfo<typeof PLUGIN_NAME>;

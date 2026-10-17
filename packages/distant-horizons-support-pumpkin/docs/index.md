@@ -5,13 +5,14 @@ navigation:
 
 # Distant Horizons Support Pumpkin
 
-This plugin lets Java Edition players use Distant Horizons with a Pumpkin server. It answers LOD
-requests from terrain the server has loaded or captured before, and keeps completed captures for
-later requests.
+Use this plugin to connect Distant Horizons clients to a Pumpkin server. It answers LOD requests
+from terrain Pumpkin has loaded or the plugin has captured and cached, then reuses those captures
+for later requests.
 
 ## Start here
 
-- Read the setup guide before installing to check client compatibility, permissions, and first-start
-  settings.
-- Use the troubleshooting guide for unavailable terrain, stale cache entries, and server status.
+- Follow the [setup guide](setup.md) to check client compatibility, install the server plugin, and
+  configure its first start.
+- Use the [troubleshooting guide](troubleshooting.md) for unavailable terrain, stale cache entries,
+  and slow or queued requests.
 - See the [PumpkinPIE placeholder reference](placeholders.md) for DH status and cache values.
