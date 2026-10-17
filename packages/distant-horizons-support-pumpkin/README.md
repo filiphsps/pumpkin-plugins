@@ -166,11 +166,9 @@ cache limits are independent; their current defaults and how to disable them are
 [Configuration](#configuration) section. When upgrading from earlier versions, the former shared
 cache limit is copied to both cache limits.
 
-Pumpkin reports a missing chunk as WIT `option-none`; Static Hermes exposes that value as `null`,
-although generated TypeScript declarations say `undefined`. Both forms now block capture before any
-block sampling. A genuinely loaded section containing only air remains valid and is still cached.
-Existing DHP1 cache entries do not record whether their source chunks were loaded, so the plugin does
-not infer corruption from an all-air payload or remove entries automatically.
+An empty cache entry can represent terrain that really contains only air, so the plugin leaves these
+entries in place. Older entries don't contain enough information to tell whether the terrain was
+loaded when they were captured.
 
 To rebuild one operator-selected server cache entry, run `/dhs cache recover <x> <z>` as a Java
 player, using block coordinates in the current world. The plugin checks that all 16 chunks for that
