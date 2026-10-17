@@ -1,12 +1,14 @@
 import { copyFile, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import ts from 'typescript';
 import { parseJsonObject } from './jsonc.ts';
 
 /** Creates a temporary resolver root when package.json is valid JSONC but not strict JSON. */
 export async function createJsoncAnalysisRoot(
     projectRoot: string,
-): Promise<{ root: string; dispose: () => Promise<void> } | undefined> {
+    entryPoint: string,
+): Promise<{ root: string; tsconfig?: string; dispose: () => Promise<void> } | undefined> {
     let source: string;
     try {
         source = await readFile(path.join(projectRoot, 'package.json'), 'utf8');
@@ -21,7 +23,9 @@ export async function createJsoncAnalysisRoot(
     } catch {
         const parsed = parseJsonObject(source);
         if (!parsed.value) return undefined;
-        return createMirroredRoot(projectRoot, parsed.value);
+        const tsconfig = ts.findConfigFile(path.dirname(path.join(projectRoot, entryPoint)), ts.sys.fileExists);
+        const mirror = await createMirroredRoot(projectRoot, parsed.value);
+        return { ...mirror, ...(tsconfig ? { tsconfig } : {}) };
     }
 }
 

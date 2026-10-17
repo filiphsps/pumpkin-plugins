@@ -28,7 +28,7 @@ export async function inferWasiCapabilities(projectRoot: string, entry: string):
     let analysisRoot = projectRoot;
     let disposeAnalysisRoot: (() => Promise<void>) | undefined;
     try {
-        const jsoncRoot = await createJsoncAnalysisRoot(projectRoot);
+        const jsoncRoot = await createJsoncAnalysisRoot(projectRoot, normalizedEntry);
         if (jsoncRoot) {
             analysisRoot = jsoncRoot.root;
             disposeAnalysisRoot = jsoncRoot.dispose;
@@ -39,6 +39,7 @@ export async function inferWasiCapabilities(projectRoot: string, entry: string):
             resolution: {
                 external: ['pumpkin:plugin/*', 'wasi:*'],
                 platform: 'browser',
+                ...(jsoncRoot?.tsconfig ? { tsconfig: jsoncRoot.tsconfig } : {}),
                 ...(analysisRoot !== projectRoot ? { preserveSymlinks: true } : {}),
             },
         });

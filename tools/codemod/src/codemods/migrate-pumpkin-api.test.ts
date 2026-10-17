@@ -88,10 +88,29 @@ describe('migratePumpkinApiTs', () => {
     }
 }\n`;
 
-        const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
+        const workspace = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
+        const root = path.join(workspace, 'plugin');
         try {
             await fs.mkdir(path.join(root, 'src'), { recursive: true });
-            await fs.writeFile(path.join(root, 'src/plugin.ts'), "import 'wasi:http/outgoing-handler@0.2.3';\n");
+            await fs.mkdir(path.join(workspace, 'types'), { recursive: true });
+            await fs.writeFile(
+                path.join(root, 'src/plugin.ts'),
+                "import type { Handler } from '@fixture/wasi-types';\nexport type { Handler };\n",
+            );
+            await fs.writeFile(
+                path.join(workspace, 'tsconfig.base.json'),
+                JSON.stringify({
+                    compilerOptions: {
+                        baseUrl: '.',
+                        paths: { '@fixture/wasi-types': ['types/wasi-types.d.ts'] },
+                    },
+                }),
+            );
+            await fs.writeFile(
+                path.join(workspace, 'types/wasi-types.d.ts'),
+                "export type Handler = import('wasi:http/outgoing-handler@0.2.3').OutgoingHandler;\n",
+            );
+            await fs.writeFile(path.join(root, 'tsconfig.json'), '{"extends":"../tsconfig.base.json"}\n');
             await fs.writeFile(path.join(root, 'package.json'), source);
             const report = await runCodemod(migratePumpkinApiTs, [root], { cwd: root });
             const result = report.changedFiles.find(({ relativePath }) => relativePath === 'package.json');
@@ -123,7 +142,7 @@ describe('migratePumpkinApiTs', () => {
                 'Review inferred pumpkinPlugin.wasi capabilities and any static-analysis notes before building.',
             );
         } finally {
-            await fs.rm(root, { recursive: true, force: true });
+            await fs.rm(workspace, { recursive: true, force: true });
         }
     });
 
