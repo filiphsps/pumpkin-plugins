@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2](https://github.com/filiphsps/pumpkin-plugins/compare/build-v0.1.1...build-v0.1.2) (2026-10-17)
+
+
+### Features
+
+* **build:** expose capability interface lookup ([cc70f9c](https://github.com/filiphsps/pumpkin-plugins/commit/cc70f9c6c69040b5ab4276e86a6247cbb71fb17d))
+* **wasi:** share capability metadata across tooling ([bbe0f2f](https://github.com/filiphsps/pumpkin-plugins/commit/bbe0f2f093273132e8fd2101233cada29af270e7))
+
 ## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/build-v0.1.0...build-v0.1.1) (2026-10-16)
 
 
