@@ -158,6 +158,20 @@ describe('planChecks', () => {
         assert.ok(turbo(plan(['tools/config/src/load.ts']))?.includes('--filter=...@pumpkin-plugins/config'));
     });
 
+    it('checks generated docs for scoped changes without running full-repository checks', () => {
+        const steps = planChecks(
+            ['tools/config/src/load.ts'],
+            () => true,
+            (dir) => names[dir],
+            { includeRepositoryChecks: false },
+        );
+        assert.ok(steps.some((step) => step.name === 'Generated READMEs'));
+        assert.equal(
+            steps.some((step) => step.name === 'Repo checks'),
+            false,
+        );
+    });
+
     it('checks grouped tools and ignores their build output', () => {
         assert.ok(
             turbo(plan(['tools/apis/upnpumpkin-api/src/index.ts']))?.includes(

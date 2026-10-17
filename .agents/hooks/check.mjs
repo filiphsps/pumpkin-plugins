@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Checks for changed files: Biome and JSDoc on those files, plus typecheck and unit tests for their
-// packages and workspace dependents. No-path runs also check repository metadata and generated docs.
+// packages and workspace dependents. Every run also checks generated docs; no-path runs additionally
+// check repository metadata.
 // Integration tests are left out because they need a server.
 //
 //   node .agents/hooks/check.mjs            check the files git reports as changed
@@ -56,7 +57,7 @@ function packageDirectory(file, packageName) {
  * @param {string[]} files Changed paths relative to the repo root, including deleted ones.
  * @param {(file: string) => boolean} [exists] Whether a path exists (deleted files aren't linted).
  * @param {(dir: string) => string | undefined} [packageName] The `name` in `<dir>/package.json`.
- * @param {{ includeRepositoryChecks?: boolean }} [options] Include full-repository metadata and generated-doc checks.
+ * @param {{ includeRepositoryChecks?: boolean }} [options] Include full-repository metadata checks.
  * @returns {Step[]}
  */
 export function planChecks(files, exists = defaultExists, packageName = defaultPackageName, options = {}) {
@@ -107,10 +108,8 @@ export function planChecks(files, exists = defaultExists, packageName = defaultP
     if (relevant.some((f) => /^(scripts|\.agents\/hooks)\/|^package\.json$/.test(f))) {
         steps.push({ name: 'Script tests', args: ['test:scripts'] });
     }
-    if (options.includeRepositoryChecks !== false) {
-        steps.push({ name: 'Repo checks', args: ['check'] });
-        steps.push({ name: 'Generated READMEs', args: ['readme:check'] });
-    }
+    if (options.includeRepositoryChecks !== false) steps.push({ name: 'Repo checks', args: ['check'] });
+    steps.push({ name: 'Generated READMEs', args: ['readme:check'] });
     return steps;
 }
 

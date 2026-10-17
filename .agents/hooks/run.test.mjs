@@ -62,7 +62,7 @@ describe('portable hook protocol', () => {
         );
         assert.equal(
             result.steps.some((s) => s.name === 'Generated READMEs'),
-            false,
+            true,
         );
     });
 
@@ -87,7 +87,7 @@ describe('portable hook protocol', () => {
         );
         assert.equal(
             checkedSteps.some((step) => step.name === 'Generated READMEs'),
-            false,
+            true,
         );
     });
 
@@ -106,7 +106,7 @@ describe('portable hook protocol', () => {
         );
         assert.equal(
             plan.steps.some((step) => step.name === 'Generated READMEs'),
-            false,
+            true,
         );
     });
 

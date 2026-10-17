@@ -30,10 +30,11 @@ pnpm run lint:actions
 ```
 
 `--plan` prints JSON with the files and commands without executing them. With no paths, the runner
-checks all staged, unstaged and untracked files, including repository-wide metadata and generated-doc
-checks. Explicit paths run file and package-scoped checks, may include deleted files, and omit those
-repository-wide checks. Checks never apply lint fixes. Use scoped `pnpm exec biome check --write` and
-`pnpm exec eslint --fix` only on files you own when fixes are needed.
+checks all staged, unstaged and untracked files, including repository-wide metadata checks. Explicit
+paths run file and package-scoped checks, may include deleted files, and omit those repository-wide
+checks. Both modes check generated READMEs whenever there are non-generated changes. Checks never
+apply lint fixes. Use scoped `pnpm exec biome check --write` and `pnpm exec eslint --fix` only on
+files you own when fixes are needed.
 
 | Change | Checks |
 | --- | --- |
@@ -44,6 +45,7 @@ repository-wide checks. Checks never apply lint fixes. Use scoped `pnpm exec bio
 | Shared root build inputs or lockfile | Typecheck and unit tests for all packages |
 | Deleted package | All package typechecks and unit tests, to catch remaining imports |
 | Scripts or hook code | `pnpm test:scripts` |
+| Any non-generated change | `pnpm readme:check` |
 | Full checkout (no paths) | `pnpm check` and `pnpm readme:check` |
 | Only generated output | No checks |
 
@@ -71,8 +73,8 @@ working tree around each tool call, then record only changed files explicitly ta
 have no attributable file scope. Root agents and subagents get separate scopes, so unrelated work in
 the same checkout does not enter another agent's completion report. Passing these fast checks does
 not prove runtime behavior, correct prose or the full CI workflow. Completion checks use explicit
-paths, so they omit repository-wide metadata and generated-doc checks; those remain available through
-the no-path runner and CI.
+paths, so they omit repository-wide metadata checks. They still run `pnpm readme:check` to catch
+generated README drift before handoff.
 
 ## Portable hook protocol
 
@@ -87,8 +89,9 @@ A request's `cwd` only resolves its relative file paths and defaults to the repo
 | `plan` | Optional `files` array and `cwd` | `ok`, `files`, `steps`; executes no checks |
 | `check` | Optional `files` array and `cwd` | `ok`, `files`, `failures`, readable `report` |
 
-Explicit `files` keep checks scoped to those paths. Omit `files` to discover all dirty files and add
-the repository-wide metadata and generated-doc checks.
+Explicit `files` keep file and package checks scoped to those paths, and still run `pnpm readme:check`
+for generated README consistency. Omit `files` to discover all dirty files and add repository-wide
+metadata checks.
 
 For example, stdin can contain:
 
