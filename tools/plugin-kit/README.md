@@ -13,7 +13,7 @@ Delayed callbacks are also released before they run, and failed scheduling retai
 Use `ansi.named` from `@pumpkin-plugins/minecraft-colors` for log values worth scanning, such as
 names, filenames, URLs, versions, UUIDs and ports. Pick the named role that fits the value and keep
 the surrounding message plain. The `color.named` formatter emits Minecraft codes for chat replies.
-See the [console color convention](../../docs/code-style.md#console-log-colors) for the palette source.
+See the [console color convention](../../docs/code-style.md#color-in-console-logs) for the palette source.
 
 `WasiDataDir.writeFile` replaces files through an exclusively created temporary sibling. Failed
 writes and renames clean up that sibling without replacing the original error. Directory creation

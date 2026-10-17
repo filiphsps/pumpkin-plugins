@@ -8,41 +8,43 @@ description: "Biome, the JSDoc rule, and how code is organized and tested"
 
 # Code style
 
-`pnpm lint` runs two linters, and CI runs the same command.
+Use this guide when you add or change code in the repository. Run `pnpm lint` to check your changes;
+CI runs the same command. Biome handles formatting and general linting, while ESLint checks public
+code for JSDoc descriptions.
 
-## Biome
+## Formatting and linting
 
-[Biome](https://biomejs.dev) formats and lints the supported files (`biome.json`). `pnpm lint:fix`
-also enables Biome's HTML formatter, which formats SVG files. The [agent check runner](agent-tooling.md)
-checks changed files without applying fixes, so it can safely inspect a working tree that contains
-other people's edits. Notable rules from the config: single quotes, four-space indent, shorthand
-array types (`T[]`), `import type` for types, and a warning on `any`.
+[Biome](https://biomejs.dev) formats and lints the files listed in `biome.json`. Run `pnpm lint:fix`
+to apply automatic fixes; it also formats SVG files with Biome's HTML formatter. `pnpm lint` checks
+without changing files. If you use the [agent check runner](agent-tooling.md), it checks only changed
+files and does not apply fixes, so it can run safely while other local edits are present.
+
+Follow the rules in `biome.json`: use single quotes, four spaces for indentation, shorthand array
+types such as `T[]`, and `import type` for type-only imports. Explicit `any` is an error.
 
 ## JSDoc
 
-Biome has no rule for documentation, so ESLint with `eslint-plugin-jsdoc` (`eslint.config.mjs`)
-does that one job. It requires a JSDoc **description** on public code:
+Biome doesn't check documentation, so ESLint uses `eslint-plugin-jsdoc` in
+[`eslint.config.mjs`](../eslint.config.mjs) to require a description for public code. Add a JSDoc
+description to exported functions, classes, interfaces, type aliases, enums and constants, and to
+public methods of exported classes. Explain what the code is for; don't just repeat its name.
 
-- exported functions, classes, interfaces, type aliases, enums and constants,
-- public methods of exported classes.
+TypeScript already provides parameter and return types, so you don't need `@param` or `@returns`
+tags. Add them when they explain something the signature can't, such as units, defaults or what an
+error means. If you add a `@param` tag, its name must match a real parameter. Don't include types in
+JSDoc tags.
 
-It does not require `@param` and `@returns` tags, since TypeScript already types them. Add them
-when they say something the signature doesn't, such as units, defaults or what a thrown error
-means. If you write a `@param`, its name must match a real parameter, and tags don't take `{types}`.
+The rule skips tests (including `test/` and `testing/` directories), config files and the
+`turbo/generators/templates/` tree. Private helpers don't need descriptions. It checks `.ts` source
+across the repository and `.mts` and `.mjs` source in `tools/static-hermes-runtime`. Keep declaration
+files aligned with their source API; this rule doesn't lint them.
 
-Tests (including the `testing/` folders of shared packages), config files and generator templates are exempt, as are private helpers. A good description
-says what the thing is for, not what its name says.
+## Color in console logs
 
-The rule checks `.ts` source across the repository and also checks `.mts` and `.mjs` source in
-`tools/static-hermes-runtime`. Declaration files are maintained with their source API but are not
-linted by this rule.
-
-## Console log colors
-
-Use `ansi.named` from [`@pumpkin-plugins/minecraft-colors`](../tools/minecraft-colors/README.md)
-for values in console log messages. It applies terminal colors using the same named roles as
-`color.named`, which formats Minecraft codes for chat replies. Keep the surrounding message plain
-and do not add formatting codes directly at log call sites.
+Format values in console log messages with `ansi.named` from
+[`@pumpkin-plugins/minecraft-colors`](../tools/minecraft-colors/README.md). Its terminal colors use
+the same named roles as `color.named`, which formats Minecraft codes for chat replies. Leave the
+surrounding message plain instead of adding formatting codes at the log call site.
 
 <!-- These Pumpkin source links are generated from the test-harness pin. Run `pnpm readme`. -->
 Keep this palette aligned with the Pumpkin server version pinned in
@@ -55,56 +57,67 @@ update the named roles if its palette or log handling changes.
 
 ## Structure
 
-- Keep files small and focused. A file that does two things should be two files. Around 150 lines
-  is a prompt to look for the seam, not a hard limit.
-- Separate logic from the host. Pure logic (parsing, ordering, protocol state machines) goes in
-  plain modules that take their dependencies as arguments. Code that touches Pumpkin or WASI is a
-  thin adapter behind an interface, such as `DataFiles` or `Transport`. That keeps almost
-  everything unit-testable and leaves only the adapters for the real-server tests.
-- Group a plugin's `src/` by concern (`config/`, `packs/`, `web/`, `platform/`) rather than by
-  kind of file.
-- Share what more than one plugin needs through a package in `tools/`, as `@pumpkin-plugins/config`
-  does, instead of copying it.
+Keep each file focused on one job. If a file starts doing two things, look for a useful seam and
+split it; around 150 lines is a prompt to review the structure, not a hard limit.
+
+Keep core logic separate from Pumpkin and WASI. Put logic such as parsing, ordering and protocol
+state machines in plain modules, and pass their dependencies in. Put Pumpkin- or WASI-specific work
+behind a thin adapter such as `DataFiles` or `Transport`. That keeps most code easy to unit test and
+lets real-server tests focus on the boundary with Pumpkin and WASI.
+
+Group a plugin's `src/` files by concern, such as `config/`, `packs/`, `web/` or `platform/`, rather
+than by file type. When more than one plugin needs the same code, put it in a package under `tools/`
+as `@pumpkin-plugins/config` does; don't copy it between plugins.
 
 ## Tests
 
-- Unit tests (`*.test.ts`) sit beside the code. Real-server tests (`*.itest.ts`) live in `test/`,
-  one file per concern. See [Testing](testing.md).
-- Test behavior, including the failure paths: invalid input, missing files, clients that hang up.
-  Don't assert things the types already guarantee.
-- Generate fixtures in code (for example `.mcpack` archives) instead of committing binaries.
+Put unit tests (`*.test.ts`) beside the code they cover. Put real-server tests (`*.itest.ts`) in
+`test/`, with one file per concern. The [Testing guide](testing.md) covers how to run them.
+
+Test behavior, including failure paths such as invalid input, missing files and clients that hang
+up. There's no need to assert behavior that TypeScript's types already guarantee. Generate fixtures
+in code—for example, build `.mcpack` archives in the test—instead of committing binary files.
 
 ## Package metadata
 
-`node scripts/package-metadata.mjs` checks the license, homepage, repository, bugs and a
-description of at most 70 characters. It derives workspace links from the root repository URL.
-`--fix` writes derived values but leaves descriptions and package-specific fields alone. Public npm
-tools set `engines.node` from the version in `.node-version`. Importable tools set `sideEffects`.
-Tools with a package-root entry also set top-level `module` and `types`; tools with subpath-only APIs
-declare `types` and runtime conditions on each public entry in `exports`. Each tool owns its `files`
-and `publishConfig` settings.
-`pnpm gen` generates plugins that pass. The homepage of a package is its folder's README on
-`master`. Packages use MIT by default. A package with its own `LICENSE`, `LICENSE.md` or
-`LICENSE.txt` file keeps the license declared in its `package.json`, including when metadata is
-fixed.
+When you add or update a package, run `node scripts/package-metadata.mjs` to check its metadata. The
+script checks the license, homepage, repository, bugs field and a description of at most 70 characters.
+It derives workspace links from the root repository URL. Add `--fix` to write values that can be
+derived; the script leaves descriptions and package-specific fields for you to maintain.
 
-## Docs match the code
+For public npm tools, set `engines.node` from `.node-version`. Tools that consumers import set
+`sideEffects`. If a tool has a package-root entry, set top-level `module` and `types`; if it exposes
+only subpath APIs, declare `types` and runtime conditions on each public entry in `exports`. Each
+tool also owns its `files` and `publishConfig` settings.
 
-`pnpm fix` checks release configuration, applies derived package metadata fixes, regenerates
-READMEs, checks documentation, and finishes with `pnpm lint:fix`. Release registration and
-hand-written documentation errors still require manual correction.
+`pnpm gen` creates plugins that pass these checks. A package's homepage points to its folder README
+on `master`. Packages use MIT by default. If a package has its own `LICENSE`, `LICENSE.md` or
+`LICENSE.txt` file, keep the license declared in its `package.json`; `--fix` preserves that value.
 
-A change that makes a doc wrong is not finished until the doc is fixed, and the checks keep it honest:
+## Keep docs in sync with code
 
-- `pnpm readme:check` fails when generated README content is stale: plugin documentation, root
-  action/package tables, or action input/output tables from `action.yml`.
-- `pnpm check` runs `scripts/check-docs.mjs`, which fails when a README is missing from a package, a
-  link, heading or repo path in the docs doesn't exist, a `pnpm` command isn't a script, a page isn't in
-  the docs index, a root script isn't documented, or a CI job isn't in the CI table.
-- Documentation that can be derived from code is derived: commands are declared once with
-  `defineCommands` and listed in the README from the same declaration, permission names are typed
-  against the ones Pumpkin knows, and settings come from the config schema.
+If a code change makes a doc inaccurate, update the doc before you finish. `pnpm fix` checks release
+configuration, fixes derived package metadata, regenerates READMEs, checks documentation and ends
+with `pnpm lint:fix`. You still need to correct release registration and errors in handwritten docs
+yourself.
 
-What a script can't check is whether the prose is right. The pull request template asks for it, so
-read the docs you touched, and the ones that describe what you changed (search `docs/` and the
-READMEs for the names you renamed).
+The documentation checks catch different kinds of drift:
+
+- `pnpm readme:check` checks generated README content, including plugin docs, the root action and
+  package tables, and action input and output tables generated from `action.yml`.
+- `pnpm check` verifies release configuration and package metadata, then runs
+  `scripts/check-docs.mjs`. That script checks for missing package READMEs, broken links, headings
+  and repository paths, invalid `pnpm` commands, pages missing from the docs index, undocumented root
+  scripts and CI jobs missing from the CI table.
+
+Keep plugin documentation tied to the code that drives it. Declare commands once with
+`defineCommands`, then use that tree for registration and README command rows; it also constrains
+command permission nodes to the plugin name. `PluginInfo` checks requested permission names against
+Pumpkin's `PumpkinPermission` type, including `sys.env.<NAME>`. Define settings in the config schema
+and pass its `describeConfig` result to `info.config`, so defaults, validation and README settings
+come from the same source. See [Plugin info and READMEs](plugin-info-and-readmes.md) and
+[Plugin config](plugin-config.md) for these contracts.
+
+Scripts can't tell whether prose still describes the behavior. Read the docs you touched and the
+ones that explain your change. When you rename something, search `docs/` and the READMEs for the old
+name; the pull request template also asks you to confirm that the prose is accurate.

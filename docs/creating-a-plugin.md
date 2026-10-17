@@ -7,100 +7,126 @@ description: "The `pnpm gen` generator, what it creates, and what to do next"
 
 # Creating a plugin
 
+Use `pnpm gen` to add a plugin package to this repository. The generator creates a working starter,
+registers it for releases, installs its workspace dependencies, and updates the generated README
+content. It leaves the changes in your working tree for you to review and develop; it doesn't commit
+them.
+
+If you're building a plugin in its own repository, skip to [Standalone projects](#standalone-projects).
+
+## Create the package
+
+Run the generator from the repository root:
+
 ```sh
 pnpm gen
 ```
 
-This runs the `plugin` generator (a [Turborepo generator](https://turborepo.dev/docs/guides/generating-code),
-defined in `turbo/generators/`). It asks for three things:
+This runs the `plugin` [Turborepo generator](https://turborepo.dev/docs/guides/generating-code)
+defined in `turbo/generators/`. It asks for a folder name, the name Pumpkin displays, and a short
+description. These answers shape the package, its release tag, and its generated metadata, so choose
+them before you start adding behavior:
 
-| Prompt | Example | Used for |
+| Prompt | Example | What to enter |
 | --- | --- | --- |
-| Folder name | `my-plugin` | `packages/my-plugin/`, the npm package name, the release tag prefix and the `.wasm` file name. Kebab-case, and the folder must not exist yet. |
-| Plugin name | `MyPlugin` | The name Pumpkin shows and the data folder name (`plugins/data/MyPlugin/`). PascalCase. Defaults to the folder name converted. |
-| Description | `Does a thing` | The plugin's metadata, its README, its `package.json` and the package table in the root README. At most 70 characters, since it is also the package description; `src/info.ts` can say more later. |
+| Folder name | `my-plugin` | A new kebab-case name for `packages/`. It becomes the npm package suffix, release tag prefix, and `.wasm` file name. The folder must not already exist. |
+| Plugin name | `MyPlugin` | A PascalCase name that Pumpkin displays and uses for `plugins/data/MyPlugin/`. It defaults to the folder name converted to PascalCase. |
+| Description | `Does a thing` | A non-empty, single-line description of at most 70 characters. It appears in package metadata, the plugin README, and the root README package list; add a fuller explanation to `src/info.ts` later. |
 
-To skip the prompts, pass the answers in that order:
+To provide the same answers without prompts, pass them in that order:
 
 ```sh
 pnpm gen --args my-plugin MyPlugin "Does a thing"
 ```
 
-## What it does
+## What the generator sets up
 
-1. Creates `packages/<folder>/` with a working plugin: `package.json`, `tsconfig.json`,
-   `vitest.config.ts`, `src/name.ts`, `src/info.ts`, `src/commands/spec.ts`, `src/plugin.ts`, a
-   barebones `README.md` (a title and generated blocks, including the component reference marker)
-   and an integration test that loads the built plugin and checks its starter `/plugin` command on a
-   real Pumpkin server. The name and command permission are declared once in their respective
-   source modules.
-2. Registers the plugin for releases: an entry in `release-please-config.json` (with
-   `"release-as": "0.0.1"`) and one in `.release-please-manifest.json`, with the plugin starting at
-   version `0.0.0`, so that its first release is `0.0.1`. The `package.json` comes with derived
-   license and repository metadata. CI checks those fields, the description and release registration
-   (`pnpm check`). See
-   [Registering a plugin for releases](ci-and-releases.md#registering-a-plugin-for-releases).
-3. Runs `pnpm install`, fills in the plugin's README from its `info.ts`, generates its docs-site
-   reference links from repository metadata, and adds the plugin to the root README.
-4. Formats the new files with Biome.
+The new `packages/<folder>/` directory contains the files you need to begin:
 
-It doesn't commit anything. CI's `🧬 Generator` job generates a throwaway plugin when its scaffold,
-generation setup or generated plugin dependencies change, then typechecks, builds and
-integration-tests it so the templates can't silently rot.
+- `package.json`, `tsconfig.json`, and `vitest.config.ts` configure the package, build, and tests.
+- `src/name.ts`, `src/info.ts`, `src/commands/spec.ts`, and `src/plugin.ts` define the plugin name,
+  metadata, starter command, and behavior. The plugin name and command permission each have one
+  source declaration.
+- `test/plugin.itest.ts` loads the built plugin on a real Pumpkin server and checks that its starter
+  `/plugin` command works. The integration-test task builds the package first.
+- `README.md` starts with the plugin title and generated-content markers, including the component
+  reference marker.
 
-## Next steps
+The generator also registers the package in both Release Please files. It starts the package at
+`0.0.0` and pins its first release to `0.0.1`, regardless of the first commit type. The package
+metadata includes the repository's standard license and repository fields. `pnpm check` validates
+the description, those fields, and both release registrations. See [Registering a plugin for
+releases](ci-and-releases.md#registering-a-plugin-for-releases) for how the first-release pin works.
 
-- Describe what the plugin needs in `src/info.ts` (permissions, commands, config), editing or
-  replacing the starter command in `src/commands/spec.ts` with `defineCommands`. Keep its permission
-  under the `COMMAND_PERMISSION` constant. See [Plugin info and READMEs](plugin-info-and-readmes.md).
-- Add plugin-specific behavior in `src/plugin.ts`'s `onPluginLoad` hook. The generated plugin extends
-  `PluginBase` and calls `registerPlugin`, which provide shared metadata, lifecycle logging and the
-  automatic update check. Read [Building](building.md) first: Static Hermes is the default runtime
-  and has runtime-specific API limits. Follow [Code style](code-style.md): public code needs JSDoc descriptions
-  and `pnpm lint` checks it.
-- If the plugin needs settings, declare them as a schema with `@pumpkin-plugins/config` and add it
-  as a dev dependency. See [Plugin config](plugin-config.md).
-- Run `pnpm build --filter=@pumpkin-plugins/<folder>` to build the plugin, then
-  `pnpm turbo run test:integration --filter=@pumpkin-plugins/<folder>` to load it on a real
-  server.
+After writing the files, the generator runs `pnpm install`, fills the plugin README from `src/info.ts`,
+adds its docs-site API reference link, updates the root README package list, and formats the new files
+with Biome. The `🧬 Generator` CI job also creates a throwaway plugin and typechecks, builds, and
+integration-tests it when the scaffold, generator setup, or generated plugin dependencies change.
+That check catches templates that have drifted out of working shape.
+
+## Make it your plugin
+
+Start with the metadata and starter command:
+
+1. Describe the plugin in `src/info.ts`, including any permissions, commands, or config. Replace or
+   extend the starter command in `src/commands/spec.ts` with `defineCommands`. Keep its permission
+   under the `COMMAND_PERMISSION` constant. [Plugin info and READMEs](plugin-info-and-readmes.md)
+   explains how these declarations feed Pumpkin metadata and the generated README.
+2. Add plugin behavior in `src/plugin.ts`, inside the `onPluginLoad` hook. The starter extends
+   `PluginBase` and calls `registerPlugin`; together they provide shared metadata, lifecycle logging,
+   and the automatic update check. Read [Building](building.md) before choosing APIs: Static Hermes
+   is the default runtime and has runtime-specific API limits. Follow [Code style](code-style.md);
+   public code needs JSDoc descriptions, and `pnpm lint` checks them.
+3. If the plugin needs settings, declare them with `@pumpkin-plugins/config` and add that package as
+   a dev dependency. See [Plugin config](plugin-config.md).
+4. Build and test the package:
+
+   ```sh
+   pnpm build --filter @pumpkin-plugins/my-plugin
+   pnpm turbo run test:integration --filter=@pumpkin-plugins/my-plugin
+   ```
+
+   Replace `my-plugin` with the package's folder name. The integration test loads the built plugin
+   on a real Pumpkin server.
 
 ### Files and network access
 
-A plugin can't read files or open sockets unless its WIT world imports the WASI interfaces. Opt in
-per plugin in `package.json`:
+The starter already enables the `http` capability for its automatic update check. To use file or
+socket APIs, include their WASI capabilities in `pumpkinPlugin.wasi` in `package.json`. For example:
 
 ```json
-"pumpkinPlugin": { "entry": "src/plugin.ts", "output": "build/my-plugin.wasm", "wasi": ["filesystem", "sockets", "http"] }
+"pumpkinPlugin": { "entry": "src/plugin.ts", "output": "build/my-plugin.wasm", "wasi": ["filesystem", "sockets", "http", "udp"] }
 ```
 
-The server also has to grant the matching permissions. `PluginBase` metadata includes the automatic
-updater permission; list other permissions in `info.permissions`:
+Declaring a capability makes its interface available to the plugin, but Pumpkin must also grant the
+matching permissions. Shared plugin metadata adds `http.outbound` for the automatic updater; list
+other permissions in `info.permissions`:
 
-| Capability | Permissions the plugin will typically request |
+| Capability | Permissions you may need |
 | --- | --- |
-| `filesystem` | `fs.read.data`, `fs.write.data` (access is limited to the plugin's own data folder, preopened as `data`) |
-| `sockets` | `network.tcp.bind` to listen, `network.tcp.connect` to connect out |
-| `udp` | `network.udp.bind` to receive, `network.udp.outgoingdatagram` to send to any address, `network.udp.connect` to talk to one |
-| `http` | `http.outbound` to make HTTP or HTTPS requests; the automatic updater adds this permission |
+| `filesystem` | `fs.read.data` to read, `fs.write.data` to write. Both are limited to the plugin's own data folder, preopened as `data`. |
+| `sockets` | `network.tcp.bind` to listen, `network.tcp.connect` to connect out. |
+| `udp` | `network.udp.bind` to receive, `network.udp.outgoingdatagram` to send to any address, `network.udp.connect` to talk to one address. |
+| `http` | `http.outbound` for HTTP or HTTPS requests. The automatic updater already adds this permission. |
 
 ## Without the generator
 
-Copy `packages/bedrock-addon-manager` or generate a plugin and delete what you don't need. Three
-things are easy to forget:
+For a plugin in this monorepo, the generator handles several pieces that are easy to miss. If you
+create the package by hand, you can copy `packages/bedrock-addon-manager` or create a generated
+plugin and remove what you don't need. Then check that you:
 
-- The plugin has to be registered for releases: an entry in `release-please-config.json` **and**
-  one in `.release-please-manifest.json`, with the plugin at version `0.0.0`. The exact entries are
-  in [Registering a plugin for releases](ci-and-releases.md#registering-a-plugin-for-releases), and
-  `node scripts/check-release-config.mjs` tells you what is missing.
-- `pnpm install` has to run so the workspace links are created.
-- `pnpm readme` has to run so the package table lists it and its docs-site reference links are
-  generated.
+- Register it in both `release-please-config.json` and `.release-please-manifest.json`, and start
+  its `package.json` version at `0.0.0`. The first-release config entry needs
+  `"release-as": "0.0.1"`. See [Registering a plugin for releases](ci-and-releases.md#registering-a-plugin-for-releases);
+  `node scripts/check-release-config.mjs` reports missing registration.
+- Run `pnpm install` so pnpm links the package into the workspace.
+- Run `pnpm readme` so the root package table and generated docs-site reference links include it.
 
 ## Standalone projects
 
-Use [`create-pumpkin-plugin`](../tools/create-pumpkin-plugin/README.md) for a small project outside
-this monorepo. It offers TypeScript and JavaScript starters with the API and build dependencies, but
-does not add `plugin-kit`, Release Please registration or repository integration-test scaffolding.
+For a plugin in a separate repository, use [`create-pumpkin-plugin`](../tools/create-pumpkin-plugin/README.md).
+It offers TypeScript and JavaScript starters with the API and build dependencies, but it doesn't
+include `plugin-kit`, Release Please registration, or this repository's integration-test scaffolding.
 
 ```sh
 pnpm create pumpkin-plugin my-plugin
@@ -108,8 +134,8 @@ pnpm create pumpkin-plugin my-plugin --ts
 pnpm create pumpkin-plugin my-plugin --js
 ```
 
-The interactive command asks which language to use. Pass `--skip-install` to create files without
-installing dependencies. The creator refuses existing destinations. Its README documents npm,
-Yarn Classic, Yarn Modern and Bun launch forms; only pnpm packed-consumer builds are part of the
-validated external support contract. See the [Plugin API guide](plugin-api/index.md) for API setup,
-lifecycle, ABI and migration details.
+The interactive command asks which language to use. Add `--skip-install` to create the files without
+installing dependencies. The creator refuses an existing destination. Its README also documents
+npm, Yarn Classic, Yarn Modern, and Bun launch forms; the validated packed-consumer build contract
+covers pnpm only. See the [Plugin API guide](plugin-api/index.md) for API setup, lifecycle, ABI, and
+migration details.

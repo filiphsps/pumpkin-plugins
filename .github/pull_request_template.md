@@ -1,18 +1,17 @@
-## What and why
+## What changed and why?
 
-<!-- Describe the change and why it's needed. Commits must use conventional commit messages, such as `feat(scope): ...` or `fix: ...`. -->
+<!-- Describe the change and why it is needed. Use a Conventional Commit message for each commit, such as `feat(scope): ...` or `fix: ...`. -->
 
-## Tested
+## Checks
 
-<!-- List the commands, scenarios and Pumpkin version you checked. "Not tested" is a valid answer. -->
+<!-- List the commands and scenarios you ran. Include the Pumpkin version for integration tests. If you skipped a check or it failed, say so; “Not tested” is fine. -->
 
 ## Checklist
 
-- [ ] Based on the current `master`; no other open PR implements the same change
-- [ ] One topic per PR; follow-up work goes in a separate PR
-- [ ] Relevant checks pass, or checks that were not run and any failures are explained under Tested
-- [ ] Docs and READMEs that describe the change are updated; run `pnpm readme` if plugin info,
-  command declarations, config schemas, action metadata, or package metadata changed
-- [ ] New plugins were created with `pnpm gen`
+- [ ] This branch is based on the current `master`, and no open PR already covers this change
+- [ ] This PR covers one topic; follow-up work belongs in a separate PR
+- [ ] Relevant checks pass, or skipped checks and failures are explained under Checks
+- [ ] I updated docs and READMEs affected by this change. If it changes plugin info, command declarations, config schemas, action metadata, or package metadata, I ran `pnpm readme`
+- [ ] If this PR adds a plugin, I created it with `pnpm gen`
 - Depends on: <!-- #PR, or none -->
-- AI-assisted: <!-- yes / no; this is collected for analytics only and does not affect merge decisions. The PR author is responsible for all PR contents. -->
+- AI-assisted: <!-- yes or no; this is collected for analytics only and does not affect merge decisions. You are responsible for all PR contents. -->

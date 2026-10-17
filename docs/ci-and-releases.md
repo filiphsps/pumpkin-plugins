@@ -2,355 +2,375 @@
 navigation:
     category: Repository maintenance
 title: "CI and releases"
-description: "The CI workflow, release-please, rebase-only merging and the market stub"
+description: "Which checks run for each change, how releases are prepared, and how plugins reach the Market"
 ---
 
 # CI and releases
 
-Plugin, action, extension and public tool checks are in `.github/workflows/ci.yml`; the external-consumer matrix is
-in the reusable `.github/workflows/external-consumer.yml`. Release orchestration is in the reusable
-`.github/workflows/release.yml`, called after the CI gates pass. Action tests run through
-the reusable `.github/workflows/actions.yml`, scoped to action code. Extension checks run through
-`.github/workflows/extensions.yml`, scoped to changed extensions. The documentation site has its own
-`.github/workflows/docs.yml`, which checks and publishes the VitePress site and mirrors it to
-`gh-pages`. GitHub workflow validation runs independently in `.github/workflows/actionlint.yml`.
-`.github/workflows/issue-forms.yml` validates the chooser configuration and required form fields;
-`.github/workflows/issue-intake.yml` checks new and edited issue bodies, managing `status: needs info`
-and `status: needs triage` for incomplete submissions. The shared setup (pnpm, Node, install,
-Turborepo cache) is the composite action in
-`.github/common/bootstrap`. Most CI jobs use
-`ubuntu-26.04`; the external-consumer matrix also runs on `macos-15` and `windows-2025`.
+Use this guide to see which checks your change runs, how to read their results, and what happens after
+a release PR merges. The main workflow, `.github/workflows/ci.yml`, classifies changes and selects
+checks for plugins, repository code, actions, extensions and public tools. It calls the reusable
+external-consumer workflow at `.github/workflows/external-consumer.yml` to make sure published tools
+work outside this monorepo.
 
-Turborepo cache keys separate runner OS, architecture and job. Engine comparison also supplies its
-matrix variant as the bootstrap's `cache-suffix`, so parallel variants keep their own build outputs.
-Restores prefer the same job and variant across commits before falling back to shared task caches;
-Turbo still validates each task's inputs. The benchmark always runs its real-server tests, including
-on a build-cache hit. Malloc variants separately cache their WASI archives and prepared-build
-fingerprint under the pinned Static Hermes cache key, preserving the shared Hades snapshot.
+After the required CI gates pass, `.github/workflows/release.yml` handles releases. The reusable
+`.github/workflows/actions.yml` tests action code, and `.github/workflows/extensions.yml` checks
+changed extensions. `.github/workflows/docs.yml` checks the documentation and publishes the
+VitePress site, then mirrors it to `gh-pages`. GitHub workflow validation runs separately in
+`.github/workflows/actionlint.yml`. `.github/workflows/issue-forms.yml` validates the chooser and
+required fields; `.github/workflows/issue-intake.yml` checks new and edited issue bodies and manages
+`status: needs info` and `status: needs triage` for incomplete submissions.
 
-Release Please branches (`release-please--branches--...`) skip CI, Docs, Actionlint and benchmark
-comment jobs. The code they release has already passed validation on its associated commit; release
-PR updates carry the generated version and changelog, while the release workflow prepares generated
-READMEs and pins.
+Most jobs use the shared setup in `.github/common/bootstrap` for pnpm, Node, dependencies and the
+Turborepo cache. Most CI jobs run on `ubuntu-26.04`; external-consumer checks also run on `macos-15`
+and `windows-2025`.
+
+Cache keys separate runner OS, architecture and job. Engine comparison adds its matrix variant as a
+`cache-suffix`, so parallel variants do not reuse each other's build outputs. Restores first look for
+the same job and variant from an earlier commit, then fall back to shared task caches. Turbo still
+checks each task's inputs before reusing outputs. The benchmark's real-server tests run even when a
+build comes from cache. Malloc variants keep their WASI archives and prepared-build fingerprint in
+a separate cache keyed to the pinned Static Hermes toolchain. This keeps those files separate from
+the shared Hades snapshot.
+
+Release Please branches (`release-please--branches--...`) skip the CI, Docs, Actionlint and benchmark
+comment jobs. The commits being released have already passed validation. Release PR updates add the
+generated version and changelog, and the release workflow prepares generated READMEs and first-release
+pins.
 
 ## Jobs
 
-| Job | Runs | What |
+| Job | When it runs | What happens |
 | --- | --- | --- |
-| 🔍 Changed files | CI-triggering changes | Separates plugin/repository code, action directories, extension directories, documentation and label configuration; selects integration suites for plugin and suite dependency changes, the generator smoke test for scaffold-related changes, and detects generated README refresh commits |
-| 🔍 Lint GitHub workflows | pull requests, default-branch pushes, and manual runs | `actionlint` validates workflow files; skipped for Release Please branches and changes limited to label configuration |
-| 💬 Commit messages | code, action, extension, or generated README changes on PRs | Lints every commit with `commitlint.config.mjs` |
-| 📋 Lint | code changes | `pnpm lint`: Biome, then the JSDoc check (see [Code style](code-style.md)) |
-| ✅ Typecheck | code changes | `pnpm typecheck` |
-| 🧪 Test | plugin or repository code changes | Package and action unit tests with V8 coverage uploaded to Codecov; project coverage may drop by up to 1 percentage point, and tests for repo scripts and agent hooks (`pnpm test:scripts`) |
-| 📦 External consumer | code changes | Packs public tools and their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters and runs `pumpkin-codemod list` outside the repository on Linux, macOS arm64 and Windows x64 with the pinned Node and pnpm versions |
-| 🧪 Action tests | action or shared helper code changes | `.github/workflows/actions.yml` lints and tests the changed action, or common plus all four public consumers for shared helper changes, then uploads c8 coverage to Codecov |
-| 🛡️ Action test gate | every non-config-only CI run, after classification and action tests | Requires every selected action suite to pass; accepts skipped tests only for an empty matrix |
-| 🧪 Extension tests | extension implementation changes | `.github/workflows/extensions.yml` lints, typechecks, tests and packages each changed extension |
-| 🛡️ Extension test gate | every non-config-only CI run, after classification and extension tests | Requires every selected extension suite to pass; accepts skipped tests only for an empty matrix |
-| 📝 Docs and config | code, action, extension, or generated README changes | Generated READMEs are current, and `pnpm check` passes: release config, package metadata, docs against the code |
-| 🔨 Build | code changes, after change classification | Starts Static Hermes preparation while lint and typecheck run, then builds every production plugin with its configured engine (Static Hermes by default), runs integration checks, and rebuilds release artifacts with the same runtime before signing and verification |
-| 📊 Engine comparison | code changes, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`; nine engine configurations run as parallel matrix jobs, then a report job validates and combines their real-Pumpkin results |
-| 📈 Engine comparison comment | successful PR CI runs with a benchmark report | `.github/workflows/engine-comparison-comment.yml` compares with the latest matching default-branch report, updates one PR comment, and embeds an SVG timing-change chart |
-| 🎃 Integration | plugin and suite dependency changes, workspace-wide build configuration or shared integration setup changes, after build | Runs changed packages and their dependents against the pinned Pumpkin release, or the full suite for workspace-wide and integration setup changes; reuses WASM files from the build job |
-| 🛡️ Integration gate | every non-config-only CI run, after classification and integration tests | Requires selected integration suites to pass; accepts a skipped suite when no relevant changes occurred or benchmark changes use Engine comparison |
-| 🧬 Generator | scaffold, generator setup or generated plugin dependency changes, after lint and build | Reuses the Static Hermes cache saved by Build, then generates a throwaway plugin, action and extension; checks release registration and READMEs; tests the action and extension; and typechecks, builds and integration-tests the plugin |
-| 🛡️ Generator gate | every non-config-only CI run, after classification and the generator smoke test | Requires the smoke test when a scaffold, generator setup or generated plugin dependency changes; accepts a skipped test when none changed |
-| 🚢 Release | plugin, action, extension or public tool release changes, on `master` pushes | Calls the reusable release workflow after CI gates pass; actions create GitHub releases, extensions attach VSIX packages, public tools publish npm tarballs, and plugins produce signed artifacts and Market listings |
-| 📝 Prepare release PR | all open release PRs on release runs | Keeps plugin and extension READMEs, action README examples, starter dependency ranges and first-release pins current |
-| 🔏 Sign, 📎 Attach, 🛒 Market | per released plugin | Checks the tag is the commit this run built, signs and uploads the exact build artifact, publishes it to an existing Market listing, then syncs its description and commands |
-| 🧹 Cleanup artifacts | after artifact consumers finish, except for config-only changes | Deletes handoffs whose consumers succeeded or were skipped, even if another job failed; retains artifacts needed to rerun failed consumers |
+| 🔍 Changed files | CI-triggering changes | Classifies plugin and repository code, action and extension directories, documentation, and label configuration. It also selects integration suites and generator smoke checks, and detects generated README refresh commits. |
+| 🔍 Lint GitHub workflows | Pull requests, default-branch pushes, and manual runs | `actionlint` checks the workflow files. It skips Release Please branches and changes limited to label configuration. |
+| 💬 Commit messages | Pull requests that change code, actions, extensions, or generated READMEs | Checks every commit with `commitlint.config.mjs`. |
+| 📋 Lint | Code changes | Runs `pnpm lint`, which runs Biome followed by the JSDoc check (see [Code style](code-style.md)). |
+| ✅ Typecheck | Code changes | Runs `pnpm typecheck`. |
+| 🧪 Test | Plugin or repository code changes | Runs workspace and action unit tests with coverage, uploads V8 coverage to Codecov, and runs repository-script and agent-hook tests with `pnpm test:scripts`. The project coverage check allows a drop of up to 1 percentage point. |
+| 📦 External consumer | Code changes | Packs public tools with their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters and runs `pumpkin-codemod list` outside the repository. The matrix covers Linux, macOS arm64 and Windows x64 with pinned Node and pnpm versions. |
+| 🧪 Action tests | Action or shared-helper code changes | The reusable workflow lints and tests each changed action. A shared-helper change tests the common package and all four public action consumers. It then uploads c8 coverage to Codecov. |
+| 🛡️ Action test gate | Every non-config-only CI run outside Release Please branches, after classification and action tests | Requires each selected action suite to pass. It accepts skipped tests only when the matrix is empty. |
+| 🧪 Extension tests | Extension changes that need checks | The reusable workflow lints, typechecks, tests and packages each changed extension. |
+| 🛡️ Extension test gate | Every non-config-only CI run outside Release Please branches, after classification and extension tests | Requires each selected extension suite to pass. It accepts skipped tests only when the matrix is empty. |
+| 📝 Docs and config | Code, action, extension, or generated README changes | Checks that generated READMEs are current and runs `pnpm check` for release configuration, package metadata and docs-to-code links. |
+| 🔨 Build | Code changes, after change classification | Prepares Static Hermes while lint and typecheck run, then builds each production plugin with its configured engine (Static Hermes by default). It runs integration checks and rebuilds release artifacts with the same runtime before signing and verification. |
+| 📊 Engine comparison | Code changes, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`. Nine engine configurations run in parallel; a report job validates and combines their results from real Pumpkin servers. |
+| 📈 Engine comparison comment | Successful PR CI runs with a benchmark report | Compares the report with the latest matching default-branch run, updates one PR comment, and embeds an SVG chart of timing changes. |
+| 🎃 Integration | Plugin or suite-dependency changes, workspace-wide build configuration, or shared integration setup changes; after build | Runs affected packages and their dependents against the pinned Pumpkin release. Workspace-wide or shared integration changes run the full suite. The job reuses WASM files from Build. |
+| 🛡️ Integration gate | Every non-config-only CI run outside Release Please branches, after classification and integration tests | Requires the selected integration suites to pass. It accepts a skipped suite when no relevant changes occurred or benchmark changes use Engine comparison. |
+| 🧬 Generator | Scaffold, generator setup, or generated-plugin dependency changes; after lint and build | Reuses Build's Static Hermes cache, generates a throwaway plugin, action and extension, checks release registration and READMEs, tests the action and extension, and typechecks, builds and integration-tests the plugin. |
+| 🛡️ Generator gate | Every non-config-only CI run outside Release Please branches, after classification and the generator smoke test | Requires the smoke test when a scaffold, generator setup or generated-plugin dependency changes. Otherwise it accepts the skipped test. |
+| 🚢 Release | Release changes to plugins, actions, extensions or public tools, on `master` pushes | Calls the reusable release workflow after CI gates pass. Actions get GitHub releases, extensions get VSIX assets, public tools publish npm tarballs, and plugins get signed artifacts and Market listings. |
+| 📝 Prepare release PR | Every open release PR on a release run | Refreshes plugin and extension READMEs, action README examples, starter dependency ranges and first-release pins. |
+| 🔏 Sign, 📎 Attach, 🛒 Market | Each released plugin | Confirms the tag points to the commit built in this run, signs and uploads that artifact, publishes it to an existing Market listing, and syncs its description and commands. |
+| 🧹 Cleanup artifacts | After artifact consumers finish, except for config-only changes and Release Please branches | Deletes handoff artifacts after their consumers succeed or are skipped, even if another job failed. It keeps artifacts needed to rerun failed consumers. |
 
-The signed `plugins` build artifact remains available in the run summary, with a direct download
-link in the build job summary, for one day. CI deletes the integration WASM files and fixture after
-integration succeeds or is skipped, even if another job fails; it keeps them when integration fails
-so that job can be retried. Per-release handoff artifacts are deleted only after the reusable
-release workflow succeeds; a failed release keeps them available for a failed-job rerun. Failure
-logs remain available for diagnosis. The Docs workflow deletes its `docs-site` and `github-pages`
-artifacts after publishing succeeds or is skipped, and keeps them if publishing fails so it can be
-retried. The benchmark comment workflow keeps the combined report artifact for its post-CI run and
-stores chart SVGs on the `benchmark-charts` branch, outside Actions artifact cleanup. Fork and
-Dependabot pull requests use read-only tokens, so their temporary artifacts expire after one day
-instead of being deleted by the workflows.
+The signed `plugins` build artifact stays available from the run summary for one day; the build job
+summary includes a direct download link. CI deletes integration WASM files and their fixture after
+integration succeeds or is skipped, even if another job fails. If integration fails, CI keeps those
+files so you can rerun the job. The release workflow deletes its handoff artifacts only after a
+successful run, which leaves them available when you need to rerun a failed release. Failure logs
+remain available for diagnosis.
+
+The Docs workflow deletes its `docs-site` and `github-pages` artifacts after publishing succeeds or
+is skipped, and keeps them when publishing fails. The benchmark-comment workflow keeps the combined
+report for its post-CI run and stores chart SVGs on the `benchmark-charts` branch, outside Actions
+artifact cleanup. Fork and Dependabot pull requests use read-only tokens, so their temporary
+artifacts expire after one day instead of being deleted by the workflows.
 
 ## Reading CI results
 
-Test jobs combine Vitest's package reports into one table with command outcomes, elapsed time and
-freshly executed test counts. Expected failures, skipped tests and todos stay separate from passes.
-Flaky-test links and unfamiliar reporter output appear in expandable details; failure annotations
-and full diagnostics remain in the step logs. Cached suites and Node test results are identified
-separately rather than counted as fresh Vitest passes.
+Start with the job summary to see what ran for your change. Test jobs combine Vitest's package
+reports into one table with command outcomes, elapsed time and freshly executed test counts. The
+table keeps expected failures, skipped tests and todos separate from passes. Expand flaky-test links
+or unfamiliar reporter output for details; use the step logs for failure annotations and full
+diagnostics. Cached suites and Node test results are labeled separately, so they aren't counted as
+fresh Vitest passes.
 
-Build summarizes its component builds and runtime smoke check, then lists plugin names, versions,
-component sizes and the signed artifact download. The signing note distinguishes a CI-only key from
-the repository release key. Build's smoke test does not append a separate Vitest report.
-Extension checks link their VSIX download; documentation publishing links the live site; release
-orchestration lists released components and release PR counts; upstream pin jobs link the source diff.
-The selected-checks summary explains the job scope before expensive checks start. Expand workflow
-step outcomes to distinguish a failure, cancellation, skipped step or tolerated error.
+The Build summary lists component builds, the runtime smoke check, plugin names and versions,
+component sizes and the signed artifact download. Its signing note distinguishes a CI-only key from
+the repository release key. The Build smoke test doesn't create a separate Vitest report. Extension
+checks link the VSIX download, the Docs workflow links the published site, release orchestration
+lists released components and release PR counts, and upstream-pin jobs link the source diff. Before
+expensive checks start, the selected-checks summary explains why each job is in scope. Expand a
+workflow step to tell a failure, cancellation, intentional skip or tolerated error apart.
 
-`scripts/ci-run.mjs` captures child-process summaries while preserving console output, annotations
-and command failures. `scripts/ci-summary.mjs` and `.github/common/job-summary` render the job result
-even after a failed command. This uses Vitest's built-in GitHub reporter, without another reporting
-action or additional token permissions. Documentation publishing preserves its summary tools before switching
-the checkout to the `gh-pages` mirror.
+`scripts/ci-run.mjs` captures summaries from child processes while keeping their console output,
+annotations and command failures. `scripts/ci-summary.mjs` and `.github/common/job-summary` can then
+render the job result even after a command fails. Vitest's built-in GitHub reporter provides the
+test output without another reporting action or extra token permissions. The Docs workflow saves its
+summary tools before switching the checkout to the `gh-pages` mirror, so it can still report the
+publish result.
 
 ## Running only what a change needs
 
-`scripts/changed-areas.mjs` diffs the change against what came before it (the pull request base or
-the push's `before` commit). Both it and `scripts/utils/release-commits.mjs` exclude commits listed in
-`.git-blame-ignore-revs`; that file is also GitHub's blame ignore list. Add a short reason comment
-above each SHA so future entries retain their context. Markdown, `docs/`,
-component-level `docs/` folders and `LICENSE` changes are documentation. Changes under
-`actions/{name}/` and `extensions/{name}/` are reported separately from plugin and repository code.
-An action-only or extension-only change skips the plugin build, integration suites and repository
-test jobs; CI calls the matching reusable workflow for each changed component. Common action helper
-changes test common and all four public consumers.
-Common is excluded from release selection. Action tests live beside their implementation in
-`actions/{name}/src/*.test.mjs`; shared helper tests live in `actions/common/src/*.test.mjs`. README,
-changelog and version-file-only changes skip action tests.
-A docs-only change triggers the separate Docs workflow, which checks the docs and builds the site;
-GitHub's path filters skip the main CI workflow, so it does not call action tests. Mixed changes run the
-relevant code or action checks.
+CI compares each change with the pull request base or the push's `before` commit. The
+`scripts/changed-areas.mjs` classifier uses that diff to select checks. Both it and
+`scripts/utils/release-commits.mjs` ignore commits listed in `.git-blame-ignore-revs`, which is also
+GitHub's blame-ignore list. Add a short reason above each SHA so future entries keep their context.
 
-Everything else outside `actions/` is a change to repository code and runs the code jobs, including
-changes under `tools/`, `scripts/` and `.github/`, and deletions, except `.github/labels.yml` and
-`.coderabbit.yaml`. Changes limited to those two files still start CI and Actionlint so they can
-report successful skips; if a code or workflow file also changes, the relevant checks run.
-Real-server integration runs only for plugin or integration-suite dependency changes, plus
-workspace-wide build configuration and shared integration setup changes. Package changes select the
-affected integration suites and their dependents.
-Lockfile importer changes select the importer packages and their dependents; catalog-only workspace
-changes use the same importer scope. Other workspace-wide changes, lockfile changes without
-importer-level changes, and changes to the integration workflow or its local actions run the full suite.
-Unrelated scripts and workflow files skip this job. Benchmark-only changes use Engine comparison.
-Biome, the type checker and the tests read none of the documentation files, so a docs-only change
-cannot fail them.
+The classifier scopes checks this way:
 
-The main CI `📝 Docs and config` job runs for code, action and extension changes, and for the automatic
-`docs: update generated READMEs` commit. GitHub may trigger CI, Docs and Actionlint for Release Please
-branch updates, but their jobs skip those branches; the associated source commit already passed
-validation, and the release workflow prepares generated READMEs and pins. The benchmark comment
-workflow also skips those CI runs. Ordinary docs-only PRs skip the main CI workflow entirely.
+- Markdown, files under `docs/`, component-level `docs/` folders and `LICENSE` changes count as
+  documentation. A docs-only pull request runs the separate Docs workflow to check the docs and
+  build the site. The main CI path filter excludes ordinary Markdown and guide changes, but
+  re-includes root, package, action and extension README paths so generated README commits can run
+  the generated-content check. A README-only change can therefore start CI, but the classifier won't
+  select plugin builds, action tests or unit tests for it. Mixed changes run checks for their code or
+  action changes as well.
+- Changes under `actions/{name}/` and `extensions/{name}/` are selected separately from plugin and
+  repository code. An action-only or extension-only change skips the plugin build, integration
+  suites and repository test jobs; CI calls the matching reusable workflow for each changed
+  component. Changes to a shared action helper test `actions/common/` and all four public consumers.
+  Action tests live beside the implementation in `actions/{name}/src/*.test.mjs`, and shared-helper
+  tests live in `actions/common/src/*.test.mjs`. The `common` helper isn't a release component.
+  README, changelog and version-file-only changes skip action tests.
+- Everything else is plugin or repository code, including changes under `tools/`, `scripts/` and
+  `.github/`, as well as deletions. `.github/labels.yml` and `.coderabbit.yaml` are exceptions:
+  changes limited to those two files still start CI and Actionlint so they can report successful
+  skips. If a code or workflow file changes alongside them, the relevant checks run.
 
-On `master`, pushes containing only `chore(master): release ...`,
-`chore: retire first-release pins` and generated README commits skip the unit and script tests,
+Real-server integration runs when a change affects plugin code or dependencies used by the
+integration suites, or changes workspace-wide build configuration or shared integration setup.
+Package changes select the affected integration suites and their dependents. Lockfile importer
+changes select the importer packages and their dependents; catalog-only workspace changes use the
+same importer scope. Other workspace-wide
+changes, lockfile changes without importer-level changes, and changes to the integration workflow or
+its local actions run the full suite. Unrelated scripts and workflow files skip integration.
+Benchmark-only changes use Engine comparison. Biome, the type checker and unit tests don't read docs,
+so documentation-only changes cannot fail those checks.
+
+The main CI `📝 Docs and config` job runs for code, action and extension changes, and for the
+automatic `docs: update generated READMEs` commit. A Release Please branch update can trigger CI,
+Docs and Actionlint at the GitHub level, but their jobs skip those branches: the source commit has
+already passed validation, and the release workflow prepares generated READMEs and first-release
+pins. The benchmark-comment workflow skips them too. Pull requests that change only guide pages or
+other Markdown outside the included README paths skip the main CI workflow entirely.
+
+On `master`, a push made up only of `chore(master): release ...`,
+`chore: retire first-release pins`, and generated README commits skips unit and script tests,
 external-consumer tests, real-server integration, generator smoke tests and Engine comparison. The
-integration and generator gates accept these intentional skips; Build, lint, typecheck, Docs and
-config checks, and release processing still run as needed.
+integration and generator gates accept these intentional skips. Build, lint, typecheck, Docs and
+config checks, and release processing still run when needed.
 
-On a push, the release job waits for the action, extension, integration and generator gates and
-docs/config checks. Plugin/repository changes normally require lint, typecheck, build,
-external-consumer and unit test jobs; the release and pin-retirement commits above still require
-lint, typecheck and build. The integration gate requires the real-server suite only for relevant
-changes.
-Engine comparison runs separately and does not gate releases.
-Empty action and extension matrices pass their gates without running component tests, including version-only release changes.
-Release Please only releases a component with
-releasable changes, so running it for changed action code does not create an empty release.
+Before a push can release, the action, extension, integration and generator gates and the Docs and
+config job must pass. Plugin and repository code changes also require lint, typecheck, build,
+external-consumer and unit test jobs. The release and pin-retirement commits above still require
+lint, typecheck and build, while the integration gate requires the real-server suite only for
+relevant changes. Engine comparison runs separately and does not gate releases. Empty action and
+extension matrices pass their gates without running component tests, including for version-only
+release changes. Release Please only creates a release for a component with releasable changes, so
+running it after an action code change doesn't create an empty release.
 
-Know this before narrowing a job further: a skipped job takes every job that needs it with it, so no
-job can be gated on less than the jobs below it. Gating `📋 Lint` without `🔨 Build` would leave a
-release with no artifact to attach, and nothing would say so.
+When changing a job condition, keep its downstream jobs in mind: if a required job is skipped, the
+jobs that need it are skipped too. For example, gating `📋 Lint` without also gating `🔨 Build` could
+leave a release without an artifact to attach and no job to report that problem.
 
 ## Label management
 
-`.github/labels.yml` is the complete repository label catalog. Add `ai_apply_when` only to labels
-CodeRabbit may apply; the label-sync workflow removes that custom field before syncing labels and
-leaves labels outside the catalog untouched. After the catalog changes on `master`, the workflow
-updates the CodeRabbit label instructions and commits `.coderabbit.yaml` directly with the Release
-GitHub App token. CodeRabbit applies labels automatically using those instructions. `ready-for-agent`
-and `ready-for-human` stay outside its eligible label set.
+`.github/labels.yml` is the full label catalog for the repository. Add `ai_apply_when` only to labels
+CodeRabbit is allowed to apply. Before syncing labels, the label-sync workflow removes this custom
+field and leaves labels outside the catalog untouched.
+
+After a catalog change reaches `master`, the workflow updates the CodeRabbit label instructions and
+commits `.coderabbit.yaml` directly with the Release GitHub App token. CodeRabbit applies labels
+using those instructions. The `ready-for-agent` and `ready-for-human` labels remain outside its
+eligible set.
 
 ## Updating upstream runtime pins
 
-`Update upstream pins` runs daily and can be started manually. Add sources to
-`.github/upstream-pins.json`; pin files follow the schemas in `schemas/`, while each source provides
-its repository, branch and pinned field in that file and the catalog supplies labels and a validation
-command. The workflow compares each pin with its branch
-tip, validates updates, and refreshes a dedicated PR. If validation fails, it closes that PR and
-creates or updates an issue. When validation later succeeds, it closes the issue and reopens or
-creates the PR. Both use the configured labels and a compare link. Static Hermes validation prepares
-the pinned runtime, checking out the source and applying its ordered patch series.
+`Update upstream pins` runs daily, and you can start it manually. To add a source, register its
+repository, branch and pinned field in `.github/upstream-pins.json`, then add a pin file that follows
+the appropriate schema in `schemas/`. The catalog also supplies labels and the command used to
+validate an update.
+
+The workflow compares each pin with its branch tip, validates any update, and refreshes a dedicated
+pull request. If validation fails, it closes that PR and creates or updates an issue. When
+validation passes again, it closes the issue and reopens or creates the PR. Both include the
+configured labels and a compare link. Static Hermes validation prepares the pinned runtime by
+checking out its source and applying the patch series in order.
 
 ## Merging
 
-Pull requests are **rebase-merged**, never squashed. Every commit lands on `master` as written, and
-release-please reads each one, so every commit message must be a conventional commit:
-`feat(scope): ...`, `fix: ...`, `feat!: ...` for breaking changes. The commit lint enforces it.
+Pull requests are **rebase-merged**, never squashed. Rebase merging preserves each commit on
+`master`, where Release Please reads it to create changelog entries and choose version bumps. Give
+every commit a conventional message such as `feat(scope): ...`, `fix: ...`, or `feat!: ...` for a
+breaking change; commit lint enforces this format.
 
-Plugin releases follow source modules reachable from each plugin entry and the workspace build tool,
-plus explicitly bundled assets. A shared fix appears in each affected plugin's changelog, starting
-at that plugin's own last release. Tests, test helpers, generated build output and documentation do
-not count as shipped code. A dependency catalog change counts only when it changes a catalog entry
-used by those source modules; changes to the shared TypeScript configuration count for every plugin.
+For plugins, the release selector follows source modules reachable from each plugin entry and the
+workspace build tool, along with explicitly bundled assets. A shared fix appears in each affected
+plugin's changelog, starting from that plugin's own previous release. Tests, test helpers, generated
+build output and documentation aren't shipped code. A dependency-catalog change counts only if it
+changes an entry used by those source modules; a change to the shared TypeScript configuration counts
+for every plugin.
 
 ## Releases
 
-On `master`, once the checks pass, [release-please](https://github.com/googleapis/release-please)
-keeps an independent release PR up to date for each plugin, action, VS Code extension, and public
-npm tool with releasable conventional commits. Public npm tools release independently: a dependency
-change creates a release for that dependency, not for every npm tool that consumes it. A tool's own
-shipped files and packed templates select its release PR; npm package dependencies still determine
-publication order, and tool PRs wait until their transitive public production dependencies have
-functional releases.
-Merging a plugin release PR:
+After the required checks pass on `master`, [Release Please](https://github.com/googleapis/release-please)
+keeps a separate release PR up to date for every plugin, action, VS Code extension and public npm
+tool with releasable conventional commits. Public npm tools release independently: a dependency
+change can release that dependency without creating PRs for every tool that consumes it. A tool's
+own shipped files and packed templates determine whether it needs a release PR. Its npm dependencies
+still determine publishing order, and a tool PR waits until all of its transitive public production
+dependencies have functional releases.
 
-- bumps each changed plugin's version and changelog,
-- tags it `<folder>-v<version>` and creates its GitHub release,
-- attaches `<folder>.wasm` and `<folder>.wasm.sha256`, taken from the artifact the build job made
-  in the same run.
+When you merge a plugin release PR, the workflow updates each changed plugin's version and generated
+changelog, creates a `<folder>-v<version>` tag and GitHub release, and attaches the `<folder>.wasm`
+and `<folder>.wasm.sha256` files from the build artifact made in that same run.
 
-If GitHub rejects release creation because the tag already belongs to an immutable release, the
-runner reuses the existing release metadata only when its target commit matches the release PR.
-That lets the matching run attach the artifact; an older run defers the artifact to the run that
-built the tagged commit. The runner changes the release PR label from pending to tagged either way.
-Other release PRs in the same run can still publish; other API errors remain failures.
-The matching run also recovers already-created releases for the configured component versions at
-its exact commit, even after another run marks their PRs as tagged. Recovered releases and newly
-created releases share the same fan-out, with each tag included once. Each successful release run
-also scans plugin releases on its first-parent history and catches up releases that have neither
-plugin asset. It rebuilds those plugins from their tag commits, then attaches the signed assets and
-publishes the release to Pumpkin Market with metadata from that tagged source. This also lets a
-retry resume npm publishing after GitHub release creation; existing npm versions must pass the
-publisher's integrity check.
+Sometimes GitHub rejects release creation because the tag already belongs to an immutable release.
+The runner reuses that release's metadata only when its target commit matches the release PR. Only the
+run that built that commit can attach its artifact; an older run leaves the attachment for the
+matching run. The runner marks the release PR as tagged either way. Other release PRs in the same run
+can still publish, while unrelated API errors remain failures.
 
-Merging an action release PR updates its `version.txt` and `CHANGELOG.md`, tags it
-`<folder>-v<version>`, and creates a GitHub release. Action releases do not run plugin packaging,
-attach WebAssembly files, or publish to Pumpkin Market.
+The matching run also recovers releases already created for configured component versions at its
+exact commit, even if another run has marked their PRs as tagged. Newly created and recovered
+releases go through the same fan-out, with each tag included once. A successful release run also
+checks plugin releases on its first-parent history for releases missing both plugin assets. It
+rebuilds each plugin from its tag commit, attaches signed assets, and publishes the release and its
+tagged listing metadata to Pumpkin Market. If GitHub release creation succeeded but npm publishing
+didn't, a later run can resume publishing; an existing npm version must pass the publisher's
+integrity check.
 
-Merging a VS Code extension release PR updates its `package.json` version and `CHANGELOG.md`, tags
-it `<folder>-v<version>`, and creates a GitHub release with the built `<folder>.vsix` attached.
-Extension releases do not run plugin packaging or publish to Pumpkin Market.
+Action release PRs update `version.txt` and `CHANGELOG.md`, create a `<folder>-v<version>` tag and
+GitHub release. They don't package plugins, attach WebAssembly files or publish to Pumpkin Market.
+VS Code extension release PRs update the `package.json` version and `CHANGELOG.md`, then create the
+same style of tag and a GitHub release with the built `<folder>.vsix` attached. They don't package
+plugins or publish to Pumpkin Market.
 
-Create and register a new extension with `pnpm gen:extension`. The generator creates its independent
-Release Please manifest entry and first-release pin; the release-config check verifies its README,
-changelog, package version and tag component.
+Create and register an extension with `pnpm gen:extension`. The generator adds its independent
+Release Please manifest entry and first-release pin. The release-config check then verifies its
+README, changelog, package version and tag component.
 
-Actions import shared runtime helpers from `actions/common/src/`. Each action tag contains its own
-snapshot of those files, so changes to a shared helper must also include releasable changes under
-each consuming action directory to publish the updated helper with those actions.
+Actions import shared runtime helpers from `actions/common/src/`, but each action tag contains its
+own snapshot of those files. To publish a shared-helper change, include a releasable change under
+each consuming action directory.
 
-Public npm tools are discovered from package manifests under `tools/` that declare
-`publishConfig.access: "public"` and are not private. Their declared production dependencies and
-packed project templates determine release order. Seed each package with a metadata-only `0.0.0`
-placeholder so its trusted publisher can be configured. Release Please creates and the workflow
-publishes the first functional `0.1.0` release. See
-[Publishing public npm tools](npm-publishing.md) for the sequence and
-[Trusted publishing for npm tools](npm-trusted-publishing.md) for the `ci.yml` identity, OIDC
-permissions, two-day validation window, provenance, and recovery.
+Release Please discovers public npm tools from package manifests under `tools/` that set
+`publishConfig.access: "public"` and aren't private. Their production dependencies and packed
+project templates determine release order. Start each package with a metadata-only `0.0.0`
+placeholder so you can configure its trusted publisher. Release Please creates the first functional
+`0.1.0` release, which the workflow publishes. See [Publishing public npm tools](npm-publishing.md)
+for the sequence and [Trusted publishing for npm tools](npm-trusted-publishing.md) for the `ci.yml`
+identity, OIDC permissions, two-day validation window, provenance and recovery.
 
-To register a new public tool, add its publishable package under `tools/` and run
-`pnpm register:tool tools/<path>`. The command uses the package name from its manifest, validates
-public access and the first version, then updates both Release Please files. It sets a missing
-first-release pin on an existing entry and rejects a conflicting one. Public tool pack checks
-discover the package from its manifest; add a consumer smoke check only for a user-facing flow that
-needs coverage.
+To register a public tool, add its publishable package under `tools/` and run the registration
+command. For example, register the codemod package with `pnpm register:tool tools/codemod`; replace
+`tools/codemod` with the new package's directory. The command reads the package name from its
+manifest, validates public access and the first version, and updates both Release Please files. It
+adds a missing first-release pin to an existing entry and rejects a conflicting pin. Public-tool
+pack checks find packages from their manifests; add a consumer smoke check only when a user-facing
+flow needs it.
 
-The merge of a release PR is its own commit, so its push can start a run while the previous commit's
-run is still active. The older run may create the tag and release first, using an artifact built from
-the previous commit. The attach job checks that the tag points to the commit built by its run and
-skips a mismatched artifact. The matching run, or a later successful run if it was skipped, builds
-the tagged source and uploads the release files.
+The merge of a release PR creates a new commit, so its push can start before the previous push's run
+finishes. The older run may create the tag and release first, but its build artifact comes from the
+previous commit. The attach job checks whether the tag points to the commit that run built and skips
+an artifact when they don't match. The matching run, or a later successful run if it was skipped,
+builds the tagged source and uploads the release files.
 
-For push runs, GitHub keeps one run active and one pending in each concurrency group; a newer push
-can replace the pending run. The npm publisher scans tool releases on the target commit's
-first-parent history and publishes missing versions from their exact tag commits, oldest first, so
-the latest successful run catches up releases from skipped pending runs. Pull request runs are
-canceled when superseded.
+For push runs, GitHub keeps one run active and one pending in each concurrency group. A newer push
+can replace that pending run. To catch up releases from a pending run that was replaced, the npm
+publisher scans tool releases on the target commit's first-parent history and publishes missing
+versions from their exact tag commits, oldest first. GitHub cancels pull request runs when a newer
+run supersedes them.
 
-Release Please creates a tag immediately, including while a GitHub release is a draft. Without that,
-a later release run can miss the previous release and recreate its changelog. The release config
-keeps `force-tag-creation` enabled, and the repository check enforces it.
+Release Please creates a tag as soon as it prepares a release, even while the GitHub release is a
+draft. That tag gives the next release run a history boundary, so it won't miss the previous release
+and repeat its changelog. The release configuration keeps `force-tag-creation` enabled, and the
+repository check enforces it.
 
-After each Release Please run, a separate matrix job finds every open component release PR and
-prepares its branch, including branches Release Please did not return as changed. Discovery retries
-briefly and fails if it cannot find all PRs returned by Release Please; a failed GitHub CLI query
-also fails the release workflow instead of silently skipping preparation. It regenerates
-plugin READMEs, generates every action README's input/output tables from its `action.yml`, and
-updates the versioned example tag from that action's Release Please manifest entry. For an action
-that has not had its first release, the README uses its `release-as` version instead of `0.0.0`. The
-job pushes a `docs: update generated READMEs` commit to the PR branch, so examples are current when
-the release merges. The same run retires the `release-as` pin for any plugin, action, extension or
-public npm tool whose first release PR advances its manifest version (see below).
-release-please rewrites its branch on every update, so those commits are re-added each time.
+After each Release Please run, a matrix job finds every open component release PR and prepares its
+branch, including branches Release Please didn't return as changed. Discovery retries briefly and
+fails if it can't find every PR returned by Release Please. A failed GitHub CLI query also fails the
+release workflow instead of silently skipping preparation. The job regenerates plugin READMEs,
+generates each action README's input and output tables from its `action.yml`, and updates the
+versioned example tag from the action's Release Please manifest entry. Before an action's first
+release, the README uses its `release-as` version instead of `0.0.0`.
 
-Release PRs refresh on every release run, even when their release notes are unchanged.
-`always-update` keeps the remaining branches based on current `master` after another plugin's
-release merges, preventing conflicts in the shared manifest and release configuration. Every
-refreshed PR goes through the README and pin preparation job again. Separate PRs keep a plugin
-that is not ready from being released with one that is.
+The preparation job pushes a `docs: update generated READMEs` commit to each release PR branch, so
+examples are current when the release merges. In the same run, it removes the `release-as` pin for
+any plugin, action, extension or public npm tool whose first release PR advances its manifest
+version (see below). Release Please rewrites its branch on each update, so the preparation commits
+are added again each time.
 
-The release, release-PR preparation and benchmark-comment jobs authenticate with short-lived GitHub
-App installation tokens. The App is installed on this repository with `actions` read and `contents`,
-`issues` and `pull-requests` write permissions. Actions settings store its Client ID in the
-`RELEASE_APP_CLIENT_ID` repository variable and its private key in the `RELEASE_APP_PRIVATE_KEY`
-repository secret. Each job mints its own repository-scoped token; the release-PR job uses its token
-to push prepared README and pin updates, which trigger the normal pull-request CI checks. The
-benchmark-comment job uses its token to read cross-run artifacts and publish its SVG as a GitHub
-attachment embedded in the PR comment.
+Release PRs refresh on every release run, even if their release notes haven't changed.
+`always-update` rebases the remaining branches on current `master` after another plugin release
+merges, which prevents conflicts in the shared manifest and release configuration. Each refreshed
+PR goes through README and pin preparation again. Separate release PRs let you hold one plugin back
+without holding another release.
 
-`scripts/release.mjs` runs the pinned Release Please runtime through `pnpm dlx` and applies the
-pre-1.0.0 versioning policy to every configured component. For a current version below `1.0.0`,
-breaking changes bump the minor (`0.0.8` to `0.1.0`), features bump the patch, and fixes and
-performance improvements bump the patch. At `1.0.0` and later, normal SemVer applies: breaking
-changes bump major, features bump minor, and fixes and performance improvements bump patch. The
-release config checker requires the corresponding `bump-minor-pre-major` and
-`bump-patch-for-minor-pre-major` options and rejects package overrides that disable them.
+The release, release-PR preparation and benchmark-comment jobs use short-lived GitHub App
+installation tokens. Install the App on this repository with `actions` read and `contents`, `issues`
+and `pull-requests` write permissions. Store its Client ID in the `RELEASE_APP_CLIENT_ID` repository
+variable and its private key in the `RELEASE_APP_PRIVATE_KEY` repository secret. Each job creates its
+own repository-scoped token. The release-PR job uses its token to push prepared README and pin
+updates, which then trigger normal pull request checks. The benchmark-comment job uses its token to
+read artifacts from earlier runs and publish the SVG as a GitHub attachment in the PR comment.
 
-`scripts/utils/release-commits.mjs` supplies shared commits through its plugin hook before versions and
-changelogs are calculated. A shipped change is included for every plugin that bundles the affected
-package, and each plugin's version bump is calculated from its own current version. Features, fixes
-and performance improvements appear in the notes. After publishing, the runner reloads the manifest
-before generating PRs. Each plugin's commits stop at its own latest release, and first-release notes
-start at the commit that added the plugin's `package.json`.
-Action commits are trimmed to their latest release boundary, so first-release notes do not repeat in
-the next release. If a manifest version has no matching GitHub release or tag, the helper uses the
-latest published release for that component with a lower version as the history boundary. If none
-exists, package paths fall back to the commit that introduced their `package.json`. It fails if no
-release or package introduction boundary exists, or if it cannot fetch enough history, rather than
-publishing incomplete notes. Increase `commit-search-depth` in the release configuration if a
-component has more than that many commits since its boundary.
-Changelogs stay generated; do not edit them by hand. Empty version-only `Release-As` commits need a
-conventional-commit scope matching the component so only that release is affected.
+`scripts/release.mjs` runs the pinned Release Please version through `pnpm dlx` and applies the
+pre-1.0.0 version policy to every configured component. Below `1.0.0`, breaking changes bump the
+minor version (`0.0.8` to `0.1.0`), while features, fixes and performance improvements bump the
+patch. At `1.0.0` and later, normal SemVer applies: breaking changes bump major, features bump minor,
+and fixes and performance improvements bump patch. The release-config check requires
+`bump-minor-pre-major` and `bump-patch-for-minor-pre-major` and rejects package overrides that turn
+either option off.
 
-To preview without changing GitHub, set `GITHUB_REPOSITORY` and `GITHUB_TOKEN`, then run:
+Before Release Please calculates versions and changelogs, `scripts/utils/release-commits.mjs` adds
+shared commits through its plugin hook. If a shipped dependency changes, every plugin that bundles
+it gets the change in its notes, and each plugin's bump uses its own current version. Features,
+fixes and performance improvements appear in release notes. After publishing, the runner reloads
+the manifest before it creates release PRs.
+
+Each plugin's changelog starts after its own latest release. For a first release, notes start at the
+commit that added the plugin's `package.json`. Action commits also stop at the action's latest
+release so its first-release notes aren't repeated in the next one. If a manifest version has no
+matching GitHub release or tag, the helper uses the latest published release with a lower version as
+the history boundary. If no such release exists, package paths use the commit that introduced their
+`package.json`. The helper fails rather than publish incomplete notes when it can't find a boundary
+or enough history; increase `commit-search-depth` if a component has more commits since its
+boundary than the configured search can cover.
+
+Changelogs are generated; don't edit them by hand. An empty version-only `Release-As` commit needs a
+conventional-commit scope matching the component so only that component is affected.
+
+To preview a release without changing GitHub, set `GITHUB_REPOSITORY` and `GITHUB_TOKEN`, then run:
 
 ```sh
 pnpm --package=release-please@17.11.2 dlx -c 'node scripts/release.mjs --dry-run "$(command -v release-please)"'
 ```
 
-Add `--component=<name>` to preview one plugin or action. `--pull-requests-only` updates release PRs without
-creating tags or GitHub releases.
+Add a `--component` value, such as `--component=apple-skin-pumpkin`, to preview one plugin or action.
+Add `--pull-requests-only` to update release PRs without creating tags or GitHub releases.
 
-Plugin releases whose GitHub release exists without either plugin asset are caught up by the next
-successful release run on `master`; it rebuilds the source at the tag, signs and verifies the plugin,
-uploads the `.wasm` and `.sha256` assets, then publishes it and its tagged listing metadata to Pumpkin
-Market. It also prepares the tag's pinned Hermes toolchain when Static Hermes is selected. A partial
-asset pair or an immutable release is skipped with a warning because the existing files cannot be
-replaced automatically.
+The catch-up job also prepares the tag's pinned Hermes toolchain when that release uses Static
+Hermes. It skips a partial plugin asset pair or an immutable release with a warning because it can't
+replace the existing files automatically.
 
 ## Signing
 
-Pumpkin can check a plugin's integrity: a signed `.wasm` carries two custom sections,
-`pumpkin.metadata` (plugin name, version, developer, issue time) and `wasm_signature` (an Ed25519
-signature over the code plus the metadata, and the public key). Pumpkin loads unsigned plugins with
-a warning unless `allow_unsigned = false` is set in its config. Signing is optional here.
+Signing lets Pumpkin detect whether a plugin file has changed. A signed `.wasm` carries two custom
+sections: `pumpkin.metadata` records the plugin name, version, developer and issue time; and
+`wasm_signature` contains an Ed25519 signature over the code and metadata, plus the public key.
+Pumpkin warns when it loads an unsigned plugin unless its config sets `allow_unsigned = false`.
+Local signing is optional.
 
 `pnpm package` builds each production plugin with its configured engine (Static Hermes by default),
-then copies built plugins into `dist/` and writes checksums; it does not sign files or warn when they
-are unsigned. CI always prepares a key and uses
-the reusable [`sign-pumpkin-plugin` action](../actions/sign-pumpkin-plugin/README.md) to sign every
-collected plugin from a metadata manifest. It then runs the
-[`verify-pumpkin-plugin` action](../actions/verify-pumpkin-plugin/README.md) against the same
-manifest, pinning verification to the public key derived from that run's signing key. Pushes use the
-repository secret when available, while pull requests and pushes without the secret use an ephemeral
-key. CI uses the verified signed files for integration tests. The ephemeral key is only for checks;
-release jobs never receive it. Release jobs use the signing action to sign the exact build artifact
-after checking that the release tag points to the commit that produced the build. The signed `.wasm`
-and refreshed `.sha256` go to the GitHub release. Before Market upload, CI verifies that signed
-artifact against the expected plugin name and version, then removes its publisher signing sections;
-Market signs each public download itself.
+copies the result into `dist/` and writes checksums. It doesn't sign files or warn that they're
+unsigned, regardless of the key environment variable. CI always prepares a signing key and uses the
+reusable [`sign-pumpkin-plugin` action](../actions/sign-pumpkin-plugin/README.md) to sign every collected
+plugin from a metadata manifest. It then runs the
+[`verify-pumpkin-plugin` action](../actions/verify-pumpkin-plugin/README.md) against that manifest,
+pinning verification to the public key derived from the same run's signing key.
+
+When a repository signing key is available, CI uses it on pushes. Pull requests and pushes without
+that secret use an ephemeral key. The verified signed files go to integration tests; the ephemeral
+key is only for checks and is never available to release jobs. Before signing a release artifact,
+the release job confirms its tag points to the commit that produced the build. It uploads the signed
+`.wasm` and refreshed `.sha256` to the GitHub release. Before uploading to Pumpkin Market, CI
+verifies the artifact's expected plugin name and version and removes the publisher's signing
+sections. Market signs each public download itself.
 
 | Situation | Result |
 | --- | --- |
@@ -359,37 +379,38 @@ Market signs each public download itself.
 | CI pull request or push without a key | Signs build artifacts with a run-only key; release signing still requires the repository key |
 | Signing action receives a malformed key | Fails rather than silently shipping unsigned files |
 
-To set it up:
+To set up the repository signing key:
 
 1. Generate a key: `node scripts/generate-signing-key.mjs`. It prints a secret and a public key and
    writes nothing.
 2. Settings, Secrets and variables, Actions: add the secret as the repository secret
    `PLUGIN_SIGNING_KEY`. The public key is safe to publish.
 
-To check a downloaded plugin: `node scripts/verify-plugin.mjs <file.wasm>`. It prints the plugin
-name, version and public key, and exits with 1 when the file is unsigned or the signature doesn't
-match.
+To check a downloaded plugin, run `node scripts/verify-plugin.mjs path/to/plugin.wasm`, replacing
+the example path with the file you downloaded. It prints the plugin name, version and public key.
+It exits with 1 if the file is unsigned or its signature doesn't match.
 
-The signature embeds its own public key, so Pumpkin 0.2.0 only checks that the file is intact; it
-doesn't know whose key it is. A server admin decides whom to trust by comparing the public key
-with the one you publish.
+The signature includes its public key, so Pumpkin 0.2.0 can check that a file is intact but can't
+identify who signed it. Server admins decide which publishers to trust by comparing the embedded key
+with the publisher's published key.
 
-To rotate the key, generate a new one and replace the secret. Releases made with the old key stay
-valid, since each file carries the key it was signed with. Only the published public key changes.
+To rotate the key, generate a new one and replace the repository secret. Releases signed with the old
+key remain valid because each file carries its signing key; only the published public key changes.
 
 ## Registering a plugin for releases
 
-A plugin is tracked only if it is listed in **both** release-please files. `pnpm gen` adds it to both
-automatically. Packages that are not ready to release can stay out of both files and be documented
-in `release-please-paused.json` with a reason. The release config check verifies that paused package
-paths exist and are not tracked. To resume a package, remove it from that file and add it to both
-release-please files.
+A plugin is tracked for releases only when it appears in **both** Release Please files.
+`pnpm gen` adds it to both. If a package isn't ready to release, leave it out of those files and add
+its path and a reason to `release-please-paused.json`. The release-config check verifies that each
+paused path exists and isn't tracked. To resume a package, remove it from the paused file and add it
+to both Release Please files.
 
-A first release has no tag boundary, so the release helper scans full history. Pausing an unreleased
-plugin prevents it from triggering that scan on every release run; it remains in the workspace and
-normal build and test workflows.
+A first release has no previous tag to mark the history boundary, so the release helper scans the
+full history. Pausing an unreleased plugin keeps it from triggering that scan on every release run;
+the package stays in the workspace and continues through normal build and test workflows.
 
-If you ever create a plugin by hand, do these three things:
+`pnpm gen` handles release registration for you. If you create a plugin by hand, make these three
+updates:
 
 1. Add it to `release-please-config.json`, under `packages`. The `component` must be the folder
    name; it becomes the tag prefix (`my-plugin-v0.0.1`):
@@ -398,12 +419,12 @@ If you ever create a plugin by hand, do these three things:
    "packages/my-plugin": { "component": "my-plugin", "release-as": "0.0.1" }
    ```
 
-   `release-as` makes the first release `0.0.1` whatever the first commits are (a breaking change
-   would otherwise make it `0.1.0`). It pins every release until it is removed, so the release job
-   removes it from the release PR (`scripts/unpin-release-as.mjs`). That has to happen **before** the
-   release PR merges, not after: `master` fails the release config check while the pin is there, and
-   the release and attach jobs both need that check, so a release merged with the pin still in place
-   is never tagged and gets no `.wasm`. To do it by hand, delete the line from the PR branch.
+   `release-as` makes the first release `0.0.1` regardless of the commits (without the pin, a
+   breaking change could make it `0.1.0`). It stays in place until removed, so the release job
+   removes it from the release PR with `scripts/unpin-release-as.mjs`. The pin must be gone **before**
+   that PR merges: while it remains, `master` fails the release-config check, which both the release
+   and attach jobs need. The merged release then won't be tagged or get a `.wasm`. To remove it by
+   hand, delete the line from the release PR branch.
 
 2. Add it to `.release-please-manifest.json`, at the same version as the plugin's `package.json`:
 
@@ -411,17 +432,17 @@ If you ever create a plugin by hand, do these three things:
    "packages/my-plugin": "0.0.0"
    ```
 
-3. Start the plugin at version `0.0.0` in its `package.json`. After the pinned `0.0.1` first
+3. Set the plugin's initial `package.json` version to `0.0.0`. After the pinned `0.0.1` first
    release, a `feat!:` breaking change bumps `0.0.X` to `0.X.0`; a regular `feat:` or `fix:` bumps
-   the patch while the current version is below `1.0.0`. Once `1.0.0` has been released, normal
-   SemVer applies: `feat:` bumps minor and a breaking change bumps major.
+   the patch while the current version is below `1.0.0`. After `1.0.0`, normal SemVer applies:
+   `feat:` bumps minor and a breaking change bumps major.
 
 ## Registering an action for releases
 
 Each directory under `actions/` with an `action.yml` or `action.yaml` is an independent release
-component. Use `pnpm gen:action` to create the standard action files and register the action. If you
-create one by hand, register it under `packages` in `release-please-config.json` with its folder as the
-component, the `simple` release strategy, and a first-release pin:
+component. Use `pnpm gen:action` to create the standard files and register a new action. If you set
+one up by hand, add it under `packages` in `release-please-config.json` with its folder as the
+component, the `simple` release strategy and a first-release pin:
 
 ```json
 "actions/my-action": {
@@ -441,71 +462,71 @@ component, the `simple` release strategy, and a first-release pin:
 > Action tests must use the runner's hyphenated environment keys (for example,
 > `'INPUT_PLUGIN-NAME'`) so this behavior stays covered.
 
-Use a JavaScript action (`runs.using: node24`) when the implementation can run on GitHub's built-in
-Node runtime. Consumers do not need `actions/setup-node` or a local Node installation for that
-action. Use a composite action when it needs to orchestrate workflow steps or support other runner
-steps.
+Use a JavaScript action (`runs.using: node24`) when it can run on GitHub's built-in Node runtime.
+Consumers don't need `actions/setup-node` or a local Node installation for that action. Use a
+composite action when it needs to orchestrate workflow steps or support other runner steps.
 
-Add `actions/my-action/version.txt` with `0.0.0`, a `CHANGELOG.md`, and the same path at version
-`0.0.0` in `.release-please-manifest.json`. Release Please updates the version file and changelog;
-the repository check enforces that the action version, manifest and config stay aligned. Its tag is
-`my-action-v<version>`. The release PR job removes `release-as` after the first version is set,
-just as it does for plugins.
+Add `actions/my-action/version.txt` with `0.0.0`, a `CHANGELOG.md` and the same path at version
+`0.0.0` in `.release-please-manifest.json`. Release Please updates the version file and changelog,
+and the repository check keeps the action version, manifest and config aligned. The tag is
+`my-action-v<version>`. As with plugins, the release PR job removes `release-as` after the first
+version is set.
 
 ## Repo checks
 
-`pnpm check` runs three scripts, each of which says exactly what is wrong. CI runs it in the
-`📝 Docs and config` job, and the `🧬 Generator` job runs it on a freshly generated plugin, so the
-generator and the checks can't drift:
+Run `pnpm check` to validate release configuration, package metadata and documentation. Each script
+explains what failed. CI runs the check in `📝 Docs and config` and again on a freshly generated
+plugin in `🧬 Generator`, so the generated setup stays compatible with repository checks:
 
 | Script | Fails when |
 | --- | --- |
-| `scripts/check-release-config.mjs` | a plugin, action or public tool is missing from either release-please file, a paused plugin is still tracked, an action is not using the `simple` strategy, `component` isn't the folder name, the manifest and package/version file disagree, an unreleased component lacks its required first-release pin, or a released one still has it |
-| `scripts/package-metadata.mjs` | a `package.json` has an incorrect derived license, homepage, repository or bugs field, lacks a short description, or a library lacks `sideEffects`, `module` or `types`. Public npm tool engines must match `.node-version`. `--fix` writes derived fields |
-| `scripts/check-docs.mjs` | a package has no README, a link, heading or path in the docs doesn't exist, a `pnpm` command isn't a script, a doc page isn't in the docs index, a root script isn't documented, or a CI job isn't in the table above |
+| `scripts/check-release-config.mjs` | A plugin, action or public tool is missing from either Release Please file; a paused plugin is still tracked; an action uses a strategy other than `simple`; `component` differs from the folder name; the manifest and package or version file disagree; or a component is missing a required first-release pin or still has one after release. |
+| `scripts/package-metadata.mjs` | A `package.json` has the wrong derived license, homepage, repository or bugs field; has no short description; or a library is missing `sideEffects`, `module` or `types`. Public npm tool engines must match `.node-version`. Use `--fix` to write derived fields. |
+| `scripts/check-docs.mjs` | A package has no README; a documentation link, heading or path doesn't exist; a `pnpm` command isn't a script; a doc page is missing from the docs index; a root script isn't documented; or a CI job is missing from the table above. |
 
-`pnpm test:scripts` runs the tests of those three, `scripts/unpin-release-as.mjs`,
-`scripts/changed-areas.mjs`, the bundled release commit selector,
-and the agent hooks, using fixtures and throwaway repos. Action README generation and example
-version updates are covered by `pnpm --filter @pumpkin-plugins/docs test`. See "Docs match the code" in
-[Code style](code-style.md).
+`pnpm test:scripts` tests those three scripts, `scripts/unpin-release-as.mjs`,
+`scripts/changed-areas.mjs`, the bundled release-commit selector and the agent hooks, using fixtures
+and throwaway repositories. The docs package tests action README generation and example-version
+updates with `pnpm --filter @pumpkin-plugins/docs test`. See [Keep docs in sync with code](code-style.md#keep-docs-in-sync-with-code).
 
 ## Publishing to market.pumpkinmc.org
 
-The reusable JavaScript action lives in
-[`actions/publish-to-pumpkin-market/`](../actions/publish-to-pumpkin-market/README.md); each action
-in this monorepo has its own directory, metadata and README. Other repositories can use a published
-version with
-`uses: filiphsps/pumpkin-plugins/actions/publish-to-pumpkin-market@publish-to-pumpkin-market-v0.0.1`.
-The action accepts the exact Pumpkin plugin name, version, `.wasm` path, optional track and release
-notes, a Market API token, and an optional API URL. It calls `PUT /api/plugins/<id>` with bearer
-authentication and multipart `wasm` and `metadata` fields, using the file it receives without
-rebuilding it. Its runner is declared in [`action.yml`](../actions/publish-to-pumpkin-market/action.yml).
+The reusable JavaScript action for publishing to Pumpkin Market lives in
+[`actions/publish-to-pumpkin-market/`](../actions/publish-to-pumpkin-market/README.md). Like the
+other actions in this monorepo, it has its own directory, metadata and README. Other repositories
+can pin a published version like this:
 
-In this repo, the `market` job downloads the `.wasm` produced by the build job, resolves the plugin's
-canonical name from its info module, and passes the per-plugin Release Please version and changelog
-to the action using its local path. After a successful publish, the job generates localized
-description from `info.description` and the plugin README, and generates command metadata from
-`info.commands`. The description omits generated README blocks plus the `Installation` and
-`Commands` sections. The job then calls the metadata action with the numeric listing ID returned by
-the publisher. The metadata action sends a patch, so it leaves the listing's other fields to the
-Market listing editor. Builds aren't byte-reproducible, so the job must upload the artifact rather
-than rebuild.
+```yaml
+uses: filiphsps/pumpkin-plugins/actions/publish-to-pumpkin-market@publish-to-pumpkin-market-v0.0.1
+```
 
-The action looks up the canonical plugin name by searching a limited result set and requiring an
-exact name match. It never creates a listing: listing
-metadata and review happen in Market. If the plugin is not listed, has not yet been published there,
-or the token is not configured, the action fails by default. Set `warn: true` to emit a warning and
-continue; this repository opts into that mode so GitHub releases remain independent of Market
-listing and credential availability. Other Market API failures always fail the job and can be
-retried. See the
-[action README](../actions/publish-to-pumpkin-market/README.md#inputs) for its complete input list.
-The listing metadata API and its observed behavior are documented in
-[Pumpkin Market API](pumpkin-market-api.md).
+Set exactly one of `plugin-name` or `plugin-id` to choose an existing listing. The action also needs
+the version, `.wasm` path and Market API token; track, release notes and API URL are optional. It
+sends the file it receives without rebuilding it, using bearer authentication and multipart `wasm`
+and `metadata` fields in a `PUT /api/plugins/<id>` request. Its runner is declared in
+[`action.yml`](../actions/publish-to-pumpkin-market/action.yml).
+
+In this repository, the `market` job downloads the `.wasm` built earlier and resolves the plugin's
+canonical name from its info module. It passes the plugin's Release Please version and changelog to
+the action by local path. After a successful publish, the job builds a localized description from
+`info.description` and the plugin README, then builds command metadata from `info.commands`. The
+description excludes generated README blocks and the `Installation` and `Commands` sections. The
+job passes the numeric listing ID returned by the publisher to the metadata action. That action
+sends a patch, leaving the listing's other fields for the Market listing editor.
+
+Builds aren't byte-reproducible, so the job uploads the Build artifact instead of rebuilding the
+plugin. When you select a listing by name, the action searches a limited result set for an exact
+canonical-name match. It never creates a Market listing; listing metadata and review happen in
+Market. By default, the action fails if the plugin isn't listed, hasn't yet been published there,
+or the token is missing. With `warn: true`, it reports a warning and continues. This repository
+enables that mode so GitHub releases don't depend on a Market listing or credentials. Other Market
+API failures still fail the job and can be retried. See the
+[action README](../actions/publish-to-pumpkin-market/README.md#inputs) for every input, and
+[Pumpkin Market API](pumpkin-market-api.md) for the listing metadata API and its observed behavior.
 
 ## GitHub settings
 
-These aren't done by the workflows:
+Set these once in GitHub; the workflows can't configure them for you:
 
 1. Settings, General, Pull Requests: enable **Allow rebase merging** only. Disable squash and merge
    commits.

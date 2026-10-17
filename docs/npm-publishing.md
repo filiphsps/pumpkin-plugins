@@ -2,84 +2,100 @@
 navigation:
     category: CI and releases
 title: "Publishing public npm tools"
-description: "Placeholder setup and Release Please publishing for public npm tools"
+description: "How to prepare a public tool for npm and recover a missed release"
 ---
 
 # Publishing public npm tools
 
-Public npm tools are discovered from package manifests under `tools/` that declare
-`publishConfig.access: "public"` and are not private. Their package manifests and packed project
-templates declare the dependencies that determine release order.
+This guide covers the first npm publication and the release path for public tools in `tools/`.
+Release automation finds packages whose `package.json` sets `publishConfig.access` to `public` and
+does not mark them private. Package manifests and packed project templates also determine which
+tools need to publish first.
 
-For initial setup, publish metadata-only placeholders at `0.0.0`. Immediately after confirming each
-placeholder on npm, configure that package's trusted publisher as described in [Trusted publishing
-for npm tools](npm-trusted-publishing.md). The placeholder does not validate OIDC: the first
-functional release must publish successfully through OIDC within two days of creating the trust
-relationship. Schedule the placeholder and trust setup when that functional release can be completed
-within the window. Release Please produces and the GitHub Actions release workflow publishes the
-first functional release for each package.
+If you are adding a tool, register it first. For example, register the codemod package with
+`pnpm register:tool tools/codemod`; replace `tools/codemod` with the new package's directory. The
+[release guide](ci-and-releases.md#releases) explains registration and how Release Please prepares
+its release PRs.
 
-## Seed package names
+## Prepare a package for its first release
 
-npm requires a package to exist before a trusted publisher can be configured. Publish one
-`0.0.0` placeholder for each public tool, confirm it on npm, and configure trusted publishing
-immediately afterward.
-Each placeholder contains only `package.json` and a README that says the package is non-functional.
-It must not contain runtime code, commands, or package dependencies.
+npm needs the package name to exist before you can configure its trusted publisher. Plan the
+placeholder and first functional release together: the first successful OIDC publish must happen
+within two days of creating the trusted-publisher relationship.
 
-Publish each verified placeholder tarball with the `placeholder` dist-tag:
+Publish one metadata-only `0.0.0` placeholder for each package. Include only `package.json` and a
+README that clearly says the package is not functional. Do not include runtime code, commands, or
+package dependencies. Publish the tarball you created with the `placeholder` dist-tag; replace the
+example path with its actual location:
 
 ```sh
-npm publish <placeholder-tarball> --access public --tag=placeholder
+npm publish ./path/to/placeholder.tgz --access public --tag=placeholder
 ```
 
-The registry also assigns the first published version to `latest`, so both tags point to `0.0.0`
-until the first functional release. The release workflow publishes without a non-default tag, moving
-`latest` to the functional version while `placeholder` remains on `0.0.0`.
+Run direct npm commands from outside the repository root, such as `/tmp`, because the root
+`devEngines` setting requires pnpm. After each publish, confirm the exact package name and `0.0.0`
+version on the public registry. npm assigns the first version to `latest` as well, so both `latest`
+and `placeholder` point to `0.0.0` until the first functional release. The release workflow then
+moves `latest` to the functional version and leaves `placeholder` on `0.0.0`.
 
-Run direct npm commands from outside the repository root, such as `/tmp`, to avoid the root
-`devEngines` package-manager requirement. Confirm the exact package name and `0.0.0` version on the
-public registry after each publish. Do not republish a placeholder version with different bytes;
-npm versions are immutable.
+Once npm shows the placeholder, configure that package's trusted publisher using [Trusted publishing
+for npm tools](npm-trusted-publishing.md). Do this immediately after confirming the package. The
+placeholder only reserves the name; it does not test OIDC. Arrange for the first functional release
+to publish successfully within two days of setting up trust. npm versions are immutable, so do not
+try to republish `0.0.0` with different contents.
 
-## Publish functional releases
+## How functional releases reach npm
 
-Release Please creates a tool's release PR only after its transitive public production dependencies
-have functional releases. The configured first functional version is `0.1.0`. The publish job orders
-selected tools from their declared production dependencies and packed project templates, so each
-consumer's required public dependencies are available before its publish job runs.
+Release Please prepares a release PR after the tool has releasable changes and its transitive public
+production dependencies have functional releases. The first functional version is `0.1.0`. When the
+PR merges, `ci.yml` runs its required checks and calls the reusable release workflow. That workflow
+publishes the released tools in dependency order, including dependencies declared in packed project
+templates.
 
-Release PR titles use the full `@pumpkin-plugins/<name>` package name for scoped tools, while tags
-keep using the folder component. The unscoped `create-pumpkin-plugin` title stays unscoped.
+Before publishing, the workflow checks the release tag, packed files, exact dependency versions, and
+the integrity of versions already on npm. If a newly published dependency has not reached the
+registry yet, it retries the lookup for up to about two minutes. The publish uses npm trusted
+publishing and provenance; GitHub does not need an npm write token. See [Trusted publishing for npm
+tools](npm-trusted-publishing.md) for the required workflow identity, OIDC setup, and validation
+window.
 
-The `ci.yml` caller invokes the reusable release workflow after CI gates pass. Its `publish-tools`
-job scans non-draft public-tool releases on the target commit's first-parent history on every normal
-run. It checks which historical versions are missing from npm, then packs and publishes them from
-their exact release commits, oldest first. It publishes the current commit's selected tools after
-catch-up, checking exact dependency versions and registry integrity before using npm trusted
-publishing and provenance. When an exact-version prerequisite is not yet visible in npm, the
-publisher retries its lookup for up to about two minutes to allow registry propagation. This
-recovers releases when a rapid series of pushes replaces an older pending CI run. See [Trusted
-publishing for npm tools](npm-trusted-publishing.md) for setup and recovery.
+Every normal release run also checks earlier non-draft tool releases on the target commit's
+first-parent history. If an earlier version is missing from npm, the workflow publishes it from its
+original release commit, oldest first, before publishing the current tools. This catches up a release
+when a newer push replaces an older pending CI run.
 
-To recover immediately without another push, dispatch the `ci.yml` caller with the full commit SHA
-that the release tag targets. For codemod, resolve its tag before dispatching:
+Release PR titles use the full `@pumpkin-plugins/<name>` for scoped tools, but their tags use the
+Release Please component name (the tool folder name). The `create-pumpkin-plugin` title remains
+unscoped.
+
+## Recover a missed publish
+
+The normal workflow checks for missing npm versions on later runs. To recover one immediately without
+another push, dispatch `ci.yml` on `master` with the full commit SHA targeted by the existing release
+tag. For example, resolve the codemod tag and dispatch that commit:
 
 ```sh
 release_commit="$(git rev-parse 'codemod-v0.1.0^{commit}')"
 gh workflow run ci.yml --ref master -f release_commit="$release_commit"
 ```
 
-This recovery reads existing GitHub releases without creating release tags or PRs, selects only npm
-tools whose tags point to that exact SHA, then checks out the same source commit for packing. Normal
-push releases remain pinned to the commit built by their own workflow run. Replace the tag with the
-target tool's release tag when recovering another package.
+For another tool, replace `codemod-v0.1.0` with its release tag. The recovery run reads existing
+GitHub releases and selects only npm tool releases whose tags point to the requested commit. It
+packs from that exact source commit and does not create release tags or PRs. Normal push releases
+remain pinned to the commit built by their own workflow run.
 
-The first successful OIDC publish must complete within two days of creating the relationship.
-Publishing the existing `0.0.0` placeholder again does not validate OIDC. Coordinate placeholder
-publication and trust setup with the functional Release Please release so that it can publish within
-the window.
+## Manual first-release fallback
 
-`pnpm npm:bootstrap` is available as a manual exact-tag fallback for a maintainer who must publish
-a `0.1.0` artifact directly. It validates the tagged source and package but does not configure npm
-trust. The normal first functional release uses the Release Please workflow above.
+If you must publish the first functional version directly, `pnpm npm:bootstrap` can publish the
+validated `0.1.0` artifact from its exact release tag. For example:
+
+```sh
+pnpm npm:bootstrap -- tools/codemod --tag codemod-v0.1.0 --expected-owner your-npm-username --confirm-write-access
+```
+
+Replace the package path, tag, and `your-npm-username` with values for the tool you are publishing.
+Authenticate to npm as that user and enable account-level two-factor authentication first. The command checks the
+tagged source, packed package, dependencies, registry integrity, and npm account before it
+publishes. It does not configure trusted publishing or count as the first successful OIDC publish,
+so the two-day validation window still applies. Use the normal Release Please workflow for
+functional releases whenever possible.

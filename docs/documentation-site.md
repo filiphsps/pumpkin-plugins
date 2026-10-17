@@ -7,23 +7,45 @@ description: "Adding component guides, generated API reference, local preview, a
 
 # Documentation site
 
-The VitePress site separates hand-written guides from folder-based docs. Direct-child Markdown pages
-in `docs/` render under `/guides/` and use their `navigation.category`; pages in `docs/<folder>/...`
-render under `/docs/` and follow their nested folder structure. A nested `index.md` is the folder's
-landing page. The site also includes component READMEs, component-level guides, and generated API
-references. It discovers plugins, tools and actions from package manifests and action metadata. On
-phones, the same menus open as compact accordions in the navigation screen.
+Put repository-wide guides in `docs/` and component guides beside the component they explain. The
+site builds its navigation from those files and their metadata, then generates API references from
+source comments and action metadata. This guide shows where pages belong, how to organize them, and
+how to preview and publish the site.
 
-## Add a component guide
+## Choose where a page belongs
 
-Create Markdown files under the component's `docs/` folder. For example, a plugin can have an
-`index.md` plus additional pages such as `configuration.md`; tools and actions use the same layout.
-The site discovers each file and adds it to that component's sidebar and reference links. Relative
-links are checked by `pnpm check`. Links from component docs to files under repository `docs/` are
-rewritten to their site routes during the build, so keep those links relative in the source Markdown.
+Direct children of `docs/` are guides and appear under `/guides/`. Put reference pages in a folder,
+such as `docs/plugin-api/setup-and-build.md`, and they appear under `/docs/` with their folder
+structure. A nested `index.md` is the landing page for its folder. The repository home and Team page
+are exceptions: `docs/index.md` renders at `/`, and `docs/team.md` renders at `/team`. Neither is
+listed in the Guides or Docs catalog.
 
-For component-specific documentation settings, add a `docs.yml` file at the component root, next to
-its `docs/` folder. Put navigation settings under `navigation`:
+For a plugin, put component-specific pages in `packages/<plugin>/docs/`; tools and actions use the
+same layout in their own folders. The site adds those pages to the component sidebar. If you create
+`docs/index.md`, it becomes the component's landing page and the README remains available as a
+separate **README** entry. Otherwise, the README is the overview when one exists; if it doesn't, the
+first docs page is used.
+
+Write links from component docs to repository docs as relative Markdown links. `pnpm check` checks
+relative links, and the site rewrites those links to their site routes during the build.
+
+## Set page titles and navigation
+
+Use frontmatter to control how a page appears in menus and sidebars:
+
+- `title` sets the menu and sidebar label. Without it, the first H1 is used; if there isn't one, the
+  filename supplies the label.
+- `description` supplies the short summary shown in menus and catalogs. Without it, the site derives
+  a summary from the first prose paragraph.
+- `navigation.category` groups direct-child guides. For nested docs, folders determine the groups;
+  the nested `index.md` title labels its folder. Without an index, a category shared by the folder's
+  pages can label it; otherwise, the site uses a readable version of the folder name.
+- `navigation.type` accepts `link`, `card`, or `spotlight`. Pages are regular links by default; use
+  `card` or `spotlight` when the page needs more visual emphasis.
+- On a component doc, `navigation.catalog: true` also lists the page in the repository-level Docs
+  menu and catalog. It remains in the component sidebar.
+
+Component menu settings belong in a `docs.yml` file at the component root, next to `docs/`:
 
 ```yaml
 navigation:
@@ -32,117 +54,91 @@ navigation:
     icon: artwork/plugin-mark.svg
 ```
 
-`category` is optional; without it, the item appears in its menu's general group. `type` is optional
-and defaults to a regular link. Use `card` for a self-contained card or `spotlight` for a wide editorial
-row. The `navigation` namespace keeps menu settings separate from other documentation settings that
-may be added later. An icon path is relative to the component root, alongside `docs.yml`. Without an
-explicit `icon`, the site automatically uses `icon.svg`, `icon.png`, `icon.webp`, `logo.svg`, `logo.png`, or
-`logo.webp` from the component root when present, falling back to its `docs/` folder. Discovered icons
-are included in the built site automatically and appear beside the title on the component's landing
-page as well as in navigation. Items without artwork keep the same alignment.
+`category` is optional; without it, the item stays in its default Plugins, Tools, or Actions group.
+`type` defaults to a regular link and can be set to `card` or `spotlight`. An `icon` path is relative
+to the component root. If you omit it—or the configured file doesn't exist—the site looks for
+`icon.svg`, `icon.png`, `icon.webp`, `logo.svg`, `logo.png`, or `logo.webp` first in the component
+root and then in `docs/`. The icon appears in navigation and beside the title on the component
+landing page.
 
-Frontmatter `title` overrides the first H1 for menu and sidebar labels. Put a page's short summary in
-frontmatter `description`; the README catalog and site menus use the same value. Direct-child guides
-use `navigation.category` to choose their guide group. Nested docs use their folders for grouping;
-their `navigation.category` can label a folder when the pages in it share a category. `navigation.type`
-can select `card` or `spotlight` for an individual page. Set `navigation.catalog: true` on a component
-doc to include that page in the repository-level Docs menu as well; it stays under its component
-menu and sidebar. These labels belong beside their docs, not in a second list in the site configuration.
+To feature a plugin in the desktop Plugins menu, set `navigation.featured: true` on its
+`docs/index.md`. The menu has one featured-plugin area; the plugin remains in its normal category as
+well. The featured card uses the page title and package description. It uses the card style by
+default; set `navigation.type: spotlight` to make it a wide row.
 
-The generated `docs/README.md` catalog keeps its introduction hand-written and its Guides and Docs
-menus generated from page metadata and folders. Site root pages such as Home and Team are not listed.
-Run `pnpm readme` to refresh it or `pnpm readme:check` to check it without writing.
+## Keep the catalog and README links current
 
-To feature a component in the desktop Plugins menu, add `navigation.featured: true` to the frontmatter
-of its `docs/index.md`. It also remains a regular link in its category. A featured item defaults to
-the card treatment, and can use `navigation.type: spotlight` to show as a wide row instead. The title
-comes from frontmatter `title` or the first H1; its description comes from the package manifest.
+The generated `docs/README.md` contains the Guides and Docs catalog; its introduction stays
+hand-written. Page metadata and folder names supply the catalog labels, while the root pages remain
+omitted. Run `pnpm readme` to refresh the catalog and generated README sections, or
+`pnpm readme:check` to check for drift without writing.
 
-The component README is the overview when no custom `docs/index.md` exists. If a custom
-index exists, it becomes the component landing page and the README remains available as a separate
-**README** entry.
+The `reference` block in a component README is also generated by `pnpm readme`. Its API URL comes
+from the component's discovered path, and a component guide link is added when `docs/index.md`
+exists. The public documentation base comes from the repository URL in the root `package.json`.
+Keep the generated markers in place and change the source metadata or docs files instead of
+maintaining those links by hand.
 
-Each component README's `reference` block is refreshed by `pnpm readme`. Its API URL is derived from
-the discovered component path, and a link to a component guide appears when `docs/index.md` exists.
-The public documentation base comes from the repository URL in the root `package.json`. Keep the
-markers in place and edit the source metadata or docs files instead of maintaining those links by
-hand.
+## Add API documentation at its source
 
-## Reference
+The API build generates pages from documented exports in plugin and tool source, action inputs and
+outputs in each action definition (`action.yml` or `action.yaml`), VS Code extension source, and
+exported repository script helpers.
+TypeDoc scans whole source folders, including implementation modules. `excludeNotDocumented` keeps
+symbols without JSDoc out of the reference; it doesn't check that every public API is documented.
+The JSDoc lint checks descriptions on exported TypeScript APIs.
 
-The **Reference** section brings together documented exports from plugin and tool source, action
-inputs and outputs from each `action.yml`, and exported repository script helpers. TypeDoc follows
-the source folders discovered from package manifests; action contracts come directly from the action
-metadata. Add JSDoc beside exported code and add action documentation to `action.yml` so the site
-stays in sync without a second list of names or settings.
+Generated Pumpkin and WASI bindings can appear by name in public signatures, but their declarations
+aren't included as reference pages. The build generates the bindings before it runs TypeDoc. The
+generated API pages are build output and ignored by Git, so edit source comments, action metadata, or
+`typedoc.json` rather than editing those pages.
 
-TypeDoc reads whole source trees, including implementation modules, so `excludeNotDocumented` keeps
-symbols without JSDoc out of the reference. It is a presentation filter, not a completeness check;
-the JSDoc lint enforces descriptions on exported TypeScript APIs.
+VitePress adds an **Edit this page on GitHub** link to Markdown pages. Generated API pages link to a
+corresponding source file when TypeDoc can identify one. The **Last updated** date comes from Git
+history; the docs workflow fetches full history so it can show the latest edit time for each page.
 
-Generated Pumpkin and WASI bindings can appear by name in public signatures, but their generated
-declarations are not included as reference pages. The docs pipeline generates the needed bindings
-before TypeDoc runs. Generated pages are build output and ignored by Git; edit source comments, action
-metadata, or `typedoc.json` instead.
+## Keep generated site details in mind
 
-VitePress adds an **Edit this page on GitHub** link to Markdown pages. Generated API pages link that
-action to the corresponding source file where TypeDoc can identify one.
+The site creates `/llms.txt` during the build from discovered guides, component docs, package and
+action metadata, and API references. Links to guides and component docs point to raw Markdown in the
+repository; API links point to the published docs site. The generated copy under `docs/` is
+gitignored. The development server serves the same content at `/llms.txt`. Update source docs or
+metadata to change its entries, and `docs/.vitepress/config.mts` to change its structure.
 
-The site shows **Last updated** using Git history. The docs workflow fetches full history so pages
-that were not changed in the latest commit still show their latest edit time.
+The [Team page](team.md) fetches all pages of contributor data from GitHub during builds and
+development, so the build needs network access and fails if GitHub is unavailable. It excludes bot
+accounts. Avatars, profile links, and contribution counts also come from GitHub, so there is no
+contributor list to maintain. If unauthenticated requests are rate limited, set `GITHUB_TOKEN`
+locally; the docs workflow supplies a read-only token. With a token, each contributor-list page can
+make at most one GraphQL request to look up public profile names. Without a token, or if name lookup
+fails, cards show GitHub usernames. The token and data loader aren't published with the cards.
 
-## llms.txt
+`filiphsps` is marked as the owner and sorted first; other contributors are sorted by contribution
+count. GitHub may take time to refresh those counts.
 
-The site generates `/llms.txt` during the VitePress build from discovered guide pages, component
-documentation, package and action metadata, and API references. Guide and component links point to
-raw Markdown in the repository; generated API links point to the public docs site. The generated
-build-side copy is gitignored and stored under `docs/`. Update source docs or metadata to
-change its entries; update the generator in `docs/.vitepress/config.mts` to change its structure.
-The shared page head links to the file with `rel="describedby"`, and the development server serves
-the same generated content at `/llms.txt`.
+Plugin and action landing pages, READMEs, and API overview pages show native VitePress version
+badges. A badge reads its version from the package manifest or action version file. It links to a
+release only when the matching tag is present in the checkout. Release configuration supplies the
+tag name, and the workflow fetches tags with the full checkout.
 
-## Theme
+## Preview, build, and publish
 
-The site uses Pumpkin's `#FF7518` accent. Light-mode text uses a darker orange for contrast;
-buttons, owner labels, and the home-page title use the primary color. Dark mode uses the primary
-orange for links, with a lighter hover shade.
+While editing, run `pnpm run dev:docs` to generate the API pages and start the VitePress development
+server. To preview the last production build instead, run `pnpm run docs:preview`.
 
-## Contributors and versions
+Build the complete site with `pnpm run docs`. It generates bindings, builds the API references, then
+builds the VitePress site. The four independent tasks for plugin-kit, update-check, pumpkin-api, and
+codemod run concurrently; plugin guest declarations are generated after them. TypeDoc runs before
+VitePress because the site reads its generated pages. `pnpm run docs:build` runs the same complete
+production build.
 
-The [Team page](team.md) lives at `/team`, with its own header link, and uses VitePress's native team components. Its data loader fetches all pages
-of the repository's GitHub contributor list during site builds and development, excluding accounts
-marked as bots and common automation accounts. When `GITHUB_TOKEN` is available, at most one GraphQL
-request per contributor page enriches the cards with public profile names. Without a token, or if that
-enrichment fails, cards use GitHub usernames. Avatars and profile links also come from GitHub; there
-is no contributor list to maintain. Each card shows GitHub's repository contribution count.
-`filiphsps` is explicitly marked as the owner and always sorted first; other contributors are sorted
-by contribution count. GitHub may take time to refresh contributor statistics.
-The contributor-list lookup requires network access and fails the build if GitHub is unavailable.
-Set `GITHUB_TOKEN` locally if unauthenticated requests are rate limited; the docs workflow supplies
-its read-only token. Only the contributor cards are included in the published site, not the loader
-or token.
+You can run the pipeline in stages: `pnpm run docs:types` generates binding declarations,
+`pnpm run docs:api` runs that step and then generates the API reference, and
+`pnpm run docs:site` builds the site from the generated pages. To run one of the four prerequisite
+tasks on its own, use `pnpm run docs:types:plugin-kit`, `pnpm run docs:types:update-check`,
+`pnpm run docs:types:pumpkin-api`, or `pnpm run docs:types:codemod`. Generate plugin guest
+declarations with `pnpm run docs:types:plugins`.
 
-Plugin and action landing pages, READMEs, and API overview pages show native VitePress version badges.
-Versions come from each plugin's package manifest or the action's version file. Badges link to the
-matching release when its tag exists in the checkout; unreleased versions remain linkless. Tag names
-come from the release configuration, and the workflow's full checkout includes the tags.
-
-## Local commands
-
-Run `pnpm run docs` to generate bindings and the API reference, then build the complete static site.
-The two independent binding-generation steps run concurrently; TypeDoc and VitePress then run in
-order because the site reads the generated API pages. Use `pnpm run dev:docs` to generate the same
-inputs and start the VitePress development server, or `pnpm run docs:preview` to preview the last
-built site.
-
-The pipeline can also be run in stages: `pnpm run docs:types` generates the binding declarations,
-`pnpm run docs:api` generates the TypeDoc reference after the bindings, and
-`pnpm run docs:site` builds the VitePress site from those generated pages. The binding steps can be
-run individually with `pnpm run docs:types:plugin-kit`, `pnpm run docs:types:update-check`,
-`pnpm run docs:types:pumpkin-api` or `pnpm run docs:types:codemod`.
-Plugin guest declarations can be generated with `pnpm run docs:types:plugins`.
-`pnpm run docs:build` is an alias for the complete production build.
-
-The separate `.github/workflows/docs.yml` workflow checks docs on pull requests and publishes the
-site from pushes to `master` or `main`. It deploys a GitHub Pages artifact and mirrors the built
-files to the `gh-pages` branch. Configure the repository's Pages source to **GitHub Actions**.
+The `.github/workflows/docs.yml` workflow checks documentation on pull requests and publishes after
+pushes to `master` or `main`. It deploys a GitHub Pages artifact and mirrors the built files to the
+`gh-pages` branch. Set the repository's Pages source to **GitHub Actions**.

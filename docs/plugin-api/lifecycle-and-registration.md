@@ -2,38 +2,92 @@
 navigation:
     category: Plugin API
 title: "Plugin API: lifecycle and registration"
-description: "Plugin lifecycle callbacks and handler registration"
+description: "Register a plugin, manage its callbacks, and release scheduled work"
 ---
 
 # Lifecycle and registration
 
-Extend `Plugin`, provide `metadata()`, implement `onLoad(context)` for startup registration, and optionally implement `onUnload(context)` to save state and release resources. Call `registerPlugin(instance)` once at module initialization so Pumpkin can invoke the lifecycle exports.
+Pumpkin calls `onLoad(context)` when it loads your plugin. Use it to initialize the plugin and
+register its handlers. You can also implement `onUnload(context)`, which Pumpkin calls when it
+unloads the plugin, to save state and release resources that belong to that load.
 
-Event, command, suggestion, AI-goal and chunk-generator callbacks belong to one plugin load. The API releases these callbacks after `onUnload`, even when it throws, so register them again from a later `onLoad`.
+## Register your plugin
 
-If event or command registration with the host fails, the corresponding callback is removed from the dispatch registry before the error is rethrown. A command resource may keep its assigned handler ID if host registration failed after the ID was assigned.
+Extend `Plugin`, implement `metadata()` to describe the plugin to Pumpkin, and register one instance
+when the module initializes:
 
-The facade keeps event, command, suggestion, task, AI-goal and chunk-generator callbacks in handler maps and passes numeric IDs to the host. Register callbacks through the plugin context or `Plugin` helper methods; do not call the internal `handle*` dispatch functions from plugin code.
+```typescript
+import { Plugin, registerPlugin } from '@pumpkin-plugins/pumpkin-api';
+import type { Context } from 'pumpkin:plugin/context@0.1.0';
 
-The Static Hermes adapter dispatches all five AI-goal methods and chunk-generator callbacks. It
-exposes the generation phase as one of `biomes`, `noise`, `surface` or `features`. The server,
-entity and chunk resources passed to these callbacks are disposed when the callback returns. If an
-AI-goal callback throws, `canStart` and `shouldContinue` return `false`; errors from void callbacks
-are logged.
+class ExamplePlugin extends Plugin {
+    metadata() {
+        return {
+            name: 'example',
+            version: '1.0.0',
+            authors: ['Example'],
+            description: 'An example plugin',
+            dependencies: [],
+            permissions: [],
+        };
+    }
 
-The pinned host's custom WASM AI-goal limitation is documented in the
-[Static Hermes Runtime guide](../../tools/static-hermes-runtime/docs/index.md). It is separate from
-Static Hermes' callback dispatch.
+    onLoad(context: Context) {
+        // Initialize the plugin and register handlers with this context.
+    }
 
-The default IPC handler rejects messages. Override `handleIpcMessage(sender, message)` when the plugin accepts IPC. The [generated reference](/api/tools/@pumpkin-plugins/pumpkin-api/) documents the complete facade signatures.
+    onUnload(context: Context) {
+        // Save state and release resources owned by this plugin.
+    }
+}
 
-Scheduled helpers return Pumpkin task IDs. Delayed callbacks are released before they run, including
-when they throw. Tick counts follow WIT `u64`: numbers must be safe integers, bigints must be between
-0 and 18,446,744,073,709,551,615, and repeating periods must be at least one tick. Repeating callbacks
-remain registered until cancellation or unload. Call
-`plugin.cancelTask(taskId)` to cancel a task created by either helper and release its captured
-resources; calling the raw scheduler cannot update the facade's callback registry. Completed and
-unknown task IDs are ignored. If host cancellation throws, the callback remains registered so the
-still-active task can continue. Failed scheduling releases the callback immediately. Unload releases
-all task callbacks even when `onUnload` throws; Pumpkin disables the plugin's scheduled tasks. At
-runtime, tick values must be numbers or bigints; other values are rejected before coercion.
+registerPlugin(new ExamplePlugin());
+```
+
+Register event, command, command suggestion, AI-goal, and chunk-generator callbacks from `onLoad`
+with the `Plugin` methods. Event and command registration also take the provided context. The
+facade stores each callback and gives the host a numeric handler ID; its `handle*` dispatch
+functions are internal and are not for plugin code. The [generated API
+reference](/api/tools/@pumpkin-plugins/pumpkin-api/) lists the complete facade signatures.
+
+These callbacks belong to one plugin load. After `onUnload` returns or throws, the facade clears the
+event, command, suggestion, AI-goal, and chunk-generator callbacks. Register them again the next time
+`onLoad` runs. If host registration of an event or command fails, the facade removes that callback
+and rethrows the error. A command resource may still hold its assigned handler ID if the host call
+fails after the ID was assigned.
+
+## Static Hermes callbacks
+
+The Static Hermes adapter dispatches all five AI-goal methods—`canStart`, `shouldContinue`, `start`,
+`stop`, and `tick`—and chunk-generator callbacks. A chunk-generator callback receives a generation
+phase of `biomes`, `noise`, `surface`, or `features`.
+The server, entity, and chunk resources passed to these callbacks are disposed when the callback
+returns, so do not keep them for later use. If an AI-goal callback throws, `canStart` and
+`shouldContinue` return `false`; errors from void callbacks are logged.
+
+The pinned Pumpkin host `0.2.0+26.3-26.51` does not start custom WASM AI goals because its
+eligibility methods return `false`. This host limitation is separate from Static Hermes' callback
+dispatch; see the [Static Hermes Runtime guide](../../tools/static-hermes-runtime/docs/index.md).
+
+## IPC messages
+
+By default, `handleIpcMessage(sender, message)` rejects messages. Override it when your plugin
+accepts IPC from other plugins.
+
+## Scheduled tasks
+
+`plugin.scheduleDelayedTask` and `plugin.scheduleRepeatingTask` return Pumpkin task IDs. A delayed
+callback is removed from the facade before it runs, even if it throws. A repeating callback stays
+registered until you cancel the task or the plugin unloads.
+
+Tick counts follow WIT `u64`. Pass safe-integer `number` values or `bigint` values in the range `0`
+through `18,446,744,073,709,551,615`; a repeating period must be at least one tick. At runtime,
+values must actually be numbers or bigints: other types are rejected before the facade tries to
+convert them.
+
+Use `plugin.cancelTask(taskId)` for tasks created by either scheduling helper. This releases the
+callback from the facade; calling the raw scheduler cannot update its callback registry. Completed
+and unknown task IDs are ignored. If host cancellation throws, the callback remains registered so
+the still-active task can continue. If scheduling fails, the facade releases the callback
+immediately. During unload, it releases every task callback even if `onUnload` throws, and Pumpkin
+disables the plugin's scheduled tasks.

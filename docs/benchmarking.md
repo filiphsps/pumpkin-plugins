@@ -3,74 +3,49 @@ title: "Benchmarking"
 description: "QuickJS and the Static Hermes profile, collector and parser matrix"
 ---
 
-# Benchmarking QuickJS and Static Hermes
+# Compare QuickJS and Static Hermes
 
-This guide explains what the engine comparison measures, how to read its report, and what conclusions its results support. It is intended for plugin authors, Pumpkin developers, runtime and CI contributors, and readers curious about the trade-offs.
-
-The comparison builds nine production WebAssembly components and exercises them on a real Pumpkin server: a QuickJS baseline plus eight Static Hermes configurations. The Hermes matrix combines runtime profiles (`full` and `lean`), collectors (Hades and malloc), and parser modes (JavaScript and TypeScript). It is a focused workload suite, not a universal JavaScript-engine ranking.
-
-## What the comparison runs
-
-The build tool bundles the same benchmark plugin source and workloads for each configuration:
-
-- **QuickJS** bundles JavaScript as an ES module and "componentizes" it with this repository’s QuickJS runtime.
-- **Static Hermes** covers every combination of full/lean profile, Hades/malloc collector, and JavaScript/TypeScript parser mode.
-- **Full** retains runtime source compilation. **Lean** omits it, so `eval` and the `Function` constructor are unavailable.
-- **JavaScript parser mode** uses Hermes's default parser. **TypeScript parser mode** passes `--parse-ts` to Hermes.
-
-The parser axis changes the compiler flag; it does not change the benchmark workload source or inputs. The matrix currently runs one QuickJS build and eight Static Hermes builds.
-
-Here, “Static Hermes” means Hermes linked into the WASI component. The plugin’s JavaScript is compiled to Hermes bytecode before the component runs; the benchmark does not translate JavaScript into native Wasm instructions. JIT is disabled for the WASI build. Every configuration is a Wasm component executed by Pumpkin’s runtime, not a native desktop engine binary.
-
-Production builds minify the bundle. The build tool enforces the repository’s 5 MiB component limit
-(5,242,880 bytes) for plugins built inside this repository. External consumers receive a warning
-and can continue. Build flags, toolchain pins, and runtime details are in the [Static Hermes Runtime
-guide](../tools/static-hermes-runtime/README.md) and [build guide](building.md).
+This guide shows you how to run the repository's engine comparison and how much to read into its results. It builds nine production WebAssembly components—a QuickJS baseline and eight Static Hermes configurations—and runs the same workloads on Pumpkin. The results help compare these builds on this workload suite; they can't predict which engine will be faster for every plugin.
 
 ## Run the comparison
 
-From the repository root:
+From the repository root, run:
 
     pnpm --filter @pumpkin-plugins/engine-comparison compare-engines
 
-The command first runs the cacheable `benchmark:build` Turbo task, then runs the real-server integration
-test in [engine-comparison.test.ts](../benchmarks/engine-comparison/test/engine-comparison.test.ts).
-Locally, the task builds and caches the nine comparison components and two stack-guard fixtures under
-separate, configuration-specific output paths in `build/engine-comparison/`. Turbo hashes the benchmark
-sources, build dependencies, and declared build environment. The integration test starts one Pumpkin
-server for each comparison component, dispatches the benchmark command, collects results, then stops
-the server.
+The command first runs the cacheable `benchmark:build` Turbo task, then runs the real-server integration test in [engine-comparison.test.ts](../benchmarks/engine-comparison/test/engine-comparison.test.ts). Turbo caches the nine comparison components and two stack-guard fixtures under configuration-specific paths in `build/engine-comparison/`. It can reuse them when the benchmark sources, build dependencies, and declared build environment match. The test starts a fresh Pumpkin server for each comparison component, runs the benchmark command, collects its results, and stops the server.
 
-CI runs the nine engine configurations as parallel matrix jobs and runs both stack-guard checks in
-parallel. Each engine job writes one result artifact. The final report job checks that all engines
-returned matching workloads and checksums, then appends the combined Markdown report to the job
-summary and uploads the raw results and report for 90 days. Static Hermes preparation runs
-automatically when a local build needs it; CI also restores and verifies its pinned toolchain before
-comparing engines in the [engine comparison workflow](../.github/workflows/engine-comparison.yml).
+CI runs the nine engine configurations as parallel matrix jobs, along with both stack-guard checks. Each engine job uploads its result. The report job checks that all configurations ran the same workloads and produced matching checksums, then adds the combined Markdown report to the job summary. It uploads the combined JSON results and report for 90 days; individual engine result artifacts are kept for one day. Static Hermes preparation runs automatically when a local build needs it. In CI, the pinned toolchain is restored and verified before the comparison runs in the [engine comparison workflow](../.github/workflows/engine-comparison.yml).
 
-After a pull-request CI run produces a complete benchmark report, a separate trusted workflow updates
-one benchmark comment on the PR, even if another CI job failed. It compares the current results with
-the newest successful default-branch benchmark that is an
-ancestor of the PR base. Changes within 10% are treated as runner jitter by default; set the repository
-variable `BENCHMARK_JITTER_PERCENT` to change that threshold. A slower result beyond the threshold
-produces a warning, significant improvements produce a celebration when there are no regressions, and
-otherwise the comment reports the run without a performance alert. The comment links to the full
-matrix report, embeds an SVG chart of the largest changes, and links directly to that chart for
-download. If no matching baseline artifact exists, the comment reports that and does not classify
-timing changes.
+After a pull-request CI run produces a complete report, a separate trusted workflow updates one benchmark comment on the PR, even if another CI job failed. It compares the results with the newest successful default-branch benchmark that is an ancestor of the PR base. By default, changes within 10% count as runner jitter; set the repository variable `BENCHMARK_JITTER_PERCENT` to change that threshold. A slower result beyond the threshold gets a warning. A significant improvement gets a celebration if there are no regressions; otherwise, the comment reports the run without a performance alert. The comment links to the full matrix report, embeds an SVG chart of the largest changes, and links to the chart for download. If no matching baseline artifact exists, it says so and leaves timing changes unclassified.
 
-The benchmark plugin and workload definitions are in [benchmark-plugin.ts](../benchmarks/engine-comparison/src/benchmark-plugin.ts) and [benchmark-workloads.ts](../benchmarks/engine-comparison/src/benchmark-workloads.ts).
+The benchmark plugin and workload definitions live in [benchmark-plugin.ts](../benchmarks/engine-comparison/src/benchmark-plugin.ts) and [benchmark-workloads.ts](../benchmarks/engine-comparison/src/benchmark-workloads.ts).
+
+## What the comparison runs
+
+Each configuration uses the same benchmark plugin source and workloads:
+
+- **QuickJS** bundles the JavaScript as an ES module and turns it into a component with this repository's QuickJS runtime.
+- **Static Hermes** covers all combinations of the `full` and `lean` runtime profiles, Hades and malloc collectors, and JavaScript and TypeScript parser modes.
+- **Full** keeps runtime source compilation available. **Lean** omits it, so `eval` and the `Function` constructor are unavailable.
+- **JavaScript parser mode** uses Hermes's default parser. **TypeScript parser mode** enables Hermes's `--parse-ts` flag.
+
+The parser setting changes a compiler flag, not the benchmark code or inputs. The matrix has one QuickJS build and eight Static Hermes builds.
+
+Here, “Static Hermes” means Hermes is linked into the WASI component. The plugin's JavaScript is compiled to Hermes bytecode before the component runs; it is not translated into native Wasm instructions. JIT is disabled in this WASI build. Pumpkin runs every configuration as a Wasm component, not as a native desktop engine binary.
+
+Production builds minify the bundle. For plugins built inside this repository, the build tool enforces a 5 MiB component limit (5,242,880 bytes). External consumers get a warning and can continue. See the [Static Hermes Runtime guide](../tools/static-hermes-runtime/README.md) and [build guide](building.md) for build flags, pinned tools, and runtime details.
 
 ## Method and scope
 
-Each configuration receives the same workload source and input count. The integration test checks that all nine configurations return matching deterministic checksums for every workload; it also pins expected checksum values for selected string and command fixtures. It checks that:
+Every configuration gets the same workload source and input count. The integration test compares deterministic checksums across all nine configurations and pins expected checksums for selected string and command fixtures. It also checks that:
 
 - every engine reports the same workload identifiers, input counts, and checksums;
 - each timed workload has one un-timed warm-up followed by five measured samples;
 - the production component is non-empty and within the build-size limit;
 - the plugin registers its command and exercises selected real Pumpkin API behavior.
 
-Workload timing uses JavaScript `Date.now()`, so samples are reported as integer milliseconds; the clock may be coarser in practice. For each workload, the report shows the median and the minimum-to-maximum range of the five samples. The timer covers the workload body; it does not include component compilation, server startup, plugin loading, or dispatching the outer benchmark command.
+The benchmark uses JavaScript `Date.now()`, so timings are whole milliseconds and the clock may have coarser resolution. For each workload, the report shows the median of five samples and their minimum-to-maximum range. Timing covers the workload body only; it excludes component compilation, server startup, plugin loading, and dispatch of the outer benchmark command.
 
 <!-- docs:begin workload-summary -->
 <!-- Generated from benchmark-workloads.ts and benchmark-plugin.ts. Run `pnpm readme`. -->
@@ -78,13 +53,13 @@ Workload timing uses JavaScript `Date.now()`, so samples are reported as integer
 There are 34 timed workloads: 33 deterministic guest-side fixtures and 1 real Pumpkin API call.
 <!-- docs:end workload-summary -->
 
-The fixture algorithms are representative examples written for this benchmark; they are not executions of the named plugins or Pumpkin’s own command router. Player-oriented fixtures use in-memory test data, not connected players.
+These fixture algorithms are examples written for this benchmark. They don't run the named plugins or Pumpkin's own command router. Player-oriented fixtures use in-memory test data rather than connected players.
 
-The local comparison test runs configurations serially: QuickJS first, then each Static Hermes profile, collector, and parser-mode combination, each with a newly started server. CI runs those configurations independently in parallel. The real API workload calls `server.getAllPlayers()` in each sample. The test server has no connected players, so the returned list is empty. The test separately registers and dispatches one real `server.command()` command, along with event and scheduled-task behavior checks. That command dispatch is API behavior coverage, not a timed command-routing workload.
+Locally, the test runs configurations one at a time in a fixed order: QuickJS first, then each Static Hermes profile, collector, and parser-mode combination. It starts a fresh server for each one. CI runs the configurations in parallel. The real API workload calls `server.getAllPlayers()` in every sample; because the test server has no connected players, each call returns an empty list. Separately, the test registers and dispatches a real `server.command()` command and checks event and scheduled-task behavior. That command dispatch checks API behavior; it is not a timed command-routing workload.
 
 ### Workload inventory
 
-“Inputs per sample” is the configured count of items or requests processed. Some workloads multiply that count across repeated operations, as `string-join` does across its joins. Counts differ by workload, so they are not a common unit for comparing unlike operations. The inventory is generated from the benchmark registry and API workload definition.
+“Inputs per sample” is the configured number of items or requests a workload processes. For example, `string-join` joins 25,000 parts 64 times, so its count is 1,600,000. Different workloads count different kinds of input, so compare timings for the same workload rather than comparing counts across rows. The inventory is generated from the benchmark registry and API workload definition.
 
 <!-- docs:begin workload-inventory -->
 <!-- Generated from benchmark-workloads.ts and benchmark-plugin.ts. Run `pnpm readme`. -->
@@ -131,18 +106,18 @@ String and command workloads include combined cases and narrower sub-operations.
 
 ## Reading the report
 
-The current report contains production component sizes, per-workload timings and ratios, and an arithmetic-mean summary.
+The report shows production component sizes, timings and ratios for each workload, and an arithmetic-mean summary.
 
 - **Component sizes** are final production component byte counts. Size differences use QuickJS as the baseline: negative means smaller than QuickJS, positive means larger.
-- **Per-workload timings** show each engine’s median and sample range in milliseconds. Lower time means that engine completed that particular workload sooner in that run.
+- **Per-workload timings** show each engine's median and sample range in milliseconds. A lower time means that engine finished that workload sooner in that run.
 - **QuickJS/engine** is the QuickJS median divided by that Static Hermes configuration's median. A ratio above 1 means Hermes was lower; below 1 means QuickJS was lower. A ratio shown as 1.00x can be a rounded tie, especially for workloads close to the timer’s one-millisecond resolution.
-- **Average benchmark median** is the arithmetic mean of the per-workload medians. Every workload contributes equally, despite different input counts and kinds of work. Treat it as a compact report statistic, not a representative plugin or server-performance score.
+- **Average benchmark median** is the arithmetic mean of the per-workload medians. It gives every workload equal weight, even though their input counts and work differ. Use it as a compact report statistic, not as a score for plugin or server performance.
 
 The integration test has no timing thresholds. Timing results are diagnostic evidence, while checksum, API behavior, and component-size checks provide pass/fail assertions.
 
 ## Example CI result
 
-The [engine-comparison job linked from PR 99](https://github.com/filiphsps/pumpkin-plugins/actions/runs/38254750702/job/114834399434?pr=99) is one reference result. It checked out the PR merge ref at commit `2a4cfa19157cfabed67f41de16b199c3fc1c0775` on a GitHub-hosted Ubuntu 26.04 runner. The run is evidence for that merge candidate and runner only; it does not describe master or another revision. The job log does not identify the runner’s CPU model. This historical run predates the GC and parser axes in the current matrix; it compares QuickJS with full and lean Hermes using Hades GC. It also predates the repeated join and radix/Unicode workloads described above, so its string-join row measures a single join and is not a result for the current workload.
+For a concrete example, see the [engine-comparison job from PR 99](https://github.com/filiphsps/pumpkin-plugins/actions/runs/38254750702/job/114834399434?pr=99). It checked out merge commit `2a4cfa19157cfabed67f41de16b199c3fc1c0775` on a GitHub-hosted Ubuntu 26.04 runner. Treat it as evidence for that merge candidate and runner; it says nothing about master or other revisions. The log does not identify the runner's CPU model. This older run predates the GC and parser axes in today's matrix: it compares QuickJS with full and lean Hermes, both using Hades GC. It also predates the repeated join and radix/Unicode workloads, so its `string-join` row measures a single join and cannot be compared directly with the current workload.
 
 ### Component sizes in that run
 
@@ -189,41 +164,41 @@ In this run, full Hermes had a lower median than QuickJS on 9 rows, QuickJS had 
 
 ## What the results suggest—and what they do not prove
 
-The linked run shows workload-specific differences, not one engine that wins every kind of work. QuickJS was faster in its command-tokenization and string-construction fixtures. Full and lean Hermes were faster in the numeric baseline and several state-processing fixtures, with especially large ratios in economy-transfers and audit-history. The real API row favored QuickJS for repeated empty-list `getAllPlayers()` calls. None of these results alone predicts a plugin’s end-to-end performance.
+The example shows differences by workload, not one engine winning across the board. QuickJS was faster in the command-tokenization and string-construction fixtures. Full and lean Hermes were faster in the numeric baseline and several state-processing fixtures, especially `economy-transfers` and `audit-history`. QuickJS was faster on the real API row, which repeatedly calls `getAllPlayers()` and gets an empty list. None of these results predicts a plugin's end-to-end performance on its own.
 
-Several mechanisms could contribute to the pattern, but this benchmark does not profile them:
+Several things could explain the pattern, but this benchmark doesn't profile them:
 
-- **Bytecode and interpreter behavior.** Both runtimes execute JavaScript through their own engine-specific representations and virtual machines in this WASI setup. Differences in instruction dispatch, optimization choices, and runtime implementation can affect arithmetic and control-heavy loops. The benchmark has no instruction-level profile to identify a cause.
-- **Built-in operations and strings.** String construction, joining, JSON, maps, and object operations pass through different engine implementations. In the linked run, the separate join row is only about one millisecond, while construction and combined strings take longer and favor QuickJS. This is consistent with construction contributing more of the measured string difference, but the rows do not isolate every internal operation.
-- **Allocation and garbage collection.** Object-heavy or state-heavy workloads may respond to object layout, allocation strategy, and collection timing. The report records no heap, allocation, or GC counters, so these remain hypotheses rather than findings.
-- **Wasm host boundary.** The API row includes real Pumpkin/WIT/JSI call plumbing as well as the JavaScript call loop. Because the server has no players, it does not measure converting or traversing a large player list. It cannot distinguish host-call overhead from the other work in the call path.
-- **Workload shape.** A fixture may reward one engine’s built-ins or implementation details without representing a production plugin’s data sizes, branches, object lifetimes, API calls, or tick cadence.
+- **Bytecode and interpreter behavior.** Both runtimes use their own JavaScript representations and virtual machines in this WASI setup. Instruction dispatch, optimization choices, and runtime implementation could affect arithmetic and control-heavy loops. There is no instruction-level profile to tell us which, if any, caused a timing difference.
+- **Built-ins and strings.** String construction, joining, JSON, maps, and object operations use engine-specific implementations. In the example run, the separate join row takes about one millisecond, while construction and combined string work take longer and favor QuickJS. That suggests construction may account for more of the measured difference, but the workloads don't isolate every internal operation.
+- **Allocation and garbage collection.** Object-heavy or state-heavy work may respond to object layout, allocation strategy, or collection timing. The report has no heap, allocation, or GC counters, so these are possibilities, not findings.
+- **The Wasm host boundary.** The API row includes real Pumpkin/WIT/JSI call plumbing and the JavaScript call loop. Since the server has no players, it doesn't measure converting or traversing a large player list. The result can't separate host-call overhead from the rest of that call path.
+- **Workload shape.** A fixture might favor an engine's built-ins or implementation details without matching a production plugin's data sizes, branches, object lifetimes, API calls, or tick cadence.
 
-For engine or plugin decisions, benchmark the plugin’s actual hot path with realistic data and the same production build settings. Use a profiler or targeted counters before assigning a cause to a timing difference.
+For an engine or plugin decision, benchmark the plugin's actual hot path with realistic data and production build settings. Use a profiler or targeted counters before attributing a timing difference to a particular cause.
 
 ## Limits and interpretation rules
 
-- The linked table is one run of one PR merge candidate. Hardware, host load, Wasmtime/Pumpkin versions, toolchain pins, and source changes can alter results. Use the linked job for provenance and compare like-for-like revisions and environments.
+- The table is one run of one PR merge candidate. Hardware, host load, Wasmtime and Pumpkin versions, toolchain pins, and source changes can all affect results. Use the linked job for provenance, and compare the same revisions and environments.
 - The job log identifies a GitHub-hosted Ubuntu 26.04 runner but not its CPU model. Do not infer a CPU from the operating-system image.
-- Five samples with integer-millisecond timing can expose large differences in these workloads, but cannot resolve small differences reliably. A zero-millisecond sample is possible; ratios are unavailable when the denominator median is zero.
-- The local comparison runs engines serially in a fixed order. CI gives each configuration its own matrix job, but runner-to-runner differences can affect timings; each job does not repeat on multiple runners.
+- Five samples measured in whole milliseconds can reveal large differences, but they can't reliably resolve small ones. A sample may take zero milliseconds; the report can't calculate a ratio when its denominator median is zero.
+- Locally, the comparison runs configurations serially in a fixed order. CI gives each one a matrix job, but runner differences can affect timings, and a job doesn't repeat on multiple runners.
 - Input counts differ by design. A million arithmetic iterations and 1,000 config validations are not equivalent units. Do not average or compare rows as if they were normalized operations.
 - The arithmetic mean weights every workload median equally. A single slower row can move it substantially, and changing the workload set changes its meaning.
-- The real API case is narrow. It measures one API method with an empty result and does not represent all Pumpkin calls or guest-to-host conversion costs.
-- Component size is the benchmark plugin’s final component size. Plugin imports, bundled dependencies, API usage, and build profile change the result.
+- The real API case is narrow: it measures one API method with an empty result, not all Pumpkin calls or guest-to-host conversion costs.
+- Component size is the benchmark plugin's final component size. Plugin imports, bundled dependencies, API usage, and build profile change the result.
 
 ## For runtime and CI contributors
 
-The test owns the compared variants, checksum assertions, workload counts, output format, and the GitHub job summary. When changing it:
+If you change the benchmark or its CI workflow, keep these guarantees in place:
 
-- Keep workload code identical across engine builds, and preserve equal input counts and deterministic checksum checks.
+- Use identical workload code and input counts across engine builds, and preserve the deterministic checksum checks.
 - Keep labels clear about provenance: guest-side synthetic fixture or real Pumpkin API.
-- Keep API behavior assertions separate from timed synthetic algorithms unless the API path itself is explicitly being measured.
-- Treat new workload rows and changes to fixture inputs as changes to the meaning of the average.
-- Report the runner image and source revision with any published comparison. Include CPU details only when the runner actually exposes them.
+- Keep API behavior assertions separate from timed synthetic algorithms unless you're explicitly measuring the API path.
+- Remember that adding a workload or changing fixture inputs changes what the average means.
+- Include the runner image and source revision with any published comparison. Include CPU details only when the runner exposes them.
 - Use the runtime guide for the pinned Hermes/WASI toolchain and build configuration; use the test harness guide for server selection and startup behavior.
 
-The maintained implementation is in [engine-comparison.test.ts](../benchmarks/engine-comparison/test/engine-comparison.test.ts), [engine-variants.ts](../benchmarks/engine-comparison/test/engine-variants.ts), [benchmark-workloads.ts](../benchmarks/engine-comparison/src/benchmark-workloads.ts), [benchmark-plugin.ts](../benchmarks/engine-comparison/src/benchmark-plugin.ts), and the [comparison workflow](../.github/workflows/engine-comparison.yml). The real-server harness is documented in [Testing](testing.md).
+The comparison is maintained in [engine-comparison.test.ts](../benchmarks/engine-comparison/test/engine-comparison.test.ts), [engine-variants.ts](../benchmarks/engine-comparison/test/engine-variants.ts), [benchmark-workloads.ts](../benchmarks/engine-comparison/src/benchmark-workloads.ts), [benchmark-plugin.ts](../benchmarks/engine-comparison/src/benchmark-plugin.ts), and the [comparison workflow](../.github/workflows/engine-comparison.yml). See [Testing](testing.md) for the real-server harness.
 
 ## Sources
 

@@ -2,14 +2,20 @@
 navigation:
     category: Plugin development
 title: "Plugin info and READMEs"
-description: "How a plugin describes itself in `src/info.ts` and how the READMEs are generated"
+description: "Define plugin metadata once, connect commands and settings, and generate the README"
 ---
 
 # Plugin info and READMEs
 
-## `src/info.ts`
+A plugin's `src/info.ts` describes it for Pumpkin and the generated README. The root README also
+uses the plugin's name and short description in its package list. Commands and settings have their
+own declarations; `info.ts` points to those sources so the README describes what the plugin
+registers and configures.
 
-Each plugin describes itself in one small module that exports `info`:
+## Describe the plugin in `src/info.ts`
+
+Each plugin exports one `info` object. Keep its runtime imports host-independent, and point it to
+the command tree and configuration summary the plugin already uses:
 
 ```ts
 import { commandInfos, type PluginInfo } from '@pumpkin-plugins/docs';
@@ -17,21 +23,21 @@ import { commands } from './commands/spec.ts';
 import { configInfo } from './config/schema.ts';
 import { PLUGIN_NAME } from './name.ts';
 
-/** What the plugin is and offers. Feeds both its Pumpkin metadata and its generated README. */
+/** What the plugin is and offers. Feeds Pumpkin metadata and the generated README. */
 export const info = {
     name: PLUGIN_NAME,
-    description: 'Does a thing.',
+    description: 'Formats player list names and headers consistently.',
     permissions: [{ name: 'fs.read.data', reason: 'Read its config.' }],
     commands: commandInfos(commands),
     config: configInfo
 } satisfies PluginInfo<typeof PLUGIN_NAME>;
 ```
 
-`permissions`, `commands` and `config` are optional. Plugins pass this object and the injected
-package version to `PluginBase` from `@pumpkin-plugins/plugin-kit/plugin`. The helper builds both
-Pumpkin metadata and README content from the same object, keeping them in sync.
-The shared metadata helper also adds `http.outbound` for the automatic Pumpkin Market update check;
-it appears in the generated README even though plugins don't repeat it in `info.permissions`:
+`name` and `description` are required. You can also list `authors`, requested `permissions`,
+`commands` and `config`, or provide extra generated README `blocks`. The `PluginInfo` type checks
+the object while preserving its literal values.
+
+Pass `info` and the package version to `PluginBase`:
 
 ```ts
 import { PluginBase } from '@pumpkin-plugins/plugin-kit/plugin';
@@ -43,36 +49,43 @@ class MyPlugin extends PluginBase {
 }
 ```
 
-`__PLUGIN_VERSION__` is the package version, injected by the build (and by the vitest config in
-tests).
+`__PLUGIN_VERSION__` is injected from the package version during builds and by the Vitest config
+when tests run. `PluginBase` uses the object and version to build Pumpkin's plugin metadata: name,
+version, authors, description and requested permissions. The metadata also includes the automatic
+update-check permission, `http.outbound`; the README lists it too, with its reason, even though you
+don't need to add it to `info.permissions`.
 
-`info` is typed, so mistakes fail `pnpm typecheck` instead of surfacing at runtime:
+The type catches mistakes before they reach the server:
 
-- `permissions[].name` must be a permission Pumpkin knows (`PumpkinPermission`, listed in
-  `tools/docs/src/permissions.ts`, plus `sys.env.<NAME>`). With `satisfies`, `typeof
-  info.permissions[number]['name']` is the union of the names the plugin actually lists.
-- `commands[].permission` must start with the plugin's name, because `PluginInfo<Name>` is
-  parameterized by it.
+- Each `permissions[].name` must be a permission Pumpkin supports: one of the values in
+  `tools/docs/src/permissions.ts` or a `sys.env.<NAME>` permission. With `satisfies`, the names you
+  list remain a literal union, so TypeScript can check code that uses those permissions.
+- Command permission nodes must start with the plugin's name. `PluginInfo<typeof PLUGIN_NAME>`
+  checks that prefix for every command listed in `info.commands`.
 
-`blocks` is optional too: extra generated README blocks by name, for content that comes from the
-plugin's code. UPnPumpkin renders its table of blocked routers into the `routers` block this way. The
-built-in names can't be used, and a block the README has no markers for is skipped.
+Plugin permissions and command permission nodes serve different purposes. For example,
+`fs.read.data` is a host capability and doesn't have a plugin-name prefix. A command node such as
+`MyPlugin:command.reload` is scoped to your plugin; Pumpkin rejects a command node with a different
+prefix when it loads the plugin.
 
-`config` is normally not written by hand: `describeConfig(schema, file)` from
-`@pumpkin-plugins/config` produces it from the plugin's config schema, so the README shows the real
-default file and a table of every setting. See [Plugin config](plugin-config.md).
+You can use `blocks` for additional README content that comes from the plugin's code. UPnPumpkin,
+for example, renders its blocked-router table into a `routers` block. The names `summary`,
+`permissions`, `commands` and `config` are reserved. If the README has no markers for one of your
+custom blocks, the generator skips it.
 
-Info modules are loaded directly by Node with the types stripped, so they may import plain modules
-(a config schema, constants, a command declaration) but nothing from Pumpkin or WASI.
+Build `config` from the plugin's configuration schema with `describeConfig(schema, file)` from
+`@pumpkin-plugins/config`. The generated README then shows the actual default file and a row for each
+setting. See [Plugin config](plugin-config.md).
 
-Pumpkin requires a plugin's permission nodes to start with the plugin's name, as in
-`MyPlugin:command.reload`. A node with any other prefix makes the plugin fail to load.
+The docs generator imports `src/info.ts` directly in Node, with TypeScript types stripped. Runtime
+imports in that module must therefore work without Pumpkin or WASI. Plain modules such as a config
+schema, constants and command declarations are fine; importing host runtime modules is not.
 
-## Commands
+## Declare commands once
 
-Commands are declared once, in a module with no Pumpkin imports, and that one declaration both
-registers them and documents them, so a command can't be in the README without existing or the other
-way round:
+Keep the command tree in a module without Pumpkin imports. The same declaration supplies the command
+registration code and the README, so a description or permission doesn't need a second hand-written
+copy:
 
 ```ts
 // src/commands/spec.ts
@@ -98,141 +111,152 @@ export const commands = defineCommands(PLUGIN_NAME, {
 import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands';
 
 registerCommands(ctx, commands, {
-    'myplugin reload': () => ['Reloaded.'] // the lines to send back
+    'myplugin reload': () => ['Reloaded.'] // lines sent back to the caller
 });
 ```
 
-- `info.commands` is `commandInfos(commands)`: one README row per runnable command (`/myplugin
-  reload`), including its permission and default access, taken from the declaration.
-- A subcommand can declare its own `permission`; otherwise it inherits the nearest parent's node.
-  Use dotted paths such as `${PLUGIN_NAME}:command.myplugin.reload` to create a waterfall. A parent
-  permission grants its child nodes through Pumpkin's permission tree.
-- Permissions default to operators at level 3 and the console. Set `defaultPermission: { tag:
-  'allow' }` on a command to make it usable by everyone, or `{ tag: 'deny' }` to deny it by default.
-  The setting is per permission node, so a read-only subcommand can be public while `reload` stays
-  operator-only.
-- The handlers are typed against the declaration (`CommandHandlers`): a command without a handler, or
-  a handler for a command that doesn't exist, doesn't compile. Argument-bearing handlers infer their
-  value types from the declaration.
-- `registerCommands` registers the permission nodes and checks each runnable subcommand against its
-  declared permission. The tree is built by `buildCommands` in
-  `@pumpkin-plugins/plugin-kit/commands`, which takes the host's command classes as an interface;
-  a plugin's tests run it against `FakeCommandHost` and compare what it registers with
-  `info.commands` (see `src/commands/handlers.test.ts` in a plugin).
-- A handler returns lines: plain strings, or `errorLine(text)` for a line shown in red. Throwing
-  `CommandFailed(message)` makes the command fail the way the server reports a failed command, with
-  the message in red.
-- A command with subcommands only groups them; only the leaves are runnable and listed. A leaf can
-  declare `arguments`; `commandInfos(commands)` includes their `<name>` placeholders in the README:
+Set `info.commands` to `commandInfos(commands)`. That produces one README row for each runnable
+command, such as `/myplugin reload`, with its description, permission and default access.
 
-  ```ts
-  locate: {
-      description: 'Find a location',
-      permission: `${PLUGIN_NAME}:command.locate`,
-      arguments: [
-          { name: 'x', type: 'integer', min: -30_000_000, max: 30_000_000 },
-          { name: 'name', type: 'string', mode: 'quotable' }
-      ]
-  }
-  ```
+A command with subcommands is a group; only its runnable leaves appear in the README. If a
+subcommand doesn't declare a permission, it inherits the nearest parent's node. Dotted nodes such as
+`${PLUGIN_NAME}:command.myplugin.reload` form a permission tree, so Pumpkin can grant a parent node
+access to its child nodes.
 
-  Use `argumentVariants` when one command should run with no arguments and also accept several
-  positional forms. The same declaration powers its typed handlers, host command tree and README:
+By default, level 3 operators and the console may run a command. Set
+`defaultPermission: { tag: 'allow' }` to let everyone run it, or `{ tag: 'deny' }` to deny it by
+default. The access setting belongs to each permission node, so you can make a read-only subcommand
+public while keeping `reload` operator-only.
 
-  ```ts
-  locate: {
-      description: 'Find a location',
-      permission: `${PLUGIN_NAME}:command.locate`,
-      argumentVariants: [
-          [{ name: 'radius', type: 'integer', min: 0, max: 16 }],
-          [
-              { name: 'x', type: 'integer' },
-              { name: 'z', type: 'integer' }
-          ],
-          [
-              { name: 'x', type: 'integer' },
-              { name: 'z', type: 'integer' },
-              { name: 'radius', type: 'integer', min: 0, max: 16 }
-          ]
-      ]
-  }
-  ```
+`CommandHandlers` checks your handlers against the declaration: a missing handler or a handler for
+an unknown command fails type checking. If the command takes arguments, TypeScript also infers the
+handler's argument values from the declaration.
 
-  This declares `/locate`, `/locate <radius>`, `/locate <x> <z>` and
-  `/locate <x> <z> <radius>`. `CommandHandlers` requires a handler for each form and infers the
-  argument object for each one. Variants cannot be combined with fixed `arguments` or literal
-  `subcommands`; shared argument prefixes become one branch in the registered command tree.
+`registerCommands` registers the permission nodes and checks each runnable subcommand against its
+declared permission. The `buildCommands` helper in
+`@pumpkin-plugins/plugin-kit/commands` builds the host command tree. Plugin tests can run that helper
+with `FakeCommandHost` and compare the registered commands with `info.commands` (see
+`src/commands/handlers.test.ts` in a plugin).
 
-  Integers can specify signed 32-bit `min` and `max` bounds. Strings support `single-word`,
-  `quotable`, and `greedy` modes; a greedy string must be the final argument. Argument handlers
-  receive a second parameter with inferred values, for example `(sender, { x, name })`. Commands
-  without arguments keep the sender-only handler shape. Arguments follow the literal command path;
-  literal subcommands cannot follow an argument node.
+A handler returns lines to send to the caller: plain strings or `errorLine(text)` for a red line.
+Throwing `CommandFailed(message)` fails the command and shows the message in red.
 
-Descriptions live as plain strings in one declaration. If you later move to message keys for
-translation, update that file and its two consumers.
+A command leaf can take arguments. `commandInfos(commands)` adds each argument name to its usage in
+the README:
 
-## Generated README blocks
+```ts
+locate: {
+    description: 'Find a location',
+    permission: `${PLUGIN_NAME}:command.locate`,
+    arguments: [
+        { name: 'x', type: 'integer', min: -30_000_000, max: 30_000_000 },
+        { name: 'name', type: 'string', mode: 'quotable' }
+    ]
+}
+```
+
+Use `argumentVariants` when one command should work with no arguments and accept several positional
+forms. The declaration still drives the handler types, host command tree and README:
+
+```ts
+locate: {
+    description: 'Find a location',
+    permission: `${PLUGIN_NAME}:command.locate`,
+    argumentVariants: [
+        [{ name: 'radius', type: 'integer', min: 0, max: 16 }],
+        [
+            { name: 'x', type: 'integer' },
+            { name: 'z', type: 'integer' }
+        ],
+        [
+            { name: 'x', type: 'integer' },
+            { name: 'z', type: 'integer' },
+            { name: 'radius', type: 'integer', min: 0, max: 16 }
+        ]
+    ]
+}
+```
+
+This gives you `/locate`, `/locate <radius>`, `/locate <x> <z>` and
+`/locate <x> <z> <radius>`. `CommandHandlers` requires a handler for every form and infers its
+argument values. You can't combine variants with fixed `arguments` or literal `subcommands`; shared
+argument prefixes become one branch in the registered command tree.
+
+Integer arguments can set signed 32-bit `min` and `max` bounds. Strings support `single-word`,
+`quotable` and `greedy` modes; a greedy string must be the final argument. Argument handlers receive
+a second parameter with inferred values, such as `(sender, { x, name })`. Commands without
+arguments use a sender-only handler. Arguments follow the literal command path, and literal
+subcommands can't follow an argument node.
+
+Command descriptions are plain strings in the declaration. If you later move them to message keys
+for translation, update the declaration and both places that consume it.
+
+## What `pnpm readme` generates
 
 `pnpm readme` refreshes the blocks between `<!-- docs:begin NAME -->` and `<!-- docs:end NAME -->`
 in a plugin's `README.md`:
 
-| Block | Rendered from |
+| Block | Source |
 | --- | --- |
 | `summary` | `info.description` |
 | `permissions` | `info.permissions` plus the automatic updater permission |
 | `commands` | `info.commands` |
-| `config` | `info.config`: the options table and the default file contents |
-| anything else | `info.blocks`: the markdown the plugin gave under that name |
+| `config` | `info.config`: the options table and default file contents |
+| Any other name | Markdown in `info.blocks` under that name |
 
-Everything outside the markers is yours to write. A block the README doesn't contain is skipped.
-Unbalanced or duplicated markers are an error.
+Write your plugin overview, examples and installation guidance outside these blocks. The generator
+leaves that prose alone. A block without markers is skipped; duplicated or unbalanced markers are
+an error.
 
-Market publishing combines `info.description` with the plugin README's written content. It omits
-generated `docs:` blocks, `## Installation` and `## Commands` sections; command metadata comes
-separately from `info.commands`.
+Market publishing combines `info.description` with the README's handwritten content. It omits
+generated `docs:` blocks and the `## Installation` and `## Commands` sections. Command metadata is
+sent separately from `info.commands`.
 
-The README has to exist. `pnpm gen` creates it from `turbo/generators/templates/plugin/README.md.hbs`,
-a barebones file with a title and the four blocks, and the first `pnpm readme` fills them in. A
-missing README is an error rather than something the tool invents.
+The README must already exist. `pnpm gen` creates a starter from
+`turbo/generators/templates/plugin/README.md.hbs`, with a title and the four built-in blocks; the
+first `pnpm readme` fills them in. If the file is missing later, generation reports an error instead
+of inventing a replacement.
 
-Every plugin, tool and action README also has a `reference` block. The repository-level
-`pumpkin-plugins-docs root` command discovers API routes from package manifests and action metadata,
-and adds a component guide link when that component has `docs/index.md`. The public site base comes
-from the root package's GitHub repository URL. Keep the markers in place; `pnpm readme` updates the
-links from these sources, so component names, slugs and site URLs do not need to be copied into the
-README by hand.
+Each plugin, tool and action README also has a generated `reference` block. The repository-level
+`pumpkin-plugins-docs root` command builds API links from package manifests and action metadata. If a
+component has `docs/index.md`, the block also links to that guide. The public site base URL comes
+from the root package's GitHub repository URL. Keep the markers in place and let `pnpm readme`
+refresh the links from these sources; you don't need to copy component names, slugs or site URLs into
+the README.
 
-Versions are deliberately not part of generated content, because release-please changes them in
-the release PR and the README would be stale the moment it merged.
+Generated content deliberately omits versions. Release Please updates package versions in its
+release PR, so putting a version in the README would leave it stale as soon as the release merges.
 
-## The root README
+## What goes in the root README
 
-The tables in the root `README.md` are rebuilt by `pnpm readme`. The Actions table has one row per
-folder in `actions/` with an `action.yml` or `action.yaml`, using its top-level `name` and
-`description` and linking to the folder. The package tables have one row per folder in `packages/`
-and `tools/`, also linked to the folder. Plugins are listed by their `info.name` and
-`info.description`, tools by their `package.json`.
-The package tables show the `license` from each package's `package.json`. A package with its own
-`LICENSE`, `LICENSE.md` or `LICENSE.txt` file (case-insensitive) gets a relative link to that file.
-Packages using the repository's root license show the license as plain text.
+`pnpm readme` rebuilds the root README's component tables from repository metadata:
 
-Tool README prose is hand-written: each one has a title that is its package name, what it is for,
-and links to relevant guides. Tools can declare custom generated blocks with a typed `documents` module and
-`pumpkin-plugins-docs generate`; see the [generator guide](../tools/docs/docs/index.md).
-The repository-level generator fills each API reference block, and
-`pnpm check` fails when a tool README is missing.
+- The Actions table lists each folder in `actions/` with an `action.yml` or `action.yaml`, using its
+  top-level `name` and `description` and linking to the folder.
+- The Plugins table lists folders in `packages/` by `info.name` and `info.description`. The Tools
+  table uses each tool's `package.json`; the VS Code extensions table uses extension metadata.
+- Package tables show the `license` from `package.json`. When a package has its own `LICENSE`,
+  `LICENSE.md` or `LICENSE.txt` file (case-insensitive), the table links to it. Packages that use
+  the repository's root license show the license as plain text.
 
-The root README's public documentation link is generated from the same repository URL. The package
-and action tables, site link and component README references are refreshed by `pnpm readme`.
+Tool README prose is handwritten: each file explains what its package does and links to relevant
+guides. A tool can also generate custom README blocks from a typed `documents` module with
+`pumpkin-plugins-docs generate`; see the [generator guide](../tools/docs/docs/index.md). The root
+generator fills the API reference block, and `pnpm check` fails if a tool README is missing.
 
-## When it runs
+The root README's public documentation link comes from the same repository URL. The package and
+action tables, site link, and component README references are all refreshed by `pnpm readme`.
 
-- `pnpm readme` runs component generators and `pumpkin-plugins-docs actions` to refresh action
-  input/output tables, then updates root README tables,
-  and site/API references. `pnpm readme:check` fails if any generated content is stale.
-- CI checks that generated content is current. Contributors should run `pnpm readme` and commit the
-  generated README changes with the source change.
-- Each time release-please creates or updates the release PR, the release job regenerates the
-  READMEs and commits them to the PR branch. See [CI and releases](ci-and-releases.md).
-- `pnpm gen` generates the new plugin's README and updates the root table straight away.
+## When to run it
+
+Run `pnpm readme` after changing plugin information, command declarations, config schemas, action
+inputs or outputs, package metadata, or component guides. It runs component generators, refreshes
+action input/output tables and rebuilds the root tables, README references and docs index.
+
+Run `pnpm readme:check` to find stale generated content without writing files. CI checks that the
+generated content is current, so commit the generated README changes along with their source change.
+Each time Release Please creates or updates its release PR, the release job regenerates the READMEs
+and commits them to that PR branch. See [CI and releases](ci-and-releases.md).
+
+When you use `pnpm gen` to create a plugin, the generator creates and fills its README and updates
+the root package list as part of scaffolding.

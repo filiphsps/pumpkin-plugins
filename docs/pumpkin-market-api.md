@@ -7,8 +7,8 @@ description: "Market listing lookup, metadata updates, current publisher behavio
 
 # Pumpkin Market API
 
-This page records the Market API behavior used by this repository's publish action, the Market
-frontend, and PPM. It also records the API calls tested against the unpublished
+This page brings together the Market API behavior relevant to this repository's publisher, the
+Market frontend, and PPM. It also records calls tested against the unpublished
 `TemporaryAPIExperiment` listing on 2026-10-07. No API token is stored here.
 
 ## Listing lookup
@@ -20,24 +20,25 @@ The public REST API is rooted at `https://market.pumpkinmc.org/api/v1/rest`.
 | `GET /plugins/{id}` | Resolve a numeric database ID or the listing's public ID to its listing metadata. |
 | `GET /plugins?q={name}&limit={n}` | Search listings by name. Confirm an exact name match; fail if it is ambiguous. |
 
-The response includes the numeric `id`, `public_id`, `name`, `category`, `version` and basic listing
-information. PPM accepts public IDs, numeric IDs, exact names, and author/name input when resolving a
-plugin. This repository's publisher uses bounded search for names and requires a case-insensitive
-exact match. In one observed lookup, `GET /plugins/TemporaryAPIExperiment` returned 404 while the
-search endpoint found the listing; that observation does not establish behavior for every name.
+The response includes the numeric `id`, `public_id`, `name`, `category`, `version`, and other basic
+listing information. PPM can resolve a plugin by public ID, numeric ID, exact name, or author/name
+input. This repository's publisher searches a bounded set of results and accepts a name only when it
+finds a case-insensitive exact match. In one test, `GET /plugins/TemporaryAPIExperiment` returned
+404 while search found the listing. That single result doesn't establish how direct lookup behaves
+for every name.
 
-The current publisher action accepts a plugin name or a numeric/public ID. It searches by name, then
-uses the listing's numeric database ID for the upload endpoint.
+The publisher action accepts either a plugin name or a numeric/public ID. For a name, it searches
+first, then uses the listing's numeric database ID for the upload endpoint.
 
-Both Market actions limit successful listing-lookup JSON responses to 1 MiB. An oversized response
-fails before either action uploads a plugin or updates listing metadata.
+Both Market actions cap successful listing-lookup JSON responses at 1 MiB. If a response exceeds
+that limit, the action fails before uploading a plugin or changing listing metadata.
 
-The public API documentation lists read endpoints, including plugin lookup and download. It does
-not document the developer listing-write endpoint described below.
+The public API documentation covers read endpoints such as plugin lookup and download. It doesn't
+document the developer listing-write endpoint described below.
 
 ## Updating listing metadata
 
-The Market frontend's Store Listing editor uses:
+When you save the Store Listing form in the Market frontend, it sends:
 
 ```http
 PUT /api/plugins/{numeric-database-id}
@@ -45,7 +46,7 @@ Authorization: Bearer <Market API token>
 Content-Type: multipart/form-data
 ```
 
-The multipart form has a `metadata` part containing JSON. The frontend uses these fields:
+The multipart form includes a `metadata` part containing JSON with these fields:
 
 | Field | Shape |
 | --- | --- |
@@ -58,66 +59,66 @@ The multipart form has a `metadata` part containing JSON. The frontend uses thes
 | `isEarlyAccess` | Boolean |
 | `commands` | Ordered array of command entries described below |
 
-Each command entry may contain `id`, `name`, `aliases` (array), `permission`, `description` (locale
-map), and `display_order`. The frontend includes the database `id` for existing command rows when
-saving. It sends the complete command array in the listing form. `preview_image` is an optional
-separate multipart file field. Screenshot uploads and deletes use separate endpoints and are outside
-the metadata update flow.
+Each command entry may contain `id`, `name`, `aliases` (an array), `permission`, `description` (a
+locale map), and `display_order`. When saving, the frontend includes the database `id` for existing
+command rows and sends the complete command array. You can also include `preview_image` as a separate
+multipart file field. Screenshot uploads and deletes use their own endpoints, outside this metadata
+update flow.
 
-The metadata-only update does not need a `wasm` part. Do not set the multipart `Content-Type`
-manually when using `fetch` and `FormData`; the runtime must add the boundary. The frontend uses
-cookie authentication and `X-Requested-With`; the API token used in this repository's publish
-action instead uses the Bearer header.
+For a metadata-only update, you don't need a `wasm` part. When sending `fetch` with `FormData`, let
+the runtime set the multipart `Content-Type` and its boundary. The frontend authenticates with a
+cookie and sends `X-Requested-With`. This repository's publish action uses an API token in the
+Bearer header instead.
 
-The current `publish-to-pumpkin-market` action uses the same `PUT` URL with a `wasm` file and a
-different `metadata` object: `version`, `track`, and `releaseNotes`. Its README documents the token
-scopes used for version uploads. The test below proves that the supplied token could update the test
-listing, but does not isolate the minimum scope required for metadata changes. The frontend also
-surfaces a 2FA requirement for listing saves and version publishing. Whether API-token writes require
-the account to have 2FA enabled has not been isolated.
+The `publish-to-pumpkin-market` action uses the same `PUT` URL, but includes a `wasm` file and a
+different `metadata` object with `version`, `track`, and `releaseNotes`. Its README lists the token
+scopes used for version uploads. The test below confirms that its token could update the test listing;
+it doesn't identify the minimum scope for metadata changes. The frontend also displays a 2FA
+requirement when saving a listing or publishing a version. We haven't determined whether API-token
+writes also require the account to have 2FA enabled.
 
 ## Partial and full listing updates
 
-There is no separate `PATCH` method in the observed frontend flow: both partial metadata edits and
-full listing saves use `PUT /api/plugins/{id}`. The difference is the set of keys in the JSON
-`metadata` part.
+In the frontend flow we observed, both partial edits and full listing saves use
+`PUT /api/plugins/{id}`; there is no separate `PATCH` request. The caller controls the scope of the
+update by choosing which keys to include in the JSON `metadata` part.
 
-The API test sent a partial object containing `translatedDescriptions` and `commands`, then read the
-listing through the public REST endpoint. The listing's existing `name` and `category` remained
-unchanged. A full listing object containing `name`, `category`, `sourceLink`, `youtubeVideoUrl`,
-`keywords`, `translatedDescriptions`, `isEarlyAccess`, and `commands` was also accepted. A later
-partial update left the full update's category unchanged. These observations support using the same
-metadata-only `PUT` for both patch-style edits and complete listing updates.
+In the API test, a partial object with `translatedDescriptions` and `commands` left the listing's
+existing `name` and `category` unchanged when read through the public REST endpoint. The endpoint
+also accepted a full listing object containing `name`, `category`, `sourceLink`, `youtubeVideoUrl`,
+`keywords`, `translatedDescriptions`, `isEarlyAccess`, and `commands`. A later partial update left
+the category from that full update unchanged. These results show that the same metadata-only `PUT`
+can be used for both patch-style edits and complete listing updates.
 
-Command-row reconciliation is not fully verified. The write endpoint returned success for command
-arrays, but the available public REST response does not include description or command rows. A
+We haven't fully verified how the backend reconciles command rows. The write endpoint accepted
+command arrays, but the public REST response doesn't include descriptions or command rows. A
 Bearer-authenticated `GET /api/plugins/{id}` for the unpublished draft returned
-`This plugin is currently offline / draft.` The frontend preserves command IDs, but the backend
-behavior for omitted IDs, omitted commands, and deletion has not been confirmed.
+`This plugin is currently offline / draft.` Although the frontend preserves command IDs, we haven't
+confirmed how the backend handles omitted IDs, omitted commands, or deletion.
 
 ## Tested behavior
 
-All writes below targeted only the unpublished `TemporaryAPIExperiment` listing. No WASM binary was
-uploaded, and no other listing was accessed for mutation.
+Every write below targeted the unpublished `TemporaryAPIExperiment` listing. The test uploaded no
+WASM binary and made no changes to any other listing.
 
 - Public detail lookup by numeric database ID and public ID both returned the same listing and
   numeric database ID.
-- Direct lookup by name returned 404; a bounded name search returned the exact listing.
+- Direct lookup by name returned 404; a bounded search returned the exact listing.
 - A Bearer-authenticated metadata-only `PUT` containing a localized description and one command
   returned HTTP 200 with `{"id":…, "status":"updated", "version":""}`.
 - A full listing metadata `PUT` also returned HTTP 200. The public REST readback showed the updated
   category and retained the listing name.
 - A subsequent partial metadata `PUT` returned HTTP 200 and left the category unchanged.
-- The listing remained offline/draft, and no binary version was published. Its public `version`
-  changed from `null` to an empty string after metadata-only writes. Because the fixture has no
-  published version, this does not establish whether a metadata-only write preserves version data
-  on an already-published listing.
+- The listing stayed offline/draft, and no binary version was published. After metadata-only writes,
+  its public `version` changed from `null` to an empty string. The fixture has no published version,
+  so this doesn't tell us whether metadata-only writes preserve version data on a listing that has
+  already been published.
 - The test fixture is left unpublished with category `Other` and the API probe description/command
   metadata.
 
-The request shape and command fields are confirmed by the frontend code. The API observations here do
-not establish command persistence, command deletion semantics, or whether metadata-only writes
-preserve version and track data on an already-published listing.
+The frontend code confirms the request shape and command fields. The API tests don't confirm whether
+commands persist, how command deletion works, or whether metadata-only writes preserve version and
+track data on a listing that has already been published.
 
 ## References
 

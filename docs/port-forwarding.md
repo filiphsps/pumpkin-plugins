@@ -7,61 +7,66 @@ description: "UPnP and NAT-PMP for plugins: the engine, UPnPumpkin, its API and 
 
 # Port forwarding
 
-Players can only reach a server behind a home router when the router forwards the server's ports.
-This repo does that with UPnP and NAT-PMP, in layers that a plugin can use at the level it needs.
+If your Pumpkin server is behind a home router, players on the internet need the router to forward
+the server's ports. This guide explains how the repository handles that with UPnP and NAT-PMP, and
+how plugins can request additional mappings.
 
-| Layer | Package | What it is |
+| Layer | Package | What it does |
 | --- | --- | --- |
-| Engine | `@pumpkin-plugins/port-mapping` (`tools/port-mapping`) | Finds the router and keeps ports open on it. No Pumpkin or WASI imports: it runs on a small `Network` interface, so it is unit-tested with a fake router. |
-| Plugin | UPnPumpkin (`packages/upnpumpkin`) | Runs the engine on WASI sockets, opens the Java and Bedrock ports, and answers other plugins. |
-| API | `@pumpkin-plugins/upnpumpkin-api` (`tools/apis/upnpumpkin-api`) | The messages, a client and a watcher for plugins that want a port opened. |
-| Host | `@pumpkin-plugins/plugin-kit` (`tools/plugin-kit`) | What every plugin needs from the host: data folder, logging, scheduling, commands, IPC. |
+| Engine | `@pumpkin-plugins/port-mapping` (`tools/port-mapping`) | Finds a router and manages port mappings. It has no Pumpkin or WASI imports; it uses a small `Network` interface that unit tests can implement with a fake router. |
+| Plugin | UPnPumpkin (`packages/upnpumpkin`) | Runs the engine over WASI sockets, opens the Java and Bedrock ports, and handles mapping requests from other plugins. |
+| API | `@pumpkin-plugins/upnpumpkin-api` (`tools/apis/upnpumpkin-api`) | Provides the IPC message format, client, and watcher for plugins that need a port opened. |
+| Host | `@pumpkin-plugins/plugin-kit` (`tools/plugin-kit`) | Gives plugins the host services UPnPumpkin uses: a data folder, logging, scheduling, commands, and IPC. |
 
-BedrockAddonManager is the first user of the API: it asks UPnPumpkin to open its web port when
-`web.public_url` is empty and `web.bind` is `0.0.0.0` (opt out with `web.port_forwarding = false`).
+BedrockAddonManager uses the API to open its web port when `web.public_url` is empty and
+`web.bind` is `0.0.0.0`. Set `web.port_forwarding = false` to manage that port yourself.
 
 ## How the engine works
 
-Plugins run inside a game tick and can't wait, so the engine is written as generators that yield
-while they wait for the network (`Steps<T>`, run by `Task`). `PortMapper` owns the work:
+Plugins run inside game ticks and can't block while waiting for the network. The engine therefore
+does its work in generators (`Steps<T>`) that yield between network operations; `Task` advances
+them. `PortMapper` manages discovery and each requested mapping:
 
 1. If this machine's address toward the internet is public, nothing is opened.
-2. Otherwise, when UPnP is enabled, `discover` completes its SSDP search and reads device
-   descriptions before starting NAT-PMP. UPnP SOAP requests and NAT-PMP requests then run side by
-   side; UPnP wins when both answer. NAT-PMP checks the first and last address of the local /24, or
-   the configured gateway.
-3. A router whose own internet-side address isn't public (carrier-grade NAT) is reported as a
-   failure, because no mapping can make the server reachable through it.
-4. Each requested port is opened with a lease, renewed at half the lease, moved to another public
-   port when the router says the first is taken, and closed when released or when the plugin stops.
-5. Failures are retried with growing waits (30 s up to 10 min), and the router is searched for
-   again when an operation fails. Each failure is logged once, not on every retry; it is logged
-   again after the port opened and later failed anew, or when the reason changes.
+2. Otherwise, discovery looks for enabled protocols. With UPnP enabled, it completes the SSDP
+   search and reads device descriptions before starting NAT-PMP. UPnP SOAP and NAT-PMP requests then
+   run side by side; UPnP is preferred if both succeed. NAT-PMP tries the first and last address of
+   the local /24, or the configured gateway.
+3. If the router's internet-side address is not public, the mapping fails. This includes
+   carrier-grade NAT, where the router is behind another shared address and cannot make the server
+   reachable on its own.
+4. Each mapping has a lease and is renewed halfway through it. If the requested public port is
+   taken, the engine tries another one. It closes the mapping when the request is released or the
+   plugin stops.
+5. After a failure, the engine searches again and retries with increasing delays, from 30 seconds
+   up to 10 minutes. It logs a given failure once, then logs it again if the reason changes or after
+   the mapping recovers and fails again.
 
-UPnP `LOCATION` and `URLBase` must use the IPv4 address that sent the SSDP response; resolved WAN
-control URLs must use that address too. Their HTTP ports may differ from the SSDP port and from
-each other. Devices that rely on cross-host descriptions or control URLs are not used.
+Some routers advertise UPnP URLs that point to the wrong machine. The engine accepts `LOCATION`,
+`URLBase`, and resolved WAN control URLs only when they use the IPv4 address that sent the SSDP
+response. Their HTTP ports may differ from the SSDP port and from each other. Devices whose URLs
+point to another host are skipped.
 
 ### Telling routers apart
 
-Pass `screen` in the discovery options and the engine identifies routers before it asks them to do
-anything. The `screen` gets a `RouterIdentity` (manufacturer, model, model number, name) and returns
-a reason to turn the router down, or nothing. Turned down, a router is never used or asked again: the
-mapper's ports fail with the reason and `info().refused` is set. Without a `screen` nothing is
-identified. The order is:
+The engine can identify routers before asking them to open ports. Pass a `screen` function in the
+discovery options; it receives the router's `RouterIdentity` (manufacturer, model, model number,
+and name) and can return a reason to reject it. A rejected router is not used or queried again;
+mapping requests fail with that reason and `info().refused` is set. Without a `screen`, the engine
+does not identify routers. Screening happens in this order:
 
-1. The router's web interface. Routers without UPnP or NAT-PMP can't describe themselves, so
-   `identify.ts` has a short list of public pages that give them away (`WEB_FINGERPRINTS`: for now
-   Telekom's Speedport login page). Only the first and last address of the local /24, or the
-   configured NAT-PMP gateway, are asked, on port 80, with a short timeout.
-2. UPnP devices: the SSDP search and the device description, whose `manufacturer`, `modelName`,
-   `modelNumber` and `friendlyName` are the identity. No SOAP action is sent yet.
-3. Only then do protocol requests begin: UPnP SOAP actions and NAT-PMP requests run side by side.
-   NAT-PMP waits for the full UPnP search and description-screening pass, so discovery can take
-   longer than the search window alone.
+1. The router's web interface. A router without UPnP can't describe itself, so `identify.ts` has a
+   short list of recognizable pages (`WEB_FINGERPRINTS`), currently Telekom's Speedport login
+   page. The engine probes port 80 at the first and last address of the local /24, or at the
+   configured NAT-PMP gateway, with a short timeout.
+2. UPnP device descriptions. The engine checks `manufacturer`, `modelName`, `modelNumber`, and
+   `friendlyName` from each response before sending any SOAP action.
+3. Protocol requests. UPnP SOAP actions and NAT-PMP requests run side by side. NAT-PMP waits for
+   the UPnP search and description-screening pass to finish, so discovery can take longer than the
+   search window alone.
 
-NAT-PMP has no way to ask a router what it is, so a NAT-PMP-only router is only recognized by its web
-interface. A router that says nothing about itself is never turned down.
+NAT-PMP has no identity query, so a NAT-PMP-only router can be recognized only through its web
+interface. The engine won't reject a router it can't identify.
 
 UPnPumpkin's `screen` is its blocklist, see below.
 
@@ -71,19 +76,18 @@ pointed at it, which sends nothing) and sockets. That is the whole `Network` int
 
 ## The blocklist
 
-`packages/upnpumpkin/src/blocklist.ts` lists the routers UPnPumpkin stays away from: a whole make
-(Telekom, which has no UPnP or NAT-PMP at all) or only some models. A rule has a `manufacturer`
-pattern, optional `models` and a short `reason`; a rule with models only blocks routers whose model
-is known. When the router is on the list:
+`packages/upnpumpkin/src/blocklist.ts` lists routers UPnPumpkin avoids. A rule can block a whole
+manufacturer (Telekom, which has no UPnP or NAT-PMP) or selected models. Each rule has a
+`manufacturer` pattern, optional `models`, and a short `reason`. A rule with `models` only applies
+when the router's model is known. When UPnPumpkin identifies a listed router:
 
 - the log gets one warning, when the router has been identified (a few seconds after the start),
 - `/upnp reload` fails with the same text,
 - `/upnp status` shows it in red,
 - ports other plugins ask for fail with the reason.
 
-The README table of blocked routers is generated from the list (`info.blocks.routers`, see [Plugin
-info and READMEs](plugin-info-and-readmes.md)), so adding a rule updates the document with
-`pnpm readme`.
+The README's blocked-router table comes from this list via `info.blocks.routers` (see [Plugin info
+and READMEs](plugin-info-and-readmes.md)). Run `pnpm readme` after adding a rule to update it.
 
 ## Asking UPnPumpkin for a port
 
@@ -95,23 +99,23 @@ const watcher = new MappingWatcher(new PortMapClient(ipcSend), request, onChange
 watcher.start();
 ```
 
-Call `watcher.tick()` once per game tick and `watcher.stop()` when done. Messages are JSON in
-Pumpkin's plugin messages (`ensure`, `status`, `release`, `info`; see `protocol.ts`). `ensure` is
-idempotent, so the watcher repeats it to learn how the request is going. UPnPumpkin keeps each
-plugin's keys apart, limits how many ports plugins may hold, and drops a request nobody has
-repeated for five minutes.
+Call `watcher.tick()` once per game tick and `watcher.stop()` when you're done. The client sends JSON
+in Pumpkin plugin messages using the `ensure`, `status`, `release`, and `info` operations (see
+`protocol.ts`). `ensure` is idempotent, so the watcher can repeat it while checking the request's
+status. UPnPumpkin keeps keys separate for each requesting plugin, limits how many ports each
+plugin can hold, and drops a request if the plugin hasn't repeated it for five minutes.
 
-UPnPumpkin is optional for the plugin that asks: while it is missing the state is `unavailable`
-and the plugin carries on. Don't list it in `dependencies`, which would stop your plugin loading
-without it.
+The requesting plugin can work without UPnPumpkin. While UPnPumpkin is unavailable, the watcher
+reports `unavailable` and your plugin can carry on. Don't add UPnPumpkin to `dependencies`; that
+would prevent your plugin from loading when UPnPumpkin isn't installed.
 
 ## Testing
 
-- Engine and API: unit tests with `FakeNetwork` and `FakeIgd` from
-  `@pumpkin-plugins/port-mapping/testing`, which move a clock by hand and simulate a router (UPnP
-  and NAT-PMP, taken ports, permanent-lease-only routers, CGNAT).
-- UPnPumpkin: integration tests start a real server and a router on localhost
-  (`@pumpkin-plugins/port-mapping/testing/router`: the same `FakeIgd` behind real UDP and HTTP
-  sockets) and point the plugin at it with `router.upnp_search` and `router.nat_pmp_gateway`.
-- BedrockAddonManager with UPnPumpkin: `test/forwarding.itest.ts` loads both on one server (see
-  [Testing](testing.md)).
+- Engine and API unit tests use `FakeNetwork` and `FakeIgd` from
+  `@pumpkin-plugins/port-mapping/testing`. They control time directly and simulate UPnP and NAT-PMP
+  routers, including taken ports, permanent-lease-only routers, and CGNAT.
+- UPnPumpkin integration tests run a real server with a localhost router from
+  `@pumpkin-plugins/port-mapping/testing/router`. The fake IGD uses real UDP and HTTP sockets; set
+  `router.upnp_search` and `router.nat_pmp_gateway` to point the plugin at it.
+- `packages/bedrock-addon-manager/test/forwarding.itest.ts` loads BedrockAddonManager and UPnPumpkin
+  together on one server. See the [Testing guide](testing.md).
