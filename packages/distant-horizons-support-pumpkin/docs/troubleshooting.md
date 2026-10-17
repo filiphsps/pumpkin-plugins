@@ -8,11 +8,21 @@ players can open Distant Horizons sessions.
 
 ## Requests stay pending because terrain is unavailable
 
-The plugin can read only chunks Pumpkin has loaded; it cannot load or generate them. If the requested
-area isn't loaded and has no cached capture, the request stays pending while the plugin checks again
-with increasing delays. Bring the area within range of a player or use a server chunk-loading tool.
-The client can cancel a request it no longer needs, and each pending request uses space in the
-configured queue. See the plugin README for the section size and capture requirements.
+The plugin reads terrain through Pumpkin's world-level adapter. If Pumpkin++ is available, the
+plugin can ask it to prepare chunks and check progress over later server ticks; the adapter must
+still report the section ready before sampling. Without a usable provider, bring the area within
+range of a player or use a server chunk-loading tool. If local availability still fails, an uncached
+request stays pending and retries with increasing delays. The client can cancel a request it no
+longer needs, and each pending request uses space in the configured queue. See the plugin README for
+the section size and capture requirements.
+
+Run `/dhs status` to inspect the Pumpkin++ provider state. `missing` means the transport confirmed no
+native provider answered, `incompatible` means the provider protocol did not match, and
+`temporarily unreachable` means the provider could not be checked or reached. Pumpkin's standard
+`ipcSend` cannot distinguish a missing recipient from other transport errors, so it reports
+`temporarily unreachable` unless absence is positively confirmed. Any loaded plugin that can send
+host IPC to Pumpkin++ can call it; the host-supplied sender name scopes operation IDs, leases and
+quotas.
 
 ## A client sees old terrain
 

@@ -179,6 +179,9 @@ catalogs:
     '@pumpkin-plugins/pumpkin-pie-api':
       specifier: workspace:*
       version: workspace:*
+    '@pumpkin-plugins/pumpkin-plus-plus-api':
+      specifier: workspace:*
+      version: workspace:*
     '@pumpkin-plugins/wasi-capabilities':
       specifier: workspace:*
       version: workspace:*
@@ -441,6 +444,9 @@ importers:
       '@pumpkin-plugins/pumpkin-pie-api':
         specifier: 'catalog:'
         version: link:../../tools/apis/pumpkin-pie-api
+      '@pumpkin-plugins/pumpkin-plus-plus-api':
+        specifier: 'catalog:'
+        version: link:../../tools/apis/pumpkin-plus-plus-api
       '@pumpkin-plugins/terrain':
         specifier: workspace:*
         version: link:../../tools/terrain

@@ -113,8 +113,8 @@ function recoverCachedLod(
         if (!found) throw new CommandFailed('Run this command as a Java player so terrain access is available.');
         if (!recovery) throw new CommandFailed('Could not start cache recovery.');
         return [
-            `Backed up ${recovery.backup.key} to ${recovery.backup.dataPath}; recorded the key in ${recovery.backup.manifestPath}.`,
-            `Started forced LOD capture at section ${color.named.value(String(recovery.start.centerX))}, ${color.named.value(String(recovery.start.centerZ))}.`,
+            `Started cache recovery for ${recovery.key}. The existing entry stays in place until every required chunk is ready.`,
+            `The rebuild will capture section ${color.named.value(String(recovery.start.centerX))}, ${color.named.value(String(recovery.start.centerZ))} after preparation completes.`,
         ];
     } catch (err) {
         if (err instanceof CommandFailed) throw err;

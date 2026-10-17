@@ -20,7 +20,7 @@ describe(info.name, () => {
     });
     it('loads, installs settings, and reports supported capabilities through its command', async () => {
         await server.waitForLog(new RegExp(`Loaded ${info.name}`));
-        await server.waitForLog(new RegExp(`serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain`));
+        await server.waitForLog(new RegExp(`serving DH protocol ${PROTOCOL} through Pumpkin's terrain adapter`));
         const config = await readFile(path.join(server.pluginDataDir(info.name), 'config.toml'), 'utf8');
         expect(config).toContain('render_distance = 128');
         expect(config).toContain('generation_requests_per_second = 20');
@@ -44,6 +44,7 @@ describe(info.name, () => {
             statusFrom,
         );
         expect(budget).toMatch(/Capture budget \d+\/8192 block samples\/tick at \d+(?:\.\d+)? reported MSPT/);
+        await server.waitForLog(/Pumpkin\+\+ provider: temporarily unreachable\./, 5000, statusFrom);
         const cacheStatusFrom = server.lines.length;
         server.command('dhs cache status');
         await server.waitForLog(/Memory cache: 0\/512 entries/, 5000, cacheStatusFrom);

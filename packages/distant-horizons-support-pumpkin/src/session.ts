@@ -1,11 +1,13 @@
 import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
+import type { PumpkinPlusPlusSession } from '@pumpkin-plugins/pumpkin-plus-plus-api';
 import { AdaptiveWorkBudget, type TerrainSource } from '@pumpkin-plugins/terrain';
 import type { Settings } from './config/schema.ts';
 import { ByteCredit } from './flow/byte-credit.ts';
 import { TransferCursor } from './flow/transfer-cursor.ts';
 import { LodBuilder } from './lod/builder.ts';
 import type { CachedLod, LodCache } from './lod/cache.ts';
+import { ChunkPreparation } from './lod/chunk-preparation.ts';
 import {
     FORCE_BLOCK_SAMPLES_PER_TICK,
     ForcedLodGeneration,
@@ -84,6 +86,7 @@ interface Request {
     builder?: LodBuilder;
     cacheChecked?: boolean;
     cached?: CachedLod | null;
+    captureId: string;
     key: string;
     level: string;
     name: string;
@@ -112,6 +115,7 @@ export class Sessions {
     private readonly terrainRetries = new Map<string, TerrainRetry>();
     private readonly refreshes = new Map<string, Refresh>();
     private readonly revisions = new Map<string, number>();
+    private readonly preparations: ChunkPreparation;
     private readonly workBudget = new AdaptiveWorkBudget({ initialUnits: 8192 });
     private readonly forcedGeneration: ForcedLodGeneration;
     private buffer = 1;
@@ -126,14 +130,18 @@ export class Sessions {
     private lastFailure = '';
     private lastBlocksBudget = 0;
     private lastServerMspt = 0;
+    private nextCaptureId = 0;
     constructor(
         private readonly settings: Settings,
         private readonly cache: LodCache,
         private readonly log: Logger,
         private readonly now = Date.now,
         private readonly measureNow = Date.now,
+        provider?: PumpkinPlusPlusSession,
+        preparationNow = now,
     ) {
-        this.forcedGeneration = new ForcedLodGeneration(cache, log, now);
+        this.preparations = new ChunkPreparation(provider, preparationNow, log);
+        this.forcedGeneration = new ForcedLodGeneration(cache, log, now, this.preparations);
     }
     /** Starts a cache-refreshing capture that takes priority over ordinary DH work. */
     forceGenerate(peer: Peer, blockX: number, blockZ: number, radius = 0): ForcedLodStart {
@@ -255,6 +263,7 @@ export class Sessions {
             `${logTag} Queued DH request ${ansi.named.number(message.tracker)} from ${ansi.named.name(peer.name)} for ${lodLocation(peer.level, message.section.x, message.section.z)}.`,
         );
         this.requests.push({
+            captureId: `lod-${++this.nextCaptureId}`,
             name: peer.name,
             tracker: message.tracker,
             key,
@@ -268,6 +277,7 @@ export class Sessions {
     tick(peers: Peers, serverMspt = 0): void {
         const handlerStarted = this.measureNow();
         this.ticks++;
+        this.preparations.beginTick(Math.max(1, Math.min(16, this.settings.pending_requests)));
         this.pruneTerrainRetries();
         const refreshesAtStart = [...this.refreshes.values()];
         for (const [name, client] of this.clients) {
@@ -332,6 +342,9 @@ export class Sessions {
                             return;
                         }
                     }
+                    const captureSlotAvailable =
+                        request.builder !== undefined ||
+                        this.captureRequestCount(request.name, request) < this.settings.requests_per_player;
                     const region = {
                         originX: request.section.x * SECTION_SIZE_BLOCKS,
                         originZ: request.section.z * SECTION_SIZE_BLOCKS,
@@ -346,26 +359,35 @@ export class Sessions {
                     availabilityChecks++;
                     let prepared: ReturnType<NonNullable<typeof peer.terrain.prepare>> | undefined;
                     try {
-                        prepared = peer.terrain.prepare?.(region);
+                        const local = peer.terrain.prepare?.(region);
+                        if (
+                            (!captureSlotAvailable || builderStepped || blocksBudget === 0) &&
+                            !this.preparations.isPreparing(request.captureId)
+                        ) {
+                            if (!local || local.status === 'ready') {
+                                request.cacheChecked = false;
+                                return;
+                            }
+                            this.deferTerrain(
+                                request,
+                                'reason' in local ? local.reason : 'Terrain preparation is pending',
+                            );
+                            return;
+                        }
+                        prepared = this.preparations.prepare(request.captureId, request.level, region, local);
                     } catch (err) {
                         this.deferTerrain(request, String(err));
                         return;
                     }
                     if (prepared && prepared.status !== 'ready') {
+                        if (prepared.status === 'pending' && this.preparations.isPreparing(request.captureId)) return;
                         this.deferTerrain(
                             request,
-                            prepared.status === 'unavailable' ? prepared.reason : 'Terrain preparation is pending',
+                            'reason' in prepared ? prepared.reason : 'Terrain preparation is pending',
                         );
                         return;
                     }
                     this.terrainRetries.delete(request.key);
-                    if (
-                        !request.builder &&
-                        this.captureRequestCount(request.name, request) >= this.settings.requests_per_player
-                    ) {
-                        request.cacheChecked = false;
-                        return;
-                    }
                     if (builderStepped || blocksBudget === 0) {
                         if (!request.builder && !request.cached) request.cacheChecked = false;
                         return;
@@ -378,7 +400,8 @@ export class Sessions {
                     if (complete) {
                         let stillLoaded: ReturnType<NonNullable<typeof peer.terrain.prepare>> | undefined;
                         try {
-                            stillLoaded = peer.terrain.prepare?.(region);
+                            const local = peer.terrain.prepare?.(region);
+                            stillLoaded = this.preparations.prepare(request.captureId, request.level, region, local);
                         } catch (err) {
                             this.deferTerrain(request, String(err));
                             this.workBudget.observe(measured.samples(), this.measureNow() - started);
@@ -387,9 +410,7 @@ export class Sessions {
                         if (stillLoaded && stillLoaded.status !== 'ready') {
                             this.deferTerrain(
                                 request,
-                                stillLoaded.status === 'unavailable'
-                                    ? stillLoaded.reason
-                                    : 'Terrain preparation is pending',
+                                'reason' in stillLoaded ? stillLoaded.reason : 'Terrain preparation is pending',
                             );
                             this.workBudget.observe(measured.samples(), this.measureNow() - started);
                             return;
@@ -508,11 +529,24 @@ export class Sessions {
         this.forcedGeneration.left(name);
         this.removeClient(name);
     }
+    /** Cancels admitted provider work before the plugin unloads. */
+    dispose(): void {
+        for (const request of [...this.requests]) this.drop(request);
+        for (const refresh of [...this.refreshes.values()]) this.finishRefresh(refresh);
+        this.forcedGeneration.stop();
+        this.preparations.dispose();
+        this.clients.clear();
+        this.terrainRetries.clear();
+        this.revisions.clear();
+    }
     /** Invalidates a known changed section and cancels its obsolete captures. */
     changed(level: string, x: number, z: number): void {
         const key = sectionKey(level, Math.floor(x / SECTION_SIZE_BLOCKS), Math.floor(z / SECTION_SIZE_BLOCKS));
         this.cache.remove(key);
         this.forcedGeneration.changed(level, x, z);
+        for (const request of this.requests) {
+            if (request.key === key) this.preparations.abandon(request.captureId);
+        }
         // Running requests and background refreshes share revisions to prevent stale writes.
         if (this.requests.some((request) => request.key === key) || this.refreshes.has(key))
             this.revisions.set(key, (this.revisions.get(key) ?? 0) + 1);
@@ -568,7 +602,10 @@ export class Sessions {
         if (forced) lines.push(forced);
         lines.push(budget.trim());
         if (this.lastFailure) lines.push(`Last rejection: ${this.lastFailure}.`);
-        lines.push('Distant chunk generation is unavailable in the pinned Pumpkin API.');
+        const providerState = this.preparations.availability();
+        const providerStatus =
+            providerState.kind === 'unknown' ? 'temporarily unreachable' : providerState.kind.replaceAll('_', ' ');
+        lines.push(`Pumpkin++ provider: ${providerStatus}.`);
         return lines.join('\n');
     }
     private scheduleRefresh(request: Request): void {
@@ -690,6 +727,7 @@ export class Sessions {
     private drop(request: Request): void {
         const index = this.requests.indexOf(request);
         if (index >= 0) this.requests.splice(index, 1);
+        this.preparations.abandon(request.captureId);
         this.clearRevisionIfUnused(request.key);
     }
     private deferTerrain(request: Request, reason: string): void {
@@ -698,6 +736,7 @@ export class Sessions {
         const attempts = Math.min((previous?.attempts ?? 0) + 1, 32);
         const delay = Math.min(INITIAL_TERRAIN_RETRY_MS * 2 ** Math.min(attempts - 1, 10), MAX_TERRAIN_RETRY_MS);
         request.builder = undefined;
+        this.preparations.defer(request.captureId);
         this.terrainRetries.delete(request.key);
         this.terrainRetries.set(request.key, { attempts, retryAt: now + delay, updatedAt: now });
         const maximumEntries = Math.max(64, this.settings.pending_requests * 4);
@@ -719,9 +758,7 @@ export class Sessions {
         }
     }
     private cancelRequests(name: string): void {
-        for (let i = this.requests.length - 1; i >= 0; i--) {
-            if (this.requests[i]?.name === name) this.requests.splice(i, 1);
-        }
+        for (const request of [...this.requests]) if (request.name === name) this.drop(request);
         for (const [key, refresh] of this.refreshes) if (refresh.name === name) this.refreshes.delete(key);
         for (const key of this.revisions.keys()) this.clearRevisionIfUnused(key);
     }

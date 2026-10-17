@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
     events: new Map<string, unknown>(),
     cleanupOrder: [] as string[],
     placeholderOptions: undefined as unknown,
+    providerOptions: undefined as unknown,
     placeholderResponse: new Uint8Array([2]),
     baseResponse: new Uint8Array([1]),
     openDataDir: vi.fn(() => state.files),
@@ -20,7 +21,12 @@ const state = vi.hoisted(() => ({
     registerCommands: vi.fn(),
     serverPeers: vi.fn(() => ['live peer']),
     sessionsTick: vi.fn(),
+    sessionsConstructor: vi.fn(),
+    sessionsDispose: vi.fn(() => state.cleanupOrder.push('sessions-dispose')),
     placeholderConstructor: vi.fn(),
+    providerConstructor: vi.fn(),
+    warningScopeConstructor: vi.fn(),
+    ipcSend: vi.fn(() => new Uint8Array()),
     placeholderTick: vi.fn(),
     placeholderIpc: vi.fn((_sender: string, _message: Uint8Array) => state.placeholderResponse),
     placeholderStop: vi.fn(() => state.cleanupOrder.push('stop')),
@@ -30,7 +36,21 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('@pumpkin-plugins/plugin-kit/data-dir', () => ({ WasiDataDir: { open: state.openDataDir } }));
+vi.mock('@pumpkin-plugins/plugin-kit/ipc', () => ({ ipcSend: state.ipcSend }));
 vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({ hostLogger: { info: state.hostInfo, warn: state.hostWarn } }));
+vi.mock('@pumpkin-plugins/pumpkin-plus-plus-api', () => ({
+    PumpkinPlusPlusSession: class {
+        constructor(options: unknown) {
+            state.providerOptions = options;
+            state.providerConstructor();
+        }
+    },
+    WarningScope: class {
+        constructor() {
+            state.warningScopeConstructor();
+        }
+    },
+}));
 vi.mock('@pumpkin-plugins/pumpkin-api', () => ({ handleCommand: vi.fn(), handleTask: vi.fn() }));
 vi.mock('wasi:clocks/monotonic-clock@0.2.3', () => ({ now: () => 0n }));
 vi.mock('@pumpkin-plugins/plugin-kit/plugin', () => ({
@@ -61,8 +81,16 @@ vi.mock('./platform/world-mutations.ts', () => ({ invalidateBlockGrow: vi.fn(), 
 vi.mock('./protocol/messages.ts', () => ({ CHANNEL: 'dh', PROTOCOL: 16 }));
 vi.mock('./session.ts', () => ({
     Sessions: class {
+        constructor(...args: unknown[]) {
+            state.sessionsConstructor(...args);
+        }
+
         tick(peers: unknown, serverMspt: number): void {
             state.sessionsTick(peers, serverMspt);
+        }
+
+        dispose(): void {
+            state.sessionsDispose();
         }
     },
 }));
@@ -95,11 +123,13 @@ describe('DistantHorizonsSupportPumpkin lifecycle', () => {
         state.events.clear();
         state.cleanupOrder.length = 0;
         state.placeholderOptions = undefined;
+        state.providerOptions = undefined;
         state.placeholderResponse = new Uint8Array([2]);
         state.baseResponse = new Uint8Array([1]);
         state.placeholderIpc.mockImplementation(() => state.placeholderResponse);
         state.baseIpc.mockImplementation(() => state.baseResponse);
         state.placeholderStop.mockImplementation(() => state.cleanupOrder.push('stop'));
+        state.sessionsDispose.mockImplementation(() => state.cleanupOrder.push('sessions-dispose'));
         state.serverPeers.mockReturnValue(['live peer']);
         state.files = {
             [Symbol.dispose]: vi.fn(() => state.cleanupOrder.push('dispose')),
@@ -114,6 +144,23 @@ describe('DistantHorizonsSupportPumpkin lifecycle', () => {
         const context = {} as Context;
 
         plugin.onPluginLoad(context);
+        expect(state.providerConstructor).toHaveBeenCalledOnce();
+        expect(state.warningScopeConstructor).toHaveBeenCalledOnce();
+        expect(state.providerOptions).toMatchObject({
+            send: state.ipcSend,
+            now: expect.any(Function),
+            warn: state.hostWarn,
+            warnings: expect.any(Object),
+        });
+        expect(state.sessionsConstructor).toHaveBeenCalledWith(
+            expect.any(Object),
+            expect.any(Object),
+            expect.any(Object),
+            expect.any(Function),
+            expect.any(Function),
+            expect.any(Object),
+            expect.any(Function),
+        );
         expect(state.placeholderConstructor).toHaveBeenCalledOnce();
         expect(state.placeholderOptions).toMatchObject({
             sessions: expect.any(Object),
@@ -134,7 +181,8 @@ describe('DistantHorizonsSupportPumpkin lifecycle', () => {
         expect(state.hostWarn).toHaveBeenCalledWith(expect.stringContaining('PumpkinPIE session tick failed'));
         plugin.onPluginUnload(context);
         expect(state.placeholderStop).toHaveBeenCalledOnce();
-        expect(state.cleanupOrder).toEqual(['stop', 'dispose']);
+        expect(state.sessionsDispose).toHaveBeenCalledOnce();
+        expect(state.cleanupOrder).toEqual(['stop', 'sessions-dispose', 'dispose']);
     });
 
     it('routes authenticated IPC and preserves the base handler when the service is absent', () => {
@@ -165,6 +213,7 @@ describe('DistantHorizonsSupportPumpkin lifecycle', () => {
         expect(() => plugin.onPluginLoad(context)).toThrow(failure);
         expect(files[Symbol.dispose]).toHaveBeenCalledOnce();
         expect(state.placeholderStop).toHaveBeenCalledOnce();
-        expect(state.cleanupOrder).toEqual(['stop', 'dispose']);
+        expect(state.sessionsDispose).toHaveBeenCalledOnce();
+        expect(state.cleanupOrder).toEqual(['stop', 'sessions-dispose', 'dispose']);
     });
 });

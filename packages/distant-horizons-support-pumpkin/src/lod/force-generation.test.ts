@@ -1,10 +1,13 @@
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
+import type { PumpkinPlusPlusSession } from '@pumpkin-plugins/pumpkin-plus-plus-api';
 import { unavailableChunkLoader, unavailableTerrainGenerator } from '@pumpkin-plugins/terrain';
 import { describe, expect, it, vi } from 'vitest';
+import { bridgeProvider } from '../bridge-provider.test-helper.ts';
 import { LodCache } from './cache.ts';
+import { ChunkPreparation } from './chunk-preparation.ts';
 import { ForcedLodGeneration, type ForcedLodPeer, type ForcedLodPeers } from './force-generation.ts';
 
-function fixture(height = 1) {
+function fixture(height = 1, provider?: PumpkinPlusPlusSession, material = 'minecraft:plains_DH-BSW_minecraft:stone') {
     const files = new MemoryFiles();
     const logger = new MemoryLogger();
     const cache = new LodCache(files, 128, 4096);
@@ -20,7 +23,7 @@ function fixture(height = 1) {
             terrainGenerator: unavailableTerrainGenerator,
             sample: () => {
                 samples++;
-                return { material: 'minecraft:plains_DH-BSW_minecraft:stone', skyLight: 15, blockLight: 0 };
+                return { material, skyLight: 15, blockLight: 0 };
             },
         },
         borderBounds: { minX: -1_000_000, maxX: 1_000_000, minZ: -1_000_000, maxZ: 1_000_000 },
@@ -34,11 +37,52 @@ function fixture(height = 1) {
             return true;
         },
     };
-    const generation = new ForcedLodGeneration(cache, logger, () => 1234);
-    return { files, cache, generation, logger, peer, peers, reports, samples: () => samples };
+    const preparations = new ChunkPreparation(provider, () => 1000, logger);
+    const generation = new ForcedLodGeneration(cache, logger, () => 1234, preparations);
+    return {
+        files,
+        cache,
+        generation,
+        logger,
+        peer,
+        peers,
+        reports,
+        preparations,
+        tick: () => {
+            preparations.beginTick(16);
+            return generation.tick(peers);
+        },
+        samples: () => samples,
+    };
 }
 
 describe('forced LOD generation', () => {
+    it('waits for Pumpkin++ leases before caching a generated all-air section', () => {
+        const bridge = bridgeProvider();
+        const f = fixture(1, bridge.provider, 'minecraft:plains_DH-BSW_minecraft:air');
+        f.peer.terrain.prepare = () =>
+            bridge.readyLeases.size === 16
+                ? { status: 'ready' }
+                : { status: 'unavailable', reason: 'Chunk is not loaded yet' };
+        f.generation.start(f.peer, 32, 32);
+
+        f.tick();
+        expect(bridge.requests.filter((request) => request.op === 'submit')).toHaveLength(16);
+        expect(f.samples()).toBe(0);
+        expect(f.cache.has('world:0:0')).toBe(false);
+
+        f.tick();
+        expect(bridge.requests.filter((request) => request.op === 'poll')).toHaveLength(16);
+        expect(f.samples()).toBe(0);
+        expect(f.cache.has('world:0:0')).toBe(false);
+
+        f.tick();
+        expect(f.samples()).toBe(4096);
+        expect(f.cache.get('world:0:0')?.data.length).toBeGreaterThan(0);
+        expect(bridge.requests.filter((request) => request.op === 'release')).toHaveLength(16);
+        expect(bridge.readyLeases.size).toBe(0);
+    });
+
     it('captures and caches a section without a DH client request', () => {
         const f = fixture();
         const started = f.generation.start(f.peer, 32, 32);
@@ -113,9 +157,10 @@ describe('forced LOD generation', () => {
         f.cache.put('world:0:0', { updated: 1, data: new Uint8Array(64) });
 
         const started = f.generation.start(f.peer, 32, 32, 1);
-        f.generation.tick(f.peers);
+        for (let tick = 0; f.generation.status() && tick < 4; tick++) f.tick();
 
         expect(started).toMatchObject({ sections: 9 });
+        expect(f.generation.status()).toBeUndefined();
         expect(f.cache.stats().memoryEntries).toBe(9);
         expect(f.samples()).toBe(8 * 4096);
         expect(f.reports.at(-1)).toContain('complete: 8 built, 1 skipped (1 already generated)');
@@ -271,19 +316,18 @@ describe('forced LOD generation', () => {
         const recovery = f.generation.recover(f.peer, 32, 32);
 
         expect(recovery.start.sections).toBe(1);
-        expect(recovery.backup.key).toBe('world:0:0');
-        expect(f.cache.get('world:0:0')).toBeUndefined();
+        expect(f.cache.get('world:0:0')?.data).toEqual(suspect);
         expect(f.cache.get('world:1:0')?.data).toEqual(unrelated);
-        f.generation.tick(f.peers);
+        expect(f.files.stat('cache-recovery')).toBeUndefined();
+        f.tick();
 
         expect(f.cache.get('world:0:0')?.updated).toBe(1234);
         expect(f.cache.get('world:0:0')?.data).not.toEqual(suspect);
         expect(f.cache.get('world:1:0')?.data).toEqual(unrelated);
-        expect(f.files.stat(recovery.backup.dataPath)?.kind).toBe('file');
-        expect(f.files.stat(recovery.backup.manifestPath)?.kind).toBe('file');
+        expect(f.files.list('cache-recovery')).toHaveLength(2);
     });
 
-    it('defers selected cache recovery until terrain is loaded without removing the entry', () => {
+    it('keeps selected cache recovery pending until terrain is loaded', () => {
         const f = fixture();
         const suspect = new Uint8Array(64).fill(3);
         const unrelated = new Uint8Array(64).fill(9);
@@ -291,14 +335,63 @@ describe('forced LOD generation', () => {
         f.cache.put('world:1:0', { updated: 2, data: unrelated });
         f.peer.terrain.prepare = () => ({ status: 'unavailable', reason: 'Chunk 0, 0 is not loaded' });
 
-        expect(() => f.generation.recover(f.peer, 32, 32)).toThrow(
-            'recovery deferred until all section chunks are loaded',
-        );
+        expect(f.generation.recover(f.peer, 32, 32).start.sections).toBe(1);
+        f.tick();
 
         expect(f.cache.get('world:0:0')?.data).toEqual(suspect);
         expect(f.cache.get('world:1:0')?.data).toEqual(unrelated);
         expect(f.files.stat('cache-recovery')).toBeUndefined();
-        expect(f.generation.status()).toBeUndefined();
+        expect(f.generation.status()).toContain('Forced LOD capture');
+    });
+
+    it('does not move a good recovery cache entry until every Pumpkin++ lease is ready', () => {
+        const bridge = bridgeProvider();
+        const f = fixture(1, bridge.provider);
+        const suspect = new Uint8Array(64).fill(3);
+        f.cache.put('world:0:0', { updated: 1, data: suspect });
+        f.peer.terrain.prepare = () =>
+            bridge.readyLeases.size === 16
+                ? { status: 'ready' }
+                : { status: 'unavailable', reason: 'Chunk is not loaded yet' };
+
+        expect(f.generation.recover(f.peer, 32, 32).start.sections).toBe(1);
+        expect(f.cache.get('world:0:0')?.data).toEqual(suspect);
+        expect(f.files.stat('cache-recovery')).toBeUndefined();
+
+        f.tick();
+        expect(f.cache.get('world:0:0')?.data).toEqual(suspect);
+        expect(f.files.stat('cache-recovery')).toBeUndefined();
+
+        f.tick();
+        expect(f.cache.get('world:0:0')?.data).toEqual(suspect);
+        expect(f.files.stat('cache-recovery')).toBeUndefined();
+
+        f.tick();
+        expect(f.cache.get('world:0:0')?.updated).toBe(1234);
+        expect(f.cache.get('world:0:0')?.data).not.toEqual(suspect);
+        expect(f.files.list('cache-recovery')).toHaveLength(2);
+        expect(bridge.requests.filter((request) => request.op === 'release')).toHaveLength(16);
+    });
+
+    it('does not replay an uncertain preparation submit during cache recovery', () => {
+        const bridge = bridgeProvider({ failFirstSubmit: true });
+        const f = fixture(1, bridge.provider);
+        const suspect = new Uint8Array(64).fill(3);
+        f.cache.put('world:0:0', { updated: 1, data: suspect });
+        f.peer.terrain.prepare = () => ({ status: 'unavailable', reason: 'Chunk is not loaded yet' });
+        f.generation.recover(f.peer, 32, 32);
+
+        f.tick();
+        expect(f.cache.get('world:0:0')?.data).toEqual(suspect);
+        expect(f.files.stat('cache-recovery')).toBeUndefined();
+        expect(bridge.requests.filter((request) => request.op === 'submit')).toHaveLength(1);
+
+        bridge.setNow(3000);
+        f.tick();
+
+        expect(bridge.requests.filter((request) => request.op === 'submit')).toHaveLength(1);
+        expect(f.cache.get('world:0:0')?.data).toEqual(suspect);
+        expect(f.files.stat('cache-recovery')).toBeUndefined();
     });
 
     it('counts sections outside the world border once and builds the in-border sections', () => {

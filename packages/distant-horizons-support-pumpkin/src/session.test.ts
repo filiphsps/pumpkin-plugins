@@ -1,7 +1,9 @@
 import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
+import type { PumpkinPlusPlusSession } from '@pumpkin-plugins/pumpkin-plus-plus-api';
 import { unavailableChunkLoader, unavailableTerrainGenerator } from '@pumpkin-plugins/terrain';
 import { describe, expect, it, vi } from 'vitest';
+import { bridgeProvider } from './bridge-provider.test-helper.ts';
 import { readSettings } from './config/load.ts';
 import { LodCache } from './lod/cache.ts';
 import { PLUGIN_NAME } from './name.ts';
@@ -9,14 +11,14 @@ import { Reader } from './protocol/bytes.ts';
 import { packet } from './protocol/messages.ts';
 import { type Peer, Sessions } from './session.ts';
 
-function fixture(measureNow = () => 1000, now = () => 1000) {
+function fixture(measureNow = () => 1000, now = () => 1000, provider?: PumpkinPlusPlusSession) {
     const files = new MemoryFiles(),
         log = new MemoryLogger();
     const settings = readSettings(files, log);
     settings.blocks_per_tick = 16384;
     settings.packets_per_tick = 16;
     const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries),
-        sessions = new Sessions(settings, cache, log, now, measureNow);
+        sessions = new Sessions(settings, cache, log, now, measureNow, provider, now);
     const sent: Uint8Array[] = [];
     const reports: string[] = [];
     let reads = 0;
@@ -581,6 +583,170 @@ describe('DH protocol contracts', () => {
 });
 
 describe('DH sessions', () => {
+    it('waits for every Pumpkin++ chunk lease and polls the same operations across ticks', () => {
+        const bridge = bridgeProvider();
+        const f = fixture(
+            () => 1000,
+            () => 1000,
+            bridge.provider,
+        );
+        f.peer.terrain.prepare = () =>
+            bridge.readyLeases.size === 16
+                ? { status: 'ready' }
+                : { status: 'unavailable', reason: 'Chunk is not loaded yet' };
+        f.sessions.receive(f.peer, f.request());
+
+        f.sessions.tick(f.peers);
+
+        const submitted = bridge.requests.filter((request) => request.op === 'submit');
+        expect(submitted).toHaveLength(16);
+        expect(f.reads()).toBe(0);
+        expect(f.cache.has('world:0:0')).toBe(false);
+
+        f.sessions.tick(f.peers);
+
+        expect(bridge.requests.filter((request) => request.op === 'poll')).toHaveLength(16);
+        expect(f.reads()).toBe(0);
+        expect(f.cache.has('world:0:0')).toBe(false);
+
+        f.sessions.tick(f.peers);
+
+        const polledIds = bridge.requests
+            .filter((request) => request.op === 'poll')
+            .map((request) => request.operationId);
+        expect(new Set(polledIds)).toEqual(new Set(bridge.operationIds));
+        expect(f.reads()).toBe(4096);
+        expect(f.cache.has('world:0:0')).toBe(true);
+        expect(bridge.requests.filter((request) => request.op === 'release')).toHaveLength(16);
+        expect(bridge.readyLeases.size).toBe(0);
+    });
+
+    it('waits for the production terrain adapter after every provider lease is ready', () => {
+        const bridge = bridgeProvider();
+        const f = fixture(
+            () => 1000,
+            () => 1000,
+            bridge.provider,
+        );
+        let terrainReady = false;
+        f.peer.terrain.prepare = () => (terrainReady ? { status: 'ready' } : { status: 'pending' });
+        f.sessions.receive(f.peer, f.request());
+
+        f.sessions.tick(f.peers);
+        f.sessions.tick(f.peers);
+        f.sessions.tick(f.peers);
+
+        expect(bridge.readyLeases.size).toBe(16);
+        expect(f.reads()).toBe(0);
+        expect(f.cache.has('world:0:0')).toBe(false);
+
+        terrainReady = true;
+        f.sessions.tick(f.peers);
+
+        expect(f.reads()).toBe(4096);
+        expect(f.cache.has('world:0:0')).toBe(true);
+        expect(bridge.requests.filter((request) => request.op === 'release')).toHaveLength(16);
+    });
+
+    it('does not automatically replay a Pumpkin++ submit after an uncertain transport failure', () => {
+        const bridge = bridgeProvider({ failFirstSubmit: true });
+        let now = 1000;
+        const f = fixture(
+            () => 1000,
+            () => now,
+            bridge.provider,
+        );
+        f.peer.terrain.prepare = () => ({ status: 'unavailable', reason: 'Chunk is not loaded yet' });
+        f.sessions.receive(f.peer, f.request());
+
+        f.sessions.tick(f.peers);
+        expect(bridge.requests.filter((request) => request.op === 'submit')).toHaveLength(1);
+
+        now = 3000;
+        bridge.setNow(now);
+        f.sessions.tick(f.peers);
+
+        expect(bridge.requests.filter((request) => request.op === 'submit')).toHaveLength(1);
+        expect(f.reads()).toBe(0);
+        expect(f.cache.has('world:0:0')).toBe(false);
+    });
+
+    it('does not submit Pumpkin++ work for a cached LOD request', () => {
+        const bridge = bridgeProvider();
+        const f = fixture(
+            () => 1000,
+            () => 1000,
+            bridge.provider,
+        );
+        f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
+        f.sessions.receive(f.peer, f.request());
+
+        f.sessions.tick(f.peers);
+
+        expect(bridge.requests).toEqual([]);
+        expect(f.reads()).toBe(0);
+        expect(f.ids()).toContain(8);
+    });
+
+    it.each([
+        [
+            'client cancellation',
+            (f: ReturnType<typeof fixture>) => f.sessions.receive(f.peer, packet(5).int(1).finish()),
+        ],
+        [
+            'session close',
+            (f: ReturnType<typeof fixture>) => f.sessions.receive(f.peer, packet(1).string('closed').finish()),
+        ],
+        ['player leave', (f: ReturnType<typeof fixture>) => f.sessions.playerLeft('Alice')],
+        [
+            'world change',
+            (f: ReturnType<typeof fixture>) => {
+                f.peer.level = 'another-world';
+                f.sessions.tick(f.peers);
+            },
+        ],
+        ['capture invalidation', (f: ReturnType<typeof fixture>) => f.sessions.changed('world', 1, 1)],
+        ['plugin unload', (f: ReturnType<typeof fixture>) => f.sessions.dispose()],
+    ])('cancels pending Pumpkin++ operations on %s', (_name, abandon) => {
+        const bridge = bridgeProvider();
+        const f = fixture(
+            () => 1000,
+            () => 1000,
+            bridge.provider,
+        );
+        f.sessions.receive(f.peer, f.request());
+        f.sessions.tick(f.peers);
+        expect(bridge.requests.filter((request) => request.op === 'submit')).toHaveLength(16);
+
+        abandon(f);
+
+        expect(bridge.requests.filter((request) => request.op === 'cancel')).toHaveLength(16);
+        expect(bridge.requests.filter((request) => request.op === 'release')).toHaveLength(0);
+    });
+
+    it('releases ready leases and cancels remaining operations when a poll reaches a terminal error', () => {
+        const bridge = bridgeProvider({
+            poll: (operationId) => {
+                if (operationId === 'operation-9') return 'timeout';
+                return Number(operationId.slice('operation-'.length)) < 9 ? 'ready' : 'running';
+            },
+        });
+        const f = fixture(
+            () => 1000,
+            () => 1000,
+            bridge.provider,
+        );
+        f.peer.terrain.prepare = () => ({ status: 'unavailable', reason: 'Not locally loaded' });
+        f.sessions.receive(f.peer, f.request());
+        f.sessions.tick(f.peers);
+        f.sessions.tick(f.peers);
+
+        expect(f.reads()).toBe(0);
+        expect(f.cache.has('world:0:0')).toBe(false);
+        expect(bridge.requests.filter((request) => request.op === 'release')).toHaveLength(8);
+        expect(bridge.requests.filter((request) => request.op === 'cancel')).toHaveLength(7);
+    });
+
     it('catches terrain preparation errors and backs off while keeping the DH request pending', () => {
         let now = 1000;
         const f = fixture(

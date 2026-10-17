@@ -3,6 +3,7 @@ import { commandInfos } from '@pumpkin-plugins/docs';
 import type { CommandHost } from '@pumpkin-plugins/plugin-kit/commands';
 import { buildCommands } from '@pumpkin-plugins/plugin-kit/commands';
 import { FakeCommandHost, type FakeNode, MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
+import { PumpkinPlusPlusSession, TransportError, WarningScope } from '@pumpkin-plugins/pumpkin-plus-plus-api';
 import { unavailableChunkLoader, unavailableTerrainGenerator } from '@pumpkin-plugins/terrain';
 import { describe, expect, it, vi } from 'vitest';
 import { readSettings } from '../config/load.ts';
@@ -17,13 +18,46 @@ vi.mock('../platform/peers.ts', () => ({ withPlayer: platform.withPlayer }));
 
 let activePeer: Peer | undefined;
 
-function setup() {
+function providerFor(state: 'available' | 'missing' | 'incompatible' | 'temporarily unreachable') {
+    const warning = vi.fn();
+    const send = (_recipient: string, bytes: Uint8Array) => {
+        const request = JSON.parse(new TextDecoder().decode(bytes)) as { op: string };
+        if (state === 'missing') throw new TransportError('missing');
+        if (state === 'temporarily unreachable') throw new Error('IPC failed');
+        if (request.op === 'probe') {
+            if (state === 'incompatible')
+                return new TextEncoder().encode(JSON.stringify({ v: 1, ok: false, code: 'incompatible' }));
+            return new TextEncoder().encode(
+                JSON.stringify({
+                    v: 1,
+                    ok: true,
+                    provider: 'Pumpkin++',
+                    protocol: 1,
+                    hostRelease: 'test-release',
+                    hostSourceCommit: 'a'.repeat(40),
+                }),
+            );
+        }
+        throw new Error(`Unexpected operation ${request.op}`);
+    };
+    return {
+        warning,
+        session: new PumpkinPlusPlusSession({
+            send,
+            now: () => 1000,
+            warn: warning,
+            warnings: new WarningScope(),
+        }),
+    };
+}
+
+function setup(provider?: PumpkinPlusPlusSession) {
     const files = new MemoryFiles();
     const logger = new MemoryLogger();
     const settings = readSettings(files, logger);
     const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries);
     cache.put('first', { updated: 1, data: new Uint8Array(100) });
-    const sessions = new Sessions(settings, cache, logger);
+    const sessions = new Sessions(settings, cache, logger, Date.now, Date.now, provider, () => 1000);
     activePeer = {
         name: 'Alice',
         level: 'world',
@@ -100,6 +134,19 @@ describe('the /dhs commands', () => {
         ]);
     });
 
+    it.each([
+        ['available', 'available'],
+        ['missing', 'missing'],
+        ['incompatible', 'incompatible'],
+        ['temporarily unreachable', 'temporarily unreachable'],
+    ] as const)('reports Pumpkin++ as %s from session evidence', (state, expected) => {
+        const provider = providerFor(state);
+        const f = setup(provider.session);
+        const lines = f.host.run(f.root, ['dhs', 'status']);
+
+        expect(lines.join('\n')).toContain(`Pumpkin++ provider: ${expected}.`);
+    });
+
     it('clears both tiers or either tier independently', () => {
         const all = setup();
         expect(all.host.run(all.root, ['dhs', 'cache', 'clear'])).toEqual([
@@ -120,12 +167,14 @@ describe('the /dhs commands', () => {
         expect(disk.cache.stats()).toMatchObject({ memoryEntries: 1, diskEntries: 0 });
     });
 
-    it('backs up and rebuilds one explicitly selected cached section from loaded terrain', () => {
+    it('keeps the selected cache entry until asynchronous recovery preparation completes', () => {
         const f = setup();
         const suspect = new Uint8Array(64);
         f.cache.put('world:0:0', { updated: 1, data: suspect });
         if (!activePeer) throw new Error('Missing command peer');
         activePeer.terrain.prepare = () => ({ status: 'ready' });
+        const recoveryReports: string[] = [];
+        activePeer.report = (message) => recoveryReports.push(message);
         const player = {
             getPosition: () => [32, 64, 32],
             getWorld: () => ({ getName: () => 'world', [Symbol.dispose]: () => undefined }),
@@ -135,10 +184,22 @@ describe('the /dhs commands', () => {
 
         f.host.runAs(f.root, ['dhs', 'cache', 'recover', '<x>', '<z>'], { x: 32, z: 32 }, sender as never);
 
-        expect(sender.lines[0]).toContain('Backed up world:0:0 to cache-recovery/');
-        expect(f.cache.get('world:0:0')).toBeUndefined();
+        expect(sender.lines[0]).toContain('Started cache recovery for world:0:0');
+        expect(f.cache.get('world:0:0')?.data).toEqual(suspect);
+        expect(f.files.stat('cache-recovery')).toBeUndefined();
+
+        f.sessions.tick({
+            withPeer: (name, use) => {
+                if (!activePeer || name !== activePeer.name) return false;
+                use(activePeer);
+                return true;
+            },
+        });
+
+        expect(f.cache.get('world:0:0')?.data).not.toEqual(suspect);
+        expect(recoveryReports).toContainEqual(expect.stringContaining('recorded the key in cache-recovery/'));
         expect(f.files.list('cache-recovery')).toHaveLength(2);
-        expect(f.sessions.status()).toContain('Forced LOD capture for Alice');
+        expect(f.sessions.status()).not.toContain('Forced LOD capture');
     });
 
     it('shows cached LOD sections around the player and at block coordinates with a chosen radius', () => {

@@ -11,9 +11,11 @@ import type { IpcMessage, PluginId } from 'pumpkin:plugin/ipc@0.1.0';
 import { now as monotonicNow } from 'wasi:clocks/monotonic-clock@0.2.3';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
 import { hostLogger } from '@pumpkin-plugins/plugin-kit/host';
+import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
+import { PumpkinPlusPlusSession, WarningScope } from '@pumpkin-plugins/pumpkin-plus-plus-api';
 import { commandHandlers } from './commands/handlers.ts';
 import { commands } from './commands/spec.ts';
 import { readSettings } from './config/load.ts';
@@ -30,6 +32,7 @@ import { Sessions } from './session.ts';
 class DistantHorizonsSupportPumpkin extends PluginBase {
     private dataDir: WasiDataDir | undefined;
     private placeholders: DistantHorizonsPlaceholderService | undefined;
+    private sessions: Sessions | undefined;
 
     constructor() {
         super(info, __PLUGIN_VERSION__);
@@ -43,6 +46,7 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
             this.initializePlugin(ctx, files);
         } catch (error) {
             this.stopPlaceholders();
+            this.stopSessions();
             this.disposeDataDir();
             throw error;
         }
@@ -51,7 +55,14 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
     private initializePlugin(ctx: Context, files: WasiDataDir): void {
         const settings = readSettings(files, hostLogger);
         const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries);
-        const sessions = new Sessions(settings, cache, hostLogger);
+        const provider = new PumpkinPlusPlusSession({
+            send: ipcSend,
+            now: monotonicMilliseconds,
+            warn: hostLogger.warn,
+            warnings: new WarningScope(),
+        });
+        const sessions = new Sessions(settings, cache, hostLogger, Date.now, Date.now, provider, monotonicMilliseconds);
+        this.sessions = sessions;
         this.placeholders = new DistantHorizonsPlaceholderService({
             sessions,
             cache,
@@ -104,12 +115,13 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
             invalidateBlockSpread(sessions, event);
         });
         hostLogger.info(
-            `${PLUGIN_NAME}: serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain. This plugin cannot load saved chunks or request normal terrain generation; see the README's Terrain access limits section.`,
+            `${PLUGIN_NAME}: serving DH protocol ${PROTOCOL} through Pumpkin's terrain adapter and cached terrain. Optional Pumpkin++ preparation can make chunks available, but the plugin still samples through that adapter. See the README's Terrain access section.`,
         );
     }
 
     protected override onPluginUnload(_ctx: Context): void {
         this.stopPlaceholders();
+        this.stopSessions();
         this.disposeDataDir();
     }
 
@@ -121,6 +133,17 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
             placeholders?.stop();
         } catch {
             hostLogger.warn(`${PLUGIN_NAME}: failed to stop PumpkinPIE session`);
+        }
+    }
+
+    /** Cancels pending Pumpkin++ jobs and releases prepared leases before plugin resources close. */
+    private stopSessions(): void {
+        const sessions = this.sessions;
+        this.sessions = undefined;
+        try {
+            sessions?.dispose();
+        } catch {
+            hostLogger.warn(`${PLUGIN_NAME}: failed to stop Distant Horizons sessions`);
         }
     }
 
