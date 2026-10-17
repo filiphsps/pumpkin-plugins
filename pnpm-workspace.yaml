@@ -12,6 +12,7 @@ allowBuilds:
 catalog:
   smol-toml: 1.9.0
   "@pumpkin-plugins/pumpkin-api": workspace:*
+  "@pumpkin-plugins/pumpkin-plus-plus-api": workspace:*
   "@pumpkin-plugins/pumpkin-pie-api": workspace:*
   "@pumpkin-plugins/wasi-capabilities": workspace:*
   "@bytecodealliance/jco": 1.36.1

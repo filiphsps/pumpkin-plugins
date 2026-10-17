@@ -1,6 +1,8 @@
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
+import type { PumpkinPlusPlusSession } from '@pumpkin-plugins/pumpkin-plus-plus-api';
 import type { Settings } from './config/schema.ts';
 import type { LodCache } from './lod/cache.ts';
+import { ChunkPreparation } from './lod/chunk-preparation.ts';
 import {
     ForcedLodGeneration,
     type ForcedLodPeer,
@@ -24,15 +26,26 @@ export type { SessionPlaceholderSnapshot } from './session/status.ts';
 export class Sessions {
     private readonly state: SessionState;
     private readonly forcedGeneration: ForcedLodGeneration;
-    constructor(settings: Settings, cache: LodCache, log: Logger, now = Date.now, measureNow = Date.now) {
-        this.state = new SessionState(settings, cache, log, now, measureNow);
-        this.forcedGeneration = new ForcedLodGeneration(cache, log, now, measureNow);
+    private readonly preparations: ChunkPreparation;
+    /** Creates bounded DH sessions with an optional native chunk-preparation provider. */
+    constructor(
+        settings: Settings,
+        cache: LodCache,
+        log: Logger,
+        now = Date.now,
+        measureNow = Date.now,
+        provider?: PumpkinPlusPlusSession,
+        preparationNow = now,
+    ) {
+        this.preparations = new ChunkPreparation(provider, preparationNow, log);
+        this.state = new SessionState(settings, cache, log, now, measureNow, this.preparations);
+        this.forcedGeneration = new ForcedLodGeneration(cache, log, now, measureNow, this.preparations);
     }
     /** Starts a cache-refreshing capture that takes priority over ordinary DH work. */
     forceGenerate(peer: ForcedLodPeer, blockX: number, blockZ: number, radius = 0): ForcedLodStart {
         return this.forcedGeneration.start(peer, blockX, blockZ, radius);
     }
-    /** Backs up and rebuilds one explicitly selected cached section from loaded terrain. */
+    /** Starts recovery of one cached section; preparation precedes its backup and rebuild. */
     forceRecover(peer: ForcedLodPeer, blockX: number, blockZ: number): ForcedLodRecovery {
         return this.forcedGeneration.recover(peer, blockX, blockZ);
     }
@@ -52,6 +65,7 @@ export class Sessions {
     tick(peers: Peers, serverMspt = 0): void {
         const handlerStarted = this.state.measureNow();
         this.state.ticks++;
+        this.preparations.beginTick(Math.max(1, Math.min(16, this.state.settings.pending_requests)));
         pruneTerrainRetries(this.state);
         const refreshesAtStart = [...this.state.refreshes.values()];
         for (const [name, client] of this.state.clients) {
@@ -88,11 +102,24 @@ export class Sessions {
         this.state.protocolWarnings.delete(name);
         this.state.removeClient(name);
     }
+    /** Drops local capture state during unload without calling host APIs from the lifecycle hook. */
+    dispose(): void {
+        this.state.requests.length = 0;
+        this.state.refreshes.clear();
+        this.forcedGeneration.stop();
+        this.preparations.dispose();
+        this.state.clients.clear();
+        this.state.terrainRetries.clear();
+        this.state.revisions.clear();
+    }
     /** Invalidates a known changed section so pending captures of it start again. */
     changed(level: string, x: number, z: number): void {
         const key = sectionKey(level, Math.floor(x / SECTION_SIZE_BLOCKS), Math.floor(z / SECTION_SIZE_BLOCKS));
         this.state.cache.remove(key);
         this.forcedGeneration.changed(level, x, z);
+        for (const request of this.state.requests) {
+            if (request.key === key) this.preparations.abandon(request.captureId);
+        }
         // Running requests and background refreshes share revisions to prevent stale writes.
         if (this.state.requests.some((request) => request.key === key) || this.state.refreshes.has(key))
             this.state.revisions.set(key, (this.state.revisions.get(key) ?? 0) + 1);

@@ -6,6 +6,7 @@ import type { ByteCredit } from '../flow/byte-credit.ts';
 import type { TransferCursor } from '../flow/transfer-cursor.ts';
 import type { LodBuilder } from '../lod/builder.ts';
 import type { CachedLod, LodCache } from '../lod/cache.ts';
+import type { ChunkPreparation } from '../lod/chunk-preparation.ts';
 import type { Section, SessionConfiguration } from '../protocol/messages.ts';
 import type { Peer, Peers } from './peer.ts';
 
@@ -39,6 +40,7 @@ export interface Request {
     builder?: LodBuilder;
     cacheChecked?: boolean;
     cached?: CachedLod | null;
+    captureId: string;
     key: string;
     level: string;
     name: string;
@@ -88,12 +90,14 @@ export class SessionState {
     lastFailure = '';
     lastBlocksBudget = 0;
     lastServerMspt = 0;
+    nextCaptureId = 0;
     constructor(
         readonly settings: Settings,
         readonly cache: LodCache,
         readonly log: Logger,
         readonly now: () => number,
         readonly measureNow: () => number,
+        readonly preparations: ChunkPreparation,
     ) {}
     /** Ends a player's DH protocol session and drops its requests and queued responses. */
     endSession(name: string): void {
@@ -126,6 +130,7 @@ export class SessionState {
     drop(request: Request): void {
         const index = this.requests.indexOf(request);
         if (index >= 0) this.requests.splice(index, 1);
+        this.preparations.abandon(request.captureId);
         this.clearRevisionIfUnused(request.key);
     }
     /** Forgets a section's change revision once no request or refresh still tracks it. */
@@ -134,9 +139,7 @@ export class SessionState {
             this.revisions.delete(key);
     }
     private cancelRequests(name: string): void {
-        for (let i = this.requests.length - 1; i >= 0; i--) {
-            if (this.requests[i]?.name === name) this.requests.splice(i, 1);
-        }
+        for (const request of [...this.requests]) if (request.name === name) this.drop(request);
         for (const [key, refresh] of this.refreshes) if (refresh.name === name) this.refreshes.delete(key);
         for (const key of this.revisions.keys()) this.clearRevisionIfUnused(key);
     }

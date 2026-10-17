@@ -101,12 +101,14 @@ describe('the /dhs commands', () => {
         expect(disk.cache.stats()).toMatchObject({ memoryEntries: 1, diskEntries: 0 });
     });
 
-    it('backs up and rebuilds one explicitly selected cached section from loaded terrain', () => {
+    it('keeps the selected cache entry until recovery preparation completes', () => {
         const f = setup();
         const suspect = new Uint8Array(64);
         f.cache.put('world:0:0', { updated: 1, data: suspect });
         if (!activePeer) throw new Error('Missing command peer');
         activePeer.terrain.prepare = () => ({ status: 'ready' });
+        const recoveryReports: string[] = [];
+        activePeer.report = (message) => recoveryReports.push(message);
         const player = {
             getPosition: () => [32, 64, 32],
             getWorld: () => ({ getName: () => 'world', [Symbol.dispose]: () => undefined }),
@@ -116,10 +118,27 @@ describe('the /dhs commands', () => {
 
         f.host.runAs(f.root, ['dhs', 'cache', 'recover', '<x>', '<z>'], { x: 32, z: 32 }, sender as never);
 
-        expect(sender.lines[0]).toContain('Backed up world:0:0 to cache-recovery/');
-        expect(f.cache.get('world:0:0')).toBeUndefined();
+        expect(plain(sender.lines[0] ?? '')).toContain('Started cache recovery for world:0:0');
+        expect(f.cache.get('world:0:0')?.data).toEqual(suspect);
+        expect(f.files.stat('cache-recovery')).toBeUndefined();
+
+        f.sessions.tick({
+            withPeer: (name, use) => {
+                if (!activePeer || name !== activePeer.name) return false;
+                use(activePeer);
+                return true;
+            },
+            withTerrain: (_name, use) => {
+                if (!activePeer) return false;
+                use(activePeer);
+                return true;
+            },
+        });
+
+        expect(f.cache.get('world:0:0')?.data).not.toEqual(suspect);
+        expect(recoveryReports).toContainEqual(expect.stringContaining('recorded the key in cache-recovery/'));
         expect(f.files.list('cache-recovery')).toHaveLength(2);
-        expect(f.sessions.status()).toContain('Forced LOD capture for Alice');
+        expect(f.sessions.status()).not.toContain('Forced LOD capture');
     });
 
     it('shows cached LOD sections around the player and at block coordinates with a chosen radius', () => {

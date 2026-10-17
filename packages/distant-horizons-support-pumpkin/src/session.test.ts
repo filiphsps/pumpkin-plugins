@@ -1,19 +1,21 @@
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
+import type { PumpkinPlusPlusSession } from '@pumpkin-plugins/pumpkin-plus-plus-api';
 import { describe, expect, it, vi } from 'vitest';
+import { bridgeProvider } from './bridge-provider.test-helper.ts';
 import { readSettings } from './config/load.ts';
 import { LodCache } from './lod/cache.ts';
 import { Reader, Writer } from './protocol/bytes.ts';
 import { encodeSection, packet } from './protocol/messages.ts';
 import { type Peer, Sessions } from './session.ts';
 
-function fixture(measureNow = () => 1000, now = () => 1000) {
+function fixture(measureNow = () => 1000, now = () => 1000, provider?: PumpkinPlusPlusSession) {
     const files = new MemoryFiles(),
         log = new MemoryLogger();
     const settings = readSettings(files, log);
     settings.blocks_per_tick = 16384;
     settings.packets_per_tick = 16;
     const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries),
-        sessions = new Sessions(settings, cache, log, now, measureNow);
+        sessions = new Sessions(settings, cache, log, now, measureNow, provider, now);
     const sent: Uint8Array[] = [];
     const reports: string[] = [];
     let reads = 0;
@@ -321,6 +323,24 @@ describe('DH protocol contracts', () => {
         expect(f.sessions.status()).toContain('2 pending LOD request(s)');
     });
 
+    it('does not terrain-check or defer a request without a capture slot', () => {
+        const f = fixture();
+        f.settings.requests_per_player = 1;
+        const prepare = vi.fn(() => ({ status: 'pending' as const }));
+        f.peer.terrain.prepare = prepare;
+        f.sessions.receive(f.peer, f.request(1));
+        f.sessions.receive(f.peer, f.request(2, 'world', 1));
+
+        f.sessions.tick(f.peers);
+
+        expect(prepare).toHaveBeenCalledTimes(1);
+        f.sessions.receive(f.peer, packet(5).int(1).finish());
+        f.sessions.tick(f.peers);
+
+        expect(prepare).toHaveBeenCalledTimes(2);
+        expect(f.sessions.status()).toContain('1 pending LOD request(s)');
+    });
+
     it('adopts requests while an earlier response is queued and keeps that transfer on config changes', () => {
         const f = fixture();
         f.settings.cached_packets_per_tick = 0;
@@ -588,6 +608,51 @@ describe('DH protocol contracts', () => {
 });
 
 describe('DH sessions', () => {
+    it('waits for Pumpkin++ leases before sampling and releases them after caching a section', () => {
+        const bridge = bridgeProvider();
+        const f = fixture(
+            () => 1000,
+            () => 1000,
+            bridge.provider,
+        );
+        f.peer.terrain.prepare = () =>
+            bridge.readyLeases.size === 16
+                ? { status: 'ready' }
+                : { status: 'unavailable', reason: 'Chunk is not loaded yet' };
+        f.sessions.receive(f.peer, f.request());
+
+        f.sessions.tick(f.peers);
+        expect(bridge.requests.filter((request) => request.op === 'submit')).toHaveLength(16);
+        expect(f.reads()).toBe(0);
+        expect(f.cache.has('world:0:0')).toBe(false);
+
+        f.sessions.tick(f.peers);
+        expect(f.reads()).toBe(0);
+
+        f.sessions.tick(f.peers);
+        expect(f.reads()).toBe(4096);
+        expect(f.cache.has('world:0:0')).toBe(true);
+        expect(bridge.requests.filter((request) => request.op === 'release')).toHaveLength(16);
+        expect(bridge.readyLeases.size).toBe(0);
+    });
+
+    it('cancels pending Pumpkin++ operations when the client cancels its LOD request', () => {
+        const bridge = bridgeProvider();
+        const f = fixture(
+            () => 1000,
+            () => 1000,
+            bridge.provider,
+        );
+        f.sessions.receive(f.peer, f.request());
+        f.sessions.tick(f.peers);
+        expect(bridge.requests.filter((request) => request.op === 'submit')).toHaveLength(16);
+
+        f.sessions.receive(f.peer, packet(5).int(1).finish());
+
+        expect(bridge.requests.filter((request) => request.op === 'cancel')).toHaveLength(16);
+        expect(bridge.requests.filter((request) => request.op === 'release')).toHaveLength(0);
+    });
+
     it('catches terrain preparation errors and backs off while keeping the DH request pending', () => {
         let now = 1000;
         const f = fixture(
@@ -632,6 +697,7 @@ describe('DH sessions', () => {
         const f = fixture();
         f.settings.blocks_per_tick = 64;
         f.settings.pending_requests = 32;
+        f.settings.requests_per_player = 16;
         f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
         let prepareCalls = 0;
         f.peer.terrain.prepare = () => {
@@ -658,6 +724,24 @@ describe('DH sessions', () => {
 
         expect(f.ids()).toEqual([10, 8]);
         expect(prepareCalls).toBe(16);
+    });
+
+    it('submits Pumpkin++ preparation while capture sampling is paused', () => {
+        const bridge = bridgeProvider();
+        const f = fixture(
+            () => 1000,
+            () => 1000,
+            bridge.provider,
+        );
+        f.settings.blocks_per_tick = 64;
+        f.peer.terrain.prepare = () => ({ status: 'unavailable', reason: 'Chunk is not loaded' });
+        f.sessions.receive(f.peer, f.request());
+
+        f.sessions.tick(f.peers, 45);
+
+        expect(bridge.requests.filter((request) => request.op === 'submit')).toHaveLength(16);
+        expect(f.reads()).toBe(0);
+        expect(f.sessions.status()).toContain('1 pending LOD request(s)');
     });
 
     it('restarts a partial capture after unavailable terrain becomes available again', () => {

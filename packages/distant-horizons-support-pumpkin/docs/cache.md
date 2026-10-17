@@ -28,9 +28,10 @@ when nothing needs capturing. Only one forced capture runs at a time. It gets up
 samples per tick, fewer when server MSPT and the measured cost per sample leave less spare tick
 time. It reports its progress in chat about every 10%, and `/dhs status` shows the active job.
 
-A forced capture uses only loaded terrain. It skips sections whose chunks aren't loaded, so bring
-the area into range first, through normal play or a server chunk-loading tool. While it runs,
-ordinary captures pause, but the plugin keeps sending cached sections to clients.
+With a usable Pumpkin++ provider, a forced capture requests preparation for each section and waits
+for its chunks to be ready before sampling. Without a usable provider, it can capture only sections
+whose chunks are already ready through Pumpkin's terrain adapter; it skips unavailable sections.
+While it runs, ordinary captures pause, but the plugin keeps sending cached sections to clients.
 
 ## Keep the cache current
 
@@ -46,12 +47,14 @@ Live push updates are off, but clients can sync cached terrain when they log in.
 An empty cache entry can be terrain that really contains only air, so the plugin never removes
 these entries on its own.
 
-If a cached area looks wrong, stand in that world, load the area's 16 chunks and run
-`/dhs cache recover <x> <z>` with block coordinates inside the section. When any chunk is missing,
-the plugin defers the recovery and leaves the entry as it is. Otherwise it copies the entry to
-`cache-recovery/` in its data folder, removes that one section from the cache and captures it
-again. If the chunks unload before that capture finishes, the plugin doesn't store an empty section
-in its place. The backups stay until you delete them.
+If a cached area looks wrong, stand in that world and run `/dhs cache recover <x> <z>` with block
+coordinates inside the section. With a usable Pumpkin++ provider, recovery requests preparation for
+the section's 16 chunks and can remain pending while that work advances. Without one, the chunks
+must already be ready through Pumpkin's terrain adapter. The existing entry stays in the cache until
+the terrain is ready; the plugin then backs it up under `cache-recovery/` in its data folder,
+removes it from the cache and captures it again. If preparation cannot make the terrain ready, the
+existing entry is preserved. If the chunks unload after capture begins, the plugin doesn't store an
+empty section in its place. The backups stay until you delete them.
 
 Recovery changes only the server's cache. It doesn't touch the cache that the Distant Horizons mod
 keeps on each client.

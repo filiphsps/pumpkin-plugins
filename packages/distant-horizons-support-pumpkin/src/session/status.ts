@@ -67,6 +67,9 @@ export function describeStatus(state: SessionState, forced: string | undefined):
     if (forced) lines.push(forced);
     lines.push(budget.trim());
     if (state.lastFailure) lines.push(`Last rejection: ${state.lastFailure}.`);
-    lines.push('Distant chunk generation is unavailable in the pinned Pumpkin API.');
+    const providerState = state.preparations.availability();
+    const providerStatus =
+        providerState.kind === 'unknown' ? 'temporarily unreachable' : providerState.kind.replaceAll('_', ' ');
+    lines.push(`Pumpkin++ provider: ${providerStatus}.`);
     return lines.join('\n');
 }

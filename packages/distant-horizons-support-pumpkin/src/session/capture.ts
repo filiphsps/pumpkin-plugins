@@ -61,6 +61,7 @@ export function stepRequests(state: SessionState, peers: Peers, blocksBudget: nu
                 const revision = state.revisions.get(request.key) ?? 0;
                 if (revision !== request.revision) {
                     // A block changed in this section; start again from current terrain.
+                    state.preparations.abandon(request.captureId);
                     request.builder = undefined;
                     request.cacheChecked = false;
                     request.cached = undefined;
@@ -91,6 +92,13 @@ export function stepRequests(state: SessionState, peers: Peers, blocksBudget: nu
                         return;
                     }
                 }
+                const captureSlotAvailable =
+                    request.builder !== undefined ||
+                    captureRequestCount(state, request.name, request) < state.settings.requests_per_player;
+                if (!captureSlotAvailable && !state.preparations.isPreparing(request.captureId)) {
+                    request.cacheChecked = false;
+                    return;
+                }
                 const region = sectionRegion(request.section, peer.terrain);
                 const retry = state.terrainRetries.get(request.key);
                 if (retry && state.now() < retry.retryAt) return;
@@ -98,27 +106,38 @@ export function stepRequests(state: SessionState, peers: Peers, blocksBudget: nu
                 availabilityChecks++;
                 let prepared: ReturnType<NonNullable<typeof peer.terrain.prepare>> | undefined;
                 try {
-                    prepared = peer.terrain.prepare?.(region);
+                    const local = peer.terrain.prepare?.(region);
+                    if (
+                        (builderStepped || blocksBudget === 0) &&
+                        !state.preparations.hasProvider() &&
+                        !state.preparations.isPreparing(request.captureId)
+                    ) {
+                        if (!local || local.status === 'ready') {
+                            request.cacheChecked = false;
+                            return;
+                        }
+                        deferTerrain(
+                            state,
+                            request,
+                            'reason' in local ? local.reason : 'Terrain preparation is pending',
+                        );
+                        return;
+                    }
+                    prepared = state.preparations.prepare(request.captureId, request.level, region, local);
                 } catch (err) {
                     deferTerrain(state, request, String(err));
                     return;
                 }
                 if (prepared && prepared.status !== 'ready') {
+                    if (prepared.status === 'pending' && state.preparations.isPreparing(request.captureId)) return;
                     deferTerrain(
                         state,
                         request,
-                        prepared.status === 'unavailable' ? prepared.reason : 'Terrain preparation is pending',
+                        'reason' in prepared ? prepared.reason : 'Terrain preparation is pending',
                     );
                     return;
                 }
                 state.terrainRetries.delete(request.key);
-                if (
-                    !request.builder &&
-                    captureRequestCount(state, request.name, request) >= state.settings.requests_per_player
-                ) {
-                    request.cacheChecked = false;
-                    return;
-                }
                 if (builderStepped || blocksBudget === 0) {
                     if (!request.builder && !request.cached) request.cacheChecked = false;
                     return;
@@ -136,18 +155,19 @@ export function stepRequests(state: SessionState, peers: Peers, blocksBudget: nu
                 if (complete) {
                     let stillLoaded: ReturnType<NonNullable<typeof peer.terrain.prepare>> | undefined;
                     try {
-                        stillLoaded = peer.terrain.prepare?.(region);
+                        const local = peer.terrain.prepare?.(region);
+                        stillLoaded = state.preparations.prepare(request.captureId, request.level, region, local);
                     } catch (err) {
                         deferTerrain(state, request, String(err));
                         return;
                     }
                     if (stillLoaded && stillLoaded.status !== 'ready') {
+                        if (stillLoaded.status === 'pending' && state.preparations.isPreparing(request.captureId))
+                            return;
                         deferTerrain(
                             state,
                             request,
-                            stillLoaded.status === 'unavailable'
-                                ? stillLoaded.reason
-                                : 'Terrain preparation is pending',
+                            'reason' in stillLoaded ? stillLoaded.reason : 'Terrain preparation is pending',
                         );
                         return;
                     }
@@ -192,6 +212,7 @@ function deferTerrain(state: SessionState, request: Request, reason: string): vo
     const attempts = Math.min((previous?.attempts ?? 0) + 1, 32);
     const delay = Math.min(INITIAL_TERRAIN_RETRY_MS * 2 ** Math.min(attempts - 1, 10), MAX_TERRAIN_RETRY_MS);
     request.builder = undefined;
+    state.preparations.defer(request.captureId);
     state.terrainRetries.delete(request.key);
     state.terrainRetries.set(request.key, { attempts, retryAt: now + delay, updatedAt: now });
     const maximumEntries = Math.max(64, state.settings.pending_requests * 4);
