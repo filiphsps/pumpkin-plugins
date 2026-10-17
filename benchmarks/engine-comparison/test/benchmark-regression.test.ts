@@ -1,6 +1,11 @@
 import { expect, it } from 'vitest';
 import type { BenchmarkWorkload } from '../src/benchmark-workloads.ts';
-import { compareBenchmarkResults, formatBenchmarkChangeSvg, formatBenchmarkComment } from './benchmark-regression.ts';
+import {
+    compareBenchmarkResults,
+    formatBenchmarkChangeSvg,
+    formatBenchmarkChangeSvgs,
+    formatBenchmarkComment,
+} from './benchmark-regression.ts';
 import type { EngineResult } from './engine-comparison-report.ts';
 
 it('flags workload changes only when they exceed the jitter threshold', () => {
@@ -72,6 +77,26 @@ it('embeds the SVG chart and links directly to it from the PR comment', () => {
     expect(comment).not.toContain('/actions/runs/123/artifacts');
 });
 
+it('selects the light and dark SVG variants by GitHub color scheme', () => {
+    const lightUrl = 'https://example.com/benchmark-light.svg';
+    const darkUrl = 'https://example.com/benchmark-dark.svg';
+    const comment = formatBenchmarkComment({
+        chartUrls: { dark: darkUrl, light: lightUrl },
+        comparison: compareBenchmarkResults(
+            [engine('quickjs', [workload('slower', [125])])],
+            [engine('quickjs', [workload('slower', [100])])],
+        ),
+        baselineSha: '1234567890abcdef',
+        currentSha: 'abcdef1234567890',
+        reportRunUrl: 'https://github.com/example/repo/actions/runs/123',
+    });
+
+    expect(comment).toContain(`media="(prefers-color-scheme: dark)" type="image/svg+xml" srcset="${darkUrl}"`);
+    expect(comment).toContain(`media="(prefers-color-scheme: light)" type="image/svg+xml" srcset="${lightUrl}"`);
+    expect(comment).toContain(`[Download light SVG](${lightUrl})`);
+    expect(comment).toContain(`[Download dark SVG](${darkUrl})`);
+});
+
 it('renders a labeled SVG chart for the largest changes', async () => {
     const comparison = compareBenchmarkResults(
         [
@@ -93,11 +118,40 @@ it('renders a labeled SVG chart for the largest changes', async () => {
     const svg = await formatBenchmarkChangeSvg(comparison);
 
     expect(svg).toContain('<svg');
-    expect(svg).toContain('Benchmark timing changes');
+    expect(svg).toContain('Runtime benchmark changes');
     expect(svg).toContain('slower · quickjs');
     expect(svg).toContain('faster · quickjs');
     expect(svg).toContain('±10%');
     expect(svg).not.toContain('<script>');
+});
+
+it('renders light and dark SVGs with full context and caps each timing direction at twelve rows', async () => {
+    const baselineWorkloads = [
+        ...Array.from({ length: 13 }, (_, index) => workload(`slower-${index}`, [100])),
+        ...Array.from({ length: 14 }, (_, index) => workload(`faster-${index}`, [100])),
+        workload('stable', [100]),
+    ];
+    const currentWorkloads = [
+        ...Array.from({ length: 13 }, (_, index) => workload(`slower-${index}`, [130 + index])),
+        ...Array.from({ length: 14 }, (_, index) => workload(`faster-${index}`, [60 + index])),
+        workload('stable', [105]),
+    ];
+    const comparison = compareBenchmarkResults(
+        [engine('quickjs', currentWorkloads)],
+        [engine('quickjs', baselineWorkloads)],
+    );
+
+    const charts = await formatBenchmarkChangeSvgs(comparison);
+
+    expect(charts.light).toContain('fill="#FFFFFF"');
+    expect(charts.dark).toContain('fill="#0D1117"');
+    expect(charts.light).toContain('top 12 of 13 regressions');
+    expect(charts.light).toContain('top 12 of 14 improvements');
+    expect(charts.light).toContain('slower-12 · quickjs');
+    expect(charts.light).not.toContain('slower-0 · quickjs');
+    expect(charts.light).not.toContain('faster-13 · quickjs');
+    expect(charts.light).toContain('100 → 142 ms');
+    expect(charts.light).toContain('1 input/sample');
 });
 
 it('escapes benchmark labels in the repeatable PR comment', () => {

@@ -22,7 +22,11 @@ it('uses the GitHub App token for artifact access and PR comments', () => {
     assert.match(workflow, /GITHUB_API_URL: \$\{\{ github\.api_url \}\}/);
     assert.match(workflow, /DEFAULT_BRANCH: \$\{\{ github\.event\.repository\.default_branch \}\}/);
     assert.match(workflow, /SOURCE_RUN_ID: \$\{\{ github\.event\.workflow_run\.id \}\}/);
-    assert.match(workflow, /BENCHMARK_CHANGE_SVG_URL: \$\{\{ steps\.publish-chart\.outputs\.chart_url \}\}/);
+    assert.match(
+        workflow,
+        /BENCHMARK_CHANGE_SVG_LIGHT_URL: \$\{\{ steps\.publish-chart\.outputs\.light_chart_url \}\}/,
+    );
+    assert.match(workflow, /BENCHMARK_CHANGE_SVG_DARK_URL: \$\{\{ steps\.publish-chart\.outputs\.dark_chart_url \}\}/);
     assert.ok(
         workflow.indexOf('name: 🕶️ Checkout trusted default-branch scripts') <
             workflow.indexOf('run: node scripts/engine-comparison-comment.mjs discover'),
@@ -177,20 +181,26 @@ it('skips runs without an unexpired benchmark report artifact', async () => {
     assert.deepEqual(outputs, [['has_report', 'false']]);
 });
 
-it('publishes the SVG to a retained chart branch and exposes its raw URL', async () => {
+it('publishes light and dark SVGs to the retained chart branch', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'engine-comparison-chart-'));
     try {
-        const chartPath = join(directory, 'changes.svg');
-        const svg = '<svg xmlns="http://www.w3.org/2000/svg"><text>chart</text></svg>';
-        writeFileSync(chartPath, svg);
+        const lightPath = join(directory, 'changes-light.svg');
+        const darkPath = join(directory, 'changes-dark.svg');
+        const lightSvg = '<svg xmlns="http://www.w3.org/2000/svg"><text>light</text></svg>';
+        const darkSvg = '<svg xmlns="http://www.w3.org/2000/svg"><text>dark</text></svg>';
+        writeFileSync(lightPath, lightSvg);
+        writeFileSync(darkPath, darkSvg);
         const requests = [];
         const outputs = [];
-        const chartUrl = 'https://raw.githubusercontent.com/example/project/benchmark-charts/engine-comparison/456.svg';
+        const chartUrls = {
+            light: 'https://raw.githubusercontent.com/example/project/benchmark-charts/engine-comparison/456-light.svg',
+            dark: 'https://raw.githubusercontent.com/example/project/benchmark-charts/engine-comparison/456-dark.svg',
+        };
 
         const result = await uploadBenchmarkChart(
             {
                 apiUrl: 'https://api.github.com',
-                chartPath,
+                chartPaths: { light: lightPath, dark: darkPath },
                 defaultBranch: 'main',
                 repository: 'example/project',
                 serverUrl: 'https://github.com',
@@ -210,17 +220,13 @@ it('publishes the SVG to a retained chart branch and exposes its raw URL', async
                     if (requestUrl.pathname === '/repos/example/project/git/refs') {
                         return jsonResponse({ ref: 'refs/heads/benchmark-charts' }, 201);
                     }
-                    if (requestUrl.pathname === '/repos/example/project/contents/engine-comparison/456.svg') {
+                    const chartPath = requestUrl.pathname.match(
+                        /\/contents\/(engine-comparison\/456-(light|dark)\.svg)$/,
+                    )?.[1];
+                    if (chartPath) {
                         if (options.method !== 'PUT') return jsonResponse({ message: 'Not Found' }, 404);
-                        return jsonResponse(
-                            {
-                                content: {
-                                    download_url: chartUrl,
-                                    path: 'engine-comparison/456.svg',
-                                },
-                            },
-                            201,
-                        );
+                        const theme = chartPath.endsWith('-light.svg') ? 'light' : 'dark';
+                        return jsonResponse({ content: { download_url: chartUrls[theme], path: chartPath } }, 201);
                     }
                     assert.fail(`Unexpected GitHub API request: ${requestUrl.pathname}`);
                 },
@@ -228,11 +234,14 @@ it('publishes the SVG to a retained chart branch and exposes its raw URL', async
             },
         );
 
-        assert.equal(result, chartUrl);
-        assert.deepEqual(outputs, [['chart_url', chartUrl]]);
+        assert.deepEqual(result, chartUrls);
+        assert.deepEqual(outputs, [
+            ['light_chart_url', chartUrls.light],
+            ['dark_chart_url', chartUrls.dark],
+        ]);
         assert.deepEqual(
             requests.map(({ options }) => options.method ?? 'GET'),
-            ['GET', 'GET', 'POST', 'GET', 'PUT'],
+            ['GET', 'GET', 'POST', 'GET', 'PUT', 'GET', 'PUT'],
         );
         assert.ok(requests.every(({ options }) => options.headers.Authorization === 'Bearer app-token'));
 
@@ -243,13 +252,16 @@ it('publishes the SVG to a retained chart branch and exposes its raw URL', async
             sha: 'mainsha',
         });
 
+        const lightUpload = requests[4];
         assert.equal(new URL(requests[3].url).searchParams.get('ref'), 'benchmark-charts');
-
-        const publishChart = requests[4];
-        assert.equal(publishChart.options.headers.Accept, 'application/vnd.github+json');
-        assert.deepEqual(JSON.parse(publishChart.options.body), {
-            message: 'ci(benchmarks): publish chart for run 456',
-            content: Buffer.from(svg).toString('base64'),
+        assert.deepEqual(JSON.parse(lightUpload.options.body), {
+            message: 'ci(benchmarks): publish light chart for run 456',
+            content: Buffer.from(lightSvg).toString('base64'),
+            branch: 'benchmark-charts',
+        });
+        assert.deepEqual(JSON.parse(requests[6].options.body), {
+            message: 'ci(benchmarks): publish dark chart for run 456',
+            content: Buffer.from(darkSvg).toString('base64'),
             branch: 'benchmark-charts',
         });
     } finally {
@@ -257,18 +269,25 @@ it('publishes the SVG to a retained chart branch and exposes its raw URL', async
     }
 });
 
-it('updates the chart file when GitHub reruns a workflow', async () => {
+it('updates both chart files when GitHub reruns a workflow', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'engine-comparison-chart-existing-'));
     try {
-        const chartPath = join(directory, 'changes.svg');
-        writeFileSync(chartPath, '<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+        const lightPath = join(directory, 'changes-light.svg');
+        const darkPath = join(directory, 'changes-dark.svg');
+        const lightSvg = '<svg xmlns="http://www.w3.org/2000/svg"><text>light</text></svg>';
+        const darkSvg = '<svg xmlns="http://www.w3.org/2000/svg"><text>dark</text></svg>';
+        writeFileSync(lightPath, lightSvg);
+        writeFileSync(darkPath, darkSvg);
         const requests = [];
-        const chartUrl = 'https://raw.githubusercontent.com/example/project/benchmark-charts/engine-comparison/789.svg';
+        const chartUrls = {
+            light: 'https://raw.githubusercontent.com/example/project/benchmark-charts/engine-comparison/789-light.svg',
+            dark: 'https://raw.githubusercontent.com/example/project/benchmark-charts/engine-comparison/789-dark.svg',
+        };
 
         const result = await uploadBenchmarkChart(
             {
                 apiUrl: 'https://api.github.com',
-                chartPath,
+                chartPaths: { light: lightPath, dark: darkPath },
                 defaultBranch: 'main',
                 repository: 'example/project',
                 serverUrl: 'https://github.com',
@@ -282,28 +301,29 @@ it('updates the chart file when GitHub reruns a workflow', async () => {
                     if (requestUrl.pathname === '/repos/example/project/git/ref/heads/benchmark-charts') {
                         return jsonResponse({ ref: 'refs/heads/benchmark-charts' });
                     }
-                    if (requestUrl.pathname === '/repos/example/project/contents/engine-comparison/789.svg') {
+                    const chartPath = requestUrl.pathname.match(
+                        /\/contents\/(engine-comparison\/789-(light|dark)\.svg)$/,
+                    )?.[1];
+                    if (chartPath) {
+                        const theme = chartPath.endsWith('-light.svg') ? 'light' : 'dark';
                         if (options.method !== 'PUT') {
                             return jsonResponse({
                                 _links: {
                                     git: 'https://api.github.com/repos/example/project/git/blobs/oldsha',
-                                    html: 'https://github.com/example/project/blob/benchmark-charts/engine-comparison/789.svg',
-                                    self: 'https://api.github.com/repos/example/project/contents/engine-comparison/789.svg',
+                                    html: `https://github.com/example/project/blob/benchmark-charts/${chartPath}`,
+                                    self: `https://api.github.com/repos/example/project/contents/${chartPath}`,
                                 },
-                                download_url: chartUrl,
+                                download_url: chartUrls[theme],
                                 encoding: 'base64',
-                                name: '789.svg',
-                                path: 'engine-comparison/789.svg',
-                                sha: 'oldsha',
+                                name: chartPath.split('/').at(-1),
+                                path: chartPath,
+                                sha: `${theme}-oldsha`,
                                 size: 34,
                                 type: 'file',
-                                url: 'https://api.github.com/repos/example/project/contents/engine-comparison/789.svg',
+                                url: `https://api.github.com/repos/example/project/contents/${chartPath}`,
                             });
                         }
-                        return jsonResponse(
-                            { content: { download_url: chartUrl, path: 'engine-comparison/789.svg' } },
-                            201,
-                        );
+                        return jsonResponse({ content: { download_url: chartUrls[theme], path: chartPath } }, 201);
                     }
                     assert.fail(`Unexpected GitHub API request: ${requestUrl.pathname}`);
                 },
@@ -311,16 +331,22 @@ it('updates the chart file when GitHub reruns a workflow', async () => {
             },
         );
 
-        assert.equal(result, chartUrl);
+        assert.deepEqual(result, chartUrls);
         assert.deepEqual(
             requests.map(({ options }) => options.method ?? 'GET'),
-            ['GET', 'GET', 'PUT'],
+            ['GET', 'GET', 'PUT', 'GET', 'PUT'],
         );
         assert.deepEqual(JSON.parse(requests[2].options.body), {
-            message: 'ci(benchmarks): publish chart for run 789',
-            content: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>').toString('base64'),
+            message: 'ci(benchmarks): publish light chart for run 789',
+            content: Buffer.from(lightSvg).toString('base64'),
             branch: 'benchmark-charts',
-            sha: 'oldsha',
+            sha: 'light-oldsha',
+        });
+        assert.deepEqual(JSON.parse(requests[4].options.body), {
+            message: 'ci(benchmarks): publish dark chart for run 789',
+            content: Buffer.from(darkSvg).toString('base64'),
+            branch: 'benchmark-charts',
+            sha: 'dark-oldsha',
         });
     } finally {
         rmSync(directory, { recursive: true, force: true });

@@ -32,7 +32,6 @@
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
         "typescript": "catalog:",
-        "vega": "6.4.0",
         "vitest": "catalog:"
     }
 }

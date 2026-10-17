@@ -16,27 +16,53 @@ export async function uploadBenchmarkChart(
     const serverUrl = normalizeBaseUrl(input.serverUrl, 'GitHub server URL');
     const defaultBranch = requireString(input.defaultBranch, 'GitHub default branch');
     const sourceRunId = requireString(input.sourceRunId, 'GitHub workflow run ID');
-    const chartPath = requireString(input.chartPath, 'SVG chart path');
+    const chartPaths = {
+        light: requireString(input.chartPaths?.light, 'Light SVG chart path'),
+        dark: requireString(input.chartPaths?.dark, 'Dark SVG chart path'),
+    };
     if (!/^\d+$/.test(sourceRunId)) throw new Error('GitHub workflow run ID must contain only digits');
 
-    const chart = Buffer.from(readFile(chartPath));
-    if (chart.byteLength === 0 || chart.byteLength > MAX_SVG_BYTES) {
-        throw new Error(`SVG chart must be between 1 byte and ${MAX_SVG_BYTES} bytes`);
-    }
-    if (!/<svg(?:\s|>)/i.test(chart.toString('utf8'))) {
-        throw new Error('SVG chart file does not contain an <svg> element');
-    }
+    const charts = Object.fromEntries(
+        Object.entries(chartPaths).map(([theme, chartPath]) => {
+            const chart = Buffer.from(readFile(chartPath));
+            if (chart.byteLength === 0 || chart.byteLength > MAX_SVG_BYTES) {
+                throw new Error(`${theme} SVG chart must be between 1 byte and ${MAX_SVG_BYTES} bytes`);
+            }
+            if (!/<svg(?:\s|>)/i.test(chart.toString('utf8'))) {
+                throw new Error(`${theme} SVG chart file does not contain an <svg> element`);
+            }
+            return [theme, chart];
+        }),
+    );
 
     const headers = apiHeaders(token);
     await ensureChartBranch({ apiBaseUrl, defaultBranch, fetchImpl, headers, repositoryPath });
 
-    const filePath = `engine-comparison/${sourceRunId}.svg`;
+    const result = {};
+    for (const [theme, chart] of Object.entries(charts)) {
+        result[theme] = await uploadChart({
+            apiBaseUrl,
+            chart,
+            fetchImpl,
+            headers,
+            repositoryPath,
+            serverUrl,
+            sourceRunId,
+            theme,
+        });
+        await writeOutput(`${theme}_chart_url`, result[theme]);
+    }
+    return result;
+}
+
+async function uploadChart({ apiBaseUrl, chart, fetchImpl, headers, repositoryPath, serverUrl, sourceRunId, theme }) {
+    const filePath = `engine-comparison/${sourceRunId}-${theme}.svg`;
     const uploadUrl = apiEndpoint(apiBaseUrl, `repos/${repositoryPath}/contents/${encodePath(filePath)}`);
     const existingChart = await getExistingChart({ fetchImpl, filePath, headers, uploadUrl });
     const uploadBody = {
         branch: CHART_BRANCH,
         content: chart.toString('base64'),
-        message: `ci(benchmarks): publish chart for run ${sourceRunId}`,
+        message: `ci(benchmarks): publish ${theme} chart for run ${sourceRunId}`,
     };
     if (existingChart) uploadBody.sha = existingChart.sha;
 
@@ -51,12 +77,9 @@ export async function uploadBenchmarkChart(
         'GitHub chart upload',
     );
     if (payload.content?.path !== filePath) {
-        throw new Error('GitHub chart upload returned an unexpected file path');
+        throw new Error(`GitHub ${theme} chart upload returned an unexpected file path`);
     }
-
-    const chartUrl = validateDownloadUrl(payload.content.download_url, serverUrl);
-    await writeOutput('chart_url', chartUrl);
-    return chartUrl;
+    return validateDownloadUrl(payload.content.download_url, serverUrl);
 }
 
 async function getExistingChart({ fetchImpl, filePath, headers, uploadUrl }) {
@@ -199,14 +222,17 @@ async function runCli() {
     if (process.argv[2] !== 'publish') throw new Error('Usage: node scripts/engine-comparison-chart.mjs publish');
     await uploadBenchmarkChart({
         apiUrl: requiredEnvironment('GITHUB_API_URL'),
-        chartPath: requiredEnvironment('BENCHMARK_CHANGE_SVG'),
+        chartPaths: {
+            light: requiredEnvironment('BENCHMARK_CHANGE_SVG_LIGHT'),
+            dark: requiredEnvironment('BENCHMARK_CHANGE_SVG_DARK'),
+        },
         defaultBranch: requiredEnvironment('DEFAULT_BRANCH'),
         repository: requiredEnvironment('GITHUB_REPOSITORY'),
         serverUrl: requiredEnvironment('GITHUB_SERVER_URL'),
         sourceRunId: requiredEnvironment('SOURCE_RUN_ID'),
         token: requiredEnvironment('GH_TOKEN'),
     });
-    process.stdout.write('Published benchmark chart to the retained chart branch.\n');
+    process.stdout.write('Published light and dark benchmark charts to the retained chart branch.\n');
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

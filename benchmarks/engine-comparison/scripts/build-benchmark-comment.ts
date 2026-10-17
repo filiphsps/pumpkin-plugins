@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import type { BenchmarkWorkload } from '../src/benchmark-workloads.ts';
 import {
     compareBenchmarkResults,
-    formatBenchmarkChangeSvg,
+    formatBenchmarkChangeSvgs,
     formatBenchmarkComment,
 } from '../test/benchmark-regression.ts';
 import type { EngineResult } from '../test/engine-comparison-report.ts';
@@ -21,7 +21,13 @@ const baselineSha = baselineResults ? process.env.BASELINE_SHA : undefined;
 const reportRunUrl = `${requiredEnvironment('GITHUB_SERVER_URL')}/${repository}/actions/runs/${requiredEnvironment('SOURCE_RUN_ID')}`;
 const comment = formatBenchmarkComment({
     baselineSha,
-    chartUrl: process.env.BENCHMARK_CHANGE_SVG_URL,
+    chartUrls:
+        process.env.BENCHMARK_CHANGE_SVG_LIGHT_URL && process.env.BENCHMARK_CHANGE_SVG_DARK_URL
+            ? {
+                  light: process.env.BENCHMARK_CHANGE_SVG_LIGHT_URL,
+                  dark: process.env.BENCHMARK_CHANGE_SVG_DARK_URL,
+              }
+            : undefined,
     comparison,
     currentSha,
     noBaselineReason:
@@ -30,10 +36,16 @@ const comment = formatBenchmarkComment({
     reportRunUrl,
 });
 
-const chartPath = process.env.BENCHMARK_CHANGE_SVG;
-if (chartPath) {
-    fs.writeFileSync(chartPath, await formatBenchmarkChangeSvg(comparison ?? emptyComparison(jitterThreshold)));
-    process.stdout.write(`Benchmark chart written to ${chartPath}\n`);
+const lightChartPath = process.env.BENCHMARK_CHANGE_SVG_LIGHT;
+const darkChartPath = process.env.BENCHMARK_CHANGE_SVG_DARK;
+if (lightChartPath || darkChartPath) {
+    if (!lightChartPath || !darkChartPath) {
+        throw new Error('Set both BENCHMARK_CHANGE_SVG_LIGHT and BENCHMARK_CHANGE_SVG_DARK');
+    }
+    const charts = await formatBenchmarkChangeSvgs(comparison ?? emptyComparison(jitterThreshold, headResults));
+    fs.writeFileSync(lightChartPath, charts.light);
+    fs.writeFileSync(darkChartPath, charts.dark);
+    process.stdout.write(`Benchmark light and dark charts written to ${lightChartPath} and ${darkChartPath}\n`);
 }
 
 const commentPath = process.env.BENCHMARK_COMMENT_FILE;
@@ -41,7 +53,9 @@ if (commentPath) {
     fs.writeFileSync(commentPath, `${comment}\n`);
     process.stdout.write(`Benchmark comment written to ${commentPath}\n`);
 }
-if (!chartPath && !commentPath) throw new Error('Set BENCHMARK_CHANGE_SVG or BENCHMARK_COMMENT_FILE');
+if (!lightChartPath && !darkChartPath && !commentPath) {
+    throw new Error('Set BENCHMARK_CHANGE_SVG_LIGHT, BENCHMARK_CHANGE_SVG_DARK, or BENCHMARK_COMMENT_FILE');
+}
 
 const summaryPath = process.env.GITHUB_STEP_SUMMARY;
 if (summaryPath && commentPath) fs.appendFileSync(summaryPath, `${comment}\n`);
@@ -133,9 +147,14 @@ function validateWorkload(value: unknown, description: string): BenchmarkWorkloa
     };
 }
 
-function emptyComparison(thresholdPercent: number) {
+function emptyComparison(thresholdPercent: number, engines: readonly EngineResult[]) {
     return {
         changes: [],
+        engineSizes: engines.map(({ binarySizeBytes, id, label }) => ({
+            binarySizeBytes,
+            engineId: id,
+            engineLabel: label,
+        })),
         improvements: [],
         medianChangePercent: null,
         regressions: [],

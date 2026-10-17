@@ -78,7 +78,7 @@ jobs:
               if: steps.discover.outputs.has_report == 'true'
               uses: ./.github/common/bootstrap
 
-            - name: 📈 Build benchmark SVG chart
+            - name: 📈 Build light and dark benchmark SVGs
               if: steps.discover.outputs.has_report == 'true'
               env:
                   SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -87,11 +87,12 @@ jobs:
                   BENCHMARK_JITTER_PERCENT: ${{ vars.BENCHMARK_JITTER_PERCENT || '10' }}
                   ENGINE_COMPARISON_HEAD_RESULTS: ${{ runner.temp }}/engine-comparison-head/engine-comparison-results.json
                   ENGINE_COMPARISON_BASELINE_RESULTS: ${{ steps.discover.outputs.baseline_run_id != '' && format('{0}/engine-comparison-baseline/engine-comparison-results.json', runner.temp) || '' }}
-                  BENCHMARK_CHANGE_SVG: ${{ runner.temp }}/engine-comparison-change.svg
+                  BENCHMARK_CHANGE_SVG_LIGHT: ${{ runner.temp }}/engine-comparison-change-light.svg
+                  BENCHMARK_CHANGE_SVG_DARK: ${{ runner.temp }}/engine-comparison-change-dark.svg
                   NO_BASELINE_REASON: No successful benchmark artifact was found on the default branch at or before base ${{ steps.discover.outputs.pr_base_sha }}.
               run: node benchmarks/engine-comparison/scripts/build-benchmark-comment.ts
 
-            - name: 🖼️ Publish benchmark chart
+            - name: 🖼️ Publish benchmark SVGs
               id: publish-chart
               if: steps.discover.outputs.has_report == 'true'
               env:
@@ -99,7 +100,8 @@ jobs:
                   GITHUB_API_URL: ${{ github.api_url }}
                   GITHUB_REPOSITORY: ${{ github.repository }}
                   GITHUB_SERVER_URL: ${{ github.server_url }}
-                  BENCHMARK_CHANGE_SVG: ${{ runner.temp }}/engine-comparison-change.svg
+                  BENCHMARK_CHANGE_SVG_LIGHT: ${{ runner.temp }}/engine-comparison-change-light.svg
+                  BENCHMARK_CHANGE_SVG_DARK: ${{ runner.temp }}/engine-comparison-change-dark.svg
                   DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
                   SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
               run: node scripts/engine-comparison-chart.mjs publish
@@ -114,7 +116,8 @@ jobs:
                   ENGINE_COMPARISON_HEAD_RESULTS: ${{ runner.temp }}/engine-comparison-head/engine-comparison-results.json
                   ENGINE_COMPARISON_BASELINE_RESULTS: ${{ steps.discover.outputs.baseline_run_id != '' && format('{0}/engine-comparison-baseline/engine-comparison-results.json', runner.temp) || '' }}
                   BENCHMARK_COMMENT_FILE: ${{ runner.temp }}/engine-comparison-comment.md
-                  BENCHMARK_CHANGE_SVG_URL: ${{ steps.publish-chart.outputs.chart_url }}
+                  BENCHMARK_CHANGE_SVG_LIGHT_URL: ${{ steps.publish-chart.outputs.light_chart_url }}
+                  BENCHMARK_CHANGE_SVG_DARK_URL: ${{ steps.publish-chart.outputs.dark_chart_url }}
                   NO_BASELINE_REASON: No successful benchmark artifact was found on the default branch at or before base ${{ steps.discover.outputs.pr_base_sha }}.
               run: node benchmarks/engine-comparison/scripts/build-benchmark-comment.ts
 

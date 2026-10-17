@@ -94,17 +94,23 @@ it('writes a PR comment and SVG from current and baseline result artifacts', () 
         const headResultsPath = path.join(temporaryDirectory, 'head.json');
         const baselineResultsPath = path.join(temporaryDirectory, 'baseline.json');
         const commentPath = path.join(temporaryDirectory, 'comment.md');
-        const chartPath = path.join(temporaryDirectory, 'changes.svg');
+        const lightChartPath = path.join(temporaryDirectory, 'changes-light.svg');
+        const darkChartPath = path.join(temporaryDirectory, 'changes-dark.svg');
         fs.writeFileSync(headResultsPath, JSON.stringify([createSingleWorkloadEngine('quickjs', 125)]));
         fs.writeFileSync(baselineResultsPath, JSON.stringify([createSingleWorkloadEngine('quickjs', 100)]));
-        const chartUrl = 'https://raw.githubusercontent.com/example/repo/benchmark-charts/engine-comparison/456.svg';
+        const lightChartUrl =
+            'https://raw.githubusercontent.com/example/repo/benchmark-charts/engine-comparison/456-light.svg';
+        const darkChartUrl =
+            'https://raw.githubusercontent.com/example/repo/benchmark-charts/engine-comparison/456-dark.svg';
 
         const result = runScript('build-benchmark-comment.ts', {
             ENGINE_COMPARISON_HEAD_RESULTS: headResultsPath,
             ENGINE_COMPARISON_BASELINE_RESULTS: baselineResultsPath,
             BENCHMARK_COMMENT_FILE: commentPath,
-            BENCHMARK_CHANGE_SVG: chartPath,
-            BENCHMARK_CHANGE_SVG_URL: chartUrl,
+            BENCHMARK_CHANGE_SVG_LIGHT: lightChartPath,
+            BENCHMARK_CHANGE_SVG_DARK: darkChartPath,
+            BENCHMARK_CHANGE_SVG_LIGHT_URL: lightChartUrl,
+            BENCHMARK_CHANGE_SVG_DARK_URL: darkChartUrl,
             BASELINE_SHA: '1234567890abcdef',
             CURRENT_SHA: 'abcdef1234567890',
             GITHUB_REPOSITORY: 'example/repo',
@@ -114,15 +120,51 @@ it('writes a PR comment and SVG from current and baseline result artifacts', () 
         expectScriptSucceeded(result);
 
         const comment = fs.readFileSync(commentPath, 'utf8');
-        const chart = fs.readFileSync(chartPath, 'utf8');
+        const lightChart = fs.readFileSync(lightChartPath, 'utf8');
+        const darkChart = fs.readFileSync(darkChartPath, 'utf8');
         expect(comment.split('\n')[0]).toMatch(/regression/i);
         expect(comment).toContain('shared-workload');
         expect(comment).toContain('https://github.com/example/repo/actions/runs/456');
-        expect(comment).toContain(`![Benchmark timing changes](${chartUrl})`);
-        expect(comment).toContain(`[Download the SVG comparison chart](${chartUrl})`);
+        expect(comment).toContain('<picture>');
+        expect(comment).toContain(`srcset="${darkChartUrl}"`);
+        expect(comment).toContain(`srcset="${lightChartUrl}"`);
+        expect(comment).toContain(`[Download light SVG](${lightChartUrl})`);
+        expect(comment).toContain(`[Download dark SVG](${darkChartUrl})`);
         expect(comment).not.toContain('/actions/runs/789/artifacts');
-        expect(chart).toContain('<svg');
-        expect(chart).toContain('shared-workload');
+        expect(lightChart).toContain('<svg');
+        expect(lightChart).toContain('shared-workload');
+        expect(lightChart).toContain('#FFFFFF');
+        expect(darkChart).toContain('#0D1117');
+    } finally {
+        fs.rmSync(temporaryDirectory, { force: true, recursive: true });
+    }
+}, 15_000);
+
+it('writes component-size charts without classifying timings when no baseline is available', () => {
+    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-comparison-no-baseline-'));
+    try {
+        const headResultsPath = path.join(temporaryDirectory, 'head.json');
+        const lightChartPath = path.join(temporaryDirectory, 'changes-light.svg');
+        const darkChartPath = path.join(temporaryDirectory, 'changes-dark.svg');
+        fs.writeFileSync(headResultsPath, JSON.stringify([createSingleWorkloadEngine('quickjs', 125)]));
+
+        const result = runScript('build-benchmark-comment.ts', {
+            ENGINE_COMPARISON_HEAD_RESULTS: headResultsPath,
+            BENCHMARK_CHANGE_SVG_LIGHT: lightChartPath,
+            BENCHMARK_CHANGE_SVG_DARK: darkChartPath,
+            CURRENT_SHA: 'abcdef1234567890',
+            GITHUB_REPOSITORY: 'example/repo',
+            GITHUB_SERVER_URL: 'https://github.com',
+            SOURCE_RUN_ID: '456',
+        });
+        expectScriptSucceeded(result);
+
+        const lightChart = fs.readFileSync(lightChartPath, 'utf8');
+        const darkChart = fs.readFileSync(darkChartPath, 'utf8');
+        expect(lightChart).toContain('COMPONENT SIZE BY ENGINE');
+        expect(lightChart).toContain('QuickJS reference size');
+        expect(lightChart).toContain('No comparable workload timings in this run.');
+        expect(darkChart).toContain('#0D1117');
     } finally {
         fs.rmSync(temporaryDirectory, { force: true, recursive: true });
     }
