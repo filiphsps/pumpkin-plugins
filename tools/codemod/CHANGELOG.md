@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.2](https://github.com/filiphsps/pumpkin-plugins/compare/codemod-v0.1.1...codemod-v0.1.2) (2026-10-17)
+
+
+### Features
+
+* **wasi:** share capability metadata across tooling ([bbe0f2f](https://github.com/filiphsps/pumpkin-plugins/commit/bbe0f2f093273132e8fd2101233cada29af270e7))
+
+
+### Bug Fixes
+
+* **codemod:** handle JSONC and share WASI metadata ([8d7f9fb](https://github.com/filiphsps/pumpkin-plugins/commit/8d7f9fb43a96db78990de6a1019f5e7a769042d3))
+* **codemod:** preserve inherited tsconfig for JSONC ([e32693f](https://github.com/filiphsps/pumpkin-plugins/commit/e32693f18147b7feae00a8d03abc66941b0b5de3))
+
 ## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/codemod-v0.1.0...codemod-v0.1.1) (2026-10-15)
 
 
