@@ -2,5 +2,5 @@
     "$schema": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/upstream-git-pin.schema.json",
     "repository": "https://github.com/facebook/hermes.git",
     "branch": "static_h",
-    "commit": "920f02c9cdb9e421201fb590933c8452c22408f6"
+    "commit": "17b37301da5da4a2cd55d78f9697c46c0fd96123"
 }
