@@ -29,9 +29,9 @@
         }
     ],
     "license": "MIT",
-    "author": "Filiph Sandstr\u00f6m <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
     "contributors": [
-        "Filiph Sandstr\u00f6m <filfat@hotmail.se> (https://github.com/filiphsps)"
+        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
     ],
     "sideEffects": false,
     "type": "module",
