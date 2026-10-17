@@ -19,7 +19,8 @@ import {
  */
 export const info = {
     name: PLUGIN_NAME,
-    description: 'This unofficial integration lets Java players use Distant Horizons with terrain from your Pumpkin server.',
+    description:
+        'This unofficial integration lets Java players use Distant Horizons with terrain from your Pumpkin server.',
     permissions: [
         { name: 'fs.read.data', reason: 'Read settings and cached LOD terrain.' },
         { name: 'fs.write.data', reason: 'Write settings and persist captured LOD terrain.' },

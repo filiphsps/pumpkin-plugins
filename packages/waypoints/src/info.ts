@@ -25,7 +25,8 @@ function renderPlaceholders(): string {
  */
 export const info = {
     name: PLUGIN_NAME,
-    description: 'Waypoints lets you create shared locations, control who can access each one, show them on a Java HUD, and look them up with PumpkinPIE placeholders.',
+    description:
+        'Waypoints lets you create shared locations, control who can access each one, show them on a Java HUD, and look them up with PumpkinPIE placeholders.',
     permissions: [
         { name: 'fs.read.data', reason: 'Read the waypoint store from the plugin data folder.' },
         { name: 'fs.write.data', reason: 'Persist waypoint changes in the plugin data folder.' },
