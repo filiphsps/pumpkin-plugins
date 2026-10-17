@@ -1,0 +1,73 @@
+{
+    "name": "@pumpkin-plugins/static-analysis",
+    "version": "0.1.0",
+    "description": "Static JavaScript and TypeScript module graph analysis",
+    "keywords": [
+        "javascript",
+        "typescript",
+        "static-analysis",
+        "module-graph",
+        "esbuild"
+    ],
+    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/static-analysis#readme",
+    "bugs": {
+        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
+        "directory": "tools/static-analysis"
+    },
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/filiphsps"
+        },
+        {
+            "type": "custom",
+            "url": "https://paypal.me/filiph"
+        }
+    ],
+    "license": "MIT",
+    "author": "Filiph Sandstr\u00f6m <filfat@hotmail.se> (https://github.com/filiphsps)",
+    "contributors": [
+        "Filiph Sandstr\u00f6m <filfat@hotmail.se> (https://github.com/filiphsps)"
+    ],
+    "sideEffects": false,
+    "type": "module",
+    "exports": {
+        ".": {
+            "types": "./dist/src/index.d.ts",
+            "import": "./dist/src/index.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "main": "./dist/src/index.js",
+    "module": "./dist/src/index.js",
+    "types": "./dist/src/index.d.ts",
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "prepack": "pnpm build",
+        "test": "vitest run",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "esbuild": "catalog:",
+        "typescript": "catalog:"
+    },
+    "devDependencies": {
+        "@types/node": "catalog:",
+        "vitest": "catalog:"
+    },
+    "engines": {
+        "node": ">=24.21.0"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}
