@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.2](https://github.com/filiphsps/pumpkin-plugins/compare/create-pumpkin-plugin-v0.1.1...create-pumpkin-plugin-v0.1.2) (2026-10-17)
+
+
+### Features
+
+* **testing:** collect process coverage and separate guest reporting ([58a6114](https://github.com/filiphsps/pumpkin-plugins/commit/58a6114babea159824feb69fd87a25a306b83f40))
+
+
+### Bug Fixes
+
+* **create-pumpkin-plugin:** sync starter tool versions ([fb91621](https://github.com/filiphsps/pumpkin-plugins/commit/fb916210fe33ccbc08317ad9215c6b90a6d059a4))
+* **create-pumpkin-plugin:** sync starter tool versions ([ba4fcfb](https://github.com/filiphsps/pumpkin-plugins/commit/ba4fcfbb6a95f9b35f098a472476a899aefd95bb))
+
 ## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/create-pumpkin-plugin-v0.1.0...create-pumpkin-plugin-v0.1.1) (2026-10-17)
 
 
