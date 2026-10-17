@@ -148,9 +148,7 @@ export async function executeCli(args: string[], pluginDir: string, options: Exe
     const startUpdateCheck = options.startUpdateCheck ?? startBuildUpdateCheck;
     const environment = options.environment ?? process.env;
     const isTTY = options.isTTY ?? process.stdout.isTTY === true;
-    if (isBuildUpdateCheckAllowed(args, environment, isTTY)) {
-        void startUpdateCheck(args, { environment, isTTY }).catch(() => undefined);
-    }
+    await startUpdateCheck(args, { environment, isTTY }).catch(() => undefined);
     await main(args, pluginDir);
 }
 

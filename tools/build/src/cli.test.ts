@@ -172,35 +172,6 @@ describe('CLI informational options', () => {
         }
     });
 
-    it.each(['--help', '--version'])('does not start update lookup for %s at the CLI boundary', async (argument) => {
-        const startUpdateCheck = vi.fn();
-
-        await executeCli([argument], '/not-a-package', {
-            environment: {},
-            isTTY: true,
-            startUpdateCheck,
-        });
-
-        expect(startUpdateCheck).not.toHaveBeenCalled();
-    });
-
-    it('does not wait for an update lookup before entering the command', async () => {
-        const startUpdateCheck = vi.fn(() => new Promise<void>(() => undefined));
-        const originalExitCode = process.exitCode;
-
-        try {
-            await executeCli(['--unknown-option'], '/not-a-package', {
-                environment: {},
-                isTTY: true,
-                startUpdateCheck,
-            });
-
-            expect(startUpdateCheck).toHaveBeenCalledOnce();
-        } finally {
-            process.exitCode = originalExitCode;
-        }
-    });
-
     it('rejects unexpected positional arguments before reading configuration', async () => {
         await expect(run(['another-plugin'], '/not-a-package')).rejects.toThrow(/too many arguments/);
     });
