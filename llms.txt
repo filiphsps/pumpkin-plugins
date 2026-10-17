@@ -7,51 +7,51 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 ## Getting started
 
 - [Creating a plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-a-plugin.md): The `pnpm gen` generator, what it creates, and what to do next
-- [Creating an action](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-action.md): The `pnpm gen:action` generator, generated input/output docs, and release setup
+- [Creating an action](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-action.md): Create, document, test, and release a GitHub Action in this repository
 - [Documentation site](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/documentation-site.md): Adding component guides, generated API reference, local preview, and publishing
 
 ## CI and releases
 
-- [Publishing public npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-publishing.md): Placeholder setup and Release Please publishing for public npm tools
+- [Publishing public npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-publishing.md): How to prepare a public tool for npm and recover a missed release
 - [Trusted publishing for npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-trusted-publishing.md): npm OIDC setup, workflow identity, validation window, provenance and recovery
 
 ## Guides
 
 - [Benchmarking](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/benchmarking.md): QuickJS and the Static Hermes profile, collector and parser matrix
-- [Creating a VS Code extension](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-extension.md): The `pnpm gen:extension` generator, extension checks, and VSIX releases
+- [Creating a VS Code extension](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-extension.md): Scaffold, build, test, and release a VS Code extension
 
 ## Plugin development
 
 - [Building](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/building.md): The shared build tool, Turborepo setup, and runtime caveats
 - [Code style](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/code-style.md): Biome, the JSDoc rule, and how code is organized and tested
-- [Plugin config](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-config.md): Declaring settings as a schema: the file, validation, upgrades and docs all come from it
-- [Plugin info and READMEs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-info-and-readmes.md): How a plugin describes itself in `src/info.ts` and how the READMEs are generated
+- [Plugin config](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-config.md): Define plugin settings once, then load, validate, migrate and document them from the same schema
+- [Plugin info and READMEs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-info-and-readmes.md): Define plugin metadata once, connect commands and settings, and generate the README
 - [Testing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/testing.md): Unit tests and integration tests against a real Pumpkin server
 - [Turborepo commands](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/turborepo.md): The pnpm Turbo wrapper, log defaults, and flag overrides
 
 ## Repository maintenance
 
 - [Agent tooling](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agent-tooling.md): Agent guidance, skills, portable hooks and scoped check diagnostics
-- [CI and releases](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/ci-and-releases.md): The CI workflow, release-please, rebase-only merging and the market stub
+- [CI and releases](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/ci-and-releases.md): Which checks run for each change, how releases are prepared, and how plugins reach the Market
 
 ## Server operations
 
-- [Checking for plugin updates](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-updates.md): Checking plugin versions against Pumpkin Market
+- [Checking for plugin updates](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-updates.md): How plugin update checks work and how to test them
 - [Port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/port-forwarding.md): UPnP and NAT-PMP for plugins: the engine, UPnPumpkin, its API and how to test them
 - [Pumpkin Market API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/pumpkin-market-api.md): Market listing lookup, metadata updates, current publisher behavior and API findings
 
 ## Docs
 
 - [Documentation index](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/README.md): Catalog of guides and documentation pages.
-- [Agent domain docs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/domain.md): How engineering skills use glossary and ADR documentation
+- [Agent domain docs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/domain.md): How agents use glossaries and ADRs to keep terms and decisions aligned
 - [Issue tracker](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/issue-tracker.md): GitHub issue commands and repository conventions
-- [Triage labels](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/triage-labels.md): Mapping triage roles to the labels used in this repository
-- [Plugin API: ABI and runtime support](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/abi-and-runtime.md): Package versions, WIT ABI alignment and runtime support notes
+- [Triage labels](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/triage-labels.md): Maps triage skill labels to this repository's GitHub labels
+- [Plugin API: ABI and runtime support](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/abi-and-runtime.md): Match the Pumpkin server to the plugin ABI and check engine support
 - [Plugin API: evolution and migration](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/api-evolution-and-migration.md): Compatibility decisions, migration and SemVer policy
-- [Plugin API: host API areas](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/host-api.md): Pumpkin WIT interfaces and WASI capability distinction
+- [Plugin API: host API areas](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/host-api.md): What plugins can ask Pumpkin to do, and when they need WASI capabilities
 - [Plugin API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/index.md): Standalone API setup, lifecycle, host interfaces, ABI support and migration
-- [Plugin API: lifecycle and registration](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/lifecycle-and-registration.md): Plugin lifecycle callbacks and handler registration
-- [Plugin API: setup and build](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/setup-and-build.md): Install the API and build packages and generate WIT declarations
+- [Plugin API: lifecycle and registration](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/lifecycle-and-registration.md): Register a plugin, manage its callbacks, and release scheduled work
+- [Plugin API: setup and build](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/setup-and-build.md): Install the API and build tool, generate TypeScript declarations, and build a standalone plugin
 - [Adding codemods](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/docs/authoring-codemods.md): Add, register, test, and package a Pumpkin codemod
 - [Using codemods](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/codemod/docs/using-codemods.md): Run the Pumpkin API migration, preview changes, and finish the manual review
 
@@ -61,30 +61,30 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [AppleSkinPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/apple-skin-pumpkin/README.md): Additional component overview and usage details.
 - [BedrockAddonManager](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/index.md): Hosts Bedrock packs over HTTP; it does not offer them to players
 - [BedrockAddonManager README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/README.md): Additional component overview and usage details.
-- [BedrockAddonManager: Set up Bedrock packs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/setup.md): The folder is scanned at startup and on /baddon reload; new files are not detected automatically.
-- [BedrockAddonManager: Troubleshoot Bedrock pack hosting](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/troubleshooting.md): Check that web.enabled is true, the pack appears in /baddon list, and the configured bind address and port are reachable through the server firewall.
+- [BedrockAddonManager: Set up Bedrock packs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/setup.md): BedrockAddonManager scans the folder at startup and whenever you run /baddon reload, so it won't pick up new files automatically.
+- [BedrockAddonManager: Troubleshoot Bedrock pack hosting](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/troubleshooting.md): Start by checking that web.enabled is true and that /baddon list shows the pack.
 - [Distant Horizons Support Pumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/index.md): Unofficial Distant Horizons server support for Pumpkin
 - [Distant Horizons Support Pumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/README.md): Additional component overview and usage details.
 - [Distant Horizons Support Pumpkin: PumpkinPIE placeholders](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/placeholders.md): <!-- docs:begin placeholders -- <!-- Generated from src/placeholders/definitions.ts and the PumpkinPIE session timing constants.
-- [Distant Horizons Support Pumpkin: Install and connect](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/setup.md): Before installing, check the plugin README for the supported Distant Horizons release and protocol.
-- [Distant Horizons Support Pumpkin: Troubleshooting](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/troubleshooting.md): Confirm the client uses the supported Distant Horizons release listed in the plugin README.
+- [Distant Horizons Support Pumpkin: Install and connect](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/setup.md): Before you install the server plugin, check its README for the supported Distant Horizons release and protocol.
+- [Distant Horizons Support Pumpkin: Troubleshooting](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/troubleshooting.md): Check the plugin README for the supported Distant Horizons release and make sure the client is running it.
 - [DynamicLightsPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/docs/index.md): Server-side dynamic lights for held light sources
 - [DynamicLightsPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/README.md): Additional component overview and usage details.
-- [DynamicLightsPumpkin: Configure light sources](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/docs/configuration.md): Settings live in plugins/data/DynamicLightsPumpkin/config.toml.
+- [DynamicLightsPumpkin: Configure light sources](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/dynamic-lights-pumpkin/docs/configuration.md): Edit plugins/data/DynamicLightsPumpkin/config.toml to change the light sources.
 - [TabDisplay](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/tab-display/docs/index.md): Formats Java row names and headers/footers; no Bedrock list changes.
 - [TabDisplay README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/tab-display/README.md): Additional component overview and usage details.
 - [UPnPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/index.md): Opens router ports for Pumpkin with UPnP and NAT-PMP
 - [UPnPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/README.md): Additional component overview and usage details.
-- [UPnPumpkin: Troubleshoot port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/troubleshooting.md): Confirm UPnP or NAT-PMP is enabled in the router settings and that the server host shares the router's local network.
+- [UPnPumpkin: Troubleshoot port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/troubleshooting.md): Start with /upnp status.
 - [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/index.md): Waypoints with access rules, a Java HUD, and PumpkinPIE placeholders
 - [Waypoints README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/README.md): Additional component overview and usage details.
 - [Waypoints: PumpkinPIE placeholders](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/placeholders.md): <!-- docs:begin placeholders -- <!-- Generated from src/placeholders/definitions.ts and the PumpkinPIE session timing constants.
 
 ## Shared tools
 
-- [PumpkinPIE API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/apis/pumpkin-pie-api/docs/index.md): Validated PumpkinPIE client, expansions and provider lifecycle
+- [PumpkinPIE API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/apis/pumpkin-pie-api/docs/index.md): PumpkinPIE client for protocol checks and placeholder expansion
 - [PumpkinPIE API README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/apis/pumpkin-pie-api/README.md): Additional component overview and usage details.
-- [UPnPumpkin plugin API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/apis/upnpumpkin-api/docs/index.md): Asks UPnPumpkin to open a port
+- [UPnPumpkin plugin API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/apis/upnpumpkin-api/docs/index.md): Request and release router port mappings through UPnPumpkin
 - [UPnPumpkin plugin API README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/apis/upnpumpkin-api/README.md): Additional component overview and usage details.
 - [Plugin build tool](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/build/docs/index.md): Shared build tool for the plugins
 - [Plugin build tool README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/build/README.md): Additional component overview and usage details.
@@ -100,7 +100,7 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [Documentation generator README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/docs/README.md): Additional component overview and usage details.
 - [Minecraft colors](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/minecraft-colors/docs/index.md): Chalk-like Minecraft text formatting for plugins
 - [Minecraft colors README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/minecraft-colors/README.md): Additional component overview and usage details.
-- [Plugin kit](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/plugin-kit/docs/index.md): Host helpers shared by plugins
+- [Plugin kit](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/plugin-kit/docs/index.md): Shared lifecycle, command, task, logging, and file helpers for plugins
 - [Plugin kit README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/plugin-kit/README.md): Additional component overview and usage details.
 - [Port mapping library](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/port-mapping/docs/index.md): UPnP and NAT-PMP port mapping
 - [Port mapping library README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/port-mapping/README.md): Additional component overview and usage details.
@@ -112,7 +112,7 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [@pumpkin-plugins/static-analysis](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-analysis/README.md): Static JavaScript and TypeScript module graph analysis
 - [Static Hermes Runtime](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/index.md): Static Hermes Runtime shim for Pumpkin plugin components
 - [Static Hermes Runtime README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/README.md): Additional component overview and usage details.
-- [Static Hermes Runtime: Maintaining Static Hermes WASI support](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/maintaining-wasi.md): This guide is for maintainers who change the locked WASI definitions, capability bundles, or native adapters.
+- [Static Hermes Runtime: Maintaining Static Hermes WASI support](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/maintaining-wasi.md): Use this guide when you change the pinned WASI definitions, capability bundles, or Static Hermes native adapters.
 - [Static Hermes Runtime: WASI in Static Hermes](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/wasi.md): Static Hermes plugins run as WebAssembly components.
 - [Terrain capture](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/docs/index.md): Shared terrain capture and access contracts
 - [Terrain capture README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/terrain/README.md): Additional component overview and usage details.
@@ -126,8 +126,8 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 
 - [Publish a plugin to Pumpkin Market](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/publish-to-pumpkin-market/docs/index.md): Upload a released Pumpkin plugin WebAssembly file to its existing Market listing
 - [Publish a plugin to Pumpkin Market README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/publish-to-pumpkin-market/README.md): Additional component overview and usage details.
-- [Sign PumpkinMC Plugins](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/sign-pumpkin-plugin/docs/index.md): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
-- [Sign PumpkinMC Plugins README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/sign-pumpkin-plugin/README.md): Additional component overview and usage details.
+- [Sign Pumpkin plugins](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/sign-pumpkin-plugin/docs/index.md): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
+- [Sign Pumpkin plugins README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/sign-pumpkin-plugin/README.md): Additional component overview and usage details.
 - [Update a Pumpkin Market listing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/update-pumpkin-market-listing/docs/index.md): Update Pumpkin Market listing metadata from a JSON file or direct inputs
 - [Update a Pumpkin Market listing README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/update-pumpkin-market-listing/README.md): Additional component overview and usage details.
 - [Verify Pumpkin plugin signatures](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/verify-pumpkin-plugin/docs/index.md): Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks
@@ -147,14 +147,14 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [TabDisplay API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/tab-display/): Formats Java row names and headers/footers; no Bedrock list changes.
 - [UPnPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/upnpumpkin/): Opens router ports for Pumpkin with UPnP and NAT-PMP
 - [Waypoints API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/waypoints/): Waypoints with access rules, a Java HUD, and PumpkinPIE placeholders
-- [PumpkinPIE API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/pumpkin-pie-api/): Validated PumpkinPIE client, expansions and provider lifecycle
-- [UPnPumpkin plugin API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/upnpumpkin-api/): Asks UPnPumpkin to open a port
+- [PumpkinPIE API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/pumpkin-pie-api/): PumpkinPIE client for protocol checks and placeholder expansion
+- [UPnPumpkin plugin API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/upnpumpkin-api/): Request and release router port mappings through UPnPumpkin
 - [Plugin build tool API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/build/): Shared build tool for the plugins
 - [Pumpkin codemods API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/codemod/): Codemod runner for Pumpkin plugins
 - [Plugin configuration library API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/config/): Schema-driven TOML config for plugins
 - [Documentation generator API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/docs/): Generates component READMEs, doc links, and repository catalogs
 - [Minecraft colors API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/minecraft-colors/): Chalk-like Minecraft text formatting for plugins
-- [Plugin kit API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/plugin-kit/): Host helpers shared by plugins
+- [Plugin kit API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/plugin-kit/): Shared lifecycle, command, task, logging, and file helpers for plugins
 - [Port mapping library API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/port-mapping/): UPnP and NAT-PMP port mapping
 - [Pumpkin Plugin API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/pumpkin-api/): TypeScript API for PumpkinMC plugins
 - [Pumpkin plugin signing API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/signing/): Ed25519 signing for plugin builds
@@ -165,6 +165,6 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [Pumpkin Market update checks API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/update-check/): Check plugin versions against Pumpkin Market
 - [@pumpkin-plugins/wasi-capabilities API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/wasi-capabilities/): WASI capability metadata for Pumpkin plugins
 - [Publish a plugin to Pumpkin Market API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/publish-to-pumpkin-market/): Upload a released Pumpkin plugin WebAssembly file to its existing Market listing
-- [Sign PumpkinMC Plugins API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/sign-pumpkin-plugin/): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
+- [Sign Pumpkin plugins API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/sign-pumpkin-plugin/): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
 - [Update a Pumpkin Market listing API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/update-pumpkin-market-listing/): Update Pumpkin Market listing metadata from a JSON file or direct inputs
 - [Verify Pumpkin plugin signatures API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/verify-pumpkin-plugin/): Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks
