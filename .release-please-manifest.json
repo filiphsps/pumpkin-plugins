@@ -22,5 +22,6 @@
     "tools/static-analysis": "0.1.0",
     "tools/static-hermes-runtime": "0.1.1",
     "tools/update-check": "0.1.2",
-    "tools/wasi-capabilities": "0.1.0"
+    "tools/wasi-capabilities": "0.1.0",
+    "tools/apis/pumpkin-plus-plus-api": "0.0.0"
 }

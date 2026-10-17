@@ -49,6 +49,12 @@
             "component-no-space": true,
             "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         },
+        "tools/apis/pumpkin-plus-plus-api": {
+            "component": "pumpkin-plus-plus-api",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}",
+            "release-as": "0.1.0"
+        },
         "tools/build": {
             "component": "build",
             "component-no-space": true,
