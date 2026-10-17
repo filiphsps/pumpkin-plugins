@@ -9,14 +9,14 @@ Chalk-like formatting for Minecraft strings, with no runtime dependencies.
 ```ts
 import { ansi, color, colorTable, minecraftColorTable } from '@pumpkin-plugins/minecraft-colors';
 
-`Memory cache: ${color.aqua('100 B')}`;
-color.gold.bold('The server is restarting');
-color.hex('#12abef').underline('Custom color');
-color.named.name('Pumpkin');
-color.named.permission('plugin.manage');
-ansi.named.name('Pumpkin'); // ANSI color for console logs.
-colorTable(); // Log this terminal table when debugging the palette.
-minecraftColorTable(); // Legacy codes for Minecraft text.
+console.log(`Memory cache: ${color.aqua('100 B')}`);
+console.log(color.gold.bold('The server is restarting'));
+console.log(color.hex('#12abef').underline('Custom color'));
+console.log(color.named.name('Pumpkin'));
+console.log(color.named.permission('plugin.manage'));
+console.log(ansi.named.name('Pumpkin')); // ANSI color for console logs.
+console.log(colorTable()); // Terminal palette for debugging.
+console.log(minecraftColorTable()); // Legacy codes for Minecraft text.
 ```
 
 `color` returns section-sign codes such as `§b100 B`, which Pumpkin can parse in chat replies.
