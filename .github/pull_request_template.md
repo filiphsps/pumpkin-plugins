@@ -11,7 +11,8 @@
 - [ ] Based on the current `master`; no other open PR implements the same change
 - [ ] One topic per PR; follow-up work goes in a separate PR
 - [ ] Relevant checks pass, or checks that were not run and any failures are explained under Tested
-- [ ] Docs and READMEs that describe the change are updated; run `pnpm readme` if plugin info or config changed
+- [ ] Docs and READMEs that describe the change are updated; run `pnpm readme` if plugin info,
+  command declarations, config schemas, action metadata, or package metadata changed
 - [ ] New plugins were created with `pnpm gen`
 - Depends on: <!-- #PR, or none -->
 - AI-assisted: <!-- yes / no; this is collected for analytics only and does not affect merge decisions. The PR author is responsible for all PR contents. -->
