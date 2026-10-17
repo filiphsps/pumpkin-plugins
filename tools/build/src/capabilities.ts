@@ -33,3 +33,14 @@ export function wasiInterfaces(capabilities: readonly Capability[]): string[] {
     if (capabilities.length === 0) return [];
     return [...new Set([...capabilities.flatMap((c) => CAPABILITIES[c]), ...SUPPORT_IMPORTS])];
 }
+
+/**
+ * Returns every capability that imports an interface, including shared support interfaces.
+ * @param interfacePath - Exact `package/interface` path, without the `wasi:` prefix or version.
+ * @returns Matching names in declaration order; an empty array for unknown paths. Only a single match is unambiguous.
+ */
+export function capabilitiesForInterface(interfacePath: string): Capability[] {
+    return (Object.keys(CAPABILITIES) as Capability[]).filter((capability) =>
+        wasiInterfaces([capability]).includes(interfacePath),
+    );
+}
