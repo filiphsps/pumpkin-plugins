@@ -1,5 +1,79 @@
 # Changelog
 
+## [0.1.0](https://github.com/filiphsps/pumpkin-plugins/compare/apple-skin-pumpkin-v0.0.7...apple-skin-pumpkin-v0.1.0) (2026-10-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **runtime:** switch to `static-hermes`
+
+### Features
+
+* **build:** add opt-in Hermes TypeScript parsing ([ee3c10d](https://github.com/filiphsps/pumpkin-plugins/commit/ee3c10de8b3a7f7959aeeb47bbe61cd16283a8d1))
+* **build:** add parse-ts build command ([bc072db](https://github.com/filiphsps/pumpkin-plugins/commit/bc072dbadfa806c49f401c14d642f6f9ce1e01a1))
+* **build:** add release and follow links to update notice ([79d982b](https://github.com/filiphsps/pumpkin-plugins/commit/79d982b79a215bbc977e29731d7ea301d34ff59e))
+* **build:** add typed standalone plugin builder ([39ff68e](https://github.com/filiphsps/pumpkin-plugins/commit/39ff68e5d963f5ba344dd6e6d989807e934becfe))
+* **build:** build plugins with Static Hermes ([bff13b5](https://github.com/filiphsps/pumpkin-plugins/commit/bff13b57430f76ef9134b5543b4f1096cbd5d499))
+* **build:** configure plugin runtime engine ([2c5c812](https://github.com/filiphsps/pumpkin-plugins/commit/2c5c812a6cd2c572385eed5be571702adc05413c))
+* **build:** enforce production wasm size limit ([f084e02](https://github.com/filiphsps/pumpkin-plugins/commit/f084e02733f1d0100f78d7fb7131fae51da2ccaf))
+* **build:** expose capability interface lookup ([cc70f9c](https://github.com/filiphsps/pumpkin-plugins/commit/cc70f9c6c69040b5ab4276e86a6247cbb71fb17d))
+* **build:** notify about available updates ([50c7cc0](https://github.com/filiphsps/pumpkin-plugins/commit/50c7cc0f98198362d54e670e9eec763aef36a2aa))
+* **build:** show Static Hermes selections in verbose logs ([f5e0f8d](https://github.com/filiphsps/pumpkin-plugins/commit/f5e0f8d2e642e8b7fa9fbcfbd783c318a0470516))
+* **build:** show TypeScript parser mode ([6e7c60b](https://github.com/filiphsps/pumpkin-plugins/commit/6e7c60b0fa57f15f26f16ef0d70be77801846910))
+* **docs:** add reusable document generation and source discovery ([33cab22](https://github.com/filiphsps/pumpkin-plugins/commit/33cab2216fd60efd9d52611fa885d5a630ea78d6))
+* **pumpkin-api:** add pinned first-party host API ([88d58ea](https://github.com/filiphsps/pumpkin-plugins/commit/88d58ea26e9d38d3183f50c441486de37c6d665f))
+* **pumpkin-api:** validate compatibility matrices with schema ([12b48b9](https://github.com/filiphsps/pumpkin-plugins/commit/12b48b963295a13bb24d3f6f819d42838de64961))
+* **runtime:** add standalone Static Hermes package ([f9b24e3](https://github.com/filiphsps/pumpkin-plugins/commit/f9b24e3b5a190a54090a87c6f1141ff075dfaeb0))
+* **runtime:** bundle plugins for Static Hermes ([2105469](https://github.com/filiphsps/pumpkin-plugins/commit/2105469a07b8f90f964dd9f10008017fbdaaa01f))
+* **runtime:** switch to `static-hermes` ([fafe44f](https://github.com/filiphsps/pumpkin-plugins/commit/fafe44fcf3c894e38bde43050128cbff522d530e))
+* **static-hermes-runtime:** replace legacy scripts with typed CLI ([2545271](https://github.com/filiphsps/pumpkin-plugins/commit/2545271153cc663a62b63a9822b17fe8b24e3dc1))
+* **static-hermes-runtime:** support opt-in TypeScript bundles ([0358ed2](https://github.com/filiphsps/pumpkin-plugins/commit/0358ed276ce1975483a6f37cbfdfd44c72110478))
+* **static-hermes-runtime:** support portable packaged builds ([e999bfd](https://github.com/filiphsps/pumpkin-plugins/commit/e999bfd4a02714c250ba85b6c7e1b8104cffb9a4))
+* **static-hermes:** add Hades GC selection ([e6f6455](https://github.com/filiphsps/pumpkin-plugins/commit/e6f64550857c52eb45549717ea81b729e66f3073))
+* **static-hermes:** generate WIT adapters and make runtime default ([000242f](https://github.com/filiphsps/pumpkin-plugins/commit/000242fe6c6b255625096f09a9d902ef949233bf))
+* **wasi:** share capability metadata across tooling ([bbe0f2f](https://github.com/filiphsps/pumpkin-plugins/commit/bbe0f2f093273132e8fd2101233cada29af270e7))
+
+
+### Bug Fixes
+
+* **bench:** streamline runtime comparison output ([5c6b1ad](https://github.com/filiphsps/pumpkin-plugins/commit/5c6b1ad9a1138b438d39a55cc3932409aec2323e))
+* **build:** analyze consumers without tsconfig ([a42e939](https://github.com/filiphsps/pumpkin-plugins/commit/a42e939f9510ee59a44f9720cae3fc6e9d48d248))
+* **build:** avoid duplicate WIT output ([aaad9b5](https://github.com/filiphsps/pumpkin-plugins/commit/aaad9b51f6cde3e0eaf9805bd8f93d87007827b2))
+* **build:** clean abandoned staging directories ([667b8d6](https://github.com/filiphsps/pumpkin-plugins/commit/667b8d67004992d5300d7958fe006c439a186e38))
+* **build:** define NODE_ENV for plugin bundles ([562bf66](https://github.com/filiphsps/pumpkin-plugins/commit/562bf66f2400edfd017c4571057dbb07b15e134f))
+* **build:** flush CLI errors before exiting ([2da29c9](https://github.com/filiphsps/pumpkin-plugins/commit/2da29c9d5f55553761827a1cd0d0481d7e007733))
+* **build:** normalize package-relative paths ([d2942ca](https://github.com/filiphsps/pumpkin-plugins/commit/d2942ca1cc65b19ed72ada31b3c08b4b2b18f70d))
+* **build:** publish isolated WIT snapshots and resolve API aliases ([7aa0f66](https://github.com/filiphsps/pumpkin-plugins/commit/7aa0f66ca0545014f1b8aad9e4ba3ffcc36965f0))
+* **build:** resolve aliased WIT constructors during adapter analysis ([54f9f53](https://github.com/filiphsps/pumpkin-plugins/commit/54f9f53b04844eb2ce55f9319c3c8b9d775fa917))
+* **build:** validate and serialize WASI WIT cache writes ([44994cf](https://github.com/filiphsps/pumpkin-plugins/commit/44994cf21a2058d1398a830b984afc65e622915d))
+* **build:** warn on oversized external components ([0ec0559](https://github.com/filiphsps/pumpkin-plugins/commit/0ec0559c53bf95e81855954ab06d9815238bb3be))
+* **docs:** avoid regex backtracking in table cells ([a1ff2e4](https://github.com/filiphsps/pumpkin-plugins/commit/a1ff2e4c27710028d7c8f78e8a2825f0e23c7dfa))
+* **docs:** contain generated targets and normalize metadata ([d41718d](https://github.com/filiphsps/pumpkin-plugins/commit/d41718d7149e0531b4070471a66a8c985f67a20f))
+* incomplete string escaping or encoding ([18cead0](https://github.com/filiphsps/pumpkin-plugins/commit/18cead0dac369a367da770bb022c0d0de603d898))
+* **plugin-kit:** ignore task ids from other plugins ([c296825](https://github.com/filiphsps/pumpkin-plugins/commit/c296825de37023156a5b7c17ad0ca72508fce06f))
+* **pumpkin-api:** release callbacks on failed registration and unload ([1517db4](https://github.com/filiphsps/pumpkin-plugins/commit/1517db4d7cf7dd4dd115d5f1324dc65d11f27303))
+* **runtime:** dispatch callbacks and release WIT resources ([d935e60](https://github.com/filiphsps/pumpkin-plugins/commit/d935e60dbf2139da6b8d3735472e037492a47216))
+* **static-hermes-runtime:** apply patches reliably on Windows ([c6a7b73](https://github.com/filiphsps/pumpkin-plugins/commit/c6a7b73e15ce0a363bc980af00b395527113a4cd))
+* **static-hermes-runtime:** clean up failed Hermes source clones ([6faa733](https://github.com/filiphsps/pumpkin-plugins/commit/6faa733994d27d6bd53b53ed8079f36660cccbf1))
+* **static-hermes-runtime:** guard WIT memory during conversion ([01ab7b0](https://github.com/filiphsps/pumpkin-plugins/commit/01ab7b0451d02cfda0021f83dfe9296e7f2ce0ed))
+* **static-hermes-runtime:** harden WIT code generation and component builds ([2a49fe7](https://github.com/filiphsps/pumpkin-plugins/commit/2a49fe71cc93c374dbdd8edc6a6b03cf57c9db21))
+* **static-hermes-runtime:** preserve event results and resources ([64e4e4b](https://github.com/filiphsps/pumpkin-plugins/commit/64e4e4bf00d3330e0e1f13ece548b5cdb1cf091c))
+* **static-hermes-runtime:** preserve LF in pinned source checkout ([330aff0](https://github.com/filiphsps/pumpkin-plugins/commit/330aff08c0ec301cc3fbc2d2b268448f914009c2))
+* **static-hermes-runtime:** protect shared build locks ([c52a12a](https://github.com/filiphsps/pumpkin-plugins/commit/c52a12a09ff23be66eb315c1d3a5fa2e8a92de4e))
+* **static-hermes-runtime:** serialize Hermes preparation stages ([458200d](https://github.com/filiphsps/pumpkin-plugins/commit/458200d19b555cd109a1ef1c373e161d40d3aeee))
+* **static-hermes-runtime:** serialize shared Hermes cache mutations ([b5ce293](https://github.com/filiphsps/pumpkin-plugins/commit/b5ce2930db7e235037e7042a41a611474027c6f7))
+* **static-hermes-runtime:** use MSVC-compatible host flags ([f00a9f8](https://github.com/filiphsps/pumpkin-plugins/commit/f00a9f8c587ae97bb839f30f0b6be4a18f45ee5f))
+* **static-hermes-runtime:** verify pinned toolchain releases and repair caches ([b56cb51](https://github.com/filiphsps/pumpkin-plugins/commit/b56cb51aacbadf2126ff8a5bbc2486292831b37b))
+* **static-hermes:** prune adapters for static event registrations ([a07538a](https://github.com/filiphsps/pumpkin-plugins/commit/a07538a53fb61ed7fd9539737cc75130982d5c04))
+* **static-hermes:** respect transferred resource ownership ([44a9ceb](https://github.com/filiphsps/pumpkin-plugins/commit/44a9cebbd58c5e31d51851ea7cb7ce0bcd990ed1))
+* **tooling:** harden WIT and runtime integration ([54469c3](https://github.com/filiphsps/pumpkin-plugins/commit/54469c39daaae1d180dd4abfd64cf362f0c291dd))
+* **update-check:** recognize WASI stream end-of-body ([059c7a1](https://github.com/filiphsps/pumpkin-plugins/commit/059c7a11401e3e34ee25dd9d8f9635f2051c6487))
+
+
+### Performance Improvements
+
+* **build:** enable explicit tree shaking ([388553d](https://github.com/filiphsps/pumpkin-plugins/commit/388553d61f654770d9f7630ae7a2bb9fe4872d7a))
+
 ## [0.0.7](https://github.com/filiphsps/pumpkin-plugins/compare/apple-skin-pumpkin-v0.0.6...apple-skin-pumpkin-v0.0.7) (2026-10-11)
 
 
