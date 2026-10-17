@@ -1,0 +1,18 @@
+{
+    "all": true,
+    "src": ["tools", "scripts", "actions", ".agents/hooks"],
+    "include": ["tools/**/src/**", "tools/**/bin/**", "scripts/**", "actions/**/src/**", ".agents/hooks/**"],
+    "exclude": [
+        "**/*.test.*",
+        "**/*.itest.*",
+        "**/*.spec.*",
+        "**/*.d.ts",
+        "**/test/**",
+        "**/__snapshots__/**",
+        "**/.cache/**"
+    ],
+    "exclude-after-remap": true,
+    "reporter": ["text-summary", "lcovonly", "json", "html"],
+    "reports-dir": "coverage/process",
+    "temp-directory": "coverage/process/raw"
+}

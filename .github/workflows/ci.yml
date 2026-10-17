@@ -252,7 +252,7 @@ jobs:
         needs: [changes]
         if: >-
             ${{
-              needs.changes.outputs.code == 'true' &&
+              (needs.changes.outputs.code == 'true' || needs.changes.outputs.actions_to_test != '[]') &&
               needs.changes.outputs.skip_expensive_checks != 'true'
             }}
         timeout-minutes: 15
@@ -266,29 +266,40 @@ jobs:
               id: bootstrap
               uses: ./.github/common/bootstrap
 
-            - name: 🧪 Unit tests with coverage
+            - name: 🧪 Behavior tests with coverage
               id: unit-tests-with-coverage
-              run: node scripts/ci-run.mjs "Unit tests with coverage" -- pnpm run coverage
+              run: node scripts/ci-run.mjs "Behavior tests and process coverage" -- pnpm run coverage
 
             - name: ☂️ Upload coverage
               id: upload-coverage
               uses: codecov/codecov-action@v7.1.1
               with:
                   directory: .
-                  flags: unittests
+                  flags: tooling,guest
+                  exclude: coverage/verification,coverage/process/raw
                   token: ${{ secrets.CODECOV_TOKEN }}
 
-            - name: 🧪 Script tests
-              id: script-tests
+            - name: 📦 Preserve coverage evidence
+              id: preserve-coverage-evidence
               if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
-              run: node scripts/ci-run.mjs "Repository scripts and agent hooks" -- pnpm run test:scripts
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  name: coverage-evidence
+                  retention-days: 7
+                  if-no-files-found: error
+                  path: |
+                      coverage/process/
+                      !coverage/process/raw/
+                      coverage/verification/
+                      tools/**/coverage/lcov.info
+                      packages/*/coverage/lcov.info
 
             - name: 📋 Job summary
               id: job-summary
               if: always()
               uses: ./.github/common/job-summary
               with:
-                  title: Unit and repository tests
+                  title: Behavior tests and coverage
                   steps: ${{ toJSON(steps) }}
                   tests: 'true'
 

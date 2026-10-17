@@ -54,7 +54,7 @@ jobs:
               uses: codecov/codecov-action@v7.1.1
               with:
                   directory: .
-                  flags: actions
+                  flags: tooling
                   token: ${{ secrets.CODECOV_TOKEN }}
 
             - name: 📋 Job summary

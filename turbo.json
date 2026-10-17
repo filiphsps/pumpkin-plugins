@@ -118,6 +118,8 @@
         },
         "test:coverage": {
             "dependsOn": ["transit"],
+            "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/coverage.config.json", "$TURBO_ROOT$/scripts/coverage.mjs"],
+            "passThroughEnv": ["NODE_V8_COVERAGE"],
             "outputs": ["coverage/**"]
         },
         "@pumpkin-plugins/build#test:coverage": {
@@ -126,6 +128,8 @@
                 "@pumpkin-plugins/static-hermes-runtime#build",
                 "@pumpkin-plugins/wasi-capabilities#build"
             ],
+            "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/coverage.config.json", "$TURBO_ROOT$/scripts/coverage.mjs"],
+            "passThroughEnv": ["NODE_V8_COVERAGE"],
             "outputs": ["coverage/**"]
         },
         "test:integration": {

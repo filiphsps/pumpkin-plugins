@@ -30,7 +30,7 @@
         "build:parse-ts": "node scripts/build.mjs --parse-ts",
         "check": "node scripts/check-release-config.mjs && node scripts/package-metadata.mjs && node scripts/check-docs.mjs",
         "clean": "pnpm purge && node scripts/clean.mjs",
-        "coverage": "pnpm turbo run test:coverage && pnpm exec c8 --reporter=lcov --reporter=text --reports-dir=coverage/actions node --test actions/*/src/*.test.mjs",
+        "coverage": "node scripts/coverage.mjs",
         "dev": "node scripts/dev.mjs",
         "dev:docs": "pnpm run docs:api && vitepress dev docs",
         "dev:nightly": "node scripts/dev.mjs --nightly",

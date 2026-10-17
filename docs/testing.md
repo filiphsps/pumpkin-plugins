@@ -15,11 +15,37 @@ define two Vitest projects:
 | `unit` | `src/**/*.test.ts` | `pnpm test`. No server needed. |
 | `integration` | `test/**/*.itest.ts` | `pnpm test:integration`. Builds first, then runs against a real Pumpkin. Test files and up to four package suites run concurrently. |
 
-From the repository root, `pnpm coverage` runs every package's unit tests with Vitest's V8 coverage
-provider, then runs the GitHub Action tests with c8. Each package writes an LCOV report to
-`coverage/lcov.info`; action coverage is written to `coverage/actions/lcov.info`. CI uploads these
-reports to Codecov. Coverage measures source files executed in the test process. Integration tests
-check compiled WASM behavior, but they don't collect coverage from guest code.
+From the repository root, `pnpm coverage` runs workspace coverage suites, including the creator's
+CLI integration tests, then repository-script, agent-hook and GitHub Action tests. Vitest writes
+each package's `coverage/lcov.info`. An outer c8 collector also measures Node child processes,
+including documentation and build CLIs, and writes `coverage/process/lcov.info`. Codecov merges
+these reports so subprocess execution contributes alongside in-process tests. Coverage tasks run
+fresh because cached reports cannot supply their child processes' raw V8 data.
+
+The existing `codecov/project` gate covers tooling: `tools/`, `scripts/`, `actions/` and
+`.agents/hooks/`. It compares against the base commit with a 1 percentage-point tolerance.
+CI runs the complete coverage job for action-only changes too, so a partial action-matrix upload
+cannot stand in for the full tooling report.
+The separate `guest` status covers `packages/` and is informational: its Node coverage does not
+measure plugin execution inside WASM. Shared libraries under `tools/` remain in the tooling gate;
+their coverage describes measured Node execution, not their execution inside a server.
+
+Unexecuted source remains in both collectors' denominators. The process collector covers the
+host-side source and CLI directories; it excludes test/spec files, declarations, test fixtures,
+snapshots and downloaded third-party caches. It does not pretend that Node instrumentation measures
+compiled WASM. Add tests for uncovered failure scenarios, rather than to raise the reported percentage.
+
+Open `coverage/process/index.html` to inspect process coverage. `coverage/process/run.json` records
+the revision, Node version, repeat command, command exit statuses and report SHA-256 hashes. CI
+retains these reports and regression evidence in the `coverage-evidence` artifact, including on
+failure. Keep scenario inputs and observable outputs with new E2E evidence so another person can
+repeat and verify it.
+
+The coverage collector's regression scenario checks failures that ordinary behavior suites cannot
+detect: lost child-process hits, dropped unexecuted TypeScript, stale hits from an earlier run,
+third-party caches counted as repository source and swallowed nonzero process exits.
+Run it with `pnpm exec node --test scripts/coverage.test.mjs`;
+its evidence is written to `coverage/verification/process-coverage/`.
 
 To run one plugin's integration tests, replace `my-plugin` with the package's folder name:
 

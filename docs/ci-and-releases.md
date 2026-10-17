@@ -47,7 +47,7 @@ pins.
 | 💬 Commit messages | Pull requests that change code, actions, extensions, or generated READMEs | Checks every commit with `commitlint.config.mjs`. |
 | 📋 Lint | Code changes | Runs `pnpm lint`, which runs Biome followed by the JSDoc check (see [Code style](code-style.md)). |
 | ✅ Typecheck | Code changes | Runs `pnpm typecheck`. |
-| 🧪 Test | Plugin or repository code changes | Runs workspace and action unit tests with coverage, uploads V8 coverage to Codecov, and runs repository-script and agent-hook tests with `pnpm test:scripts`. The project coverage check allows a drop of up to 1 percentage point. |
+| 🧪 Test | Plugin, repository or action code changes | Runs workspace behavior suites and script, hook and action tests with `pnpm coverage`. Merges Node process coverage with package reports in Codecov and retains coverage evidence. Tooling coverage is gated with a 1 percentage-point tolerance; plugin guest coverage is informational until WASM execution can be measured. |
 | 📦 External consumer | Code changes | Packs public tools with their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters and runs `pumpkin-codemod list` outside the repository. The matrix covers Linux, macOS arm64 and Windows x64 with pinned Node and pnpm versions. |
 | 🧪 Action tests | Action or shared-helper code changes | The reusable workflow lints and tests each changed action. A shared-helper change tests the common package and all four public action consumers. It then uploads c8 coverage to Codecov. |
 | 🛡️ Action test gate | Every non-config-only CI run outside Release Please branches, after classification and action tests | Requires each selected action suite to pass. It accepts skipped tests only when the matrix is empty. |
@@ -549,5 +549,6 @@ Set these once in GitHub; the workflows can't configure them for you:
    the key out of the repository and chat messages.
 5. Optional: add the Codecov repository upload token as the `CODECOV_TOKEN` Actions secret to publish
    coverage from protected branches and same-repository runs. Public fork pull requests can use
-   Codecov's tokenless upload setting. The `codecov.yml` project status compares coverage with the
-   base commit and allows a drop of up to 1 percentage point to avoid failing on small fluctuations.
+   Codecov's tokenless upload setting. The existing `codecov.yml` default project status gates
+   tooling coverage against the base commit with a 1 percentage-point tolerance. The separate guest
+   status is informational because Node coverage cannot measure plugin execution inside WASM.

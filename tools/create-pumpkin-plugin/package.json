@@ -51,6 +51,7 @@
         "readme": "pumpkin-plugins-docs generate docs.ts",
         "readme:check": "pumpkin-plugins-docs generate docs.ts --check",
         "test": "vitest run --project unit",
+        "test:coverage": "vitest run --coverage",
         "test:integration": "vitest run --project integration",
         "typecheck": "tsc --noEmit"
     },
@@ -61,6 +62,7 @@
     "devDependencies": {
         "@pumpkin-plugins/docs": "workspace:*",
         "@types/node": "catalog:",
+        "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
     },

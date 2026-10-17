@@ -4,6 +4,23 @@ coverage:
   status:
     project:
       default:
+        flags: [tooling]
         target: auto
         threshold: 1%
+      guest:
+        flags: [guest]
+        target: auto
+        threshold: 1%
+        informational: true
     patch: off
+
+flags:
+  tooling:
+    paths:
+      - tools/
+      - scripts/
+      - actions/
+      - .agents/hooks/
+  guest:
+    paths:
+      - packages/

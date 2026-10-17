@@ -65,6 +65,11 @@ inputs, and follow the dependency and cache rules in [Building](docs/building.md
   At the end of E2E tests, produce a verifiable and repeatable artifact.
 - If you must test a system in isolation, first write down all the ways it could fail, then write
   the code.
+- Add tests only for failure scenarios existing coverage misses; assert observable outcomes and
+  retain evidence with the command, inputs and outputs needed to repeat and verify the result.
+- Collect and merge coverage from CLI/process E2E tests where instrumentation supports it. Keep
+  tooling coverage gated and plugin guest coverage informational until WASM execution is measurable.
+  Keep unexecuted production source in coverage reports; never exclude it to raise the percentage.
 
 ## Verify before finishing
 
