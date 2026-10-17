@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/filiphsps/pumpkin-plugins/compare/build-v0.1.2...build-v0.1.3) (2026-10-17)
+
+
+### Features
+
+* **build:** shorten update cache and add bypass option ([7a7545f](https://github.com/filiphsps/pumpkin-plugins/commit/7a7545f9bed4b8db8beb3a64ea8d797797983e90))
+
 ## [0.1.2](https://github.com/filiphsps/pumpkin-plugins/compare/build-v0.1.1...build-v0.1.2) (2026-10-17)
 
 
