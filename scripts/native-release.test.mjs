@@ -16,6 +16,7 @@ afterEach(() => {
 });
 const nativePath = 'native/pumpkin-plus-plus';
 const tag = 'pumpkin-plus-plus-v0.0.1';
+const windowsArmQuickJsSkipReason = 'The pinned QuickJS componentizer has no Windows ARM64 CLI.';
 function put(directory, file, contents) {
     mkdirSync(dirname(join(directory, file)), { recursive: true });
     writeFileSync(
@@ -248,7 +249,12 @@ import {createHash} from 'node:crypto';
 const args = Object.fromEntries(Array.from({length:(process.argv.length-2)/2},(_,i)=>[process.argv[2+i*2].slice(2),process.argv[3+i*2]]));
 const digest = file => createHash('sha256').update(readFileSync(file)).digest('hex');
 const status = process.env.FAIL_LOAD ? 'failed' : 'passed';
-writeFileSync(args.evidence,JSON.stringify({status,artifactSha256:digest(args.library),hostBinarySha256:digest(args.host),target:args.target,protocolVersion:1,githubTokens:[process.env.GH_TOKEN,process.env.GITHUB_TOKEN].filter(Boolean),engines:['quickjs','static-hermes'].map(engine=>({engine,status}))}));
+const skipQuickJs = args.target === 'aarch64-pc-windows-msvc' || process.env.SKIP_QUICKJS === '1';
+const engines = [
+    {engine:'quickjs',status:skipQuickJs?'skipped':status,...(skipQuickJs?{reason:process.env.WRONG_SKIP_REASON==='1'?'No CLI':'${windowsArmQuickJsSkipReason}'}:{})},
+    {engine:'static-hermes',status},
+];
+writeFileSync(args.evidence,JSON.stringify({status,artifactSha256:digest(args.library),hostBinarySha256:digest(args.host),target:args.target,protocolVersion:1,githubTokens:[process.env.GH_TOKEN,process.env.GITHUB_TOKEN].filter(Boolean),engines}));
 `,
     );
     const git = (...args) =>
@@ -402,6 +408,18 @@ it('builds verified artifacts without credentials, then attaches only matching r
         assert.equal(metadata.artifact.sha256, digest(bytes));
         assert.equal(readFileSync(join(f.output, `${name}.sha256`), 'utf8'), `${digest(bytes)}  ${name}\n`);
         assert.equal(metadata.loadTest.status, 'passed');
+        assert.deepEqual(
+            metadata.loadTest.engines.map(({ engine, status, reason }) => ({ engine, status, reason })),
+            target === 'aarch64-pc-windows-msvc'
+                ? [
+                      { engine: 'quickjs', status: 'skipped', reason: windowsArmQuickJsSkipReason },
+                      { engine: 'static-hermes', status: 'passed', reason: undefined },
+                  ]
+                : [
+                      { engine: 'quickjs', status: 'passed', reason: undefined },
+                      { engine: 'static-hermes', status: 'passed', reason: undefined },
+                  ],
+        );
         assert.deepEqual(metadata.loadTest.githubTokens, []);
         const commands = readFileSync(f.trace, 'utf8').trim().split('\n').map(JSON.parse);
         const compile = commands.find(({ tool }) => tool === 'cargo');
@@ -446,6 +464,18 @@ it('refuses a moved source tag, wrong host bytes and failed load evidence', () =
     const loadResult = build(failedLoad, targets[0][0], { FAIL_LOAD: '1' });
     assert.notEqual(loadResult.status, 0);
     assert.match(loadResult.stderr, /load-test evidence/);
+});
+
+it('rejects engine skips outside the configured target and incorrect skip reasons', () => {
+    const unsupportedSkip = packagingFixture(...targets[0]);
+    const unsupportedResult = build(unsupportedSkip, targets[0][0], { SKIP_QUICKJS: '1' });
+    assert.notEqual(unsupportedResult.status, 0);
+    assert.match(unsupportedResult.stderr, /load-test evidence/);
+
+    const incorrectReason = packagingFixture(...targets.at(-1));
+    const incorrectResult = build(incorrectReason, targets.at(-1)[0], { WRONG_SKIP_REASON: '1' });
+    assert.notEqual(incorrectResult.status, 0);
+    assert.match(incorrectResult.stderr, /load-test evidence/);
 });
 
 it('revalidates the host binary after the load test before publishing compatibility metadata', () => {
@@ -516,7 +546,9 @@ it('fans native tags into an architecture-matched load-test matrix and includes 
     const capabilityBuildIndex = job.steps.findIndex(
         ({ name }) => name === 'Build WASI capability package for native tests',
     );
-    const nativeBuildIndex = job.steps.findIndex(({ name }) => name === 'Build, load-test and package native component');
+    const nativeBuildIndex = job.steps.findIndex(
+        ({ name }) => name === 'Build, load-test and package native component',
+    );
     assert.equal(hostIndex, sourceIndex + 1, 'the pinned host must be the first step after source checkout');
     assert.ok(hostIndex < bootstrapIndex, 'the host token step must precede dependency installation');
     assert.ok(hostIndex < pnpmSetupIndex, 'the host token step must precede running the pnpm toolchain');

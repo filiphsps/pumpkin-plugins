@@ -10,7 +10,6 @@ import { nativeAssetNames, nativeTargets } from './utils/native-targets.mjs';
 
 const shaPattern = /^[0-9a-f]{40}$/;
 const digestPattern = /^[0-9a-f]{64}$/;
-const requiredLoadTestEngines = ['quickjs', 'static-hermes'];
 const githubToken = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
 delete process.env.GH_TOKEN;
 delete process.env.GITHUB_TOKEN;
@@ -120,13 +119,19 @@ function requireSha(actual, expected, label) {
 }
 function validateLoadTestEvidence(proof, expected) {
     const engineProofs = proof?.engines;
+    const target = nativeTargets.find((entry) => entry.target === expected.target);
+    const expectedEngines = target?.loadTestEngines;
     const enginesPassed =
         Array.isArray(engineProofs) &&
-        engineProofs.length === requiredLoadTestEngines.length &&
-        new Set(engineProofs.map((engineProof) => engineProof?.engine)).size === requiredLoadTestEngines.length &&
-        requiredLoadTestEngines.every((engine) =>
-            engineProofs.some((engineProof) => engineProof?.engine === engine && engineProof.status === 'passed'),
-        );
+        Array.isArray(expectedEngines) &&
+        engineProofs.length === expectedEngines.length &&
+        new Set(engineProofs.map((engineProof) => engineProof?.engine)).size === expectedEngines.length &&
+        expectedEngines.every((expectation) => {
+            const engineProof = engineProofs.find((candidate) => candidate?.engine === expectation.engine);
+            return expectation.skipReason
+                ? engineProof?.status === 'skipped' && engineProof.reason === expectation.skipReason
+                : engineProof?.status === 'passed';
+        });
     if (
         proof?.status !== 'passed' ||
         !enginesPassed ||
@@ -135,7 +140,9 @@ function validateLoadTestEvidence(proof, expected) {
         proof.artifactSha256 !== expected.artifactSha256 ||
         proof.hostBinarySha256 !== expected.hostBinarySha256
     )
-        throw new Error('Native load-test evidence does not match both engines, library, host, target and protocol');
+        throw new Error(
+            'Native load-test evidence does not match required engines, library, host, target and protocol',
+        );
 }
 function renderNativeReadmeMatrix(spec) {
     const { host } = spec;
@@ -148,23 +155,29 @@ function renderNativeReadmeMatrix(spec) {
     )
         throw new Error('Native README matrix requires exact host, toolchain and protocol metadata');
     const rows = nativeTargets
-        .map(({ target, runner }) => {
+        .map(({ target, runner, loadTestEngines }) => {
             const asset = host.assets?.[target];
             if (!asset || typeof asset.name !== 'string' || !/^[\w.+-]+$/.test(asset.name))
                 throw new Error(`Missing exact host release asset for native target ${target}`);
             const [library] = nativeAssetNames('pumpkin-plus-plus', target);
-            return `| \`${target}\` | \`${library}\` | \`${asset.name}\` | \`${runner}\` |`;
+            const engineLabels = loadTestEngines
+                .map(({ engine, skipReason }) => {
+                    const label = engine === 'static-hermes' ? 'Static Hermes' : 'QuickJS';
+                    return skipReason ? `${label} skipped (${skipReason})` : label;
+                })
+                .join(', ');
+            return `| \`${target}\` | \`${library}\` | \`${asset.name}\` | \`${runner}\` | ${engineLabels} |`;
         })
         .join('\n');
     const hostReleaseUrl = `https://github.com/${host.repository}/releases/tag/${encodeURIComponent(host.tag)}`;
     return [
         "Use the library built for your server's target and the matching Pumpkin host release asset.",
-        'The release workflow builds and load-tests every pair on its matching runner with QuickJS and Static Hermes before attaching the native library.',
+        'The release workflow builds each pair on its matching runner and requires every listed engine to pass before attaching the native library. An engine marked skipped is excluded for the stated reason.',
         `This compatibility set is pinned to Pumpkin [\`${host.tag}\`](${hostReleaseUrl}),`,
         `source commit \`${host.sha}\`, Rust \`${spec.rustToolchain}\`, and protocol version \`${spec.protocolVersion}\`.`,
         '',
-        '| Target triple | Native library asset | Matching Pumpkin host asset | Validation runner |',
-        '| --- | --- | --- | --- |',
+        '| Target triple | Native library asset | Matching Pumpkin host asset | Validation runner | Required real-server engines |',
+        '| --- | --- | --- | --- | --- |',
         rows,
         '',
         'Target triples and runners come from [the native target definitions](../../scripts/utils/native-targets.mjs);',

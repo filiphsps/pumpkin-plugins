@@ -29,6 +29,11 @@
         "extensions/minecraft-terms": {
             "component": "minecraft-terms"
         },
+        "native/pumpkin-plus-plus": {
+            "component": "pumpkin-plus-plus",
+            "release-type": "rust",
+            "release-as": "0.1.0"
+        },
         "packages/apple-skin-pumpkin": {
             "component": "apple-skin-pumpkin"
         },

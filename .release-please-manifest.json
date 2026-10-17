@@ -4,12 +4,14 @@
     "actions/update-pumpkin-market-listing": "0.0.3",
     "actions/verify-pumpkin-plugin": "0.0.5",
     "extensions/minecraft-terms": "0.0.1",
+    "native/pumpkin-plus-plus": "0.0.0",
     "packages/apple-skin-pumpkin": "0.1.0",
     "packages/distant-horizons-support-pumpkin": "0.1.1",
     "packages/dynamic-lights-pumpkin": "0.1.0",
     "packages/upnpumpkin": "0.1.0",
     "packages/waypoints": "0.1.0",
     "tools/apis/pumpkin-pie-api": "0.1.1",
+    "tools/apis/pumpkin-plus-plus-api": "0.0.0",
     "tools/build": "0.1.5",
     "tools/codemod": "0.1.3",
     "tools/config": "0.1.1",
@@ -22,6 +24,5 @@
     "tools/static-analysis": "0.1.0",
     "tools/static-hermes-runtime": "0.1.1",
     "tools/update-check": "0.1.2",
-    "tools/wasi-capabilities": "0.1.0",
-    "tools/apis/pumpkin-plus-plus-api": "0.0.0"
+    "tools/wasi-capabilities": "0.1.0"
 }
