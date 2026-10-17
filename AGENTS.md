@@ -58,6 +58,14 @@ inputs, and follow the dependency and cache rules in [Building](docs/building.md
   coverage for their own sake. Optimize effort, not rigor: trace dependencies, assess impact and
   validate the change.
 
+## Testing policy
+
+- Never write unit tests after you write code.
+- Highly prefer E2E tests as the sole testing mechanism. Use them to verify complex features work.
+  At the end of E2E tests, produce a verifiable and repeatable artifact.
+- If you must test a system in isolation, first write down all the ways it could fail, then write
+  the code.
+
 ## Verify before finishing
 
 1. The configured completion hook checks your scoped changes and blocks completion on failure.
