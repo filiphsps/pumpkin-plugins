@@ -111,8 +111,7 @@
         "tools/wasi-capabilities": {
             "component": "wasi-capabilities",
             "component-no-space": true,
-            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}",
-            "release-as": "0.1.0"
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
         }
     },
     "changelog-sections": [
