@@ -88,9 +88,10 @@ helper; it owns cell escaping.
 
 `generateDocuments(documents, root, check?)` provides the same validation and write behavior as the
 CLI and returns `updated`, `unchanged` or `stale`. `discoverComponents(root, group)` finds sorted
-`packages`, `tools` or `actions` folders with metadata, excluding underscore-prefixed scratch
-folders. Each result supplies `slug`, `directory` and `metadataFile`; callers decide whether source
-files or READMEs are also required. `walkMarkdown(directory, { exclude? })` finds sorted Markdown
+folders under `packages`, `tools`, `actions`, `extensions` or `native` that have group-specific
+metadata, excluding underscore-prefixed scratch folders. Each result supplies `slug`, `directory`
+and `metadataFile`; callers decide whether source files or READMEs are also required.
+`walkMarkdown(directory, { exclude? })` finds sorted Markdown
 files recursively, excluding `node_modules`, `.git` and explicit absolute paths.
 
 Import Node helpers through the `/node` entry point, never from guest plugin code. Keep package
