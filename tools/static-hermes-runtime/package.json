@@ -1,6 +1,6 @@
 {
     "name": "@pumpkin-plugins/static-hermes-runtime",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Static Hermes Runtime shim for Pumpkin plugin components",
     "keywords": [
         "minecraft",
