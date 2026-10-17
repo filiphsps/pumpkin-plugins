@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { WASI_VERSION } from './capabilities.ts';
+import { WASI_VERSION } from '@pumpkin-plugins/wasi-capabilities';
 import { BuildError } from './errors.ts';
 
 /**

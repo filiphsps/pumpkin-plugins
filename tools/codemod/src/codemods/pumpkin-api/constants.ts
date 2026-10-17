@@ -32,7 +32,7 @@ export const SOURCE_EXTENSIONS = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs',
 
 /** Review notes attached to package manifest changes. */
 export const MIGRATION_NOTES = [
-    'Review pumpkinPlugin.wasi and add the capabilities used by this plugin.',
+    'Review inferred pumpkinPlugin.wasi capabilities and any static-analysis notes before building.',
     `Verify that tsconfig.json includes ${GENERATED_TYPES_GLOB} and does not exclude it through exclude or compilerOptions.outDir.`,
     "Update the lockfile by running the project's package manager install command.",
     'Review the migration guide for runtime behavior and license changes.',

@@ -29,7 +29,7 @@ export async function runCodemod(
     for (const absolutePath of files) {
         const relativePath = toPosixPath(path.relative(cwd, absolutePath));
         const before = await fs.readFile(absolutePath, 'utf8');
-        const result = codemod.transform({ absolutePath, projectRoot: cwd, relativePath, source: before });
+        const result = await codemod.transform({ absolutePath, projectRoot: cwd, relativePath, source: before });
         messages.push(...(result.messages ?? []).map((text) => ({ relativePath, text })));
         if (result.source === before) continue;
         changedFiles.push({ absolutePath, before, after: result.source, relativePath });

@@ -11,13 +11,19 @@ Public npm tools are discovered from package manifests under `tools/` that decla
 `publishConfig.access: "public"` and are not private. Their package manifests and packed project
 templates declare the dependencies that determine release order.
 
-For initial setup, publish metadata-only placeholders at `0.0.0`. Release Please produces and the
-GitHub Actions release workflow publishes the first functional release for each package.
+For initial setup, publish metadata-only placeholders at `0.0.0`. Immediately after confirming each
+placeholder on npm, configure that package's trusted publisher as described in [Trusted publishing
+for npm tools](npm-trusted-publishing.md). The placeholder does not validate OIDC: the first
+functional release must publish successfully through OIDC within two days of creating the trust
+relationship. Schedule the placeholder and trust setup when that functional release can be completed
+within the window. Release Please produces and the GitHub Actions release workflow publishes the
+first functional release for each package.
 
 ## Seed package names
 
 npm requires a package to exist before a trusted publisher can be configured. Publish one
-`0.0.0` placeholder for each public tool before setting up trusted publishing.
+`0.0.0` placeholder for each public tool, confirm it on npm, and configure trusted publishing
+immediately afterward.
 Each placeholder contains only `package.json` and a README that says the package is non-functional.
 It must not contain runtime code, commands, or package dependencies.
 
@@ -69,9 +75,10 @@ tools whose tags point to that exact SHA, then checks out the same source commit
 push releases remain pinned to the commit built by their own workflow run. Replace the tag with the
 target tool's release tag when recovering another package.
 
-Configure trust for a package only after its placeholder exists and its real Release Please release
-is ready. The first successful OIDC publish must complete within two days of creating the
-relationship. Publishing the existing `0.0.0` placeholder again does not validate OIDC.
+The first successful OIDC publish must complete within two days of creating the relationship.
+Publishing the existing `0.0.0` placeholder again does not validate OIDC. Coordinate placeholder
+publication and trust setup with the functional Release Please release so that it can publish within
+the window.
 
 `pnpm npm:bootstrap` is available as a manual exact-tag fallback for a maintainer who must publish
 a `0.1.0` artifact directly. It validates the tagged source and package but does not configure npm

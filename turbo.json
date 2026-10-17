@@ -79,7 +79,11 @@
             "cache": true
         },
         "@pumpkin-plugins/build#build": {
-            "dependsOn": ["transit", "@pumpkin-plugins/static-hermes-runtime#build"],
+            "dependsOn": [
+                "transit",
+                "@pumpkin-plugins/static-hermes-runtime#build",
+                "@pumpkin-plugins/wasi-capabilities#build"
+            ],
             "outputs": ["dist/**"]
         },
         "@pumpkin-plugins/static-hermes-runtime#build": {
@@ -94,18 +98,34 @@
             "dependsOn": ["transit"]
         },
         "@pumpkin-plugins/build#test": {
-            "dependsOn": ["transit", "@pumpkin-plugins/static-hermes-runtime#build"]
+            "dependsOn": [
+                "transit",
+                "@pumpkin-plugins/static-hermes-runtime#build",
+                "@pumpkin-plugins/wasi-capabilities#build"
+            ]
         },
         "@pumpkin-plugins/static-hermes-runtime#test": {
-            "dependsOn": ["transit"],
+            "dependsOn": ["transit", "@pumpkin-plugins/wasi-capabilities#build"],
             "outputs": ["dist/**"]
+        },
+        "@pumpkin-plugins/static-hermes-runtime#readme": {
+            "dependsOn": ["@pumpkin-plugins/wasi-capabilities#build"],
+            "cache": false
+        },
+        "@pumpkin-plugins/static-hermes-runtime#readme:check": {
+            "dependsOn": ["@pumpkin-plugins/wasi-capabilities#build"],
+            "cache": false
         },
         "test:coverage": {
             "dependsOn": ["transit"],
             "outputs": ["coverage/**"]
         },
         "@pumpkin-plugins/build#test:coverage": {
-            "dependsOn": ["transit", "@pumpkin-plugins/static-hermes-runtime#build"],
+            "dependsOn": [
+                "transit",
+                "@pumpkin-plugins/static-hermes-runtime#build",
+                "@pumpkin-plugins/wasi-capabilities#build"
+            ],
             "outputs": ["coverage/**"]
         },
         "test:integration": {

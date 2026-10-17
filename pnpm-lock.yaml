@@ -179,6 +179,9 @@ catalogs:
     '@pumpkin-plugins/pumpkin-pie-api':
       specifier: workspace:*
       version: workspace:*
+    '@pumpkin-plugins/wasi-capabilities':
+      specifier: workspace:*
+      version: workspace:*
     '@types/node':
       specifier: 24.19.1
       version: 24.19.1
@@ -700,6 +703,9 @@ importers:
       '@pumpkin-plugins/static-hermes-runtime':
         specifier: workspace:*
         version: link:../static-hermes-runtime
+      '@pumpkin-plugins/wasi-capabilities':
+        specifier: 'catalog:'
+        version: link:../wasi-capabilities
       commander:
         specifier: 'catalog:'
         version: 15.0.0
@@ -731,6 +737,12 @@ importers:
       '@commander-js/extra-typings':
         specifier: 'catalog:'
         version: 15.0.0(commander@15.0.0)
+      '@pumpkin-plugins/static-analysis':
+        specifier: workspace:*
+        version: link:../static-analysis
+      '@pumpkin-plugins/wasi-capabilities':
+        specifier: 'catalog:'
+        version: link:../wasi-capabilities
       commander:
         specifier: 'catalog:'
         version: 15.0.0
@@ -936,6 +948,22 @@ importers:
         specifier: 'catalog:'
         version: 5.0.4(@types/node@24.19.1)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.6.1)(yaml@2.9.1))
 
+  tools/static-analysis:
+    dependencies:
+      esbuild:
+        specifier: 'catalog:'
+        version: 0.28.2
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.4(@types/node@24.19.1)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.6.1)(yaml@2.9.1))
+
   tools/static-hermes-runtime:
     dependencies:
       '@commander-js/extra-typings':
@@ -960,6 +988,9 @@ importers:
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../test-harness
+      '@pumpkin-plugins/wasi-capabilities':
+        specifier: 'catalog:'
+        version: link:../wasi-capabilities
       vitest:
         specifier: 'catalog:'
         version: 5.0.4(@types/node@24.19.1)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.6.1)(yaml@2.9.1))
@@ -1028,6 +1059,18 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.4(@types/node@24.19.1)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.6.1)(yaml@2.9.1))
+
+  tools/wasi-capabilities:
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 5.0.4(vitest@5.0.4)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.4(@types/node@26.6.5)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.6.1)(yaml@2.9.1))
 
 packages:
 

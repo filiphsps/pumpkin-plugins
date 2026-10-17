@@ -189,6 +189,7 @@ describe('bundled release commits', () => {
 
         assert.ok(inputs.catalogs.has('default:typescript'));
         assert.ok(!inputs.catalogs.has('default:@types/vscode'));
+        assert.ok(inputs.paths.has('tools/wasi-capabilities/src/index.ts'));
         assert.deepEqual(
             releaseCommits(history, inputs, 'boundary', 'apple-skin-pumpkin', catalogChangesByCommit).map(
                 (entry) => entry.sha,

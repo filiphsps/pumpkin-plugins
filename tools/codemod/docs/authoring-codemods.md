@@ -70,14 +70,14 @@ can return notes through `TransformResult.messages`; the CLI prints them beside 
 From the repository root, run:
 
 ```sh
-pnpm --filter @pumpkin-plugins/codemod test
-pnpm --filter @pumpkin-plugins/codemod typecheck
-pnpm --filter @pumpkin-plugins/codemod build
+pnpm turbo run test --filter=@pumpkin-plugins/codemod
+pnpm turbo run typecheck --filter=@pumpkin-plugins/codemod
+pnpm turbo run build --filter=@pumpkin-plugins/codemod
 ```
 
 After changing the codemod registry or `engines.node`, regenerate the README and user guide with
-`pnpm --filter @pumpkin-plugins/codemod readme`. Their codemod catalog and Node.js requirement are
-generated from the registry and `package.json`.
+`pnpm turbo run readme --filter=@pumpkin-plugins/codemod`. Their codemod catalog and Node.js
+requirement are generated from the registry and `package.json`.
 
 The package exposes `runCodemod`, the `CodemodDefinition` types and the bundled `codemods` registry
 from its root entry point. The CLI accepts a codemod ID, paths, `--write` and `--print`. Keep the

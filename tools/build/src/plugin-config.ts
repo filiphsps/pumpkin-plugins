@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { StaticHermesGcVariant, StaticHermesRuntimeVariant } from '@pumpkin-plugins/static-hermes-runtime';
-import { CAPABILITIES, type Capability, isCapability } from './capabilities.ts';
+import { CAPABILITIES, type Capability, isCapability } from '@pumpkin-plugins/wasi-capabilities';
 import { BuildError } from './errors.ts';
 
 /** JavaScript runtime used to build a plugin component. */
