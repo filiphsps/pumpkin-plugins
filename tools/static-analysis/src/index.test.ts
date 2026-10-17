@@ -212,7 +212,8 @@ test('does not parse assets as JavaScript and keeps resolver suffixes', async ()
 
 test('honors package boundaries, main fields, node platform and extra search paths', async () => {
     const root = await project({
-        'main.ts': "import 'node:fs'; import 'pkg'; import type { Shape } from 'pkg'; import 'extra';",
+        'main.ts':
+            "import 'node:fs'; import 'pkg'; import type { Shape } from 'pkg'; import 'extra'; import type { ExtraShape } from 'extra-types';",
         'node_modules/pkg/package.json':
             '{"main":"server.js","module":"module.js","browser":"browser.js","types":"types.d.ts"}',
         'node_modules/pkg/server.js': 'module.exports = {};',
@@ -221,6 +222,12 @@ test('honors package boundaries, main fields, node platform and extra search pat
         'node_modules/pkg/types.d.ts': 'export interface Shape {}',
         'vendor/extra/package.json': '{"main":"index.js"}',
         'vendor/extra/index.js': 'export {};',
+        'vendor/extra-types/package.json': '{"exports":{"types":"./types/index.d.ts","default":"./index.js"}}',
+        'vendor/extra-types/index.d.ts': 'export interface ExtraShape { unexpected: true; }',
+        'vendor/extra-types/index.js': 'export {};',
+        'vendor/extra-types/types/index.d.ts': "export interface ExtraShape { nested: import('nested-types').Nested; }",
+        'vendor/nested-types/package.json': '{"types":"index.d.ts"}',
+        'vendor/nested-types/index.d.ts': 'export interface Nested {}',
     });
     const graph = await analyzeModuleGraph({
         projectRoot: root,
@@ -233,6 +240,8 @@ test('honors package boundaries, main fields, node platform and extra search pat
         { status: 'resolved', path: join(root, 'node_modules/pkg/server.js') },
         { status: 'resolved', path: join(root, 'node_modules/pkg/types.d.ts') },
         { status: 'resolved', path: join(root, 'vendor/extra/index.js') },
+        { status: 'resolved', path: join(root, 'vendor/extra-types/types/index.d.ts') },
+        { status: 'resolved', path: join(root, 'vendor/nested-types/index.d.ts') },
     ]);
     const external = await analyzeModuleGraph({
         projectRoot: root,
@@ -273,6 +282,28 @@ test('resolves type-only aliases and inherited tsconfig paths with discovered an
     });
     expect(raw.diagnostics).toEqual([]);
     expect(raw.edges[0].resolution).toEqual({ status: 'resolved', path: join(root, 'types/alternate.d.ts') });
+});
+
+test('uses the project tsconfig for declarations imported from dependencies', async () => {
+    const root = await project({
+        'tsconfig.json': JSON.stringify({ compilerOptions: { strict: true } }),
+        'main.ts': "import type { Shape } from 'dependency';",
+        'node_modules/dependency/package.json': JSON.stringify({ types: './index.d.ts' }),
+        'node_modules/dependency/index.d.ts':
+            "import type { Nested } from './nested'; export interface Shape { nested: Nested; }",
+        'node_modules/dependency/nested.d.ts': 'export interface Nested {}',
+        'node_modules/dependency/tsconfig.json': JSON.stringify({ extends: './missing-base.json' }),
+    });
+    const graph = await analyzeModuleGraph({ projectRoot: root, entryPoints: ['main.ts'] });
+    expect(graph.diagnostics).toEqual([]);
+    expect(graph.files).toContainEqual({
+        path: join(root, 'node_modules/dependency/index.d.ts'),
+        reachability: 'type-only',
+    });
+    expect(graph.files).toContainEqual({
+        path: join(root, 'node_modules/dependency/nested.d.ts'),
+        reachability: 'type-only',
+    });
 });
 
 test('keeps disabled browser modules terminal instead of reading their source', async () => {
