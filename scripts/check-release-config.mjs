@@ -2,7 +2,8 @@
 // See the release registration guides in docs/ci-and-releases.md.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { discoverComponents } from '@pumpkin-plugins/docs/node';
+import { discoverComponents, readNativeManifest } from '@pumpkin-plugins/docs/node';
+import { hasIndependentNativeTagSettings } from './utils/native-release-config.mjs';
 import { publicToolReleaseTitleOptions } from './utils/release-pr-title.mjs';
 import { discoverPublicToolPackages } from './utils/tool-packages.mjs';
 
@@ -38,6 +39,15 @@ for (const [dir, reason] of pausedEntries) {
 const plugins = discoveredPlugins.filter((dir) => !pausedPlugins.has(dir));
 const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
 const extensions = discoverComponents(root, 'extensions').map(({ slug }) => `extensions/${slug}`);
+const native = discoverComponents(root, 'native').map(({ slug, metadataFile }) => ({
+    path: `native/${slug}`,
+    ...readNativeManifest(metadataFile),
+}));
+for (const { path: dir } of native) {
+    for (const file of ['README.md', 'CHANGELOG.md']) {
+        if (!fs.existsSync(path.join(root, dir, file))) problems.push(`${dir}/${file} is missing`);
+    }
+}
 const publicTools = discoverPublicToolPackages(root);
 const tools = publicTools.map(({ path: packagePath }) => packagePath);
 for (const dir of actions) {
@@ -51,6 +61,7 @@ for (const dir of extensions) {
     }
 }
 const components = new Map([
+    ...native.map(({ path: dir, version }) => [dir, { type: 'native', version }]),
     ...plugins.map((dir) => [dir, { type: 'plugin', version: read(`${dir}/package.json`).version }]),
     ...publicTools.map(({ path: dir, name, packageJson }) => [
         dir,
@@ -109,6 +120,8 @@ for (const [dir, { type, version, packageName }] of components) {
             `${dir} needs "component": "${name}" in release-please-config.json (it becomes the tag prefix, ${name}-v<version>)`,
         );
     }
+    if (type === 'native' && entry?.['release-type'] !== 'rust')
+        problems.push(`${dir} needs "release-type": "rust" in release-please-config.json`);
     if (type === 'action' && entry?.['release-type'] !== 'simple') {
         problems.push(`${dir} needs "release-type": "simple" in release-please-config.json`);
     }
@@ -130,13 +143,16 @@ for (const [dir, { type, version, packageName }] of components) {
     // Plugins and actions start at 0.0.0 and use 0.0.1 as their first release. Public tools retain
     // their pre-release package version and use a 0.0.0 manifest baseline until their first 0.1.0 tag.
     const releaseAs = entry?.['release-as'];
+    const firstRelease = type === 'native' && version !== FIRST_VERSION_BASE ? version : FIRST_RELEASE;
+    if (type === 'native' && !hasIndependentNativeTagSettings(config, entry))
+        problems.push(`${dir} requires an independent ${name}-v<version> tag stream`);
     if (type === 'tool' && entry && manifest[dir] === FIRST_VERSION_BASE && releaseAs !== FIRST_TOOL_RELEASE) {
         problems.push(
             `${dir} has not been released yet, so it needs "release-as": "${FIRST_TOOL_RELEASE}" in release-please-config.json to make its first release ${FIRST_TOOL_RELEASE}`,
         );
-    } else if (entry && type !== 'tool' && manifest[dir] === FIRST_VERSION_BASE && releaseAs !== FIRST_RELEASE) {
+    } else if (entry && type !== 'tool' && manifest[dir] === FIRST_VERSION_BASE && releaseAs !== firstRelease) {
         problems.push(
-            `${dir} has not been released yet, so it needs "release-as": "${FIRST_RELEASE}" in release-please-config.json to make its first release ${FIRST_RELEASE}`,
+            `${dir} has not been released yet, so it needs "release-as": "${firstRelease}" in release-please-config.json to make its first release ${firstRelease}`,
         );
     } else if (entry && manifest[dir] !== FIRST_VERSION_BASE && releaseAs !== undefined) {
         problems.push(
@@ -146,13 +162,15 @@ for (const [dir, { type, version, packageName }] of components) {
 
     if (!(dir in manifest)) {
         problems.push(`${dir} is not in .release-please-manifest.json. Add "${dir}": "${version}"`);
+    } else if (type === 'native' && manifest[dir] === FIRST_VERSION_BASE && version === releaseAs) {
+        // Native Cargo versions may already declare the intended first functional release.
     } else if (type === 'tool' && manifest[dir] === FIRST_VERSION_BASE) {
         if (version !== FIRST_TOOL_RELEASE) {
             problems.push(`${dir}/package.json must be "${FIRST_TOOL_RELEASE}" before its first public release`);
         }
     } else if (manifest[dir] !== version) {
         problems.push(
-            `.release-please-manifest.json has "${dir}": "${manifest[dir]}" but ${type === 'action' ? `${dir}/version.txt` : `${dir}/package.json`} is "${version}". They must match: release-please updates both on every release`,
+            `.release-please-manifest.json has "${dir}": "${manifest[dir]}" but ${type === 'action' ? `${dir}/version.txt` : type === 'native' ? `${dir}/Cargo.toml` : `${dir}/package.json`} is "${version}". They must match: release-please updates both on every release`,
         );
     }
 }
@@ -171,5 +189,5 @@ if (problems.length) {
 }
 const pausedSummary = pausedPlugins.size ? `; ${pausedPlugins.size} paused: ${[...pausedPlugins].join(', ')}` : '';
 console.log(
-    `Release config covers ${plugins.length} plugin${plugins.length === 1 ? '' : 's'}, ${actions.length} action${actions.length === 1 ? '' : 's'}, ${tools.length} public tool${tools.length === 1 ? '' : 's'}, and ${extensions.length} extension${extensions.length === 1 ? '' : 's'}: ${[...components.keys()].join(', ')}${pausedSummary}`,
+    `Release config covers ${native.length} native component(s), ${plugins.length} plugin${plugins.length === 1 ? '' : 's'}, ${actions.length} action${actions.length === 1 ? '' : 's'}, ${tools.length} public tool${tools.length === 1 ? '' : 's'}, and ${extensions.length} extension${extensions.length === 1 ? '' : 's'}: ${[...components.keys()].join(', ')}${pausedSummary}`,
 );

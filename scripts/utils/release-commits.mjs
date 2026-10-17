@@ -262,6 +262,16 @@ export function pluginReleaseInputs(packages, releasePath, root = DEFAULT_WORKSP
 }
 
 function packageReleaseInputs(packages, releasePath, root) {
+    if (releasePath.startsWith('native/')) {
+        return {
+            paths: new Set([releasePath]),
+            sharedFiles: new Set([
+                'scripts/native-release.mjs',
+                'scripts/utils/native-targets.mjs',
+                '.github/workflows/native.yml',
+            ]),
+        };
+    }
     if (releasePath.startsWith('packages/')) {
         const plugin = [...packages.values()].find((pkg) => pkg.path === releasePath);
         if (!plugin) throw new Error(`Unknown release package: ${releasePath}`);
@@ -307,7 +317,7 @@ function packageReleaseInputs(packages, releasePath, root) {
 
 function shippedFile(file, inputs, commit, catalogChangesByCommit) {
     if (
-        /\.md$|(?:^|\/)(?:test|testing|__tests__)\/|^(?:packages|tools|extensions)\/[^/]+\/(?:build|dist|node_modules)\/|\.(?:spec|test|itest)\.[cm]?[jt]s$/.test(
+        /\.md$|(?:^|\/)(?:test|tests|testing|__tests__)\/|^(?:packages|tools|extensions|native)\/[^/]+\/(?:build|dist|target|node_modules)\/|\.(?:spec|test|itest)\.[cm]?[jt]s$/.test(
             file,
         )
     )
@@ -394,7 +404,7 @@ async function firstPackageCommitSha(github, branch, path) {
         owner: api.repository.owner,
         repo: api.repository.repo,
         sha: branch,
-        path: `${path}/package.json`,
+        path: `${path}/${path.startsWith('native/') ? 'Cargo.toml' : 'package.json'}`,
         per_page: 100,
     });
     const firstCommit = commits.at(-1);
@@ -465,7 +475,8 @@ export function bundledChangesPlugin(
             const pluginPaths = Object.keys(strategies).filter((path) => path.startsWith('packages/'));
             const toolPaths = Object.keys(strategies).filter((path) => publicToolPaths.has(path));
             const extensionPaths = Object.keys(strategies).filter((path) => path.startsWith('extensions/'));
-            const packagePaths = [...pluginPaths, ...toolPaths, ...extensionPaths];
+            const nativePaths = Object.keys(strategies).filter((path) => path.startsWith('native/'));
+            const packagePaths = [...pluginPaths, ...toolPaths, ...extensionPaths, ...nativePaths];
             const releasePaths = [...packagePaths, ...actionPaths];
             if (releasePaths.length === 0) return strategies;
             const commits = [];

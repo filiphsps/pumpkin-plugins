@@ -60,6 +60,7 @@
     },
     "dependencies": {
         "commander": "catalog:",
+        "smol-toml": "catalog:",
         "yaml": "catalog:"
     },
     "devDependencies": {

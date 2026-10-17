@@ -11,6 +11,7 @@ import {
     githubPagesUrl,
     githubRepositoryUrl,
     readActionMetadata,
+    readNativeManifest,
     rootPageRewrites,
     walkMarkdown,
 } from '@pumpkin-plugins/docs/node';
@@ -142,7 +143,12 @@ function components(group: ComponentGroup): Component[] {
                       .replace(/\.md$/, '')}`
                 : `/${group}/${slug}/README`;
         const headingSource = customIndex ?? (fs.existsSync(readme) ? readme : docs[0]);
-        const manifest = group !== 'actions' ? JSON.parse(fs.readFileSync(metadataFile, 'utf8')) : undefined;
+        const manifest =
+            group === 'native'
+                ? readNativeManifest(metadataFile)
+                : group !== 'actions'
+                  ? JSON.parse(fs.readFileSync(metadataFile, 'utf8'))
+                  : undefined;
         const actionManifest = group === 'actions' ? readActionMetadata(metadataFile) : undefined;
         const fallbackTitle = manifest?.name ?? slug;
         const title = headingSource ? titleOf(headingSource, fallbackTitle) : fallbackTitle;
@@ -203,8 +209,9 @@ function components(group: ComponentGroup): Component[] {
 const plugins = components('packages');
 const tools = components('tools');
 const actions = components('actions');
+const native = components('native');
 const componentLandingIcons = new Map(
-    [...plugins, ...tools, ...actions].flatMap((item) =>
+    [...plugins, ...tools, ...actions, ...native].flatMap((item) =>
         item.icon ? [[`${item.overview.slice(1)}.md`, item.icon] as const] : [],
     ),
 );
@@ -216,13 +223,23 @@ const componentVersions = new Map<string, { version: string; release?: string }>
 for (const [group, items] of [
     ['packages', plugins],
     ['actions', actions],
+    ['native', native],
 ] as const) {
     for (const item of items) {
         const directory = `${group}/${item.slug}`;
-        const versionFile = path.join(repoRoot, directory, group === 'packages' ? 'package.json' : 'version.txt');
+        const versionFile = path.join(
+            repoRoot,
+            directory,
+            group === 'packages' ? 'package.json' : group === 'native' ? 'Cargo.toml' : 'version.txt',
+        );
         if (!fs.existsSync(versionFile)) continue;
         const source = fs.readFileSync(versionFile, 'utf8');
-        const version: string = group === 'packages' ? JSON.parse(source).version : source.trim();
+        const version: string =
+            group === 'packages'
+                ? JSON.parse(source).version
+                : group === 'native'
+                  ? readNativeManifest(versionFile).version
+                  : source.trim();
         if (!version) continue;
         const component = releaseConfig.packages[directory]?.component;
         const tag = component ? `${component}-v${version}` : undefined;
@@ -343,6 +360,7 @@ function generateLlmsText(): string {
             .filter(([category]) => category !== 'Getting started')
             .map(([category, entries]) => llmsSection(category, entries)),
         llmsSection('Docs', [docsIndex, ...docsEntries]),
+        llmsSection('Native plugins', native.flatMap(componentLlmsEntries)),
         llmsSection('Plugins', plugins.flatMap(componentLlmsEntries)),
         llmsSection('Shared tools', tools.flatMap(componentLlmsEntries)),
         llmsSection('GitHub Actions', actions.flatMap(componentLlmsEntries)),
@@ -352,7 +370,7 @@ function generateLlmsText(): string {
                 url: publishedPageUrl(link),
                 description: 'Generated API and action contract documentation.',
             })),
-            ...[...plugins, ...tools, ...actions]
+            ...[...plugins, ...tools, ...actions, ...native]
                 .filter((item) => item.apiReference)
                 .map((item) => ({
                     text: `${item.title} API reference`,
@@ -586,6 +604,15 @@ const megaMenus: MegaMenu[] = [
             ? { featured: { ...card(featuredPlugin), type: featuredPlugin.menuItemType ?? 'card' } }
             : {}),
     },
+    ...(native.length
+        ? [
+              {
+                  text: 'Native plugins',
+                  description: 'Native libraries for an exact Pumpkin host build.',
+                  sections: groupMenuItems(native.map(card), 'Native plugins'),
+              },
+          ]
+        : []),
     {
         text: 'Tools',
         description: 'Shared packages and utilities for building and maintaining plugins.',
@@ -634,6 +661,9 @@ megaMenus.push({ text: 'Team', description: 'Meet the contributors.', link: '/te
 
 const mobileNav: DefaultTheme.NavItem[] = [
     { text: 'Plugins', items: plugins.map((item) => ({ text: item.title, link: item.overview })) },
+    ...(native.length
+        ? [{ text: 'Native plugins', items: native.map((item) => ({ text: item.title, link: item.overview })) }]
+        : []),
     { text: 'Tools', items: tools.map((item) => ({ text: item.title, link: item.overview })) },
     { text: 'Actions', items: actions.map((item) => ({ text: item.title, link: item.overview })) },
     { text: 'Guides', items: guidePages.map(({ text, link }) => ({ text, link })) },
@@ -646,6 +676,9 @@ const componentSidebars: Record<string, SidebarItem[]> = {};
 for (const item of plugins) componentSidebars[`/packages/${item.slug}/`] = componentSidebar(item, plugins, 'plugins');
 for (const item of tools) componentSidebars[`/tools/${item.slug}/`] = componentSidebar(item, tools, 'tools');
 for (const item of actions) componentSidebars[`/actions/${item.slug}/`] = componentSidebar(item, actions, 'actions');
+
+for (const item of native)
+    componentSidebars[`/native/${item.slug}/`] = componentSidebar(item, native, 'native plugins');
 
 const guideSidebar: SidebarItem[] = [
     { text: 'Guides', collapsed: false, items: guidePages.map(({ text, link }) => ({ text, link })) },

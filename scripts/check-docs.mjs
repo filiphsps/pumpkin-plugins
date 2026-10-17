@@ -41,6 +41,7 @@ const generatedPackageOutputs = new Set(
 );
 const actions = discoverComponents(root, 'actions').map(({ slug }) => `actions/${slug}`);
 const extensions = discoverComponents(root, 'extensions').map(({ slug }) => `extensions/${slug}`);
+const native = packageDirs('native');
 const handwrittenDocs = discoverHandwrittenDocs(root);
 const docPagesBySiteRoute = new Map(
     handwrittenDocs.map((page) => [page.siteRoute.replace(/^\//, '').replace(/\/$/, ''), page.repositoryPath]),
@@ -58,6 +59,8 @@ const docs = [
     ...actions.flatMap((p) => markdownFiles(`${p}/docs`)),
     ...extensions.map((p) => `${p}/README.md`).filter((p) => exists(p)),
     ...extensions.flatMap((p) => markdownFiles(`${p}/docs`)),
+    ...native.map((p) => `${p}/README.md`).filter((p) => exists(p)),
+    ...native.flatMap((p) => markdownFiles(`${p}/docs`)),
     ...benchmarkDocs,
     ...markdownFiles('.github'),
     ...(exists('AGENTS.md') ? ['AGENTS.md'] : []),
@@ -82,10 +85,10 @@ for (const dir of packages) {
         }
     }
 }
-for (const dir of [...actions, ...extensions]) {
+for (const dir of [...actions, ...extensions, ...native]) {
     if (!exists(dir, 'README.md')) {
         problems.push(
-            `${dir}/README.md is missing. Every action and extension needs an overview and usage instructions`,
+            `${dir}/README.md is missing. Every action, extension and native component needs an overview and usage instructions`,
         );
     }
 }
@@ -153,7 +156,8 @@ const code = (text) => [...text.matchAll(/```[\s\S]*?```|`[^`\n]*`/g)].map((m) =
 const PLACEHOLDERS = ['my-plugin', 'my-action'];
 
 // 3. Repo paths in code spans exist.
-const PATH_IN_CODE = /`((?:packages|tools|actions|extensions|benchmarks|scripts|docs|\.github|\.agents)\/[\w./@-]+)`/g;
+const PATH_IN_CODE =
+    /`((?:packages|tools|actions|extensions|native|benchmarks|scripts|docs|\.github|\.agents)\/[\w./@-]+)`/g;
 for (const file of docs) {
     for (const match of read(file).matchAll(PATH_IN_CODE)) {
         const target = (match[1] ?? '').replace(/[.,;:]+$/, '');

@@ -20,6 +20,7 @@ on:
             - 'packages/*/README.md'
             - 'actions/*/README.md'
             - 'extensions/*/README.md'
+            - 'native/*/README.md'
     push:
         branches:
             - master
@@ -42,6 +43,7 @@ on:
             - 'packages/*/README.md'
             - 'actions/*/README.md'
             - 'extensions/*/README.md'
+            - 'native/*/README.md'
             # Docs-only default-branch pushes still need release processing to refresh open release
             # PRs and catch up any releases from an earlier run that did not finish.
             - '**/*.md'
@@ -79,6 +81,7 @@ jobs:
         runs-on: ubuntu-26.04
         outputs:
             code: ${{ steps.classify.outputs.code }}
+            native: ${{ steps.classify.outputs.native }}
             config_only: ${{ steps.label-config-scope.outputs.config_only }}
             skip_expensive_checks: ${{ steps.release-commits.outputs.skip_expensive_checks }}
             actions: ${{ steps.classify.outputs.actions }}
@@ -847,9 +850,37 @@ jobs:
                   echo "Required generator verification did not pass: $GENERATOR_RESULT" >&2
                   exit 1
 
+    native:
+        name: 🦀 Native build and load tests
+        needs: [changes]
+        if: needs.changes.outputs.native == 'true' && needs.changes.outputs.skip_expensive_checks != 'true'
+        uses: ./.github/workflows/native.yml
+        permissions:
+            contents: read
+
+    native-gate:
+        name: 🦀 Native gate
+        needs: [changes, native]
+        if: always() && needs.changes.result == 'success'
+        runs-on: ubuntu-26.04
+        timeout-minutes: 5
+        steps:
+            - name: Require selected native checks
+              shell: bash
+              env:
+                  SELECTED: ${{ needs.changes.outputs.native }}
+                  SKIP: ${{ needs.changes.outputs.skip_expensive_checks }}
+                  RESULT: ${{ needs.native.result }}
+              run: |
+                  set -euo pipefail
+                  if [[ "$RESULT" == success ]]; then exit 0; fi
+                  if [[ ( "$SELECTED" != true || "$SKIP" == true ) && "$RESULT" == skipped ]]; then exit 0; fi
+                  echo "Required native build/load tests did not pass: $RESULT" >&2
+                  exit 1
+
     release:
         name: 🚢 Release
-        needs: [changes, lint, typecheck, build, external-consumer, test, docs, integration-gate, action-gate, extension-gate, generator-gate]
+        needs: [changes, lint, typecheck, build, external-consumer, test, docs, integration-gate, action-gate, extension-gate, generator-gate, native-gate]
         if: >-
             ${{
               always() &&
@@ -867,6 +898,7 @@ jobs:
                   needs['extension-gate'].result == 'success' &&
                   needs['integration-gate'].result == 'success' &&
                   needs['generator-gate'].result == 'success' &&
+                  needs['native-gate'].result == 'success' &&
                   (
                     (
                       needs.changes.outputs.code == 'true' &&

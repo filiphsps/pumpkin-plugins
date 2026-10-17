@@ -65,6 +65,7 @@ describe('public tool release fanout', () => {
                 actionPaths: ['actions/sign-pumpkin-plugin'],
                 toolPaths: ['tools/build'],
                 extensionPaths: ['extensions/minecraft-terms'],
+                nativePaths: [],
             },
         );
     });

@@ -5,6 +5,7 @@
 // release asset attached. See "Registering a component for releases" in docs/ci-and-releases.md.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { readNativeManifest } from '@pumpkin-plugins/docs/node';
 
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
 const file = path.join(root, 'release-please-config.json');
@@ -17,11 +18,13 @@ for (const [dir, entry] of Object.entries(config.packages ?? {})) {
     if (entry['release-as'] === undefined) continue;
     const versionFile = dir.startsWith('actions/')
         ? path.join(root, dir, 'version.txt')
-        : path.join(root, dir, 'package.json');
+        : path.join(root, dir, dir.startsWith('native/') ? 'Cargo.toml' : 'package.json');
     if (!fs.existsSync(versionFile)) continue;
     const fileVersion = dir.startsWith('actions/')
         ? fs.readFileSync(versionFile, 'utf8').trim()
-        : JSON.parse(fs.readFileSync(versionFile, 'utf8')).version;
+        : dir.startsWith('native/')
+          ? readNativeManifest(versionFile).version
+          : JSON.parse(fs.readFileSync(versionFile, 'utf8')).version;
     const version = manifest[dir] ?? fileVersion;
     // Keep first-release pins until Release Please advances the authoritative manifest version.
     if (version === '0.0.0') continue;

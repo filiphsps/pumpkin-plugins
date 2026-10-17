@@ -11,6 +11,7 @@ allowBuilds:
   tsc-rs: true
 minimumReleaseAge: 0
 catalog:
+  smol-toml: 1.9.0
   # API package version 0.1.0 carries Pumpkin WIT ABI 0.1.0 for release 0.2.0+26.3-26.51.
   "@pumpkin-plugins/pumpkin-api": workspace:*
   "@pumpkin-plugins/pumpkin-pie-api": workspace:*

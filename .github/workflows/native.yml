@@ -1,0 +1,159 @@
+name: Native components
+
+on:
+    workflow_call:
+        inputs:
+            releases:
+                description: Exact native release records, one per tag
+                type: string
+                default: '[]'
+            attach:
+                description: Build from exact release tags for subsequent GitHub Release attachment
+                type: boolean
+                default: false
+        outputs:
+            platforms:
+                description: Supported native target and runner matrix
+                value: ${{ jobs.plan.outputs.platforms }}
+
+permissions:
+    contents: read
+
+jobs:
+    plan:
+        name: 🦀 Native matrix
+        runs-on: ubuntu-26.04
+        timeout-minutes: 10
+        outputs:
+            platforms: ${{ steps.matrix.outputs.platforms }}
+            releases: ${{ steps.matrix.outputs.releases }}
+        steps:
+            - uses: actions/checkout@v7.0.1
+            - uses: ./.github/common/bootstrap
+            - id: matrix
+              shell: bash
+              env:
+                  RELEASES: ${{ inputs.releases }}
+                  ATTACH: ${{ inputs.attach }}
+              run: |
+                  set -euo pipefail
+                  echo "platforms=$(node scripts/native-release.mjs matrix)" >> "$GITHUB_OUTPUT"
+                  if [[ "$ATTACH" == true ]]; then
+                      echo "releases=$RELEASES" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "releases=$(node scripts/native-release.mjs ci-releases --sha "$GITHUB_SHA")" >> "$GITHUB_OUTPUT"
+                  fi
+
+    build:
+        name: 🦀 ${{ matrix.release.tagName }} / ${{ matrix.platform.target }}
+        needs: [plan]
+        if: needs.plan.outputs.releases != '[]'
+        runs-on: ${{ matrix.platform.runner }}
+        timeout-minutes: 120
+        permissions:
+            contents: read
+        strategy:
+            fail-fast: false
+            matrix:
+                release: ${{ fromJSON(needs.plan.outputs.releases) }}
+                platform: ${{ fromJSON(needs.plan.outputs.platforms).include }}
+        env:
+            GH_TOKEN: ${{ github.token }}
+            GH_REPO: ${{ github.repository }}
+            TAG: ${{ matrix.release.tagName }}
+            RELEASE_SHA: ${{ matrix.release.sha }}
+            TARGET: ${{ matrix.platform.target }}
+            ATTACH: ${{ inputs.attach }}
+            # Bound compiler memory/stack use for generated pumpkin-data.
+            RUST_MIN_STACK: '67108864'
+            CARGO_BUILD_JOBS: '2'
+        steps:
+            - name: Checkout packaging tooling
+              uses: actions/checkout@v7.0.1
+            - uses: ./.github/common/bootstrap
+            - name: Checkout exact native source
+              id: source
+              uses: actions/checkout@v7.0.1
+              with:
+                  ref: ${{ inputs.attach && format('refs/tags/{0}', matrix.release.tagName) || matrix.release.sha }}
+                  path: release-source
+                  fetch-depth: 0
+                  persist-credentials: false
+            - name: Resolve exact source pnpm version
+              id: source-toolchain
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  pnpm_version="$(jq -er '.devEngines.packageManager | select(.name == "pnpm") | .version' release-source/package.json)"
+                  if [[ ! "$pnpm_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                      echo "::error::Tagged source must pin an exact pnpm version, found '$pnpm_version'."
+                      exit 1
+                  fi
+                  echo "pnpm_version=$pnpm_version" >> "$GITHUB_OUTPUT"
+            - name: Setup exact source pnpm
+              uses: pnpm/action-setup@v6.1.0
+              with:
+                  version: ${{ steps.source-toolchain.outputs.pnpm_version }}
+            - name: Setup Node for exact native source
+              uses: actions/setup-node@v7.1.0
+              with:
+                  node-version-file: release-source/.node-version
+                  cache: pnpm
+                  cache-dependency-path: release-source/pnpm-lock.yaml
+            - name: Install exact native source dependencies
+              run: pnpm --dir release-source install --frozen-lockfile
+            - name: Validate source and resolve pinned Rust
+              id: resolve
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  args=()
+                  if [[ "$ATTACH" != true ]]; then args+=(--check); fi
+                  node scripts/native-release.mjs resolve --tag "$TAG" --sha "$RELEASE_SHA" \
+                      --source-root release-source "${args[@]}"
+            - name: Install exact native compiler
+              shell: bash
+              env:
+                  RUST_TOOLCHAIN: ${{ steps.resolve.outputs.rust_toolchain }}
+              run: rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --target "$TARGET"
+            - name: Setup Static Hermes toolchain
+              id: setup-hermes
+              uses: ./.github/common/setup-static-hermes
+              with:
+                  toolchain-config-root: release-source/tools/static-hermes-runtime
+            - name: Setup MSVC 2022 toolset 14.44
+              if: runner.os == 'Windows'
+              uses: ilammy/msvc-dev-cmd@v1.13.0
+              with:
+                  arch: ${{ matrix.platform.target == 'aarch64-pc-windows-msvc' && 'arm64' || 'x64' }}
+                  toolset: '14.44'
+            - name: Prepare Static Hermes
+              id: prepare-hermes
+              working-directory: release-source
+              run: pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
+            - name: Save Static Hermes build cache
+              if: steps.prepare-hermes.outcome == 'success'
+              uses: actions/cache/save@v6.1.0
+              with:
+                  path: ${{ github.workspace }}/.cache/hermes
+                  key: ${{ steps.setup-hermes.outputs.hermes-cache-key }}
+            - name: Build, load-test and package native component
+              id: build
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  args=(--check)
+                  if [[ "$ATTACH" == true ]]; then args=(); fi
+                  node scripts/native-release.mjs build --tag "$TAG" --sha "$RELEASE_SHA" \
+                      --target "$TARGET" --source-root release-source --repository "$GH_REPO" \
+                      --output "$RUNNER_TEMP/native-assets" "${args[@]}"
+            - name: Retain native verification evidence
+              if: always()
+              uses: actions/upload-artifact@v7.0.2
+              with:
+                  name: native-${{ matrix.release.tagName }}-${{ matrix.platform.target }}
+                  path: |
+                      ${{ runner.temp }}/native-assets/*.*
+                      ${{ runner.temp }}/native-assets/evidence/**
+                  if-no-files-found: warn
+                  retention-days: 7

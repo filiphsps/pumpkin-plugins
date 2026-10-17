@@ -6,6 +6,7 @@ import { GENERATED_NOTE } from './blocks.ts';
 import { discoverComponents, localLicenseFile } from './discovery.ts';
 import { type DocumentUpdate, generateDocuments, prepareDocument, type Status, writeDocuments } from './documents.ts';
 import type { PluginInfo } from './info.ts';
+import { readNativeManifest } from './native.ts';
 import { type ActionRow, type PackageRow, ROOT_NOTE, renderPackagesBlock } from './packages.ts';
 import { renderBlocks } from './sections.ts';
 import {
@@ -14,6 +15,7 @@ import {
     type DocumentationTreeFolder,
     discoverHandwrittenDocs,
     githubPagesUrl,
+    githubRepositoryUrl,
 } from './site.ts';
 
 const REFERENCE_NOTE =
@@ -187,11 +189,32 @@ export async function generateRootReadme(root: string, check = false): Promise<S
     const siteUrl = githubPagesUrl(rootPackage.repository);
     if (!siteUrl)
         throw new Error(`${path.join(root, 'package.json')} needs a GitHub repository URL for documentation links`);
+    const native = discoverComponents(root, 'native').map((component) => ({
+        ...component,
+        manifest: readNativeManifest(component.metadataFile),
+    }));
+    const nativeUpdates = native.map(({ directory, manifest, slug }) =>
+        prepareDocument(
+            {
+                file: path.join(directory, 'README.md'),
+                blocks: {
+                    'native-release': `[Download ${manifest.name} ${manifest.version}](${githubRepositoryUrl(rootPackage.repository)?.href}/releases/tag/${slug}-v${manifest.version})`,
+                },
+            },
+            root,
+        ),
+    );
     const block = renderPackagesBlock(
         await rows(root, 'packages'),
         await rows(root, 'tools'),
         actionRows(root),
         await rows(root, 'extensions'),
+        native.map(({ slug, manifest }) => ({
+            dir: `native/${slug}`,
+            name: manifest.name,
+            description: manifest.description,
+            license: manifest.license,
+        })),
     );
     const update = prepareDocument(
         {
@@ -204,7 +227,10 @@ export async function generateRootReadme(root: string, check = false): Promise<S
         },
         root,
     );
-    return writeDocuments([update, ...(await prepareComponentReferenceUpdates(root, siteUrl))], check);
+    return writeDocuments(
+        [update, ...nativeUpdates, ...(await prepareComponentReferenceUpdates(root, siteUrl))],
+        check,
+    );
 }
 
 /** Escape Markdown link labels without changing the stored page title. */
@@ -292,6 +318,7 @@ export type { ActionInput, ActionMetadata, ActionOutput } from './actions.ts';
 export { generateActionReadmes, readActionMetadata, renderActionSections } from './actions.ts';
 export type { ComponentGroup, SourceComponent } from './discovery.ts';
 export { discoverComponents, localLicenseFile, walkMarkdown } from './discovery.ts';
+export { readNativeManifest } from './native.ts';
 export type {
     DocumentationTreeFolder,
     DocumentationTreeNode,

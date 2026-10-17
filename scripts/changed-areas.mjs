@@ -401,6 +401,14 @@ const code = changed.filter(
         !/^actions\/[^/]+\//.test(file) &&
         !/^extensions\/[^/]+\//.test(file),
 );
+const native = code.some(
+    (file) =>
+        file.startsWith('native/') ||
+        ['scripts/native-release.mjs', 'scripts/utils/native-targets.mjs', '.github/workflows/native.yml'].includes(
+            file,
+        ),
+);
+const nativeRuntime = code.some((file) => file.startsWith('native/'));
 const generatorRelevant = code.length > 0 ? generatorInputs() : undefined;
 const generator = Boolean(
     generatorRelevant &&
@@ -432,7 +440,8 @@ const integrationRuntimeChanged = Boolean(
 );
 const integrationAllChanged = Boolean(
     integrationRelevant &&
-        (workspaceLayoutChangedForIntegration ||
+        (nativeRuntime ||
+            workspaceLayoutChangedForIntegration ||
             lockfileWideChanged ||
             code.some(
                 (file) =>
@@ -486,6 +495,6 @@ if (integrationPackages.size) console.log(`Integration packages: ${[...integrati
 if (process.env.GITHUB_OUTPUT) {
     appendFileSync(
         process.env.GITHUB_OUTPUT,
-        `code=${code.length > 0}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\nextensions=${JSON.stringify(extensions)}\nextensions_to_test=${JSON.stringify(extensionsToTest)}\ngenerated_readmes=${generatedReadmes}\ngenerator=${generator}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n${integrationPackages.size ? `integration_packages=${JSON.stringify([...integrationPackages].sort())}\n` : ''}`,
+        `code=${code.length > 0}\nnative=${native}\nactions=${JSON.stringify(actions)}\nactions_to_test=${JSON.stringify(actionsToTest)}\nextensions=${JSON.stringify(extensions)}\nextensions_to_test=${JSON.stringify(extensionsToTest)}\ngenerated_readmes=${generatedReadmes}\ngenerator=${generator}\nintegration_scope=${integrationScope}\nintegration_extra=${integrationExtra}\n${integrationPackages.size ? `integration_packages=${JSON.stringify([...integrationPackages].sort())}\n` : ''}`,
     );
 }

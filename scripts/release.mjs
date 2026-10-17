@@ -59,6 +59,8 @@ const outputs = {
     action_paths_released: '[]',
     tool_paths_released: '[]',
     extension_paths_released: '[]',
+    native_paths_released: '[]',
+    native_releases: '[]',
     release_metadata: '{}',
     release_notes: '{}',
     release_count: '0',
@@ -163,6 +165,13 @@ if (!dryRun && !pullRequestsOnly) {
     outputs.action_paths_released = JSON.stringify(releasePaths.actionPaths);
     outputs.tool_paths_released = JSON.stringify(releasePaths.toolPaths);
     outputs.extension_paths_released = JSON.stringify(releasePaths.extensionPaths);
+    outputs.native_paths_released = JSON.stringify(releasePaths.nativePaths);
+    const nativePaths = new Set(releasePaths.nativePaths);
+    outputs.native_releases = JSON.stringify(
+        releases
+            .filter(({ path }) => nativePaths.has(path))
+            .map(({ path, tagName, sha, version }) => ({ path, tagName, sha, version: version.toString() })),
+    );
     outputs.release_count = String(releases.length);
     const releaseMetadata = {};
     const releaseNotes = {};
@@ -226,7 +235,7 @@ if (dryRun) {
     }
     console.log(`Prepared ${prs.length} release PR(s)`);
     console.log(
-        `Release fan-out: plugin paths=${outputs.paths_released}, action paths=${outputs.action_paths_released}, tool paths=${outputs.tool_paths_released}, extension paths=${outputs.extension_paths_released}, release PR count=${prs.length}`,
+        `Release fan-out: plugin paths=${outputs.paths_released}, action paths=${outputs.action_paths_released}, tool paths=${outputs.tool_paths_released}, extension paths=${outputs.extension_paths_released}, native releases=${outputs.native_releases}, release PR count=${prs.length}`,
     );
 }
 commitFilesCache?.save();

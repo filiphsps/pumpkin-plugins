@@ -213,6 +213,7 @@ it('routes a previously created codemod release for its commit to npm publishing
         actionPaths: [],
         toolPaths: ['tools/codemod'],
         extensionPaths: [],
+        nativePaths: [],
     });
 });
 
@@ -301,6 +302,7 @@ it('limits a manual release replay to npm packages at the requested release comm
         actionPaths: [],
         toolPaths: ['tools/codemod'],
         extensionPaths: [],
+        nativePaths: [],
     });
 });
 

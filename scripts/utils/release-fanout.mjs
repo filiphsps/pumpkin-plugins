@@ -1,4 +1,10 @@
-import { recoverExistingReleases, recoverIncompletePluginReleases } from './release-recovery.mjs';
+import { resolve } from 'node:path';
+import { discoverComponents } from '@pumpkin-plugins/docs/node';
+import {
+    recoverExistingReleases,
+    recoverIncompleteNativeReleases,
+    recoverIncompletePluginReleases,
+} from './release-recovery.mjs';
 import { discoverPublicToolPackages } from './tool-packages.mjs';
 
 /**
@@ -6,14 +12,16 @@ import { discoverPublicToolPackages } from './tool-packages.mjs';
  *
  * @param {Array<{ path: string }>} releases - Components released at the current commit.
  * @param {string} [root] - Workspace root used to find public tool packages.
- * @returns {{ pluginPaths: string[], actionPaths: string[], toolPaths: string[], extensionPaths: string[] }} Release paths grouped by publisher.
+ * @returns {{ pluginPaths: string[], actionPaths: string[], toolPaths: string[], extensionPaths: string[], nativePaths: string[] }} Release paths grouped by publisher.
  * @throws {Error} When a configured release path has no publisher.
  */
-export function partitionReleasePaths(releases, root) {
-    const result = { pluginPaths: [], actionPaths: [], toolPaths: [], extensionPaths: [] };
+export function partitionReleasePaths(releases, root = resolve(import.meta.dirname, '../..')) {
+    const result = { pluginPaths: [], actionPaths: [], toolPaths: [], extensionPaths: [], nativePaths: [] };
+    const nativePaths = new Set(discoverComponents(root, 'native').map(({ slug }) => `native/${slug}`));
     const publicToolPaths = new Set(discoverPublicToolPackages(root).map(({ path: packagePath }) => packagePath));
     for (const release of releases) {
-        if (release.path.startsWith('actions/')) result.actionPaths.push(release.path);
+        if (nativePaths.has(release.path)) result.nativePaths.push(release.path);
+        else if (release.path.startsWith('actions/')) result.actionPaths.push(release.path);
         else if (release.path.startsWith('packages/')) result.pluginPaths.push(release.path);
         else if (publicToolPaths.has(release.path)) result.toolPaths.push(release.path);
         else if (release.path.startsWith('extensions/')) result.extensionPaths.push(release.path);
@@ -70,6 +78,16 @@ export async function collectReleaseFanout({
             log,
         })),
     );
+    candidates.push(
+        ...(await recoverIncompleteNativeReleases({
+            releases: candidates,
+            existingReleases,
+            repositoryConfig,
+            firstParentShas,
+            getReleaseAssets,
+            log,
+        })),
+    );
     const releases = [];
     for (const release of candidates) {
         if (!release.sha) throw new Error(`Release ${release.tagName} has no target commit SHA`);
@@ -98,6 +116,7 @@ export async function collectReleaseFanout({
             actionPaths: [],
             toolPaths: toolReleases.map(({ path }) => path),
             extensionPaths: [],
+            nativePaths: [],
         },
     };
 }

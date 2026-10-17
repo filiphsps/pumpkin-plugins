@@ -155,7 +155,7 @@ export function discoverHandwrittenDocs(root: string): HandwrittenDocPage[] {
             ];
         },
     );
-    const componentDocs = (['packages', 'tools', 'actions', 'extensions'] as const).flatMap((group) => {
+    const componentDocs = (['packages', 'tools', 'actions', 'extensions', 'native'] as const).flatMap((group) => {
         return discoverComponents(root, group).flatMap(({ directory, slug }) => {
             const componentDocsDirectory = path.join(directory, 'docs');
             return walkMarkdown(componentDocsDirectory).flatMap((file) => {

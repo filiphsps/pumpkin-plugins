@@ -1,3 +1,5 @@
+import { nativeAssetNames, nativeTargets } from './native-targets.mjs';
+
 const PLUGIN_PATH_PATTERN = /^packages\/[^/]+$/;
 const RELEASE_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
@@ -198,5 +200,55 @@ export async function recoverImmutableReleaseConflict({
     }
 
     if (pullRequestNumber && labelingEnabled) await restoreLabels(pullRequestNumber);
+    return recovered;
+}
+
+/** Recover incomplete native matrices from their own tags, including mutable partial uploads. */
+export async function recoverIncompleteNativeReleases({
+    releases,
+    existingReleases,
+    repositoryConfig,
+    firstParentShas,
+    getReleaseAssets,
+    log = console.log,
+}) {
+    const knownTags = new Set(releases.map(({ tagName }) => tagName));
+    const recovered = [];
+    for (const release of existingReleases) {
+        if (!release.tagName || !firstParentShas.has(release.sha) || knownTags.has(release.tagName)) continue;
+        const matches = Object.entries(repositoryConfig).flatMap(([path, config]) => {
+            if (!/^native\/[^/]+$/.test(path) || config.skipGithubRelease) return [];
+            const component = path.split('/').at(-1);
+            if (
+                config.component !== component ||
+                config.includeComponentInTag === false ||
+                config.includeVInTag === false ||
+                (config.tagSeparator && config.tagSeparator !== '-')
+            ) {
+                throw new Error(`Native release ${path} requires its independent ${component}-v<version> tag stream`);
+            }
+            const prefix = `${component}-v`;
+            const version = release.tagName.slice(prefix.length);
+            return release.tagName.startsWith(prefix) && RELEASE_VERSION_PATTERN.test(version)
+                ? [{ path, component, version }]
+                : [];
+        });
+        if (matches.length === 0) continue;
+        if (matches.length !== 1) throw new Error(`Ambiguous native release tag ${release.tagName}`);
+        const [{ path, component, version }] = matches;
+        const details = await getReleaseAssets(release.tagName);
+        if (!Array.isArray(details.assets))
+            throw new Error(`Could not inspect GitHub assets for native release ${release.tagName}`);
+        const expected = nativeTargets.flatMap(({ target }) => nativeAssetNames(component, target));
+        if (expected.every((name) => details.assets.includes(name))) continue;
+        if (details.immutable) {
+            log(
+                `Warning: Skipping incomplete immutable native release ${release.tagName}; GitHub prevents repairing its assets.`,
+            );
+            continue;
+        }
+        recovered.push({ ...release, path, version, recovered: true, rebuildFromTag: true });
+        knownTags.add(release.tagName);
+    }
     return recovered;
 }
