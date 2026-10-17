@@ -8,7 +8,7 @@ ownership, and runtime limits.
 
 | Concern | Source |
 | --- | --- |
-| Capability names and interface expansion | [`tools/build/src/capabilities.ts`](../../build/src/capabilities.ts) |
+| Capability names and interface expansion | [`tools/wasi-capabilities/src/index.ts`](../../wasi-capabilities/src/index.ts) |
 | WASI version, WIT files, hashes, source URLs, and generated WIT files | [`tools/build/wasi-wit.lock.json`](../../build/wasi-wit.lock.json) |
 | WIT download, SHA-256 verification, and versioned cache | [`tools/build/src/wasi-wit.ts`](../../build/src/wasi-wit.ts) |
 | Plugin-world imports and WIT file preparation | [`tools/build/src/wit.ts`](../../build/src/wit.ts) |
@@ -28,7 +28,7 @@ ownership, and runtime limits.
    compatible.
 2. Add or update the pinned files and hashes in `tools/build/wasi-wit.lock.json`. Keep alternate
    source URLs there; the WASI HTTP definitions use the `wasi-http` source recorded by the lock.
-3. Add the interface to a bundle in `tools/build/src/capabilities.ts` with its required dependencies.
+3. Add the interface to a bundle in `tools/wasi-capabilities/src/index.ts` with its required dependencies.
    Keep shared imports deduplicated.
 4. Check that selected feature-gated operations enable their required `wit-bindgen` feature. The
    build derives these features from the selected operations.

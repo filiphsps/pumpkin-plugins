@@ -42,7 +42,7 @@
         "docs:preview": "vitepress preview docs",
         "docs:site": "vitepress build docs",
         "docs:types": "concurrently --kill-others-on-fail --success all \"pnpm:docs:types:plugin-kit\" \"pnpm:docs:types:update-check\" \"pnpm:docs:types:pumpkin-api\" \"pnpm:docs:types:codemod\" && pnpm run docs:types:plugins",
-        "docs:types:codemod": "pnpm --filter @pumpkin-plugins/codemod typecheck",
+        "docs:types:codemod": "pnpm turbo run typecheck --filter=@pumpkin-plugins/codemod",
         "docs:types:plugin-kit": "pnpm --filter @pumpkin-plugins/plugin-kit typecheck",
         "docs:types:plugins": "pnpm --filter './packages/*' --parallel run types",
         "docs:types:pumpkin-api": "pnpm --filter @pumpkin-plugins/pumpkin-api typecheck",

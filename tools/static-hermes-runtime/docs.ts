@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { code, generatedBlocks, table } from '@pumpkin-plugins/docs/markdown';
 import type { DocumentSpec } from '@pumpkin-plugins/docs/node';
-import { CAPABILITIES, type Capability, WASI_VERSION, wasiInterfaces } from '../build/src/capabilities.ts';
+import { CAPABILITIES, type Capability, WASI_VERSION, wasiInterfaces } from '@pumpkin-plugins/wasi-capabilities';
 import { PUMPKIN_RELEASE } from '../test-harness/src/pumpkin-version.ts';
 
 interface ToolchainVersions {
@@ -163,7 +163,7 @@ const customGoalHostLimit = [
 const toolchainNote =
     '<!-- Generated from .node-version, package.json, toolchain-versions.json, wasi-sdk.lock.json and Static Hermes CI pins. Run `pnpm readme`. -->';
 const wasiNote =
-    '<!-- Generated from tools/build/src/capabilities.ts and tools/build/wasi-wit.lock.json. Run `pnpm readme`. -->';
+    '<!-- Generated from tools/wasi-capabilities/src/index.ts and tools/build/wasi-wit.lock.json. Run `pnpm readme`. -->';
 
 /** Update the README prose and toolchain table from their maintained source files. */
 function updateReadme(source: string): string {

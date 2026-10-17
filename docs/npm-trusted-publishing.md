@@ -13,11 +13,12 @@ secrets.
 
 ## Prerequisites
 
-Configure a trusted publisher only after its npm package exists. The metadata-only `0.0.0`
-placeholder satisfies this requirement but contains no working package code. Because the new
-relationship must be validated by a successful publish within two days, wait until the real
-Release Please release is ready to merge before creating it. npm also requires package write access,
-account-level two-factor authentication, and npm CLI `11.15.0` or newer for the `npm trust` command.
+Publish and confirm the metadata-only `0.0.0` placeholder first, then configure its trusted
+publisher immediately. The placeholder contains no working package code and does not validate OIDC;
+the first functional publish must succeed within two days of creating the relationship. Schedule the
+placeholder and trust setup when the real Release Please release can be completed within that
+window. npm also requires package write access, account-level two-factor authentication, and npm CLI
+`11.15.0` or newer for the `npm trust` command.
 Check the CLI with `npm --version`; update it with
 `npm install --global npm@^11.15.0` if needed.
 

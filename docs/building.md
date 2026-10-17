@@ -131,9 +131,10 @@ and how to override them.
 | `test:integration` | Depends on `build`, never cached (it starts a real server) |
 | `readme`, `readme:check` | Never cached, they write or inspect files |
 
-The `@pumpkin-plugins/build` test tasks also build `@pumpkin-plugins/static-hermes-runtime` first because
-the build tool imports its compiled package entry. Both public tools declare their `dist/**` output so
-Turbo restores the compiled files when those builds come from cache.
+The `@pumpkin-plugins/build` build and test tasks also build `@pumpkin-plugins/static-hermes-runtime`
+and `@pumpkin-plugins/wasi-capabilities` first because the build tool imports their compiled package
+entries. Both public tools declare their `dist/**` output so Turbo restores the compiled files when
+those builds come from cache.
 
 Run `pnpm clean` to remove workspace `node_modules`, root and workspace `build/` and `dist/` output,
 and `.turbo/cache/`. It preserves `.cache/`.
@@ -191,9 +192,11 @@ so their package-level Turbo configurations declare no outputs. Plugin typecheck
 
 Things to know when changing `turbo.json`:
 
-- **Cache invalidation.** The workspace packages are used as source (their `exports` point at
+- **Cache invalidation.** Most workspace packages are used as source (their `exports` point at
   `src/`), so nothing is built in between and Turborepo has no reason to look at a dependency's
-  files. The `transit` task is the fix from the Turborepo docs ("transit nodes"): it has no script
+  files. The public `@pumpkin-plugins/wasi-capabilities` package is compiled to `dist/` so Node can
+  load it from `node_modules`; its build runs before dependent package tasks. The `transit` task is
+  the fix from the Turborepo docs ("transit nodes"): it has no script
   and depends on `^transit`, and `build`, `typecheck` and `test` depend on it, so a change in any
   package a package depends on (including `devDependencies` such as `tools/build`, whose
   `wasi-wit.lock.json` and `src/` decide what a plugin is built from) invalidates exactly its

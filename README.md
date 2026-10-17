@@ -61,6 +61,7 @@ Browse the [public documentation site](https://filiphsps.github.io/pumpkin-plugi
 | [@pumpkin-plugins/terrain](tools/terrain) | Shared terrain capture and access contracts | MIT |
 | [@pumpkin-plugins/test-harness](tools/test-harness) | Runs plugins on a real Pumpkin in vitest | MIT |
 | [@pumpkin-plugins/update-check](tools/update-check) | Check plugin versions against Pumpkin Market | MIT |
+| [@pumpkin-plugins/wasi-capabilities](tools/wasi-capabilities) | WASI capability metadata for Pumpkin plugins | [MIT](tools/wasi-capabilities/LICENSE) |
 
 **VS Code extensions**
 

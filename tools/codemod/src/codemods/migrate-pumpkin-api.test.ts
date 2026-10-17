@@ -6,9 +6,33 @@ import * as ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { runCodemod } from '../runner.js';
 import { migratePumpkinApiTs } from './migrate-pumpkin-api.js';
+import { mergeJsonStringArray } from './pumpkin-api/jsonc.js';
+
+describe('mergeJsonStringArray', () => {
+    it('deduplicates and appends entries without dropping JSONC comments or layout', () => {
+        const source = `{
+    "pumpkinPlugin": {
+        "wasi": [
+            // Keep the original capability note.
+            "http",
+            // Keep this note after deduplicating the grant.
+            "http",
+            "sockets",
+        ]
+    }
+}`;
+
+        const updated = mergeJsonStringArray(source, ['pumpkinPlugin', 'wasi'], ['filesystem', 'http'], source);
+
+        expect(parse(updated).pumpkinPlugin.wasi).toEqual(['http', 'sockets', 'filesystem']);
+        expect(updated).toContain('            // Keep the original capability note.');
+        expect(updated).toContain('            // Keep this note after deduplicating the grant.');
+        expect(updated).toContain('            "sockets",\n            "filesystem",\n');
+    });
+});
 
 describe('migratePumpkinApiTs', () => {
-    it('updates static, type-only, dynamic, and CommonJS package references without reformatting source', () => {
+    it('updates static, type-only, dynamic, and CommonJS package references without reformatting source', async () => {
         const source = [
             "import { Plugin } from '@pumpkinmc/pumpkin-api-ts';",
             "export type { Api } from '@pumpkinmc/pumpkin-api-ts';",
@@ -17,7 +41,7 @@ describe('migratePumpkinApiTs', () => {
             "const lazy = import('@pumpkinmc/pumpkin-api-ts');",
         ].join('\n');
 
-        const result = migratePumpkinApiTs.transform({
+        const result = await migratePumpkinApiTs.transform({
             absolutePath: '/project/src/plugin.ts',
             projectRoot: '/project',
             relativePath: 'src/plugin.ts',
@@ -35,10 +59,10 @@ describe('migratePumpkinApiTs', () => {
         );
     });
 
-    it('leaves TypeScript with syntax errors unchanged and reports the parse failure', () => {
+    it('leaves TypeScript with syntax errors unchanged and reports the parse failure', async () => {
         const source = ["import { Plugin } from '@pumpkinmc/pumpkin-api-ts';", 'const broken = ;'].join('\n');
 
-        const result = migratePumpkinApiTs.transform({
+        const result = await migratePumpkinApiTs.transform({
             absolutePath: '/project/src/plugin.ts',
             projectRoot: '/project',
             relativePath: 'src/plugin.ts',
@@ -51,7 +75,7 @@ describe('migratePumpkinApiTs', () => {
         );
     });
 
-    it('moves dependencies and derives the new builder config from the old positional build command', () => {
+    it('preserves JSONC comments and skips WASI inference when esbuild cannot resolve the manifest', async () => {
         const source = `{
     // Keep this project note.
     "name": "example-plugin",
@@ -64,44 +88,306 @@ describe('migratePumpkinApiTs', () => {
     }
 }\n`;
 
-        const result = migratePumpkinApiTs.transform({
-            absolutePath: '/project/package.json',
-            projectRoot: '/project',
-            relativePath: 'package.json',
-            source,
-        });
-        const manifest = parse(result.source) as {
-            dependencies: Record<string, string>;
-            scripts: Record<string, string>;
-            pumpkinPlugin: Record<string, unknown>;
-        };
+        const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
+        try {
+            await fs.mkdir(path.join(root, 'src'), { recursive: true });
+            await fs.writeFile(path.join(root, 'src/plugin.ts'), 'export {};');
+            await fs.writeFile(path.join(root, 'package.json'), source);
+            const report = await runCodemod(migratePumpkinApiTs, [root], { cwd: root });
+            const result = report.changedFiles.find(({ relativePath }) => relativePath === 'package.json');
+            expect(result).toBeDefined();
+            const manifest = parse(result?.after ?? '') as {
+                dependencies: Record<string, string>;
+                scripts: Record<string, string>;
+                pumpkinPlugin: Record<string, unknown>;
+            };
 
-        expect(result.source).toContain('// Keep this project note.');
-        expect(manifest.dependencies).toEqual({
-            'other-package': '1.2.3',
-            '@pumpkin-plugins/pumpkin-api': '^0.1.0',
-            '@pumpkin-plugins/build': '^0.1.0',
-        });
-        expect(manifest.scripts).toEqual({
-            build: 'pumpkin-plugins-build',
-            typecheck: 'pumpkin-plugins-build --types-only && tsc --noEmit',
-        });
-        expect(manifest.pumpkinPlugin).toEqual({
-            entry: 'src/plugin.ts',
-            output: 'build/plugin.wasm',
-            engine: 'static-hermes',
-            wasi: [],
-        });
-        expect(result.messages).toContain('Review pumpkinPlugin.wasi and add the capabilities used by this plugin.');
+            expect(result?.after).toContain('// Keep this project note.');
+            expect(manifest.dependencies).toEqual({
+                'other-package': '1.2.3',
+                '@pumpkin-plugins/pumpkin-api': '^0.1.0',
+                '@pumpkin-plugins/build': '^0.1.0',
+            });
+            expect(manifest.scripts).toEqual({
+                build: 'pumpkin-plugins-build',
+                typecheck: 'pumpkin-plugins-build --types-only && tsc --noEmit',
+            });
+            expect(manifest.pumpkinPlugin).toEqual({
+                entry: 'src/plugin.ts',
+                output: 'build/plugin.wasm',
+                engine: 'static-hermes',
+            });
+            expect(report.messages.map(({ text }) => text).join('\n')).toContain('JSON does not support comments');
+            expect(report.messages.map(({ text }) => text)).toContain(
+                'Review inferred pumpkinPlugin.wasi capabilities and any static-analysis notes before building.',
+            );
+        } finally {
+            await fs.rm(root, { recursive: true, force: true });
+        }
     });
 
-    it('recognizes the direct and pnpm exec forms with quoted positional paths', () => {
+    it('sets an empty WASI array when analysis finds no capabilities', async () => {
+        const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
+        try {
+            await fs.mkdir(path.join(root, 'src'), { recursive: true });
+            await fs.writeFile(path.join(root, 'src/plugin.ts'), 'export {};');
+            await fs.writeFile(
+                path.join(root, 'package.json'),
+                JSON.stringify({
+                    dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
+                    pumpkinPlugin: { entry: 'src/plugin.ts', output: 'build/plugin.wasm' },
+                }),
+            );
+
+            const report = await runCodemod(migratePumpkinApiTs, [root], { cwd: root });
+            const packageChange = report.changedFiles.find(({ relativePath }) => relativePath === 'package.json');
+            expect(parse(packageChange?.after ?? '').pumpkinPlugin.wasi).toEqual([]);
+        } finally {
+            await fs.rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('infers runtime and type-only WASI capabilities only from the configured production graph', async () => {
+        const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
+        try {
+            await fs.mkdir(path.join(root, 'src'), { recursive: true });
+            await fs.mkdir(path.join(root, 'test'), { recursive: true });
+            const dependencyDirectory = path.join(root, 'node_modules/@fixture/wasi-helper');
+            await fs.mkdir(dependencyDirectory, { recursive: true });
+            await fs.writeFile(
+                path.join(root, 'src/plugin.ts'),
+                [
+                    "import { handle } from 'wasi:http/outgoing-handler@0.2.3';",
+                    "import type { Descriptor } from 'wasi:filesystem/types@0.2.3';",
+                    "type Fields = import('wasi:http/types@0.2.3').Fields;",
+                    "import './helper.ts';",
+                    "import '@fixture/wasi-helper';",
+                    "const lazy = import('wasi:filesystem/preopens@0.2.3');",
+                    "const preopens = require('wasi:filesystem/preopens@0.2.3');",
+                    'export { handle, Descriptor, Fields, lazy, preopens };',
+                ].join('\n'),
+            );
+            await fs.writeFile(
+                path.join(root, 'src/helper.ts'),
+                "export type { Descriptor } from 'wasi:filesystem/types@0.2.3';\n",
+            );
+            await fs.writeFile(
+                path.join(dependencyDirectory, 'package.json'),
+                JSON.stringify({
+                    name: '@fixture/wasi-helper',
+                    version: '1.0.0',
+                    type: 'module',
+                    exports: './index.js',
+                }),
+            );
+            await fs.writeFile(path.join(dependencyDirectory, 'index.js'), "import 'wasi:sockets/tcp@0.2.3';\n");
+            await fs.writeFile(path.join(root, 'src/legacy.ts'), "import 'wasi:sockets/udp@0.2.3';\n");
+            await fs.writeFile(path.join(root, 'test/plugin.test.ts'), "import 'wasi:sockets/udp@0.2.3';\n");
+            await fs.writeFile(
+                path.join(root, 'package.json'),
+                JSON.stringify({
+                    scripts: { build: 'pumpkin-plugin-build src/legacy.ts build/plugin.wasm' },
+                    dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
+                    pumpkinPlugin: {
+                        entry: 'src/plugin.ts',
+                        output: 'build/plugin.wasm',
+                        wasi: ['http', 'http', 'custom'],
+                    },
+                }),
+            );
+
+            const report = await runCodemod(migratePumpkinApiTs, [root], { cwd: root });
+            const packageChange = report.changedFiles.find(({ relativePath }) => relativePath === 'package.json');
+            expect(packageChange).toBeDefined();
+            expect(parse(packageChange?.after ?? '').pumpkinPlugin.wasi).toEqual([
+                'http',
+                'custom',
+                'filesystem',
+                'sockets',
+            ]);
+            expect(report.messages).toContainEqual({
+                relativePath: 'package.json',
+                text: 'Existing pumpkinPlugin.entry differs from the path in scripts.build; confirm which entry is correct.',
+            });
+        } finally {
+            await fs.rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('keeps known capabilities and reports uncertainty in a partial production graph', async () => {
+        const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
+        try {
+            await fs.mkdir(path.join(root, 'src'), { recursive: true });
+            await fs.writeFile(
+                path.join(root, 'src/plugin.ts'),
+                [
+                    "import 'wasi:filesystem/types@0.2.3';",
+                    "import 'wasi:sockets/network@0.2.3';",
+                    "import './missing.js';",
+                    'const lazy = import(resolveModuleName());',
+                ].join('\n'),
+            );
+            await fs.writeFile(
+                path.join(root, 'package.json'),
+                JSON.stringify({
+                    dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
+                    pumpkinPlugin: { entry: 'src/plugin.ts', output: 'build/plugin.wasm' },
+                }),
+            );
+
+            const report = await runCodemod(migratePumpkinApiTs, [root], { cwd: root });
+            const packageChange = report.changedFiles.find(({ relativePath }) => relativePath === 'package.json');
+            const packageMessages = report.messages.filter(({ relativePath }) => relativePath === 'package.json');
+            expect(parse(packageChange?.after ?? '').pumpkinPlugin.wasi).toEqual(['filesystem']);
+            expect(packageMessages.map(({ text }) => text).join('\n')).toContain(
+                'WASI interface "sockets/network" is shared by sockets, udp; no capability was inferred for it.',
+            );
+            expect(packageMessages.map(({ text }) => text).join('\n')).toContain('Could not resolve "./missing.js"');
+            expect(packageMessages.map(({ text }) => text).join('\n')).toContain('computed dynamic-import');
+        } finally {
+            await fs.rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('preserves existing WASI values when the configured production entry cannot be analyzed', async () => {
+        const cases = [
+            { config: { wasi: ['http', 'http'] } },
+            { config: { entry: 'src/missing.ts', wasi: ['http', 'http'] } },
+        ];
+        for (const { config } of cases) {
+            const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
+            try {
+                await fs.writeFile(
+                    path.join(root, 'package.json'),
+                    JSON.stringify({
+                        dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
+                        pumpkinPlugin: config,
+                    }),
+                );
+                const report = await runCodemod(migratePumpkinApiTs, [root], { cwd: root });
+                const packageChange = report.changedFiles.find(({ relativePath }) => relativePath === 'package.json');
+                expect(parse(packageChange?.after ?? '').pumpkinPlugin.wasi).toEqual(['http', 'http']);
+                expect(
+                    report.messages.some(
+                        ({ relativePath, text }) =>
+                            relativePath === 'package.json' && text.includes('the existing wasi value was preserved'),
+                    ),
+                ).toBe(true);
+            } finally {
+                await fs.rm(root, { recursive: true, force: true });
+            }
+        }
+    });
+
+    it('creates an empty WASI array for an incomplete graph with no known mappings', async () => {
+        const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
+        try {
+            await fs.mkdir(path.join(root, 'src'), { recursive: true });
+            await fs.writeFile(
+                path.join(root, 'src/plugin.ts'),
+                [
+                    "import 'wasi:sockets/network@0.2.3';",
+                    "import './missing.js';",
+                    'const lazy = import(resolveModuleName());',
+                ].join('\n'),
+            );
+            await fs.writeFile(
+                path.join(root, 'package.json'),
+                JSON.stringify({
+                    dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
+                    pumpkinPlugin: { entry: 'src/plugin.ts', output: 'build/plugin.wasm' },
+                }),
+            );
+
+            const report = await runCodemod(migratePumpkinApiTs, [root], { cwd: root });
+            const packageChange = report.changedFiles.find(({ relativePath }) => relativePath === 'package.json');
+            expect(parse(packageChange?.after ?? '').pumpkinPlugin.wasi).toEqual([]);
+            expect(
+                report.messages.some(
+                    ({ relativePath, text }) =>
+                        relativePath === 'package.json' && text.includes('is shared by sockets, udp'),
+                ),
+            ).toBe(true);
+            expect(
+                report.messages.some(
+                    ({ relativePath, text }) =>
+                        relativePath === 'package.json' && text.includes('Could not resolve "./missing.js"'),
+                ),
+            ).toBe(true);
+        } finally {
+            await fs.rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('leaves a non-array WASI setting unchanged and reports the limitation', async () => {
+        const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
+        try {
+            await fs.mkdir(path.join(root, 'src'), { recursive: true });
+            await fs.writeFile(path.join(root, 'src/plugin.ts'), "import 'wasi:http/types@0.2.3';\n");
+            await fs.writeFile(
+                path.join(root, 'package.json'),
+                JSON.stringify({
+                    dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
+                    pumpkinPlugin: { entry: 'src/plugin.ts', output: 'build/plugin.wasm', wasi: 'http' },
+                }),
+            );
+
+            const report = await runCodemod(migratePumpkinApiTs, [root], { cwd: root });
+            const packageChange = report.changedFiles.find(({ relativePath }) => relativePath === 'package.json');
+            const manifest = parse(packageChange?.after ?? '');
+            expect(manifest.pumpkinPlugin.wasi).toBe('http');
+            expect(report.messages).toContainEqual({
+                relativePath: 'package.json',
+                text: 'pumpkinPlugin.wasi is not an array; its value was left unchanged.',
+            });
+        } finally {
+            await fs.rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('is idempotent across runCodemod passes', async () => {
+        const root = await fs.mkdtemp(path.join(os.tmpdir(), 'pumpkin-codemod-wasi-'));
+        try {
+            await fs.mkdir(path.join(root, 'src'), { recursive: true });
+            await fs.writeFile(
+                path.join(root, 'src/plugin.ts'),
+                [
+                    "import { Plugin } from '@pumpkinmc/pumpkin-api-ts';",
+                    "import 'wasi:http/types@0.2.3';",
+                    'export { Plugin };',
+                ].join('\n'),
+            );
+            await fs.writeFile(
+                path.join(root, 'package.json'),
+                JSON.stringify({
+                    scripts: { build: 'pumpkin-plugin-build src/plugin.ts build/plugin.wasm' },
+                    dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
+                }),
+            );
+
+            const first = await runCodemod(migratePumpkinApiTs, [root], { cwd: root, write: true });
+            expect(first.changedFiles.map(({ relativePath }) => relativePath)).toEqual([
+                'package.json',
+                'src/plugin.ts',
+            ]);
+            expect(parse(await fs.readFile(path.join(root, 'package.json'), 'utf8')).pumpkinPlugin.wasi).toEqual([
+                'http',
+            ]);
+
+            const second = await runCodemod(migratePumpkinApiTs, [root], { cwd: root, write: true });
+            expect(second.changedFiles).toEqual([]);
+        } finally {
+            await fs.rm(root, { recursive: true, force: true });
+        }
+    });
+
+    it('recognizes the direct and pnpm exec forms with quoted positional paths', async () => {
         const source = JSON.stringify({
             scripts: { build: 'pnpm exec pumpkin-plugin-build "src/plugin entry.ts" "build/plugin.wasm"' },
             dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
         });
 
-        const result = migratePumpkinApiTs.transform({
+        const result = await migratePumpkinApiTs.transform({
             absolutePath: '/project/package.json',
             projectRoot: '/project',
             relativePath: 'package.json',
@@ -114,7 +400,7 @@ describe('migratePumpkinApiTs', () => {
         });
     });
 
-    it('keeps legacy build commands with unsupported paths for manual review', () => {
+    it('keeps legacy build commands with unsupported paths for manual review', async () => {
         const commands = [
             'pumpkin-plugin-build /outside/plugin.ts build/plugin.wasm',
             'pumpkin-plugin-build src/plugin.ts ../outside.wasm',
@@ -126,7 +412,7 @@ describe('migratePumpkinApiTs', () => {
                 scripts: { build: command },
                 dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
             });
-            const result = migratePumpkinApiTs.transform({
+            const result = await migratePumpkinApiTs.transform({
                 absolutePath: '/project/package.json',
                 projectRoot: '/project',
                 relativePath: 'package.json',
@@ -141,12 +427,12 @@ describe('migratePumpkinApiTs', () => {
         }
     });
 
-    it('does not report an inference failure when scripts.build is absent', () => {
+    it('does not report a build-script inference failure when scripts.build is absent', async () => {
         const source = JSON.stringify({
             dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
         });
 
-        const result = migratePumpkinApiTs.transform({
+        const result = await migratePumpkinApiTs.transform({
             absolutePath: '/project/package.json',
             projectRoot: '/project',
             relativePath: 'package.json',
@@ -159,9 +445,12 @@ describe('migratePumpkinApiTs', () => {
         expect(result.messages).toContain(
             'After setting pumpkinPlugin.entry/output, add the builder --types-only step to scripts.typecheck.',
         );
+        expect(result.messages).toContain(
+            'Could not infer pumpkinPlugin.wasi because pumpkinPlugin.entry is missing; the existing wasi value was preserved.',
+        );
     });
 
-    it('leaves shell expansions, command chains, flags and other launchers for manual review', () => {
+    it('leaves shell expansions, command chains, flags and other launchers for manual review', async () => {
         const commands = [
             'pnpm exec pumpkin-plugin-build "$ENTRY" "$OUTPUT"',
             'pnpm exec pumpkin-plugin-build src/plugin.ts build/plugin.wasm && echo done',
@@ -174,7 +463,7 @@ describe('migratePumpkinApiTs', () => {
                 scripts: { build: command },
                 dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
             });
-            const result = migratePumpkinApiTs.transform({
+            const result = await migratePumpkinApiTs.transform({
                 absolutePath: '/project/package.json',
                 projectRoot: '/project',
                 relativePath: 'package.json',
@@ -190,13 +479,13 @@ describe('migratePumpkinApiTs', () => {
         }
     });
 
-    it('adds generated type declarations to an explicit tsconfig include list', () => {
+    it('adds generated type declarations to an explicit tsconfig include list', async () => {
         const source = `{
     "compilerOptions": { "strict": true },
     "include": ["src/**/*.ts", "test/**/*.ts"]
 }\n`;
 
-        const result = migratePumpkinApiTs.transform({
+        const result = await migratePumpkinApiTs.transform({
             absolutePath: '/project/tsconfig.json',
             projectRoot: '/project',
             relativePath: 'tsconfig.json',
@@ -492,7 +781,7 @@ describe('migratePumpkinApiTs', () => {
         }
     });
 
-    it('fills missing builder paths without replacing existing runtime or WASI settings', () => {
+    it('fills missing builder paths without replacing existing runtime or WASI settings', async () => {
         const source = JSON.stringify({
             name: 'example-plugin',
             scripts: { build: 'pumpkin-plugin-build src/plugin.ts build/plugin.wasm', typecheck: 'tsc --noEmit' },
@@ -500,7 +789,7 @@ describe('migratePumpkinApiTs', () => {
             pumpkinPlugin: { wasi: ['filesystem'], engine: 'static-hermes' },
         });
 
-        const result = migratePumpkinApiTs.transform({
+        const result = await migratePumpkinApiTs.transform({
             absolutePath: '/project/package.json',
             projectRoot: '/project',
             relativePath: 'package.json',
@@ -517,14 +806,14 @@ describe('migratePumpkinApiTs', () => {
         expect(manifest.scripts.typecheck).toBe('pumpkin-plugins-build --types-only && tsc --noEmit');
     });
 
-    it('leaves custom build scripts intact and reports paths that need manual migration', () => {
+    it('leaves custom build scripts intact and reports paths that need manual migration', async () => {
         const source = JSON.stringify({
             name: 'example-plugin',
             scripts: { build: 'custom-build src/plugin.ts' },
             dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
         });
 
-        const result = migratePumpkinApiTs.transform({
+        const result = await migratePumpkinApiTs.transform({
             absolutePath: '/project/package.json',
             projectRoot: '/project',
             relativePath: 'package.json',
@@ -538,7 +827,7 @@ describe('migratePumpkinApiTs', () => {
         );
     });
 
-    it('leaves the old builder command when an existing pumpkinPlugin value is invalid', () => {
+    it('leaves the old builder command when an existing pumpkinPlugin value is invalid', async () => {
         const source = JSON.stringify({
             name: 'example-plugin',
             scripts: { build: 'pumpkin-plugin-build src/plugin.ts build/plugin.wasm' },
@@ -546,7 +835,7 @@ describe('migratePumpkinApiTs', () => {
             pumpkinPlugin: 'invalid configuration',
         });
 
-        const result = migratePumpkinApiTs.transform({
+        const result = await migratePumpkinApiTs.transform({
             absolutePath: '/project/package.json',
             projectRoot: '/project',
             relativePath: 'package.json',
@@ -559,8 +848,8 @@ describe('migratePumpkinApiTs', () => {
         );
     });
 
-    it('is idempotent after the package manifest and source have migrated', () => {
-        const first = migratePumpkinApiTs.transform({
+    it('is idempotent after the package manifest and source have migrated', async () => {
+        const first = await migratePumpkinApiTs.transform({
             absolutePath: '/project/package.json',
             projectRoot: '/project',
             relativePath: 'package.json',
@@ -570,7 +859,7 @@ describe('migratePumpkinApiTs', () => {
                 dependencies: { '@pumpkinmc/pumpkin-api-ts': '^0.1.1' },
             }),
         });
-        const second = migratePumpkinApiTs.transform({
+        const second = await migratePumpkinApiTs.transform({
             absolutePath: '/project/package.json',
             projectRoot: '/project',
             relativePath: 'package.json',

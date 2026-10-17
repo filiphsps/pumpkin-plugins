@@ -103,7 +103,7 @@ the Canonical ABI. Runtime maintainers who change supported imports or adapters 
 are generated from the build tool's capability map and the locked WASI version.
 
 <!-- docs:begin capability-bundles -->
-<!-- Generated from tools/build/src/capabilities.ts and tools/build/wasi-wit.lock.json. Run `pnpm readme`. -->
+<!-- Generated from tools/wasi-capabilities/src/index.ts and tools/build/wasi-wit.lock.json. Run `pnpm readme`. -->
 
 | Capability | Interfaces imported by the build |
 | --- | --- |
@@ -140,7 +140,7 @@ For example, a plugin that makes outgoing HTTP requests declares:
 It can then import the generated WASI bindings by their versioned interface names:
 
 <!-- docs:begin versioned-http-imports -->
-<!-- Generated from tools/build/src/capabilities.ts and tools/build/wasi-wit.lock.json. Run `pnpm readme`. -->
+<!-- Generated from tools/wasi-capabilities/src/index.ts and tools/build/wasi-wit.lock.json. Run `pnpm readme`. -->
 
 ```ts
 import { handle } from 'wasi:http/outgoing-handler@0.2.3';

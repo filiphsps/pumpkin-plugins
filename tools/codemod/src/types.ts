@@ -8,8 +8,8 @@ export interface CodemodDefinition {
     /** Selects files this codemod understands, using a project-relative path. */
     matchesFile(relativePath: string): boolean;
 
-    /** Transforms one selected file and may return review notes for the user. */
-    transform(context: TransformContext): TransformResult;
+    /** Transforms one selected file synchronously or asynchronously and may return review notes. */
+    transform(context: TransformContext): TransformResult | Promise<TransformResult>;
 }
 
 /** Input supplied to a codemod for one file. */

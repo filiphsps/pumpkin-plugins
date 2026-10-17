@@ -37,12 +37,6 @@
     ],
     "sideEffects": false,
     "type": "module",
-    "exports": {
-        "./capabilities": {
-            "types": "./dist/capabilities.d.ts",
-            "import": "./dist/capabilities.js"
-        }
-    },
     "bin": {
         "pumpkin-plugins-build": "dist/cli.js"
     },
@@ -52,7 +46,7 @@
         "wasi-wit.lock.json"
     ],
     "scripts": {
-        "build": "esbuild src/cli.ts src/capabilities.ts --bundle --platform=node --format=esm --target=node24 --packages=external --alias:@pumpkin-plugins/minecraft-colors=../minecraft-colors/src/index.ts --outdir=dist && tsc -p tsconfig.capabilities.json",
+        "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --target=node24 --packages=external --alias:@pumpkin-plugins/minecraft-colors=../minecraft-colors/src/index.ts --outdir=dist",
         "prepack": "pnpm build",
         "readme": "pumpkin-plugins-docs generate docs.ts",
         "readme:check": "pumpkin-plugins-docs generate docs.ts --check",
@@ -68,6 +62,7 @@
         "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@pumpkin-plugins/static-hermes-runtime": "workspace:*",
+        "@pumpkin-plugins/wasi-capabilities": "catalog:",
         "commander": "catalog:",
         "esbuild": "catalog:",
         "typescript": "catalog:"

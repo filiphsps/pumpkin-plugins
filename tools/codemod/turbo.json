@@ -1,0 +1,33 @@
+{
+    "extends": ["//"],
+    "tasks": {
+        "build": {
+            "dependsOn": [
+                "transit",
+                "@pumpkin-plugins/static-analysis#build",
+                "@pumpkin-plugins/wasi-capabilities#build"
+            ]
+        },
+        "test": {
+            "dependsOn": [
+                "transit",
+                "@pumpkin-plugins/static-analysis#build",
+                "@pumpkin-plugins/wasi-capabilities#build"
+            ]
+        },
+        "typecheck": {
+            "dependsOn": [
+                "transit",
+                "@pumpkin-plugins/static-analysis#build",
+                "@pumpkin-plugins/wasi-capabilities#build"
+            ],
+            "outputs": []
+        },
+        "readme": {
+            "dependsOn": ["@pumpkin-plugins/static-analysis#build", "@pumpkin-plugins/wasi-capabilities#build"]
+        },
+        "readme:check": {
+            "dependsOn": ["@pumpkin-plugins/static-analysis#build", "@pumpkin-plugins/wasi-capabilities#build"]
+        }
+    }
+}

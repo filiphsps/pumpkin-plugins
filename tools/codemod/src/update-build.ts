@@ -127,11 +127,11 @@ function composeUpdateCodemod(latest: string, migrations: readonly BuildMigratio
     };
 }
 
-function transformUpdateFile(
+async function transformUpdateFile(
     context: TransformContext,
     latest: string,
     migrations: readonly BuildMigration[],
-): TransformResult {
+): Promise<TransformResult> {
     let source = context.source;
     const messages: string[] = [];
 
@@ -143,7 +143,7 @@ function transformUpdateFile(
 
     for (const { codemod } of migrations) {
         if (!codemod.matchesFile(context.relativePath)) continue;
-        const result = codemod.transform({ ...context, source });
+        const result = await codemod.transform({ ...context, source });
         source = result.source;
         messages.push(...(result.messages ?? []));
     }

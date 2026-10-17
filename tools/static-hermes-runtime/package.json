@@ -83,6 +83,7 @@
         "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@pumpkin-plugins/test-harness": "workspace:*",
+        "@pumpkin-plugins/wasi-capabilities": "catalog:",
         "vitest": "catalog:"
     },
     "engines": {

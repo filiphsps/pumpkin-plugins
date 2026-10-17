@@ -41,28 +41,12 @@ the build result. It is skipped for help and version output, CI, development mod
 `PUMPKIN_PLUGINS_NO_UPDATE_NOTIFIER=1` to opt out. When a notice appears, preview the release
 migration from the plugin directory with `pnpm dlx @pumpkin-plugins/codemod update-build .`.
 
-## Capability lookup
+## WASI capability metadata
 
-The public `@pumpkin-plugins/build/capabilities` subpath ships JavaScript and TypeScript declarations
-in the npm package. Importing it only loads the mapping helpers; it does not run the CLI or prepare
-the build toolchain. The CLI remains available as `pumpkin-plugins-build`.
-
-```ts
-import { type Capability, capabilitiesForInterface } from '@pumpkin-plugins/build/capabilities';
-
-const candidates: Capability[] = capabilitiesForInterface('http/types'); // ['http']
-const shared = capabilitiesForInterface('sockets/network'); // ['sockets', 'udp']
-```
-
-Pass an exact `package/interface` path without the `wasi:` prefix or `@version` suffix. For example,
-normalize `wasi:http/types@0.2.3` to `http/types` before looking it up. Results contain every matching
-capability in mapping declaration order. A single match permits confident inference; multiple matches
-require manual review, and an empty array means the path is unknown. Common support interfaces such
-as `io/poll` match every capability, so they cannot identify a unique capability.
-
-The mapping and support imports in `src/capabilities.ts` are the sole source of truth for both this
-lookup and the builder's WIT preparation. Consumers should query this API rather than maintain a
-separate mapping. WASI capabilities describe required services; they do not infer Pumpkin permissions.
+The builder and migration codemod use the shared, dependency-free
+[`@pumpkin-plugins/wasi-capabilities`](../../wasi-capabilities/README.md) package for capability names,
+WIT interfaces and the pinned WASI version. WASI capabilities describe required services; they do not
+infer Pumpkin permissions.
 
 ## Build constraints
 
