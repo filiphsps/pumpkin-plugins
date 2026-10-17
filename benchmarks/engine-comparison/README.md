@@ -15,8 +15,8 @@ pnpm --filter @pumpkin-plugins/engine-comparison compare-engines
 
 The command builds the nine WebAssembly components, then starts a Pumpkin server for each one and
 runs the benchmark plugin. It prints component sizes and workload timings, and checks that the builds
-produce matching results. Build outputs are stored under
-`benchmarks/engine-comparison/build/engine-comparison/` and can be reused on later runs.
+produce matching results. It stores build outputs in the benchmark's generated build directory, so
+later runs can reuse them.
 
 ## What changes between builds
 
