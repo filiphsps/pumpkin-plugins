@@ -48,8 +48,8 @@ The TypeScript template uses `src/plugin.ts`. The JavaScript template uses `src/
 
 | Starter | Package version | Package dependencies | Host WIT imports |
 | --- | --- | --- | --- |
-| JavaScript | `0.1.0` | `@pumpkin-plugins/build@^0.1.1`, `@pumpkin-plugins/pumpkin-api@^0.1.0` | `pumpkin:plugin/metadata@0.1.0` |
-| TypeScript | `0.1.0` | `@pumpkin-plugins/build@^0.1.1`, `@pumpkin-plugins/pumpkin-api@^0.1.0` | `pumpkin:plugin/metadata@0.1.0` |
+| JavaScript | `0.1.0` | `@pumpkin-plugins/build@^0.1.2`, `@pumpkin-plugins/pumpkin-api@^0.1.0` | `pumpkin:plugin/metadata@0.1.0` |
+| TypeScript | `0.1.0` | `@pumpkin-plugins/build@^0.1.2`, `@pumpkin-plugins/pumpkin-api@^0.1.0` | `pumpkin:plugin/metadata@0.1.0` |
 <!-- docs:end template-defaults -->
 
 The npm package dependency range and host WIT interface version identify separate compatibility layers. See the [ABI and runtime guide](../../docs/plugin-api/abi-and-runtime.md) for compatibility with Pumpkin server releases.
