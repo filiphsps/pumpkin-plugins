@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/create-pumpkin-plugin-v0.1.0...create-pumpkin-plugin-v0.1.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **create-pumpkin-plugin:** sync starter tool versions ([528e985](https://github.com/filiphsps/pumpkin-plugins/commit/528e985a215ce8894d9ad133e5cf87b01c00e74b))
+
 ## 0.1.0 (2026-10-15)
 
 
