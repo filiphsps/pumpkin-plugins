@@ -109,6 +109,7 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [Pumpkin Plugin API: Migrate From `@pumpkinmc/pumpkin-api-ts`](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/docs/migration.md): This guide moves a plugin from an audited API baseline to @pumpkin-plugins/pumpkin-api and its pumpkin-plugins-build command.
 - [Pumpkin plugin signing](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/docs/index.md): Ed25519 signing for plugin builds
 - [Pumpkin plugin signing README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/signing/README.md): Additional component overview and usage details.
+- [@pumpkin-plugins/static-analysis](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-analysis/README.md): Static JavaScript and TypeScript module graph analysis
 - [Static Hermes Runtime](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/index.md): Static Hermes Runtime shim for Pumpkin plugin components
 - [Static Hermes Runtime README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/README.md): Additional component overview and usage details.
 - [Static Hermes Runtime: Maintaining Static Hermes WASI support](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/static-hermes-runtime/docs/maintaining-wasi.md): This guide is for maintainers who change the locked WASI definitions, capability bundles, or native adapters.
@@ -119,6 +120,7 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [Pumpkin test harness README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/test-harness/README.md): Additional component overview and usage details.
 - [Pumpkin Market update checks](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/update-check/docs/index.md): Check plugin versions against Pumpkin Market
 - [Pumpkin Market update checks README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/update-check/README.md): Additional component overview and usage details.
+- [@pumpkin-plugins/wasi-capabilities](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/wasi-capabilities/README.md): WASI capability metadata for Pumpkin plugins
 
 ## GitHub Actions
 
@@ -156,10 +158,12 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [Port mapping library API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/port-mapping/): UPnP and NAT-PMP port mapping
 - [Pumpkin Plugin API API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/pumpkin-api/): TypeScript API for PumpkinMC plugins
 - [Pumpkin plugin signing API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/signing/): Ed25519 signing for plugin builds
+- [@pumpkin-plugins/static-analysis API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/static-analysis/): Static JavaScript and TypeScript module graph analysis
 - [Static Hermes Runtime API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/static-hermes-runtime/): Static Hermes Runtime shim for Pumpkin plugin components
 - [Terrain capture API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/terrain/): Shared terrain capture and access contracts
 - [Pumpkin test harness API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/test-harness/): Runs plugins on a real Pumpkin in vitest
 - [Pumpkin Market update checks API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/update-check/): Check plugin versions against Pumpkin Market
+- [@pumpkin-plugins/wasi-capabilities API reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/@pumpkin-plugins/wasi-capabilities/): WASI capability metadata for Pumpkin plugins
 - [Publish a plugin to Pumpkin Market API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/publish-to-pumpkin-market/): Upload a released Pumpkin plugin WebAssembly file to its existing Market listing
 - [Sign PumpkinMC Plugins API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/sign-pumpkin-plugin/): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
 - [Update a Pumpkin Market listing API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/update-pumpkin-market-listing/): Update Pumpkin Market listing metadata from a JSON file or direct inputs
