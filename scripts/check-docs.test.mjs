@@ -26,6 +26,7 @@ test('accepts generated API links when the ignored API output is absent', () => 
             '.github',
             'package.json',
             'biome.json',
+            'eslint.config.mjs',
         ]) {
             const source = path.join(repositoryRoot, entry);
             if (!fs.existsSync(source)) continue;
