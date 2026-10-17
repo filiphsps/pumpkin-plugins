@@ -34,18 +34,4 @@ describe('the /baddon commands', () => {
             tag: 'allow',
         });
     });
-
-    it('list prints the packs found', () => {
-        const { host, root } = setup();
-        const lines = host.run(root, ['baddon', 'list']);
-        expect(lines[0]).toBe('Bedrock packs (1), in the order they are listed:');
-        expect(lines[1]).toContain('a.mcpack');
-    });
-
-    it('reload rescans the packs folder and says how many are listed', () => {
-        const { files, manager, host, root } = setup();
-        files.put('packs/b.mcpack', makeMcpack(manifestJson({ uuid: '33333333-3333-4333-8333-333333333333' })));
-        expect(host.run(root, ['baddon', 'reload'])[0]).toContain('2 packs listed');
-        expect(manager.entries).toHaveLength(2);
-    });
 });

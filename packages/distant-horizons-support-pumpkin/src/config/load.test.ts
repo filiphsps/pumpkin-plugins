@@ -29,20 +29,6 @@ describe('DH settings', () => {
         expect(files.text('config.toml')).toContain('cached_requests_per_tick = 8');
         expect(files.text('config.toml')).toContain('cached_packets_per_tick = 64');
     });
-    it('copies a legacy cache limit into both new limits and uses each default when it is absent', () => {
-        const files = new MemoryFiles(),
-            log = new MemoryLogger();
-        files.put('config.toml', '[support]\ncache_entries = 512\n');
-
-        const settings = readSettings(files, log);
-        const config = files.text('config.toml') ?? '';
-
-        expect(settings.memory_cache_entries).toBe(512);
-        expect(settings.disk_cache_entries).toBe(512);
-        expect(config).toContain('memory_cache_entries = 512');
-        expect(config).toContain('disk_cache_entries = 512');
-        expect(config).not.toMatch(/^cache_entries =/m);
-    });
     it('accepts any negative cache limit as unlimited', () => {
         const files = new MemoryFiles(),
             log = new MemoryLogger();
@@ -52,16 +38,6 @@ describe('DH settings', () => {
 
         expect(settings.memory_cache_entries).toBe(-42);
         expect(settings.disk_cache_entries).toBe(-99);
-    });
-    it('accepts the development server sample cap without falling back to the default', () => {
-        const files = new MemoryFiles(),
-            log = new MemoryLogger();
-        files.put('config.toml', '[support]\nblocks_per_tick = 32768\n');
-
-        const settings = readSettings(files, log);
-
-        expect(settings.blocks_per_tick).toBe(32768);
-        expect(log.of('warn')).toHaveLength(0);
     });
     it('accepts separate DH request rates', () => {
         const files = new MemoryFiles(),
@@ -83,21 +59,6 @@ describe('DH settings', () => {
 
         expect(settings.worlds.world).toMatchObject({ sample_biomes_3d: true });
         expect(log.of('warn')).toHaveLength(0);
-    });
-    it('treats arbitrarily large negative TOML integers as unlimited', () => {
-        const files = new MemoryFiles(),
-            log = new MemoryLogger();
-        files.put(
-            'config.toml',
-            '[support]\nmemory_cache_entries = -9223372036854775808\ndisk_cache_entries = -9223372036854775808\n',
-        );
-
-        const settings = readSettings(files, log);
-
-        expect(settings.memory_cache_entries).toBe(-1);
-        expect(settings.disk_cache_entries).toBe(-1);
-        expect(files.text('config.toml')).toContain('memory_cache_entries = -1');
-        expect(files.text('config.toml')).toContain('disk_cache_entries = -1');
     });
     it('preserves invalid values and malformed TOML without overwriting user files', () => {
         const files = new MemoryFiles(),

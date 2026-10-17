@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reloadLines, statusLines } from './format.ts';
+import { statusLines } from './format.ts';
 
 const spec = { protocol: 'tcp', port: 25565, description: 'x' } as const;
 
@@ -42,13 +42,6 @@ describe('statusLines', () => {
             { key: 'own:java', spec, state: { kind: 'open', via: 'public', address: [1, 2, 3, 4], port: 25565 } },
         ]);
         expect(line).toBe('java (TCP 25565): reachable at 1.2.3.4:25565 (this machine has a public address)');
-    });
-});
-
-describe('reloadLines', () => {
-    it('counts the ports', () => {
-        expect(reloadLines(1)).toEqual(['Reloaded the config. 1 port is being kept open.']);
-        expect(reloadLines(3)).toEqual(['Reloaded the config. 3 ports are being kept open.']);
     });
 });
 

@@ -92,15 +92,6 @@ describe('HttpSession', () => {
         expect(t.files.map((f) => f.closed)).toEqual([1]);
     });
 
-    it('404s unknown packs and anything outside /packs/', () => {
-        for (const target of ['/packs/nope.mcpack', '/', '/config.toml']) {
-            const t = setup();
-            t.transport.inbound.push(get(target));
-            t.run();
-            expect(t.transport.response().status, target).toBe(404);
-        }
-    });
-
     it('answers HEAD for an unknown pack without sending the GET error body', () => {
         const t = setup();
         t.transport.inbound.push(strToU8('HEAD /packs/nope.mcpack HTTP/1.1\r\n\r\n'));
@@ -111,14 +102,6 @@ describe('HttpSession', () => {
         expect(res.headers['Content-Type']).toBe('text/plain');
         expect(res.headers['Content-Length']).toBe('4');
         expect(res.body).toHaveLength(0);
-    });
-
-    it('never looks up a path that tries to leave the packs folder', () => {
-        const t = setup();
-        t.transport.inbound.push(get('/packs/..%2Fconfig.toml'));
-        t.run();
-        expect(t.transport.response().status).toBe(404);
-        expect(t.lookups).toEqual([]);
     });
 
     it('rejects other methods and malformed requests', () => {

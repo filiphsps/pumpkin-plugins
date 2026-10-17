@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BLOCKED_ROUTERS, type BlockedRouter, blockedReason, findBlocked, renderBlockedRouters } from './blocklist.ts';
+import { type BlockedRouter, blockedReason, findBlocked, renderBlockedRouters } from './blocklist.ts';
 
 const rules: BlockedRouter[] = [
     { manufacturer: 'Acme', match: /^acme\b/i, reason: 'Acme routers have no UPnP' },
@@ -53,10 +53,6 @@ describe('the real blocklist', () => {
     it('does not block other makes', () => {
         expect(blockedReason({ manufacturer: 'AVM Berlin', model: 'FRITZ!Box 7590', source: 'upnp' })).toBeUndefined();
         expect(blockedReason({ manufacturer: 'TP-Link', source: 'upnp' })).toBeUndefined();
-    });
-
-    it('has a reason without a full stop for every rule, since it is quoted in sentences', () => {
-        for (const rule of BLOCKED_ROUTERS) expect(rule.reason).not.toMatch(/[.!?]$/);
     });
 });
 

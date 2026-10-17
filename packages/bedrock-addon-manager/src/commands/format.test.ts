@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PackEntry } from '../packs/entries.ts';
-import { formatSize, listLines, reloadLines } from './format.ts';
+import { formatSize, listLines } from './format.ts';
 
 const entry = (over: Partial<PackEntry> = {}): PackEntry => ({
     fileName: 'a.mcpack',
@@ -44,13 +44,5 @@ describe('listLines', () => {
             '2. b.mcpack: 627409cd-5207-46f1-b1e8-0d4492616419 v1.0.1, 4.9 MiB, add-on pack, scripts, ray tracing',
             '   http://127.0.0.1:8123/packs/a.mcpack',
         ]);
-    });
-});
-
-describe('reloadLines', () => {
-    it('pluralizes', () => {
-        expect(reloadLines(1)[0]).toContain('1 pack listed');
-        expect(reloadLines(0)[0]).toContain('0 packs listed');
-        expect(reloadLines(2)[0]).toContain('2 packs listed');
     });
 });

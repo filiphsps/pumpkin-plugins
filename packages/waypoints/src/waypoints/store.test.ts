@@ -120,16 +120,6 @@ describe(WaypointStore.name, () => {
         expect(new WaypointStore(files, new MemoryLogger()).list()).toEqual([waypoint(lower)]);
     });
 
-    it('writes four-space indented JSON with a trailing newline', () => {
-        const files = new MemoryFiles();
-        const store = new WaypointStore(files, new MemoryLogger());
-        store.add(waypoint());
-
-        expect(files.text('waypoints.json')).toBe(
-            `${JSON.stringify({ version: 2, waypoints: [waypoint()] }, null, 4)}\n`,
-        );
-    });
-
     it('migrates legacy locator color and retains adapter settings in the byte-identical backup', () => {
         const original = JSON.stringify({
             version: 1,

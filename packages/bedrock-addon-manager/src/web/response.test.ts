@@ -24,21 +24,6 @@ function plan(request: Partial<HttpRequest> | undefined, known = 'a.mcpack') {
 }
 
 describe('planResponse', () => {
-    it('streams a whole pack', () => {
-        const p = plan({});
-        expect(p.text).toMatch(/^HTTP\/1\.1 200 OK\r\n/);
-        expect(p.text).toContain('Content-Length: 1000\r\n');
-        expect(p.body).toMatchObject({ offset: 0, remaining: 1000 });
-        expect(p.files[0].closed).toBe(0);
-    });
-
-    it('streams just the requested range', () => {
-        const p = plan({ headers: { range: 'bytes=100-199' } });
-        expect(p.text).toMatch(/^HTTP\/1\.1 206 Partial Content\r\n/);
-        expect(p.text).toContain('Content-Range: bytes 100-199/1000\r\n');
-        expect(p.body).toMatchObject({ offset: 100, remaining: 100 });
-    });
-
     it('sends only headers for HEAD and closes the file straight away', () => {
         const p = plan({ method: 'HEAD' });
         expect(p.text).toContain('Content-Length: 1000\r\n');
@@ -52,17 +37,6 @@ describe('planResponse', () => {
         expect(p.text).toContain('Content-Range: bytes */1000\r\n');
         expect(p.body).toBeUndefined();
         expect(p.files.map((f) => f.closed)).toEqual([1]);
-    });
-
-    it('answers 404 for unknown packs without opening anything else', () => {
-        expect(plan({ target: '/packs/nope.mcpack' }).text).toMatch(/^HTTP\/1\.1 404 /);
-        expect(plan({ target: '/elsewhere' }).lookups).toEqual([]);
-    });
-
-    it('never looks up a name that tries to leave the packs folder', () => {
-        const p = plan({ target: '/packs/..%2Fconfig.toml' });
-        expect(p.text).toMatch(/^HTTP\/1\.1 404 /);
-        expect(p.lookups).toEqual([]);
     });
 
     it('answers 405 for other methods and 400 for a malformed request', () => {

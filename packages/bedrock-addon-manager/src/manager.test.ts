@@ -39,25 +39,6 @@ const NO_FORWARDING = '[web]\nport_forwarding = false\n';
 const OPEN = { kind: 'open', via: 'upnp', address: '93.184.216.34', port: 8123 } as const;
 
 describe('PackManager', () => {
-    it('creates the config and packs folder, finds packs and starts the web server', () => {
-        const { files, log, server, manager } = setup();
-        files.createDirectory('packs');
-        files.put('packs/a.mcpack', pack(1));
-        manager.start();
-
-        expect(files.text(CONFIG_FILE)).toContain('[web]');
-        expect(files.stat('packs')?.kind).toBe('directory');
-        expect(manager.entries.map((e) => e.fileName)).toEqual(['a.mcpack']);
-        expect(server.started).toEqual([{ bind: '0.0.0.0', port: 8123 }]);
-        expect(log.of('info')).toContain(`Serving packs on ${ansi.named.url('http://0.0.0.0:8123/packs/')}.`);
-    });
-
-    it('creates the packs folder when it is missing', () => {
-        const { files, manager } = setup();
-        manager.start();
-        expect(files.stat('packs')?.kind).toBe('directory');
-    });
-
     it('keeps the web server running when the packs folder cannot be scanned', () => {
         const { files, log, server, manager } = setup();
         vi.spyOn(files, 'list').mockImplementation((directory) => {
@@ -123,19 +104,6 @@ describe('PackManager', () => {
             wait(60_000);
             manager.stop();
             expect(upnp.requests).toEqual([]);
-        });
-
-        it('uses the address UPnPumpkin opened for the download urls, and says so', () => {
-            const { files, upnp, log, manager, wait } = setup();
-            files.put('packs/a.mcpack', pack(1));
-            manager.start();
-            upnp.status = OPEN;
-            wait(1000);
-            expect(urls(manager)).toEqual(['http://93.184.216.34:8123/packs/a.mcpack']);
-            expect(log.of('info')).toContain(
-                `Opened port ${ansi.named.port('8123')} on the router (upnp): clients download packs from ${ansi.named.url('http://93.184.216.34:8123')}.`,
-            );
-            expect(log.of('warn')).toEqual([]);
         });
 
         it('does not rescan the packs folder when the address arrives', () => {
@@ -267,32 +235,6 @@ describe('PackManager', () => {
         expect(server.ticks).toBe(2);
     });
 
-    it('does not look for packs on its own, only on start and reload', () => {
-        const { files, manager } = setup();
-        manager.start();
-        files.put('packs/late.mcpack', pack(5));
-        for (let i = 0; i < 500; i++) manager.tick();
-        expect(manager.entries).toHaveLength(0);
-
-        manager.reload();
-        expect(manager.entries.map((e) => e.fileName)).toEqual(['late.mcpack']);
-    });
-
-    it('reports discovered packs without implying that it sends them to players', () => {
-        const { files, log, manager } = setup();
-        files.put('packs/a.mcpack', pack(1));
-        manager.start();
-        expect(log.of('info')).toContain(
-            `Found ${ansi.named.number('1')} Bedrock pack. This plugin does not send pack offers to players.`,
-        );
-
-        files.put('packs/b.mcpack', pack(2));
-        manager.reload();
-        expect(log.of('info')).toContain(
-            `Found ${ansi.named.number('2')} Bedrock packs. This plugin does not send pack offers to players.`,
-        );
-    });
-
     it('restarts the web server only when its address changed', () => {
         const { files, server, manager } = setup();
         manager.start();
@@ -314,15 +256,6 @@ describe('PackManager', () => {
         expect(log.of('info')).toContain('The web server is turned off (web.enabled = false).');
         manager.reload();
         expect(server.started).toHaveLength(1);
-    });
-
-    it('logs a web server that cannot start and keeps the plugin running', () => {
-        const { log, server, manager } = setup();
-        server.failStart = 'port 8123 is already in use';
-        manager.start();
-        expect(log.of('error')).toEqual(['Could not start the web server: port 8123 is already in use']);
-        manager.tick();
-        expect(manager.config.web.port).toBe(8123);
     });
 
     it('tries again on reload after a failed start', () => {

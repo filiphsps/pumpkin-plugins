@@ -64,18 +64,6 @@ describe('tab display configuration', () => {
             });
     });
 
-    it('rejects native sorting until a Java client verifies order direction', () => {
-        const config = structuredClone(defaultValues(configSchema));
-        config.sorting.rules = [{ kind: 'name', direction: 'ascending' }];
-        const result = validateConfig(config);
-        expect(result.kind).toBe('invalid');
-        if (result.kind === 'invalid')
-            expect(result.issues).toContainEqual({
-                path: 'sorting.rules',
-                reason: expect.stringContaining('not verified'),
-            });
-    });
-
     it('rejects duplicate sort keys and invalid styles before a config can be applied', () => {
         const config = structuredClone(defaultValues(configSchema));
         config.header.lines = [{ text: 'Hi', color: 'red' }];

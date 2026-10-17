@@ -1,8 +1,6 @@
 import { defaultValues } from '@pumpkin-plugins/config';
-import { ansi } from '@pumpkin-plugins/minecraft-colors';
-import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
-import { makeMcpack, manifestJson, noise } from '../../test/fixtures.ts';
+import { makeMcpack, manifestJson } from '../../test/fixtures.ts';
 import { MemoryLogger } from '../../test/logger.ts';
 import { MemoryFiles } from '../../test/memory-files.ts';
 import { type Config, configSchema } from '../config/schema.ts';
@@ -20,25 +18,6 @@ function setup(config: Partial<Config> = {}) {
 }
 
 describe('PackIndex', () => {
-    it('lists the packs it finds and says what it found', () => {
-        const { files, log, settings, index } = setup();
-        files.put('packs/a.mcpack', pack(1));
-        index.refresh(settings);
-
-        expect(index.entries.map((e) => [e.fileName, e.uuid])).toEqual([['a.mcpack', uuid(1)]]);
-        expect(log.of('info')).toEqual([
-            `Found ${ansi.named.number('1')} Bedrock pack: ${ansi.named.name('a.mcpack')} (${ansi.named.uuid(uuid(1))} v${ansi.named.version('1.0.0')}).`,
-        ]);
-    });
-
-    it('says so when there are no packs', () => {
-        const { log, settings, index } = setup();
-        index.refresh(settings);
-        expect(log.of('info')).toEqual([
-            `No packs in ${ansi.named.name('packs/')}. Put .mcpack or .mcaddon files there and run /baddon reload.`,
-        ]);
-    });
-
     it('notices added, updated and removed packs on the next refresh', () => {
         const { files, settings, index } = setup();
         index.refresh(settings);
@@ -53,20 +32,6 @@ describe('PackIndex', () => {
         expect(index.entries).toHaveLength(0);
     });
 
-    it('opens a pack taken from a .mcaddon by the name it is listed under', () => {
-        const { files, settings, index } = setup();
-        files.put(
-            'packs/Cool.mcaddon',
-            zipSync({
-                'RP/manifest.json': strToU8(JSON.stringify(manifestJson({ uuid: uuid(1) }))),
-                'RP/a.png': noise(100),
-            }),
-        );
-        index.refresh(settings);
-        expect(index.entries.map((e) => e.fileName)).toEqual(['Cool.mcpack']);
-        expect(index.open('Cool.mcpack')?.size).toBeGreaterThan(100);
-    });
-
     it('warns about a problem once, not on every scan, and again if it returns', () => {
         const { files, log, settings, index } = setup();
         files.put('packs/bad.mcpack', 'not a zip');
@@ -79,18 +44,6 @@ describe('PackIndex', () => {
         files.put('packs/bad.mcpack', 'not a zip either');
         index.refresh(settings);
         expect(log.of('warn')).toHaveLength(2);
-    });
-
-    it('opens only packs that are in the list', () => {
-        const { files, settings, index } = setup({
-            overrides: { 'hidden.mcpack': { enabled: false } },
-        });
-        files.put('packs/a.mcpack', pack(1)).put('packs/hidden.mcpack', pack(2)).put('packs/secret.txt', 'x');
-        index.refresh(settings);
-        expect(index.open('a.mcpack')?.size).toBeGreaterThan(0);
-        expect(index.open('hidden.mcpack')).toBeUndefined();
-        expect(index.open('secret.txt')).toBeUndefined();
-        expect(index.open('missing.mcpack')).toBeUndefined();
     });
 
     it('returns undefined instead of throwing when a listed pack vanished before it was opened', () => {

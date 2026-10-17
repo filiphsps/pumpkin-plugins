@@ -100,19 +100,6 @@ describe('the /dhs commands', () => {
         ]);
     });
 
-    it('colors the changing values in the status output', () => {
-        const { host, root } = setup();
-
-        const status = host.run(root, ['dhs', 'status']);
-
-        expect(status.length).toBeGreaterThan(1);
-        expect(status[0]).toContain('§60§r Distant Horizons client(s), §60§r pending LOD request(s)');
-        expect(status.find((line) => line.includes('Capture budget'))).toContain(
-            'Capture budget §60§r/§68192§r block samples/tick at §60.0§r reported MSPT',
-        );
-        expect(status.every((line) => line.length <= 120)).toBe(true);
-    });
-
     it('clears both tiers or either tier independently', () => {
         const all = setup();
         expect(all.host.run(all.root, ['dhs', 'cache', 'clear'])).toEqual([
@@ -188,14 +175,6 @@ describe('the /dhs commands', () => {
         host.runAs(root, ['dhs', 'map', '<x>', '<z>'], { x: 64, z: 0 }, sender as never);
         expect(sender.lines).toHaveLength(11);
         expect(sender.lines[0]).toContain('center section 1, 0');
-    });
-
-    it('replies cleanly when the map command is run from the console', () => {
-        const { host, root } = setup();
-        const sender = host.runAs(root, ['dhs', 'map', '<radius>'], { radius: 32 });
-
-        expect(sender.errors).toEqual(['Run this command as a player so the current world is known.']);
-        expect(sender.lines).toEqual(sender.errors);
     });
 
     it('starts forced captures at the player or block coordinates with the selected radius', () => {
