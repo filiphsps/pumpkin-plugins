@@ -92,6 +92,22 @@ describe('forced LOD generation', () => {
         expect(f.reports.at(-1)).toContain('complete: 0 built, 1 skipped');
     });
 
+    it('bounds terrain preparation calls per tick during a large forced scan', () => {
+        const f = fixture();
+        const prepare = vi.fn(() => ({ status: 'unavailable' as const, reason: 'Chunk is not loaded' }));
+        f.peer.terrain.prepare = prepare;
+        f.generation.start(f.peer, 32, 32, 2);
+
+        for (const expectedCalls of [8, 8, 8, 1]) {
+            prepare.mockClear();
+            f.generation.tick(f.peers);
+            expect(prepare).toHaveBeenCalledTimes(expectedCalls);
+        }
+
+        expect(f.generation.status()).toBeUndefined();
+        expect(f.reports.at(-1)).toContain('complete: 0 built, 25 skipped');
+    });
+
     it('skips sections already in the LOD cache while generating the remaining sections', () => {
         const f = fixture();
         f.cache.put('world:0:0', { updated: 1, data: new Uint8Array(64) });

@@ -72,6 +72,8 @@ interface ForcedJob extends ForcedLodStart {
 }
 
 const MAX_SECTIONS_CHECKED_PER_TICK = 64;
+// Terrain checks call the host synchronously; cap them separately from cache and border scans.
+const MAX_TERRAIN_PREPARATIONS_PER_TICK = 8;
 
 /** Captures operator-requested sections at full work budget without retaining Pumpkin handles. */
 export class ForcedLodGeneration {
@@ -214,6 +216,14 @@ export class ForcedLodGeneration {
     private advance(job: ForcedJob, peer: ForcedLodPeer): void {
         let budget = FORCE_BLOCK_SAMPLES_PER_TICK;
         let sectionsChecked = 0;
+        let terrainPreparations = 0;
+        const prepareTerrain = (region: TerrainRegion) => {
+            if (!peer.terrain.prepare) return undefined;
+            if (terrainPreparations >= MAX_TERRAIN_PREPARATIONS_PER_TICK) return { status: 'pending' as const };
+            terrainPreparations++;
+            return peer.terrain.prepare(region);
+        };
+
         while (sectionsChecked < MAX_SECTIONS_CHECKED_PER_TICK) {
             let target = job.current;
             if (!target) {
@@ -247,7 +257,7 @@ export class ForcedLodGeneration {
 
             try {
                 const region = this.region(target.coordinate, peer.terrain);
-                const prepared = peer.terrain.prepare?.(region);
+                const prepared = prepareTerrain(region);
                 if (prepared?.status === 'pending') break;
                 if (prepared && prepared.status !== 'ready') {
                     this.skip(job, prepared.reason);
@@ -260,7 +270,7 @@ export class ForcedLodGeneration {
                 budget -= measured.samples();
                 if (!complete) break;
 
-                const stillPrepared = peer.terrain.prepare?.(region);
+                const stillPrepared = prepareTerrain(region);
                 if (stillPrepared?.status === 'pending') break;
                 if (stillPrepared && stillPrepared.status !== 'ready') {
                     this.skip(job, stillPrepared.reason);
