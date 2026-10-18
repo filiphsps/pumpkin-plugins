@@ -17,7 +17,7 @@
         "typecheck": "pumpkin-plugins-build --types-only && tsc --noEmit"
     },
     "dependencies": {
-        "@pumpkin-plugins/build": "^0.1.4",
+        "@pumpkin-plugins/build": "^0.1.5",
         "@pumpkin-plugins/pumpkin-api": "^0.1.0"
     },
     "devDependencies": {
