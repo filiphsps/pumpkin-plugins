@@ -17,6 +17,7 @@ import {
     resolvePumpkinBinary,
     runDev,
 } from './dev.mjs';
+import { nativeAssetNames, nativeTargets } from './utils/native-targets.mjs';
 
 const configRequire = createRequire(new URL('../tools/config/package.json', import.meta.url));
 const { parse: parseToml } = await import(pathToFileURL(configRequire.resolve('smol-toml')));
@@ -37,6 +38,17 @@ function addPluginFixture(root) {
         JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } }),
     );
     fs.writeFileSync(output, 'built plugin');
+}
+
+function addNativeFixture(root) {
+    const componentDir = path.join(root, 'native', 'fixture-native');
+    fs.mkdirSync(componentDir, { recursive: true });
+    fs.writeFileSync(
+        path.join(componentDir, 'Cargo.toml'),
+        '[package]\nname = "fixture-native"\nversion = "1.0.0"\ndescription = "Native test fixture"\nlicense = "MIT"\n\n[lib]\nname = "fixture_native"\ncrate-type = ["cdylib"]\n',
+    );
+    fs.writeFileSync(path.join(componentDir, 'build.mjs'), '// replaced by the test process');
+    return componentDir;
 }
 
 async function configureDevServer(config) {
@@ -526,6 +538,89 @@ describe('copyPluginBuild', () => {
 });
 
 describe('runDev', () => {
+    it('builds and copies host native components before starting Pumpkin', async () => {
+        const root = tempDir();
+        addPluginFixture(root);
+        const componentDir = addNativeFixture(root);
+        const nativeBuildScript = path.join(componentDir, 'build.mjs');
+        const calls = [];
+        const spawnImpl = (command, args, options) => {
+            const child = new EventEmitter();
+            child.kill = (signal) => process.nextTick(() => child.emit('exit', null, signal));
+            calls.push({ command, args, options });
+
+            if (command === process.execPath && args[0] === nativeBuildScript) {
+                const target = args[args.indexOf('--target') + 1];
+                const nativeTarget = nativeTargets.find((entry) => entry.target === target);
+                assert.ok(nativeTarget, `expected a supported native target, got ${target}`);
+                const profile = args.includes('--release') ? 'release' : 'debug';
+                const artifactDir = path.join(componentDir, 'target', target, profile);
+                fs.mkdirSync(artifactDir, { recursive: true });
+                fs.writeFileSync(
+                    path.join(artifactDir, `${nativeTarget.prefix}fixture_native.${nativeTarget.extension}`),
+                    'built native library',
+                );
+                process.nextTick(() => child.emit('exit', 0, null));
+            } else if (args.includes('run') || command === '/fake/pumpkin') {
+                process.nextTick(() => child.emit('exit', 0, null));
+            }
+            return child;
+        };
+
+        await runDev({
+            root,
+            spawnImpl,
+            resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' }),
+        });
+
+        const nativeBuild = calls.find(
+            ({ command, args }) => command === process.execPath && args[0] === nativeBuildScript,
+        );
+        assert.ok(nativeBuild, 'expected the native component build to run');
+        const target = nativeBuild.args[nativeBuild.args.indexOf('--target') + 1];
+        const serverLibrary = path.join(
+            root,
+            '.cache',
+            'pumpkin-dev',
+            'plugins',
+            nativeAssetNames('fixture-native', target)[0],
+        );
+        assert.equal(fs.readFileSync(serverLibrary, 'utf8'), 'built native library');
+        assert.ok(calls.findIndex((call) => call.command === '/fake/pumpkin') > calls.indexOf(nativeBuild));
+    });
+
+    it('does not start Pumpkin when a native component fails to build', async () => {
+        const root = tempDir();
+        addPluginFixture(root);
+        const componentDir = addNativeFixture(root);
+        const nativeBuildScript = path.join(componentDir, 'build.mjs');
+        const calls = [];
+        const spawnImpl = (command, args, options) => {
+            const child = new EventEmitter();
+            child.kill = (signal) => process.nextTick(() => child.emit('exit', null, signal));
+            calls.push({ command, args, options });
+            if (command === process.execPath && args[0] === nativeBuildScript) {
+                process.nextTick(() => child.emit('exit', 1, null));
+            } else if (args.includes('run') || command === '/fake/pumpkin') {
+                process.nextTick(() => child.emit('exit', 0, null));
+            }
+            return child;
+        };
+
+        await assert.rejects(
+            runDev({
+                root,
+                spawnImpl,
+                resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' }),
+            }),
+            /native build for fixture-native exited \(1\)/,
+        );
+        assert.equal(
+            calls.some(({ command }) => command === '/fake/pumpkin'),
+            false,
+        );
+    });
+
     it('updates a quoted hot-reload key without adding a duplicate', async () => {
         const config = await configureDevServer('[plugins]\n"hot_reload" = false # keep\n');
 

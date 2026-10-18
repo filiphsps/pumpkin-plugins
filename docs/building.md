@@ -107,15 +107,16 @@ consumer.
 
 ## Run all plugins on Pumpkin
 
-Run `pnpm dev` to build every plugin and start the latest stable Pumpkin release. To use Pumpkin's
-latest nightly build, run `pnpm dev --nightly` or `pnpm dev:nightly`. Stable release metadata is
-cached in `.cache/pumpkin` for 24 hours; set `PUMPKIN_REFRESH_RELEASE=1` to refresh it for one run.
+Run `pnpm dev` to build every plugin and native component, then start the latest stable Pumpkin
+release. To use Pumpkin's latest nightly build, run `pnpm dev --nightly` or `pnpm dev:nightly`.
+Stable release metadata is cached in `.cache/pumpkin` for 24 hours; set
+`PUMPKIN_REFRESH_RELEASE=1` to refresh it for one run.
 Nightly metadata refreshes at every start because the `nightly` tag is reused, and the binary cache
 uses the uploaded asset ID to detect replaced builds. Stable binaries are checked against
 `checksums.sha256`; nightly binaries are checked against their GitHub release asset SHA-256 digest.
 
-Pass `--release` to use release settings for the initial build and hot-reload rebuilds. For example,
-run `pnpm dev -- --release`.
+Pass `--release` to use release settings for the initial plugin build, hot-reload rebuilds, and
+native component builds. For example, run `pnpm dev -- --release`.
 
 To build once and run without plugin hot reload or build watchers, run `pnpm dev:no-hot-reload`. Add
 `--nightly` or use `pnpm dev:nightly:no-hot-reload` to start the latest nightly build. You can also
@@ -130,6 +131,11 @@ inside each package; copying the file ensures Pumpkin sees changes because a lin
 would not notify it when the target changes. Automatic Market update checks are disabled in the
 default development builds and included in `--release` builds. Plugins that request permissions
 still need those permissions granted on their initial load; a hot reload can't prompt for them.
+
+At startup, the command also builds each Cargo component under `native/` for your host target with
+that component's `build.mjs`, then copies its target-qualified library into the same `plugins/`
+directory. Native libraries aren't hot-reloaded, so restart `pnpm dev` after changing native source
+or Cargo files.
 
 To use a local server binary instead of downloading the latest release, set `PUMPKIN_BIN`. Set
 `PUMPKIN_CACHE_DIR` to change the binary cache directory. To reset the dev server's world, config,

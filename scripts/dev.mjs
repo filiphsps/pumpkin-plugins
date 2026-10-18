@@ -3,8 +3,9 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { discoverComponents } from '@pumpkin-plugins/docs/node';
+import { discoverComponents, readNativeManifest } from '@pumpkin-plugins/docs/node';
 import { Command } from 'commander';
+import { nativeAssetNames, nativeTargetForHost } from './utils/native-targets.mjs';
 
 const REPOSITORY = 'Pumpkin-MC/Pumpkin';
 const RELEASES_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
@@ -69,6 +70,39 @@ export function listPluginBuilds(root) {
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function listNativeBuilds(root, { release = false, env = process.env } = {}) {
+    const components = discoverComponents(root, 'native');
+    if (components.length === 0) return [];
+
+    const target = nativeTargetForHost();
+    return components
+        .map(({ slug, directory, metadataFile }) => {
+            const { library } = readNativeManifest(metadataFile);
+            const buildScript = path.join(directory, 'build.mjs');
+            if (!fs.existsSync(buildScript))
+                throw new Error(`${buildScript} is required to build native component ${slug}`);
+            const targetDirectory = env.CARGO_TARGET_DIR
+                ? path.resolve(directory, env.CARGO_TARGET_DIR)
+                : path.join(directory, 'target');
+            const profile = release ? 'release' : 'debug';
+            return {
+                name: slug,
+                directory,
+                buildScript,
+                target: target.target,
+                outputPath: path.join(
+                    targetDirectory,
+                    target.target,
+                    profile,
+                    `${target.prefix}${library}.${target.extension}`,
+                ),
+                assetName: nativeAssetNames(slug, target.target)[0],
+                release,
+            };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Copies a built plugin into Pumpkin's watched directory, overwriting regular files in place. */
 export function copyPluginBuild(plugin, serverPluginsDir) {
     fs.mkdirSync(serverPluginsDir, { recursive: true });
@@ -79,6 +113,18 @@ export function copyPluginBuild(plugin, serverPluginsDir) {
         if (error.code !== 'ENOENT') throw error;
     }
     fs.copyFileSync(plugin.outputPath, destination);
+    return destination;
+}
+
+function copyNativeBuild(component, serverPluginsDir) {
+    fs.mkdirSync(serverPluginsDir, { recursive: true });
+    const destination = path.join(serverPluginsDir, component.assetName);
+    try {
+        if (fs.lstatSync(destination).isSymbolicLink()) fs.unlinkSync(destination);
+    } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+    }
+    fs.copyFileSync(component.outputPath, destination);
     return destination;
 }
 
@@ -455,6 +501,19 @@ export function startInitialBuild(root, spawnImpl = spawn, env = process.env, pa
     );
 }
 
+function startNativeBuild(component, spawnImpl, env) {
+    return spawnChild(
+        process.execPath,
+        [component.buildScript, ...(component.release ? ['--release'] : []), '--target', component.target],
+        {
+            cwd: component.directory,
+            stdio: 'inherit',
+            env,
+        },
+        spawnImpl,
+    );
+}
+
 /** Starts a dev server with optional plugin hot reload and release-mode builds. */
 export async function runDev({
     root = path.resolve(import.meta.dirname, '..'),
@@ -470,6 +529,7 @@ export async function runDev({
 } = {}) {
     const plugins = listPluginBuilds(root);
     if (plugins.length === 0) throw new Error('No plugin packages with pumpkinPlugin.output were found');
+    const nativeBuilds = listNativeBuilds(root, { release });
 
     const serverDir = path.join(root, '.cache', 'pumpkin-dev');
     const serverPluginsDir = createServerDirectory(serverDir, hotReload);
@@ -508,7 +568,7 @@ export async function runDev({
 
     try {
         console.log(
-            `Building every plugin, then launching the latest ${nightly ? 'nightly build' : 'stable release'}.`,
+            `Building ${plugins.length} plugin${plugins.length === 1 ? '' : 's'} and ${nativeBuilds.length} native component${nativeBuilds.length === 1 ? '' : 's'}, then launching the latest ${nightly ? 'nightly build' : 'stable release'}.`,
         );
         const initialBuild = startInitialBuild(root, spawnImpl, buildEnv, parseTypeScript, turboArgs);
         children.push(initialBuild);
@@ -517,12 +577,27 @@ export async function runDev({
                 throw new Error(`turbo run build exited (${signal ?? code ?? 'unknown status'})`);
             }
         });
-        const startup = Promise.all([buildResult, resolveBinary({ root, nightly })]);
+        const nativeBuildResults = nativeBuilds.map((component) => {
+            const nativeBuild = startNativeBuild(component, spawnImpl, buildEnv);
+            children.push(nativeBuild);
+            return nativeBuild.done.then(({ code, signal }) => {
+                if (!shuttingDown && (code !== 0 || signal)) {
+                    throw new Error(
+                        `native build for ${component.name} exited (${signal ?? code ?? 'unknown status'})`,
+                    );
+                }
+            });
+        });
+        const startup = Promise.all([
+            Promise.all([buildResult, ...nativeBuildResults]),
+            resolveBinary({ root, nightly }),
+        ]);
         const startupResult = await Promise.race([startup, shutdown]);
         if (shuttingDown) return;
         const [, resolvedBinary] = startupResult;
 
         for (const plugin of plugins) copyPluginBuild(plugin, serverPluginsDir);
+        for (const component of nativeBuilds) copyNativeBuild(component, serverPluginsDir);
         const backgroundTasks = [];
         if (hotReload) {
             outputs = watchBuildOutputs(plugins, serverPluginsDir);
@@ -548,7 +623,9 @@ export async function runDev({
         }
 
         const { binary: serverBinary, release: serverRelease } = resolvedBinary;
-        console.log(`Starting Pumpkin ${serverRelease} with ${plugins.length} plugins in ${serverDir}`);
+        console.log(
+            `Starting Pumpkin ${serverRelease} with ${plugins.length} plugin${plugins.length === 1 ? '' : 's'} and ${nativeBuilds.length} native component${nativeBuilds.length === 1 ? '' : 's'} in ${serverDir}`,
+        );
         const server = spawnChild(serverBinary, [], { cwd: serverDir, stdio: 'inherit' }, spawnImpl);
         children.push(server);
         const serverResult = await Promise.race([server.done, ...backgroundTasks, shutdown]);

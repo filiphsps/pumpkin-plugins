@@ -7,6 +7,20 @@ export const nativeTargets = [
     { target: 'aarch64-pc-windows-msvc', runner: 'windows-11-arm', extension: 'dll', prefix: '' },
 ];
 
+/** Returns the configured native build target for the current host platform and architecture. */
+export function nativeTargetForHost(platform = process.platform, arch = process.arch) {
+    const architecture = { x64: 'x86_64', arm64: 'aarch64' }[arch];
+    const operatingSystem = {
+        darwin: 'apple-darwin',
+        linux: 'unknown-linux-gnu',
+        win32: 'pc-windows-msvc',
+    }[platform];
+    const target = architecture && operatingSystem ? `${architecture}-${operatingSystem}` : undefined;
+    const configuredTarget = nativeTargets.find((entry) => entry.target === target);
+    if (!configuredTarget) throw new Error(`No native target for ${platform}-${arch}`);
+    return configuredTarget;
+}
+
 /** Target-qualified library and verification files attached to one native release. */
 export function nativeAssetNames(component, target) {
     const platform = nativeTargets.find((entry) => entry.target === target);
