@@ -14,6 +14,8 @@ test('accepts generated API links when the ignored API output is absent', () => 
     try {
         for (const entry of [
             'AGENTS.md',
+            'GLOSSARY-MAP.md',
+            'GLOSSARY.md',
             'README.md',
             '.node-version',
             'actions',
