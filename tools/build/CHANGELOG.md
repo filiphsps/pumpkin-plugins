@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/filiphsps/pumpkin-plugins/compare/build-v0.1.4...build-v0.1.5) (2026-10-18)
+
+
+### Features
+
+* **build:** color update notice highlights ([fe868f0](https://github.com/filiphsps/pumpkin-plugins/commit/fe868f0a28a454e8ae81f80662f268005f5738f1))
+
 ## [0.1.4](https://github.com/filiphsps/pumpkin-plugins/compare/build-v0.1.3...build-v0.1.4) (2026-10-17)
 
 
