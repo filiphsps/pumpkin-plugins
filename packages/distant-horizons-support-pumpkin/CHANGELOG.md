@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.1.0...distant-horizons-support-pumpkin-v0.1.1) (2026-10-18)
+
+
+### Features
+
+* **build:** color update notice highlights ([fe868f0](https://github.com/filiphsps/pumpkin-plugins/commit/fe868f0a28a454e8ae81f80662f268005f5738f1))
+* **build:** expose capability interface lookup ([cc70f9c](https://github.com/filiphsps/pumpkin-plugins/commit/cc70f9c6c69040b5ab4276e86a6247cbb71fb17d))
+* **build:** shorten update cache and add bypass option ([7a7545f](https://github.com/filiphsps/pumpkin-plugins/commit/7a7545f9bed4b8db8beb3a64ea8d797797983e90))
+* **wasi:** share capability metadata across tooling ([bbe0f2f](https://github.com/filiphsps/pumpkin-plugins/commit/bbe0f2f093273132e8fd2101233cada29af270e7))
+
+
+### Bug Fixes
+
+* **build:** remove duplicate update check ([06eb3d5](https://github.com/filiphsps/pumpkin-plugins/commit/06eb3d52807d146dcf3acdac5fa6a90d517b7db9))
+
 ## [0.1.0](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.0.13...distant-horizons-support-pumpkin-v0.1.0) (2026-10-17)
 
 
