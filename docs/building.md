@@ -107,26 +107,40 @@ consumer.
 
 ## Run all plugins on Pumpkin
 
-Run `pnpm dev` to build every plugin and start the Pumpkin release pinned in
-[`pumpkin-version.ts`](../tools/test-harness/src/pumpkin-version.ts), the same one the integration
-tests use, so the server matches the plugins' WIT ABI. It's downloaded once into `.cache/pumpkin`
-and checked against the SHA-256 pinned beside the release.
+Run `pnpm dev` to build every plugin and native component. Native builds require Rustup and the
+toolchain pinned by each native package's `rust-toolchain.toml`. For Pumpkin++, install its current
+toolchain and components with:
 
-To try a newer server, run `pnpm dev --latest` for the latest stable release, or run
-`pnpm dev --nightly` (or `pnpm dev:nightly`) for the latest nightly build. Plugins may fail to load
-there if that server's ABI differs from the pin. Latest-release metadata is cached in
+```sh
+rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy --component llvm-tools
+```
+
+Without native components, `pnpm dev` starts the
+Pumpkin release pinned in [`pumpkin-version.ts`](../tools/test-harness/src/pumpkin-version.ts), the
+same one the integration tests use, so the server matches the plugins' WIT ABI. When native
+components are present, the server release comes from their `release.json` pins; all native
+components must use the same host release. The server is downloaded once into `.cache/pumpkin` and
+checked against its pinned SHA-256.
+
+To try a newer server without native components, run `pnpm dev --latest` for the latest stable
+release, or run `pnpm dev --nightly` for the latest nightly build. Plugins
+may fail to load there if that server's ABI differs from the pin. Native components require their
+pinned host release, so `--latest` and `--nightly` are unavailable when native components are
+present. Release metadata is cached in
 `.cache/pumpkin` for 24 hours; set `PUMPKIN_REFRESH_RELEASE=1` to refresh it for one run. Nightly
 metadata refreshes at every start because the `nightly` tag is reused, and the binary cache uses the
-uploaded asset ID to detect replaced builds. Stable binaries are checked against `checksums.sha256`;
-nightly binaries are checked against their GitHub release asset SHA-256 digest.
+uploaded asset ID to detect replaced builds. Stable binaries without native components are checked
+against `checksums.sha256`; pinned native host binaries are checked against the SHA-256 in
+`release.json`. Nightly binaries are checked against their GitHub release asset SHA-256 digest.
 
-Pass `--release` to use release settings for the initial build and hot-reload rebuilds. For example,
-run `pnpm dev -- --release`.
+Pass `--release` to use release settings for the initial plugin build, hot-reload rebuilds, and
+native component builds. For example, run `pnpm dev -- --release`.
 
 To build once and run without plugin hot reload or build watchers, run `pnpm dev:no-hot-reload`. Add
-`--latest` or `--nightly`, or use `pnpm dev:nightly:no-hot-reload`, to start a newer server. You can
-also pass `--release`, as in `pnpm dev:no-hot-reload -- --release`. Restart the command after
-changing a plugin.
+`--latest` or `--nightly` after `--` to start a newer server when no native components are present;
+for example, run `pnpm dev:no-hot-reload -- --nightly`. You can also pass `--release`, as in
+`pnpm dev:no-hot-reload -- --release`. Restart the command after changing a plugin or native
+component.
 
 The dev server lives in `.cache/pumpkin-dev`, so its world and settings remain between runs. Each
 command configures Pumpkin's plugin hot reload to match the mode you chose. In hot-reload mode,
@@ -138,7 +152,13 @@ default development builds and included in `--release` builds. Each rebuild chan
 file, so a hot reload denies a plugin's permissions until you restart the server or pre-allow them
 in the dev server's `pumpkin.toml`; see [Runtime caveats](#runtime-caveats).
 
-To use a local server binary instead of downloading one, set `PUMPKIN_BIN`. Set
+At startup, the command also builds each Cargo component under `native/` for your host target with
+that component's `build.mjs`, then copies its target-qualified library into the same `plugins/`
+directory. Native libraries aren't hot-reloaded, so restart `pnpm dev` after changing native source
+or Cargo files.
+
+To use a local server binary instead of downloading a release, set `PUMPKIN_BIN`. When native
+components are present, its bytes must match the pinned host asset's SHA-256 for your platform. Set
 `PUMPKIN_CACHE_DIR` to change the binary cache directory. To reset the dev server's world, config,
 and plugins, stop the server and remove `.cache/pumpkin-dev`.
 
