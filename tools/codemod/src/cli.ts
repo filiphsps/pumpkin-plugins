@@ -53,9 +53,7 @@ export async function runCli(argv: string[] = process.argv, options: CliOptions 
                 });
                 printReport(report, flags.print === true, stdout);
                 if (report.changedFiles.length > 0) {
-                    stdout(
-                        'Review the changes. After applying them, run your package manager to update the lockfile.\n',
-                    );
+                    stdout('Once the changes are written, run your package manager to update the lockfile.\n');
                 }
                 return;
             }
@@ -104,4 +102,7 @@ function printReport(
         );
     }
     for (const message of report.messages) stdout(`NOTE ${message.relativePath}: ${message.text}\n`);
+    if (report.changedFiles.length > 0 && !report.wroteFiles) {
+        stdout('Preview only; no files were changed. To apply these changes, rerun the command with --write.\n');
+    }
 }
