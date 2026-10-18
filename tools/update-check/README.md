@@ -30,6 +30,13 @@ checks with an injected synchronous JSON request function, which is useful for d
 `requestMarketJson` transport blocks and must not be called during plugin loading or server ticks.
 `marketplaceUrl` overrides the Market base URL for registration and direct version checks.
 
+<!-- docs:begin release-notes -->
+<!-- Generated from docs.ts. Run `pnpm readme`. -->
+
+When Market returns optional `release_notes`, the checker converts its Markdown to plain text for the update notice.
+The current Market check endpoint does not return this field; a Market API update must add it before plugins can show changelogs.
+<!-- docs:end release-notes -->
+
 For the server capability and registration setup, see the [plugin updates guide](../../docs/plugin-updates.md).
 
 <!-- docs:begin reference -->

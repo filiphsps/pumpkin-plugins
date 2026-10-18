@@ -62,26 +62,65 @@ function updateLimitsBlock(source: string, before: string, after: string, legacy
     return `${source.slice(0, blockStart)}\n\n${generatedBlock}\n\n${source.slice(blockEnd)}`;
 }
 
+const releaseNotesStart = '<!-- docs:begin release-notes -->';
+const releaseNotesEnd = '<!-- docs:end release-notes -->';
+const releaseNotesNote = '<!-- Generated from docs.ts. Run `pnpm readme`. -->';
+const releaseNotesText = [
+    'When Market returns optional `release_notes`, the checker converts its Markdown to plain text for the update notice.',
+    'The current Market check endpoint does not return this field; a Market API update must add it before plugins can show changelogs.',
+].join('\n');
+
+function updateReleaseNotesBlock(source: string, anchor: string): string {
+    const anchorMatch = findUniqueAnchor(source, anchor, 'before the release notes block');
+    const insertion = anchorMatch.index + anchorMatch.length;
+    const startCount = source.split(releaseNotesStart).length - 1;
+    const endCount = source.split(releaseNotesEnd).length - 1;
+    if (startCount !== endCount || startCount > 1) {
+        throw new Error('Release notes documentation markers are unbalanced or duplicated');
+    }
+
+    const generatedBlock = `${releaseNotesStart}\n${releaseNotesNote}\n\n${releaseNotesText}\n${releaseNotesEnd}`;
+    if (startCount === 1) {
+        const start = source.indexOf(releaseNotesStart);
+        const end = source.indexOf(releaseNotesEnd);
+        if (start < insertion || end < start || source.slice(insertion, start).trim()) {
+            throw new Error('Release notes documentation block is outside its expected section');
+        }
+        const suffix = source.slice(end + releaseNotesEnd.length);
+        return `${source.slice(0, start)}${generatedBlock}${suffix.trim() ? suffix : '\n'}`;
+    }
+
+    const whitespace = /^\s*/.exec(source.slice(insertion))?.[0] ?? '';
+    const following = source.slice(insertion + whitespace.length);
+    return `${source.slice(0, insertion)}\n\n${generatedBlock}${following ? `\n\n${following}` : '\n'}`;
+}
+
 /** HTTP limits shared by the package README and user guide. */
 export const documents = [
     {
         file: 'README.md',
         transform: (source: string) =>
-            updateLimitsBlock(
-                source,
-                'Automatic checks do not block plugin startup or server ticks.',
-                'A failed update request is logged and does not interrupt plugin loading.',
-                /^Asynchronous\s+requests\s+stop\s+after\s+\d+\s+seconds\s+and\s+reject\s+bodies\s+larger\s+than\s+\d+\s+KiB\.$/,
+            updateReleaseNotesBlock(
+                updateLimitsBlock(
+                    source,
+                    'Automatic checks do not block plugin startup or server ticks.',
+                    'A failed update request is logged and does not interrupt plugin loading.',
+                    /^Asynchronous\s+requests\s+stop\s+after\s+\d+\s+seconds\s+and\s+reject\s+bodies\s+larger\s+than\s+\d+\s+KiB\.$/,
+                ),
+                '`marketplaceUrl` overrides the Market base URL for registration and direct version checks.',
             ),
     },
     {
         file: 'docs/index.md',
         transform: (source: string) =>
-            updateLimitsBlock(
-                source,
-                'A failed request is logged and does not prevent the plugin from loading.',
-                '`marketplaceUrl` can override the Market base URL for tests or alternate environments.',
-                /^Requests\s+stop\s+after\s+\d+\s+seconds\s+and\s+response\s+bodies\s+larger\s+than\s+\d+\s+KiB\s+are\s+rejected\.$/,
+            updateReleaseNotesBlock(
+                updateLimitsBlock(
+                    source,
+                    'A failed request is logged and does not prevent the plugin from loading.',
+                    '`marketplaceUrl` can override the Market base URL for tests or alternate environments.',
+                    /^Requests\s+stop\s+after\s+\d+\s+seconds\s+and\s+response\s+bodies\s+larger\s+than\s+\d+\s+KiB\s+are\s+rejected\.$/,
+                ),
+                '`requestMarketJson` blocks, so do not call it during plugin loading or a server tick.',
             ),
     },
 ] satisfies DocumentSpec[];

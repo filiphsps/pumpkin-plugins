@@ -5,6 +5,8 @@ export type JsonRequest = (url: string, headers?: Record<string, string>) => unk
 export interface UpdateCheck {
     currentVersion: string;
     latestVersion: string | null;
+    /** Markdown notes for the latest release, when Market provides them. */
+    releaseNotes?: string;
     updateAvailable: boolean;
 }
 

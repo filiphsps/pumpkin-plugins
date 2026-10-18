@@ -59,7 +59,10 @@ the plugin's `info.name` and installed metadata version, URL-encoded. The respon
 a string `latest_version` and boolean `update_available`; when no stable release exists,
 `latest_version` is `null` and `update_available` is `false`. The checker validates both fields,
 then compares the semantic versions itself to decide whether to log an update; it does not rely on
-the response's `update_available` value for that decision.
+the response's `update_available` value for that decision. An optional `release_notes` string can
+carry the update's Markdown changelog, which the checker converts to plain text for the server log.
+The current Market check endpoint does not return this field yet, so displaying changelogs also
+requires a Market API update.
 
 The request includes the plugin name and version, not plugin data or configuration. The default
 URL uses HTTPS. The lower-level `registerPluginWithUpdates` and `checkMarketUpdate` APIs accept a

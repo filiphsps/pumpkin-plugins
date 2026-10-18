@@ -21,11 +21,18 @@ export function checkMarketUpdate(options: MarketUpdateOptions): UpdateCheck {
         marketUpdateUrl(options.pluginName, options.currentVersion, options.marketplaceUrl),
     );
     if (typeof response !== 'object' || response === null) throw new TypeError('Invalid Market update response');
-    const payload = response as { latest_version?: unknown; update_available?: unknown };
+    const payload = response as {
+        latest_version?: unknown;
+        release_notes?: unknown;
+        update_available?: unknown;
+    };
     if (
         typeof payload.update_available !== 'boolean' ||
         (payload.latest_version !== null && typeof payload.latest_version !== 'string') ||
-        (payload.latest_version === null && payload.update_available)
+        (payload.latest_version === null && payload.update_available) ||
+        (payload.release_notes !== undefined &&
+            payload.release_notes !== null &&
+            typeof payload.release_notes !== 'string')
     ) {
         throw new TypeError('Invalid Market update response');
     }
@@ -36,5 +43,6 @@ export function checkMarketUpdate(options: MarketUpdateOptions): UpdateCheck {
         currentVersion: options.currentVersion,
         latestVersion,
         updateAvailable: latestVersion === null ? false : compareVersions(options.currentVersion, latestVersion) < 0,
+        ...(typeof payload.release_notes === 'string' ? { releaseNotes: payload.release_notes } : {}),
     };
 }

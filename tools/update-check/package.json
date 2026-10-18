@@ -58,7 +58,8 @@
     "dependencies": {
         "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/pumpkin-api": "catalog:",
-        "fflate": "catalog:"
+        "fflate": "catalog:",
+        "remove-markdown": "0.7.0"
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",

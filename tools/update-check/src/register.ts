@@ -2,6 +2,7 @@ import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import type { PluginInfo } from '@pumpkin-plugins/docs';
 import { type Plugin, registerPlugin } from '@pumpkin-plugins/pumpkin-api';
 import { requestMarketJsonAsync, type SchedulePoll } from './http.ts';
+import { normalizeMarkdownForConsole } from './markdown.ts';
 import { checkMarketUpdate, marketUpdateUrl } from './sources/market.ts';
 import type { JsonRequest } from './updates.ts';
 
@@ -61,7 +62,17 @@ function reportUpdate(pluginName: string, currentVersion: string, response: unkn
 
 function logUpdate(pluginName: string, update: ReturnType<typeof checkMarketUpdate>): void {
     if (update.updateAvailable && update.latestVersion) {
-        logging.log('info', `${pluginName} update available: ${update.currentVersion} -> ${update.latestVersion}`);
+        const changelog = update.releaseNotes ? normalizeMarkdownForConsole(update.releaseNotes) : '';
+        const formattedChangelog = changelog
+            ? `\nChangelog:\n${changelog
+                  .split('\n')
+                  .map((line) => `  ${line}`)
+                  .join('\n')}`
+            : '';
+        logging.log(
+            'info',
+            `${pluginName} update available: ${update.currentVersion} -> ${update.latestVersion}${formattedChangelog}`,
+        );
     }
 }
 
