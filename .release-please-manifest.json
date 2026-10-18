@@ -11,7 +11,7 @@
     "packages/waypoints": "0.1.0",
     "tools/apis/pumpkin-pie-api": "0.1.1",
     "tools/build": "0.1.5",
-    "tools/codemod": "0.1.2",
+    "tools/codemod": "0.1.3",
     "tools/config": "0.1.1",
     "tools/create-pumpkin-plugin": "0.1.3",
     "tools/cspell-dict-minecraft": "0.1.0",
