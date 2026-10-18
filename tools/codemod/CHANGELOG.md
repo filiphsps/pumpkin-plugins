@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/filiphsps/pumpkin-plugins/compare/codemod-v0.1.2...codemod-v0.1.3) (2026-10-18)
+
+
+### Bug Fixes
+
+* **codemod:** clarify preview write instructions ([9f4adc5](https://github.com/filiphsps/pumpkin-plugins/commit/9f4adc559706bdd1a3ca5c249a803313b97b6d5f))
+
 ## [0.1.2](https://github.com/filiphsps/pumpkin-plugins/compare/codemod-v0.1.1...codemod-v0.1.2) (2026-10-17)
 
 
