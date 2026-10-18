@@ -66,6 +66,16 @@ That check catches templates that have drifted out of working shape.
 
 ## Make it your plugin
 
+### Choose edition support
+
+Plan for useful behavior on both Java and Bedrock. Features can differ, but a plugin that loads while
+leaving an edition's relevant experience unchanged doesn't count as supported on that edition.
+
+Use the pinned Pumpkin API to identify host limits, and verify client-dependent behavior with the
+relevant real client before claiming it works. If the plugin's purpose requires a mod for one edition,
+or a required Pumpkin API or client capability is unavailable, document the unsupported edition and
+the reason in the plugin README. Keep behavior without real-client evidence marked as unverified.
+
 Start with the metadata and starter command:
 
 1. Describe the plugin in `src/info.ts`, including any permissions, commands, or config. Replace or

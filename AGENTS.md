@@ -4,6 +4,20 @@
 building, testing, documenting, and releasing them. Plugin packages live in `packages/`; shared
 libraries and developer tools live in `tools/`, re-usable GitHub actions live in `actions/`.
 
+## Project goals
+
+The project exists to make useful, reliable Pumpkin plugins easy to build, test, release, and run.
+
+- Players and server operators are co-primary beneficiaries. Plugin authors, including authors
+  building in standalone repositories, are a core audience; maintainability keeps the project able
+  to serve them.
+- Plugins are the direct products. Tools, reusable actions, public npm packages, and extensions
+  belong when they materially support plugin quality, authoring, or maintenance. Minecraft adjacency
+  or personal usefulness alone is not enough.
+- Treat each intentionally published npm package for external use as a product with compatibility
+  and maintenance commitments. When package behavior is affected, validate its packed artifact at
+  the consumer seam.
+
 ## Questions are read-only
 
 - A question is a request for an answer, not for changes. If the message opens with "how hard would it be", "what are your thoughts", "why does", "should we", "is it possible", or otherwise asks rather than instructs: answer it, and do not edit files.
@@ -39,8 +53,11 @@ inputs, and follow the dependency and cache rules in [Building](docs/building.md
 ## Repository rules
 
 - For runtime changes, use the pinned API WIT and generated guest types. Keep the API version in
-  `pnpm-workspace.yaml` aligned with `tools/test-harness/src/pumpkin-version.ts`; follow the
-  [runtime caveats](docs/building.md#runtime-caveats).
+  `pnpm-workspace.yaml` aligned with `tools/test-harness/src/pumpkin-version.ts`. Make compatibility
+  claims only for pinned WIT and Pumpkin version pairs verified together; treat nightly compatibility
+  as exploratory until verified. Static Hermes is primary; QuickJS is supported with engine-specific
+  caveats and no parity promise. See [runtime caveats](docs/building.md#runtime-caveats) and
+  [Plugin API runtime support](docs/plugin-api/abi-and-runtime.md).
 - Treat generated files as output: edit their source and run the owning generator (usually
   `pnpm readme`). Let owning tools update `pnpm-lock.yaml`, changelogs,
   `.release-please-manifest.json` and build output.
@@ -54,6 +71,10 @@ inputs, and follow the dependency and cache rules in [Building](docs/building.md
   that will need replacement.
 - Keep components modular and concerns clearly separated. Prefer established, well-maintained
   libraries when they reduce overall complexity or improve reliability.
+- Plugins should provide useful intended behavior for both Java and Bedrock where the pinned
+  Pumpkin API supports it. Feature parity isn't required. Document exceptions for mod-specific
+  purposes or concrete Pumpkin API/client limitations, and treat client-unverified behavior as
+  unverified. See [Creating a plugin](docs/creating-a-plugin.md#choose-edition-support).
 - Use tests to protect meaningful behavior and regression risks; do not optimize test counts or
   coverage for their own sake. Optimize effort, not rigor: trace dependencies, assess impact and
   validate the change.
@@ -79,10 +100,13 @@ inputs, and follow the dependency and cache rules in [Building](docs/building.md
 2. Runtime changes also need affected integration tests against a real Pumpkin server; the fast
    runner does not start one. Use the testing skill to include shared-library dependents and
    cross-plugin scenarios.
-3. Trace affected callers, workspace dependents and runtime variants. Read your diff and affected
+3. For public consumer packages, validate the packed artifact in a standalone consumer when package
+   behavior is affected. Workspace-only resolution doesn't establish the published contract; see
+   [Testing](docs/testing.md#packed-standalone-consumer).
+4. Trace affected callers, workspace dependents and runtime variants. Read your diff and affected
    docs; check behavior and failure paths. Bug fixes need regression coverage. Unit tests sit beside
    code; server tests go in `test/`; generate fixtures in code.
-4. Report what changed, what checks ran, and anything that failed or could not be checked. A
+5. Report what changed, what checks ran, and anything that failed or could not be checked. A
    configured automatic check is not evidence that it passed.
 
 ## Agent skills
@@ -97,4 +121,5 @@ Issues and specs live in this repo’s GitHub Issues; use the `gh` CLI. See `doc
 
 ### Domain docs
 
-single-context. See `docs/agents/domain.md`.
+The repository is an ecosystem umbrella with multiple domain contexts; the root glossary covers only
+the Pumpkin Plugin API. See [Agent domain docs](docs/agents/domain.md) and [GLOSSARY-MAP.md](GLOSSARY-MAP.md).
