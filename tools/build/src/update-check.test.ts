@@ -48,7 +48,11 @@ describe('build update check', () => {
         expect(output.join('')).toContain('0.2.0');
         expect(output.join('')).toContain('pnpm dlx @pumpkin-plugins/codemod update-build .');
 
-        const lines = output.join('').trimEnd().split('\n');
+        const lines = output
+            .join('')
+            .replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g'), '')
+            .trimEnd()
+            .split('\n');
         const boxWidth = lines[0]?.length ?? 0;
         expect(lines[0]).toMatch(/^╭─+╮$/);
         expect(lines.at(-1)).toBe(`╰${'─'.repeat(boxWidth - 2)}╯`);

@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { type LatestVersionOptions, type LatestVersionPackage, latestVersion } from '@badisi/latest-version';
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 
 const packageMetadata = createRequire(import.meta.url)('../package.json') as {
     name: string;
@@ -79,20 +80,31 @@ export async function startBuildUpdateCheck(args: readonly string[], options: Bu
 }
 
 function formatBuildUpdateNotice(currentVersion: string, latestVersion: string): string {
+    const changelogUrl = new URL(`releases/tag/${releaseComponent}-v${latestVersion}`, `${repositoryUrl}/`).href;
+    const migrationCommand = 'pnpm dlx @pumpkin-plugins/codemod update-build .';
     const content = [
-        '',
-        `Update available v${currentVersion} ≫ v${latestVersion}`,
-        `Changelog: ${new URL(`releases/tag/${releaseComponent}-v${latestVersion}`, `${repositoryUrl}/`).href}`,
-        'Run "pnpm dlx @pumpkin-plugins/codemod update-build ." to update',
-        '',
-        'Follow Filiph Sandström for updates: https://x.com/filiphsandstrom',
-        '',
+        { plain: '', styled: '' },
+        {
+            plain: `Update available v${currentVersion} ≫ v${latestVersion}`,
+            styled: `${ansi.named.value.bold('Update available')} ${ansi.named.version(`v${currentVersion}`)} ≫ ${ansi.named.version.bold(`v${latestVersion}`)}`,
+        },
+        { plain: `Changelog: ${changelogUrl}`, styled: `Changelog: ${ansi.named.url(changelogUrl)}` },
+        {
+            plain: `Run "${migrationCommand}" to update`,
+            styled: `Run "${ansi.named.name(migrationCommand)}" to update`,
+        },
+        { plain: '', styled: '' },
+        {
+            plain: 'Follow Filiph Sandström for updates: https://x.com/filiphsandstrom',
+            styled: `Follow Filiph Sandström for updates: ${ansi.named.url('https://x.com/filiphsandstrom')}`,
+        },
+        { plain: '', styled: '' },
     ];
-    const contentWidth = Math.max(...content.map((line) => line.length));
+    const contentWidth = Math.max(...content.map((line) => line.plain.length));
     const border = '─'.repeat(contentWidth + 2);
     const body = content.map((line) => {
-        const leftPadding = Math.floor((contentWidth - line.length) / 2);
-        const centeredLine = `${' '.repeat(leftPadding)}${line}${' '.repeat(contentWidth - line.length - leftPadding)}`;
+        const leftPadding = Math.floor((contentWidth - line.plain.length) / 2);
+        const centeredLine = `${' '.repeat(leftPadding)}${line.styled}${' '.repeat(contentWidth - line.plain.length - leftPadding)}`;
         return `│ ${centeredLine} │`;
     });
     return [`╭${border}╮`, ...body, `╰${border}╯`, ''].join('\n');
