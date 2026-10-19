@@ -6,15 +6,15 @@ only when a context has shared terms worth recording.
 
 ## Contexts
 
-- [Pumpkin Plugin API](./GLOSSARY.md), implemented in [`tools/pumpkin-api/`](./tools/pumpkin-api/):
+- [Pumpkin Plugin API](./GLOSSARY.md), implemented in [`tools/pumpkin-api/`](https://github.com/filiphsps/pumpkin-plugins/tree/master/tools/pumpkin-api):
   defines the host contract that Pumpkin plugins compile against. This is the only context glossary
   currently maintained.
-- Plugins in [`packages/`](./packages/): provide behavior for players and server operators.
-- Developer tools in [`tools/`](./tools/): help authors build, test, document, publish, and maintain
+- Plugins in [`packages/`](https://github.com/filiphsps/pumpkin-plugins/tree/master/packages): provide behavior for players and server operators.
+- Developer tools in [`tools/`](https://github.com/filiphsps/pumpkin-plugins/tree/master/tools): help authors build, test, document, publish, and maintain
   plugins. Published packages also serve authors working in standalone repositories.
-- Reusable GitHub Actions in [`actions/`](./actions/): automate plugin signing, verification, and
+- Reusable GitHub Actions in [`actions/`](https://github.com/filiphsps/pumpkin-plugins/tree/master/actions): automate plugin signing, verification, and
   Market publishing workflows.
-- Editor extensions in [`extensions/`](./extensions/): support authoring workflows around the
+- Editor extensions in [`extensions/`](https://github.com/filiphsps/pumpkin-plugins/tree/master/extensions): support authoring workflows around the
   Minecraft ecosystem.
 
 ## Relationships
