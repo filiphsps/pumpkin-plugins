@@ -37,17 +37,6 @@ for (const command of commands) {
 if (values.tests)
     summary +=
         '\nCounts cover freshly executed Vitest suites. Cached suites and Node test results remain in the command logs. Failures retain their source annotations.\n';
-const steps = JSON.parse(process.env.CI_STEPS_JSON ?? '{}');
-const stepEntries = Object.entries(steps);
-if (stepEntries.length) {
-    summary += '\n<details>\n<summary>Workflow step outcomes</summary>\n\n| Step | Outcome |\n| --- | --- |\n';
-    for (const [name, step] of stepEntries)
-        summary += `| ${escapeSummaryText(name)} | ${escapeSummaryText(step.outcome)}${step.outcome !== step.conclusion ? ` (conclusion: ${escapeSummaryText(step.conclusion)})` : ''} |\n`;
-    summary += '\n</details>\n';
-}
-const unsuccessful = stepEntries.filter(([, step]) => ['failure', 'cancelled'].includes(step.outcome));
-if (unsuccessful.length)
-    summary += `\nAttention: ${unsuccessful.map(([name, step]) => `${escapeSummaryText(name)} (${escapeSummaryText(step.outcome)})`).join(', ')}. Open the corresponding step log for diagnostics.\n`;
 if (process.env.CI_ARTIFACT_URL) {
     const url = new URL(process.env.CI_ARTIFACT_URL);
     if (url.protocol !== 'https:') throw new Error('Artifact links must use HTTPS');
