@@ -43,15 +43,18 @@
     "scripts": {
         "build": "tsc -p . && node scripts/copy-dictionary.mjs",
         "package": "node ../../scripts/package-extension.mjs",
-        "test": "vitest run",
+        "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
         "typecheck": "tsc -p . --noEmit"
     },
     "activationEvents": [
         "onStartupFinished"
     ],
     "devDependencies": {
+        "@pumpkin-plugins/cspell-dict-minecraft": "workspace:*",
         "@types/vscode": "catalog:",
         "@vscode/vsce": "catalog:",
+        "cspell": "catalog:",
+        "fflate": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
     },
