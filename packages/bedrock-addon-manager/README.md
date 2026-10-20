@@ -19,7 +19,7 @@ See the [plugin guide](https://filiphsps.github.io/pumpkin-plugins/packages/bedr
 
 BedrockAddonManager hasn't been released yet, so there is no `bedrock-addon-manager.wasm` to download.
 
-Release pause reason: Not ready for its first release.
+Release pause reason: It doesn't send resource-pack offers yet, so players can't download packs from the server.
 
 To try it, clone this repository, run `pnpm build --filter @pumpkin-plugins/bedrock-addon-manager`, copy `build/bedrock-addon-manager.wasm` from the plugin's folder to your server's `plugins/` folder, and restart Pumpkin.
 <!-- docs:end installation -->
