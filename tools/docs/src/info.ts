@@ -1,5 +1,6 @@
 // Pure data and helpers shared by the plugin runtime and the README generator. Keep this
 // file free of Pumpkin and WASI imports so Node can load it directly.
+import type { CommandPermissionDefault } from './commands.ts';
 import type { PumpkinPermission } from './permissions.ts';
 
 export type {
@@ -41,7 +42,7 @@ export interface PermissionInfo<Name extends string = PumpkinPermission> {
 /** A command the plugin lists in its README. Build these with `commandInfos` rather than writing them. */
 export interface CommandInfo<Node extends string = string> {
     /** Who may run the command by default. */
-    defaultPermission?: import('./commands.ts').CommandPermissionDefault;
+    defaultPermission?: CommandPermissionDefault;
     description: string;
     /** Permission node required to run it, if any. */
     permission?: Node;
@@ -76,7 +77,7 @@ export interface PluginInfo<Name extends string = string> {
      * More generated README blocks, by name: the markdown goes between `<!-- docs:begin NAME -->` and
      * `<!-- docs:end NAME -->`. For content that comes from the plugin's code, such as a list of
      * routers it refuses. A name the README doesn't have markers for is skipped, and the built-in
-     * names (`summary`, `permissions`, `commands`, `config`) are taken.
+     * names (`summary`, `permissions`, `commands`, `config`, `installation`) are taken.
      */
     blocks?: Readonly<Record<string, string>>;
     /** The commands, normally `commandInfos(commands)` of the tree that registers them. */

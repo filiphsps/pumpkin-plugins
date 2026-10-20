@@ -20,6 +20,7 @@ export async function loadTeamMembers() {
     const repository = githubRepositoryUrl(manifest.repository);
     if (!repository) throw new Error('Root package.json needs a GitHub repository URL');
     const repo = repository.pathname.slice(1);
+    const isOwner = (login) => login.toLowerCase() === repo.split('/')[0].toLowerCase();
     const headers = {
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
@@ -82,7 +83,7 @@ export async function loadTeamMembers() {
         for (const contributor of humans) {
             const name = names.get(contributor.login);
             const count = contributor.contributions;
-            const owner = contributor.login.toLowerCase() === 'filiphsps';
+            const owner = isOwner(contributor.login);
             const contributionLabel = `${count.toLocaleString('en-US')} ${count === 1 ? 'contribution' : 'contributions'}`;
             members.set(contributor.login, {
                 login: contributor.login,
@@ -97,8 +98,7 @@ export async function loadTeamMembers() {
         if (contributors.length < 100) break;
     }
     return [...members.values()].sort((left, right) => {
-        const ownerOrder =
-            Number(right.login.toLowerCase() === 'filiphsps') - Number(left.login.toLowerCase() === 'filiphsps');
+        const ownerOrder = Number(isOwner(right.login)) - Number(isOwner(left.login));
         return ownerOrder || right.contributions - left.contributions || left.login.localeCompare(right.login);
     });
 }

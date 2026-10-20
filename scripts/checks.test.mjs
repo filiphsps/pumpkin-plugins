@@ -1,5 +1,5 @@
 // Tests for the repo checks (check-docs, check-release-config, package-metadata) against small
-// throwaway repos. Run with `pnpm test:scripts`.
+// throwaway repos. Workflow tests live in workflows.test.mjs. Run with `pnpm test:scripts`.
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -48,205 +48,6 @@ function run(script, dir, ...args) {
     });
     return { ok: result.status === 0, out: `${result.stdout}${result.stderr}` };
 }
-
-describe('setup-static-hermes action', () => {
-    const action = parse(
-        fs.readFileSync(path.join(scripts, '../.github/common/setup-static-hermes/action.yml'), 'utf8'),
-    );
-    const steps = action.runs.steps;
-    const step = (id) => steps.find((candidate) => candidate.id === id);
-
-    it('uses pinned host tool and toolchain versions in cache keys', () => {
-        const versionScript = step('versions').run;
-        assert.match(versionScript, /wasi-sdk\.lock\.json/);
-        assert.match(versionScript, /toolchain-versions\.json/);
-        assert.match(versionScript, /\.tools\["wit-bindgen"\]/);
-        assert.match(versionScript, /\.tools\.rust/);
-
-        const hostToolsCache = step('host-tools-cache').with;
-        assert.match(hostToolsCache.path, /host-tools/);
-        assert.match(hostToolsCache.key, /steps\.versions\.outputs\.cmake-version/);
-        assert.match(hostToolsCache.key, /steps\.versions\.outputs\.ninja-version/);
-
-        const witBindgenCache = step('wit-bindgen-cache').with;
-        assert.match(witBindgenCache.path, /wit-bindgen-\$\{\{ steps\.versions\.outputs\.wit-bindgen-version \}\}/);
-        assert.match(witBindgenCache.key, /steps\.versions\.outputs\.wit-bindgen-version/);
-        assert.match(witBindgenCache.key, /steps\.versions\.outputs\.rust-toolchain-version/);
-
-        const hermesCache = step('hermes-workspace-cache').with;
-        assert.match(hermesCache.path, /\.cache\/hermes/);
-        assert.match(hermesCache.key, /static-hermes-workspace-cache-v6/);
-        assert.match(hermesCache.key, /src\/hermes/);
-        assert.match(hermesCache.key, /src\/cli\.ts/);
-        assert.doesNotMatch(hermesCache.key, /bin\/toolchain-environment\.mjs/);
-        assert.match(hermesCache.key, /steps\.versions\.outputs\.cmake-version/);
-        assert.match(hermesCache.key, /steps\.versions\.outputs\.ninja-version/);
-        assert.match(hermesCache.key, /steps\.versions\.outputs\.wasi-sdk-version/);
-        assert.match(hermesCache.key, /steps\.versions\.outputs\.wit-bindgen-version/);
-        assert.match(hermesCache.key, /steps\.versions\.outputs\.rust-toolchain-version/);
-        assert.doesNotMatch(`${witBindgenCache.key} ${hermesCache.key}`, /wasi-sdk-34|wit-bindgen-0\.62|rust-1\.99/);
-    });
-});
-
-describe('upstream pin workflow', () => {
-    const workflow = parse(
-        fs.readFileSync(path.join(scripts, '../.github/workflows/update-upstream-pins.yml'), 'utf8'),
-    );
-    const releaseWorkflow = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/release.yml'), 'utf8'));
-
-    it('bootstraps dependencies before discovering upstream updates', () => {
-        const steps = workflow.jobs.discover.steps;
-        const bootstrapIndex = steps.findIndex((step) => step.uses === './.github/common/bootstrap');
-        const discoverIndex = steps.findIndex((step) => step.id === 'pins');
-
-        assert.ok(bootstrapIndex > 0, 'discover job must install repository dependencies');
-        assert.ok(discoverIndex > bootstrapIndex, 'discovery must run after the dependency install');
-    });
-
-    it('fails discovery when the Node command fails', () => {
-        const steps = workflow.jobs.discover.steps;
-        const discover = steps.find((step) => step.id === 'pins');
-        const dir = repo({ 'bin/node': '#!/bin/sh\nexit 23\n' });
-        const output = path.join(dir, 'github-output');
-        fs.chmodSync(path.join(dir, 'bin/node'), 0o755);
-
-        const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', discover.run], {
-            cwd: scripts,
-            env: {
-                ...process.env,
-                PATH: `${path.join(dir, 'bin')}:${process.env.PATH}`,
-                GITHUB_OUTPUT: output,
-            },
-            encoding: 'utf8',
-        });
-
-        assert.equal(result.status, 23, `${result.stdout}${result.stderr}`);
-        assert.equal(fs.existsSync(output), false, 'failed discovery must not write an empty matrix');
-    });
-
-    it('uses the release GitHub App token so created pull requests trigger CI', () => {
-        const update = workflow.jobs.update;
-        const token = update.steps.find((step) => step.id === 'app-token');
-        const checkout = update.steps.find((step) => step.uses === 'actions/checkout@v7.0.1');
-        const reconcile = update.steps.find((step) => step.name === '🔄 Reconcile upstream update PR or issue');
-        const release = releaseWorkflow.jobs.release.steps;
-        const releaseToken = release.find((step) => step.id === 'app-token');
-        const releasePlease = release.find((step) => step.id === 'release');
-
-        assert.ok(token, 'updater must create a GitHub App token');
-        assert.equal(token.uses, 'actions/create-github-app-token@v3.2.0');
-        assert.equal(token.with['client-id'], releaseToken.with['client-id']);
-        assert.equal(token.with['private-key'], releaseToken.with['private-key']);
-        assert.equal(token.with['permission-contents'], 'write');
-        assert.equal(token.with['permission-issues'], 'write');
-        assert.equal(token.with['permission-pull-requests'], 'write');
-        const appTokenExpression = ['$', '{{ steps.app-token.outputs.token }}'].join('');
-        assert.equal(checkout.with.token, appTokenExpression);
-        assert.equal(reconcile.env.GH_TOKEN, appTokenExpression);
-        assert.equal(releasePlease.env.GITHUB_TOKEN, appTokenExpression);
-        assert.equal(reconcile.run, 'node scripts/upstream-pins.mjs reconcile');
-    });
-
-    it('publishes registered tool releases through the caller workflow with OIDC', () => {
-        const ciWorkflow = parse(fs.readFileSync(path.join(scripts, '../.github/workflows/ci.yml'), 'utf8'));
-        const callerPermissions = ciWorkflow.jobs.release.permissions;
-        const publish = releaseWorkflow.jobs['publish-tools'];
-        assert.equal(ciWorkflow.on.workflow_dispatch.inputs.release_commit.required, true);
-        assert.equal(ciWorkflow.jobs.release.with.release_commit, ['$', "{{ inputs.release_commit || '' }}"].join(''));
-        assert.ok(releaseWorkflow.jobs.release.outputs.tool_paths_released);
-        assert.equal(callerPermissions['id-token'], 'write');
-        assert.ok(publish, 'release workflow needs a separate npm publish job for tools');
-        assert.equal(publish.permissions['id-token'], 'write');
-        assert.match(publish.if, /needs\.release\.outputs\.tool_paths_released/);
-        assert.equal(publish.strategy, undefined, 'tool publication must run sequentially in one job');
-        assert.equal(publish['timeout-minutes'], 60);
-        assert.equal(publish['runs-on'], 'ubuntu-26.04');
-        assert.equal(
-            releaseWorkflow.jobs.release.outputs.release_metadata,
-            ['$', '{{ steps.release.outputs.release_metadata }}'].join(''),
-        );
-        assert.equal(
-            releaseWorkflow.jobs.release.outputs.release_notes,
-            ['$', '{{ steps.release.outputs.release_notes }}'].join(''),
-        );
-        assert.equal(releaseWorkflow.jobs.release.outputs.all, undefined);
-        assert.equal(
-            releaseWorkflow.jobs['release-fanout-check'].env.RELEASE_METADATA,
-            ['$', '{{ needs.release.outputs.release_metadata }}'].join(''),
-        );
-        assert.equal(
-            publish.env.RELEASED_TOOL_PATHS,
-            ['$', '{{ needs.release.outputs.tool_paths_released }}'].join(''),
-        );
-        assert.equal(publish.env.RELEASE_METADATA, ['$', '{{ needs.release.outputs.release_metadata }}'].join(''));
-        assert.equal(
-            releaseWorkflow.jobs.market.env.MARKET_RELEASE_NOTES,
-            ['$', "{{ fromJSON(needs.release.outputs.release_notes)[format('{0}--body', matrix.path)] }}"].join(''),
-        );
-        const steps = publish.steps;
-        const tagCheck = steps.find((step) => step.name === '🔒 Check each tag is the commit this run built');
-        assert.match(tagCheck.run, /git\/ref\/tags\/\$RELEASE_TAG/);
-        assert.match(tagCheck.run, /git\/tags\/\$sha/);
-        assert.equal(publish.env.RELEASE_TARGET_SHA, ['$', '{{ inputs.release_commit || github.sha }}'].join(''));
-        const publishScript = steps.find((step) => step.name === '📤 Publish verified public npm packages');
-        assert.match(publishScript.run, /npm 11\.5\.1 or newer/);
-        assert.match(publishScript.run, /pnpm exec node scripts\/publish-tool-packages\.mjs/);
-    });
-
-    it('checks the release tag against its requested commit when a newer workflow commit exists', () => {
-        const tagCheck = releaseWorkflow.jobs['publish-tools'].steps.find(
-            (step) => step.name === '🔒 Check each tag is the commit this run built',
-        );
-        const directory = repo({
-            'bin/gh': '#!/bin/sh\nprintf "commit %s\\n" "$TAG_SHA"\n',
-            'bin/jq': '#!/bin/sh\nprintf "%s\\n" "$TAG_NAME"\n',
-        });
-        fs.chmodSync(path.join(directory, 'bin/gh'), 0o755);
-        fs.chmodSync(path.join(directory, 'bin/jq'), 0o755);
-        const releaseSha = 'b'.repeat(40);
-        const fasterWorkflowSha = 'a'.repeat(40);
-        const runGuard = (releaseTargetSha) =>
-            spawnSync('bash', ['-e', '-o', 'pipefail', '-c', tagCheck.run], {
-                cwd: scripts,
-                env: {
-                    ...process.env,
-                    PATH: `${path.join(directory, 'bin')}:${process.env.PATH}`,
-                    GH_REPO: 'filiphsps/pumpkin-plugins',
-                    RELEASED_TOOL_PATHS: '["tools/codemod"]',
-                    RELEASE_METADATA: '{}',
-                    RELEASE_TARGET_SHA: releaseTargetSha,
-                    TAG_NAME: 'codemod-v0.1.0',
-                    TAG_SHA: releaseSha,
-                    GITHUB_SHA: fasterWorkflowSha,
-                },
-                encoding: 'utf8',
-            });
-
-        const exactTarget = runGuard(releaseSha);
-        assert.equal(exactTarget.status, 0, exactTarget.stderr);
-
-        const fasterCommitTarget = runGuard(fasterWorkflowSha);
-        assert.equal(fasterCommitTarget.status, 1);
-        assert.match(fasterCommitTarget.stdout, /requested release commit/);
-    });
-
-    it('packages released extensions and attaches VSIX files to GitHub releases', () => {
-        const publish = releaseWorkflow.jobs['publish-extensions'];
-        assert.ok(releaseWorkflow.jobs.release.outputs.extension_paths_released);
-        assert.ok(publish, 'release workflow needs a VSIX packaging job for extensions');
-        assert.match(publish.if, /extension_paths_released/);
-        assert.equal(
-            publish.strategy.matrix.path,
-            ['$', '{{ fromJSON(needs.release.outputs.extension_paths_released) }}'].join(''),
-        );
-        const steps = publish.steps.map((step) => step.run ?? '').join('\n');
-        assert.match(steps, /run build/);
-        assert.match(steps, /run package/);
-        assert.match(steps, /gh release upload/);
-        assert.match(steps, /git\/ref\/tags\/\$TAG/);
-        assert.match(releaseWorkflow.jobs['release-fanout-check'].steps[0].run, /extension_count/);
-    });
-});
 
 const REPO = 'https://github.com/filiphsps/pumpkin-plugins';
 const metadata = (dir) => ({
@@ -298,6 +99,63 @@ describe('check-docs', () => {
             }),
         );
         assert.ok(inCode.ok, inCode.out);
+    });
+
+    it('resolves heading links the way GitHub names them', () => {
+        const headings =
+            '# Guide\n\n## Getting started\n\n## Use foo_bar\n\n## Setup\n\n## Setup\n\n```sh\n# Setup\n```\n';
+        const valid = run(
+            'check-docs.mjs',
+            repoWithCurrentDocsIndex({
+                ...good,
+                'docs/guide.md': `${headings}\n[a](#use-foo_bar) [b](#setup) [c](#setup-1)\n`,
+            }),
+        );
+        assert.ok(valid.ok, valid.out);
+        const broken = run(
+            'check-docs.mjs',
+            repoWithCurrentDocsIndex({
+                ...good,
+                'docs/guide.md': `${headings}\n[a](#use-foobar) [b](#setup-2)\n`,
+            }),
+        );
+        assert.match(broken.out, /links to #use-foobar, but docs\/guide\.md has no such heading/);
+        assert.match(broken.out, /links to #setup-2, but docs\/guide\.md has no such heading/);
+    });
+
+    it('checks links with titles and reference-style links', () => {
+        const result = run(
+            'check-docs.mjs',
+            repoWithCurrentDocsIndex({
+                ...good,
+                'docs/guide.md': '# Guide\n\n[x](titled.md "Title") [y][ref]\n\n[ref]: referenced.md\n',
+            }),
+        );
+        assert.match(result.out, /links to titled\.md, which does not exist/);
+        assert.match(result.out, /links to referenced\.md, which does not exist/);
+    });
+
+    it('accepts links to generated API pages whether or not the ignored API output exists', () => {
+        const result = run(
+            'check-docs.mjs',
+            repoWithCurrentDocsIndex({
+                ...good,
+                'docs/guide.md':
+                    '# Guide\n\n## Getting started\n\nSee `tools/kit/src/a.ts` and [the API](/api/kit/).\n',
+            }),
+        );
+        assert.ok(result.ok, result.out);
+
+        const built = run(
+            'check-docs.mjs',
+            repoWithCurrentDocsIndex({
+                ...good,
+                'docs/guide.md':
+                    '# Guide\n\n## Getting started\n\nSee `tools/kit/src/a.ts` and [the API](/api/kit/).\n',
+                'docs/api/other/index.md': '# Other\n',
+            }),
+        );
+        assert.ok(built.ok, `a local API build must not change the result:\n${built.out}`);
     });
 
     it('validates agent guidance and skill links and commands too', () => {
@@ -383,6 +241,17 @@ describe('check-docs', () => {
             }),
         );
         assert.match(result.out, /the script "deploy"/);
+
+        const prefixOnly = run(
+            'check-docs.mjs',
+            repoWithCurrentDocsIndex({
+                ...good,
+                'package.json': { name: 'root', scripts: { test: 'x', readme: 'x', lint: 'x', 'lint:fix': 'x' } },
+                'README.md': `${good['README.md']}\nRun \`pnpm lint:fix\`.\n`,
+            }),
+        );
+        assert.match(prefixOnly.out, /the script "lint"/);
+        assert.doesNotMatch(prefixOnly.out, /the script "lint:fix"/);
     });
 
     it('fails for a doc page the index does not list', () => {
@@ -414,6 +283,17 @@ describe('check-docs', () => {
         );
         assert.match(result.out, /does not list the CI job "🚀 Ship"/);
         assert.doesNotMatch(result.out, /Lint/);
+
+        const reformatted = run(
+            'check-docs.mjs',
+            repoWithCurrentDocsIndex({
+                ...good,
+                '.github/workflows/ci.yml': 'jobs:\n  cpp:\n    name: 🛠️ C++ build\n  ship:\n    name: 🚀 Ship\n',
+                'docs/ci-and-releases.md': '# CI\n\n| 🛠️ C++ build | always |\n',
+            }),
+        );
+        assert.match(reformatted.out, /does not list the CI job "🚀 Ship"/);
+        assert.doesNotMatch(reformatted.out, /C\+\+/);
     });
 
     it('ignores scratch folders that start with an underscore', () => {
@@ -458,7 +338,7 @@ describe('package-metadata', () => {
         assert.ok(result.ok, result.out);
     });
 
-    it('keeps benchmark workspace packages private and outside Release Please', () => {
+    it('keeps benchmark workspace packages private', () => {
         const privatePackage = repo(
             files({
                 'benchmarks/engine-comparison/package.json': {
@@ -476,22 +356,6 @@ describe('package-metadata', () => {
             run('package-metadata.mjs', publicPackage).out,
             /benchmark workspace packages must set "private": true/,
         );
-
-        const registered = repo({
-            ...files({
-                'benchmarks/engine-comparison/package.json': {
-                    name: '@pumpkin-plugins/engine-comparison',
-                    private: true,
-                },
-            }),
-            'release-please-config.json': {
-                packages: { 'benchmarks/engine-comparison': { component: 'engine-comparison' } },
-            },
-            '.release-please-manifest.json': { 'benchmarks/engine-comparison': '0.0.0' },
-        });
-        const result = run('package-metadata.mjs', registered);
-        assert.match(result.out, /private benchmark packages cannot be in release-please-config\.json/);
-        assert.match(result.out, /private benchmark packages cannot be in \.release-please-manifest\.json/);
     });
 
     it('names the missing or wrong fields', () => {
@@ -741,6 +605,23 @@ describe('check-release-config', () => {
             run('check-release-config.mjs', repo(noReason)).out,
             /packages\/plug in release-please-paused\.json needs a non-empty reason/,
         );
+    });
+
+    it('rejects a private benchmark package in either Release Please file', () => {
+        const registered = files();
+        registered['benchmarks/engine-comparison/package.json'] = {
+            name: '@pumpkin-plugins/engine-comparison',
+            private: true,
+        };
+        registered['release-please-config.json'].packages['benchmarks/engine-comparison'] = {
+            component: 'engine-comparison',
+        };
+        registered['.release-please-manifest.json']['benchmarks/engine-comparison'] = '0.0.0';
+
+        const result = run('check-release-config.mjs', repo(registered));
+        assert.equal(result.ok, false);
+        assert.match(result.out, /release-please-config\.json lists benchmarks\/engine-comparison/);
+        assert.match(result.out, /\.release-please-manifest\.json lists benchmarks\/engine-comparison/);
     });
 
     it('requires release-as 0.0.1 until the first release', () => {

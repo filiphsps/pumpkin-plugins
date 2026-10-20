@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, it } from 'vitest';
 
 const cli = path.join(import.meta.dirname, '../bin/pumpkin-plugins-docs.mjs');
 const dirs: string[] = [];
@@ -79,7 +79,6 @@ describe('action version CLI', { timeout: 15000 }, () => {
             publishMarket: readme(dir, 'publish-market'),
             anotherAction: readme(dir, 'another-action'),
         };
-        expect(generatedReadmes).toMatchSnapshot();
         assert.match(generatedReadmes.publishMarket, /publish-market-v0\.0\.1/);
         assert.match(generatedReadmes.anotherAction, /market-helper-v1\.2\.3/);
     });

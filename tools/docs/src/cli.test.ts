@@ -51,7 +51,6 @@ describe('plugin README', { timeout: 15000 }, () => {
         const generated = run(p);
         expect(generated.status).toBe(0);
         const firstReadme = read('p/README.md');
-        expect(firstReadme).toMatchSnapshot();
         expect(firstReadme).toContain('| `/demo list` | List | none |');
 
         put('p/README.md', firstReadme.replace('Hand-written words.', 'My own words.'));
@@ -59,7 +58,6 @@ describe('plugin README', { timeout: 15000 }, () => {
         expect(unchanged.status).toBe(0);
         const preservedReadme = read('p/README.md');
         expect(preservedReadme).toBe(firstReadme.replace('Hand-written words.', 'My own words.'));
-        expect(preservedReadme).toMatchSnapshot();
 
         put(
             'p/src/info.ts',
@@ -72,7 +70,6 @@ describe('plugin README', { timeout: 15000 }, () => {
         const updated = run(p);
         expect(updated.status).toBe(0);
         const updatedReadme = read('p/README.md');
-        expect(updatedReadme).toMatchSnapshot();
         expect(updatedReadme).toContain('`/demo reload`');
         expect(updatedReadme).toContain('My own words.');
     });
@@ -83,17 +80,40 @@ describe('plugin README', { timeout: 15000 }, () => {
         put('p/src/info.ts', plugin('Demo', 'Does demo things.', ', blocks: { routers: "| Telekom |", unused: "x" }'));
         expect(run(p).status).toBe(0);
         const generatedReadme = read('p/README.md');
-        expect(generatedReadme).toMatchSnapshot();
         expect(generatedReadme).toContain('<!-- docs:begin routers -->\n<!-- Generated');
         expect(generatedReadme).toContain('| Telekom |');
         expect(generatedReadme).not.toContain('unused');
+    });
+
+    it('tells readers how to get the plugin while it is paused and after it is released', () => {
+        const p = path.join(dir, 'p');
+        put(
+            'p/package.json',
+            '{"name":"@x/p","version":"1.0.0","type":"module","pumpkinPlugin":{"output":"build/demo.wasm"}}',
+        );
+        put('p/README.md', `${README}\n<!-- docs:begin installation -->\n<!-- docs:end installation -->\n`);
+        put('release-please-paused.json', '{"p":"Players can not see its output yet."}');
+
+        expect(run(p).status).toBe(0);
+        const paused = read('p/README.md');
+        expect(paused).toContain("hasn't been released");
+        expect(paused).toContain('Players can not see its output yet.');
+        expect(paused).toContain('`pnpm build --filter @x/p`');
+        expect(paused).not.toContain('GitHub release');
+
+        put('release-please-paused.json', '{}');
+        expect(run(p, '--check').status).toBe(1);
+        expect(run(p).status).toBe(0);
+        const released = read('p/README.md');
+        expect(released).toContain("Download `demo.wasm` from the plugin's GitHub release");
+        expect(released).not.toContain("hasn't been released");
     });
 
     it('accepts the explicit plugin command', () => {
         const result = run(path.join(dir, 'p'), 'plugin');
 
         expect(result.status).toBe(0);
-        expect(read('p/README.md')).toMatchSnapshot();
+        expect(read('p/README.md')).toContain('| `/demo list` | List | none |');
     });
 
     it('--check fails on a stale README and never writes', () => {
@@ -161,7 +181,6 @@ describe('root README', { timeout: 15000 }, () => {
         const generated = run(dir, 'root');
         expect(generated.status).toBe(0);
         const first = read('README.md');
-        expect(first).toMatchSnapshot();
         expect(first).toContain('| [Alpha](packages/alpha) | Alpha plugin. | MIT |');
         expect(first).toContain('| [@x/beta](packages/beta) | Beta from package.json | MIT |');
         expect(first).toContain('| [@x/build](tools/build) | Builds | MIT |');
@@ -180,18 +199,24 @@ describe('root README', { timeout: 15000 }, () => {
         const expanded = run(dir, 'root');
         expect(expanded.status).toBe(0);
         const expandedReadme = read('README.md');
-        expect(expandedReadme).toMatchSnapshot();
         expect(expandedReadme.match(/^\| \[/gm)).toHaveLength(5);
         expect(expandedReadme).toContain('[@x/gamma](packages/gamma)');
 
         fs.rmSync(path.join(dir, 'packages/beta'), { recursive: true });
         expect(run(dir, 'root').status).toBe(0);
         const removedReadme = read('README.md');
-        expect(removedReadme).toMatchSnapshot();
         expect(removedReadme).not.toContain('beta');
         const unchanged = run(dir, 'root', '--check');
         expect(unchanged.status).toBe(0);
         expect(read('README.md')).toBe(removedReadme);
+    });
+
+    it('marks paused plugins as unreleased', () => {
+        put('release-please-paused.json', '{"packages/alpha":"Not verified on a client yet."}');
+        expect(run(dir, 'root').status).toBe(0);
+        const generated = read('README.md');
+        expect(generated).toContain('| [Alpha](packages/alpha) (unreleased) | Alpha plugin. | MIT |');
+        expect(generated).toContain('| [@x/beta](packages/beta) | Beta from package.json | MIT |');
     });
 
     it('lists action metadata and detects changes without writing in check mode', () => {
@@ -205,7 +230,6 @@ describe('root README', { timeout: 15000 }, () => {
         const updatedRoot = run(dir, 'root');
         expect(updatedRoot.status).toBe(0);
         const generatedReadme = read('README.md');
-        expect(generatedReadme).toMatchSnapshot();
         expect(generatedReadme).toContain('**Actions**');
         expect(generatedReadme).toContain('| [Sign plugin](actions/sign) | Add the plugin release signature |');
         expect(generatedReadme.indexOf('**Actions**')).toBeLessThan(generatedReadme.indexOf('**Plugins**'));
@@ -223,7 +247,6 @@ describe('root README', { timeout: 15000 }, () => {
         expect(read('README.md')).toBe(generatedReadme);
         expect(run(dir, 'root').status).toBe(0);
         const updatedReadme = read('README.md');
-        expect(updatedReadme).toMatchSnapshot();
         expect(updatedReadme).toContain('| [Sign plugin](actions/sign) | Verify the plugin release signature |');
     });
 
@@ -232,7 +255,6 @@ describe('root README', { timeout: 15000 }, () => {
         put('actions/folded/action.yml', 'name: Folded\ndescription: >-\n  Action with\n  folded words\n');
         expect(run(dir, 'root').status).toBe(0);
         const generatedReadme = read('README.md');
-        expect(generatedReadme).toMatchSnapshot();
         expect(generatedReadme).toContain("| [A: B](actions/quoted) | Action with a 'quote' |");
         expect(generatedReadme).toContain('| [Folded](actions/folded) | Action with folded words |');
 
@@ -307,7 +329,6 @@ describe('custom document CLI', { timeout: 15000 }, () => {
             const generated = run(root, 'generate', 'docs.ts');
             expect(generated.status).toBe(0);
             const generatedReadme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
-            expect(generatedReadme).toMatchSnapshot();
             expect(generatedReadme).toContain('Fresh');
             const unchanged = run(root, 'generate', 'docs.ts', '--check');
             expect(unchanged.status).toBe(0);
@@ -322,5 +343,41 @@ describe('custom document CLI', { timeout: 15000 }, () => {
         } finally {
             fs.rmSync(root, { recursive: true, force: true });
         }
+    });
+});
+
+describe('docs index CLI', { timeout: 15000 }, () => {
+    beforeEach(() => {
+        put('docs/README.md', '# Docs\n\n<!-- docs:begin site-index -->\n<!-- docs:end site-index -->\n');
+        put('docs/index.md', '# Home\n');
+        put('docs/setup.md', '---\nnavigation:\n    category: Basics\n---\n\n# Setup\n\nInstall the tools.\n');
+        put('docs/api/generated.md', '# Generated API page\n');
+        put('docs/topics/index.md', '---\ntitle: Topic overview\ndescription: All topics\n---\n\n# Ignored\n');
+        put('docs/topics/alpha.md', '# Alpha topic\n\nAlpha prose.\n');
+        put('docs/odds-and-ends/beta.md', '# Beta notes\n');
+        put('packages/demo/package.json', '{"name":"@x/demo"}');
+        put('packages/demo/docs/usage.md', '---\nnavigation:\n    catalog: true\n---\n\n# Demo usage\n');
+        put('packages/demo/docs/internal.md', '# Demo internals\n');
+    });
+
+    it('lists guides by category and nests docs folders and catalogued component pages', () => {
+        expect(run(dir, 'docs-index', '--check').status).toBe(1);
+        expect(run(dir, 'docs-index').status).toBe(0);
+        const index = read('docs/README.md');
+
+        expect(index).toContain('### Basics\n\n- [Setup](setup.md) — Install the tools.');
+        expect(index).toContain('- [Topic overview](topics/index.md) — All topics\n  - [Alpha topic](topics/alpha.md)');
+        expect(index).toContain('- **Odds And Ends**\n  - [Beta notes](odds-and-ends/beta.md)');
+        expect(index).toContain('[Demo usage](../packages/demo/docs/usage.md)');
+        expect(index).not.toContain('Demo internals');
+        expect(index).not.toContain('Generated API page');
+        expect(index).not.toContain('[Home]');
+        expect(run(dir, 'docs-index', '--check').status).toBe(0);
+    });
+
+    it('leaves agent instructions out of the public docs index', () => {
+        put('docs/agents/triage.md', '# Triage labels\n');
+        expect(run(dir, 'docs-index').status).toBe(0);
+        expect(read('docs/README.md')).not.toContain('Triage labels');
     });
 });

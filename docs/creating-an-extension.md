@@ -1,4 +1,6 @@
 ---
+navigation:
+    category: Getting started
 title: "Creating a VS Code extension"
 description: "Scaffold, build, test, and release a VS Code extension"
 ---
@@ -80,7 +82,9 @@ dependencies such as TypeScript and Vitest stay in `devDependencies`.
 
 If the extension ships generated files from another workspace package, list that package's name in
 `pumpkinBundleDependencies` in the extension's `package.json`. Release tooling uses this declaration
-to include changes to the bundled package when deciding whether the extension needs a release.
+to include changes to the bundled package when deciding whether the extension needs a release. Also
+add the package to `devDependencies` as `workspace:*`, so Turbo rebuilds the extension when it
+changes.
 
 ## What CI checks
 

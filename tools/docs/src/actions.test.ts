@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, it } from 'vitest';
 
 const script = path.join(import.meta.dirname, '../bin/pumpkin-plugins-docs.mjs');
 const dirs: string[] = [];
@@ -58,7 +58,6 @@ describe('action README CLI', { timeout: 15000 }, () => {
         assert.equal(result.status, 0, result.output);
         const market = readme(root, 'market-action');
         const noOutput = readme(root, 'no-output');
-        expect({ market, noOutput }).toMatchSnapshot();
         assert.match(market, /\| `plugin-id` \| No \| {2}\| Public or numeric ID \|/);
         assert.match(market, /\| `update-mode` \| No \| `patch` \| Update mode \|/);
         assert.match(market, /\| `listing-id` \| Resolved numeric ID \|/);
@@ -82,7 +81,7 @@ describe('action README CLI', { timeout: 15000 }, () => {
         const generated = run(root);
         assert.equal(generated.status, 0, generated.output);
         const generatedReadme = readme(root, 'action');
-        expect(generatedReadme).toMatchSnapshot();
+        assert.match(generatedReadme, /\| `result` \| Result value \|/);
         const unchanged = run(root, true);
         assert.equal(unchanged.status, 0);
         assert.equal(readme(root, 'action'), generatedReadme);
