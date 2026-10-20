@@ -25,10 +25,21 @@ function run(command, args) {
 
 if (process.argv[2] === '--collect') {
     // Turbo must execute tests: cached LCOV does not contain raw coverage from their child processes.
-    process.exitCode = run('pnpm', ['turbo', 'run', 'test:coverage', '--force', '--output-logs=errors-only']);
-    if (process.exitCode === 0) process.exitCode = run('pnpm', ['test:scripts']);
-    if (process.exitCode === 0)
-        process.exitCode = run(process.execPath, ['--test', ...fs.globSync('actions/*/src/*.test.mjs', { cwd: root })]);
+    // Every suite runs even after one fails, so one failure doesn't hide the others; the first
+    // failure's exit code fails the run. Turbo skips only the tasks whose own dependencies failed.
+    const exitCodes = [
+        run('pnpm', [
+            'turbo',
+            'run',
+            'test:coverage',
+            '--force',
+            '--output-logs=errors-only',
+            '--continue=dependencies-successful',
+        ]),
+        run('pnpm', ['test:scripts']),
+        run(process.execPath, ['--test', ...fs.globSync('actions/*/src/*.test.mjs', { cwd: root })]),
+    ];
+    process.exitCode = exitCodes.find((code) => code !== 0) ?? 0;
 } else {
     fs.rmSync(directory, { recursive: true, force: true });
     fs.mkdirSync(directory, { recursive: true });

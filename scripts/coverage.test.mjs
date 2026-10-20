@@ -11,6 +11,50 @@ const c8 = require.resolve('c8/bin/c8.js');
 const config = path.resolve(import.meta.dirname, '../coverage.config.json');
 const evidence = path.resolve(import.meta.dirname, '../coverage/verification/process-coverage');
 
+test('runs the script and action suites after a package suite fails, and still fails the run', () => {
+    const cwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-coverage-collect-')));
+    try {
+        fs.mkdirSync(path.join(cwd, 'scripts'));
+        fs.copyFileSync(path.join(import.meta.dirname, 'coverage.mjs'), path.join(cwd, 'scripts/coverage.mjs'));
+        fs.mkdirSync(path.join(cwd, 'coverage/process'), { recursive: true });
+        fs.mkdirSync(path.join(cwd, 'actions/demo/src'), { recursive: true });
+        fs.writeFileSync(
+            path.join(cwd, 'actions/demo/src/demo.test.mjs'),
+            "import { test } from 'node:test';\ntest('passes', () => {});\n",
+        );
+        // A stand-in pnpm: one package's coverage task fails, the repository script tests pass.
+        fs.mkdirSync(path.join(cwd, 'bin'));
+        fs.writeFileSync(
+            path.join(cwd, 'bin/pnpm'),
+            '#!/bin/sh\nif [ "$1" = turbo ]; then echo "package suite failed" >&2; exit 3; fi\nexit 0\n',
+            { mode: 0o755 },
+        );
+
+        const collect = spawnSync(process.execPath, ['scripts/coverage.mjs', '--collect'], {
+            cwd,
+            encoding: 'utf8',
+            env: { ...process.env, PATH: `${path.join(cwd, 'bin')}${path.delimiter}${process.env.PATH}` },
+        });
+
+        assert.equal(collect.status, 3, 'the run must fail with the failing suite exit code');
+        const { commands } = JSON.parse(fs.readFileSync(path.join(cwd, 'coverage/process/run.json'), 'utf8'));
+        assert.deepEqual(
+            commands.map(({ command, exitCode }) => [command.slice(0, 4).join(' '), exitCode]),
+            [
+                ['pnpm turbo run test:coverage', 3],
+                ['pnpm test:scripts', 0],
+                [`${process.execPath} --test actions/demo/src/demo.test.mjs`, 0],
+            ],
+        );
+        assert.ok(
+            commands[0].command.some((arg) => /^--continue(?:=|$)/.test(arg)),
+            'Turbo must keep running the other packages after one fails',
+        );
+    } finally {
+        fs.rmSync(cwd, { recursive: true, force: true });
+    }
+});
+
 test('process coverage includes child-only TypeScript, keeps unvisited source, and rejects failed runs', () => {
     const cwd = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-process-coverage-')));
     const source = path.join(cwd, 'tools/fixture/src');
