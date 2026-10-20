@@ -1,10 +1,5 @@
 import * as vscode from 'vscode';
-import { registerDictionary } from './register-dictionary.js';
-
-interface CodeSpellCheckerApi {
-    /** Registers a CSpell configuration file with Code Spell Checker. */
-    registerConfig(configPath: string): void | Promise<void>;
-}
+import { type CodeSpellCheckerApi, registerDictionary } from './register-dictionary.js';
 
 /** Activates the Minecraft dictionary in Code Spell Checker. */
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
