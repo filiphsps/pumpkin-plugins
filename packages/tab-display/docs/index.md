@@ -5,79 +5,75 @@ navigation:
 
 # TabDisplay
 
-TabDisplay customizes Pumpkin's native Java player list with formatted real-player names and
-per-viewer headers and footers. It keeps the native roster and latency behavior. Bedrock players
-continue to see Pumpkin's unchanged player list.
+TabDisplay formats the Java player list: it gives every listed player's name the same template and
+style, and shows each Java player their own header and footer lines. Bedrock players keep Pumpkin's
+normal player list.
 
 Install `tab-display.wasm` in the server's `plugins/` directory and restart. TabDisplay creates
-`plugins/data/TabDisplay/config.toml`. It requests `fs.read.data` and `fs.write.data` for that file;
-the normal Pumpkin Market update check also requests `http.outbound`.
+`plugins/data/TabDisplay/config.toml` on the first start. It needs `fs.read.data` and `fs.write.data`
+for that file, and `http.outbound` for the usual Pumpkin Market update check.
 
-## Current capability boundary
+## What it changes
 
-The Java adapter makes tab-name and header/footer calls only for the protocol version listed in the
-capability table below. It leaves other Java versions unchanged and reports them as unsupported in
-`/tabdisplay status`. These adapter calls have not been verified with a live Java client in this
-environment. Status and documentation do not claim that a live client displayed the result.
-
-Native sorting is disabled. Non-empty `sorting.rules` values fail config validation because the
-client's ordering direction has not been verified. Numeric objectives are also rejected until their
-player-list display behavior is verified. The Bedrock adapter does not send Java tab fields or
-modify names, scores, identities, skins or roster membership.
-
-<!-- docs:begin capabilities -->
-<!-- Generated from src/model.ts and docs.ts. Run `pnpm readme`. -->
-
-| Surface | Current behavior |
+| Part of the player list | What TabDisplay does |
 | --- | --- |
-| Java row names | Global subject formatting, gated to `v-26-3`; live client behavior unverified |
-| Java header/footer | Per-viewer formatted lines, gated to `v-26-3`; live client behavior unverified |
-| Java sorting | Disabled; config rejects non-empty rules |
-| Java numeric objective | Disabled; config rejects `objective.enabled = true` |
-| Bedrock roster | Left unchanged; objective and row formatting unsupported |
-| Per-viewer row names, fake rows and fixed slots | Not implemented |
-<!-- docs:end capabilities -->
+| Java row names | Applies `entry.text` and its style to every listed player |
+| Java header and footer | Renders `header.lines` and `footer.lines` for each viewer |
+| Bedrock player list | Leaves it unchanged |
 
-## PumpkinPIE placeholders
+TabDisplay doesn't sort the list, add score columns, add fake rows or show different row names to
+different viewers. It never changes player identities, skins or who appears in the list.
 
-PumpkinPIE is an optional external plugin, built and released separately from TabDisplay. TabDisplay
-talks to the configured plugin name through the shared PumpkinPIE client API and does not require
-the provider as plugin metadata. If it is absent, the display
-commands still work and templates use the configured `placeholders.missing_provider` fallback
-(`literal` by default, or `empty`). Once the provider returns, one shared session resumes bounded
-placeholder work. Unknown identifiers follow `placeholders.unresolved`.
+## Placeholders
 
-Install only a PumpkinPIE artifact compatible with the server and plugin API versions. Confirm its
-release provenance from the provider's official distribution before installing it; no provider source
-or binary is bundled here. Real-IPC integration against a provenance-verified provider artifact is
-still pending.
+Templates can contain tokens such as `%player_name%`. Without any other plugin, TabDisplay fills in
+two of them itself: `%player_name%` and `%server_online%`, the number of players online. That covers
+the default config, so a fresh install shows real names and counts.
 
-Header and footer templates use the viewer's context. A row-name template uses the listed subject's
-context. Placeholders receive a player's current name only at the request boundary; internal state
-uses UUIDs. Provider output is rendered as literal text and cannot inject formatting JSON or
-clickable commands.
+Every other token needs [PumpkinPIE](https://github.com/Rennex07/PumpkinPIE/releases), a separate
+plugin that TabDisplay doesn't bundle. Install a PumpkinPIE release built for your Pumpkin version
+next to TabDisplay. `placeholders.provider` is the plugin name TabDisplay asks for values.
 
-## Configuration and ownership
+While PumpkinPIE isn't running, `placeholders.missing_provider` decides what the other tokens show:
+`literal` leaves the token text in place and `empty` removes it. Tokens PumpkinPIE doesn't know
+follow `placeholders.unresolved` in the same way.
 
-Use `/tabdisplay reload` to validate and apply `config.toml`. Invalid TOML or unsupported settings
-leave the running config and file contents untouched. `/tabdisplay status` reports provider state,
-connected Java versions, unsupported capabilities and unresolved placeholder identifiers.
-`/tabdisplay inspect <player>` reports safe per-player context and placeholder IDs; it never displays
-resolved placeholder values.
+Header and footer tokens are filled in for the player looking at the list. Row-name tokens are filled
+in for the player in that row. Placeholder values are always shown as plain text, so a value can't
+add formatting or clickable commands.
 
-The commands are operator-only by default. A row name is restored on disable, reload that turns row
-formatting off, disconnect or unload only while the current value still matches TabDisplay's last
-write. If another plugin changes the name, TabDisplay releases ownership and leaves that value alone.
-Headers and footers have no getter for original state in the pinned API; TabDisplay clears them to
-empty on disable or unload under exclusive ownership. Native order resets to zero if later enabled
-after a verified probe.
+If PumpkinPIE stops answering, TabDisplay keeps showing the last complete result for up to 30
+seconds, then switches to the fallback text above.
 
-## Work limits and measurements
+## Commands and config changes
 
-Defaults refresh templates every 20 ticks and snapshot at most 500 players; `general.max_players` is
-bounded at 5,000. Placeholder resolution processes at most 256 requests and 1 MiB per batch on a
-tick. Rendered fields are capped at 8 KiB. When the provider is unavailable, the last successful
-frame is retained for up to 30 seconds before configured fallback text is applied.
+The `/tabdisplay` commands are for operators by default:
 
-No server TPS or client display performance benchmark has been collected. The work limits bound
-individual snapshots and placeholder batches, but they are not a measured capacity claim.
+- `/tabdisplay status` shows whether PumpkinPIE is connected, how many Java and Bedrock players are
+  online, their Java versions, unknown placeholder tokens and the last problem TabDisplay hit.
+- `/tabdisplay reload` applies changes to `config.toml`. If the file has invalid TOML or an invalid
+  value, the reload lists the problems and keeps the current settings.
+- `/tabdisplay inspect <player>` shows which placeholder tokens apply to one player. It doesn't show
+  their values.
+
+At startup, an invalid value falls back to its default and TabDisplay logs a warning; if the file
+isn't valid TOML, every setting uses its default. TabDisplay never rewrites a file that has invalid
+values, so your edits stay in place for you to fix.
+
+## Turning it off
+
+Set `general.enabled = false` and reload to undo all of TabDisplay's changes for online players, or
+set `entry.enabled = false` to undo only the row names. Unloading the plugin undoes them too. A row
+name goes back to what it was before TabDisplay changed it, unless another plugin has changed it
+since; that newer name is left alone. Pumpkin has no way to read the previous header and footer, so
+TabDisplay clears them.
+
+## Limits
+
+TabDisplay refreshes the list every `general.refresh_ticks` ticks, 20 by default. It works on at most
+`general.max_players` online players, 500 by default and 5,000 at most. When more players are online
+than that, it stops updating and logs a warning, then logs again and carries on once the count drops.
+
+Each tick sends PumpkinPIE at most one batch of 256 placeholder requests, and no batch is larger
+than 1 MiB. A rendered line longer than 8 KiB is cut to fit. These limits keep each tick's work
+bounded, but nobody has measured their effect on server TPS yet.

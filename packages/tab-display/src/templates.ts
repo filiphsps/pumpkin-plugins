@@ -1,9 +1,9 @@
 import type { ResolvedLine } from '@pumpkin-plugins/pumpkin-pie-api';
-import { strToU8 } from 'fflate';
+import { strFromU8, strToU8 } from 'fflate';
 
 /** Maximum configured template input size, measured as UTF-8 bytes. */
 export const MAX_TEMPLATE_BYTES = 4 * 1024;
-/** Maximum rendered field size, measured as UTF-8 bytes. */
+/** Maximum rendered field size, measured as UTF-8 bytes. Longer fields are cut to fit. */
 export const MAX_RENDERED_FIELD_BYTES = 8 * 1024;
 
 /** A parsed token or literal segment from one configured field. */
@@ -51,16 +51,30 @@ export function compileTemplate(source: string): CompiledTemplate {
     };
 }
 
-/** Renders one provider result as literal text, applying fallback only to unresolved tokens. */
+/**
+ * Renders one provider result as literal text, applying fallback only to unresolved tokens.
+ *
+ * @param builtins - Values used for matching tokens when there is no provider result, so common
+ * tokens such as `%player_name%` still render without PumpkinPIE.
+ */
 export function renderTemplate(
     template: CompiledTemplate,
     resolution: ResolvedLine | undefined,
     fallback: PlaceholderFallback,
     providerAvailable: boolean,
+    builtins: ReadonlyMap<string, string> = new Map(),
 ): string {
     if (!template.hasPlaceholders) return template.source;
     if (!providerAvailable || resolution === undefined) {
-        return bounded(fallback === 'literal' ? template.source : withoutPlaceholders(template));
+        return bounded(
+            template.parts
+                .map((part) =>
+                    part.kind === 'literal'
+                        ? part.text
+                        : (builtins.get(part.id) ?? (fallback === 'literal' ? part.token : '')),
+                )
+                .join(''),
+        );
     }
 
     const unresolved = new Set(resolution.unresolved);
@@ -73,13 +87,11 @@ export function renderTemplate(
     return bounded(rendered);
 }
 
-function withoutPlaceholders(template: CompiledTemplate): string {
-    return template.parts.map((part) => (part.kind === 'literal' ? part.text : '')).join('');
-}
-
 function bounded(text: string): string {
-    if (strToU8(text).length > MAX_RENDERED_FIELD_BYTES) {
-        throw new RangeError('Rendered field must be at most 8 KiB in UTF-8');
-    }
-    return text;
+    const bytes = strToU8(text);
+    if (bytes.length <= MAX_RENDERED_FIELD_BYTES) return text;
+    // Step back over UTF-8 continuation bytes so the cut never splits a character.
+    let end = MAX_RENDERED_FIELD_BYTES;
+    while (end > 0 && ((bytes[end] ?? 0) & 0xc0) === 0x80) end -= 1;
+    return strFromU8(bytes.subarray(0, end));
 }

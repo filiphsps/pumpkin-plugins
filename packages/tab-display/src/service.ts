@@ -1,15 +1,7 @@
-import type { ResolvedLine, SessionState } from '@pumpkin-plugins/pumpkin-pie-api';
+import { encodeRequest, LIMITS, type ResolvedLine, type SessionState } from '@pumpkin-plugins/pumpkin-pie-api';
 import { strToU8 } from 'fflate';
-import { type ConfigValidation, type TabDisplayConfig, type TemplateLineConfig, validateConfig } from './config.ts';
-import {
-    type ApplyResult,
-    type Capability,
-    JAVA_DISPLAY_VERSION,
-    type PlayerSnapshot,
-    type RenderedLine,
-    type TabDisplayStatus,
-} from './model.ts';
-import { assignDenseOrders } from './sorting.ts';
+import type { TabDisplayConfig, TemplateLineConfig } from './config.ts';
+import type { ApplyResult, PlayerSnapshot, RenderedLine, TabDisplayStatus } from './model.ts';
 import { type CompiledTemplate, compileTemplate, renderTemplate } from './templates.ts';
 
 /** One request sent to the shared PumpkinPIE client. */
@@ -32,8 +24,6 @@ export interface TabDisplayHost {
     setEntryName(uuid: string, value: RenderedLine | undefined): ApplyResult;
     /** Applies a personalized viewer header and footer. */
     setHeaderFooter(uuid: string, header: readonly RenderedLine[], footer: readonly RenderedLine[]): ApplyResult;
-    /** Applies one dense native player-list order. */
-    setOrder(uuid: string, order: number): ApplyResult;
     /** Copies bounded player primitives from the host. */
     snapshotPlayers(limit: number): readonly PlayerSnapshot[];
 }
@@ -45,7 +35,6 @@ export interface TabDisplayServiceOptions {
     readonly log?: (message: string) => void;
     readonly now: () => number;
     readonly resolver: TabPlaceholderResolver;
-    readonly sortingCapability?: Capability;
 }
 
 /** Maximum placeholder jobs resolved on a single game tick. */
@@ -53,6 +42,7 @@ export const MAX_JOBS_PER_TICK = 256;
 /** Maximum time a previous placeholder frame is retained during provider outages. */
 export const STALE_FRAME_MS = 30_000;
 const RESET_FAILURE = 'Could not restore plugin-owned tab fields';
+const EMPTY_BATCH_BYTES = encodeRequest({ op: 'set_placeholders_batch', requests: [] }).length;
 
 interface RenderTarget {
     readonly style: Omit<RenderedLine, 'text'>;
@@ -89,32 +79,26 @@ export class TabDisplayService {
     private unresolved = new Set<string>();
     private previousOnline = new Set<string>();
     private readonly appliedNames = new Map<string, string | undefined>();
-    private readonly appliedOrders = new Map<string, number>();
     private readonly appliedHeaders = new Map<string, string>();
     private readonly unsupportedNames = new Set<string>();
-    private readonly unsupportedOrders = new Set<string>();
     private readonly unsupportedHeaders = new Set<string>();
     private readonly playerCapabilities = new Map<string, string>();
     private readonly disableResetPending = new Set<string>();
     private latestPlayers: readonly PlayerSnapshot[] = [];
     private disabled = false;
+    private overLimit = false;
 
-    /** Creates the service from a validated config snapshot. */
+    /** Creates the service from a loaded config snapshot. */
     constructor(private readonly options: TabDisplayServiceOptions) {
-        const checked = validateConfig(options.config);
-        if (checked.kind !== 'valid') throw new Error(formatIssues(checked));
-        this.config = checked.config;
+        this.config = options.config;
     }
 
-    /** Validates the whole replacement before atomically swapping configuration. */
-    setConfig(value: unknown): ApplyResult {
-        const checked = validateConfig(value);
-        if (checked.kind === 'invalid') return { kind: 'failed', error: formatIssues(checked) };
-        this.config = checked.config;
+    /** Swaps in a loaded configuration and starts a fresh refresh on the next tick. */
+    setConfig(config: TabDisplayConfig): void {
+        this.config = config;
         this.pending = undefined;
         this.nextRefreshTick = this.tickNumber;
         this.lastFailure = undefined;
-        return { kind: 'applied' };
     }
 
     /** Returns one copied online snapshot and configured placeholder IDs, never resolved values. */
@@ -143,7 +127,13 @@ export class TabDisplayService {
         if (snapshots.length > this.config.general.max_players) {
             this.pending = undefined;
             this.lastFailure = `Online player count exceeds general.max_players (${this.config.general.max_players})`;
+            if (!this.overLimit) this.options.log?.(`${this.lastFailure}; display updates are paused`);
+            this.overLimit = true;
             return;
+        }
+        if (this.overLimit) {
+            this.overLimit = false;
+            this.options.log?.('Online player count is within general.max_players again; display updates resumed');
         }
         this.latestPlayers = snapshots.map(copySnapshot);
         this.syncPlayerCapabilities(this.latestPlayers);
@@ -207,13 +197,6 @@ export class TabDisplayService {
         const javaVersions = [
             ...new Set(this.latestPlayers.flatMap(({ javaVersion }) => (javaVersion ? [javaVersion] : []))),
         ].sort();
-        const unsupportedJavaVersions = [
-            ...new Set(
-                this.latestPlayers
-                    .filter(({ edition, javaVersion }) => edition === 'java' && javaVersion !== JAVA_DISPLAY_VERSION)
-                    .map(({ javaVersion }) => javaVersion ?? 'unknown'),
-            ),
-        ].sort();
         return {
             enabled: this.config.general.enabled,
             provider: state?.kind ?? 'ready',
@@ -224,20 +207,9 @@ export class TabDisplayService {
             unresolved: [...this.unresolved].sort(),
             javaVersions,
             ...(this.lastFailure === undefined ? {} : { lastFailure: this.lastFailure }),
-            java:
-                unsupportedJavaVersions.length > 0
-                    ? {
-                          kind: 'unsupported',
-                          reason: `Java tab display calls are gated to ${JAVA_DISPLAY_VERSION}; live client behavior is unverified (connected: ${unsupportedJavaVersions.join(', ')})`,
-                      }
-                    : { kind: 'supported' },
             bedrock: {
                 kind: 'unsupported',
                 reason: 'TabDisplay leaves the native Bedrock player list unchanged.',
-            },
-            sorting: this.options.sortingCapability ?? {
-                kind: 'unsupported',
-                reason: 'Native Java tab order direction is not verified on a client.',
             },
         };
     }
@@ -314,6 +286,7 @@ export class TabDisplayService {
         try {
             const unresolved = new Set<string>();
             const rendered = generation.players.map((player) => {
+                const builtins = builtinValues(player.snapshot, generation.players.length);
                 const render = (target: RenderTarget): RenderedLine => {
                     const resolution = target.template.hasPlaceholders
                         ? generation.results.get(jobKey(player.snapshot, target.template.source))
@@ -323,7 +296,7 @@ export class TabDisplayService {
                         ? fallback(this.config.placeholders.unresolved)
                         : fallback(this.config.placeholders.missing_provider);
                     return {
-                        text: renderTemplate(target.template, resolution, policy, providerAvailable),
+                        text: renderTemplate(target.template, resolution, policy, providerAvailable, builtins),
                         ...target.style,
                     };
                 };
@@ -337,7 +310,7 @@ export class TabDisplayService {
             if (providerAvailable) this.lastSuccessfulAt = now;
             this.unresolved = unresolved;
             phase = 'updating';
-            const failed = this.applyGeneration(generation.players, rendered);
+            const failed = this.applyGeneration(rendered);
             this.pending = undefined;
             if (!failed) this.lastFailure = undefined;
         } catch (error) {
@@ -355,20 +328,23 @@ export class TabDisplayService {
         if (this.lastSuccessfulAt !== undefined && now - this.lastSuccessfulAt < STALE_FRAME_MS) return;
 
         try {
-            const rendered = generation.players.map((player) => ({
-                snapshot: player.snapshot,
-                entry: player.entry === undefined ? undefined : renderTemplateFallback(player.entry, this.config),
-                header: player.header.map((target) => renderTemplateFallback(target, this.config)),
-                footer: player.footer.map((target) => renderTemplateFallback(target, this.config)),
-            }));
-            this.applyGeneration(generation.players, rendered);
+            const rendered = generation.players.map((player) => {
+                const builtins = builtinValues(player.snapshot, generation.players.length);
+                const render = (target: RenderTarget) => renderTemplateFallback(target, this.config, builtins);
+                return {
+                    snapshot: player.snapshot,
+                    entry: player.entry === undefined ? undefined : render(player.entry),
+                    header: player.header.map(render),
+                    footer: player.footer.map(render),
+                };
+            });
+            this.applyGeneration(rendered);
         } catch {
-            this.lastFailure = 'Literal fallback exceeded the configured output limits';
+            this.lastFailure = 'Could not apply the fallback display';
         }
     }
 
     private applyGeneration(
-        prepared: readonly PreparedPlayer[],
         rendered: readonly {
             readonly snapshot: PlayerSnapshot;
             readonly entry: RenderedLine | undefined;
@@ -377,34 +353,12 @@ export class TabDisplayService {
         }[],
     ): boolean {
         let failed = false;
-        const snapshots = prepared.map(({ snapshot }) => snapshot);
-        const orderByUuid =
-            this.config.sorting.rules.length === 0
-                ? new Map<string, number>()
-                : new Map(
-                      assignDenseOrders(snapshots, this.config.sorting.rules).map(({ uuid, order }) => [uuid, order]),
-                  );
-
         for (const item of rendered) {
             const { snapshot } = item;
             if (snapshot.edition === 'java' && item.entry !== undefined) {
                 if (this.applyName(snapshot.uuid, item.entry)) failed = true;
             } else if (snapshot.edition === 'java' && this.appliedNames.has(snapshot.uuid)) {
                 if (this.applyName(snapshot.uuid, undefined)) failed = true;
-            }
-            if (this.config.sorting.rules.length > 0) {
-                const order = orderByUuid.get(snapshot.uuid) ?? 0;
-                if (!this.unsupportedOrders.has(snapshot.uuid) && this.appliedOrders.get(snapshot.uuid) !== order) {
-                    const result = this.options.host.setOrder(snapshot.uuid, order);
-                    if (result.kind === 'unsupported') this.unsupportedOrders.add(snapshot.uuid);
-                    else if (this.recordApply(result)) this.appliedOrders.set(snapshot.uuid, order);
-                    else failed = true;
-                }
-            } else if (!this.unsupportedOrders.has(snapshot.uuid) && this.appliedOrders.has(snapshot.uuid)) {
-                const result = this.options.host.setOrder(snapshot.uuid, 0);
-                if (result.kind === 'unsupported') this.unsupportedOrders.add(snapshot.uuid);
-                else if (this.recordApply(result)) this.appliedOrders.delete(snapshot.uuid);
-                else failed = true;
             }
             if (snapshot.edition === 'java') {
                 const key = JSON.stringify([item.header, item.footer]);
@@ -473,10 +427,8 @@ export class TabDisplayService {
 
     private clearPlayerCaches(uuid: string): void {
         this.appliedNames.delete(uuid);
-        this.appliedOrders.delete(uuid);
         this.appliedHeaders.delete(uuid);
         this.unsupportedNames.delete(uuid);
-        this.unsupportedOrders.delete(uuid);
         this.unsupportedHeaders.delete(uuid);
         this.playerCapabilities.delete(uuid);
     }
@@ -493,10 +445,8 @@ export class TabDisplayService {
 
     private clearDisplayCaches(): void {
         this.appliedNames.clear();
-        this.appliedOrders.clear();
         this.appliedHeaders.clear();
         this.unsupportedNames.clear();
-        this.unsupportedOrders.clear();
         this.unsupportedHeaders.clear();
         this.playerCapabilities.clear();
     }
@@ -542,24 +492,34 @@ function jobKey(player: PlayerSnapshot, template: string): string {
 
 function fitBatch(jobs: readonly PlaceholderJob[], offset: number, countLimit: number): readonly PlaceholderJob[] {
     const result: PlaceholderJob[] = [];
-    let bytes = strToU8('{"op":"set_placeholders_batch","requests":[]}').length;
+    let bytes = EMPTY_BATCH_BYTES;
     for (let index = offset; index < jobs.length && result.length < countLimit; index += 1) {
         const job = jobs[index];
         if (job === undefined) break;
-        const single =
-            strToU8(JSON.stringify({ op: 'set_placeholders_batch', requests: [job.request] })).length -
-            strToU8('{"op":"set_placeholders_batch","requests":[]}').length;
-        const extra = single + (result.length > 0 ? 1 : 0);
-        if (bytes + extra > 1_048_576) break;
+        // Each request adds its JSON plus a comma separator inside the batch's request array.
+        const extra = strToU8(JSON.stringify(job.request)).length + (result.length > 0 ? 1 : 0);
+        if (bytes + extra > LIMITS.message) break;
         result.push(job);
         bytes += extra;
     }
     return result;
 }
 
-function renderTemplateFallback(target: RenderTarget, config: TabDisplayConfig): RenderedLine {
+function renderTemplateFallback(
+    target: RenderTarget,
+    config: TabDisplayConfig,
+    builtins: ReadonlyMap<string, string>,
+): RenderedLine {
     const policy = fallback(config.placeholders.missing_provider);
-    return { text: renderTemplate(target.template, undefined, policy, false), ...target.style };
+    return { text: renderTemplate(target.template, undefined, policy, false, builtins), ...target.style };
+}
+
+// ponytail: only the tokens the default config uses; anything else needs PumpkinPIE.
+function builtinValues(player: PlayerSnapshot, online: number): ReadonlyMap<string, string> {
+    return new Map([
+        ['player_name', player.name],
+        ['server_online', String(online)],
+    ]);
 }
 
 function fallback(value: string): 'literal' | 'empty' {
@@ -572,10 +532,5 @@ function copySnapshot(snapshot: PlayerSnapshot): PlayerSnapshot {
         name: snapshot.name,
         edition: snapshot.edition,
         ...(snapshot.javaVersion === undefined ? {} : { javaVersion: snapshot.javaVersion }),
-        ...(snapshot.ping === undefined ? {} : { ping: snapshot.ping }),
     };
-}
-
-function formatIssues(result: Extract<ConfigValidation, { kind: 'invalid' }>): string {
-    return result.issues.map(({ path, reason }) => `${path}: ${reason}`).join('; ');
 }

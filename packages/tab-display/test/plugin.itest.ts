@@ -27,20 +27,19 @@ describe(info.name, () => {
         const from = server.lines.length;
         server.command('tabdisplay status');
         await server.waitForLog(/Placeholder provider: (unavailable|ready)/, 5000, from);
-        await server.waitForLog(/Native sorting: unsupported/, 5000, from);
         expect(server.errors()).toEqual([]);
     });
 
     it('keeps an invalid config file untouched when reload is rejected', async () => {
         const configPath = join(server.pluginDataDir(info.name), 'config.toml');
         const original = readFileSync(configPath, 'utf8');
-        const invalid = original.replace('rules = []', 'rules = [{ kind = "name", direction = "ascending" }]');
+        const invalid = original.replace('color = "#FFFFFF"', 'color = "white"');
         expect(invalid).not.toBe(original);
         writeFileSync(configPath, invalid);
 
         const from = server.lines.length;
         server.command('tabdisplay reload');
-        await server.waitForLog(/TabDisplay reload failed: .*sorting\.rules/, 5000, from);
+        await server.waitForLog(/TabDisplay reload failed: .*entry\.color/, 5000, from);
         expect(readFileSync(configPath, 'utf8')).toBe(invalid);
 
         writeFileSync(configPath, original);
