@@ -29,9 +29,10 @@ export function ensurePumpkinWit({ lockFile, cacheRoot }) {
     const cacheDirectory = path.join(cacheParent, lockDigest);
     const cachedWit = path.join(cacheDirectory, pin.subdirectory);
     const isCached = () => isValidCache(cacheDirectory, cachedWit, lockDigest, pin.commit, pin.subdirectory);
+    fs.mkdirSync(cacheParent, { recursive: true });
+    removeAbandonedStaging(cacheParent);
     if (isCached()) return cachedWit;
 
-    fs.mkdirSync(cacheParent, { recursive: true });
     const stagingDirectory = fs.mkdtempSync(path.join(cacheParent, '.staging-'));
 
     try {
@@ -72,6 +73,22 @@ export function ensurePumpkinWit({ lockFile, cacheRoot }) {
         );
     } finally {
         fs.rmSync(stagingDirectory, { recursive: true, force: true });
+    }
+}
+
+// A build killed mid-fetch never reaches its cleanup, so its staging directory stays behind.
+// ponytail: age check, so a fetch running for over a day loses its staging directory; record owner
+// PIDs if that ever matters.
+function removeAbandonedStaging(cacheParent) {
+    const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    for (const name of fs.readdirSync(cacheParent)) {
+        if (!name.startsWith('.staging-')) continue;
+        const staging = path.join(cacheParent, name);
+        try {
+            if (fs.statSync(staging).mtimeMs < dayAgo) fs.rmSync(staging, { recursive: true, force: true });
+        } catch {
+            // Another build removed it first.
+        }
     }
 }
 
