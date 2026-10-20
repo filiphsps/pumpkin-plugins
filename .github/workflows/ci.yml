@@ -432,6 +432,8 @@ jobs:
         needs: [changes]
         if: fromJSON(needs.changes.outputs.jobs)['external-consumer']
         uses: ./.github/workflows/external-consumer.yml
+        with:
+            platforms: ${{ needs.changes.outputs.external_consumer_full == 'true' && '["Linux x64", "macOS arm64", "Windows x64"]' || '["Linux x64"]' }}
 
     engine-comparison:
         name: 📊 Engine comparison
