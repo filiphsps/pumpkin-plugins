@@ -17,13 +17,13 @@ aren't listed here.
 ### Getting started
 
 - [Creating a plugin](creating-a-plugin.md) — The `pnpm gen` generator, what it creates, and what to do next
+- [Creating a VS Code extension](creating-an-extension.md) — Scaffold, build, test, and release a VS Code extension
 - [Creating an action](creating-an-action.md) — Create, document, test, and release a GitHub Action in this repository
 - [Documentation site](documentation-site.md) — Adding component guides, generated API reference, local preview, and publishing
 
 ### Guides
 
 - [Benchmarking](benchmarking.md) — QuickJS and the Static Hermes profile, collector and parser matrix
-- [Creating a VS Code extension](creating-an-extension.md) — Scaffold, build, test, and release a VS Code extension
 
 ### Plugin development
 
@@ -46,11 +46,6 @@ aren't listed here.
 - [Pumpkin Market API](pumpkin-market-api.md) — Market listing lookup, metadata updates, current publisher behavior and API findings
 
 ## Docs
-
-- **Agents**
-  - [Agent domain docs](agents/domain.md) — How agents use glossaries and ADRs to keep terms and decisions aligned
-  - [Issue tracker](agents/issue-tracker.md) — GitHub issue commands and repository conventions
-  - [Triage labels](agents/triage-labels.md) — Maps triage skill labels to this repository's GitHub labels
 
 - [Plugin API](plugin-api/index.md) — Standalone API setup, lifecycle, host interfaces, ABI support and migration
   - [Plugin API: ABI and runtime support](plugin-api/abi-and-runtime.md) — Match the Pumpkin server to the plugin ABI and check engine support

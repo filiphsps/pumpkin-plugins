@@ -50,7 +50,12 @@ class MyPlugin extends PluginBase {
 ```
 
 `__PLUGIN_VERSION__` is injected from the package version during builds and by the Vitest config
-when tests run. `PluginBase` uses the object and version to build Pumpkin's plugin metadata: name,
+when tests run. Its type declaration ships with `@pumpkin-plugins/build`, so add
+`node_modules/@pumpkin-plugins/build/globals.d.ts` to the `include` list in your `tsconfig.json`;
+without it, TypeScript reports `Cannot find name '__PLUGIN_VERSION__'`. Plugins in this repository
+include `../../tools/build/globals.d.ts` instead.
+
+`PluginBase` uses the object and version to build Pumpkin's plugin metadata: name,
 version, authors, description and requested permissions. The metadata also includes the automatic
 update-check permission, `http.outbound`; the README lists it too, with its reason, even though you
 don't need to add it to `info.permissions`.
@@ -70,7 +75,7 @@ prefix when it loads the plugin.
 
 You can use `blocks` for additional README content that comes from the plugin's code. UPnPumpkin,
 for example, renders its blocked-router table into a `routers` block. The names `summary`,
-`permissions`, `commands` and `config` are reserved. If the README has no markers for one of your
+`permissions`, `commands`, `config` and `installation` are reserved. If the README has no markers for one of your
 custom blocks, the generator skips it.
 
 Build `config` from the plugin's configuration schema with `describeConfig(schema, file)` from
@@ -114,6 +119,19 @@ registerCommands(ctx, commands, {
     'myplugin reload': () => ['Reloaded.'] // lines sent back to the caller
 });
 ```
+
+`registerCommands` gives each handler a plugin-kit handler ID, and only the kit's `handleCommand`
+knows those IDs. Export it from your entry point, together with `handleTask`, so the named exports
+replace the API package's versions that `export *` would otherwise re-export:
+
+```ts
+// src/plugin.ts
+export { handleCommand, handleTask } from '@pumpkin-plugins/plugin-kit/plugin';
+export * from '@pumpkin-plugins/pumpkin-api';
+```
+
+Without the `handleCommand` export, Pumpkin calls the API package's handler, and every registered
+command fails with `No handler for command ID`.
 
 Set `info.commands` to `commandInfos(commands)`. That produces one README row for each runnable
 command, such as `/myplugin reload`, with its description, permission and default access.
@@ -202,6 +220,7 @@ in a plugin's `README.md`:
 | `permissions` | `info.permissions` plus the automatic updater permission |
 | `commands` | `info.commands` |
 | `config` | `info.config`: the options table and default file contents |
+| `installation` | `pumpkinPlugin.output` in `package.json`; a plugin listed in `release-please-paused.json` gets build steps and the reason instead of a download link |
 | Any other name | Markdown in `info.blocks` under that name |
 
 Write your plugin overview, examples and installation guidance outside these blocks. The generator

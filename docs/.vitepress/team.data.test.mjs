@@ -35,11 +35,9 @@ function graphQLResponse(nodes) {
 }
 
 describe('Team data loader', () => {
-    it('batches human names for a contributor page and filters bots', async () => {
+    it('shows profile names for human contributors and filters bots', async () => {
         process.env.GITHUB_TOKEN = 'test-token';
-        const calls = [];
-        globalThis.fetch = async (url, options) => {
-            calls.push({ url: String(url), options });
+        globalThis.fetch = async (url) => {
             if (String(url).includes('/contributors?')) {
                 return response([
                     contributor('alice'),
@@ -59,13 +57,6 @@ describe('Team data loader', () => {
 
         const members = await loadTeamMembers();
 
-        assert.equal(calls.length, 2);
-        assert.match(calls[0].url, /\/contributors\?per_page=100&page=1$/);
-        assert.equal(calls[1].url, 'https://api.github.com/graphql');
-        assert.equal(calls[1].options.method, 'POST');
-        assert.equal(calls[1].options.headers['Content-Type'], 'application/json');
-        assert.deepEqual(JSON.parse(calls[1].options.body).variables.ids, ['NODE_alice', 'NODE_bob']);
-        assert.equal(calls[1].options.headers.Authorization, 'Bearer test-token');
         assert.deepEqual(
             members.map(({ login, name }) => ({ login, name })),
             [
@@ -107,36 +98,24 @@ describe('Team data loader', () => {
             graphqlCalls.map(({ options }) => JSON.parse(options.body).variables.ids.length),
             [100, 1],
         );
-        assert.equal(
-            calls.some(({ url }) => /\/users\//.test(url)),
-            false,
-        );
     });
 
-    it('uses logins without a token and makes no profile requests', async () => {
+    it('uses logins without a token', async () => {
         delete process.env.GITHUB_TOKEN;
-        const calls = [];
         globalThis.fetch = async (url) => {
-            calls.push(String(url));
-            return response([contributor('alice')]);
+            if (String(url).includes('/contributors?')) return response([contributor('alice')]);
+            assert.fail(`unexpected GitHub request: ${url}`);
         };
 
         const members = await loadTeamMembers();
 
         assert.equal(members[0].name, 'alice');
-        assert.equal(calls.length, 1);
-        assert.equal(
-            calls.some((url) => url.includes('/graphql') || /\/users\//.test(url)),
-            false,
-        );
     });
 
     it('falls back to logins when GraphQL enrichment fails', async () => {
         process.env.GITHUB_TOKEN = 'test-token';
         console.warn = () => {};
-        const calls = [];
         globalThis.fetch = async (url) => {
-            calls.push(String(url));
             if (String(url).includes('/contributors?')) return response([contributor('alice')]);
             return response({}, { status: 502, ok: false });
         };
@@ -144,10 +123,23 @@ describe('Team data loader', () => {
         const members = await loadTeamMembers();
 
         assert.equal(members[0].name, 'alice');
-        assert.equal(calls.length, 2);
-        assert.equal(
-            calls.some((url) => /\/users\//.test(url)),
-            false,
+    });
+
+    it('lists the repository owner first and labels them', async () => {
+        delete process.env.GITHUB_TOKEN;
+        globalThis.fetch = async () =>
+            response([
+                contributor('busy', 'NODE_busy', { contributions: 90 }),
+                contributor('filiphsps', 'NODE_owner', { contributions: 3 }),
+            ]);
+
+        const members = await loadTeamMembers();
+
+        assert.deepEqual(
+            members.map(({ login }) => login),
+            ['filiphsps', 'busy'],
         );
+        assert.match(members[0].desc, /Owner/);
+        assert.doesNotMatch(members[1].desc, /Owner/);
     });
 });

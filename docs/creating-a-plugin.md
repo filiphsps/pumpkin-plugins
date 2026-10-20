@@ -43,12 +43,15 @@ pnpm gen --args my-plugin MyPlugin "Does a thing"
 
 The new `packages/<folder>/` directory contains the files you need to begin:
 
-- `package.json`, `tsconfig.json`, and `vitest.config.ts` configure the package, build, and tests.
+- `package.json`, `tsconfig.json`, `vitest.config.ts`, and `turbo.json` configure the package, build,
+  tests, and the Turbo typecheck cache.
 - `src/name.ts`, `src/info.ts`, `src/commands/spec.ts`, and `src/plugin.ts` define the plugin name,
   metadata, starter command, and behavior. The plugin name and command permission each have one
   source declaration.
 - `test/plugin.itest.ts` loads the built plugin on a real Pumpkin server and checks that its starter
-  `/plugin` command works. The integration-test task builds the package first.
+  command works. The command and its permission are named after the folder, such as `/my-plugin`
+  with `MyPlugin:command.my-plugin`, so they don't clash with Pumpkin's built-in commands. The
+  integration-test task builds the package first.
 - `README.md` starts with the plugin title and generated-content markers, including the component
   reference marker.
 
@@ -57,6 +60,12 @@ The generator also registers the package in both Release Please files. It starts
 metadata includes the repository's standard license and repository fields. `pnpm check` validates
 the description, those fields, and both release registrations. See [Registering a plugin for
 releases](ci-and-releases.md#registering-a-plugin-for-releases) for how the first-release pin works.
+
+The generator doesn't add the package's `plugin: <Name>` label. Add one to `.github/labels.yml`,
+naming `packages/<folder>/` in its `ai_apply_when` like the existing plugin labels, then run
+`node .github/scripts/coderabbit-labels.mjs` and commit both files. The issue form and label
+validation workflow fails for a plugin package without a label. See
+[Label management](ci-and-releases.md#label-management) for the catalog.
 
 After writing the files, the generator runs `pnpm install`, fills the plugin README from `src/info.ts`,
 adds its docs-site API reference link, updates the root README package list, and formats the new files
@@ -79,9 +88,11 @@ the reason in the plugin README. Keep behavior without real-client evidence mark
 Start with the metadata and starter command:
 
 1. Describe the plugin in `src/info.ts`, including any permissions, commands, or config. Replace or
-   extend the starter command in `src/commands/spec.ts` with `defineCommands`. Keep its permission
-   under the `COMMAND_PERMISSION` constant. [Plugin info and READMEs](plugin-info-and-readmes.md)
-   explains how these declarations feed Pumpkin metadata and the generated README.
+   extend the starter command in `src/commands/spec.ts` with `defineCommands`, and keep listing the
+   commands in `info.commands` with `commandInfos` so the README documents what is registered. Keep
+   the permission under the `COMMAND_PERMISSION` constant.
+   [Plugin info and READMEs](plugin-info-and-readmes.md) explains how these declarations feed Pumpkin
+   metadata and the generated README.
 2. Add plugin behavior in `src/plugin.ts`, inside the `onPluginLoad` hook. The starter extends
    `PluginBase` and calls `registerPlugin`; together they provide shared metadata, lifecycle logging,
    and the automatic update check. Read [Building](building.md) before choosing APIs: Static Hermes
@@ -122,8 +133,9 @@ other permissions in `info.permissions`:
 ## Without the generator
 
 For a plugin in this monorepo, the generator handles several pieces that are easy to miss. If you
-create the package by hand, you can copy `packages/bedrock-addon-manager` or create a generated
-plugin and remove what you don't need. Then check that you:
+create the package by hand, you can copy `packages/dynamic-lights-pumpkin`, a released plugin with
+commands, config and tests, and delete its `CHANGELOG.md`. You can also create a generated plugin
+and remove what you don't need. Then check that you:
 
 - Register it in both `release-please-config.json` and `.release-please-manifest.json`, and start
   its `package.json` version at `0.0.0`. The first-release config entry needs

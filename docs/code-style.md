@@ -71,12 +71,13 @@ as `@pumpkin-plugins/config` does; don't copy it between plugins.
 
 ## Tests
 
-Put unit tests (`*.test.ts`) beside the code they cover. Put real-server tests (`*.itest.ts`) in
-`test/`, with one file per concern. The [Testing guide](testing.md) covers how to run them.
+The repository's [testing policy](https://github.com/filiphsps/pumpkin-plugins/blob/master/AGENTS.md#testing-policy)
+decides which kind of test to write and when. Real-server tests (`*.itest.ts`) in `test/` get one
+file per concern, and the [Testing guide](testing.md) covers how to run them.
 
 Test behavior, including failure paths such as invalid input, missing files and clients that hang
 up. There's no need to assert behavior that TypeScript's types already guarantee. Generate fixtures
-in code—for example, build `.mcpack` archives in the test—instead of committing binary files.
+in code, for example by building `.mcpack` archives in the test, instead of committing binary files.
 
 ## Package metadata
 

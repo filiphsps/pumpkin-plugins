@@ -1,7 +1,7 @@
 // Fails when the hand-written docs no longer match the repo: a package without a README, a link or a
 // path that doesn't exist, a `pnpm` command that isn't a script, a doc page missing from the index,
 // a root script nobody documents, or a CI job the CI doc doesn't list. The generated parts of the
-// READMEs are checked by `pnpm readme:check`. See "Docs match the code" in docs/code-style.md.
+// READMEs are checked by `pnpm readme:check`. See "Keep docs in sync with code" in docs/code-style.md.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -10,6 +10,7 @@ import {
     generateDocsIndex,
     walkMarkdown,
 } from '@pumpkin-plugins/docs/node';
+import { parse } from 'yaml';
 
 const root = process.env.PUMPKIN_PLUGINS_ROOT ?? path.resolve(import.meta.dirname, '..');
 const exists = (...parts) => fs.existsSync(path.join(root, ...parts));
@@ -91,18 +92,31 @@ for (const dir of [...actions, ...extensions]) {
 }
 
 // 2. Relative links point at files that exist, and at headings that exist.
+/** GitHub's heading id: lowercase, punctuation other than `-` and `_` dropped, each space a `-`. */
 const slug = (heading) =>
     heading
         .toLowerCase()
-        .replace(/`/g, '')
-        .replace(/[^\p{L}\p{N}\s-]/gu, '')
-        .trim()
-        .replace(/\s/g, '-');
-const anchors = (file) =>
-    new Set([...read(file).matchAll(/^#{1,6}\s+(.+?)\s*#*\s*$/gm)].map((m) => slug(m[1] ?? '')).filter(Boolean));
+        .replace(/[^\p{L}\p{M}\p{N}\p{Pc} -]/gu, '')
+        .replace(/ /g, '-');
+/** Heading ids of a Markdown file; a repeated heading gets `-1`, `-2`, ... like on GitHub. */
+const anchors = (file) => {
+    const ids = new Set();
+    for (const [, heading = ''] of read(file)
+        .replace(/```[\s\S]*?```/g, '')
+        .matchAll(/^#{1,6}\s+(.+?)\s*#*\s*$/gm)) {
+        const base = slug(heading);
+        let id = base;
+        for (let n = 1; ids.has(id); n++) id = `${base}-${n}`;
+        ids.add(id);
+    }
+    return ids;
+};
 
 /** Markdown text without code, so examples don't count as links. */
 const prose = (text) => text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '');
+/** Inline link targets, with or without a title, and reference definitions (not footnotes). */
+const LINK =
+    /\]\(\s*<?([^)\s>]+)>?(?:\s+(?:"[^"]*"|'[^']*'|\([^)]*\)))?\s*\)|^ {0,3}\[(?!\^)[^\]]+\]:\s*<?([^\s>]+)>?/gm;
 
 /** Resolve an absolute documentation-site route to its source Markdown file.
  *
@@ -118,28 +132,24 @@ function resolveSiteRoute(href) {
         const source = path.posix.join('docs', route.slice('guides/'.length));
         return source.endsWith('/') ? `${source}index.md` : /\.md$/.test(source) ? source : `${source}.md`;
     }
-    if (route.startsWith('api/')) {
-        const source = path.posix.join('docs', route);
-        return source.endsWith('/') ? `${source}index.md` : /\.md$/.test(source) ? source : `${source}/index.md`;
-    }
     return undefined;
 }
 
 for (const file of docs) {
-    for (const match of prose(read(file)).matchAll(/\]\(([^)\s]+)\)/g)) {
-        const target = match[1] ?? '';
+    for (const match of prose(read(file)).matchAll(LINK)) {
+        const target = match[1] ?? match[2] ?? '';
         if (/^(https?:|mailto:)/.test(target)) continue;
         const [href, anchor] = target.split('#');
+        // API pages are generated during the docs build and ignored by Git, so a local build must not
+        // change the result.
+        if (href.startsWith('/api/')) continue;
         const resolved = href
             ? href.startsWith('/')
                 ? (resolveSiteRoute(href) ?? path.posix.normalize(path.posix.join(path.posix.dirname(file), href)))
                 : path.posix.normalize(path.posix.join(path.posix.dirname(file), href))
             : file;
         if (!exists(resolved)) {
-            // API pages are generated during the docs build and intentionally ignored by Git.
-            if (!(href.startsWith('/api/') && !exists('docs/api'))) {
-                problems.push(`${file} links to ${target}, which does not exist`);
-            }
+            problems.push(`${file} links to ${target}, which does not exist`);
         } else if (anchor && resolved.endsWith('.md') && !anchors(resolved).has(anchor)) {
             problems.push(`${file} links to ${target}, but ${resolved} has no such heading`);
         }
@@ -208,7 +218,7 @@ for (const file of docs) {
 // 5. Every root script is documented, so a new one can't go unmentioned.
 const documented = docs.map((f) => code(read(f))).join('\n');
 for (const script of rootScripts) {
-    if (!new RegExp(`pnpm (run )?${script.replace(/[:]/g, '\\:')}\\b`).test(documented)) {
+    if (!new RegExp(`pnpm (run )?${RegExp.escape(script)}(?![\\w:-])`).test(documented)) {
         problems.push(`package.json has the script "${script}", which no doc mentions as \`pnpm ${script}\``);
     }
 }
@@ -223,13 +233,14 @@ if (exists('docs', 'README.md')) {
 // 7. The CI doc lists every job in the workflow (by emoji and first word, which is how it names them).
 if (exists('.github/workflows/ci.yml') && exists('docs', 'ci-and-releases.md')) {
     const doc = read('docs', 'ci-and-releases.md');
-    for (const match of read('.github/workflows/ci.yml').matchAll(/^ {8}name: (.+)$/gm)) {
-        const name = (match[1] ?? '')
+    for (const job of Object.values(parse(read('.github/workflows/ci.yml'))?.jobs ?? {})) {
+        if (typeof job?.name !== 'string') continue;
+        const name = job.name
             .replace(/\$\{\{[^}]*\}\}/g, '')
             .replace(/\([^)]*\)/g, '')
             .trim();
         const [emoji, word] = name.split(/\s+/);
-        if (emoji && word && !new RegExp(`${emoji}\\s+${word}`, 'i').test(doc)) {
+        if (emoji && word && !new RegExp(`${RegExp.escape(emoji)}\\s+${RegExp.escape(word)}`, 'i').test(doc)) {
             problems.push(`docs/ci-and-releases.md does not list the CI job "${name}"`);
         }
     }

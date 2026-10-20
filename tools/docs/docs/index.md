@@ -1,33 +1,70 @@
 # Documentation generator
 
-`@pumpkin-plugins/docs` defines plugin metadata and generates repository documentation from the
-component sources. It reads plugin `src/info.ts`, command declarations, configuration schemas,
-package manifests, component guide files, and GitHub Action metadata rather than maintaining a
-separate component catalog.
+`@pumpkin-plugins/docs` writes README blocks and catalogs from metadata the repository already has:
+plugin `src/info.ts` files, command trees, config schemas, `package.json` manifests, `action.yml`
+files and page frontmatter. Its `pumpkin-plugins-docs` command does the writing, and the root
+`pnpm readme` runs every command this repository needs.
 
 ## Regenerate repository docs
 
 Run `pnpm readme` after changing plugin information, command declarations, config schemas, action
-inputs or outputs, package metadata, or component guides. It updates generated README sections,
-component guide and API reference links, and the root package and action tables.
+inputs or outputs, package metadata, release pauses or guide pages. Run `pnpm readme:check` to see
+whether generated content is current without writing anything.
 
-Run `pnpm readme:check` to verify that generated files are current without writing them. Keep the
-markers around generated README blocks in place. Change their source metadata or the Markdown
-outside generated blocks instead of editing generated content by hand.
+Generated content sits between markers such as `<!-- docs:begin commands -->` and
+`<!-- docs:end commands -->`. Keep the markers in place and edit the source metadata or the Markdown
+outside them. The generator keeps everything outside the markers as you wrote it.
 
-## Plugin metadata
+## Commands
 
-Plugins declare their name, description, permissions, commands, compatibility notes, and config
-description as typed `PluginInfo`. The same declarations feed Pumpkin metadata and generated
-README tables, which helps keep runtime behavior and operator documentation aligned. Component
-guides live next to the package in `docs/`; the site discovers those pages and their navigation
-from the filesystem and component metadata.
+Each command reads from the folder you run it in and writes only existing files. Add `--check` to any
+command to report stale files without writing them; the command then exits with code 1 if something
+is out of date.
+
+| Command | Run from | Writes |
+| --- | --- | --- |
+| `plugin` (the default) | A plugin folder | The generated blocks of that plugin's `README.md` |
+| `root` | The repository root | The action, plugin, tool and extension tables in `README.md`, and the `reference` block with guide and API links in each component README |
+| `docs-index` | The repository root | The Guides and Docs catalog in `docs/README.md` |
+| `generate [module]` | A component folder | The blocks a document module declares; the module defaults to `docs.ts` |
+| `actions` | The repository root | The input and output tables in each action README |
+| `action-versions` | The repository root | The example release tags in each action README |
+
+The release workflow runs `action-versions` on its own because the tags follow
+`.release-please-manifest.json`. An action that hasn't been released yet uses its `release-as` pin
+from `release-please-config.json`.
+
+Outside this repository, add the package as a development dependency and run the command with
+`pnpm exec pumpkin-plugins-docs`. The published package is compiled JavaScript, so it runs on Node
+without TypeScript tooling.
+
+## What the commands find
+
+The `root` and `actions` commands look for components in `packages/`, `tools/`, `actions/` and
+`extensions/`. A folder is a component when it has a `package.json`, or an `action.yml` or
+`action.yaml` for actions. A folder in `tools/` without a manifest groups related tools, so
+`tools/apis/upnpumpkin-api` is a component of its own. Folders whose names start with `_` are
+skipped, which leaves room for scratch work.
+
+`docs-index` lists each direct child of `docs/` as a guide, grouped by its `navigation.category`
+frontmatter. Pages in subfolders become the Docs tree, and a folder's `index.md` is its landing page.
+It skips the `api` folder of `docs/`, which holds generated API pages, and `docs/agents/`, which
+holds instructions for coding agents. A component guide appears in the catalog only when its frontmatter sets
+`navigation.catalog: true`.
+
+## Plugin READMEs
+
+A plugin describes itself with a typed `PluginInfo`: its name, description, permissions, commands
+and config file. Pumpkin's plugin metadata and the README tables come from the same object. The
+`installation` block also reads `pumpkinPlugin.output` from `package.json`, and a plugin listed in
+`release-please-paused.json` gets build steps and the pause reason instead of a download link. The
+[plugin info and READMEs guide](../../../docs/plugin-info-and-readmes.md) covers each block.
 
 ## Generate custom component documents
 
-Tools and other components can generate named blocks in any existing Markdown file. Declare the
-blocks from the component's source metadata, then let this package handle marker validation, file
-updates and drift checks. Keep the content renderer local to its component.
+Tools and other components can fill named blocks in any existing Markdown file. Write a document
+module that renders the blocks from the component's own source, and let the CLI handle markers,
+writes and drift checks.
 
 ```ts
 // docs.ts, in the component root
@@ -46,98 +83,62 @@ export const documents = [{
 }] satisfies DocumentSpec[];
 ```
 
-Place the corresponding markers in the document:
+Put the matching markers in the document:
 
 ```md
 <!-- docs:begin limits -->
 <!-- docs:end limits -->
 ```
 
-Add `"readme": "pumpkin-plugins-docs generate docs.ts"` and
-`"readme:check": "pumpkin-plugins-docs generate docs.ts --check"` to the component's package scripts.
-Declare `@pumpkin-plugins/docs` as a `workspace:*` development dependency. The root `pnpm readme`
-and `pnpm readme:check` commands then include it through Turborepo.
+Then add `"readme": "pumpkin-plugins-docs generate docs.ts"` and
+`"readme:check": "pumpkin-plugins-docs generate docs.ts --check"` to the component's scripts, and
+declare `@pumpkin-plugins/docs` as a `workspace:*` development dependency. The root `pnpm readme`
+and `pnpm readme:check` pick the scripts up through Turborepo.
 
-The module must export a `documents` array. Paths are relative to the working directory, even when
-the module lives in a subdirectory. Node loads TypeScript modules by stripping types, so their
-imports must work without Pumpkin/WASI and without TypeScript syntax requiring transformation.
-The command defaults to `docs.ts` when its module argument is omitted.
+The module must export a `documents` array. File paths are relative to the folder you run the
+command in, even when the module lives in a subfolder. Node loads a TypeScript module by stripping
+its types, so the module and its imports can't need Pumpkin, WASI or TypeScript syntax that has to be
+compiled.
 
-Generation requires existing files and exactly one ordered marker pair for every declared block.
-All targets are read and validated before any writes; duplicate targets, missing markers, duplicate
-markers and reversed pairs are errors. `--check` reports stale content without writing. Filesystem
-write failures can still leave earlier targets updated; this is validation before writes, not a
-transaction. Everything outside the generated markers is preserved.
+Each target file must exist and contain exactly one ordered marker pair for every declared block. The
+command reads and checks every target before it writes any of them, so a duplicate target or a
+missing, repeated or reversed marker fails without changing files. A failed write can still leave
+earlier files updated.
 
-Each document accepts `note` (omitting it uses a generic generation note; an empty string omits it), `required: false` to allow absent blocks,
-and `markers: 'action'` for existing `<!-- action-inputs:start -->` / `<!-- action-inputs:end -->`
-markers. Plugin README generation retains its existing optional-block behavior.
+A document can also set:
+
+- `note` to replace the generated comment at the top of each block, or `''` to leave it out.
+- `required: false` to skip blocks the file has no markers for.
+- `markers: 'action'` to use the `<!-- action-inputs:start -->` and `<!-- action-inputs:end -->`
+  marker style of action READMEs.
+- `transform(source)` instead of `blocks`, for values outside markers. It returns the whole new file
+  and can throw when a required value is missing.
+
+The PumpkinPIE API's [document module](../../apis/pumpkin-pie-api/docs.ts) is a working example.
 
 ## Reuse the generation helpers
 
 | Entry point | Use |
 | --- | --- |
-| `@pumpkin-plugins/docs` | Host-safe plugin metadata, commands, `code` and `table` |
-| `@pumpkin-plugins/docs/markdown` | Host-safe `cell`, `code`, `table`, generated-block readers and their types |
-| `@pumpkin-plugins/docs/node` | Node-only `generateDocuments`, `DocumentSpec`, `Status`, component discovery and Markdown traversal |
+| `@pumpkin-plugins/docs` | Plugin metadata, commands, `code` and `table`; safe to import from plugin code |
+| `@pumpkin-plugins/docs/markdown` | `cell`, `code`, `table` and generated-block readers; safe to import from plugin code |
+| `@pumpkin-plugins/docs/node` | File generation, drift checks, component and page discovery; Node only |
 
-`table(headers, rows)` escapes pipes in headers and values and folds multiline cells into one
-line. Pass `{ multiline: 'break' }` to retain line breaks as `<br>`. `code(text)` chooses a backtick
-fence that preserves embedded backticks and surrounding spaces. Pass unescaped text to the table
-helper; it owns cell escaping.
+`table(headers, rows)` escapes pipes and folds multiline cells into one line. Pass
+`{ multiline: 'break' }` to keep line breaks as `<br>`. `code(text)` picks a backtick fence that
+keeps embedded backticks and surrounding spaces. Pass plain text to `table`, which escapes cells
+itself.
 
-`generateDocuments(documents, root, check?)` provides the same validation and write behavior as the
-CLI and returns `updated`, `unchanged` or `stale`. `discoverComponents(root, group)` finds sorted
-`packages`, `tools` or `actions` folders with metadata, excluding underscore-prefixed scratch
-folders. Each result supplies `slug`, `directory` and `metadataFile`; callers decide whether source
-files or READMEs are also required. `walkMarkdown(directory, { exclude? })` finds sorted Markdown
-files recursively, excluding `node_modules`, `.git` and explicit absolute paths.
+`generatedBlocks(source)` returns each complete generated block with its name, marker style, text and
+source offsets, and `stripGeneratedBlocks(source)` removes them while keeping hand-written content.
+Market descriptions and the agent edit guard use these readers.
 
-Import Node helpers through the `/node` entry point, never from guest plugin code. Keep package
-versions owned by release-please out of generated prose unless regeneration is part of that release
-workflow. Protocol versions and pinned external fixtures can be generated from their own metadata.
+From `/node`, `generateDocuments(documents, root, check?)` runs the same checks and writes as the
+`generate` command and returns `updated`, `unchanged` or `stale`. `discoverComponents(root, group)`
+and `walkMarkdown(directory, { exclude? })` are the discovery rules described above, and
+`discoverHandwrittenDocs(root)` and `buildDocumentationTree(pages)` build the docs catalog the site
+also uses. `titleOf`, `descriptionOf` and `frontmatterOf` read page metadata the same way the catalog
+does. Never import `/node` from plugin code.
 
-## GitHub Action documentation
-
-`pumpkin-plugins-docs actions` generates every action README's input/output sections from
-`action.yml` or `action.yaml`. Run it from the repository root; add `--check` to check for drift.
-The existing `action-inputs` and `action-outputs` markers remain supported, with the same strict
-pair validation as custom documents. All action targets are validated before writing.
-
-The `/node` entry point exports `readActionMetadata(file)`, `renderActionSections(metadata, options?)`
-and `generateActionReadmes(root, check?)`. The README generator and API-reference builder use the
-same action renderer, including required inputs, default values, descriptions and actions without
-inputs or outputs. YAML parsing is shared with the repository catalog and site.
-
-`githubRepositoryUrl(repository)` normalizes a GitHub package repository field;
-`githubPagesUrl(repository)` derives its Pages base URL. `componentApiRoute(group, slug, packageName?)`
-provides the API route used by README links, generated references and the site. Tool routes use the
-package name; plugin and action routes use the folder slug.
-
-The release workflow runs `pnpm exec pumpkin-plugins-docs action-versions` separately to refresh
-example tags from `.release-please-manifest.json`. Unreleased actions use their `release-as` pin
-from `release-please-config.json`. `--check` checks these values without changing files. This
-command is intentionally separate from ordinary README regeneration because it follows release
-metadata rather than action input/output contracts.
-
-For generated values outside block markers, a document can supply `transform(source)` instead of
-`blocks`. The transformation returns the complete next text and can throw when a required value is
-missing. The shared generator still prepares every target before writing and supports drift checks.
-
-`localLicenseFile(directory)` finds a local `LICENSE`, `LICENSE.md` or `LICENSE.txt` file,
-case-insensitively, ignoring directories. Package metadata checks and generated catalogs use the
-same rule. Repository scripts also reuse component discovery for release registration, bundled
-package lookup, plugin collection, signed artifact installation and development builds.
-
-`generatedBlocks(source)` finds complete blocks in both supported marker syntaxes, returning each
-block's name, syntax, text and `[start, end)` source offsets. `stripGeneratedBlocks(source)` removes
-those blocks while preserving handwritten content. These host-safe `/markdown` helpers are shared
-by generation, Market descriptions and the agent edit guard. Extraction accepts spaced markers and
-leaves incomplete pairs untouched; generation separately enforces its declared marker pairs.
-
-The PumpkinPIE API's [document module](../../apis/pumpkin-pie-api/docs.ts) uses this CLI and the shared
-Markdown helpers to render protocol facts and provider provenance from source metadata. It keeps
-only its component-specific renderer and has no separate file updater or drift-check command.
-
-This package is ESM. VitePress data loaders that import its Node API use `.data.mts` or `.data.mjs`
-so VitePress's loader bundler treats those imports as ESM too.
+This package is ESM. A VitePress data loader that imports `/node` needs the `.data.mts` or
+`.data.mjs` extension so VitePress bundles it as ESM.

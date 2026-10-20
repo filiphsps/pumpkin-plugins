@@ -2,4 +2,3 @@
 .vitepress/dist/
 .vitepress/.temp/
 api/
-llms.txt

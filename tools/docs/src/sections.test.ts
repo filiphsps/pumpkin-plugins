@@ -35,6 +35,15 @@ describe('renderSections', () => {
         expect(s.config).toContain('```toml\n[web]\nport = 8123\n```');
     });
 
+    it('describes when Pumpkin prompts for permissions as the pinned server does', () => {
+        const { permissions } = renderSections(full);
+        // Pumpkin skips the prompt for pre-allowed permissions and caches the answer per WASM file hash.
+        expect(permissions).toContain('`allowed_permissions`');
+        expect(permissions).toContain('ask_permission_confirmation');
+        expect(permissions).toMatch(/asks again/);
+        expect(permissions).not.toMatch(/first time/);
+    });
+
     it('says what is missing instead of leaving sections empty', () => {
         const s = renderSections({ name: 'Bare', description: 'd' });
         expect(s.permissions).toContain('| `http.outbound` | Check Pumpkin Market for plugin updates. |');

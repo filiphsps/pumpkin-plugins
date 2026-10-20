@@ -57,10 +57,12 @@
         }
     }
 
-    function onTriggerKeydown(event: KeyboardEvent, index: number) {
+    function onTriggerKeydown(event: KeyboardEvent) {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();
         const buttons = [...(root.value?.querySelectorAll<HTMLButtonElement>('[data-menu-trigger]') ?? [])];
+        // Link menus such as Team are not buttons, so step through the buttons rather than the menu list.
+        const index = buttons.indexOf(event.currentTarget as HTMLButtonElement);
         const nextIndex =
             event.key === 'Home'
                 ? 0
@@ -111,10 +113,10 @@
                     type="button"
                     :data-menu-trigger="menu.text"
                     :aria-expanded="openMenu === menu.text"
-                    :aria-controls="`mega-panel-${index}`"
+                    :aria-controls="openMenu === menu.text ? `mega-panel-${index}` : undefined"
                     @click="toggleMenu(menu.text)"
                     @pointerenter="onTriggerPointerenter(menu.text, $event)"
-                    @keydown="onTriggerKeydown($event, index)"
+                    @keydown="onTriggerKeydown"
                 >
                     {{ menu.text }}
                     <span class="site-mega-nav__chevron" aria-hidden="true"></span>

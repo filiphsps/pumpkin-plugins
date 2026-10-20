@@ -475,6 +475,7 @@
     .site-mega-nav__body--reference .site-mega-nav__sections {
         grid-template-areas:
             "plugin-apis tool-apis tool-apis action-references"
+            "plugin-apis tool-apis tool-apis extension-apis"
             "plugin-apis tool-apis tool-apis repository-scripts";
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 14px;
@@ -564,7 +565,7 @@
         grid-template-areas:
             "plugin-apis action-references"
             "tool-apis tool-apis"
-            "repository-scripts repository-scripts";
+            "extension-apis repository-scripts";
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
