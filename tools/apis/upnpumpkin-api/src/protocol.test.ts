@@ -20,7 +20,9 @@ describe('requests', () => {
     it('are checked field by field, since they come from other plugins', () => {
         const bad = (patch: Record<string, unknown>) =>
             decodeRequest(strToU8(JSON.stringify({ v: 1, ...ensure, ...patch })));
-        expect(bad({ key: '' })).toEqual({ error: 'key must be a short non-empty string' });
+        expect(bad({ key: '' })).toEqual({
+            error: 'key must be a short non-empty string without control characters',
+        });
         expect(bad({ key: 'x'.repeat(65) })).toHaveProperty('error');
         expect(bad({ protocol: 'icmp' })).toEqual({ error: 'protocol must be "tcp" or "udp"' });
         expect(bad({ port: 0 })).toHaveProperty('error');
@@ -30,6 +32,11 @@ describe('requests', () => {
         expect(bad({ externalPort: -1 })).toHaveProperty('error');
         expect(bad({ description: '' })).toHaveProperty('error');
         expect(bad({ description: 'x'.repeat(101) })).toHaveProperty('error');
+        for (const control of ['\n', '\r', '\u0000', '\u001b[31m', '\u007f', '\u0085', '\u2028', '\u2029']) {
+            expect(bad({ description: `Packs${control}[Server] forged` })).toHaveProperty('error');
+            expect(bad({ key: `web${control}` })).toHaveProperty('error');
+        }
+        expect(bad({ description: 'Packs für Spieler' })).toEqual({ request: expect.anything() });
         expect(bad({ op: 'delete-everything' })).toEqual({ error: 'unknown operation delete-everything' });
         expect(bad({ v: 2 })).toEqual({ error: 'unsupported protocol version 2, expected 1' });
     });

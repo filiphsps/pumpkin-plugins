@@ -16,10 +16,14 @@ const rules: BlockedRouter[] = [
 
 describe('findBlocked', () => {
     it('blocks every model of a make that is blocked as a whole', () => {
-        expect(findBlocked({ manufacturer: 'ACME Corp', model: 'Anything', source: 'upnp' }, rules)?.reason).toBe(
+        expect(findBlocked({ manufacturer: 'ACME Corp', model: 'Anything', source: 'web' }, rules)?.reason).toBe(
             'Acme routers have no UPnP',
         );
         expect(findBlocked({ manufacturer: 'Acme', source: 'web' }, rules)).toBe(rules[0]);
+    });
+
+    it('lets a router of a make blocked as a whole through when it answered over UPnP', () => {
+        expect(findBlocked({ manufacturer: 'ACME Corp', model: 'Anything', source: 'upnp' }, rules)).toBeUndefined();
     });
 
     it('blocks only the listed models of a make, by model, model number or name', () => {
@@ -43,11 +47,9 @@ describe('findBlocked', () => {
 });
 
 describe('the real blocklist', () => {
-    it('blocks Telekom, however its routers say it', () => {
+    it('blocks Telekom when it is recognized by its web interface', () => {
         expect(blockedReason({ manufacturer: 'Telekom', name: 'Speedport', source: 'web' })).toContain('Telekom');
-        expect(
-            blockedReason({ manufacturer: 'Deutsche Telekom AG', model: 'Speedport Smart 4', source: 'upnp' }),
-        ).toBeDefined();
+        expect(blockedReason({ manufacturer: 'Deutsche Telekom AG', source: 'web' })).toBeDefined();
     });
 
     it('does not block other makes', () => {

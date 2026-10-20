@@ -14,10 +14,14 @@ function configStore(files: DataFiles): ConfigStore {
 
 /**
  * Loads the plugin's config, creating or upgrading the file as needed, and reports what happened.
- * A file that can't be read is never overwritten: the defaults are used until it is fixed.
+ * A file that is not valid TOML is never overwritten. Without `current` settings the defaults are
+ * used until it is fixed.
+ * @param current - The settings in use. When given, a file that is not valid TOML throws instead,
+ * so the caller can keep these and say why.
  * @returns The settings to run with.
+ * @throws {ConfigSyntaxError} When `current` is given and the file is not valid TOML.
  */
-export function loadPluginConfig(files: DataFiles, log: Logger): Config {
+export function loadPluginConfig(files: DataFiles, log: Logger, current?: Config): Config {
     try {
         const result = loadConfig(configSchema, configStore(files), CONFIG_RENDER_OPTIONS);
         for (const warning of result.warnings) log.warn(`${ansi.named.name(CONFIG_FILE)}: ${warning}`);
@@ -39,7 +43,7 @@ export function loadPluginConfig(files: DataFiles, log: Logger): Config {
         }
         return result.values;
     } catch (err) {
-        if (!(err instanceof ConfigSyntaxError)) throw err;
+        if (!(err instanceof ConfigSyntaxError) || current) throw err;
         log.error(
             `${ansi.named.name(CONFIG_FILE)} is not valid TOML (${err.message}). Using the default settings until it is fixed; the file was not changed.`,
         );

@@ -14,12 +14,12 @@ how plugins can request additional mappings.
 | Layer | Package | What it does |
 | --- | --- | --- |
 | Engine | `@pumpkin-plugins/port-mapping` (`tools/port-mapping`) | Finds a router and manages port mappings. It has no Pumpkin or WASI imports; it uses a small `Network` interface that unit tests can implement with a fake router. |
-| Plugin | UPnPumpkin (`packages/upnpumpkin`) | Runs the engine over WASI sockets, opens the Java and Bedrock ports, and handles mapping requests from other plugins. |
+| Plugin | UPnPumpkin (`packages/upnpumpkin`) | Runs the engine over WASI sockets, opens the Java port (TCP) and the Bedrock port (TCP and UDP), and handles mapping requests from other plugins. |
 | API | `@pumpkin-plugins/upnpumpkin-api` (`tools/apis/upnpumpkin-api`) | Provides the IPC message format, client, and watcher for plugins that need a port opened. |
 | Host | `@pumpkin-plugins/plugin-kit` (`tools/plugin-kit`) | Gives plugins the host services UPnPumpkin uses: a data folder, logging, scheduling, commands, and IPC. |
 
-BedrockAddonManager uses the API to open its web port when `web.public_url` is empty and
-`web.bind` is `0.0.0.0`. Set `web.port_forwarding = false` to manage that port yourself.
+BedrockAddonManager uses the API to open its web port when `web.port_forwarding` is true,
+`web.public_url` is empty and `web.bind` is `0.0.0.0`. Forwarding is off by default.
 
 ## How the engine works
 
@@ -27,17 +27,22 @@ Plugins run inside game ticks and can't block while waiting for the network. The
 does its work in generators (`Steps<T>`) that yield between network operations; `Task` advances
 them. `PortMapper` manages discovery and each requested mapping:
 
+The engine is IPv4-only: it asks for IPv4 port mappings and opens no IPv6 firewall pinholes
+(`WANIPv6FirewallControl`).
+
 1. If this machine's address toward the internet is public, nothing is opened.
 2. Otherwise, discovery looks for enabled protocols. With UPnP enabled, it completes the SSDP
    search and reads device descriptions before starting NAT-PMP. UPnP SOAP and NAT-PMP requests then
    run side by side; UPnP is preferred if both succeed. NAT-PMP tries the first and last address of
    the local /24, or the configured gateway.
-3. If the router's internet-side address is not public, the mapping fails. This includes
-   carrier-grade NAT, where the router is behind another shared address and cannot make the server
-   reachable on its own.
-4. Each mapping has a lease and is renewed halfway through it. If the requested public port is
-   taken, the engine tries another one. It closes the mapping when the request is released or the
-   plugin stops.
+3. If the router's internet-side address is not public, the mapping fails. The reason names the
+   cause by the address range: `100.64.0.0/10` is carrier-grade NAT, a private range such as
+   `192.168.0.0/16` means another router sits in front (double NAT), and `0.0.0.0` means the router
+   has no internet connection right now.
+4. Each mapping has a lease and is renewed halfway through it, or after five minutes if that
+   comes first, so a router reboot or a new WAN address is noticed quickly. If the requested public
+   port is taken, the engine tries another one. It closes the mapping when the request is released
+   or the plugin stops.
 5. After a failure, the engine searches again and retries with increasing delays, from 30 seconds
    up to 10 minutes. It logs a given failure once, then logs it again if the reason changes or after
    the mapping recovers and fails again.
@@ -55,18 +60,21 @@ and name) and can return a reason to reject it. A rejected router is not used or
 mapping requests fail with that reason and `info().refused` is set. Without a `screen`, the engine
 does not identify routers. Screening happens in this order:
 
-1. The router's web interface. A router without UPnP can't describe itself, so `identify.ts` has a
-   short list of recognizable pages (`WEB_FINGERPRINTS`), currently Telekom's Speedport login
-   page. The engine probes port 80 at the first and last address of the local /24, or at the
-   configured NAT-PMP gateway, with a short timeout.
-2. UPnP device descriptions. The engine checks `manufacturer`, `modelName`, `modelNumber`, and
+1. UPnP device descriptions. The engine checks `manufacturer`, `modelName`, `modelNumber`, and
    `friendlyName` from each response before sending any SOAP action.
-3. Protocol requests. UPnP SOAP actions and NAT-PMP requests run side by side. NAT-PMP waits for
+2. Protocol requests. UPnP SOAP actions and NAT-PMP requests run side by side. NAT-PMP waits for
    the UPnP search and description-screening pass to finish, so discovery can take longer than the
    search window alone.
+3. The router's web interface, only when neither protocol found a router. A router without UPnP
+   can't describe itself, so `identify.ts` has a short list of recognizable pages
+   (`WEB_FINGERPRINTS`), currently Telekom's Speedport login page. The engine probes port 80 at the
+   first and last address of the local /24, or at the configured NAT-PMP gateway, with a short
+   timeout. A match turns the failure into a refusal that names the router.
 
-NAT-PMP has no identity query, so a NAT-PMP-only router can be recognized only through its web
-interface. The engine won't reject a router it can't identify.
+The probe runs last so that another device at one of those addresses, such as a Speedport used as
+an access point, can't hide the router that answers. NAT-PMP has no identity query, so a NAT-PMP
+router that answers is used without being identified. The engine won't reject a router it can't
+identify.
 
 UPnPumpkin's `screen` is its blocklist, see below.
 
@@ -111,9 +119,11 @@ would prevent your plugin from loading when UPnPumpkin isn't installed.
 
 ## Testing
 
-- Engine and API unit tests use `FakeNetwork` and `FakeIgd` from
-  `@pumpkin-plugins/port-mapping/testing`. They control time directly and simulate UPnP and NAT-PMP
-  routers, including taken ports, permanent-lease-only routers, and CGNAT.
+- Engine unit tests use `FakeNetwork` and `FakeIgd` from `@pumpkin-plugins/port-mapping/testing`.
+  They control time directly and simulate UPnP and NAT-PMP routers, including taken ports,
+  permanent-lease-only routers, and CGNAT.
+- API unit tests give `PortMapClient` a send function that decodes each request and answers with an
+  encoded reply, so no router or network is involved.
 - UPnPumpkin integration tests run a real server with a localhost router from
   `@pumpkin-plugins/port-mapping/testing/router`. The fake IGD uses real UDP and HTTP sockets; set
   `router.upnp_search` and `router.nat_pmp_gateway` to point the plugin at it.

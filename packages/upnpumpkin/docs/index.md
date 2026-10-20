@@ -1,13 +1,13 @@
 # UPnPumpkin
 
 If players outside your local network need to reach your server, UPnPumpkin can ask your router to
-forward the Java TCP and Bedrock UDP ports using UPnP or NAT-PMP. When the network supports
-automatic mapping, you don't have to add those router rules by hand.
+forward the Java TCP port and the Bedrock TCP and UDP ports using UPnP or NAT-PMP. When the network
+supports automatic mapping, you don't have to add those router rules by hand.
 
 Install `upnpumpkin.wasm` in the Pumpkin server's `plugins/` folder, then restart the server. The
 [configuration reference](../README.md#configuration) lists the default ports and other settings.
-The router keeps each mapping for a limited lease; UPnPumpkin renews it halfway through that time
-and closes it when the server stops.
+The router keeps each mapping for a limited lease; UPnPumpkin renews it halfway through that time,
+or after five minutes if that comes first, and closes it when the server stops.
 
 ## Check the mapping
 
@@ -25,9 +25,11 @@ for five minutes.
 ## Network requirements
 
 Your router needs to support and have UPnP or NAT-PMP enabled, and your server needs a route to the
-internet through that router. A mapping cannot get around carrier-grade NAT. A second router or a
-container network that blocks multicast can also prevent router discovery. If multicast is blocked,
-set the router search address in the configuration. UPnPumpkin checks its unsupported-router list
+internet through that router. A mapping cannot get around carrier-grade NAT or a second router in
+front of yours (double NAT); `/upnp status` names the one it found. For double NAT, forward the
+ports on the outer router or put it in bridge mode. A container network that blocks multicast can
+prevent router discovery. If multicast is blocked, set the router search address in the
+configuration. UPnPumpkin checks its unsupported-router list
 before opening ports and refuses routers on that list.
 
 UPnP is available to devices on your local network, so run it only on a network you trust. If a port

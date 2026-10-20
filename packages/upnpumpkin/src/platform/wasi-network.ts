@@ -1,9 +1,11 @@
 import type { InputStream, OutputStream } from 'wasi:io/streams@0.2.3';
-import type { IpSocketAddress, Network as WasiNet } from 'wasi:sockets/network@0.2.3';
+import type { Network as WasiNet } from 'wasi:sockets/network@0.2.3';
 import type { TcpSocket } from 'wasi:sockets/tcp@0.2.3';
 import type { IncomingDatagram, UdpSocket } from 'wasi:sockets/udp@0.2.3';
 import { wasiErrorCode } from '@pumpkin-plugins/plugin-kit/wasi-error';
+import { toSafeNumber } from '@pumpkin-plugins/plugin-kit/wasi-number';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
+import { fromIpSocketAddress, settle, toIpSocketAddress } from '@pumpkin-plugins/plugin-kit/wasi-socket';
 import type { Connection, Datagram, DatagramSocket, Dial, Endpoint, Ipv4, Network } from '../port-mapping.ts';
 
 /**
@@ -13,14 +15,14 @@ import type { Connection, Datagram, DatagramSocket, Dial, Endpoint, Ipv4, Networ
 export interface Sockets {
     /** The network the host routes over. */
     instance(): WasiNet;
+    /** Blocks for `ms` milliseconds. */
+    pause?(ms: number): void;
     tcp(): TcpSocket;
     udp(): UdpSocket;
 }
 
 /** Where to point a connected UDP socket to learn which local address leads to the internet. No packet is sent. */
 const INTERNET: Ipv4 = [8, 8, 8, 8];
-/** How often to retry a socket step that reports it would block. */
-const MAX_SETTLE_ATTEMPTS = 100;
 /** Most datagrams read from a socket in one call. */
 const RECEIVE_BATCH = 16;
 
@@ -32,30 +34,14 @@ const REASONS: Record<string, string> = {
     'host-unreachable': 'the host is unreachable',
 };
 
-const address = ({ address, port }: Endpoint): IpSocketAddress => ({
-    tag: 'ipv4',
-    val: { port, address: [...address] as Ipv4 & [number, number, number, number] },
-});
-
 function describe(err: unknown): string {
     const code = wasiErrorCode(err);
     if (code) return REASONS[code] ?? code;
     return err instanceof Error ? err.message : String(err);
 }
 
-/** Socket start/finish pairs may report `would-block` while the host works; try again until they settle. */
-function settle<T>(step: () => T): T {
-    for (let attempt = 1; ; attempt++) {
-        try {
-            return step();
-        } catch (err) {
-            if (wasiErrorCode(err) !== 'would-block' || attempt >= MAX_SETTLE_ATTEMPTS) throw err;
-        }
-    }
-}
-
 function bindAnyPort(socket: UdpSocket, network: WasiNet): void {
-    socket.startBind(network, { tag: 'ipv4', val: { port: 0, address: [0, 0, 0, 0] } });
+    socket.startBind(network, toIpSocketAddress({ address: [0, 0, 0, 0], port: 0 }));
     settle(() => socket.finishBind());
 }
 
@@ -72,16 +58,15 @@ class WasiDatagramSocket implements DatagramSocket {
     send(to: Endpoint, data: Uint8Array): void {
         // A datagram may only be sent after check-send allowed it; sending without asking traps.
         if (this.outgoing.checkSend() < 1n) throw new Error('the socket cannot send right now');
-        this.outgoing.send([{ data, remoteAddress: address(to) }]);
+        this.outgoing.send([{ data, remoteAddress: toIpSocketAddress(to) }]);
     }
 
     receive(): Datagram | undefined {
         if (this.closed) return undefined;
         if (this.pending.length === 0) this.pending = this.incoming.receive(BigInt(RECEIVE_BATCH));
         for (let packet = this.pending.shift(); packet; packet = this.pending.shift()) {
-            if (packet.remoteAddress.tag !== 'ipv4') continue;
-            const { address: from, port } = packet.remoteAddress.val;
-            return { from: { address: [from[0], from[1], from[2], from[3]], port }, data: packet.data };
+            const from = fromIpSocketAddress(packet.remoteAddress);
+            if (from) return { from, data: packet.data };
         }
         return undefined;
     }
@@ -121,7 +106,7 @@ class WasiConnection implements Connection {
     }
 
     writable(): number {
-        return toSafeNumber(this.output.checkWrite());
+        return toSafeNumber(this.output.checkWrite(), 'WASI writable byte count');
     }
 
     write(bytes: Uint8Array): void {
@@ -147,7 +132,7 @@ class WasiDial implements Dial {
     constructor(sockets: Sockets, to: Endpoint) {
         const socket = sockets.tcp();
         try {
-            socket.startConnect(sockets.instance(), address(to));
+            socket.startConnect(sockets.instance(), toIpSocketAddress(to));
         } catch (err) {
             disposeWasiResource(socket);
             throw new Error(describe(err));
@@ -161,14 +146,8 @@ class WasiDial implements Dial {
         let streams: [InputStream, OutputStream] | undefined;
         try {
             streams = socket.finishConnect();
-            const local = socket.localAddress();
-            const from = local.tag === 'ipv4' ? local.val.address : [0, 0, 0, 0];
-            const connection = new WasiConnection(socket, streams[0], streams[1], [
-                from[0] ?? 0,
-                from[1] ?? 0,
-                from[2] ?? 0,
-                from[3] ?? 0,
-            ]);
+            const local = fromIpSocketAddress(socket.localAddress())?.address ?? [0, 0, 0, 0];
+            const connection = new WasiConnection(socket, streams[0], streams[1], local);
             this.socket = undefined;
             return connection;
         } catch (err) {
@@ -196,14 +175,6 @@ class WasiDial implements Dial {
     }
 }
 
-function toSafeNumber(value: bigint): number {
-    const number = Number(value);
-    if (!Number.isSafeInteger(number) || number < 0) {
-        throw new RangeError("WASI writable byte count exceeds JavaScript's safe integer range");
-    }
-    return number;
-}
-
 /**
  * The `Network` the port mapping code runs on, over WASI UDP and TCP sockets. A UDP socket lets the
  * operating system choose the local interface without sending a packet.
@@ -216,6 +187,11 @@ export class WasiNetwork implements Network {
     /** {@inheritDoc port-mapping!Network#now} */
     now(): number {
         return Date.now();
+    }
+
+    /** {@inheritDoc port-mapping!Network#pause} */
+    pause(ms: number): void {
+        this.sockets.pause?.(ms);
     }
 
     /** {@inheritDoc port-mapping!Network#openDatagram} */
@@ -241,12 +217,10 @@ export class WasiNetwork implements Network {
         const socket = this.sockets.udp();
         try {
             bindAnyPort(socket, this.sockets.instance());
-            const [incoming, outgoing] = socket.stream(address({ address: toward, port: 9 }));
+            const [incoming, outgoing] = socket.stream(toIpSocketAddress({ address: toward, port: 9 }));
             try {
-                const local = socket.localAddress();
-                if (local.tag !== 'ipv4') return undefined;
-                const [a, b, c, d] = local.val.address;
-                return a === 0 ? undefined : [a, b, c, d];
+                const local = fromIpSocketAddress(socket.localAddress())?.address;
+                return local?.[0] === 0 ? undefined : local;
             } finally {
                 disposeWasiResource(incoming);
                 disposeWasiResource(outgoing);
