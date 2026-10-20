@@ -512,7 +512,7 @@ index 06f585f..73491aa 100644
 +++ b/external/llvh/lib/Support/Watchdog.cpp
 @@ -15,9 +15,13 @@
  #include "llvh/Config/llvm-config.h"
-
+ 
  // Include the platform-specific parts of this class.
 +#ifdef __wasi__
 +#include "Wasi/Watchdog.inc"
