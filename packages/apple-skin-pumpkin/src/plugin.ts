@@ -1,13 +1,15 @@
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { PlayerJoinEventData, PlayerLeaveEventData } from 'pumpkin:plugin/event@0.1.0';
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { hostLogger } from '@pumpkin-plugins/plugin-kit/host';
+import { taggedLogger } from '@pumpkin-plugins/plugin-kit/logger';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { info } from './info.ts';
 import { PlayerSync } from './platform/player-sync.ts';
 
 /** Tells AppleSkin clients the server's hunger values, which vanilla keeps to itself. */
 class AppleSkinPumpkin extends PluginBase {
-    private readonly sync = new PlayerSync(hostLogger);
+    private readonly sync = new PlayerSync(taggedLogger(ansi.named.name(info.name), hostLogger));
 
     constructor() {
         super(info, __PLUGIN_VERSION__);
