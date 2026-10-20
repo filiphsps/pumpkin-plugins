@@ -20,6 +20,7 @@ import { blockedReason } from './blocklist.ts';
 import { parseEndpoint } from './config/fields.ts';
 import { loadPluginConfig } from './config/load.ts';
 import type { Config } from './config/schema.ts';
+import { ownKey, pluginKey } from './keys.ts';
 import { type Refusal, refusalMessage } from './refusal.ts';
 
 /** A request nobody has repeated for this long is dropped: the plugin that asked is gone. */
@@ -27,15 +28,14 @@ const REQUEST_TTL_MS = 5 * 60_000;
 const PRUNE_EVERY_MS = 10_000;
 /** How long stopping may wait for the router to confirm that ports were closed. */
 const SHUTDOWN_BUDGET_MS = 3000;
+/** How long stopping blocks between checks on the router's answers. */
+const SHUTDOWN_POLL_MS = 10;
 
 interface PluginRequest {
     lastSeen: number;
     sender: string;
     spec: MappingSpec;
 }
-
-const ownKey = (name: string) => `own:${name}`;
-const pluginKey = (sender: string, key: string) => `plugin:${sender}:${key}`;
 
 /** The wire form of a mapper state. */
 export function toStatus(state: MappingState | undefined): PortStatus {
@@ -58,6 +58,7 @@ export class PortForwarder {
     private retiring: { task: Task<void>; deadline: number } | undefined;
     private readonly requests = new Map<string, PluginRequest>();
     private lastPrune = 0;
+    private readonly warnedSenders = new Set<string>();
 
     /** Creates a forwarder. Call `start` to begin. */
     constructor(
@@ -90,10 +91,14 @@ export class PortForwarder {
         this.reload();
     }
 
-    /** Reloads `config.toml`. The router is searched for again only when its settings changed. */
+    /**
+     * Reloads `config.toml`. The router is searched for again only when its settings changed.
+     * @throws {ConfigSyntaxError} When the file is not valid TOML. The current settings stay.
+     */
     reload(): void {
-        this.settings = loadPluginConfig(this.files, this.log);
-        const { router } = this.settings;
+        this.settings = loadPluginConfig(this.files, this.log, this.settings);
+        // The lease plays no part in finding the router; the mapper reads it at each renewal.
+        const { lease_seconds: _lease, ...router } = this.settings.router;
         const key = JSON.stringify(router);
         if (this.mapper && key !== this.mapperSettings) this.retireMapper();
         if (!this.mapper) this.openMapper(key);
@@ -163,6 +168,18 @@ export class PortForwarder {
                         error: 'requests from other plugins are turned off in the UPnPumpkin config (plugins.allow_requests)',
                     };
                 }
+                if (!this.settings.plugins.allowed.includes(sender)) {
+                    if (!this.warnedSenders.has(sender)) {
+                        this.warnedSenders.add(sender);
+                        this.log.warn(
+                            `${ansi.named.name(sender)} asked for ${request.protocol.toUpperCase()} port ${ansi.named.port(request.port)} to be opened, but it is not in plugins.allowed in the UPnPumpkin config.`,
+                        );
+                    }
+                    return {
+                        ok: false,
+                        error: `${sender} may not ask for ports: add it to plugins.allowed in the UPnPumpkin config`,
+                    };
+                }
                 const known = this.requests.has(key);
                 const requestCount = [...this.requests.values()].filter((current) => current.sender === sender).length;
                 if (!known && requestCount >= this.settings.plugins.max_requests_per_plugin) {
@@ -192,11 +209,14 @@ export class PortForwarder {
 
     private openMapper(settingsKey: string): void {
         const { router } = this.config;
+        const settings = () => this.config.router;
         this.mapperSettings = settingsKey;
         this.mapper = new PortMapper(this.net, {
             upnp: router.upnp,
             natPmp: router.nat_pmp,
-            leaseSeconds: router.lease_seconds,
+            get leaseSeconds() {
+                return settings().lease_seconds;
+            },
             ssdp: parseEndpoint(router.upnp_search),
             natPmpGateway: parseEndpoint(router.nat_pmp_gateway),
             screen: blockedReason,
@@ -224,8 +244,10 @@ export class PortForwarder {
         if (!closing) return;
         const deadline = this.net.now() + SHUTDOWN_BUDGET_MS;
         try {
-            while (closing.poll().state === 'running' && this.net.now() < deadline) {
-                // Only unload drains synchronously; live reload advances retirement on ticks.
+            // Only unload drains synchronously; live reload advances retirement on ticks.
+            for (let now = this.net.now(); closing.poll().state === 'running' && now < deadline; ) {
+                this.net.pause?.(Math.min(SHUTDOWN_POLL_MS, deadline - now));
+                now = this.net.now();
             }
         } finally {
             closing.cancel();
@@ -236,9 +258,17 @@ export class PortForwarder {
         const mapper = this.mapper;
         if (!mapper) return;
         const { java, bedrock } = this.config;
+        // Bedrock players reach the server over UDP, but Pumpkin's NetherNet listener sets each
+        // connection up over HTTP on the same port number, so Bedrock needs both protocols.
         const own = [
             { name: 'java', setting: java, protocol: 'tcp' as const, description: 'Pumpkin Java Edition' },
             { name: 'bedrock', setting: bedrock, protocol: 'udp' as const, description: 'Pumpkin Bedrock Edition' },
+            {
+                name: 'bedrock-tcp',
+                setting: bedrock,
+                protocol: 'tcp' as const,
+                description: 'Pumpkin Bedrock Edition signaling',
+            },
         ];
         for (const { name, setting, protocol, description } of own) {
             if (setting.enabled) mapper.request(ownKey(name), { protocol, port: setting.port, description });

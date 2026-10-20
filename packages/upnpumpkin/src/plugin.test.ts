@@ -24,17 +24,16 @@ vi.mock('@pumpkin-plugins/plugin-kit/plugin', () => ({
     registerPlugin: (plugin: LoadedPlugin) => {
         state.plugin = plugin;
     },
+    handleCommand: vi.fn(),
     handleTask: vi.fn(),
 }));
 vi.mock('@pumpkin-plugins/plugin-kit/data-dir', () => ({ WasiDataDir: { open: () => state.files } }));
 vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({
     cancelTask: state.cancelTask,
     hostLogger: { error: vi.fn() },
-    runCommand: vi.fn(),
     scheduleRepeating: state.scheduleRepeating,
 }));
 vi.mock('@pumpkin-plugins/pumpkin-api', () => ({
-    handleCommand: vi.fn(),
     handleIpcMessage: vi.fn(() => state.apiReply),
 }));
 vi.mock('./commands/register.ts', () => ({ registerCommands: state.registerCommands }));

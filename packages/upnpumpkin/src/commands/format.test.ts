@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { pluginKey } from '../keys.ts';
 import { statusLines } from './format.ts';
 
 const spec = { protocol: 'tcp', port: 25565, description: 'x' } as const;
@@ -13,7 +14,11 @@ describe('statusLines', () => {
                     spec,
                     state: { kind: 'open', via: 'upnp', address: [93, 184, 216, 34], port: 25565 },
                 },
-                { key: 'plugin:BedrockAddonManager:web', spec: { ...spec, port: 8123 }, state: { kind: 'pending' } },
+                {
+                    key: pluginKey('BedrockAddonManager', 'web'),
+                    spec: { ...spec, port: 8123 },
+                    state: { kind: 'pending' },
+                },
                 {
                     key: 'own:bedrock',
                     spec: { ...spec, protocol: 'udp', port: 19132 },

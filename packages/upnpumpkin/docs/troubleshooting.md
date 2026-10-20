@@ -11,6 +11,12 @@ local network. UPnP normally uses multicast discovery. If the server's network b
 set `router.upnp_search` in `plugins/data/UPnPumpkin/config.toml` to the router's IPv4 address and
 UPnP port, for example `192.168.1.1:1900`. Run `/upnp reload` to apply the change.
 
+If the reason says the plugin is not allowed to use the network that way, Pumpkin blocked the
+socket. Check that the plugin's `network.*` permissions were granted when Pumpkin asked on the
+console, and that `pumpkin.toml` doesn't list them in `plugins.blocked_permissions`. Also check that
+`plugins.loopback_only` is off, or that `[plugins.overrides.UPnPumpkin]` sets
+`loopback_only = false`. With it on, the plugin can only reach localhost, never the router.
+
 For NAT-PMP, set `router.nat_pmp_gateway` to the gateway's IPv4 address and port (usually
 `192.168.1.1:5351`) if automatic probing does not find it. In a container or a network with
 multiple routers, check that the server can reach the router and receive its replies; a container
@@ -19,13 +25,21 @@ network may not pass the discovery traffic the router needs.
 ## A port is not opened or players cannot connect
 
 In `/upnp status`, look at the state and reason shown for the Java and Bedrock ports. Confirm
-`java.port` and `bedrock.port` match the server listeners. Java uses TCP and Bedrock uses UDP. The
-router mapping does not change host firewall rules, so allow the same ports and protocols through
-the server's firewall.
+`java.port` and `bedrock.port` match the server listeners. Java uses TCP, and Bedrock uses both
+TCP and UDP on the same port. The router mapping does not change host firewall rules, so allow the
+same ports and protocols through the server's firewall.
 
-The router also needs a public internet-side address to accept inbound connections. If its address
-is private or shared through carrier-grade NAT, a mapping cannot make the server reachable from the
-internet. A server machine that already has a public address does not need a router mapping.
+The router also needs a public internet-side address to accept inbound connections. When it has
+none, the reason in `/upnp status` says why:
+
+- Your provider shares one address between customers (carrier-grade NAT). Ask the provider for a
+  public IPv4 address; no router setting fixes this.
+- Another router sits between yours and the internet (double NAT), for example the provider's modem.
+  Forward the ports on that router, or put it in bridge mode so yours gets the public address.
+- The router has no internet connection right now, for example during a reconnect. UPnPumpkin
+  tries again later.
+
+A server machine that already has a public address does not need a router mapping.
 
 If `/upnp status` reports that the router is unsupported, UPnPumpkin intentionally opens nothing
 for that router. Forward the ports manually in the router settings instead.

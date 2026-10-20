@@ -580,9 +580,6 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.4(vitest@5.0.4)
-      smol-toml:
-        specifier: 1.9.0
-        version: 1.9.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
