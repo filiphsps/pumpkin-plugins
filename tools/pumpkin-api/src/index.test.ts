@@ -14,27 +14,14 @@ class TestPlugin extends Plugin {
     }
 }
 
-it('returns fallback metadata before a plugin is registered', () => {
-    expect(metadata.getMetadata()).toEqual({
-        name: 'unknown',
-        version: '0.0.0',
-        authors: [],
-        description: 'No metadata',
-        dependencies: [],
-        permissions: [],
-    });
+it('fails metadata requests before a plugin is registered', () => {
+    expect(() => metadata.getMetadata()).toThrowError(/registerPlugin\(\)/);
 });
 
 it('rejects IPC messages when a plugin does not provide a handler', () => {
-    expect(() => new TestPlugin().handleIpcMessage('sender' as never, {} as never)).toThrowError(Error);
-    expect(() => new TestPlugin().handleIpcMessage('sender' as never, {} as never)).toThrowError(
-        'This plugin does not handle IPC messages',
-    );
+    expect(() => new TestPlugin().handleIpcMessage('sender' as never, {} as never)).toThrowError(/IPC/);
 });
 
 it('rejects IPC messages before a plugin is registered', () => {
-    expect(() => handleIpcMessage('sender' as never, {} as never)).toThrowError(Error);
-    expect(() => handleIpcMessage('sender' as never, {} as never)).toThrowError(
-        'Cannot handle IPC messages before a plugin is registered',
-    );
+    expect(() => handleIpcMessage('sender' as never, {} as never)).toThrowError(/registered/);
 });

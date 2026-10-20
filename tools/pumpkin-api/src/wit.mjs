@@ -5,9 +5,6 @@ import * as path from 'node:path';
 
 const upstreamGitPinSchema =
     'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/schemas/upstream-git-pin.schema.json';
-const lockWait = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
-const staleLockAgeMs = 30_000;
-const maxLockWaitMs = 15 * 60_000;
 
 /**
  * Fetch the pinned Pumpkin WIT subdirectory on first use and when its lockfile changes.
@@ -17,7 +14,7 @@ const maxLockWaitMs = 15 * 60_000;
  * checkout and the checkout is removed before the cache is published. Cached WIT files are
  * verified against their SHA-256 manifest before reuse, so a modified cache cannot change API bindings.
  *
- * @param {{ lockFile: string, cacheRoot: string }} options Lockfile path and consumer-owned cache root.
+ * @param options - Lockfile path and consumer-owned cache root.
  * @returns The cached WIT package directory selected by the lockfile.
  * @throws {Error} If the lock is invalid, Git cannot fetch its commit, or the commit lacks WIT files.
  */
@@ -31,74 +28,91 @@ export function ensurePumpkinWit({ lockFile, cacheRoot }) {
     const cacheParent = path.join(resolvedCacheRoot, 'pumpkin-api-wit');
     const cacheDirectory = path.join(cacheParent, lockDigest);
     const cachedWit = path.join(cacheDirectory, pin.subdirectory);
-    if (isValidCache(cacheDirectory, cachedWit, lockDigest, pin.commit, pin.subdirectory)) return cachedWit;
+    const isCached = () => isValidCache(cacheDirectory, cachedWit, lockDigest, pin.commit, pin.subdirectory);
+    if (isCached()) return cachedWit;
 
     fs.mkdirSync(cacheParent, { recursive: true });
-    const releaseLock = acquireCacheLock(
-        cacheParent,
-        cacheDirectory,
-        cachedWit,
-        lockDigest,
-        pin.commit,
-        pin.subdirectory,
-    );
-    if (!releaseLock) return cachedWit;
+    const stagingDirectory = fs.mkdtempSync(path.join(cacheParent, '.staging-'));
 
     try {
-        if (isValidCache(cacheDirectory, cachedWit, lockDigest, pin.commit, pin.subdirectory)) return cachedWit;
-        fs.rmSync(cacheDirectory, { recursive: true, force: true });
-        const stagingDirectory = fs.mkdtempSync(path.join(cacheParent, '.staging-'));
+        const checkout = path.join(stagingDirectory, 'checkout');
+        // Fetch only the pinned commit and only the blobs under the WIT subdirectory. End option
+        // parsing so a validated remote cannot be interpreted as a Git option.
+        runGit(['init', '--quiet', checkout]);
+        runGit([
+            '-C',
+            checkout,
+            'fetch',
+            '--quiet',
+            '--depth',
+            '1',
+            '--filter=blob:none',
+            '--',
+            pin.repository,
+            pin.commit,
+        ]);
 
-        try {
-            const checkout = path.join(stagingDirectory, 'checkout');
-            // End option parsing so a validated remote cannot be interpreted as a Git option.
-            runGit(['clone', '--filter=blob:none', '--no-checkout', '--', pin.repository, checkout]);
-            runGit(['-C', checkout, 'fetch', '--depth', '1', 'origin', pin.commit]);
-            runGit(['-C', checkout, 'checkout', '--quiet', '--detach', pin.commit]);
-
-            const checkedOutCommit = runGit(['-C', checkout, 'rev-parse', 'HEAD']).toLowerCase();
-            if (checkedOutCommit !== pin.commit) {
-                throw new Error(`Git checked out ${checkedOutCommit}, expected ${pin.commit}`);
-            }
-
-            const sourceWit = path.join(checkout, pin.subdirectory);
-            if (!hasWitFiles(sourceWit)) {
-                throw new Error(`upstream commit ${pin.commit} does not contain WIT files under ${pin.subdirectory}/`);
-            }
-
-            const stagedWit = path.join(stagingDirectory, pin.subdirectory);
-            fs.mkdirSync(path.dirname(stagedWit), { recursive: true });
-            fs.cpSync(sourceWit, stagedWit, { recursive: true });
-            fs.writeFileSync(
-                path.join(stagingDirectory, 'pin.json'),
-                `${JSON.stringify({ lockDigest, ...pin, witFiles: getWitFileManifest(stagedWit) }, null, 4)}\n`,
-            );
-            fs.rmSync(checkout, { recursive: true, force: true });
-
-            try {
-                fs.renameSync(stagingDirectory, cacheDirectory);
-            } catch (error) {
-                if (!isValidCache(cacheDirectory, cachedWit, lockDigest, pin.commit, pin.subdirectory)) throw error;
-            }
-            return cachedWit;
-        } finally {
-            fs.rmSync(stagingDirectory, { recursive: true, force: true });
+        const fetchedCommit = runGit(['-C', checkout, 'rev-parse', 'FETCH_HEAD']).toLowerCase();
+        if (fetchedCommit !== pin.commit) {
+            throw new Error(`Git fetched ${fetchedCommit}, expected ${pin.commit}`);
         }
+        const missingWit = new Error(
+            `upstream commit ${pin.commit} does not contain WIT files under ${pin.subdirectory}/`,
+        );
+        if (!runGit(['-C', checkout, 'ls-tree', '--name-only', 'FETCH_HEAD', '--', pin.subdirectory])) throw missingWit;
+        runGit(['-C', checkout, 'checkout', '--quiet', 'FETCH_HEAD', '--', pin.subdirectory]);
+
+        const sourceWit = path.join(checkout, pin.subdirectory);
+        if (!hasWitFiles(sourceWit)) throw missingWit;
+
+        const stagedWit = path.join(stagingDirectory, pin.subdirectory);
+        fs.mkdirSync(path.dirname(stagedWit), { recursive: true });
+        fs.cpSync(sourceWit, stagedWit, { recursive: true });
+        fs.writeFileSync(
+            path.join(stagingDirectory, 'pin.json'),
+            `${JSON.stringify({ lockDigest, ...pin, witFiles: getWitFileManifest(stagedWit) }, null, 4)}\n`,
+        );
+        fs.rmSync(checkout, { recursive: true, force: true });
+        publishCache(stagingDirectory, cacheDirectory, cacheParent, isCached);
+        return cachedWit;
     } catch (error) {
         throw new Error(
             `could not fetch Pumpkin WIT from ${pin.repository} at ${pin.commit} for ${lockFile}: ${errorMessage(error)}. The first build after a lock change needs Git and network access.`,
             { cause: error },
         );
     } finally {
-        releaseLock();
+        fs.rmSync(stagingDirectory, { recursive: true, force: true });
+    }
+}
+
+// Concurrent builds may fetch the same pin; the first rename wins and the others reuse its cache.
+// An invalid cache is renamed aside before publishing, so no build deletes a directory in use.
+function publishCache(stagingDirectory, cacheDirectory, cacheParent, isCached) {
+    for (let attempt = 0; ; attempt++) {
+        try {
+            fs.renameSync(stagingDirectory, cacheDirectory);
+            return;
+        } catch (error) {
+            if (!isExistingDirectory(error)) throw error;
+            if (isCached()) return;
+            if (attempt > 0) throw error;
+        }
+
+        const trash = path.join(cacheParent, `.trash-${randomUUID()}`);
+        try {
+            fs.renameSync(cacheDirectory, trash);
+        } catch (error) {
+            if (!isMissing(error)) throw error;
+        }
+        fs.rmSync(trash, { recursive: true, force: true });
     }
 }
 
 /**
  * Validate the lockfile fields described by the upstream Git pin schema.
- * @param {string} source Lockfile JSON text.
- * @param {string} lockFile Lockfile path for diagnostics.
- * @returns {{ repository: string, branch: string, commit: string, subdirectory: string }} The normalized pin.
+ * @param source - Lockfile JSON text.
+ * @param lockFile - Lockfile path for diagnostics.
+ * @returns The normalized pin.
  */
 export function parsePumpkinWitPin(source, lockFile) {
     let value;
@@ -202,7 +216,37 @@ function isValidCache(cacheDirectory, witDirectory, lockDigest, commit, subdirec
     }
 }
 
+/**
+ * Digest the WIT files under a package directory, including nested folders.
+ *
+ * Each file contributes its `/`-separated relative path and contents, in path order, so the digest
+ * changes when a WIT file is added, removed, renamed or edited. Files without the `.wit` extension
+ * are ignored. Compatibility matrices record this value as `sourceWitSha256`.
+ *
+ * @param directory - WIT package directory, such as the one returned by `ensurePumpkinWit`.
+ * @returns The lowercase hexadecimal SHA-256 digest.
+ */
+export function digestWitDirectory(directory) {
+    const hash = createHash('sha256');
+    for (const file of listWitFiles(directory)) {
+        hash.update(file);
+        hash.update('\0');
+        hash.update(fs.readFileSync(path.join(directory, file)));
+        hash.update('\0');
+    }
+    return hash.digest('hex');
+}
+
 function getWitFileManifest(directory) {
+    return listWitFiles(directory).map((file) => ({
+        path: file,
+        sha256: createHash('sha256')
+            .update(fs.readFileSync(path.join(directory, file)))
+            .digest('hex'),
+    }));
+}
+
+function listWitFiles(directory) {
     const witFiles = [];
 
     function collect(currentDirectory) {
@@ -211,16 +255,13 @@ function getWitFileManifest(directory) {
             if (entry.isDirectory()) {
                 collect(entryPath);
             } else if (entry.isFile() && entry.name.endsWith('.wit')) {
-                witFiles.push({
-                    path: path.relative(directory, entryPath).split(path.sep).join('/'),
-                    sha256: createHash('sha256').update(fs.readFileSync(entryPath)).digest('hex'),
-                });
+                witFiles.push(path.relative(directory, entryPath).split(path.sep).join('/'));
             }
         }
     }
 
     collect(directory);
-    return witFiles.sort(compareWitFilePaths);
+    return witFiles.sort();
 }
 
 function matchesWitFileManifest(manifest, actualWitFiles) {
@@ -251,157 +292,17 @@ function compareWitFilePaths(left, right) {
     return left.path < right.path ? -1 : left.path > right.path ? 1 : 0;
 }
 
-function acquireCacheLock(cacheParent, cacheDirectory, cachedWit, lockDigest, commit, subdirectory) {
-    const lockDirectory = path.join(cacheParent, `.${lockDigest}.lock`);
-    const reclaimDirectory = `${lockDirectory}.reclaim`;
-    const startedAt = Date.now();
-
-    while (Date.now() - startedAt < maxLockWaitMs) {
-        if (isValidCache(cacheDirectory, cachedWit, lockDigest, commit, subdirectory)) return undefined;
-
-        try {
-            fs.mkdirSync(lockDirectory);
-            return createOwnedDirectoryLock(lockDirectory);
-        } catch (error) {
-            if (!isAlreadyExists(error)) throw error;
-            if (isStaleLock(lockDirectory)) {
-                const releaseReclaimClaim = tryCreateOwnedDirectoryLock(reclaimDirectory);
-                if (releaseReclaimClaim) {
-                    try {
-                        if (isValidCache(cacheDirectory, cachedWit, lockDigest, commit, subdirectory)) return undefined;
-                        if (!isStaleLock(lockDirectory)) continue;
-
-                        fs.rmSync(lockDirectory, { recursive: true, force: true });
-                        try {
-                            fs.mkdirSync(lockDirectory);
-                        } catch (createError) {
-                            if (isAlreadyExists(createError)) continue;
-                            throw createError;
-                        }
-                        return createOwnedDirectoryLock(lockDirectory);
-                    } finally {
-                        releaseReclaimClaim();
-                    }
-                }
-            }
-            Atomics.wait(lockWait, 0, 0, 100);
-        }
-    }
-
-    throw new Error(
-        `timed out waiting for the Pumpkin WIT cache lock: ${lockDirectory}; stale-lock recovery claim: ${reclaimDirectory}`,
-    );
+function isExistingDirectory(error) {
+    // POSIX reports EEXIST or ENOTEMPTY for a non-empty rename target; Windows reports EPERM.
+    return hasErrorCode(error, 'EEXIST') || hasErrorCode(error, 'ENOTEMPTY') || hasErrorCode(error, 'EPERM');
 }
 
-function tryCreateOwnedDirectoryLock(lockDirectory) {
-    try {
-        fs.mkdirSync(lockDirectory);
-    } catch (error) {
-        if (!isAlreadyExists(error)) throw error;
-        if (!removeStaleOwnedDirectoryLock(lockDirectory)) return undefined;
-        try {
-            fs.mkdirSync(lockDirectory);
-        } catch (createError) {
-            if (isAlreadyExists(createError)) return undefined;
-            throw createError;
-        }
-    }
-    return createOwnedDirectoryLock(lockDirectory);
+function isMissing(error) {
+    return hasErrorCode(error, 'ENOENT');
 }
 
-function removeStaleOwnedDirectoryLock(lockDirectory) {
-    const identity = readDirectoryIdentity(lockDirectory);
-    if (!identity) return true;
-
-    const ownerFile = path.join(lockDirectory, 'owner.json');
-    const ownerSource = readLockOwnerSource(ownerFile);
-    if (!isStaleLock(lockDirectory)) return false;
-    if (readDirectoryIdentity(lockDirectory) !== identity || readLockOwnerSource(ownerFile) !== ownerSource)
-        return false;
-    if (!isStaleLock(lockDirectory)) return false;
-
-    fs.rmSync(lockDirectory, { recursive: true, force: true });
-    return true;
-}
-
-function createOwnedDirectoryLock(lockDirectory) {
-    const ownerFile = path.join(lockDirectory, 'owner.json');
-    const token = randomUUID();
-    const identity = readDirectoryIdentity(lockDirectory);
-
-    try {
-        fs.writeFileSync(ownerFile, JSON.stringify({ pid: process.pid, token }));
-    } catch (error) {
-        removeDirectoryIfUnchanged(lockDirectory, identity);
-        throw error;
-    }
-
-    return () => {
-        if (readLockOwnerToken(ownerFile) === token) fs.rmSync(lockDirectory, { recursive: true, force: true });
-    };
-}
-
-function readDirectoryIdentity(directory) {
-    try {
-        const { dev, ino } = fs.statSync(directory);
-        return `${dev}:${ino}`;
-    } catch {
-        return undefined;
-    }
-}
-
-function removeDirectoryIfUnchanged(directory, identity) {
-    if (identity && readDirectoryIdentity(directory) === identity) {
-        fs.rmSync(directory, { recursive: true, force: true });
-    }
-}
-
-function readLockOwnerToken(ownerFile) {
-    const contents = readLockOwnerSource(ownerFile);
-    if (contents === undefined) return undefined;
-    try {
-        const owner = JSON.parse(contents);
-        return typeof owner.token === 'string' ? owner.token : undefined;
-    } catch {
-        return undefined;
-    }
-}
-
-function readLockOwnerSource(ownerFile) {
-    try {
-        return fs.readFileSync(ownerFile, 'utf8');
-    } catch {
-        return undefined;
-    }
-}
-
-function isStaleLock(lockDirectory) {
-    let owner;
-    try {
-        owner = JSON.parse(fs.readFileSync(path.join(lockDirectory, 'owner.json'), 'utf8'));
-    } catch {
-        try {
-            return Date.now() - fs.statSync(lockDirectory).mtimeMs > staleLockAgeMs;
-        } catch {
-            return true;
-        }
-    }
-
-    if (typeof owner.pid !== 'number' || !Number.isInteger(owner.pid) || owner.pid < 1) return true;
-    try {
-        process.kill(owner.pid, 0);
-        return false;
-    } catch (error) {
-        return isNoSuchProcess(error);
-    }
-}
-
-function isAlreadyExists(error) {
-    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'EEXIST';
-}
-
-function isNoSuchProcess(error) {
-    return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ESRCH';
+function hasErrorCode(error, code) {
+    return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
 }
 
 function hasWitFiles(directory) {
