@@ -308,7 +308,6 @@ jobs:
             contents: read
             id-token: write
         env:
-            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             GH_REPO: ${{ github.repository }}
             RELEASED_TOOL_PATHS: ${{ needs.release.outputs.tool_paths_released }}
             RELEASE_METADATA: ${{ needs.release.outputs.release_metadata }}
@@ -342,6 +341,12 @@ jobs:
                       node scripts/verify-release-tag.mjs "$RELEASE_TAG" "$RELEASE_TARGET_SHA"
                   done <<< "$release_tags"
 
+            - name: 📚 Catch up pending public tool releases
+              if: ${{ !inputs.tool_only }}
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: pnpm exec node scripts/publish-pending-tool-releases.mjs
+
             - name: 📦 Configure npm OIDC publishing
               uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
               with:
@@ -363,9 +368,6 @@ jobs:
                       }
                   }
                   NODE
-                  if [[ "$RELEASE_TOOL_ONLY" != 'true' ]]; then
-                      pnpm exec node scripts/publish-pending-tool-releases.mjs
-                  fi
                   if [[ "$RELEASE_TOOL_ONLY" == 'true' ]]; then
                       pnpm --dir "$GITHUB_WORKSPACE/release-source" install --frozen-lockfile
                       PUMPKIN_PUBLIC_TOOL_ROOT="$GITHUB_WORKSPACE/release-source" \
@@ -387,7 +389,6 @@ jobs:
             matrix:
                 path: ${{ fromJSON(needs.release.outputs.extension_paths_released) }}
         env:
-            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             GH_REPO: ${{ github.repository }}
             TAG: ${{ fromJSON(needs.release.outputs.release_metadata)[format('{0}--tag_name', matrix.path)] }}
             EXTENSION_DIRECTORY: ${{ matrix.path }}
@@ -408,6 +409,13 @@ jobs:
                   extension_name="${EXTENSION_NAME##*/}"
                   pnpm --filter "./$EXTENSION_NAME" run build
                   pnpm --filter "./$EXTENSION_NAME" run package -- --out "$RUNNER_TEMP/$extension_name.vsix"
+
+            - name: 📤 Attach VS Code extension to GitHub release
+              env:
+                  EXTENSION_NAME: ${{ matrix.path }}
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  extension_name="${EXTENSION_NAME##*/}"
                   gh release upload "$TAG" "$RUNNER_TEMP/$extension_name.vsix" --clobber
 
     plugins:
