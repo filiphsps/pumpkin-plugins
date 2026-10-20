@@ -28,12 +28,11 @@ export interface ClientOptions {
 /** Validated protocol 0 consumer with no host imports or implicit cache. */
 export class PieClient {
     readonly guard: CallbackGuard;
+    private readonly send: SendMessage;
     private readonly provider: string;
     /** Inject the transport and share a callback guard with any expansion router. */
-    constructor(
-        private readonly send: SendMessage,
-        options: ClientOptions = {},
-    ) {
+    constructor(send: SendMessage, options: ClientOptions = {}) {
+        this.send = send;
         this.guard = options.guard ?? new CallbackGuard();
         this.provider = options.provider ?? PIE_PROVIDER;
     }
@@ -58,16 +57,15 @@ export class PieClient {
         const inputs = lines.map((line) => ({ text: line.text, viewer: line.viewer }));
         const batches: Line[][] = [];
         let batch: Line[] = [];
-        let bytes = encodeRequest({ op: 'set_placeholders_batch', requests: [] }).length;
+        const emptyBytes = encodeRequest({ op: 'set_placeholders_batch', requests: [] }).length;
+        let bytes = emptyBytes;
         for (const line of inputs) {
-            const size =
-                encodeRequest({ op: 'set_placeholders_batch', requests: [line] }).length -
-                encodeRequest({ op: 'set_placeholders_batch', requests: [] }).length;
+            const size = encodeRequest({ op: 'set_placeholders_batch', requests: [line] }).length - emptyBytes;
             const extra = size + (batch.length ? 1 : 0);
             if (batch.length === LIMITS.batch || bytes + extra > LIMITS.message) {
                 batches.push(batch);
                 batch = [];
-                bytes = encodeRequest({ op: 'set_placeholders_batch', requests: [] }).length;
+                bytes = emptyBytes;
             }
             batch.push(line);
             bytes += size + (batch.length > 1 ? 1 : 0);

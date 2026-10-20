@@ -636,9 +636,18 @@ importers:
         specifier: 'catalog:'
         version: 0.8.3
     devDependencies:
+      '@pumpkin-plugins/build':
+        specifier: workspace:*
+        version: link:../../build
       '@pumpkin-plugins/docs':
         specifier: workspace:*
         version: link:../../docs
+      '@pumpkin-plugins/plugin-kit':
+        specifier: workspace:*
+        version: link:../../plugin-kit
+      '@pumpkin-plugins/pumpkin-api':
+        specifier: 'catalog:'
+        version: link:../../pumpkin-api
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../../test-harness
