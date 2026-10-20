@@ -32,7 +32,7 @@ reviews:
     related_issues: true
     related_prs: true
     suggested_labels: true
-    # Keep label names aligned with the repository's GitHub label set.
+    # Generated from .github/labels.yml by .github/scripts/coderabbit-labels.mjs.
     labeling_instructions:
         - label: 'area: actions'
           instructions: Changes to reusable GitHub Actions under actions/.
@@ -125,7 +125,7 @@ reviews:
           instructions: Use only when the PR is explicitly awaiting owner, classification, or
             priority.
     mutually_exclusive_groups:
-        # Choose one priority and one release stage when either label family applies.
+        # Choose at most one runtime, one status and one priority label.
         runtime:
             - "runtime: quickjs"
             - "runtime: static-hermes"
@@ -265,10 +265,10 @@ reviews:
             - name: Pumpkin API and server ABI alignment
               mode: warning
               instructions: >-
-                  Apply when the diff changes tools/pumpkin-api/wit.lock.json,
-                  tools/pumpkin-api/package.json, generated guest declarations, the test server pin
-                  in tools/test-harness/src/pumpkin-version.ts, or the API catalog entry in
-                  pnpm-workspace.yaml. When the host API or WIT changes, verify that the WIT ABI
+                  Apply when the diff changes the WIT pin in tools/pumpkin-api/wit.lock.json, the
+                  version in tools/pumpkin-api/package.json, generated guest declarations, or the
+                  test server pin in tools/test-harness/src/pumpkin-version.ts. When the host API or
+                  WIT changes, verify that the WIT ABI
                   matches the intended Pumpkin release and update the affected pin, compatibility
                   inventory, and guidance. Do not require an ABI or server pin change for a
                   TypeScript-facade-only change. Use docs/plugin-api/abi-and-runtime.md: the npm

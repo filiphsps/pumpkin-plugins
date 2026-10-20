@@ -5,6 +5,10 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
 import { Command } from 'commander';
+// Import the harness modules directly: its index also loads instance.ts, which Node can't strip.
+import { resolvePumpkinBinary as resolvePinnedPumpkinBinary } from '../tools/test-harness/src/binary.ts';
+import { PUMPKIN_RELEASE } from '../tools/test-harness/src/pumpkin-version.ts';
+import { assetName, isMuslLinux, parseChecksums } from '../tools/test-harness/src/util.ts';
 
 const REPOSITORY = 'Pumpkin-MC/Pumpkin';
 const RELEASES_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
@@ -13,30 +17,6 @@ const RELEASE_METADATA_TTL_MS = 24 * 60 * 60 * 1000;
 const RELEASE_METADATA_FILE = 'latest-release.json';
 const NIGHTLY_METADATA_FILE = 'latest-nightly.json';
 const CHILD_SHUTDOWN_TIMEOUT_MS = 10_000;
-
-/** Returns the Pumpkin release asset name for a platform. */
-export function assetName(platform, arch) {
-    const names = {
-        'darwin-arm64': 'pumpkin-ARM64-macOS',
-        'linux-x64': 'pumpkin-X64-Linux',
-        'linux-arm64': 'pumpkin-ARM64-Linux',
-        'win32-x64': 'pumpkin-X64-Windows.exe',
-        'win32-arm64': 'pumpkin-ARM64-Windows.exe',
-    };
-    const asset = names[`${platform}-${arch}`];
-    if (!asset) throw new Error(`No Pumpkin release binary for ${platform}-${arch}`);
-    return asset;
-}
-
-/** Parses a sha256sum manifest into a map of asset name to digest. */
-export function parseChecksums(text) {
-    const checksums = new Map();
-    for (const line of text.split('\n')) {
-        const match = /^([0-9a-f]{64})\s+\*?(.+?)\s*$/i.exec(line);
-        if (match) checksums.set(match[2], match[1].toLowerCase());
-    }
-    return checksums;
-}
 
 /** Finds a release asset by name. */
 export function releaseAsset(release, name) {
@@ -203,10 +183,11 @@ async function fetchText(fetchImpl, url) {
 }
 
 /** Resolves the newest stable or nightly Pumpkin binary, verifies its checksum, and caches it. */
-export async function resolvePumpkinBinary({
+export async function resolveLatestPumpkinBinary({
     root,
     platform = process.platform,
     arch = process.arch,
+    musl = isMuslLinux(),
     env = process.env,
     fetchImpl = fetch,
     now = Date.now,
@@ -242,7 +223,7 @@ export async function resolvePumpkinBinary({
             release = cachedMetadata.release;
         }
     }
-    const assetFile = assetName(platform, arch);
+    const assetFile = assetName(platform, arch, musl);
     const binaryAsset = releaseAsset(release, assetFile);
     if (nightly && !Number.isSafeInteger(binaryAsset.id)) {
         throw new Error(`Pumpkin nightly asset ${assetFile} is missing its release asset ID`);
@@ -278,6 +259,13 @@ export async function resolvePumpkinBinary({
     return { binary: target, release: release.tag_name };
 }
 
+/** Resolves the pinned Pumpkin release, or the newest stable or nightly build when asked for one. */
+export async function resolveDevPumpkinBinary({ root, latest = false, nightly = false }) {
+    if (latest || nightly) return resolveLatestPumpkinBinary({ root, nightly });
+    const binary = await resolvePinnedPumpkinBinary();
+    return { binary, release: process.env.PUMPKIN_BIN ? 'local PUMPKIN_BIN' : PUMPKIN_RELEASE };
+}
+
 function fileHash(file) {
     try {
         return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -287,7 +275,7 @@ function fileHash(file) {
     }
 }
 
-function watchBuildOutputs(plugins, serverPluginsDir) {
+function watchBuildOutputs(plugins, serverPluginsDir, watchImpl) {
     const previousHashes = new Map(plugins.map((plugin) => [plugin.name, fileHash(plugin.outputPath)]));
     const watchers = [];
     const timers = new Map();
@@ -326,7 +314,7 @@ function watchBuildOutputs(plugins, serverPluginsDir) {
     for (const plugin of plugins) {
         const outputDir = path.dirname(plugin.outputPath);
         fs.mkdirSync(outputDir, { recursive: true });
-        const watcher = fs.watch(outputDir, (_eventType, filename) => {
+        const watcher = watchImpl(outputDir, (_eventType, filename) => {
             if (!filename || filename.toString() === path.basename(plugin.outputPath)) scheduleInspect(plugin);
         });
         watcher.on('error', fail);
@@ -459,8 +447,10 @@ export function startInitialBuild(root, spawnImpl = spawn, env = process.env, pa
 export async function runDev({
     root = path.resolve(import.meta.dirname, '..'),
     spawnImpl = spawn,
-    resolveBinary = resolvePumpkinBinary,
+    watchImpl = fs.watch,
+    resolveBinary = resolveDevPumpkinBinary,
     hotReload = true,
+    latest = false,
     nightly = false,
     release = false,
     parseTypeScript = false,
@@ -507,17 +497,20 @@ export async function runDev({
     signalSource.on('SIGTERM', onTerminate);
 
     try {
-        console.log(
-            `Building every plugin, then launching the latest ${nightly ? 'nightly build' : 'stable release'}.`,
-        );
+        const target = nightly
+            ? 'the latest Pumpkin nightly build'
+            : latest
+              ? 'the latest stable Pumpkin release'
+              : `Pumpkin ${PUMPKIN_RELEASE}`;
+        console.log(`Building every plugin, then launching ${target}.`);
         const initialBuild = startInitialBuild(root, spawnImpl, buildEnv, parseTypeScript, turboArgs);
         children.push(initialBuild);
         const buildResult = initialBuild.done.then(({ code, signal }) => {
             if (!shuttingDown && (code !== 0 || signal)) {
-                throw new Error(`turbo run build exited (${signal ?? code ?? 'unknown status'})`);
+                throw new Error(`pnpm run build exited (${signal ?? code ?? 'unknown status'})`);
             }
         });
-        const startup = Promise.all([buildResult, resolveBinary({ root, nightly })]);
+        const startup = Promise.all([buildResult, resolveBinary({ root, latest, nightly })]);
         const startupResult = await Promise.race([startup, shutdown]);
         if (shuttingDown) return;
         const [, resolvedBinary] = startupResult;
@@ -525,7 +518,7 @@ export async function runDev({
         for (const plugin of plugins) copyPluginBuild(plugin, serverPluginsDir);
         const backgroundTasks = [];
         if (hotReload) {
-            outputs = watchBuildOutputs(plugins, serverPluginsDir);
+            outputs = watchBuildOutputs(plugins, serverPluginsDir, watchImpl);
             const turbo = spawnChild(
                 pnpmCommand(),
                 ['turbo', 'watch', parseTypeScript ? 'build:parse-ts' : 'build', '--ui=stream', ...turboArgs],
@@ -567,7 +560,7 @@ export function parseDevArgs(args) {
     const turboArgs = [];
     for (const arg of args) {
         if (arg === '--') continue;
-        if (!['--no-hot-reload', '--nightly', '--release', '--parse-ts', '-h', '--help'].includes(arg)) {
+        if (!['--no-hot-reload', '--latest', '--nightly', '--release', '--parse-ts', '-h', '--help'].includes(arg)) {
             turboArgs.push(arg);
         } else {
             devArgs.push(arg);
@@ -578,13 +571,15 @@ export function parseDevArgs(args) {
         .name('pumpkin-plugins-dev')
         .description('Build plugins and launch a local Pumpkin server.')
         .option('--no-hot-reload', 'Disable plugin rebuilds while files change')
+        .option('--latest', 'Use the latest stable Pumpkin release instead of the pinned one')
         .option('--nightly', 'Use the latest Pumpkin nightly build')
-        .option('--release', 'Use the latest stable Pumpkin release')
+        .option('--release', 'Build plugins with release settings (includes Market update checks)')
         .option('--parse-ts', 'Use Hermes TypeScript parsing for plugin builds')
         .parse(devArgs, { from: 'user' });
     const options = program.opts();
     return {
         hotReload: options.hotReload ?? true,
+        latest: options.latest ?? false,
         nightly: options.nightly ?? false,
         release: options.release ?? false,
         parseTypeScript: options.parseTs ?? false,
@@ -593,9 +588,9 @@ export function parseDevArgs(args) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-    const { hotReload, nightly, release, parseTypeScript, turboArgs } = parseDevArgs(process.argv.slice(2));
-    const command = hotReload ? 'pnpm dev' : 'pnpm dev:no-hot-reload';
-    runDev({ hotReload, nightly, release, parseTypeScript, turboArgs }).catch((error) => {
+    const options = parseDevArgs(process.argv.slice(2));
+    const command = options.hotReload ? 'pnpm dev' : 'pnpm dev:no-hot-reload';
+    runDev(options).catch((error) => {
         console.error(`${command}: ${error.message}`);
         process.exitCode = 1;
     });
