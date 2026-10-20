@@ -10,10 +10,10 @@ import {
     SyntaxKind,
 } from 'jsonc-parser';
 
-/** Parses an object and captures a readable syntax error instead of discarding the file. */
+/** Parses a JSONC object the way TypeScript reads tsconfig.json and reports a readable syntax error. */
 export function parseJsonObject(source: string): { value?: Record<string, unknown>; error?: string } {
     const errors: ParseError[] = [];
-    const value = parse(source, errors);
+    const value = parse(source, errors, { allowTrailingComma: true });
     if (errors.length > 0) return { error: 'Skipped invalid JSONC; fix its syntax and rerun the codemod.' };
     const object = recordOf(value);
     return object ? { value: object } : { error: 'Skipped JSONC whose top level is not an object.' };
@@ -32,7 +32,7 @@ export function setJsonValue(
     );
 }
 
-/** Merges string values into a JSONC array while preserving comments and existing layout. */
+/** Appends string values missing from a JSONC array while preserving comments and existing layout. */
 export function mergeJsonStringArray(
     source: string,
     propertyPath: Array<string | number>,
@@ -43,58 +43,10 @@ export function mergeJsonStringArray(
     const array = root && findNodeAtLocation(root, propertyPath);
     if (array?.type !== 'array') return source;
 
-    const children = array.children ?? [];
-    const seen = new Set<string>();
-    const duplicateIndices = new Set<number>();
-    for (const [index, child] of children.entries()) {
-        if (child.type !== 'string' || typeof child.value !== 'string') continue;
-        if (seen.has(child.value)) duplicateIndices.add(index);
-        else seen.add(child.value);
-    }
-
-    const values = [...new Set(valuesToAdd)].filter((value) => !seen.has(value));
-    let migrated = source;
-    if (duplicateIndices.size > 0) {
-        const edits: Edit[] = [];
-        const lastIndex = children.length - 1;
-        for (const index of duplicateIndices) {
-            const child = children[index];
-            if (!child) continue;
-            edits.push({ offset: child.offset, length: child.length, content: '' });
-
-            const isRunStart = index === 0 || !duplicateIndices.has(index - 1);
-            if (!isRunStart) continue;
-
-            let runEnd = index;
-            while (duplicateIndices.has(runEnd + 1)) runEnd++;
-            if (runEnd === lastIndex) {
-                const previous = children[index - 1];
-                if (previous) {
-                    const comma = commaBetween(source, previous.offset + previous.length, child.offset);
-                    if (comma) edits.push(comma);
-                }
-                for (let current = index; current < runEnd; current++) {
-                    const currentChild = children[current];
-                    const nextChild = children[current + 1];
-                    if (!currentChild || !nextChild) continue;
-                    const comma = commaBetween(source, currentChild.offset + currentChild.length, nextChild.offset);
-                    if (comma) edits.push(comma);
-                }
-            } else {
-                for (let current = index; current <= runEnd; current++) {
-                    const currentChild = children[current];
-                    const nextChild = children[current + 1];
-                    if (!currentChild || !nextChild) continue;
-                    const comma = commaBetween(source, currentChild.offset + currentChild.length, nextChild.offset);
-                    if (comma) edits.push(comma);
-                }
-            }
-        }
-        migrated = applySortedEdits(source, edits);
-    }
-
-    if (values.length === 0) return migrated;
-    return appendJsonArrayValues(migrated, propertyPath, values, formattingSource);
+    const existing = new Set((array.children ?? []).map((child) => child.value));
+    const values = [...new Set(valuesToAdd)].filter((value) => !existing.has(value));
+    if (values.length === 0) return source;
+    return appendJsonArrayValues(source, propertyPath, values, formattingSource);
 }
 
 /** Finds a comma token between two parsed JSON values. */
@@ -156,7 +108,7 @@ function appendJsonArrayValues(
     );
 }
 
-/** Adds an array separator when needed and applies its append edits in source order. */
+/** Adds an array separator when needed, then inserts the new content. */
 function appendArrayContent(
     source: string,
     lastValueEnd: number | undefined,
@@ -169,15 +121,7 @@ function appendArrayContent(
         edits.push({ offset: lastValueEnd, length: 0, content: ',' });
     }
     edits.push({ offset: insertionOffset, length: 0, content });
-    return applySortedEdits(source, edits);
-}
-
-/** Applies nonoverlapping JSONC edits from the end of the document toward the start. */
-function applySortedEdits(source: string, edits: Edit[]): string {
-    return applyEdits(
-        source,
-        edits.sort((left, right) => left.offset - right.offset),
-    );
+    return applyEdits(source, edits);
 }
 
 /** Derives JSONC indentation and line endings for edits. */

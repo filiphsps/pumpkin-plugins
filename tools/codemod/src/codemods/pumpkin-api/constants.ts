@@ -13,8 +13,11 @@ export const LEGACY_BUILD_COMMAND = 'pumpkin-plugin-build';
 /** Command used by the standalone Pumpkin plugin builder. */
 export const BUILD_COMMAND = 'pumpkin-plugins-build';
 
-/** Initial semver range used when adding the new public tool dependencies. */
+/** Range added for the API package; a test keeps it in line with the current release. */
 export const API_VERSION_RANGE = '^0.1.0';
+
+/** Range added for the builder package; a test keeps it in line with the current release. */
+export const BUILD_VERSION_RANGE = '^0.1.5';
 
 /** Generated declaration pattern emitted by the new builder. */
 export const GENERATED_TYPES_GLOB = 'build/types/bindings/**/*.d.ts';
@@ -29,6 +32,10 @@ export const DEPENDENCY_SECTIONS = [
 
 /** Source extensions parsed by the migration's TypeScript AST pass. */
 export const SOURCE_EXTENSIONS = new Set(['.cjs', '.cts', '.js', '.jsx', '.mjs', '.mts', '.ts', '.tsx']);
+
+/** Review note for a manifest that gets the new builder's default engine. */
+export const ENGINE_NOTE =
+    'Set pumpkinPlugin.engine to static-hermes, the new default runtime. The old builder ran QuickJS; set it to quickjs to keep the old runtime.';
 
 /** Review notes attached to package manifest changes. */
 export const MIGRATION_NOTES = [
