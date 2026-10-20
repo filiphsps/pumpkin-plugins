@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { discoverComponents } from '@pumpkin-plugins/docs/node';
@@ -50,6 +52,47 @@ export function nodeEngineRange(root = REPOSITORY_ROOT) {
 }
 
 /**
+ * Orders two semantic versions by semver precedence; a leading `v` is allowed.
+ *
+ * @param {string} left - First version.
+ * @param {string} right - Second version.
+ * @returns {number} A negative number when left is lower, zero when equal, positive when higher.
+ * @throws {Error} When either value is not a semantic version.
+ */
+export function compareVersions(left, right) {
+    const parse = (version) => {
+        const match = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(version);
+        if (!match) throw new Error(`Invalid semantic version: ${version}`);
+        return { core: match.slice(1, 4).map(Number), prerelease: match[4]?.split('.') };
+    };
+
+    const leftVersion = parse(left);
+    const rightVersion = parse(right);
+    for (let index = 0; index < leftVersion.core.length; index++) {
+        const difference = leftVersion.core[index] - rightVersion.core[index];
+        if (difference !== 0) return difference;
+    }
+
+    if (!leftVersion.prerelease) return rightVersion.prerelease ? 1 : 0;
+    if (!rightVersion.prerelease) return -1;
+    for (let index = 0; index < Math.max(leftVersion.prerelease.length, rightVersion.prerelease.length); index++) {
+        const leftIdentifier = leftVersion.prerelease[index];
+        const rightIdentifier = rightVersion.prerelease[index];
+        if (leftIdentifier === undefined) return -1;
+        if (rightIdentifier === undefined) return 1;
+        if (leftIdentifier === rightIdentifier) continue;
+
+        const leftIsNumeric = /^\d+$/.test(leftIdentifier);
+        const rightIsNumeric = /^\d+$/.test(rightIdentifier);
+        if (leftIsNumeric && rightIsNumeric) return Number(leftIdentifier) - Number(rightIdentifier);
+        if (leftIsNumeric) return -1;
+        if (rightIsNumeric) return 1;
+        return leftIdentifier < rightIdentifier ? -1 : 1;
+    }
+    return 0;
+}
+
+/**
  * Parses a `tar -t` listing from any supported host platform.
  *
  * @param {string} listing - Newline-delimited tar entries.
@@ -65,6 +108,30 @@ export function embeddedPackageManifestEntries(entries) {
 }
 
 /**
+ * Packs one package with pnpm and reads what the tarball contains.
+ *
+ * @param {string} packageDirectory - Directory holding the package's `package.json`.
+ * @param {string} destination - Directory that receives the tarball; other files in it are ignored.
+ * @param {{ command: string; args: string[] }} [packageManager] - How to start pnpm, for callers that run a specific pnpm binary.
+ * @returns {{ tarballPath: string; entries: string[]; packageJson: Record<string, unknown>; embeddedPackageJsons: Record<string, unknown>[]; integrity: string }}
+ * The tarball path, its entries with the `package/` prefix, the packed and embedded manifests, and the tarball's sha512 SRI.
+ * @throws {Error} When pnpm, tar or a packed manifest fails.
+ */
+export function packAndInspect(packageDirectory, destination, packageManager = { command: 'pnpm', args: [] }) {
+    const tarballPath = packTarball(packageDirectory, destination, packageManager);
+    const entries = parseTarEntries(execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' }));
+    const readPackedJson = (entry) =>
+        JSON.parse(execFileSync('tar', ['-xOzf', tarballPath, entry], { encoding: 'utf8' }));
+    return {
+        tarballPath,
+        entries,
+        packageJson: readPackedJson('package/package.json'),
+        embeddedPackageJsons: embeddedPackageManifestEntries(entries).map(readPackedJson),
+        integrity: `sha512-${createHash('sha512').update(fs.readFileSync(tarballPath)).digest('base64')}`,
+    };
+}
+
+/**
  * Checks that packed package metadata still permits public npm publication.
  *
  * @param {Record<string, unknown>} packageJson - The packed package metadata to validate.
@@ -77,11 +144,13 @@ export function assertPublicToolPackage(packageJson, expectedName, root = REPOSI
         throw new Error(`Public tool package name must be ${expectedName}; received ${String(packageJson.name)}`);
     }
     if (packageJson.private === true) throw new Error(`${expectedName} must not be private`);
-    if (packageJson.publishConfig?.access !== 'public') {
+    const publishConfig = packageJson.publishConfig;
+    if (!isRecord(publishConfig) || publishConfig.access !== 'public') {
         throw new Error(`${expectedName} publishConfig.access must be public`);
     }
     const expectedEngine = nodeEngineRange(root);
-    if (packageJson.engines?.node !== expectedEngine) {
+    const engines = packageJson.engines;
+    if (!isRecord(engines) || engines.node !== expectedEngine) {
         throw new Error(`${expectedName} engines.node must be ${expectedEngine}`);
     }
     assertPackedDependencySpecs(packageJson);
@@ -276,6 +345,38 @@ export function sourcePrerequisitePaths(root, packagePath, pathsByName) {
     return new Set(names.map((name) => pathsByName.get(name)).filter(Boolean));
 }
 
+// Lifecycle scripts such as prepack write to pnpm pack's stdout even with --json, so the tarball is
+// found as the only file in an empty pack directory. --use-stderr keeps their output in the log.
+function packTarball(packageDirectory, destination, packageManager) {
+    const packDirectory = fs.mkdtempSync(path.join(destination, '.pack-'));
+    try {
+        execFileSync(
+            packageManager.command,
+            [...packageManager.args, 'pack', '--pack-destination', packDirectory, '--use-stderr'],
+            { cwd: packageDirectory, stdio: ['ignore', 'ignore', 'inherit'] },
+        );
+        const [filename, ...others] = fs.readdirSync(packDirectory);
+        if (!filename || others.length > 0) {
+            throw new Error(`pnpm pack did not write exactly one tarball for ${packageDirectory}`);
+        }
+        const tarballPath = path.join(destination, filename);
+        fs.renameSync(path.join(packDirectory, filename), tarballPath);
+        return tarballPath;
+    } finally {
+        fs.rmSync(packDirectory, { recursive: true, force: true });
+    }
+}
+
+/**
+ * Checks whether a value is a non-array object record.
+ *
+ * @param {unknown} value - Value to inspect.
+ * @returns {value is Record<string, unknown>} Whether the value is a record.
+ */
+function isRecord(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 function publicDependencies(packageJson, packageNames) {
     const dependencies = { ...packageJson.dependencies, ...packageJson.optionalDependencies };
     return Object.entries(dependencies)
@@ -377,14 +478,9 @@ function isPackedFile(file, patterns) {
 }
 
 function matchesFilePattern(file, pattern) {
-    const normalizedFile = file.replaceAll('\\', '/');
-    if (!pattern.includes('*')) return normalizedFile === pattern || normalizedFile.startsWith(`${pattern}/`);
-    const expressionSource = pattern
-        .split('**')
-        .map((part) => escapeRegExp(part).replaceAll('*', '[^/]*'))
-        .join('.*');
-    const expression = new RegExp(`^${expressionSource}$`);
-    return expression.test(normalizedFile);
+    // npm packs everything below a directory that a `files` pattern matches.
+    const segments = file.replaceAll('\\', '/').split('/');
+    return segments.some((_, index) => path.posix.matchesGlob(segments.slice(0, index + 1).join('/'), pattern));
 }
 
 function toWorkspacePath(root, directory) {
