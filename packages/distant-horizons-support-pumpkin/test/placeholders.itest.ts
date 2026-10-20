@@ -1,11 +1,18 @@
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
+import { PIE_RELEASE, resolvePieProvider } from '@pumpkin-plugins/pumpkin-pie-api/testing/provider';
 import { builtPluginPath, type PumpkinInstance, startPumpkin } from '@pumpkin-plugins/test-harness';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { PIE_RELEASE, resolvePieProvider } from '../../../tools/apis/pumpkin-pie-api/test/provider.ts';
-import { run as buildPlugin } from '../../../tools/build/src/cli.ts';
 import { info } from '../src/info.ts';
+import { dhsPlaceholderDefinitions } from '../src/placeholders/definitions.ts';
+
+// Build fixtures through the builder's published CLI, as a standalone plugin would.
+const buildCli = createRequire(import.meta.url).resolve('@pumpkin-plugins/build/dist/cli.js');
+const buildPlugin = (cwd: string) => promisify(execFile)(process.execPath, [buildCli, '--no-update-notifier'], { cwd });
 
 describe('Distant Horizons PumpkinPIE integration', () => {
     let unavailableServer: PumpkinInstance | undefined;
@@ -14,7 +21,7 @@ describe('Distant Horizons PumpkinPIE integration', () => {
 
     beforeAll(async () => {
         const fixtureDir = join(process.cwd(), 'test/fixtures/pie-consumer');
-        await buildPlugin([], fixtureDir);
+        await buildPlugin(fixtureDir);
         providerPath = await resolvePieProvider();
 
         unavailableServer = await startPumpkin({
@@ -40,7 +47,7 @@ describe('Distant Horizons PumpkinPIE integration', () => {
         });
         await providerServer.waitForLog(/Loaded.*PumpkinPIE/, 15_000);
         await providerServer.waitForLog(new RegExp(`Loaded ${info.name}`));
-        await providerServer.waitForLog(/DistantHorizonsPIEFixture:.*"advertisedCount":15/, 15_000);
+        await providerServer.waitForLog(/DistantHorizonsPIEFixture:.*"advertisedCount"/, 15_000);
     }, 180_000);
 
     afterAll(async () => {
@@ -60,7 +67,7 @@ describe('Distant Horizons PumpkinPIE integration', () => {
             .update(await readFile(providerPath))
             .digest('hex');
         expect(digest).toBe(PIE_RELEASE.sha256);
-        expect(providerServer?.logs()).toMatch(/"advertisedCount":15/);
+        expect(providerServer?.logs()).toContain(`"advertisedCount":${dhsPlaceholderDefinitions.length},`);
         expect(providerServer?.logs()).toMatch(/"clients":\{"known":true,"value":"0"\}/);
         expect(providerServer?.logs()).toMatch(/"memoryEntries":\{"known":true,"value":"0"\}/);
         expect(providerServer?.logs()).toMatch(/"clientConnected":\{"known":false\}/);

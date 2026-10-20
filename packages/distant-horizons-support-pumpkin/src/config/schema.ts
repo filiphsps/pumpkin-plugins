@@ -72,7 +72,8 @@ export const schema = defineConfig(PLUGIN_NAME, {
                 max: 1024,
             }),
             cached_requests_per_tick: int({
-                description: 'Maximum cached LOD requests checked per server tick across all players.',
+                description:
+                    'Maximum LOD cache lookups per server tick across all players. The same number separately limits terrain availability checks for requests the cache cannot answer.',
                 default: 8,
                 min: 1,
                 max: 2048,
@@ -87,6 +88,13 @@ export const schema = defineConfig(PLUGIN_NAME, {
                 'Maximum LOD sections cached in memory. Set to 0 to disable; any negative value means unlimited.',
                 512,
             ),
+            memory_cache_mb: int({
+                description:
+                    'Maximum megabytes of LOD data cached in memory; memory_cache_entries also applies. A complex section can take about 1 MB.',
+                default: 64,
+                min: 1,
+                max: 2048,
+            }),
             disk_cache_entries: cacheLimit(
                 'Maximum LOD sections cached on disk. Set to 0 to disable; any negative value means unlimited.',
                 4096,

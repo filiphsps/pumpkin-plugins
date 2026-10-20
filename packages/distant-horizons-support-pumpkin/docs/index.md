@@ -13,6 +13,7 @@ for later requests.
 
 - Follow the [setup guide](setup.md) to check client compatibility, install the server plugin, and
   configure its first start.
+- Read [Manage the LOD cache](cache.md) to view, prepare, rebuild or clear cached terrain.
 - Use the [troubleshooting guide](troubleshooting.md) for unavailable terrain, stale cache entries,
   and slow or queued requests.
 - See the [PumpkinPIE placeholder reference](placeholders.md) for DH status and cache values.

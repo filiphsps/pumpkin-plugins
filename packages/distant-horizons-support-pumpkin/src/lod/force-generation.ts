@@ -1,9 +1,8 @@
 import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
-import type { TerrainAccess, TerrainRegion, TerrainSource } from '@pumpkin-plugins/terrain';
-import { PLUGIN_NAME } from '../name.ts';
-import { SECTION_DETAIL, SECTION_SIZE_BLOCKS } from '../protocol/constants.ts';
-import type { Section } from '../protocol/messages.ts';
+import { AdaptiveWorkBudget, type TerrainAccess, type TerrainRegion } from '@pumpkin-plugins/terrain';
+import { SECTION_SIZE_BLOCKS } from '../protocol/constants.ts';
+import { encodeSection } from '../protocol/messages.ts';
 import { LodBuilder } from './builder.ts';
 import type { CacheRecoveryBackup, LodCache } from './cache.ts';
 import {
@@ -13,12 +12,11 @@ import {
     lodGenerationSectionCount,
     MAX_LOD_GENERATION_SECTIONS,
     sectionKey,
+    sectionRegion,
 } from './generation.ts';
 import { lodLocation } from './location.ts';
 
-const logTag = ansi.named.name(PLUGIN_NAME);
-
-/** Maximum block samples a forced capture attempts in one server tick. */
+/** Maximum block samples a forced capture attempts in one server tick; MSPT and sample cost lower it. */
 export const FORCE_BLOCK_SAMPLES_PER_TICK = 32_768;
 
 /** Terrain and reporting access valid only for the duration of a peer callback. */
@@ -32,7 +30,7 @@ export interface ForcedLodPeer {
     terrain: TerrainAccess;
 }
 
-/** Obtains a fresh player and world handle for a forced-capture tick. */
+/** Obtains a fresh player and world handle for a forced-capture tick; returns false when the player is gone. */
 export interface ForcedLodPeers {
     withPeer(name: string, use: (peer: ForcedLodPeer) => void): boolean;
 }
@@ -75,14 +73,16 @@ const MAX_SECTIONS_CHECKED_PER_TICK = 64;
 // Terrain checks call the host synchronously; cap them separately from cache and border scans.
 const MAX_TERRAIN_PREPARATIONS_PER_TICK = 8;
 
-/** Captures operator-requested sections at full work budget without retaining Pumpkin handles. */
+/** Captures operator-requested sections with spare tick time, without retaining Pumpkin handles. */
 export class ForcedLodGeneration {
     private job?: ForcedJob;
+    private readonly workBudget = new AdaptiveWorkBudget({ initialUnits: FORCE_BLOCK_SAMPLES_PER_TICK });
 
     constructor(
         private readonly cache: LodCache,
         private readonly log: Logger,
         private readonly now = Date.now,
+        private readonly measureNow = Date.now,
     ) {}
 
     /** Starts one bounded, cache-refreshing job around the selected block position. */
@@ -114,7 +114,7 @@ export class ForcedLodGeneration {
         const key = sectionKey(peer.level, centerX, centerZ);
         if (!this.cache.has(key)) throw new Error('No cached LOD section exists at the selected coordinates.');
         const selection = this.validateSelection(peer, blockX, blockZ, 0);
-        const prepared = peer.terrain.prepare?.(this.region({ x: centerX, z: centerZ }, peer.terrain));
+        const prepared = peer.terrain.prepare?.(sectionRegion({ x: centerX, z: centerZ }, peer.terrain));
         if (prepared?.status !== 'ready') {
             const reason = prepared && 'reason' in prepared ? ` ${prepared.reason}` : '';
             throw new Error(
@@ -154,25 +154,38 @@ export class ForcedLodGeneration {
             skipped: 0,
             lastReportedStep: 0,
         };
-        this.log.info(`Started forced LOD capture for ${peer.name}: ${sections} requested sections in ${peer.level}.`);
+        this.log.info(
+            `Started forced LOD capture for ${ansi.named.name(peer.name)}: ${ansi.named.number(sections)} requested sections in ${ansi.named.identifier(peer.level)}.`,
+        );
         return { centerX, centerZ, radius, sections };
     }
 
-    /** Advances the active job, returning true when this tick was reserved for forced work. */
-    tick(peers: ForcedLodPeers): boolean {
+    /** Advances the active job within the server's spare tick time, returning true when this tick was reserved for forced work. */
+    tick(peers: ForcedLodPeers, serverMspt = 0): boolean {
         const job = this.job;
         if (!job) return false;
 
-        const found = peers.withPeer(job.owner, (peer) => {
-            if (peer.level !== job.level) {
-                this.sendReport(peer, 'Forced LOD capture cancelled because you changed worlds.');
-                this.job = undefined;
-                return;
-            }
-            this.advance(job, peer);
-        });
+        let found: boolean;
+        try {
+            found = peers.withPeer(job.owner, (peer) => {
+                if (peer.level !== job.level) {
+                    this.sendReport(peer, 'Forced LOD capture cancelled because you changed worlds.');
+                    this.job = undefined;
+                    return;
+                }
+                this.advance(job, peer, serverMspt);
+            });
+        } catch (err) {
+            this.log.warn(
+                `Cancelled forced LOD capture for ${ansi.named.name(job.owner)} after an error: ${String(err)}.`,
+            );
+            if (this.job === job) this.job = undefined;
+            return true;
+        }
         if (!found && this.job === job) {
-            this.log.info(`Cancelled forced LOD capture for ${job.owner}: player is no longer available.`);
+            this.log.info(
+                `Cancelled forced LOD capture for ${ansi.named.name(job.owner)}: player is no longer available.`,
+            );
             this.job = undefined;
         }
         return true;
@@ -201,7 +214,7 @@ export class ForcedLodGeneration {
         ) {
             target.invalidated = true;
             this.log.debug(
-                `${logTag} Invalidated forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(level, target.coordinate.x, target.coordinate.z)} after a block change.`,
+                `Invalidated forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(level, target.coordinate.x, target.coordinate.z)} after a block change.`,
             );
         }
     }
@@ -210,11 +223,11 @@ export class ForcedLodGeneration {
     left(name: string): void {
         if (this.job?.owner !== name) return;
         this.job = undefined;
-        this.log.info(`Cancelled forced LOD capture for ${name}: player disconnected.`);
+        this.log.info(`Cancelled forced LOD capture for ${ansi.named.name(name)}: player disconnected.`);
     }
 
-    private advance(job: ForcedJob, peer: ForcedLodPeer): void {
-        let budget = FORCE_BLOCK_SAMPLES_PER_TICK;
+    private advance(job: ForcedJob, peer: ForcedLodPeer, serverMspt: number): void {
+        let budget = this.workBudget.next(serverMspt, FORCE_BLOCK_SAMPLES_PER_TICK);
         let sectionsChecked = 0;
         let terrainPreparations = 0;
         const prepareTerrain = (region: TerrainRegion) => {
@@ -237,17 +250,24 @@ export class ForcedLodGeneration {
                     job.skippedOutsideBorder++;
                     continue;
                 }
-                // Validate cache blobs within the existing per-tick section budget, never during admission.
-                if (this.cache.get(key)) {
-                    job.skippedAlreadyGenerated++;
-                    continue;
-                }
                 target = { coordinate, key, invalidated: false };
                 job.current = target;
+                // Validate cache blobs within the existing per-tick section budget, never during admission.
+                // A failed read skips only this section; escaping here would end the whole job.
+                try {
+                    if (this.cache.get(key)) {
+                        job.skippedAlreadyGenerated++;
+                        job.current = undefined;
+                        continue;
+                    }
+                } catch (err) {
+                    this.skip(job, String(err));
+                    continue;
+                }
             }
             if (target.invalidated) {
                 this.log.debug(
-                    `${logTag} Skipped invalidated forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)}.`,
+                    `Skipped invalidated forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)}.`,
                 );
                 job.skipped++;
                 job.current = undefined;
@@ -256,7 +276,7 @@ export class ForcedLodGeneration {
             if (budget === 0) break;
 
             try {
-                const region = this.region(target.coordinate, peer.terrain);
+                const region = sectionRegion(target.coordinate, peer.terrain);
                 const prepared = prepareTerrain(region);
                 if (prepared?.status === 'pending') break;
                 if (prepared && prepared.status !== 'ready') {
@@ -264,10 +284,17 @@ export class ForcedLodGeneration {
                     continue;
                 }
 
-                target.builder ??= new LodBuilder(section(target.coordinate), region.minY, region.height);
-                const measured = measureTerrain(peer.terrain);
-                const complete = target.builder.step(measured.source, budget);
-                budget -= measured.samples();
+                target.builder ??= new LodBuilder(
+                    encodeSection(target.coordinate.x, target.coordinate.z),
+                    region.minY,
+                    region.height,
+                );
+                const sampledBefore = target.builder.samples();
+                const started = this.measureNow();
+                const complete = target.builder.step(peer.terrain, budget);
+                const sampled = target.builder.samples() - sampledBefore;
+                this.workBudget.observe(sampled, this.measureNow() - started);
+                budget -= sampled;
                 if (!complete) break;
 
                 const stillPrepared = prepareTerrain(region);
@@ -280,7 +307,7 @@ export class ForcedLodGeneration {
                 const data = target.builder.finish(this.now());
                 this.cache.put(target.key, { updated: this.now(), data });
                 this.log.debug(
-                    `${logTag} Built forced LOD for ${ansi.named.name(peer.name)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)} (${ansi.named.number(data.length)} bytes).`,
+                    `Built forced LOD for ${ansi.named.name(peer.name)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)} (${ansi.named.number(data.length)} bytes).`,
                 );
                 job.built++;
                 job.current = undefined;
@@ -296,24 +323,13 @@ export class ForcedLodGeneration {
         this.reportProgress(job, peer);
     }
 
-    private region(section: LodSectionCoordinate, terrain: TerrainAccess): TerrainRegion {
-        return {
-            originX: section.x * SECTION_SIZE_BLOCKS,
-            originZ: section.z * SECTION_SIZE_BLOCKS,
-            width: SECTION_SIZE_BLOCKS,
-            depth: SECTION_SIZE_BLOCKS,
-            minY: terrain.minY,
-            height: terrain.height,
-        };
-    }
-
     private skip(job: ForcedJob, reason: string): void {
         const target = job.current;
         job.skipped++;
         job.current = undefined;
         if (target) {
             this.log.debug(
-                `${logTag} Skipped forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)}: ${reason}.`,
+                `Skipped forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)}: ${reason}.`,
             );
         }
     }
@@ -340,9 +356,7 @@ export class ForcedLodGeneration {
             }
             if (message) {
                 this.sendReport(peer, message);
-                this.log.info(
-                    `${message} World ${job.level}, center ${job.centerX}, ${job.centerZ}, radius ${job.radius}.`,
-                );
+                this.log.info(`${message} ${this.jobSummary(job)}`);
                 this.job = undefined;
                 return;
             }
@@ -350,8 +364,12 @@ export class ForcedLodGeneration {
         const skipped = this.skipped(job);
         const message = `Forced LOD capture complete: ${job.built} built, ${skipped} skipped (${job.skippedAlreadyGenerated} already generated).`;
         this.sendReport(peer, message);
-        this.log.info(`${message} World ${job.level}, center ${job.centerX}, ${job.centerZ}, radius ${job.radius}.`);
+        this.log.info(`${message} ${this.jobSummary(job)}`);
         this.job = undefined;
+    }
+
+    private jobSummary(job: ForcedJob): string {
+        return `Player ${ansi.named.name(job.owner)}, world ${ansi.named.identifier(job.level)}, center ${ansi.named.number(job.centerX)}, ${ansi.named.number(job.centerZ)}, radius ${ansi.named.number(job.radius)}.`;
     }
 
     private completed(job: ForcedJob): number {
@@ -396,7 +414,7 @@ export class ForcedLodGeneration {
         try {
             peer.report(message);
         } catch (err) {
-            this.log.warn(`Could not report forced LOD progress to ${peer.name}: ${String(err)}`);
+            this.log.warn(`Could not report forced LOD progress to ${ansi.named.name(peer.name)}: ${String(err)}`);
         }
     }
 }
@@ -408,30 +426,4 @@ function isInsideBorder(peer: ForcedLodPeer, coordinate: LodSectionCoordinate): 
         peer.insideBorder(minX, minZ) &&
         peer.insideBorder(minX + SECTION_SIZE_BLOCKS - 1, minZ + SECTION_SIZE_BLOCKS - 1)
     );
-}
-
-function section(coordinate: LodSectionCoordinate): Section {
-    const x = coordinate.x & 0x0fff_ffff;
-    const z = coordinate.z & 0x0fff_ffff;
-    return {
-        x: coordinate.x,
-        z: coordinate.z,
-        detail: SECTION_DETAIL,
-        high: ((z << 4) | (x >>> 24)) >>> 0,
-        low: ((x << 8) | SECTION_DETAIL) >>> 0,
-    };
-}
-
-function measureTerrain(source: TerrainSource): { source: TerrainSource; samples: () => number } {
-    let samples = 0;
-    const measured: TerrainSource = {
-        minY: source.minY,
-        height: source.height,
-        sample: (x, y, z) => {
-            samples++;
-            return source.sample(x, y, z);
-        },
-    };
-    if (source.top) measured.top = source.top.bind(source);
-    return { source: measured, samples: () => samples };
 }

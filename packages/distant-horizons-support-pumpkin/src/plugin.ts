@@ -8,11 +8,13 @@ import type {
     PlayerLeaveEventData,
 } from 'pumpkin:plugin/event@0.1.0';
 import type { IpcMessage, PluginId } from 'pumpkin:plugin/ipc@0.1.0';
-import { now as monotonicNow } from 'wasi:clocks/monotonic-clock@0.2.3';
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
 import { hostLogger } from '@pumpkin-plugins/plugin-kit/host';
+import { taggedLogger } from '@pumpkin-plugins/plugin-kit/logger';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands';
+import { monotonicMs } from '@pumpkin-plugins/plugin-kit/wasi-clock';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
 import { commandHandlers } from './commands/handlers.ts';
 import { commands } from './commands/spec.ts';
@@ -25,6 +27,8 @@ import { serverPeers, withPlayer } from './platform/peers.ts';
 import { invalidateBlockGrow, invalidateBlockSpread } from './platform/world-mutations.ts';
 import { CHANNEL, PROTOCOL } from './protocol/messages.ts';
 import { Sessions } from './session.ts';
+
+const log = taggedLogger(ansi.named.name(PLUGIN_NAME), hostLogger);
 
 /** Serves Distant Horizons requests from loaded chunks and previously captured terrain. */
 class DistantHorizonsSupportPumpkin extends PluginBase {
@@ -49,14 +53,19 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
     }
 
     private initializePlugin(ctx: Context, files: WasiDataDir): void {
-        const settings = readSettings(files, hostLogger);
-        const cache = new LodCache(files, settings.memory_cache_entries, settings.disk_cache_entries);
-        const sessions = new Sessions(settings, cache, hostLogger);
+        const settings = readSettings(files, log);
+        const cache = new LodCache(
+            files,
+            settings.memory_cache_entries,
+            settings.disk_cache_entries,
+            settings.memory_cache_mb * 1024 * 1024,
+        );
+        const sessions = new Sessions(settings, cache, log, Date.now, monotonicMs);
         this.placeholders = new DistantHorizonsPlaceholderService({
             sessions,
             cache,
-            now: monotonicMilliseconds,
-            onTransition: (state) => hostLogger.info(`${PLUGIN_NAME}: PumpkinPIE provider is ${state.kind}`),
+            now: monotonicMs,
+            onTransition: (state) => log.info(`PumpkinPIE provider is ${ansi.named.value(state.kind)}`),
         });
         registerCommands(ctx, commands, commandHandlers(sessions, cache, settings));
         this.registerEvent(ctx, 'player-custom-payload-event', (_server, event: PlayerCustomPayloadEventData) => {
@@ -64,19 +73,25 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
             try {
                 withPlayer(event.player, settings, (peer) => sessions.receive(peer, event.data));
             } catch (err) {
-                sessions.left(event.player.getName());
-                hostLogger.warn(`${PLUGIN_NAME}: cannot open DH session: ${String(err)}`);
+                const name = event.player.getName();
+                sessions.endSession(name);
+                log.warn(`DH message from ${ansi.named.name(name)} failed: ${String(err)}`);
             }
         });
         this.registerEvent(ctx, 'player-leave-event', (_server, event: PlayerLeaveEventData) => {
             sessions.playerLeft(event.player.getName());
         });
         this.registerEvent(ctx, 'server-tick-end-event', (server) => {
-            sessions.tick(serverPeers(server, settings, hostLogger), server.getMspt());
+            const peers = serverPeers(server, settings);
+            try {
+                sessions.tick(peers, server.getMspt());
+            } finally {
+                peers[Symbol.dispose]();
+            }
             try {
                 this.placeholders?.tick();
-            } catch {
-                hostLogger.warn(`${PLUGIN_NAME}: PumpkinPIE session tick failed`);
+            } catch (err) {
+                log.warn(`PumpkinPIE session tick failed: ${String(err)}`);
             }
         });
         this.registerEvent(ctx, 'block-place-event', (_server, event: BlockPlaceEventData) => {
@@ -103,8 +118,8 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
         this.registerEvent(ctx, 'block-spread-event', (_server, event: BlockSpreadEventData) => {
             invalidateBlockSpread(sessions, event);
         });
-        hostLogger.info(
-            `${PLUGIN_NAME}: serving DH protocol ${PROTOCOL} from loaded chunks and cached terrain. This plugin cannot load saved chunks or request normal terrain generation; see the README's Terrain access limits section.`,
+        log.info(
+            `serving DH protocol ${ansi.named.number(PROTOCOL)} from loaded chunks and cached terrain. This plugin cannot load saved chunks or request normal terrain generation; see the README's Compatibility and terrain section.`,
         );
     }
 
@@ -119,8 +134,8 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
         this.placeholders = undefined;
         try {
             placeholders?.stop();
-        } catch {
-            hostLogger.warn(`${PLUGIN_NAME}: failed to stop PumpkinPIE session`);
+        } catch (err) {
+            log.warn(`failed to stop PumpkinPIE session: ${String(err)}`);
         }
     }
 
@@ -137,10 +152,6 @@ class DistantHorizonsSupportPumpkin extends PluginBase {
         this.dataDir = undefined;
         files?.[Symbol.dispose]();
     }
-}
-
-function monotonicMilliseconds(): number {
-    return Number(monotonicNow() / 1_000_000n);
 }
 
 registerPlugin(new DistantHorizonsSupportPumpkin());

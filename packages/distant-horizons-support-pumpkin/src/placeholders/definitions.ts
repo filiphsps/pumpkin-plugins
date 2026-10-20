@@ -24,6 +24,7 @@ export const dhsPlaceholderDefinitions = [
         description: 'Cached LOD payload byte lengths in memory, excluding JavaScript object overhead.',
     },
     { name: 'memory_limit', description: 'Memory cache entry limit; -1 means unlimited and 0 means disabled.' },
+    { name: 'memory_byte_limit', description: 'Memory cache byte limit set by memory_cache_mb.' },
     { name: 'disk_entries', description: 'Number of entries indexed in the disk cache.' },
     { name: 'disk_bytes', description: 'Bytes indexed in the disk cache.' },
     { name: 'disk_limit', description: 'Disk cache entry limit; -1 means unlimited and 0 means disabled.' },

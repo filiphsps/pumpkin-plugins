@@ -1,170 +1,217 @@
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
+import type { Server } from 'pumpkin:plugin/server@0.1.0';
+import { MemoryFiles } from '@pumpkin-plugins/plugin-kit/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CHANNEL, encodeSection, packet } from './protocol/messages.ts';
+
+// Only the host is fake here: Pumpkin's lifecycle base, WIT imports, the data folder and command
+// registration. Sessions, the cache, settings and the PumpkinPIE service are the real modules.
 
 interface LoadedPlugin {
-    handleIpcMessage(sender: string, message: Uint8Array): Uint8Array;
     onPluginLoad(context: Context): void;
     onPluginUnload(context: Context): void;
 }
 
-const state = vi.hoisted(() => ({
-    files: undefined as unknown,
+type Handler = (server: Server, event?: unknown) => void;
+
+const host = vi.hoisted(() => ({
     plugin: undefined as LoadedPlugin | undefined,
-    events: new Map<string, unknown>(),
-    cleanupOrder: [] as string[],
-    placeholderOptions: undefined as unknown,
-    placeholderResponse: new Uint8Array([2]),
-    baseResponse: new Uint8Array([1]),
-    openDataDir: vi.fn(() => state.files),
-    readSettings: vi.fn(),
-    registerCommands: vi.fn(),
-    serverPeers: vi.fn(() => ['live peer']),
-    sessionsTick: vi.fn(),
-    placeholderConstructor: vi.fn(),
-    placeholderTick: vi.fn(),
-    placeholderIpc: vi.fn((_sender: string, _message: Uint8Array) => state.placeholderResponse),
-    placeholderStop: vi.fn(() => state.cleanupOrder.push('stop')),
-    baseIpc: vi.fn((_sender: string, _message: Uint8Array) => state.baseResponse),
-    hostInfo: vi.fn(),
-    hostWarn: vi.fn(),
+    events: new Map<string, Handler>(),
+    commands: undefined as Record<string, (...args: never[]) => string[]> | undefined,
+    files: undefined as (MemoryFiles & Disposable) | undefined,
+    filesReleased: false,
+    logs: [] as { level: string; message: string }[],
+    clockNs: 1_000_000_000n,
+    ipcReply: undefined as Uint8Array | undefined,
+    transitionLogFails: false,
+    commandRegistrationFails: false,
 }));
 
-vi.mock('@pumpkin-plugins/plugin-kit/data-dir', () => ({ WasiDataDir: { open: state.openDataDir } }));
-vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({ hostLogger: { info: state.hostInfo, warn: state.hostWarn } }));
-vi.mock('@pumpkin-plugins/pumpkin-api', () => ({ handleCommand: vi.fn(), handleTask: vi.fn() }));
-vi.mock('wasi:clocks/monotonic-clock@0.2.3', () => ({ now: () => 0n }));
 vi.mock('@pumpkin-plugins/plugin-kit/plugin', () => ({
     PluginBase: class {
-        registerEvent(_context: unknown, name: string, handler: unknown): void {
-            state.events.set(name, handler);
+        registerEvent(_ctx: Context, name: string, handler: Handler): void {
+            host.events.set(name, handler);
         }
-
-        handleIpcMessage(sender: string, message: Uint8Array): Uint8Array {
-            return state.baseIpc(sender, message);
+        handleIpcMessage(): Uint8Array {
+            return new Uint8Array();
         }
-
-        onPluginUnload(): void {}
     },
     registerPlugin: (plugin: LoadedPlugin) => {
-        state.plugin = plugin;
+        host.plugin = plugin;
+    },
+    handleCommand: vi.fn(),
+    handleTask: vi.fn(),
+}));
+vi.mock('@pumpkin-plugins/pumpkin-api', () => ({}));
+vi.mock('@pumpkin-plugins/plugin-kit/data-dir', () => ({ WasiDataDir: { open: () => host.files } }));
+vi.mock('@pumpkin-plugins/plugin-kit/register-commands', () => ({
+    registerCommands: (_ctx: Context, _tree: unknown, handlers: typeof host.commands) => {
+        if (host.commandRegistrationFails) throw new Error('command registration failed');
+        host.commands = handlers;
     },
 }));
-vi.mock('@pumpkin-plugins/plugin-kit/register-commands', () => ({ registerCommands: state.registerCommands }));
-vi.mock('./commands/handlers.ts', () => ({ commandHandlers: vi.fn(() => ({})) }));
-vi.mock('./commands/spec.ts', () => ({ commands: [] }));
-vi.mock('./config/load.ts', () => ({ readSettings: state.readSettings }));
-vi.mock('./info.ts', () => ({ info: { name: 'DistantHorizonsSupportPumpkin' } }));
-vi.mock('./lod/cache.ts', () => ({ LodCache: class {} }));
-vi.mock('./name.ts', () => ({ PLUGIN_NAME: 'DistantHorizonsSupportPumpkin' }));
-vi.mock('./platform/peers.ts', () => ({ serverPeers: state.serverPeers, withPlayer: vi.fn() }));
-vi.mock('./platform/world-mutations.ts', () => ({ invalidateBlockGrow: vi.fn(), invalidateBlockSpread: vi.fn() }));
-vi.mock('./protocol/messages.ts', () => ({ CHANNEL: 'dh', PROTOCOL: 16 }));
-vi.mock('./session.ts', () => ({
-    Sessions: class {
-        tick(peers: unknown, serverMspt: number): void {
-            state.sessionsTick(peers, serverMspt);
-        }
+vi.mock('pumpkin:plugin/logging@0.1.0', () => ({
+    log: (level: string, message: string) => {
+        if (host.transitionLogFails && message.includes('PumpkinPIE provider is')) throw new Error('log unavailable');
+        host.logs.push({ level, message });
     },
 }));
-vi.mock('./placeholders/service.ts', () => ({
-    DistantHorizonsPlaceholderService: class {
-        constructor(options: unknown) {
-            state.placeholderOptions = options;
-            state.placeholderConstructor();
-        }
-
-        tick(): void {
-            state.placeholderTick();
-        }
-
-        handleIpcMessage(sender: string, message: Uint8Array): Uint8Array {
-            return state.placeholderIpc(sender, message);
-        }
-
-        stop(): void {
-            state.placeholderStop();
-        }
-    },
+vi.mock('pumpkin:plugin/scheduler@0.1.0', () => ({}));
+vi.mock('pumpkin:plugin/text@0.1.0', () => ({ TextComponent: class {} }));
+vi.mock('pumpkin:plugin/world@0.1.0', () => ({
+    blockStateToInfo: () => ({ name: 'minecraft:stone', properties: [] }),
 }));
+// PumpkinPIE is not installed until a test sets the provider's reply.
+vi.mock('pumpkin:plugin/ipc@0.1.0', () => ({
+    sendIpcMessage: () =>
+        host.ipcReply ? { tag: 'ok', val: host.ipcReply } : { tag: 'err', val: 'plugin not loaded' },
+}));
+vi.mock('wasi:clocks/monotonic-clock@0.2.3', () => ({ now: () => host.clockNs }));
+
+const context = {} as Context;
+const server = { getMspt: () => 10, getPlayerByName: () => undefined } as unknown as Server;
+
+function loadedPlugin(): LoadedPlugin {
+    if (!host.plugin) throw new Error('Plugin was not registered');
+    return host.plugin;
+}
+
+function workerTicks(): number {
+    const status = host.commands?.['dhs status']?.().join('\n').replaceAll(/§./g, '');
+    const ticks = status?.match(/(\d+) worker tick/)?.[1];
+    if (ticks === undefined) throw new Error(`No worker tick count in status: ${status}`);
+    return Number(ticks);
+}
+
+function tickEnd(tickServer = server): void {
+    const handler = host.events.get('server-tick-end-event');
+    if (!handler) throw new Error('Tick-end handler was not registered');
+    handler(tickServer);
+}
+
+/** Java players in one loaded overworld, counting server lookups and the host handles still open. */
+function javaPlayers(names: readonly string[]) {
+    const lookups = new Map<string, number>();
+    let open = 0;
+    const handle = <T extends object>(value: T): T => {
+        open++;
+        return Object.assign(value, { [Symbol.dispose]: () => open-- });
+    };
+    const player = (name: string) =>
+        handle({
+            getName: () => name,
+            getPosition: () => [0, 64, 0],
+            asJava: () => handle({ sendCustomPayload: () => {} }),
+            getWorld: () =>
+                handle({
+                    getName: () => 'world',
+                    getDimension: () => 'minecraft:overworld',
+                    getMinY: () => 0,
+                    getWorldBorder: () =>
+                        handle({ getCenterX: () => 0, getCenterZ: () => 0, getSize: () => 60_000_000 }),
+                    getChunk: () => handle({}),
+                    getBlockStateId: () => 1,
+                    getBiome: () => 'plains',
+                    getTopBlockY: () => 0,
+                    getSkyLight: () => 15,
+                    getBlockLight: () => 0,
+                }),
+        });
+    const server = {
+        getMspt: () => 10,
+        getPlayerByName: (name: string) => {
+            lookups.set(name, (lookups.get(name) ?? 0) + 1);
+            return names.includes(name) ? player(name) : undefined;
+        },
+    } as unknown as Server;
+    const send = (name: string, data: Uint8Array) => {
+        const handler = host.events.get('player-custom-payload-event');
+        if (!handler) throw new Error('Custom payload handler was not registered');
+        handler(server, { channel: CHANNEL, player: player(name), data });
+    };
+    const reset = () => {
+        lookups.clear();
+        open = 0;
+    };
+    return { server, lookups, send, reset, open: () => open };
+}
+
+function lodRequest(tracker: number, x: number, z: number): Uint8Array {
+    const section = encodeSection(x, z);
+    return packet(7).int(tracker).string('world').words(section.high, section.low).bool(false).finish();
+}
 
 describe('DistantHorizonsSupportPumpkin lifecycle', () => {
     beforeEach(async () => {
         vi.resetModules();
-        vi.clearAllMocks();
-        state.plugin = undefined;
-        state.events.clear();
-        state.cleanupOrder.length = 0;
-        state.placeholderOptions = undefined;
-        state.placeholderResponse = new Uint8Array([2]);
-        state.baseResponse = new Uint8Array([1]);
-        state.placeholderIpc.mockImplementation(() => state.placeholderResponse);
-        state.baseIpc.mockImplementation(() => state.baseResponse);
-        state.placeholderStop.mockImplementation(() => state.cleanupOrder.push('stop'));
-        state.serverPeers.mockReturnValue(['live peer']);
-        state.files = {
-            [Symbol.dispose]: vi.fn(() => state.cleanupOrder.push('dispose')),
-        };
-        state.readSettings.mockReturnValue({});
+        host.plugin = undefined;
+        host.events.clear();
+        host.commands = undefined;
+        host.logs.length = 0;
+        host.clockNs = 1_000_000_000n;
+        host.ipcReply = undefined;
+        host.transitionLogFails = false;
+        host.commandRegistrationFails = false;
+        host.filesReleased = false;
+        host.files = Object.assign(new MemoryFiles(), {
+            [Symbol.dispose]: () => {
+                host.filesReleased = true;
+            },
+        });
         await import('./plugin.ts');
     });
 
-    it('creates the optional service and ticks it without skipping DH processing on PIE failure', () => {
-        const plugin = state.plugin;
-        if (!plugin) throw new Error('Plugin was not registered');
-        const context = {} as Context;
-
+    it('keeps processing DH ticks when the PumpkinPIE tick fails', () => {
+        const plugin = loadedPlugin();
         plugin.onPluginLoad(context);
-        expect(state.placeholderConstructor).toHaveBeenCalledOnce();
-        expect(state.placeholderOptions).toMatchObject({
-            sessions: expect.any(Object),
-            cache: expect.any(Object),
-            now: expect.any(Function),
-            onTransition: expect.any(Function),
-        });
+        tickEnd();
+        expect(workerTicks()).toBe(1);
 
-        state.placeholderTick.mockImplementationOnce(() => {
-            throw new Error('PIE tick failed');
-        });
-        const tickEnd = state.events.get('server-tick-end-event');
-        if (typeof tickEnd !== 'function') throw new Error('Tick-end handler was not registered');
-        tickEnd({ getMspt: () => 42 });
+        // A provider with another protocol answers the next retry, and logging that change throws
+        // inside the PumpkinPIE tick. DH sessions use the same clock, so it has to keep working.
+        host.ipcReply = new TextEncoder().encode(
+            JSON.stringify({
+                ok: true,
+                ping: { protocol: 1, name: 'PumpkinPIE', version: '9.0.0', placeholders: 0, expansions: 0 },
+            }),
+        );
+        host.transitionLogFails = true;
+        host.clockNs += 2_000_000_000n;
+        expect(() => tickEnd()).not.toThrow();
+        expect(() => tickEnd()).not.toThrow();
 
-        expect(state.sessionsTick).toHaveBeenCalledOnce();
-        expect(state.sessionsTick).toHaveBeenCalledWith(['live peer'], 42);
-        expect(state.hostWarn).toHaveBeenCalledWith(expect.stringContaining('PumpkinPIE session tick failed'));
+        expect(workerTicks()).toBe(3);
+        expect(host.logs).toContainEqual({
+            level: 'warn',
+            message: expect.stringContaining('PumpkinPIE session tick failed: Error: log unavailable'),
+        });
         plugin.onPluginUnload(context);
-        expect(state.placeholderStop).toHaveBeenCalledOnce();
-        expect(state.cleanupOrder).toEqual(['stop', 'dispose']);
+        expect(host.filesReleased).toBe(true);
     });
 
-    it('routes authenticated IPC and preserves the base handler when the service is absent', () => {
-        const plugin = state.plugin;
-        if (!plugin) throw new Error('Plugin was not registered');
-        const context = {} as Context;
-        const message = new Uint8Array([9, 8, 7]);
-
+    it('looks up each DH player once per server tick and releases the handles when it ends', () => {
+        const plugin = loadedPlugin();
         plugin.onPluginLoad(context);
-        expect(plugin.handleIpcMessage('PumpkinPIE', message)).toBe(state.placeholderResponse);
-        expect(state.placeholderIpc).toHaveBeenCalledWith('PumpkinPIE', message);
+        const players = javaPlayers(['Alice', 'Bob', 'Carol']);
+        const init = packet(3).string('minecraft:overworld').finish();
+        for (const name of ['Alice', 'Bob', 'Carol']) players.send(name, init);
+        players.send('Alice', lodRequest(1, 0, 0));
+        players.send('Alice', lodRequest(2, 1, 0));
+        players.send('Bob', lodRequest(3, 0, 1));
+        players.reset();
 
+        tickEnd(players.server);
+
+        expect(Object.fromEntries(players.lookups)).toEqual({ Alice: 1, Bob: 1, Carol: 1 });
+        expect(players.open()).toBe(0);
         plugin.onPluginUnload(context);
-        expect(plugin.handleIpcMessage('OtherPlugin', message)).toBe(state.baseResponse);
-        expect(state.baseIpc).toHaveBeenCalledWith('OtherPlugin', message);
     });
 
-    it('stops a partially initialized service before disposing its data directory', () => {
-        const plugin = state.plugin;
-        if (!plugin) throw new Error('Plugin was not registered');
-        const files = state.files as { [Symbol.dispose](): void };
-        const context = {} as Context;
-        const failure = new Error('command registration failed');
-        state.registerCommands.mockImplementationOnce(() => {
-            throw failure;
-        });
+    it('releases its data folder when loading fails', () => {
+        const plugin = loadedPlugin();
+        host.commandRegistrationFails = true;
 
-        expect(() => plugin.onPluginLoad(context)).toThrow(failure);
-        expect(files[Symbol.dispose]).toHaveBeenCalledOnce();
-        expect(state.placeholderStop).toHaveBeenCalledOnce();
-        expect(state.cleanupOrder).toEqual(['stop', 'dispose']);
+        expect(() => plugin.onPluginLoad(context)).toThrow('command registration failed');
+        expect(host.filesReleased).toBe(true);
     });
 });

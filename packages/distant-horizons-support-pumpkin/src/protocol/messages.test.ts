@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { Reader, Writer } from './bytes.ts';
-import { decode, levelInit, packet, readSection, sessionConfig, transfer } from './messages.ts';
+import {
+    decode,
+    encodeSection,
+    levelInit,
+    packet,
+    readSection,
+    sessionConfig,
+    TRANSFER_PACKET_BYTES,
+    transferFragment,
+    transferResponse,
+} from './messages.ts';
 
 describe('Distant Horizons protocol', () => {
     it('encodes a UTF-8 level announcement with a millisecond timestamp', () => {
@@ -15,6 +25,38 @@ describe('Distant Horizons protocol', () => {
         input.end();
         expect([...new Writer().string('ö😀').finish()]).toEqual([0, 6, 195, 182, 240, 159, 152, 128]);
         expect(new Reader(new Writer().string('ö😀').finish()).string()).toBe('ö😀');
+    });
+    it('round-trips long strings and blobs mixed with numbers', () => {
+        const text = 'ö'.repeat(30_000);
+        const blob = new Uint8Array(70_000).map((_, i) => i);
+        const data = new Writer()
+            .int(-2)
+            .string(text)
+            .blob(blob)
+            .short(65535)
+            .timestamp(2 ** 40)
+            .finish();
+        const input = new Reader(data);
+        expect(input.int()).toBe(-2);
+        expect(input.string()).toBe(text);
+        expect(input.bytes(input.int())).toEqual(blob);
+        expect(input.short()).toBe(65535);
+        expect(input.timestamp()).toBe(2 ** 40);
+        input.end();
+        expect(() => new Writer().string('x'.repeat(65536))).toThrow('too long');
+    });
+    it('packs section coordinates that read back unchanged', () => {
+        for (const [x, z] of [
+            [0, 0],
+            [-1, -1],
+            [123, -456],
+            [-(2 ** 27), 2 ** 27 - 1],
+        ] as const) {
+            const section = encodeSection(x, z);
+            const bytes = new Writer().words(section.high, section.low).finish();
+            expect(readSection(new Reader(bytes))).toEqual({ ...section, x, z, detail: 6 });
+        }
+        expect(encodeSection(-1, -1)).toMatchObject({ high: 0xffffffff, low: 0xffffff06 });
     });
     it('decodes signed section coordinates without rounding 64-bit positions', () => {
         const bytes = new Writer().words(0xffffffff, 0xffffff06).finish();
@@ -115,7 +157,11 @@ describe('Distant Horizons protocol', () => {
     });
     it('splits data before sending its tracked response', () => {
         const bytes = new Uint8Array(60001).fill(9);
-        const messages = transfer(42, 17, bytes);
+        const messages: Uint8Array[] = [];
+        for (let offset = 0; offset < bytes.length; offset += TRANSFER_PACKET_BYTES) {
+            messages.push(transferFragment(17, bytes, offset));
+        }
+        messages.push(transferResponse(42, 17));
         const restored: number[] = [];
         for (let i = 0; i < 3; i++) {
             const input = new Reader(messages[i] ?? new Uint8Array());

@@ -29,6 +29,13 @@ describe('DH settings', () => {
         expect(files.text('config.toml')).toContain('cached_requests_per_tick = 8');
         expect(files.text('config.toml')).toContain('cached_packets_per_tick = 64');
     });
+    it('loads a config file larger than 64 KiB', () => {
+        const files = new MemoryFiles(),
+            log = new MemoryLogger();
+        files.put('config.toml', `${'# notes\n'.repeat(10_000)}[support]\nrender_distance = 256\n`);
+
+        expect(readSettings(files, log).render_distance).toBe(256);
+    });
     it('accepts any negative cache limit as unlimited', () => {
         const files = new MemoryFiles(),
             log = new MemoryLogger();

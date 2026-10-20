@@ -1,5 +1,6 @@
 import type { DataFiles } from '@pumpkin-plugins/plugin-kit/files';
 import { Reader, Writer } from '../protocol/bytes.ts';
+import { MIN_DTO_BYTES } from './builder.ts';
 
 const MAX_CACHE_FILE_BYTES = 16 * 1024 * 1024;
 const CACHE_FILE_READ_CHUNK_BYTES = 1 << 20;
@@ -15,6 +16,7 @@ export interface LodCacheStats {
     diskBytes: number;
     diskEntries: number;
     diskLimit: number;
+    memoryByteLimit: number;
     memoryBytes: number;
     memoryEntries: number;
     memoryLimit: number;
@@ -31,10 +33,17 @@ export class LodCache {
     private readonly diskIndex = new Map<string, { modified: number; size: number }>();
     private readonly diskOrder: string[] = [];
     private diskBytes = 0;
+    private memoryBytes = 0;
+    /**
+     * Opens the cache directory. An entry limit of 0 disables its tier and a negative one means unlimited.
+     *
+     * @param memoryByteLimit - Payload bytes the memory tier may hold; negative means unlimited.
+     */
     constructor(
         private readonly files: DataFiles,
         private readonly memoryLimit: number,
         private readonly diskLimit: number,
+        private readonly memoryByteLimit = -1,
     ) {
         files.createDirectory('cache');
         for (const entry of this.scanDiskFiles()) this.indexDiskFile(entry.name, entry.modified, entry.size);
@@ -68,7 +77,8 @@ export class LodCache {
                 const updated = input.timestamp();
                 const data = input.bytes(input.int());
                 input.end();
-                if (checksum(data) !== expected || data.length < 64) throw new Error('Invalid cached payload');
+                if (checksum(data) !== expected || data.length < MIN_DTO_BYTES)
+                    throw new Error('Invalid cached payload');
                 value = { updated, data };
             } catch {
                 this.files.remove(path);
@@ -76,11 +86,7 @@ export class LodCache {
                 return undefined;
             }
         }
-        if (this.memoryLimit !== 0) {
-            this.memory.delete(key);
-            this.memory.set(key, value);
-            this.trimMemory();
-        }
+        this.remember(key, value);
         return value;
     }
     /** Saves a complete capture atomically and evicts entries above their respective limits. */
@@ -95,13 +101,7 @@ export class LodCache {
             const stat = this.files.stat(path);
             if (stat?.kind === 'file') this.indexDiskFile(this.name(key), stat.modified, stat.size);
         }
-        if (this.memoryLimit !== 0) {
-            this.memory.delete(key);
-            this.memory.set(key, value);
-        } else {
-            this.memory.delete(key);
-        }
-        this.trimMemory();
+        this.remember(key, value);
         this.pruneDisk();
     }
     /** Exports one selected entry, records its key, then removes it from the active cache. */
@@ -133,17 +133,16 @@ export class LodCache {
     }
     /** Invalidates a section affected by a known world change. */
     remove(key: string): void {
-        this.memory.delete(key);
+        this.forget(key);
         this.removeDiskFile(this.name(key));
     }
     /** Returns cache usage without reading or decoding disk entries. */
     stats(): LodCacheStats {
-        let memoryBytes = 0;
-        for (const value of this.memory.values()) memoryBytes += value.data.length;
         return {
             memoryEntries: this.memory.size,
-            memoryBytes,
+            memoryBytes: this.memoryBytes,
             memoryLimit: this.memoryLimit,
+            memoryByteLimit: this.memoryByteLimit,
             diskEntries: this.diskIndex.size,
             diskBytes: this.diskBytes,
             diskLimit: this.diskLimit,
@@ -153,6 +152,7 @@ export class LodCache {
     clearMemory(): number {
         const removed = this.memory.size;
         this.memory.clear();
+        this.memoryBytes = 0;
         return removed;
     }
     /** Drops every persisted LOD file and returns how many were removed. */
@@ -199,17 +199,32 @@ export class LodCache {
         const bytes = new Writer().string(key).finish();
         return `${checksum(bytes).toString(16).padStart(8, '0')}${checksum(bytes, 0x12345678).toString(16).padStart(8, '0')}.lod`;
     }
-    private trimMemory(): void {
-        if (this.memoryLimit < 0) return;
-        while (this.memory.size > this.memoryLimit) {
-            const first = this.memory.keys().next().value;
-            if (first === undefined) break;
-            this.memory.delete(first);
+    private remember(key: string, value: CachedLod): void {
+        this.forget(key);
+        if (this.memoryLimit === 0) return;
+        if (this.memoryByteLimit >= 0 && value.data.length > this.memoryByteLimit) return;
+        this.memory.set(key, value);
+        this.memoryBytes += value.data.length;
+        while (
+            (this.memoryLimit >= 0 && this.memory.size > this.memoryLimit) ||
+            (this.memoryByteLimit >= 0 && this.memoryBytes > this.memoryByteLimit)
+        ) {
+            const oldest = this.memory.keys().next().value;
+            if (oldest === undefined) break;
+            this.forget(oldest);
         }
     }
+    private forget(key: string): void {
+        const value = this.memory.get(key);
+        if (!value) return;
+        this.memory.delete(key);
+        this.memoryBytes -= value.data.length;
+    }
     private scanDiskFiles(): { name: string; modified: number; size: number }[] {
-        return this.files
-            .list('cache')
+        const names = this.files.list('cache');
+        // Writes are atomic through a temp sibling; a server killed mid-write leaves one behind.
+        for (const name of names) if (/^[0-9a-f]+\.lod\.tmp\.\d+$/.test(name)) this.files.remove(`cache/${name}`);
+        return names
             .filter((name) => /^[0-9a-f]+\.lod$/.test(name))
             .map((name) => ({ name, info: this.files.stat(`cache/${name}`) }))
             .filter((entry) => entry.info?.kind === 'file')
