@@ -79,7 +79,6 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Extension verification (${{ matrix.extension }})
-                  steps: ${{ toJSON(steps) }}
                   tests: 'true'
                   artifact-url: ${{ steps.upload-vsix.outputs.artifact-url }}
                   link-label: Download the verified VSIX

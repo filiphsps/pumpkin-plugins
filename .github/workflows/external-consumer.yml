@@ -134,5 +134,4 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: External consumers (${{ matrix.platform }})
-                  steps: ${{ toJSON(steps) }}
                   note: Checks public package metadata, TypeScript and JavaScript starters, and the standalone codemod outside this repository.

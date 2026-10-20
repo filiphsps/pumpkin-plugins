@@ -122,7 +122,6 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Upstream pin (${{ matrix.source.name }})
-                  steps: ${{ toJSON(steps) }}
                   artifact-url: ${{ matrix.source.compareUrl }}
                   link-label: Compare upstream changes
                   facts: |
