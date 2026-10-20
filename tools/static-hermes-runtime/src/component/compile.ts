@@ -76,7 +76,10 @@ export function compileAndLinkComponent(input: ComponentCompilationInput): void 
         `-out=${unitBytecode}`,
         diagnosticBundle,
     ]);
-    fs.writeFileSync(bytecodeHeader, renderEmbeddedBytecode(fs.readFileSync(unitBytecode)));
+    fs.writeFileSync(
+        bytecodeHeader,
+        renderEmbeddedBytecode(path.basename(unitBytecode), fs.statSync(unitBytecode).size),
+    );
 
     const includeFlags = hermesIncludes.map((include) => `-I${include}`);
     run(compiler, [

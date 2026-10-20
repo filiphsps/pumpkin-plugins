@@ -7,12 +7,18 @@ import { resolveConsumerWorkspaceRoot } from './workspace-root.ts';
 
 /** Options for resolving Pumpkin and WASI package imports while bundling for Static Hermes. */
 export interface StaticHermesImportsOptions {
-    /** Excludes automatic update checks from development bundles. */
+    /**
+     * Ignored. update-check skips its automatic check in development bundles through `__PUMPKIN_DEV_MODE__`.
+     * @deprecated Has no effect.
+     */
     developmentMode?: boolean;
     /** Called for each resolved WASI import so the component build can select its adapters. */
     onWasiImport?: (specifier: string) => void;
-    /** Directory used to resolve the development update-check module. */
-    resolveDir: string;
+    /**
+     * Ignored. It resolved the development update-check stub this plugin no longer provides.
+     * @deprecated Has no effect.
+     */
+    resolveDir?: string;
     /** Prepared WIT world used to resolve and generate Pumpkin and WASI interfaces. */
     witDir: string;
     /** Consumer project directory used to find the nearest pnpm workspace root for runtime toolchain caches. */
@@ -24,8 +30,7 @@ export interface StaticHermesImportsOptions {
  *
  * @remarks
  * The setup hook resolves the pinned `wasm-tools` binary before registering module handlers. Imports that are
- * absent from the WIT world fail the esbuild build. In development mode, the update-check import is replaced with
- * a wrapper that registers the plugin without running automatic update checks.
+ * absent from the WIT world fail the esbuild build.
  *
  * @param options - WIT inputs and callbacks used to resolve the bundle's imports.
  * @returns An esbuild plugin that loads generated Pumpkin and WASI facade modules.
@@ -77,22 +82,6 @@ export function staticHermesImportsPlugin(options: StaticHermesImportsOptions): 
                 loader: 'js',
                 contents: wasiModules.get(path),
             }));
-
-            if (options.developmentMode) {
-                build.onResolve({ filter: /^@pumpkin-plugins\/update-check$/ }, ({ path }) => ({
-                    path,
-                    namespace: 'pumpkin-static-hermes-dev-update-check',
-                }));
-                build.onLoad({ filter: /.*/, namespace: 'pumpkin-static-hermes-dev-update-check' }, () => ({
-                    loader: 'js',
-                    resolveDir: options.resolveDir,
-                    contents: /* JavaScript */ `
-                        import { registerPlugin } from '@pumpkin-plugins/pumpkin-api';
-                        /** Register a plugin without running automatic update checks. */
-                        export function registerPluginWithUpdates(plugin) { registerPlugin(plugin); }
-                    `,
-                }));
-            }
         },
     };
 }

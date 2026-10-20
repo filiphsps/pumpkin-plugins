@@ -1,95 +1,91 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { beforeEach, expect, it, vi } from 'vitest';
-import { buildStaticHermesComponent } from './index.ts';
+import { expect, it, vi } from 'vitest';
+import { createStaticHermesProgram } from './cli.ts';
+import type { ComponentBuildOptions } from './component/types.ts';
+import { buildStaticHermesComponent, type StaticHermesBuildOptions } from './index.ts';
 
 const mocks = vi.hoisted(() => ({ execFileSync: vi.fn() }));
 
 vi.mock('node:child_process', () => ({ execFileSync: mocks.execFileSync }));
 vi.mock('./esbuild-plugin.ts', () => ({ staticHermesImportsPlugin: vi.fn() }));
 
-beforeEach(() => mocks.execFileSync.mockReset());
+/** Run the public builder, then parse the CLI arguments it spawned the way the packaged CLI would. */
+async function cliBuildFor(options: StaticHermesBuildOptions) {
+    mocks.execFileSync.mockReset();
+    buildStaticHermesComponent(options);
+    const [command, [cli, ...args], spawnOptions] = mocks.execFileSync.mock.calls[0] as [
+        string,
+        string[],
+        { stdio: unknown },
+    ];
+    expect(command).toBe(process.execPath);
+    expect(fs.existsSync(cli)).toBe(true);
 
-it('forwards selected build options to the packaged CLI', () => {
-    const options = {
+    const received: ComponentBuildOptions[] = [];
+    await createStaticHermesProgram({
+        hermesSource: () => undefined,
+        hermesPatch: () => undefined,
+        hermesBuild: () => undefined,
+        hermesPrepare: () => undefined,
+        analyze: () => undefined,
+        generate: () => undefined,
+        componentBuild: (build) => {
+            received.push(build);
+        },
+    }).parseAsync(args, { from: 'user' });
+    expect(received).toHaveLength(1);
+    return { build: received[0], stdio: spawnOptions.stdio };
+}
+
+it('passes every build option through to the CLI component build', async () => {
+    const { build, stdio } = await cliBuildFor({
         workspaceRoot: '/plugin',
         bundle: '/plugin/build/plugin.ts',
         witDir: '/plugin/build/wit',
         output: '/plugin/build/plugin.wasm',
         developmentMode: true,
         parseTypeScript: true,
-        runtimeVariant: 'full' as const,
-        gcVariant: 'malloc' as const,
+        runtimeVariant: 'full',
+        gcVariant: 'malloc',
         quietOutput: true,
         wasiImports: ['wasi:filesystem/types@0.2.3'],
         wasiMethods: ['wasi:filesystem/types@0.2.3#read-via-stream'],
         apiMethods: ['logging.log'],
         eventTypes: ['server-tick-end-event'],
-    };
+    });
 
-    buildStaticHermesComponent(options);
-
-    const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-    expect(mocks.execFileSync).toHaveBeenCalledWith(
-        process.execPath,
-        [
-            path.join(packageRoot, 'dist/cli.js'),
-            'component',
-            'build',
-            '--bundle',
-            options.bundle,
-            '--parse-ts',
-            '--wit',
-            options.witDir,
-            '--output',
-            options.output,
-            '--workspace-root',
-            options.workspaceRoot,
-            '--development-mode',
-            '--wasi-imports',
-            JSON.stringify(options.wasiImports),
-            '--wasi-methods',
-            JSON.stringify(options.wasiMethods),
-            '--api-methods',
-            JSON.stringify(options.apiMethods),
-            '--event-types',
-            JSON.stringify(options.eventTypes),
-            '--runtime-variant',
-            'full',
-            '--gc-variant',
-            'malloc',
-        ],
-        { stdio: ['inherit', 'ignore', 'pipe'], maxBuffer: 16 * 1024 * 1024 },
-    );
+    expect(build).toEqual({
+        workspaceRoot: path.resolve('/plugin'),
+        bundle: path.resolve('/plugin/build/plugin.ts'),
+        wit: path.resolve('/plugin/build/wit'),
+        output: path.resolve('/plugin/build/plugin.wasm'),
+        developmentMode: true,
+        parseTypeScript: true,
+        runtimeVariant: 'full',
+        gcVariant: 'malloc',
+        wasiImports: ['wasi:filesystem/types@0.2.3'],
+        wasiMethods: ['wasi:filesystem/types@0.2.3#read-via-stream'],
+        apiMethods: ['logging.log'],
+        eventTypes: ['server-tick-end-event'],
+    });
+    expect(stdio).toEqual(['inherit', 'ignore', 'pipe']);
 });
 
-it('inherits runtime output by default for direct component builds', () => {
-    buildStaticHermesComponent({
-        bundle: 'bundle.js',
-        witDir: 'wit',
-        output: 'plugin.wasm',
+it('defaults to no WASI imports, leaves other selections open, and inherits output', async () => {
+    const { build, stdio } = await cliBuildFor({
+        bundle: '/plugin/bundle.js',
+        witDir: '/plugin/wit',
+        output: '/plugin/plugin.wasm',
         developmentMode: false,
     });
 
-    expect(mocks.execFileSync).toHaveBeenCalledWith(expect.any(String), expect.any(Array), { stdio: 'inherit' });
-});
-
-it('uses empty WASI imports and omits optional selections by default', () => {
-    buildStaticHermesComponent({
-        bundle: 'bundle.js',
-        witDir: 'wit',
-        output: 'plugin.wasm',
+    expect(build).toEqual({
+        bundle: path.resolve('/plugin/bundle.js'),
+        wit: path.resolve('/plugin/wit'),
+        output: path.resolve('/plugin/plugin.wasm'),
         developmentMode: false,
+        wasiImports: [],
     });
-
-    const args = mocks.execFileSync.mock.calls[0]?.[1] as string[] | undefined;
-    expect(args).toContain('--wasi-imports');
-    expect(args?.[args.indexOf('--wasi-imports') + 1]).toBe('[]');
-    expect(args).not.toContain('--development-mode');
-    expect(args).not.toContain('--wasi-methods');
-    expect(args).not.toContain('--api-methods');
-    expect(args).not.toContain('--event-types');
-    expect(args).not.toContain('--runtime-variant');
-    expect(args).not.toContain('--gc-variant');
-    expect(args).not.toContain('--parse-ts');
+    expect(stdio).toBe('inherit');
 });

@@ -1,5 +1,10 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-    test: { include: ['test/**/*.itest.ts'], testTimeout: 300_000 },
+    test: {
+        // Keep this package's module cache to itself: concurrent runs clear vitest's workspace-wide default.
+        fsModuleCachePath: 'node_modules/.vitest-cache',
+        include: ['test/**/*.itest.ts'],
+        testTimeout: 300_000,
+    },
 });

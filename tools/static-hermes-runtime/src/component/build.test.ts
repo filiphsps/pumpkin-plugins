@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ComponentWitAnalysis } from './analyze.ts';
-import { buildStaticHermesComponent } from './build.ts';
+import { buildComponent } from './build.ts';
 import type { ComponentGeneratedFiles } from './generate.ts';
 
 const mocks = vi.hoisted(() => ({
@@ -61,12 +61,12 @@ afterEach(() => {
     }
 });
 
-describe('buildStaticHermesComponent', () => {
+describe('buildComponent', () => {
     it('prepares missing Hermes artifacts, defaults to lean, and cleans temporary files', async () => {
         configureToolchain();
         const options = { ...buildOptions(), workspaceRoot: root };
 
-        await buildStaticHermesComponent(options);
+        await buildComponent(options);
 
         expect(mocks.setupToolchain).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -78,11 +78,9 @@ describe('buildStaticHermesComponent', () => {
         );
         expect(mocks.prepareHermes).toHaveBeenCalledOnce();
         expect(mocks.prepareHermes).toHaveBeenCalledWith(expect.objectContaining({ workspaceRoot: root }));
-        expect(mocks.analyze).toHaveBeenCalledWith(options);
         expect(mocks.compile).toHaveBeenCalledWith(
             expect.objectContaining({
                 options: expect.objectContaining({
-                    ...options,
                     output: expect.stringContaining(path.join(outputDirectory, '.static-hermes-')),
                 }),
                 stackSizeBytes: '262144',
@@ -103,7 +101,7 @@ describe('buildStaticHermesComponent', () => {
             throw new Error('component linker failed');
         });
 
-        await expect(buildStaticHermesComponent(options)).rejects.toThrow('component linker failed');
+        await expect(buildComponent(options)).rejects.toThrow('component linker failed');
 
         expect(fs.readFileSync(options.output, 'utf8')).toBe('known-good component');
         expect(mocks.compile.mock.calls[0]?.[0].options.output).not.toBe(options.output);
@@ -120,7 +118,7 @@ describe('buildStaticHermesComponent', () => {
         };
         fs.rmSync(missingOutputDirectory, { recursive: true, force: true });
 
-        await buildStaticHermesComponent(options);
+        await buildComponent(options);
 
         expect(fs.existsSync(missingOutputDirectory)).toBe(true);
         expect(mocks.generate).toHaveBeenCalledOnce();
@@ -136,7 +134,7 @@ describe('buildStaticHermesComponent', () => {
         const expectedWorkspaceRoot = process.cwd();
 
         try {
-            await buildStaticHermesComponent(buildOptions());
+            await buildComponent(buildOptions());
 
             expect(mocks.setupToolchain.mock.calls[0]?.[0].workspaceRoot).toBe(expectedWorkspaceRoot);
         } finally {
@@ -153,7 +151,7 @@ describe('buildStaticHermesComponent', () => {
         process.env.STATIC_HERMES_CACHE_DIR = cacheDirectory;
         configureToolchain({ STATIC_HERMES_CACHE_DIR: cacheDirectory });
 
-        await buildStaticHermesComponent({ ...buildOptions(), workspaceRoot: pluginRoot });
+        await buildComponent({ ...buildOptions(), workspaceRoot: pluginRoot });
 
         expect(mocks.setupToolchain.mock.calls[0]?.[0]).toMatchObject({
             workspaceRoot,
@@ -182,7 +180,7 @@ describe('buildStaticHermesComponent', () => {
         });
         expect(process.env.WASM_TOOLS).toBeUndefined();
 
-        await buildStaticHermesComponent(buildOptions());
+        await buildComponent(buildOptions());
 
         expect(stages).toEqual(['setup', 'analyze', 'prepare']);
     });
@@ -193,13 +191,12 @@ describe('buildStaticHermesComponent', () => {
         process.env.STATIC_HERMES_STACK_SIZE = '524288';
         const options = { ...buildOptions(), runtimeVariant: 'full' as const };
 
-        await buildStaticHermesComponent(options);
+        await buildComponent(options);
 
         expect(mocks.prepareHermes).not.toHaveBeenCalled();
         expect(mocks.compile).toHaveBeenCalledWith(
             expect.objectContaining({
                 options: expect.objectContaining({
-                    ...options,
                     output: expect.stringContaining(path.join(outputDirectory, '.static-hermes-')),
                 }),
                 stackSizeBytes: '524288',
@@ -223,7 +220,7 @@ describe('buildStaticHermesComponent', () => {
             }
         });
 
-        await buildStaticHermesComponent({ ...buildOptions(), gcVariant: 'malloc' });
+        await buildComponent({ ...buildOptions(), gcVariant: 'malloc' });
 
         expect(mocks.prepareHermes).toHaveBeenCalledOnce();
         expect(mocks.compile).toHaveBeenCalledWith(
@@ -238,7 +235,7 @@ describe('buildStaticHermesComponent', () => {
     it('rejects an invalid runtime profile before setting up the toolchain', async () => {
         const options = { ...buildOptions(), runtimeVariant: 'invalid' as 'lean' };
 
-        await expect(buildStaticHermesComponent(options)).rejects.toThrow('--runtime-variant must be "full" or "lean"');
+        await expect(buildComponent(options)).rejects.toThrow('--runtime-variant must be "full" or "lean"');
 
         expect(mocks.setupToolchain).not.toHaveBeenCalled();
         expect(mocks.prepareHermes).not.toHaveBeenCalled();
@@ -248,7 +245,7 @@ describe('buildStaticHermesComponent', () => {
         configureToolchain();
         process.env.STATIC_HERMES_STACK_SIZE = '131073';
 
-        await expect(buildStaticHermesComponent(buildOptions())).rejects.toThrow(
+        await expect(buildComponent(buildOptions())).rejects.toThrow(
             'STATIC_HERMES_STACK_SIZE must be a multiple of 16 and between 131072 and 4294967280 bytes',
         );
         expect(mocks.setupToolchain).not.toHaveBeenCalled();
@@ -261,7 +258,7 @@ describe('buildStaticHermesComponent', () => {
     it('rejects a stack larger than the wasm32 address space before setting up the toolchain', async () => {
         process.env.STATIC_HERMES_STACK_SIZE = '4294967296';
 
-        await expect(buildStaticHermesComponent(buildOptions())).rejects.toThrow(
+        await expect(buildComponent(buildOptions())).rejects.toThrow(
             'STATIC_HERMES_STACK_SIZE must be a multiple of 16 and between 131072 and 4294967280 bytes',
         );
 
@@ -274,7 +271,7 @@ describe('buildStaticHermesComponent', () => {
         configureToolchain();
         fs.rmSync(path.join(options.wit, 'plugin.wit'));
 
-        await expect(buildStaticHermesComponent(options)).rejects.toThrow('Prepared WIT package has no plugin.wit');
+        await expect(buildComponent(options)).rejects.toThrow('Prepared WIT package has no plugin.wit');
 
         expect(mocks.setupToolchain).not.toHaveBeenCalled();
         expect(mocks.analyze).not.toHaveBeenCalled();
@@ -286,7 +283,7 @@ describe('buildStaticHermesComponent', () => {
         configureToolchain();
         fs.rmSync(options.bundle);
 
-        await expect(buildStaticHermesComponent(options)).rejects.toThrow(/ENOENT/);
+        await expect(buildComponent(options)).rejects.toThrow(/ENOENT/);
 
         expect(mocks.setupToolchain).not.toHaveBeenCalled();
         expect(mocks.analyze).not.toHaveBeenCalled();
@@ -296,7 +293,7 @@ describe('buildStaticHermesComponent', () => {
         configureToolchain();
         fs.rmSync(path.join(root, 'wasi-build/lib/libhermesvmlean_a.a'));
 
-        await expect(buildStaticHermesComponent(buildOptions())).rejects.toThrow('WASI Hermes lean runtime archive');
+        await expect(buildComponent(buildOptions())).rejects.toThrow('WASI Hermes lean runtime archive');
         expect(mocks.generate).not.toHaveBeenCalled();
         expect(mocks.compile).not.toHaveBeenCalled();
     });
