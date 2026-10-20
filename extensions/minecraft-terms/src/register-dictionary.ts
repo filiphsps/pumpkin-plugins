@@ -1,6 +1,7 @@
 import type { ExtensionContext } from 'vscode';
 
-interface CodeSpellCheckerApi {
+/** The part of the Code Spell Checker extension API that this extension calls. */
+export interface CodeSpellCheckerApi {
     /** Registers a CSpell configuration file with Code Spell Checker. */
     registerConfig(configPath: string): void | Promise<void>;
 }

@@ -24,7 +24,7 @@ function installedVersion(packageName) {
 
 /** Replaces pnpm-only dependency protocols in a temporary VSCE manifest. */
 function normalizeDependencyRanges() {
-    for (const field of ['dependencies', 'devDependencies', 'optionalDependencies']) {
+    for (const field of ['devDependencies', 'optionalDependencies']) {
         const dependencies = manifest[field];
         if (!dependencies || typeof dependencies !== 'object') continue;
         for (const [name, range] of Object.entries(dependencies)) {
@@ -34,6 +34,10 @@ function normalizeDependencyRanges() {
         }
     }
 }
+
+// Without a listener, Ctrl+C or SIGTERM ends Node before `finally` restores package.json. vsce gets
+// the signal too, so spawnSync returns; after the restore, the signal is raised again to exit.
+for (const name of ['SIGINT', 'SIGTERM']) process.once(name, () => process.kill(process.pid, name));
 
 let exitCode = 0;
 try {
