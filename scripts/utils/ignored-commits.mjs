@@ -7,11 +7,7 @@ const commits = readFileSync(file, 'utf8')
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith('#'));
 
-if (
-    !Array.isArray(commits) ||
-    commits.some((sha) => typeof sha !== 'string' || !/^[a-f\d]{40}$/.test(sha)) ||
-    new Set(commits).size !== commits.length
-) {
+if (commits.some((sha) => !/^[a-f\d]{40}$/.test(sha)) || new Set(commits).size !== commits.length) {
     throw new Error(`${file} must contain unique 40-character commit SHAs, one per line`);
 }
 

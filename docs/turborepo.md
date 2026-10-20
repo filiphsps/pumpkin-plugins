@@ -33,9 +33,8 @@ pnpm turbo run typecheck --log-order=stream --log-prefix=none
 ```
 
 The root `pnpm build` and `pnpm dev` scripts also apply these defaults to their internal Turbo
-commands. Pass overrides through those scripts after `--`:
-
-The `--` separator forwards the following options through pnpm to the script.
+commands. To override them, pass the flags after `--`, which forwards them through pnpm to the
+script:
 
 ```sh
 pnpm build -- --output-logs=full

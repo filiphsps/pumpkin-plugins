@@ -2,7 +2,7 @@
     "extends": ["//"],
     "tasks": {
         "typecheck": {
-            "outputs": []
+            "outputs": ["build/types/**"]
         }
     }
 }
