@@ -3,7 +3,7 @@ import { strFromU8, strToU8 } from 'fflate';
 
 const PREFERENCES_FILE = 'disabled-players.json';
 
-/** Stores the players who have chosen to hide dynamic lights. */
+/** Stores the UUIDs of players who have chosen to hide dynamic lights, so the choice survives a name change. */
 export class PlayerLightPreferences {
     private disabled: Set<string>;
 
@@ -12,15 +12,15 @@ export class PlayerLightPreferences {
     }
 
     /** Returns whether a player has dynamic lights enabled. */
-    isEnabled(playerName: string): boolean {
-        return !this.disabled.has(playerName);
+    isEnabled(playerId: string): boolean {
+        return !this.disabled.has(playerId);
     }
 
     /** Toggles a player's setting and returns whether dynamic lights are now enabled. */
-    toggle(playerName: string): boolean {
+    toggle(playerId: string): boolean {
         const disabled = new Set(this.disabled);
-        const enabled = disabled.delete(playerName);
-        if (!enabled) disabled.add(playerName);
+        const enabled = disabled.delete(playerId);
+        if (!enabled) disabled.add(playerId);
         if (disabled.size === 0) this.files.remove(PREFERENCES_FILE);
         else this.files.writeFile(PREFERENCES_FILE, strToU8(JSON.stringify([...disabled].sort())));
         this.disabled = disabled;

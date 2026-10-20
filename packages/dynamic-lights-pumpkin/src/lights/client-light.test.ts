@@ -45,7 +45,7 @@ describe(ClientLightTracker.name, () => {
             { position, level: 15 },
         ]);
         tracker.replaceSources('Alex', client, 'entities', [{ position, level: 8 }]);
-        tracker.remove('Alex', client);
+        tracker.sync('Alex', client, position, 0);
         tracker.replaceSources('Alex', client, 'entities', []);
 
         expect(client.changes).toEqual([

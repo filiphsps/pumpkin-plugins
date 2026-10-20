@@ -19,7 +19,7 @@ const state = vi.hoisted(() => ({
     nextTask: 0,
 }));
 
-vi.mock('pumpkin:plugin/logging@0.1.0', () => ({ log: vi.fn() }));
+vi.mock('pumpkin:plugin/uuid@0.1.0', () => ({ toString: (id: string) => id }));
 vi.mock('@pumpkin-plugins/pumpkin-api', () => ({ handleCommand: vi.fn() }));
 vi.mock('@pumpkin-plugins/plugin-kit/plugin', () => ({
     PluginBase: class {
@@ -30,6 +30,7 @@ vi.mock('@pumpkin-plugins/plugin-kit/plugin', () => ({
     registerPlugin: (plugin: LoadedPlugin) => {
         state.plugin = plugin;
     },
+    handleCommand: vi.fn(),
     handleTask: vi.fn(),
 }));
 vi.mock('@pumpkin-plugins/plugin-kit/data-dir', () => ({ WasiDataDir: { open: () => state.files } }));
@@ -37,6 +38,7 @@ vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({
     scheduleDelayed: (_delay: number, run: (server: Server) => void) => schedule(run, false),
     scheduleRepeating: (_delay: number, run: (server: Server) => void) => schedule(run, true),
     cancelTask: (id: number) => state.tasks.delete(id),
+    hostLogger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     runCommand: vi.fn(),
 }));
 vi.mock('./commands/register.ts', () => ({ registerCommands: state.registerCommands }));
@@ -174,6 +176,24 @@ describe('DynamicLightsPumpkin host lifecycle', () => {
         expect(files[Symbol.dispose]).toHaveBeenCalledOnce();
     });
 
+    it("keeps a player's disabled choice after they change name", () => {
+        const env = setup();
+        env.player.item = 'minecraft:torch';
+        env.plugin.togglePlayerLights(env.player as unknown as Player);
+        env.player.name = 'Steve';
+
+        env.event('player-join-event');
+        env.delayed();
+
+        expect(env.player.sent).toEqual([]);
+    });
+
+    it('lights players who are already online when loaded into a running server', () => {
+        const env = setup({ item: 'minecraft:torch' });
+
+        expect(env.player.sent).toEqual([{ x: 0, y: 64, z: 0, level: 14 }]);
+    });
+
     it('cancels a pending refresh when the player leaves', () => {
         const env = setup();
         env.event('player-join-event');
@@ -188,18 +208,20 @@ function entity(id: number, type: string, x: number) {
     return { getId: () => id, getType: () => type, getPosition: () => [x, 64, 0] };
 }
 
-function setup() {
+function setup(options: { item?: string } = {}) {
     const plugin = state.plugin;
     if (plugin === undefined) throw new Error('Plugin was not registered');
     // Test handles can omit Symbol.dispose even though generated declarations include it.
     const player = {
         online: true,
-        item: undefined as string | undefined,
+        item: options.item,
         worldId: 'overworld',
         entities: [] as ReturnType<typeof entity>[],
         sent: [] as { x: number; y: number; z: number; level: number }[],
         resets: [] as { x: number; y: number; z: number }[],
-        getName: () => 'Alex',
+        name: 'Alex',
+        getId: () => '853c80ef-3c37-49fd-aa49-938b674adae6',
+        getName: () => player.name,
         getPosition: () => [0, 64, 0],
         getItemInHand: (hand: string) =>
             hand === 'right' && player.item !== undefined ? { getRegistryKey: () => player.item } : null,
@@ -211,6 +233,7 @@ function setup() {
     };
     const server = {
         getAllPlayers: () => [player],
+        getAllWorlds: () => [],
         getPlayerByName: () => (player.online ? player : null),
     } as unknown as Server;
     const context = { getServer: () => server } as Context;
