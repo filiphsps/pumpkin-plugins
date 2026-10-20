@@ -19,6 +19,7 @@ const expectedNames = [
     'memory_entries',
     'memory_bytes',
     'memory_limit',
+    'memory_byte_limit',
     'disk_entries',
     'disk_bytes',
     'disk_limit',
@@ -64,6 +65,7 @@ function setup() {
         memoryEntries: 10,
         memoryBytes: 2048,
         memoryLimit: -1,
+        memoryByteLimit: 67_108_864,
         diskEntries: 11,
         diskBytes: 4096,
         diskLimit: 0,
@@ -159,6 +161,7 @@ describe('Distant Horizons PumpkinPIE placeholders', () => {
             memory_entries: '10',
             memory_bytes: '2048',
             memory_limit: '-1',
+            memory_byte_limit: '67108864',
             disk_entries: '11',
             disk_bytes: '4096',
             disk_limit: '0',
@@ -166,11 +169,11 @@ describe('Distant Horizons PumpkinPIE placeholders', () => {
         for (const [name, value] of Object.entries(values)) {
             expect(reply(f, name)).toEqual({ ok: true, on_request: { value } });
         }
-        expect(f.cacheReads()).toBe(6);
+        expect(f.cacheReads()).toBe(7);
         expect(reply(f, 'client_connected')).toEqual({ ok: true, on_request: {} });
         expect(reply(f, 'client_connected', 'Alex')).toEqual({ ok: true, on_request: { value: 'true' } });
         expect(reply(f, 'client_connected', 'alex')).toEqual({ ok: true, on_request: { value: 'false' } });
-        expect(f.cacheReads()).toBe(6);
+        expect(f.cacheReads()).toBe(7);
     });
 
     it('declines unexpected arguments and unknown names without reading cache stats', () => {

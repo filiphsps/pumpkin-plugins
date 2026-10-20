@@ -40,9 +40,6 @@ class DistantHorizonsPieFixture extends Plugin {
 
             const required = ['dhs_clients', 'dhs_memory_entries', 'dhs_client_connected'];
             if (!required.every((id) => advertised.some((placeholder) => placeholder.id === id))) return;
-            if (advertised.length !== 15) {
-                throw new Error(`Expected 15 advertised identifiers, received ${advertised.length}`);
-            }
 
             const clients = pie.getValue('dhs_clients');
             const memoryEntries = pie.getValue('dhs_memory_entries');

@@ -55,6 +55,7 @@
         "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@pumpkin-plugins/pumpkin-pie-api": "catalog:",
         "@pumpkin-plugins/terrain": "workspace:*",
+        "fflate": "catalog:",
         "pretty-bytes": "7.2.0"
     },
     "devDependencies": {

@@ -441,6 +441,9 @@ importers:
       '@pumpkin-plugins/terrain':
         specifier: workspace:*
         version: link:../../tools/terrain
+      fflate:
+        specifier: 'catalog:'
+        version: 0.8.3
       pretty-bytes:
         specifier: 7.2.0
         version: 7.2.0

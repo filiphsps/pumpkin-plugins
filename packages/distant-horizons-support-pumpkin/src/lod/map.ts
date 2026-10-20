@@ -1,6 +1,6 @@
 import { SECTION_SIZE_BLOCKS } from '../protocol/constants.ts';
-import { sectionKey } from '../session.ts';
 import type { LodCache } from './cache.ts';
+import { sectionKey } from './generation.ts';
 import { DEFAULT_LOD_MAP_RADIUS, MAX_LOD_MAP_RADIUS } from './map-constants.ts';
 
 export { DEFAULT_LOD_MAP_RADIUS, MAX_LOD_MAP_RADIUS };
