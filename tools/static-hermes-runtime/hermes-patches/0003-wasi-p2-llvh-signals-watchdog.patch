@@ -1,10 +1,24 @@
+Subject: [PATCH] Add WASI signal and watchdog stubs to LLVH
+
+WASI has no signals or alarm timer. Provide empty Signals.inc and
+Watchdog.inc implementations so crash handlers and the PrettyStackTrace
+timeout compile and do nothing, as on Windows.
+
+Upstream: not submitted. Needed only for a WASI target.
+---
+ external/llvh/lib/Support/Wasi/Signals.inc  | 34 +++++++++++++++++++++
+ external/llvh/lib/Support/Wasi/Watchdog.inc |  8 +++++
+ 2 files changed, 42 insertions(+)
+ create mode 100644 external/llvh/lib/Support/Wasi/Signals.inc
+ create mode 100644 external/llvh/lib/Support/Wasi/Watchdog.inc
+
 diff --git a/external/llvh/lib/Support/Wasi/Signals.inc b/external/llvh/lib/Support/Wasi/Signals.inc
 new file mode 100644
-index 0000000..a7933be
+index 0000000..15d8419
 --- /dev/null
 +++ b/external/llvh/lib/Support/Wasi/Signals.inc
-@@ -0,0 +1,55 @@
-+//===- Signals.cpp - Generic Unix Signals Implementation -----*- C++ -*-===//
+@@ -0,0 +1,34 @@
++//===- Wasi/Signals.inc - WASI Signals Implementation --------*- C++ -*-===//
 +//
 +//                     The LLVM Compiler Infrastructure
 +//
@@ -13,29 +27,8 @@ index 0000000..a7933be
 +//
 +//===----------------------------------------------------------------------===//
 +//
-+// This file defines some helpful functions for dealing with the possibility of
-+// Unix signals occurring while your program is running.
-+//
-+//===----------------------------------------------------------------------===//
-+//
-+// This file is extremely careful to only do signal-safe things while in a
-+// signal handler. In particular, memory allocation and acquiring a mutex
-+// while in a signal handler should never occur. ManagedStatic isn't usable from
-+// a signal handler for 2 reasons:
-+//
-+//  1. Creating a new one allocates.
-+//  2. The signal handler could fire while llvm_shutdown is being processed, in
-+//     which case the ManagedStatic is in an unknown state because it could
-+//     already have been destroyed, or be in the process of being destroyed.
-+//
-+// Modifying the behavior of the signal handlers (such as registering new ones)
-+// can acquire a mutex, but all this guarantees is that the signal handler
-+// behavior is only modified by one thread at a time. A signal handler can still
-+// fire while this occurs!
-+//
-+// Adding work to a signal handler requires lock-freedom (and assume atomics are
-+// always lock-free) because the signal handler could fire while new work is
-+// being added.
++// WASI has no signals. These hooks keep the LLVH signal API linkable and do
++// nothing.
 +//
 +//===----------------------------------------------------------------------===//
 +

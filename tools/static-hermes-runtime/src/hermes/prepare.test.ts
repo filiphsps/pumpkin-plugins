@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { prepareHermes, runHermesPreparationStages } from './prepare.ts';
+import { prepareHermes } from './prepare.ts';
 
 const mocks = vi.hoisted(() => ({
     setupToolchain: vi.fn(),
@@ -26,6 +26,7 @@ vi.mock('./build.ts', () => ({
 vi.mock('./patch.ts', () => ({
     affectedHermesPaths: mocks.affectedPaths,
     applyHermesPatchSeries: mocks.applyPatches,
+    HermesPatchConflictError: class extends Error {},
     readHermesPatchSeries: mocks.readPatches,
 }));
 vi.mock('./source.ts', () => ({
@@ -59,39 +60,28 @@ beforeEach(() => {
 
 it('runs source validation, patching, and building in order', async () => {
     const stages: string[] = [];
-
-    await runHermesPreparationStages({
-        source() {
-            stages.push('source');
-        },
-        async patch() {
-            await Promise.resolve();
-            stages.push('patch');
-        },
-        build() {
-            stages.push('build');
-        },
+    mocks.ensureSource.mockImplementation(() => stages.push('source'));
+    mocks.applyPatches.mockImplementation(() => stages.push('patch'));
+    mocks.buildHermesWithLockHeld.mockImplementation(async () => {
+        stages.push('build');
     });
+
+    await prepareHermes({ workspaceRoot: '/workspace', packageRoot: '/package', environment: {} });
 
     expect(stages).toEqual(['source', 'patch', 'build']);
 });
 
 it('stops before patching or building when source validation fails', async () => {
     const failure = new Error('source pin mismatch');
-    const patch = vi.fn();
-    const build = vi.fn();
+    mocks.ensureSource.mockImplementation(() => {
+        throw failure;
+    });
 
-    await expect(
-        runHermesPreparationStages({
-            source() {
-                throw failure;
-            },
-            patch,
-            build,
-        }),
-    ).rejects.toBe(failure);
-    expect(patch).not.toHaveBeenCalled();
-    expect(build).not.toHaveBeenCalled();
+    await expect(prepareHermes({ workspaceRoot: '/workspace', packageRoot: '/package', environment: {} })).rejects.toBe(
+        failure,
+    );
+    expect(mocks.applyPatches).not.toHaveBeenCalled();
+    expect(mocks.buildHermesWithLockHeld).not.toHaveBeenCalled();
 });
 
 it('prepares the pinned source, applies patches, and builds with resolved cache paths', async () => {
