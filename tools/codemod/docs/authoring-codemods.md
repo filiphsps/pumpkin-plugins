@@ -39,9 +39,9 @@ for JavaScript and TypeScript.
 Builder-release migrations go in `src/codemods/build-migrations.ts`. Each entry names the first
 published builder version that requires the consumer change. Add an entry only when you have
 verified that release needs it, and test both the change and repeat-run idempotence. The
-`update-build` workflow selects migrations newer than the installed builder and no newer than the
-latest version fetched from npm, then applies them in version order. Leave the registry empty until
-a published release requires a migration; don't add placeholders.
+`update-build` workflow selects migrations newer than the builder installed for each file's package
+and no newer than the latest version fetched from npm, then applies them in version order. Leave the
+registry empty until a published release requires a migration; don't add placeholders.
 
 The ID becomes a CLI argument, so keep it unique and stable. `matchesFile` receives a slash-separated
 path relative to the runner's working directory—the directory where the CLI was invoked. A source
@@ -54,7 +54,8 @@ there's nothing to change; the runner treats identical output as unchanged.
 For JavaScript and TypeScript, prefer syntax-aware matching. When you need to preserve formatting,
 comments, and unrelated text, use AST source spans to replace only the relevant part. The Pumpkin
 API migration parses module specifiers with the TypeScript parser and edits `package.json` and
-`tsconfig.json` with `jsonc-parser`.
+`tsconfig.json` with `jsonc-parser`. It reads `package.json` with `JSON.parse`, because package
+managers reject comments and trailing commas there.
 
 Preserve formatting, comments, unrelated settings, and custom commands. Only add dependencies or
 configuration fields when the transform has enough information to give them valid values. If it
@@ -74,6 +75,13 @@ From the repository root, run:
 pnpm turbo run test --filter=@pumpkin-plugins/codemod
 pnpm turbo run typecheck --filter=@pumpkin-plugins/codemod
 pnpm turbo run build --filter=@pumpkin-plugins/codemod
+```
+
+To try your changes on a plugin before a release, run the built CLI from the repository root:
+
+```sh
+node tools/codemod/dist/bin/pumpkin-codemod.js list
+node tools/codemod/dist/bin/pumpkin-codemod.js migrate-pumpkin-api-ts path/to/plugin
 ```
 
 After changing the codemod registry or `engines.node`, regenerate the README and end-user guide with

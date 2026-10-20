@@ -24,7 +24,7 @@ provides the following migrations:
 Requires Node.js `>=24.21.0`.
 <!-- docs:end node-requirement -->
 
-After the package is available from npm, use:
+Run it from your plugin directory:
 
 ```sh
 pnpm dlx @pumpkin-plugins/codemod list
@@ -33,15 +33,6 @@ pnpm dlx @pumpkin-plugins/codemod migrate-pumpkin-api-ts . --write
 ```
 
 The migration previews changes by default. Pass `--write` to update files.
-
-Before the first npm release, build and run the local CLI from the repository root:
-
-```sh
-pnpm --filter @pumpkin-plugins/codemod build
-node tools/codemod/dist/bin/pumpkin-codemod.js list
-node tools/codemod/dist/bin/pumpkin-codemod.js migrate-pumpkin-api-ts path/to/plugin
-node tools/codemod/dist/bin/pumpkin-codemod.js migrate-pumpkin-api-ts path/to/plugin --write
-```
 
 - [End-user guide](docs/using-codemods.md)
 - [Contributor and maintainer guide](docs/authoring-codemods.md)

@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import { type AnalysisDiagnostic, analyzeModuleGraph, type ModuleGraph } from '@pumpkin-plugins/static-analysis';
-import { type Capability, capabilitiesForInterface } from '@pumpkin-plugins/wasi-capabilities';
-import { createJsoncAnalysisRoot } from './jsonc-analysis-root.ts';
+import { type Capability, capabilitiesForInterface, EXTERNAL_MODULES } from '@pumpkin-plugins/wasi-capabilities';
 import { normalizePackagePath } from './package-path.ts';
 
 /** Capabilities found in a production graph and any limits that need user review. */
@@ -25,23 +24,11 @@ export async function inferWasiCapabilities(projectRoot: string, entry: string):
     }
 
     let graph: ModuleGraph;
-    let analysisRoot = projectRoot;
-    let disposeAnalysisRoot: (() => Promise<void>) | undefined;
     try {
-        const jsoncRoot = await createJsoncAnalysisRoot(projectRoot, normalizedEntry);
-        if (jsoncRoot) {
-            analysisRoot = jsoncRoot.root;
-            disposeAnalysisRoot = jsoncRoot.dispose;
-        }
         graph = await analyzeModuleGraph({
-            projectRoot: analysisRoot,
+            projectRoot,
             entryPoints: [normalizedEntry],
-            resolution: {
-                external: ['pumpkin:plugin/*', 'wasi:*'],
-                platform: 'browser',
-                ...(jsoncRoot?.tsconfig ? { tsconfig: jsoncRoot.tsconfig } : {}),
-                ...(analysisRoot !== projectRoot ? { preserveSymlinks: true } : {}),
-            },
+            resolution: { external: [...EXTERNAL_MODULES], platform: 'browser' },
         });
     } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
@@ -52,15 +39,11 @@ export async function inferWasiCapabilities(projectRoot: string, entry: string):
                 `Could not analyze pumpkinPlugin.entry ${JSON.stringify(entry)}: ${detail}; the existing wasi value was preserved.`,
             ],
         };
-    } finally {
-        await disposeAnalysisRoot?.();
     }
 
     const root = graph.roots[0];
     if (root?.resolution.status !== 'resolved') {
-        const messages = graph.diagnostics.map((diagnostic) =>
-            formatAnalysisDiagnostic(diagnostic, projectRoot, analysisRoot),
-        );
+        const messages = graph.diagnostics.map((diagnostic) => formatAnalysisDiagnostic(diagnostic, projectRoot));
         messages.push(
             `Could not resolve pumpkinPlugin.entry ${JSON.stringify(entry)}; WASI inference was skipped and the existing wasi value was preserved.`,
         );
@@ -69,18 +52,14 @@ export async function inferWasiCapabilities(projectRoot: string, entry: string):
 
     const reachableFiles = new Set(graph.files.map(({ path: filePath }) => filePath));
     if (!reachableFiles.has(root.resolution.path)) {
-        const messages = graph.diagnostics.map((diagnostic) =>
-            formatAnalysisDiagnostic(diagnostic, projectRoot, analysisRoot),
-        );
+        const messages = graph.diagnostics.map((diagnostic) => formatAnalysisDiagnostic(diagnostic, projectRoot));
         messages.push(
             `Could not read the configured production entry ${JSON.stringify(entry)}; WASI inference was skipped and the existing wasi value was preserved.`,
         );
         return { analyzed: false, capabilities: [], messages: [...new Set(messages)] };
     }
 
-    const messages = graph.diagnostics.map((diagnostic) =>
-        formatAnalysisDiagnostic(diagnostic, projectRoot, analysisRoot),
-    );
+    const messages = graph.diagnostics.map((diagnostic) => formatAnalysisDiagnostic(diagnostic, projectRoot));
     const capabilities = new Set<Capability>();
     const ambiguous = new Map<string, Capability[]>();
     for (const edge of graph.edges) {
@@ -88,7 +67,7 @@ export async function inferWasiCapabilities(projectRoot: string, entry: string):
         const interfacePath = wasiInterfacePath(edge.specifier);
         if (!interfacePath) {
             messages.push(
-                `Could not identify the WASI interface in ${JSON.stringify(edge.specifier)} from ${formatLocation(edge.importer, edge.location, projectRoot, analysisRoot)}; other interfaces were still analyzed.`,
+                `Could not identify the WASI interface in ${JSON.stringify(edge.specifier)} from ${formatLocation(edge.importer, edge.location, projectRoot)}; other interfaces were still analyzed.`,
             );
             continue;
         }
@@ -129,8 +108,8 @@ function wasiInterfacePath(specifier: string): string | undefined {
 }
 
 /** Formats one analyzer diagnostic as a package-manifest review note. */
-function formatAnalysisDiagnostic(diagnostic: AnalysisDiagnostic, projectRoot: string, analysisRoot: string): string {
-    const location = formatLocation(diagnostic.importer, diagnostic.location, projectRoot, analysisRoot);
+function formatAnalysisDiagnostic(diagnostic: AnalysisDiagnostic, projectRoot: string): string {
+    const location = formatLocation(diagnostic.importer, diagnostic.location, projectRoot);
     const specifier = diagnostic.specifier === undefined ? '' : ` ${JSON.stringify(diagnostic.specifier)}`;
     switch (diagnostic.code) {
         case 'nonliteral-import':
@@ -147,14 +126,7 @@ function formatAnalysisDiagnostic(diagnostic: AnalysisDiagnostic, projectRoot: s
 }
 
 /** Formats a project-relative source location for migration notes. */
-function formatLocation(
-    importer: string,
-    location: { line: number; column: number },
-    projectRoot: string,
-    analysisRoot: string,
-): string {
-    const importerPath =
-        analysisRoot === projectRoot ? importer : path.join(projectRoot, path.relative(analysisRoot, importer));
-    const relativePath = path.relative(projectRoot, importerPath).split(path.sep).join('/');
+function formatLocation(importer: string, location: { line: number; column: number }, projectRoot: string): string {
+    const relativePath = path.relative(projectRoot, importer).split(path.sep).join('/');
     return `${relativePath || path.basename(importer)}:${location.line}:${location.column}`;
 }

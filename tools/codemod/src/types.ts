@@ -17,7 +17,7 @@ export interface TransformContext {
     /** Absolute path to the file being transformed. */
     absolutePath: string;
 
-    /** Root directory passed to the codemod runner. */
+    /** Working directory the runner resolves input paths against. */
     projectRoot: string;
 
     /** File path relative to the runner's current working directory. */

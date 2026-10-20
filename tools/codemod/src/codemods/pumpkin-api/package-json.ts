@@ -4,7 +4,9 @@ import {
     API_VERSION_RANGE,
     BUILD_COMMAND,
     BUILD_PACKAGE,
+    BUILD_VERSION_RANGE,
     DEPENDENCY_SECTIONS,
+    ENGINE_NOTE,
     LEGACY_API_PACKAGE,
     LEGACY_BUILD_COMMAND,
     MIGRATION_NOTES,
@@ -13,36 +15,84 @@ import { mergeJsonStringArray, parseJsonObject, recordOf, setJsonValue } from '.
 import { parseLegacyBuildCommand } from './legacy-build-command.ts';
 import { inferWasiCapabilities } from './wasi-capabilities.ts';
 
-/** Migrates dependencies and build settings while preserving JSONC comments and formatting. */
-export async function migratePackageJson(source: string, projectRoot: string): Promise<TransformResult> {
-    const original = parseJsonObject(source);
-    if (!original.value) return { source, messages: [original.error ?? 'Skipped an invalid package.json.'] };
+type LegacyBuildPaths = NonNullable<ReturnType<typeof parseLegacyBuildCommand>>;
 
-    const initialDependencies = dependencyObjects(original.value);
-    const scripts = recordOf(original.value.scripts);
+/** Migrates dependencies and build settings while preserving the manifest's formatting. */
+export async function migratePackageJson(source: string, projectRoot: string): Promise<TransformResult> {
+    const manifest = parseManifest(source);
+    if (!manifest) {
+        return {
+            source,
+            messages: ['Skipped package.json because it is not a JSON object; npm and pnpm cannot read it.'],
+        };
+    }
+
+    const scripts = recordOf(manifest.scripts);
     const buildScript = typeof scripts?.build === 'string' ? scripts.build : undefined;
-    const legacyApiUsed = initialDependencies.some((section) => Object.hasOwn(section, LEGACY_API_PACKAGE));
+    const legacyApiUsed = dependencyObjects(manifest).some((section) => Object.hasOwn(section, LEGACY_API_PACKAGE));
     const legacyBuildUsed = buildScript?.includes(LEGACY_BUILD_COMMAND) === true;
     if (!legacyApiUsed && !legacyBuildUsed) return { source };
 
-    let migrated = source;
-    const apiVersion = existingDependencyVersion(initialDependencies, API_PACKAGE) ?? API_VERSION_RANGE;
-    const buildVersion = existingDependencyVersion(initialDependencies, BUILD_PACKAGE) ?? API_VERSION_RANGE;
+    const migration: ManifestMigration = { original: source, source, messages: [] };
+    const inferredPaths = buildScript ? parseLegacyBuildCommand(buildScript) : undefined;
+    migrateDependencies(migration, manifest);
+    const configIsComplete = migrateBuilderConfig(migration, manifest, inferredPaths);
+    await migrateWasi(migration, manifest, projectRoot);
+    migrateScripts(migration, scripts, buildScript, inferredPaths, configIsComplete);
+
+    if (migration.source !== source) migration.messages.push(...MIGRATION_NOTES);
+    return { source: migration.source, messages: [...new Set(migration.messages)] };
+}
+
+/** Manifest text being migrated, with the original text that sets edit formatting. */
+interface ManifestMigration {
+    readonly messages: string[];
+    readonly original: string;
+    source: string;
+}
+
+/** Applies one property edit to the manifest being migrated. */
+function setValue(migration: ManifestMigration, propertyPath: string[], value: unknown): void {
+    migration.source = setJsonValue(migration.source, propertyPath, value, migration.original);
+}
+
+/** Reads `pumpkinPlugin` from the manifest as it stands after earlier edits. */
+function builderConfig(migration: ManifestMigration): Record<string, unknown> | undefined {
+    return recordOf(parseJsonObject(migration.source).value?.pumpkinPlugin);
+}
+
+/** Replaces the legacy API package and adds the new API and builder packages to dependencies. */
+function migrateDependencies(migration: ManifestMigration, manifest: Record<string, unknown>): void {
+    const sections = dependencyObjects(manifest);
+    const apiVersion = existingDependencyVersion(sections, API_PACKAGE) ?? API_VERSION_RANGE;
+    const buildVersion = existingDependencyVersion(sections, BUILD_PACKAGE) ?? BUILD_VERSION_RANGE;
 
     for (const sectionName of DEPENDENCY_SECTIONS) {
-        if (Object.hasOwn(recordOf(original.value[sectionName]) ?? {}, LEGACY_API_PACKAGE)) {
-            migrated = setJsonValue(migrated, [sectionName, LEGACY_API_PACKAGE], undefined, source);
+        if (Object.hasOwn(recordOf(manifest[sectionName]) ?? {}, LEGACY_API_PACKAGE)) {
+            setValue(migration, [sectionName, LEGACY_API_PACKAGE], undefined);
         }
     }
-    migrated = ensureDependency(migrated, API_PACKAGE, apiVersion, source);
-    migrated = ensureDependency(migrated, BUILD_PACKAGE, buildVersion, source);
+    migration.source = ensureDependency(migration.source, API_PACKAGE, apiVersion, migration.original);
+    migration.source = ensureDependency(migration.source, BUILD_PACKAGE, buildVersion, migration.original);
+}
 
-    const inferredPaths = buildScript ? parseLegacyBuildCommand(buildScript) : undefined;
-    const unsupportedBuildScript = legacyBuildUsed && !inferredPaths;
-    const configState = parseJsonObject(migrated);
-    const currentConfig = recordOf(configState.value?.pumpkinPlugin);
-    const configCanBeWritten = currentConfig !== undefined || inferredPaths !== undefined;
-    const messages: string[] = [];
+/**
+ * Moves legacy build paths into `pumpkinPlugin` and adds the default engine.
+ *
+ * @returns Whether `pumpkinPlugin` now has both a string entry and a string output.
+ */
+function migrateBuilderConfig(
+    migration: ManifestMigration,
+    manifest: Record<string, unknown>,
+    inferredPaths: LegacyBuildPaths | undefined,
+): boolean {
+    const { messages } = migration;
+    const currentConfig = recordOf(manifest.pumpkinPlugin);
+
+    if (Object.hasOwn(manifest, 'pumpkinPlugin') && !currentConfig) {
+        messages.push('pumpkinPlugin is not an object; configure the new builder settings manually.');
+        return false;
+    }
 
     if (inferredPaths && currentConfig) {
         if (typeof currentConfig.entry === 'string' && currentConfig.entry !== inferredPaths.entry) {
@@ -55,108 +105,109 @@ export async function migratePackageJson(source: string, projectRoot: string): P
                 'Existing pumpkinPlugin.output differs from the path in scripts.build; confirm which output is correct.',
             );
         }
-    }
-
-    if (configState.value && Object.hasOwn(configState.value, 'pumpkinPlugin') && !currentConfig) {
-        messages.push('pumpkinPlugin is not an object; configure the new builder settings manually.');
-    } else if (!currentConfig && inferredPaths) {
-        migrated = setJsonValue(
-            migrated,
-            ['pumpkinPlugin'],
-            { entry: inferredPaths.entry, output: inferredPaths.output },
-            source,
-        );
-    } else if (currentConfig && inferredPaths) {
         if (typeof currentConfig.entry !== 'string') {
             if (Object.hasOwn(currentConfig, 'entry')) {
                 messages.push(
                     'Existing pumpkinPlugin.entry is not a string; replaced it with the path from scripts.build.',
                 );
             }
-            migrated = setJsonValue(migrated, ['pumpkinPlugin', 'entry'], inferredPaths.entry, source);
+            setValue(migration, ['pumpkinPlugin', 'entry'], inferredPaths.entry);
         }
         if (!Object.hasOwn(currentConfig, 'output')) {
-            migrated = setJsonValue(migrated, ['pumpkinPlugin', 'output'], inferredPaths.output, source);
+            setValue(migration, ['pumpkinPlugin', 'output'], inferredPaths.output);
         }
+    } else if (inferredPaths) {
+        setValue(migration, ['pumpkinPlugin'], { entry: inferredPaths.entry, output: inferredPaths.output });
+    } else if (!currentConfig) {
+        return false;
     }
 
-    if (configCanBeWritten) {
-        const config = recordOf(parseJsonObject(migrated).value?.pumpkinPlugin);
-        if (config && !Object.hasOwn(config, 'engine')) {
-            migrated = setJsonValue(migrated, ['pumpkinPlugin', 'engine'], 'static-hermes', source);
-        }
+    if (!Object.hasOwn(builderConfig(migration) ?? {}, 'engine')) {
+        setValue(migration, ['pumpkinPlugin', 'engine'], 'static-hermes');
+        messages.push(ENGINE_NOTE);
     }
 
-    const currentMigratedConfig = recordOf(parseJsonObject(migrated).value?.pumpkinPlugin);
-    const configIsComplete =
-        typeof currentMigratedConfig?.entry === 'string' && typeof currentMigratedConfig.output === 'string';
-    if (currentMigratedConfig && !configIsComplete) {
+    const config = builderConfig(migration);
+    const complete = typeof config?.entry === 'string' && typeof config.output === 'string';
+    if (!complete)
         messages.push('Set both pumpkinPlugin.entry and pumpkinPlugin.output before running the new builder.');
-    }
+    return complete;
+}
 
-    if (currentMigratedConfig && typeof currentMigratedConfig.entry === 'string') {
-        const inference = await inferWasiCapabilities(projectRoot, currentMigratedConfig.entry);
-        messages.push(...inference.messages);
-        if (inference.analyzed) {
-            const wasi = currentMigratedConfig.wasi;
-            if (wasi === undefined) {
-                migrated = setJsonValue(migrated, ['pumpkinPlugin', 'wasi'], inference.capabilities, source);
-            } else if (Array.isArray(wasi)) {
-                migrated = mergeJsonStringArray(migrated, ['pumpkinPlugin', 'wasi'], inference.capabilities, source);
-            } else {
-                messages.push('pumpkinPlugin.wasi is not an array; its value was left unchanged.');
-            }
+/** Merges WASI capabilities inferred from the configured production entry into `pumpkinPlugin.wasi`. */
+async function migrateWasi(
+    migration: ManifestMigration,
+    manifest: Record<string, unknown>,
+    projectRoot: string,
+): Promise<void> {
+    const { messages } = migration;
+    const config = builderConfig(migration);
+    if (typeof config?.entry !== 'string') {
+        if (!Object.hasOwn(manifest, 'pumpkinPlugin')) {
+            messages.push(
+                'Could not infer pumpkinPlugin.wasi because pumpkinPlugin.entry is missing; the existing wasi value was preserved.',
+            );
+        } else if (config) {
+            messages.push(
+                'Could not infer pumpkinPlugin.wasi because pumpkinPlugin.entry is missing or not a string; the existing wasi value was preserved.',
+            );
         }
-    } else if (!Object.hasOwn(configState.value ?? {}, 'pumpkinPlugin')) {
-        messages.push(
-            'Could not infer pumpkinPlugin.wasi because pumpkinPlugin.entry is missing; the existing wasi value was preserved.',
-        );
-    } else if (currentMigratedConfig) {
-        messages.push(
-            'Could not infer pumpkinPlugin.wasi because pumpkinPlugin.entry is missing or not a string; the existing wasi value was preserved.',
-        );
+        return;
     }
 
-    if (inferredPaths && configIsComplete) {
-        migrated = setJsonValue(migrated, ['scripts', 'build'], BUILD_COMMAND, source);
-    } else if (buildScript === undefined && configIsComplete) {
-        migrated = setJsonValue(migrated, ['scripts', 'build'], BUILD_COMMAND, source);
+    const inference = await inferWasiCapabilities(projectRoot, config.entry);
+    messages.push(...inference.messages);
+    if (!inference.analyzed) return;
+    if (config.wasi === undefined) {
+        setValue(migration, ['pumpkinPlugin', 'wasi'], inference.capabilities);
+    } else if (Array.isArray(config.wasi)) {
+        migration.source = mergeJsonStringArray(
+            migration.source,
+            ['pumpkinPlugin', 'wasi'],
+            inference.capabilities,
+            migration.original,
+        );
+    } else {
+        messages.push('pumpkinPlugin.wasi is not an array; its value was left unchanged.');
+    }
+}
+
+/** Switches the build and typecheck scripts to the new builder when the config allows it. */
+function migrateScripts(
+    migration: ManifestMigration,
+    scripts: Record<string, unknown> | undefined,
+    buildScript: string | undefined,
+    inferredPaths: LegacyBuildPaths | undefined,
+    configIsComplete: boolean,
+): void {
+    const { messages } = migration;
+    if (configIsComplete && (inferredPaths || buildScript === undefined)) {
+        setValue(migration, ['scripts', 'build'], BUILD_COMMAND);
     } else if (buildScript !== undefined && buildScript.trim() !== BUILD_COMMAND) {
         messages.push(
             'Could not infer the entry and output paths from scripts.build; configure pumpkinPlugin.entry/output and update the build script manually.',
         );
     }
 
-    const typecheck = recordOf(parseJsonObject(migrated).value?.scripts)?.typecheck;
-    if (typecheck === undefined && configIsComplete) {
-        migrated = setJsonValue(
-            migrated,
-            ['scripts', 'typecheck'],
-            `${BUILD_COMMAND} --types-only && tsc --noEmit`,
-            source,
-        );
-    } else if (typecheck === 'tsc --noEmit' && configIsComplete) {
-        migrated = setJsonValue(
-            migrated,
-            ['scripts', 'typecheck'],
-            `${BUILD_COMMAND} --types-only && tsc --noEmit`,
-            source,
-        );
+    const typecheck = scripts?.typecheck;
+    if (configIsComplete && (typecheck === undefined || typecheck === 'tsc --noEmit')) {
+        setValue(migration, ['scripts', 'typecheck'], `${BUILD_COMMAND} --types-only && tsc --noEmit`);
     } else if (typeof typecheck === 'string' && !typecheck.includes(`${BUILD_COMMAND} --types-only`)) {
         messages.push('Review the existing scripts.typecheck command and add the new builder --types-only step.');
-    } else if (typecheck === undefined && !configIsComplete) {
+    } else if (typecheck === undefined) {
         messages.push(
             'After setting pumpkinPlugin.entry/output, add the builder --types-only step to scripts.typecheck.',
         );
     }
+}
 
-    if (unsupportedBuildScript) {
-        messages.push(
-            'Could not infer the entry and output paths from scripts.build; configure pumpkinPlugin.entry/output and update the build script manually.',
-        );
+/** Parses package.json strictly, because npm and pnpm reject comments and trailing commas in it. */
+function parseManifest(source: string): Record<string, unknown> | undefined {
+    try {
+        return recordOf(JSON.parse(source));
+    } catch {
+        return undefined;
     }
-    if (migrated !== source) messages.push(...MIGRATION_NOTES);
-    return { source: migrated, messages: [...new Set(messages)] };
 }
 
 /** Places a package in dependencies, moving an existing version from another section if present. */
@@ -190,7 +241,7 @@ function dependencyObjects(manifest: Record<string, unknown>): Record<string, un
     );
 }
 
-/** Chooses the first valid declared range for a dependency across standard package sections. */
+/** Returns the first string range declared for a dependency, checking sections in `DEPENDENCY_SECTIONS` order. */
 function existingDependencyVersion(
     sections: readonly Record<string, unknown>[],
     packageName: string,
