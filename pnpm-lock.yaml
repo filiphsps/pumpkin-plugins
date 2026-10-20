@@ -244,9 +244,6 @@ importers:
       '@turbo/gen':
         specifier: 2.11.7
         version: 2.11.7(@types/node@24.19.1)
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.19.1
       c8:
         specifier: 'catalog:'
         version: 12.0.0
