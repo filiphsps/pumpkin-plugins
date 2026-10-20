@@ -1,6 +1,6 @@
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
-import { wrapBundleForDiagnostics } from '../src/component/bundle-diagnostics.ts';
+import { wrapBundleForDiagnostics } from './bundle-diagnostics.ts';
 
 describe('wrapBundleForDiagnostics', () => {
     it('installs the resource proxy before evaluating plugin code', () => {

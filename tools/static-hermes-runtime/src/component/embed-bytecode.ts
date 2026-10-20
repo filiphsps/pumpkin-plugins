@@ -1,19 +1,22 @@
-/** Render bytecode as a C++ header containing the embedded Hermes program. */
-export function renderEmbeddedBytecode(bytecode: Uint8Array): string {
-    if (bytecode.length === 0) throw new Error('Hermes bytecode is empty');
-    const lines: string[] = [];
-    for (let index = 0; index < bytecode.length; index += 12) {
-        lines.push(
-            `    ${[...bytecode.subarray(index, index + 12)]
-                .map((value) => `0x${value.toString(16).padStart(2, '0')}`)
-                .join(', ')}`,
-        );
-    }
+/**
+ * Render a C++ header that embeds the Hermes bytecode file with `#embed`.
+ *
+ * @param bytecodeFileName - Bytecode file name, resolved from the header's own directory.
+ * @param byteLength - Size of the bytecode file, used to reject an empty compile result.
+ */
+export function renderEmbeddedBytecode(bytecodeFileName: string, byteLength: number): string {
+    if (byteLength === 0) throw new Error('Hermes bytecode is empty');
+    // clang accepts #embed in C++ as an extension and warns about it.
     return /* cpp */ `#pragma once
 #include <cstddef>
 #include <cstdint>
 
-static constexpr std::uint8_t pluginBundleBytecode[] = {\n${lines.join(',\n')}\n};
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc23-extensions"
+static constexpr std::uint8_t pluginBundleBytecode[] = {
+#embed "${bytecodeFileName}"
+};
+#pragma clang diagnostic pop
 static constexpr std::size_t pluginBundleBytecodeSize = sizeof(pluginBundleBytecode);
 `;
 }

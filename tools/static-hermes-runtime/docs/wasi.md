@@ -25,7 +25,7 @@ component does not receive ordinary operating-system syscalls or ambient access 
 network. A WIT world declares the interfaces it needs; at instantiation, a compatible host must
 provide them. WASI's design uses imported interfaces and resource handles as capabilities, and
 defines no ambient authorities. The host still decides what resources and permissions to provide.
-See the upstream [WASI capability model][^wasi-capabilities] and [design principles][^wasi-principles].
+See the upstream WASI capability model[^wasi-capabilities] and design principles.[^wasi-principles]
 
 In this repository there are two distinct interface families:
 
@@ -43,8 +43,8 @@ WIT is an interface-definition language for the WebAssembly Component Model. It 
 interfaces, functions, data types, resources, and the component's imports and exports. Generated
 bindings lower those higher-level values through the Component Model's Canonical ABI. That ABI
 defines how values cross a component boundary, including when values are passed directly and when
-they are represented in linear memory. See the upstream [WIT description][^wit] and [Component
-Model explainer][^canonical-abi].
+they are represented in linear memory. See the upstream WIT description[^wit] and Component Model
+explainer.[^canonical-abi]
 
 ## From plugin configuration to a WASI component
 
@@ -75,8 +75,8 @@ last step leaves those imports for the Pumpkin runtime to resolve.
    Static Hermes, an esbuild plugin checks that each imported interface is present in the prepared
    WIT world and generates an ES module facade from its declarations. TypeScript call analysis
    identifies which declared operations the plugin uses.
-6. **The native adapters and component are built.** The build analyzes the plugin's typed source
-   graph to identify called WIT methods. `wit-bindgen c` generates C bindings for the plugin world;
+6. **The native adapters and component are built.** The build analyzes the source files esbuild
+   bundled to identify called WIT methods. `wit-bindgen c` generates C bindings for the plugin world;
    the runtime generator emits JSI host functions and WASI adapters for selected operations.
    If source analysis cannot provide Pumpkin API selections, the runtime keeps every operation in
    the imported Pumpkin API interfaces because esbuild has already inlined their facades into the
@@ -93,7 +93,7 @@ the imported WIT interface. The component's world still declares each selected i
 functions and types in that interface. The Pumpkin runtime must resolve that component import.
 Adapter selection is a build detail, not a per-method permission boundary.
 
-The component uses the [WebAssembly Component Model][^component-model], including WIT imports and
+The component uses the WebAssembly Component Model,[^component-model] including WIT imports and
 the Canonical ABI. Runtime maintainers who change supported imports or adapters should follow the
 [WASI maintenance guide](maintaining-wasi.md).
 

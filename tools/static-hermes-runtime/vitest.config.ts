@@ -1,0 +1,9 @@
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+    test: {
+        // Keep this package's module cache to itself: concurrent runs clear vitest's workspace-wide default.
+        fsModuleCachePath: 'node_modules/.vitest-cache',
+        include: ['{src,test}/**/*.test.{ts,mjs}'],
+    },
+});

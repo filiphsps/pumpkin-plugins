@@ -9,7 +9,8 @@ alternative engine.
 
 For capability imports, host permissions, and WASI resource lifetimes, see the [WASI guide](wasi.md).
 Runtime maintainers changing capability bundles or native adapters should use the
-[WASI maintenance guide](maintaining-wasi.md).
+[WASI maintenance guide](maintaining-wasi.md). To move the Hermes pin or change its patches, see
+[Maintaining the Hermes patch series](maintaining-hermes.md).
 
 Static Hermes uses the Hades garbage collector by default. Set `staticHermesGc` to `"malloc"` in a
 plugin's `pumpkinPlugin` configuration to use malloc-managed GC. Direct component builds accept
@@ -22,9 +23,9 @@ and lean runtime profiles.
 The Static Hermes adapter dispatches event, command, suggestion, task, custom AI-goal, and
 chunk-generation callbacks. AI-goal and chunk-generation callbacks receive Pumpkin resources that
 are disposed when the callback returns. AI-goal boolean callbacks return `false` when their handler
-throws; errors from void callbacks are logged. The adapter dispatches chunk-generation callbacks
-when the host invokes them. See the [lifecycle and registration guide](../../../docs/plugin-api/lifecycle-and-registration.md)
-for callback details.
+throws; errors from void callbacks are logged. See the
+[lifecycle and registration guide](../../../docs/plugin-api/lifecycle-and-registration.md) for
+callback details.
 
 <!-- docs:begin custom-goal-host-limit -->
 <!-- Generated from tools/test-harness/src/pumpkin-version.ts. Run `pnpm readme`. -->

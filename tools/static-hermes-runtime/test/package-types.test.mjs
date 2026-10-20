@@ -43,7 +43,6 @@ it('resolves public package types in a pnpm consumer without declaring Node type
                     strict: true,
                     noEmit: true,
                     skipLibCheck: true,
-                    allowImportingTsExtensions: true,
                     types: [],
                 },
                 include: ['src/**/*.ts'],

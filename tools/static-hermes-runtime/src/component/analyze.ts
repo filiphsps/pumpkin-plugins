@@ -2,7 +2,7 @@ import { analyzeWitUsage, type WitAnalysis } from '../wit/analysis.ts';
 import { readInterfaceDeclarationOrder, readPluginImportOrder, readWitToolsDocument } from '../wit/parser.ts';
 import { resolvePluginApi, resolveWitDocument } from '../wit/resolver.ts';
 import type { WitApiPackage } from '../wit/types.ts';
-import type { ComponentBuildOptions } from './types.ts';
+import type { ComponentWitSelection } from './types.ts';
 
 /** Result of resolving the plugin's WIT world and selecting its imported API operations. */
 export interface ComponentWitAnalysis {
@@ -13,7 +13,7 @@ export interface ComponentWitAnalysis {
 }
 
 /** Resolve the prepared WIT world and select operations from explicit build inputs. */
-export function analyzeComponentWit(options: ComponentBuildOptions): ComponentWitAnalysis {
+export function analyzeComponentWit(options: ComponentWitSelection): ComponentWitAnalysis {
     const document = readWitToolsDocument(options.wit);
     const imports = readPluginImportOrder(options.wit);
     const resolved = resolveWitDocument(document, readInterfaceDeclarationOrder(options.wit));
