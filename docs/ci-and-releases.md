@@ -174,7 +174,7 @@ creates a release for a component with releasable changes, so running it after a
 change doesn't create an empty release.
 
 To add a CI job, add its row to the table in `scripts/ci-gate.mjs`, read it in the job's `if:`, and
-add the job to the `needs` of `🛡️ CI result`; `scripts/workflows.test.mjs` fails when one of these
+add the job to the `needs` of `🛡️ CI result`; `scripts/release-workflow.test.mjs` fails when one of these
 is missing. Keep downstream jobs in mind: if a selected job is skipped, the jobs that need it are
 skipped too, and CI result reports each of them.
 
@@ -568,5 +568,5 @@ Set these once in GitHub; the workflows can't configure them for you:
    status is informational because Node coverage cannot measure plugin execution inside WASM.
 
 Forks have neither the release App nor these secrets, so each job that needs them starts its `if:`
-with `!github.event.repository.fork` and skips in a fork; `scripts/workflows.test.mjs` fails when one
+with `!github.event.repository.fork` and skips in a fork; `scripts/release-workflow.test.mjs` fails when one
 doesn't.
