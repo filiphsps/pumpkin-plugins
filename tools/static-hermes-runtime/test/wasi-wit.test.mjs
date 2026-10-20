@@ -2,24 +2,13 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { setupHermesToolchainEnvironment } from '../src/hermes/toolchain-environment.ts';
+import { afterEach, describe, expect, inject, it } from 'vitest';
 import { emitWasiFacade } from '../src/wit/emitters.ts';
 import { readInterfaceDeclarationOrder, readPluginImportOrder, readWitToolsDocument } from '../src/wit/parser.ts';
 import { resolveWasiImports, resolveWitDocument } from '../src/wit/resolver.ts';
 
 const directories = [];
-let wasmTools;
-
-beforeAll(async () => {
-    const toolchain = await setupHermesToolchainEnvironment({
-        workspaceRoot: path.resolve(import.meta.dirname, '../../..'),
-        includeWasiSdk: false,
-        includeWitBindgen: false,
-        includeWasmTools: true,
-    });
-    wasmTools = process.env.WASM_TOOLS ?? toolchain.WASM_TOOLS;
-}, 120_000);
+const wasmTools = inject('wasmTools');
 
 /** Resolve the plugin world's WASI imports the way `codegen generate` does. */
 function readWasiWitImports(root, requestedImports) {

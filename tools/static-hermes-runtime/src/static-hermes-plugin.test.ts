@@ -1,28 +1,22 @@
 import * as fs from 'node:fs';
-import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { ensurePumpkinWit } from '@pumpkin-plugins/pumpkin-api/wit';
 import { WASI_VERSION } from '@pumpkin-plugins/wasi-capabilities';
 import * as esbuild from 'esbuild';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, inject, it, vi } from 'vitest';
 import { type StaticHermesImportsOptions, staticHermesImportsPlugin } from './esbuild-plugin.ts';
-import { resolveConsumerWorkspaceRoot } from './workspace-root.ts';
 
-const apiRoot = path.dirname(createRequire(import.meta.url).resolve('@pumpkin-plugins/pumpkin-api/package.json'));
+declare module 'vitest' {
+    interface ProvidedContext {
+        /** The pinned Pumpkin WIT, resolved by `test/pinned-inputs.mjs` before the workers start. */
+        pumpkinWitDir: string;
+    }
+}
+
+const apiWitDir = inject('pumpkinWitDir');
 const temporaryDirectories: string[] = [];
-let apiWitDir = '';
 let resolveDir = '';
-
-beforeAll(() => {
-    apiWitDir = ensurePumpkinWit({
-        lockFile: path.join(apiRoot, 'wit.lock.json'),
-        cacheRoot:
-            process.env.PUMPKIN_PLUGINS_CACHE_DIR ||
-            path.join(resolveConsumerWorkspaceRoot(import.meta.dirname), '.cache'),
-    });
-});
 
 beforeEach(() => {
     resolveDir = temporaryDirectory('static-hermes-plugin-src-');
