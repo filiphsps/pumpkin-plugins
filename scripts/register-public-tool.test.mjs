@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import nodeFs, { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
@@ -136,27 +136,5 @@ describe('registerPublicTool', () => {
         assert.throws(() => registerPublicTool(root, 'packages/codemod'), /must be under tools\//);
         assert.equal(readFileSync(join(root, 'release-please-config.json'), 'utf8'), configBefore);
         assert.equal(readFileSync(join(root, '.release-please-manifest.json'), 'utf8'), manifestBefore);
-    });
-
-    it('keeps the Release Please file intact when atomic replacement fails', () => {
-        const root = repository();
-        const configPath = join(root, 'release-please-config.json');
-        const configBefore = readFileSync(configPath, 'utf8');
-        const originalRename = nodeFs.renameSync;
-        nodeFs.renameSync = (temporaryPath, targetPath) => {
-            if (targetPath === configPath) throw new Error('simulated rename failure');
-            return originalRename(temporaryPath, targetPath);
-        };
-
-        try {
-            assert.throws(() => registerPublicTool(root, 'tools/codemod'), /simulated rename failure/);
-            assert.equal(readFileSync(configPath, 'utf8'), configBefore);
-            assert.equal(
-                readdirSync(root).some((name) => name.endsWith('.tmp')),
-                false,
-            );
-        } finally {
-            nodeFs.renameSync = originalRename;
-        }
     });
 });

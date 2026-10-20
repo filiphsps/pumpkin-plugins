@@ -1,14 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { PUMPKIN_RELEASE } from '../tools/test-harness/src/pumpkin-version.ts';
 
-const pumpkinVersionSource = readFileSync(
-    new URL('../tools/test-harness/src/pumpkin-version.ts', import.meta.url),
-    'utf8',
-);
-const pumpkinRelease = pumpkinVersionSource.match(/export const PUMPKIN_RELEASE = '([^']+)';/)?.[1];
-
-if (!pumpkinRelease) throw new Error('Could not read PUMPKIN_RELEASE from tools/test-harness/src/pumpkin-version.ts');
-
-const pumpkinRef = encodeURIComponent(pumpkinRelease);
+const pumpkinRef = encodeURIComponent(PUMPKIN_RELEASE);
 
 function updateSourceLink(source, file, expectedCount) {
     const escapedFile = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -20,6 +12,7 @@ function updateSourceLink(source, file, expectedCount) {
     if (count !== expectedCount) {
         throw new Error(`Expected ${expectedCount} pinned Pumpkin link(s) to ${file}; found ${count}`);
     }
+    // Drop `#L…` anchors: line numbers from another release would point at the wrong code.
     return source.replace(pattern, `https://github.com/Pumpkin-MC/Pumpkin/blob/${pumpkinRef}/${file}`);
 }
 

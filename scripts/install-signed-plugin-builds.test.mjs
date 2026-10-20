@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
-import { signWasm, verifyWasm } from '../tools/signing/src/index.ts';
+import { generateKeyPair, signWasm, verifyWasm } from '../tools/signing/src/index.ts';
 import { customSection } from '../tools/signing/src/wasm.ts';
 
 const script = path.resolve(import.meta.dirname, 'install-signed-plugin-builds.mjs');
@@ -15,7 +15,7 @@ afterEach(() => {
     for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-function fixture(signedArtifact) {
+function fixture(signedArtifact, signingKey = seed) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'signed-plugin-builds-'));
     dirs.push(root);
     fs.mkdirSync(path.join(root, 'packages/example/build'), { recursive: true });
@@ -42,16 +42,16 @@ function fixture(signedArtifact) {
             license_key: null,
             issued_at: '2026-10-06T00:00:00.000Z',
         },
-        seed,
+        signingKey,
     );
     fs.writeFileSync(path.join(root, 'packages/example/build/example.wasm'), original);
     fs.writeFileSync(path.join(root, 'dist/example.wasm'), signedArtifact ? signed : original);
     return { root, original, signed };
 }
 
-function run(root) {
+function run(root, env = { PLUGIN_SIGNING_KEY: seed }) {
     const result = spawnSync(process.execPath, [script], {
-        env: { ...process.env, PUMPKIN_PLUGINS_ROOT: root },
+        env: { ...process.env, PUMPKIN_PLUGINS_ROOT: root, ...env },
         encoding: 'utf8',
     });
     return { status: result.status, output: `${result.stdout}${result.stderr}` };
@@ -74,6 +74,24 @@ describe('install-signed-plugin-builds', () => {
         const result = run(root);
         assert.equal(result.status, 1);
         assert.match(result.output, /failed verification/);
+        assert.deepEqual(fs.readFileSync(path.join(root, 'packages/example/build/example.wasm')), original);
+    });
+
+    it('rejects artifacts signed by a key other than PLUGIN_SIGNING_KEY', () => {
+        const { root, original } = fixture(true, generateKeyPair().secretKeyHex);
+
+        const result = run(root);
+        assert.equal(result.status, 1);
+        assert.match(result.output, /unexpected signer/);
+        assert.deepEqual(fs.readFileSync(path.join(root, 'packages/example/build/example.wasm')), original);
+    });
+
+    it('refuses to run without PLUGIN_SIGNING_KEY', () => {
+        const { root, original } = fixture(true);
+
+        const result = run(root, { PLUGIN_SIGNING_KEY: '' });
+        assert.equal(result.status, 1);
+        assert.match(result.output, /PLUGIN_SIGNING_KEY/);
         assert.deepEqual(fs.readFileSync(path.join(root, 'packages/example/build/example.wasm')), original);
     });
 });
