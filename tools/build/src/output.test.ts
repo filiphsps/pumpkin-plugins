@@ -1,67 +1,103 @@
-import { expect, it } from 'vitest';
-import { formatBuildOutput } from './output.ts';
+import { stripVTControlCharacters } from 'node:util';
+import { expect, it, vi } from 'vitest';
+import { type BuildOutputMessage, formatBuildOutput, printBuildOutput } from './output.ts';
+
+function plain(message: BuildOutputMessage): string {
+    return stripVTControlCharacters(formatBuildOutput(message));
+}
 
 it('formats both componentizers and results with the shared build prefix', () => {
-    expect(formatBuildOutput({ type: 'componentize', engine: 'quickjs' })).toBe(
-        '[build] Componentizing with \u001b[36mQuickJS\u001b[0m...',
+    expect(plain({ type: 'componentize', engine: 'quickjs' })).toBe('[build] Componentizing with QuickJS...');
+    expect(plain({ type: 'componentize', engine: 'static-hermes', runtimeVariant: 'lean', gcVariant: 'hades' })).toBe(
+        '[build] Componentizing with Static Hermes (lean, hades)...',
     );
-    expect(formatBuildOutput({ type: 'componentize', engine: 'static-hermes', runtimeVariant: 'lean' })).toBe(
-        '[build] Componentizing with \u001b[36mStatic Hermes (lean, hades)\u001b[0m...',
-    );
-    expect(formatBuildOutput({ type: 'built', output: 'build/plugin.wasm', sizeBytes: 2048 })).toBe(
-        '[build] Built \u001b[36mbuild/plugin.wasm\u001b[0m (\u001b[94m2 KiB\u001b[0m)',
+    expect(plain({ type: 'built', output: 'build/plugin.wasm', sizeBytes: 2048 })).toBe(
+        '[build] Built build/plugin.wasm (2 KiB)',
     );
 });
 
 it('shows when Static Hermes uses its TypeScript parser', () => {
     expect(
-        formatBuildOutput({ type: 'bundle', entry: 'src/plugin.ts', engine: 'static-hermes', parseTypeScript: true }),
-    ).toBe(
-        '[build] Bundling \u001b[36msrc/plugin.ts\u001b[0m with \u001b[36mStatic Hermes (hades, -parse-ts)\u001b[0m...',
-    );
+        plain({
+            type: 'bundle',
+            entry: 'src/plugin.ts',
+            engine: 'static-hermes',
+            gcVariant: 'hades',
+            parseTypeScript: true,
+        }),
+    ).toBe('[build] Bundling src/plugin.ts with Static Hermes (hades, TS parser)...');
     expect(
-        formatBuildOutput({
+        plain({
             type: 'componentize',
             engine: 'static-hermes',
             runtimeVariant: 'lean',
+            gcVariant: 'hades',
             parseTypeScript: true,
         }),
-    ).toBe('[build] Componentizing with \u001b[36mStatic Hermes (lean, hades, -parse-ts)\u001b[0m...');
+    ).toBe('[build] Componentizing with Static Hermes (lean, hades, TS parser)...');
 });
 
 it('shows an explicitly selected malloc collector', () => {
     expect(
-        formatBuildOutput({
+        plain({
             type: 'componentize',
             engine: 'static-hermes',
             runtimeVariant: 'lean',
             gcVariant: 'malloc',
         }),
-    ).toBe('[build] Componentizing with \u001b[36mStatic Hermes (lean, malloc)\u001b[0m...');
+    ).toBe('[build] Componentizing with Static Hermes (lean, malloc)...');
 });
 
 it('prints Static Hermes selections and explains omitted all-operation filters', () => {
     expect(
-        formatBuildOutput({
+        plain({
             type: 'componentize',
             engine: 'static-hermes',
             runtimeVariant: 'lean',
+            gcVariant: 'hades',
             selections: {
                 wasiImports: ['wasi:clocks/monotonic-clock@0.2.3'],
                 apiMethods: ['player.player.get-position'],
             },
         }),
     ).toBe(
-        '[build] Componentizing with \u001b[36mStatic Hermes (lean, hades)\u001b[0m...\n' +
-            '[build]   \u001b[36m--wasi-imports\u001b[0m \u001b[33m["wasi:clocks/monotonic-clock@0.2.3"]\u001b[0m\n' +
-            '[build]   \u001b[36m--wasi-methods\u001b[0m \u001b[33m(omitted; all imported WASI operations)\u001b[0m\n' +
-            '[build]   \u001b[36m--api-methods\u001b[0m \u001b[33m["player.player.get-position"]\u001b[0m\n' +
-            '[build]   \u001b[36m--event-types\u001b[0m \u001b[33m(omitted; all event variants)\u001b[0m',
+        '[build] Componentizing with Static Hermes (lean, hades)...\n' +
+            '[build]   --wasi-imports ["wasi:clocks/monotonic-clock@0.2.3"]\n' +
+            '[build]   --wasi-methods (omitted; all imported WASI operations)\n' +
+            '[build]   --api-methods ["player.player.get-position"]\n' +
+            '[build]   --event-types (omitted; all event variants)',
     );
 });
 
 it('keeps captured runtime diagnostics in the shared error format', () => {
-    expect(formatBuildOutput({ type: 'error', message: 'componentizer failed\nlink failed' })).toBe(
-        '[build] Error: \u001b[1;31mcomponentizer failed\u001b[0m\n[build]   \u001b[1;31mlink failed\u001b[0m',
+    expect(plain({ type: 'error', message: 'componentizer failed\nlink failed' })).toBe(
+        '[build] Error: componentizer failed\n[build]   link failed',
     );
+});
+
+it('prints each message as one JSON object when the JSON log format is selected', () => {
+    vi.stubEnv('PUMPKIN_PLUGINS_BUILD_LOG_FORMAT', 'json');
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+        printBuildOutput({
+            type: 'componentize',
+            engine: 'static-hermes',
+            runtimeVariant: 'lean',
+            gcVariant: 'hades',
+            parseTypeScript: true,
+        });
+        printBuildOutput({ type: 'error', message: 'componentizer failed\nlink failed' });
+
+        expect(log.mock.calls).toEqual([
+            [
+                '{"type":"componentize","engine":"static-hermes","runtimeVariant":"lean","gcVariant":"hades","parseTypeScript":true}',
+            ],
+        ]);
+        expect(error.mock.calls).toEqual([['{"type":"error","message":"componentizer failed\\nlink failed"}']]);
+    } finally {
+        log.mockRestore();
+        error.mockRestore();
+        vi.unstubAllEnvs();
+    }
 });

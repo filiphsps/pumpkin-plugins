@@ -84,6 +84,7 @@ export {
     );
     try {
         await bundlePlugin({
+            engine: 'static-hermes',
             entry,
             output,
             witDir: apiWitDir,

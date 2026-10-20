@@ -42,6 +42,13 @@ point, selected runtime, componentization stage, and final artifact size. It sup
 output from the QuickJS and Static Hermes toolchains; if a tool fails, its captured stderr appears
 in the build output.
 
+If a script needs to check what a build selected, set `PUMPKIN_PLUGINS_BUILD_LOG_FORMAT=json`. The
+tool then prints each of these messages as one JSON object per line, on the same stream as the text
+line. Each object has a `type` of `bundle`, `componentize`, `built`, `warning` or `error`, plus that
+message's details, such as `engine`, `runtimeVariant`, `gcVariant`, `output` and `sizeBytes`. The
+`bundle` and `componentize` messages include `parseTypeScript: true` only when the TypeScript
+parser is on. Toolchain output that `PUMPKIN_PLUGINS_VERBOSE_BUILD=1` adds stays plain text.
+
 In an interactive terminal, the executable checks npm for a newer builder release in the background
 and may print an update notice. Results are cached for three hours, and registry errors do not affect
 the build. Pass `--no-update-cache` to check npm without reading or writing the cache. The check is
@@ -56,6 +63,11 @@ The builder and migration codemod use the shared, dependency-free
 [`@pumpkin-plugins/wasi-capabilities`](../../wasi-capabilities/README.md) package for capability names,
 WIT interfaces, and the pinned WASI version. These capabilities describe the services a plugin needs;
 they do not infer its Pumpkin permissions.
+
+That package's `WASI_VERSION` is the only owner of the WASI version. The builder's
+`wasi-wit.lock.json` pins the WIT files for that release, and the builder stops with an error that
+names both files if the lock's `version` differs. To move to a new WASI release, change
+`WASI_VERSION` and refresh the lock in the same change.
 
 ## Build constraints
 

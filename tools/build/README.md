@@ -4,7 +4,7 @@
 [![latest npm release](https://img.shields.io/npm/v/%40pumpkin-plugins%2Fbuild?label=latest%20release)](https://www.npmjs.com/package/@pumpkin-plugins/build)
 [![npm license](https://img.shields.io/npm/l/%40pumpkin-plugins%2Fbuild)](https://www.npmjs.com/package/@pumpkin-plugins/build)
 
-Builds a plugin to a `.wasm` file: bundles `src/plugin.ts`, adds the WASI imports the plugin asked for and generates the guest types. It provides the `pumpkin-plugins-build` command.
+Builds a plugin to a `.wasm` file: bundles the configured entry, adds the WASI imports the plugin asked for and generates the guest types. It provides the `pumpkin-plugins-build` command.
 
 This package is configured for public npm publication as `@pumpkin-plugins/build`. Release tags
 publish its packed tarball; see [CI and releases](../../docs/ci-and-releases.md#releases) and the

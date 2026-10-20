@@ -697,9 +697,6 @@ importers:
       '@di-framework/componentize-qjs':
         specifier: 0.4.4-di.3
         version: 0.4.4-di.3
-      '@pumpkin-plugins/minecraft-colors':
-        specifier: workspace:*
-        version: link:../minecraft-colors
       '@pumpkin-plugins/pumpkin-api':
         specifier: 'catalog:'
         version: link:../pumpkin-api
@@ -722,6 +719,9 @@ importers:
       '@pumpkin-plugins/docs':
         specifier: workspace:*
         version: link:../docs
+      '@pumpkin-plugins/minecraft-colors':
+        specifier: workspace:*
+        version: link:../minecraft-colors
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1

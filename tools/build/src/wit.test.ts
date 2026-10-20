@@ -75,18 +75,18 @@ describe('prepareWit', () => {
         fs.writeFileSync(path.join(apiWit, 'plugin.wit'), PLUGIN_WIT);
         fs.writeFileSync(path.join(apiWit, 'other.wit'), 'x');
         fs.writeFileSync(path.join(wasiWit, 'io/poll.wit'), 'package wasi:io;');
-        return { root, apiWit, wasiWit, target: path.join(root, 'out', 'wit') };
+        return { root, apiWit, wasiWit, wasiFiles: ['io/poll.wit'], target: path.join(root, 'out', 'wit') };
     }
 
     it('uses the API folder untouched when there is nothing to add', () => {
-        const { apiWit, target } = layout();
-        expect(prepareWit({ apiWit, target, interfaces: [] })).toBe(apiWit);
+        const { apiWit, wasiFiles, target } = layout();
+        expect(prepareWit({ apiWit, target, wasiFiles, interfaces: [] })).toBe(apiWit);
         expect(fs.existsSync(target)).toBe(false);
     });
 
     it('copies the API, adds the WASI packages under deps and imports them', () => {
-        const { apiWit, wasiWit, target } = layout();
-        expect(prepareWit({ apiWit, target, wasiWit, interfaces: ['io/poll'] })).toBe(target);
+        const { apiWit, wasiWit, wasiFiles, target } = layout();
+        expect(prepareWit({ apiWit, target, wasiWit, wasiFiles, interfaces: ['io/poll'] })).toBe(target);
         expect(fs.readFileSync(path.join(target, 'other.wit'), 'utf8')).toBe('x');
         expect(fs.readFileSync(path.join(target, 'deps/io/poll.wit'), 'utf8')).toBe('package wasi:io;');
         expect(fs.readFileSync(path.join(target, 'plugin.wit'), 'utf8')).toContain('import wasi:io/poll@0.2.3;');
@@ -112,15 +112,15 @@ describe('prepareWit', () => {
     });
 
     it('starts from a clean target every time', () => {
-        const { apiWit, wasiWit, target } = layout();
+        const { apiWit, wasiWit, wasiFiles, target } = layout();
         fs.mkdirSync(target, { recursive: true });
         fs.writeFileSync(path.join(target, 'stale.wit'), 'old');
-        prepareWit({ apiWit, target, wasiWit, interfaces: ['io/poll'] });
+        prepareWit({ apiWit, target, wasiWit, wasiFiles, interfaces: ['io/poll'] });
         expect(fs.existsSync(path.join(target, 'stale.wit'))).toBe(false);
     });
 
     it('cleans a partial API copy before retrying a transient I/O error', () => {
-        const { apiWit, wasiWit, target } = layout();
+        const { apiWit, wasiWit, wasiFiles, target } = layout();
         let attempts = 0;
         vi.mocked(fs.cpSync).mockImplementation((source, destination, options) => {
             if (source === apiWit && attempts++ === 0) {
@@ -130,21 +130,21 @@ describe('prepareWit', () => {
             return copy(source, destination, options);
         });
 
-        prepareWit({ apiWit, wasiWit, target, interfaces: ['io/poll'] });
+        prepareWit({ apiWit, wasiWit, wasiFiles, target, interfaces: ['io/poll'] });
 
         expect(fs.existsSync(path.join(target, 'stale.wit'))).toBe(false);
     });
 
     it('does not leave a temporary directory after preparation', () => {
-        const { apiWit, wasiWit, target } = layout();
-        prepareWit({ apiWit, target, wasiWit, interfaces: ['io/poll'] });
+        const { apiWit, wasiWit, wasiFiles, target } = layout();
+        prepareWit({ apiWit, target, wasiWit, wasiFiles, interfaces: ['io/poll'] });
 
         expect(fs.readdirSync(path.dirname(target)).filter((name) => name.startsWith('.wit-'))).toEqual([]);
     });
 
     it('needs the WASI files when it has interfaces to import', () => {
-        const { apiWit, target } = layout();
-        expect(() => prepareWit({ apiWit, target, interfaces: ['io/poll'] })).toThrow(BuildError);
+        const { apiWit, wasiFiles, target } = layout();
+        expect(() => prepareWit({ apiWit, target, wasiFiles, interfaces: ['io/poll'] })).toThrow(BuildError);
     });
 });
 
