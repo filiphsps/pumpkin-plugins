@@ -17,7 +17,8 @@ On eligible `master` pushes, `.github/workflows/release.yml` handles releases af
 workflow's `ci-result` job passes. An operator can also run CI manually for an explicit commit on
 `master`. The `🧪 Test` job runs script, hook and action suites; `.github/workflows/extensions.yml`
 checks changed extensions. `.github/workflows/docs.yml` checks the documentation and, outside forks,
-publishes the VitePress site, then mirrors it to `gh-pages`. GitHub workflow validation runs separately in
+publishes the VitePress site, then mirrors it to `gh-pages`. GitHub workflow validation runs
+separately in
 `.github/workflows/actionlint.yml`. `.github/workflows/issue-forms.yml` validates the chooser, the
 issue forms and the label catalog; `.github/workflows/issue-intake.yml` checks new and edited issue
 bodies and manages `status: needs info` and `status: needs triage` for incomplete submissions.
