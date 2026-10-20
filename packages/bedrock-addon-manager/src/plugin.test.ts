@@ -34,11 +34,10 @@ vi.mock('./manager.ts', () => ({
         }
     },
 }));
-vi.mock('./platform/data-dir.ts', () => ({ WasiDataDir: { open: () => state.files } }));
-vi.mock('./platform/host.ts', () => ({
+vi.mock('@pumpkin-plugins/plugin-kit/data-dir', () => ({ WasiDataDir: { open: () => state.files } }));
+vi.mock('@pumpkin-plugins/plugin-kit/host', () => ({
     cancelTask: state.cancelTask,
     hostLogger: { error: vi.fn() },
-    runCommand: vi.fn(),
     scheduleRepeating: vi.fn(() => 1),
 }));
 vi.mock('./web/tcp-server.ts', () => ({ TcpWebServer: class {} }));

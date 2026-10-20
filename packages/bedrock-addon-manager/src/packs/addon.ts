@@ -19,6 +19,9 @@ export interface AddonContents {
     skipped: string[];
 }
 
+/** Most bytes a `.mcaddon` may hold, packed or unpacked. Bundles are unpacked in memory. */
+export const MAX_ADDON_BYTES = 256 << 20;
+
 const baseName = (path: string) => path.split('/').pop() ?? path;
 const stripExtension = (name: string) => name.replace(/\.mcpack$/i, '');
 
@@ -35,14 +38,25 @@ function packFolders(paths: string[]): string[] {
  * manifest each or nested `.mcpack` archives, and often hold a behavior pack beside the resource
  * pack. Behavior packs can't be offered to Bedrock clients, so they are skipped.
  * @param zip - The bytes of the bundle.
+ * @param maxBytes - Most bytes the bundle's files may add up to once unpacked.
  * @returns The resource packs, repackaged as `.mcpack` archives, and the packs that were skipped.
- * @throws {ManifestError} When the bundle isn't a zip archive.
+ * @throws {ManifestError} When the bundle isn't a zip archive or unpacks to more than `maxBytes`.
  */
-export function readAddon(zip: Uint8Array): AddonContents {
+export function readAddon(zip: Uint8Array, maxBytes = MAX_ADDON_BYTES): AddonContents {
     let files: Record<string, Uint8Array>;
+    let unpacked = 0;
     try {
-        files = unzipSync(zip);
-    } catch {
+        files = unzipSync(zip, {
+            // fflate inflates each file into a buffer of its declared size, so this sum bounds the memory used.
+            filter: (file) => {
+                unpacked += file.originalSize;
+                if (unpacked > maxBytes)
+                    throw new ManifestError(`is too large: it unpacks to more than ${maxBytes} bytes`);
+                return true;
+            },
+        });
+    } catch (err) {
+        if (err instanceof ManifestError) throw err;
         throw new ManifestError('not a valid zip archive');
     }
     const paths = Object.keys(files).filter((p) => !p.endsWith('/'));

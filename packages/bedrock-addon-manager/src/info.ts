@@ -7,7 +7,7 @@ import { PLUGIN_NAME } from './name.ts';
 export const info = {
     name: PLUGIN_NAME,
     description:
-        'BedrockAddonManager hosts resource packs over HTTP and reads their manifests. Players still need another way to download the packs because the plugin does not send offers.',
+        'BedrockAddonManager hosts Bedrock resource packs over HTTP, reads their manifests and prints the `pumpkin.toml` block that makes Pumpkin offer them to players.',
     permissions: [
         { name: 'fs.read.data', reason: 'Read the packs folder and the plugin config in its data folder.' },
         {

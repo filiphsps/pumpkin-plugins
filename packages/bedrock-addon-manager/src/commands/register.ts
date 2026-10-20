@@ -5,7 +5,7 @@ import { commandHandlers } from './handlers.ts';
 import { commands } from './spec.ts';
 
 /**
- * Registers the `/baddon` commands. Operators of level 3 and the console may use them.
+ * Registers the `/baddon` commands. By default only operators of level 3 and the console may use them.
  * @param ctx - The plugin context.
  * @param manager - The manager the commands report on and control.
  */

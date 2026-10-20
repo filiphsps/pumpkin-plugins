@@ -2,9 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { builtPluginPath, freePort, type PumpkinInstance, startPumpkin } from '@pumpkin-plugins/test-harness';
 import { afterEach } from 'vitest';
-
-/** Name the plugin gives Pumpkin, which is also its data folder name. */
-export const PLUGIN_NAME = 'BedrockAddonManager';
+import { PLUGIN_NAME } from '../src/name.ts';
 
 /** A Pumpkin server running the plugin, with the web server on a known port. */
 export interface Running {
@@ -30,8 +28,6 @@ export interface StartOptions {
     files?: Record<string, Uint8Array | string>;
     /** Label for saved server logs. */
     name: string;
-    /** Overrides merged into the server's `pumpkin.toml`. */
-    pumpkin?: Record<string, unknown>;
 }
 
 /** Starts a Pumpkin server with the built plugin, seeding its data folder first. */
@@ -46,7 +42,6 @@ export async function startPlugin(options: StartOptions): Promise<Running> {
         name: options.name,
         plugins: [builtPluginPath(process.cwd())],
         files,
-        config: options.pumpkin,
     });
     const data = server.pluginDataDir(PLUGIN_NAME);
     return {

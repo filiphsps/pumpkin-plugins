@@ -119,6 +119,17 @@ describe('buildEntries', () => {
 });
 
 describe('urls', () => {
+    it('warns about each pack without a download_url when the web server is off', () => {
+        const { entries, warnings } = buildEntries(
+            [scanned('a.mcpack', 1), scanned('b.mcpack', 2)],
+            withOverrides({ 'b.mcpack': { download_url: 'https://cdn.example.com/b.mcpack' } }, { enabled: false }),
+        );
+        expect(entries).toHaveLength(2);
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]).toContain('a.mcpack');
+        expect(warnings[0]).toContain('download_url');
+    });
+
     it('falls back to loopback on the web port and says so', () => {
         expect(publicBaseUrl(withOverrides({}, { port: 9000 }))).toEqual({
             url: 'http://127.0.0.1:9000',

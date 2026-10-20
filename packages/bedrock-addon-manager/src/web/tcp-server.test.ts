@@ -11,11 +11,18 @@ vi.mock('wasi:clocks/monotonic-clock@0.2.3', () => ({ now: host.now }));
 vi.mock('wasi:sockets/instance-network@0.2.3', () => ({ instanceNetwork: () => ({}) }));
 vi.mock('wasi:sockets/tcp-create-socket@0.2.3', () => ({ createTcpSocket: host.create }));
 
-function client() {
+let clients = 0;
+
+/** A connection from its own address, or from `address` when given. */
+function client(address: [number, number, number, number] = [10, 0, (clients >> 8) & 255, clients++ & 255]) {
     const inbound: Uint8Array[] = [];
     const written: number[] = [];
     const disposed = { socket: 0, input: 0, output: 0 };
-    const socket = { shutdown: vi.fn(), [Symbol.dispose]: () => disposed.socket++ };
+    const socket = {
+        shutdown: vi.fn(),
+        remoteAddress: () => ({ tag: 'ipv4', val: { port: 50_000, address } }),
+        [Symbol.dispose]: () => disposed.socket++,
+    };
     const input = {
         read: vi.fn((max: bigint) => {
             const bytes = inbound.shift() ?? new Uint8Array();
@@ -128,7 +135,7 @@ describe('TcpWebServer', () => {
             files.push(file);
             return file;
         });
-        const clients = Array.from({ length: count }, client);
+        const clients = Array.from({ length: count }, () => client());
         admit(t, clients);
         for (const c of clients) c.inbound.push(strToU8('GET /packs/a.mcpack HTTP/1.1\r\n\r\n'));
         t.server.tick();
@@ -159,7 +166,7 @@ describe('TcpWebServer', () => {
             files.push(file);
             return file;
         });
-        const clients = Array.from({ length: 64 }, client);
+        const clients = Array.from({ length: 64 }, () => client());
         clients[0].output.checkWrite.mockReturnValue(0n);
         admit(t, clients);
         for (const c of clients) c.inbound.push(strToU8('GET /packs/a.mcpack HTTP/1.1\r\n\r\n'));
@@ -185,7 +192,7 @@ describe('TcpWebServer', () => {
 
     it('releases trickled head slots at the absolute deadline and admits a replacement client', () => {
         const t = setup();
-        const clients = Array.from({ length: 64 }, client);
+        const clients = Array.from({ length: 64 }, () => client());
         t.pending.push(...clients.map((c) => c.resources));
         for (let i = 0; i < 8; i++) t.server.tick();
         t.clock.now = 14_000;
@@ -204,5 +211,36 @@ describe('TcpWebServer', () => {
         expect(replacement.disposed.socket).toBe(0);
         t.server.stop();
         expect(replacement.disposed).toEqual({ socket: 1, input: 1, output: 1 });
+    });
+
+    it('limits how many downloads one address can hold at once', () => {
+        const t = setup();
+        const same = Array.from({ length: 9 }, () => client([203, 0, 113, 7]));
+        const other = client([203, 0, 113, 8]);
+        t.pending.push(...same.map((c) => c.resources), other.resources);
+        t.server.tick();
+        t.server.tick();
+        expect(same.slice(0, 8).every((c) => c.disposed.socket === 0)).toBe(true);
+        expect(same[8]?.disposed).toEqual({ socket: 1, input: 1, output: 1 });
+        expect(other.disposed.socket).toBe(0);
+
+        same[0]?.inbound.push(strToU8('GET /packs/missing.mcpack HTTP/1.1\r\n\r\n'));
+        for (let i = 0; i < 5; i++) t.server.tick();
+        expect(same[0]?.disposed.socket).toBe(1);
+        const next = client([203, 0, 113, 7]);
+        t.pending.push(next.resources);
+        t.server.tick();
+        expect(next.disposed.socket).toBe(0);
+        t.server.stop();
+    });
+
+    it('does not limit loopback, where a reverse proxy on this machine connects from', () => {
+        const t = setup();
+        const proxied = Array.from({ length: 12 }, () => client([127, 0, 0, 1]));
+        t.pending.push(...proxied.map((c) => c.resources));
+        t.server.tick();
+        t.server.tick();
+        expect(proxied.every((c) => c.disposed.socket === 0)).toBe(true);
+        t.server.stop();
     });
 });

@@ -1,5 +1,3 @@
-import type { Ipv4 } from './ipv4.ts';
-
 /** Where the web server listens. */
 export interface WebServerSettings {
     /** IPv4 address to listen on. */
@@ -20,5 +18,3 @@ export interface WebServer {
     /** Accepts new connections and moves the running downloads forward. Call once per game tick. */
     tick(): void;
 }
-
-export type { Ipv4 };
