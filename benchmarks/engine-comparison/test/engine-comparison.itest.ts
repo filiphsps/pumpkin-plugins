@@ -2,13 +2,14 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { startPumpkin } from '@pumpkin-plugins/test-harness';
 import { expect, it } from 'vitest';
-import { type EngineResult, formatConsoleReport, formatReport } from './engine-comparison-report.ts';
+import { type EngineResult, formatInteger, median, validateMatchingResults } from '../src/benchmark-results.ts';
+import { formatConsoleReport, formatReport } from '../src/engine-comparison-report.ts';
 import {
     createEngineComparisonMatrix,
     createEngineVariants,
     type EngineVariant,
     getEngineVariantBuildOutput,
-} from './engine-variants.ts';
+} from '../src/engine-variants.ts';
 
 const engineVariants = createEngineVariants();
 const engineComparisonMatrix = createEngineComparisonMatrix();
@@ -82,8 +83,8 @@ async function compareEngineConfigurations(): Promise<void> {
         const result = results[0];
         if (!result) throw new Error(`${selectedVariant.label} did not produce benchmark results`);
         validateEngineFeatures(results, [selectedVariant]);
-        validateApiBehavior(results, result);
-        validateWorkloads(results, result);
+        validateApiBehavior(result);
+        validateWorkloads(result);
 
         const resultPath = process.env.ENGINE_COMPARISON_RESULT_PATH;
         if (!resultPath) throw new Error('ENGINE_COMPARISON_RESULT_PATH is required for a matrix benchmark run');
@@ -95,8 +96,9 @@ async function compareEngineConfigurations(): Promise<void> {
 
     const baseline = requireResult(results, sizeBaselineEngineId);
     validateEngineFeatures(results, engineVariants);
-    validateApiBehavior(results, baseline);
-    validateWorkloads(results, baseline);
+    validateMatchingResults(results, baseline);
+    validateApiBehavior(baseline);
+    validateWorkloads(baseline);
 
     const hermesRuntimeProfiles = new Set(
         engineVariants
@@ -140,13 +142,7 @@ function validateEngineFeatures(results: EngineResult[], variants: EngineVariant
     }
 }
 
-function validateApiBehavior(results: EngineResult[], baseline: EngineResult): void {
-    for (const result of results) {
-        expect(result.apiBehavior, `${result.label} API behavior differs from ${baseline.label}`).toEqual(
-            baseline.apiBehavior,
-        );
-    }
-
+function validateApiBehavior(baseline: EngineResult): void {
     const behavior = baseline.apiBehavior;
     expect(behavior.eventRegistrations).toBeGreaterThan(0);
     expect(behavior.eventDispatches).toBeGreaterThanOrEqual(behavior.eventRegistrations);
@@ -159,32 +155,20 @@ function validateApiBehavior(results: EngineResult[], baseline: EngineResult): v
     expect(behavior.playersObserved).toBe(0);
 }
 
-function validateWorkloads(results: EngineResult[], baseline: EngineResult): void {
+/** Checks one engine's own workload output; validateMatchingResults compares engines with each other. */
+function validateWorkloads(baseline: EngineResult): void {
     const workloadNames = baseline.workloads.map(({ name }) => name);
     expect(workloadNames.length).toBeGreaterThan(0);
     expect(new Set(workloadNames).size).toBe(workloadNames.length);
     expect(baseline.workloads.some(({ provenance }) => provenance === 'synthetic guest fixture')).toBe(true);
     expect(baseline.workloads.some(({ provenance }) => provenance === 'real Pumpkin API')).toBe(true);
 
-    for (const result of results) {
-        const resultNames = result.workloads.map(({ name }) => name);
-        expect(resultNames, `${result.label} workload count`).toHaveLength(workloadNames.length);
-        expect([...resultNames].sort(), `${result.label} workload names`).toEqual([...workloadNames].sort());
-
-        for (const expected of baseline.workloads) {
-            const workload = result.workloads.find(({ name }) => name === expected.name);
-            if (!workload) throw new Error(`${result.label} is missing workload ${expected.name}`);
-            expect(workload.area).toBe(expected.area);
-            expect(workload.provenance).toBe(expected.provenance);
-            expect(workload.operationsPerSample).toBeGreaterThan(0);
-            expect(workload.operationsPerSample).toBe(expected.operationsPerSample);
-            expect(Number.isFinite(workload.checksum)).toBe(true);
-            expect(workload.checksum, `${result.label} ${workload.name} correctness checks`).not.toBe(-1);
-            expect(workload.checksum, `${result.label} ${workload.name} checksum`).toBe(expected.checksum);
-            expect(workload.samplesMs.length).toBeGreaterThan(0);
-            expect(workload.samplesMs.length).toBe(expected.samplesMs.length);
-            expect(workload.samplesMs.every((sample) => Number.isFinite(sample) && sample >= 0)).toBe(true);
-        }
+    for (const workload of baseline.workloads) {
+        expect(workload.operationsPerSample).toBeGreaterThan(0);
+        expect(Number.isFinite(workload.checksum)).toBe(true);
+        expect(workload.checksum, `${baseline.label} ${workload.name} correctness checks`).not.toBe(-1);
+        expect(workload.samplesMs.length).toBeGreaterThan(0);
+        expect(workload.samplesMs.every((sample) => Number.isFinite(sample) && sample >= 0)).toBe(true);
     }
 }
 
@@ -192,13 +176,13 @@ function validateReport(report: string, results: EngineResult[], baseline: Engin
     expect(report).toContain(baseline.label);
     for (const result of results) {
         expect(report).toContain(result.label);
-        expect(report).toContain(`${result.binarySizeBytes.toLocaleString()} bytes`);
+        expect(report).toContain(`${formatInteger(result.binarySizeBytes)} bytes`);
     }
 
     for (const workload of baseline.workloads) {
         expect(report).toContain(workload.name);
         expect(report).toContain(workload.area);
-        expect(report).toContain(workload.operationsPerSample.toLocaleString());
+        expect(report).toContain(formatInteger(workload.operationsPerSample));
         for (const result of results) {
             const resultWorkload = result.workloads.find(({ name }) => name === workload.name);
             if (!resultWorkload) throw new Error(`${result.label} is missing workload ${workload.name}`);
@@ -235,9 +219,4 @@ async function verifyHermesStackGuard(
     } finally {
         await server.stop();
     }
-}
-
-function median(samples: number[]): number {
-    const ordered = [...samples].sort((left, right) => left - right);
-    return ordered[Math.floor(ordered.length / 2)];
 }

@@ -1,20 +1,33 @@
 import * as fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { requiredEnvironment, setOutput } from './utils/ci-output.mjs';
+import {
+    apiHeaders,
+    encodePath,
+    encodeRepository,
+    normalizeBaseUrl,
+    readJsonResponse,
+    requestJson,
+    requireString,
+} from './utils/github-api.mjs';
 
-const API_VERSION = '2022-11-28';
 const CHART_BRANCH = 'benchmark-charts';
+const CHART_DIRECTORY = 'engine-comparison';
+const CHART_FILE = /^(\d+)-(?:light|dark)\.svg$/;
+// About 64 KB per run; older PR comments lose their chart image once their run is pruned.
+const KEEP_RUNS = 100;
+const MAX_PUBLISH_ATTEMPTS = 3;
 const MAX_SVG_BYTES = 10_000_000;
 
-/** Publishes a benchmark chart on a retained branch and writes its URL as a workflow output. */
+/** Publishes the light and dark charts on the chart branch and writes their URLs as workflow outputs. */
 export async function uploadBenchmarkChart(
     input,
-    { fetchImpl = fetch, readFile = fs.readFileSync, writeOutput = writeGitHubOutput } = {},
+    { fetchImpl = fetch, readFile = fs.readFileSync, writeOutput = setOutput } = {},
 ) {
     const token = requireString(input.token, 'GitHub App token');
     const repositoryPath = encodeRepository(input.repository);
     const apiBaseUrl = normalizeBaseUrl(input.apiUrl, 'GitHub API URL');
     const serverUrl = normalizeBaseUrl(input.serverUrl, 'GitHub server URL');
-    const defaultBranch = requireString(input.defaultBranch, 'GitHub default branch');
     const sourceRunId = requireString(input.sourceRunId, 'GitHub workflow run ID');
     const chartPaths = {
         light: requireString(input.chartPaths?.light, 'Light SVG chart path'),
@@ -36,154 +49,134 @@ export async function uploadBenchmarkChart(
     );
 
     const headers = apiHeaders(token);
-    await ensureChartBranch({ apiBaseUrl, defaultBranch, fetchImpl, headers, repositoryPath });
-
-    const result = {};
-    for (const [theme, chart] of Object.entries(charts)) {
-        result[theme] = await uploadChart({
-            apiBaseUrl,
-            chart,
+    const api = (path) => new URL(`repos/${repositoryPath}/${path}`, apiBaseUrl);
+    const post = (path, body, description) =>
+        requestJson(
             fetchImpl,
-            headers,
-            repositoryPath,
-            serverUrl,
-            sourceRunId,
-            theme,
-        });
-        await writeOutput(`${theme}_chart_url`, result[theme]);
+            api(path),
+            { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+            description,
+        );
+
+    const ourCharts = new Map();
+    for (const [theme, chart] of Object.entries(charts)) {
+        const blob = await post(
+            'git/blobs',
+            { content: chart.toString('base64'), encoding: 'base64' },
+            'GitHub chart upload',
+        );
+        ourCharts.set(`${sourceRunId}-${theme}.svg`, requireString(blob.sha, 'GitHub chart blob SHA'));
     }
-    return result;
-}
 
-async function uploadChart({ apiBaseUrl, chart, fetchImpl, headers, repositoryPath, serverUrl, sourceRunId, theme }) {
-    const filePath = `engine-comparison/${sourceRunId}-${theme}.svg`;
-    const uploadUrl = apiEndpoint(apiBaseUrl, `repos/${repositoryPath}/contents/${encodePath(filePath)}`);
-    const existingChart = await getExistingChart({ fetchImpl, filePath, headers, uploadUrl });
-    const uploadBody = {
-        branch: CHART_BRANCH,
-        content: chart.toString('base64'),
-        message: `ci(benchmarks): publish ${theme} chart for run ${sourceRunId}`,
-    };
-    if (existingChart) uploadBody.sha = existingChart.sha;
+    // The branch is rewritten as one parentless commit each time, so it never carries history.
+    // A concurrent run can overwrite the ref after us; re-read it and publish again until our charts are on it.
+    for (let attempt = 0; attempt < MAX_PUBLISH_ATTEMPTS; attempt++) {
+        const headSha = await getChartBranchHead({ api, fetchImpl, headers });
+        const files = headSha ? await listCharts({ api, fetchImpl, headSha, headers }) : new Map();
+        for (const [name, sha] of ourCharts) files.set(name, sha);
 
-    const payload = await requestJson(
-        fetchImpl,
-        uploadUrl,
-        {
-            method: 'PUT',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify(uploadBody),
-        },
-        'GitHub chart upload',
+        const tree = await post(
+            'git/trees',
+            {
+                tree: keepNewestRuns(files, sourceRunId).map(([name, sha]) => ({
+                    path: `${CHART_DIRECTORY}/${name}`,
+                    mode: '100644',
+                    type: 'blob',
+                    sha,
+                })),
+            },
+            'GitHub chart tree creation',
+        );
+        const commit = await post(
+            'git/commits',
+            { message: `ci(benchmarks): publish charts for run ${sourceRunId}`, tree: tree.sha, parents: [] },
+            'GitHub chart commit creation',
+        );
+
+        const refResponse = headSha
+            ? await fetchImpl(api(`git/refs/heads/${encodePath(CHART_BRANCH)}`), {
+                  method: 'PATCH',
+                  headers: { ...headers, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ sha: commit.sha, force: true }),
+              })
+            : await fetchImpl(api('git/refs'), {
+                  method: 'POST',
+                  headers: { ...headers, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ ref: `refs/heads/${CHART_BRANCH}`, sha: commit.sha }),
+              });
+        // 422 on creation means another run created the branch after our lookup.
+        if (!headSha && refResponse.status === 422) continue;
+        await readJsonResponse(refResponse, 'GitHub chart branch update');
+
+        const urls = {};
+        for (const theme of Object.keys(chartPaths)) {
+            const name = `${sourceRunId}-${theme}.svg`;
+            const published = await getPublishedChart({ api, fetchImpl, headers, name });
+            if (published?.sha !== ourCharts.get(name)) break;
+            urls[theme] = validateDownloadUrl(published.download_url, serverUrl);
+        }
+        if (Object.keys(urls).length < Object.keys(chartPaths).length) continue;
+
+        for (const [theme, url] of Object.entries(urls)) await writeOutput(`${theme}_chart_url`, url);
+        return urls;
+    }
+    throw new Error(
+        `Other workflows kept replacing the ${CHART_BRANCH} branch, so the run ${sourceRunId} charts were not published`,
     );
-    if (payload.content?.path !== filePath) {
-        throw new Error(`GitHub ${theme} chart upload returned an unexpected file path`);
-    }
-    return validateDownloadUrl(payload.content.download_url, serverUrl);
 }
 
-async function getExistingChart({ fetchImpl, filePath, headers, uploadUrl }) {
-    const lookupUrl = new URL(uploadUrl);
-    lookupUrl.searchParams.set('ref', CHART_BRANCH);
-    const response = await fetchImpl(lookupUrl, { headers });
+async function getChartBranchHead({ api, fetchImpl, headers }) {
+    const response = await fetchImpl(api(`git/ref/heads/${encodePath(CHART_BRANCH)}`), { headers });
     if (response.status === 404) return undefined;
-
-    const payload = await readJsonResponse(response, 'GitHub existing chart lookup');
-    if (typeof payload.sha !== 'string' || payload.path !== filePath) {
-        throw new Error('GitHub existing chart lookup returned an unexpected file');
-    }
-    return { sha: payload.sha };
+    const ref = await readJsonResponse(response, 'GitHub chart branch lookup');
+    return requireString(ref.object?.sha, 'GitHub chart branch commit SHA');
 }
 
-async function ensureChartBranch({ apiBaseUrl, defaultBranch, fetchImpl, headers, repositoryPath }) {
-    const chartRefUrl = apiEndpoint(apiBaseUrl, `repos/${repositoryPath}/git/ref/heads/${encodeRefPath(CHART_BRANCH)}`);
-    const chartRefResponse = await fetchImpl(chartRefUrl, { headers });
-    if (chartRefResponse.ok) return;
-    if (chartRefResponse.status !== 404) {
-        await readJsonResponse(chartRefResponse, 'GitHub chart branch lookup');
-    }
-
-    const defaultRefUrl = apiEndpoint(
-        apiBaseUrl,
-        `repos/${repositoryPath}/git/ref/heads/${encodeRefPath(defaultBranch)}`,
+/** Lists chart file names and blob SHAs on the branch head, ignoring anything outside the chart directory. */
+async function listCharts({ api, fetchImpl, headSha, headers }) {
+    const commit = await requestJson(
+        fetchImpl,
+        api(`git/commits/${headSha}`),
+        { headers },
+        'GitHub chart commit lookup',
     );
-    const defaultRef = await requestJson(fetchImpl, defaultRefUrl, { headers }, 'GitHub default branch lookup');
-    if (typeof defaultRef.object?.sha !== 'string' || !defaultRef.object.sha) {
-        throw new Error('GitHub default branch lookup did not return a commit SHA');
-    }
-
-    const createRefUrl = apiEndpoint(apiBaseUrl, `repos/${repositoryPath}/git/refs`);
-    const createRefResponse = await fetchImpl(createRefUrl, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ref: `refs/heads/${CHART_BRANCH}`, sha: defaultRef.object.sha }),
-    });
-    if (createRefResponse.ok) return;
-
-    // Another workflow may create the shared chart branch after our initial lookup.
-    if (createRefResponse.status === 422) {
-        const concurrentRefResponse = await fetchImpl(chartRefUrl, { headers });
-        if (concurrentRefResponse.ok) return;
-        await readJsonResponse(concurrentRefResponse, 'GitHub chart branch lookup after creation conflict');
-    }
-
-    await readJsonResponse(createRefResponse, 'GitHub chart branch creation');
+    const root = await requestJson(
+        fetchImpl,
+        api(`git/trees/${requireString(commit.tree?.sha, 'GitHub chart tree SHA')}`),
+        { headers },
+        'GitHub chart tree lookup',
+    );
+    const directory = (Array.isArray(root.tree) ? root.tree : []).find(
+        (entry) => entry.path === CHART_DIRECTORY && entry.type === 'tree',
+    );
+    if (!directory) return new Map();
+    const listing = await requestJson(
+        fetchImpl,
+        api(`git/trees/${directory.sha}`),
+        { headers },
+        'GitHub chart tree lookup',
+    );
+    return new Map(
+        (Array.isArray(listing.tree) ? listing.tree : [])
+            .filter((entry) => entry.type === 'blob' && CHART_FILE.test(entry.path))
+            .map((entry) => [entry.path, entry.sha]),
+    );
 }
 
-function encodeRepository(value) {
-    const parts = requireString(value, 'GitHub repository').split('/');
-    if (parts.length !== 2 || parts.some((part) => !part)) {
-        throw new Error(`Invalid GitHub repository: ${value}`);
-    }
-    return parts.map(encodeURIComponent).join('/');
+/** Keeps the chart files of the newest `KEEP_RUNS` workflow runs by run ID, plus the run being published. */
+function keepNewestRuns(charts, sourceRunId) {
+    const runOf = (name) => Number(name.match(CHART_FILE)[1]);
+    const runs = [...new Set([...charts.keys()].map(runOf))].sort((a, b) => b - a);
+    const kept = new Set(runs.slice(0, KEEP_RUNS)).add(Number(sourceRunId));
+    return [...charts].filter(([name]) => kept.has(runOf(name)));
 }
 
-function encodePath(value) {
-    return value.split('/').map(encodeURIComponent).join('/');
-}
-
-function encodeRefPath(value) {
-    return value.split('/').map(encodeURIComponent).join('/');
-}
-
-function apiEndpoint(baseUrl, path) {
-    return new URL(path, baseUrl);
-}
-
-function normalizeBaseUrl(value, description) {
-    let url;
-    try {
-        url = new URL(requireString(value, description));
-    } catch {
-        throw new Error(`${description} must be a valid URL`);
-    }
-    if (url.protocol !== 'https:') throw new Error(`${description} must use HTTPS`);
-    return new URL(url.href.endsWith('/') ? url.href : `${url.href}/`);
-}
-
-function apiHeaders(token) {
-    return {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${token}`,
-        'X-GitHub-Api-Version': API_VERSION,
-    };
-}
-
-async function requestJson(fetchImpl, url, options, description) {
-    return readJsonResponse(await fetchImpl(url, options), description);
-}
-
-async function readJsonResponse(response, description) {
-    if (!response.ok) {
-        const body = await response.text();
-        const detail = body ? `: ${body.slice(0, 500)}` : '';
-        throw new Error(`${description} failed with HTTP ${response.status}${detail}`);
-    }
-    try {
-        return await response.json();
-    } catch {
-        throw new Error(`${description} returned invalid JSON`);
-    }
+async function getPublishedChart({ api, fetchImpl, headers, name }) {
+    const url = api(`contents/${encodePath(`${CHART_DIRECTORY}/${name}`)}`);
+    url.searchParams.set('ref', CHART_BRANCH);
+    const response = await fetchImpl(url, { headers });
+    if (response.status === 404) return undefined;
+    return readJsonResponse(response, 'GitHub published chart lookup');
 }
 
 function validateDownloadUrl(value, serverUrl) {
@@ -203,21 +196,6 @@ function validateDownloadUrl(value, serverUrl) {
     return url.href;
 }
 
-function requireString(value, description) {
-    if (typeof value !== 'string' || !value.trim()) throw new Error(`${description} is required`);
-    return value.trim();
-}
-
-function writeGitHubOutput(name, value) {
-    const outputPath = process.env.GITHUB_OUTPUT;
-    if (!outputPath) throw new Error('GITHUB_OUTPUT is required');
-    fs.appendFileSync(outputPath, `${name}=${value}\n`);
-}
-
-function requiredEnvironment(name) {
-    return requireString(process.env[name], name);
-}
-
 async function runCli() {
     if (process.argv[2] !== 'publish') throw new Error('Usage: node scripts/engine-comparison-chart.mjs publish');
     await uploadBenchmarkChart({
@@ -226,7 +204,6 @@ async function runCli() {
             light: requiredEnvironment('BENCHMARK_CHANGE_SVG_LIGHT'),
             dark: requiredEnvironment('BENCHMARK_CHANGE_SVG_DARK'),
         },
-        defaultBranch: requiredEnvironment('DEFAULT_BRANCH'),
         repository: requiredEnvironment('GITHUB_REPOSITORY'),
         serverUrl: requiredEnvironment('GITHUB_SERVER_URL'),
         sourceRunId: requiredEnvironment('SOURCE_RUN_ID'),

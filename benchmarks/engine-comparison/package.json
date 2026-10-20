@@ -16,10 +16,10 @@
     "scripts": {
         "benchmark:build": "node scripts/build-engine-comparison.ts",
         "benchmark:collect": "node scripts/collect-engine-comparison.ts",
-        "compare-engines": "pnpm --dir ../.. turbo run benchmark:build --filter=@pumpkin-plugins/engine-comparison && vitest run test/engine-comparison.test.ts",
+        "compare-engines": "pnpm --dir ../.. turbo run benchmark:build --filter=@pumpkin-plugins/engine-comparison && vitest run --project integration",
         "readme": "pnpm --dir ../.. exec pumpkin-plugins-docs generate benchmarks/engine-comparison/docs.ts",
         "readme:check": "pnpm --dir ../.. exec pumpkin-plugins-docs generate benchmarks/engine-comparison/docs.ts --check",
-        "test": "vitest run test/engine-comparison-report.test.ts test/engine-variants.test.ts test/benchmark-workloads.test.ts test/engine-variant-cache.test.ts test/benchmark-regression.test.ts test/workflow-scripts.test.ts",
+        "test": "vitest run --project unit",
         "typecheck": "pnpm types && tsc --noEmit",
         "types": "node ../../tools/pumpkin-api/scripts/gen-types.mjs build/types"
     },

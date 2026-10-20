@@ -3,8 +3,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { expect, it } from 'vitest';
-import type { EngineResult } from './engine-comparison-report.ts';
-import { createEngineVariants } from './engine-variants.ts';
+import type { EngineResult } from '../src/benchmark-results.ts';
+import { createEngineVariants } from '../src/engine-variants.ts';
 
 const benchmarkDirectory = path.resolve(import.meta.dirname, '..');
 
@@ -130,7 +130,7 @@ it('writes a PR comment and SVG from current and baseline result artifacts', () 
         expect(comment).toContain(`srcset="${lightChartUrl}"`);
         expect(comment).toContain(`[Download light SVG](${lightChartUrl})`);
         expect(comment).toContain(`[Download dark SVG](${darkChartUrl})`);
-        expect(comment).not.toContain('/actions/runs/789/artifacts');
+        expect(comment).not.toContain('/actions/runs/456/artifacts');
         expect(lightChart).toContain('<svg');
         expect(lightChart).toContain('shared-workload');
         expect(lightChart).toContain('#FFFFFF');
@@ -220,7 +220,7 @@ function runScript(scriptName: string, environment: NodeJS.ProcessEnv): SpawnSyn
     return spawnSync(process.execPath, [scriptPath], {
         cwd: benchmarkDirectory,
         encoding: 'utf8',
-        env: { ...process.env, ...environment },
+        env: { ...process.env, GITHUB_OUTPUT: '', GITHUB_STEP_SUMMARY: '', ...environment },
     });
 }
 

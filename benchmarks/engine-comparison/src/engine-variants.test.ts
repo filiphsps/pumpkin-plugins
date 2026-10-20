@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { createEngineVariants } from './engine-variants.ts';
+import { createEngineVariants, getEngineVariantBuildOutput } from './engine-variants.ts';
 
 it('includes QuickJS and every Static Hermes profile, collector, and parser mode', () => {
     const variants = createEngineVariants();
@@ -22,4 +22,8 @@ it('includes QuickJS and every Static Hermes profile, collector, and parser mode
     );
     expect(new Set(combinations).size).toBe(hermesVariants.length);
     expect(new Set(variants.map(({ id }) => id)).size).toBe(variants.length);
+    const buildOutputs = variants.map(({ id }) =>
+        getEngineVariantBuildOutput('/repo/benchmarks/engine-comparison', id),
+    );
+    expect(new Set(buildOutputs).size).toBe(variants.length);
 });

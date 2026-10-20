@@ -14,10 +14,10 @@ jobs:
             jobs: ${{ steps.generate.outputs.jobs }}
         steps:
             - name: 🕶️ Checkout repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: 🟢 Setup Node
-              uses: actions/setup-node@v7.1.0
+              uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
               with:
                   node-version-file: .node-version
 
@@ -36,7 +36,7 @@ jobs:
         steps:
             - name: 🕶️ Checkout repository
               id: checkout-repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: 🚀 Bootstrap
               id: bootstrap
@@ -49,22 +49,37 @@ jobs:
               if: startsWith(matrix.variant, 'static-hermes-')
               uses: ./.github/common/setup-static-hermes
 
-            # The shared snapshot contains Hades. Keep malloc's separate archives and fingerprint
-            # so each variant can reuse compilation without replacing that immutable snapshot.
-            - name: 💾 Cache malloc Static Hermes build
-              id: cache-malloc-static-hermes-build
-              if: contains(matrix.variant, '-malloc-')
-              uses: actions/cache@v6.1.0
-              with:
-                  path: |
-                      .cache/hermes/build-wasip2-malloc
-                      .cache/hermes/prepared-build-malloc.json
-                  key: ${{ steps.setup-hermes.outputs.hermes-cache-key }}-benchmark-malloc-v1
-
             - name: 🏗️ Verify Static Hermes is prepared
               id: verify-static-hermes-is-prepared
               if: startsWith(matrix.variant, 'static-hermes-')
               run: pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
+
+            # The shared snapshot contains Hades. Keep malloc's separate archives and fingerprint
+            # so each variant can reuse compilation without replacing that immutable snapshot.
+            # Building malloc reconfigures the shared host build, which rewrites its compiler export,
+            # and the malloc fingerprint records that file. Restore it only after the Hades check
+            # above, which would otherwise see a changed host build and rebuild Hades.
+            - name: 💾 Restore and save malloc Static Hermes build
+              id: cache-malloc-static-hermes-build
+              if: contains(matrix.variant, '-malloc-') && steps.bootstrap.outputs.save-caches == 'true'
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: |
+                      .cache/hermes/build-wasip2-malloc
+                      .cache/hermes/prepared-build-malloc.json
+                      .cache/hermes/build-host/ImportHostCompilers.cmake
+                  key: ${{ steps.setup-hermes.outputs.hermes-cache-key }}-benchmark-malloc-v2
+
+            - name: 💾 Restore malloc Static Hermes build
+              id: restore-malloc-static-hermes-build
+              if: contains(matrix.variant, '-malloc-') && steps.bootstrap.outputs.save-caches != 'true'
+              uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: |
+                      .cache/hermes/build-wasip2-malloc
+                      .cache/hermes/prepared-build-malloc.json
+                      .cache/hermes/build-host/ImportHostCompilers.cmake
+                  key: ${{ steps.setup-hermes.outputs.hermes-cache-key }}-benchmark-malloc-v2
 
             - name: 📊 Run benchmark variant
               id: run-benchmark-variant
@@ -78,7 +93,7 @@ jobs:
             - name: 📤 Upload benchmark result
               id: upload-benchmark-result
               if: matrix.kind == 'benchmark'
-              uses: actions/upload-artifact@v7.0.2
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   name: engine-comparison-result-${{ matrix.variant }}
                   path: ${{ runner.temp }}/engine-comparison-results/${{ matrix.variant }}.json
@@ -88,7 +103,7 @@ jobs:
             - name: 📤 Upload engine comparison server logs
               id: upload-engine-comparison-server-logs
               if: failure()
-              uses: actions/upload-artifact@v7.0.2
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   retention-days: 1
                   name: engine-comparison-pumpkin-logs-${{ matrix.variant }}
@@ -102,7 +117,6 @@ jobs:
               with:
                   title: Engine comparison (${{ matrix.variant }})
                   tests: 'true'
-                  steps: ${{ toJSON(steps) }}
 
     report:
         name: 📋 Collect and display results
@@ -111,13 +125,13 @@ jobs:
         runs-on: ubuntu-26.04
         steps:
             - name: 🕶️ Checkout repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: 🚀 Bootstrap
               uses: ./.github/common/bootstrap
 
             - name: 📥 Download benchmark matrix results
-              uses: actions/download-artifact@v8.0.2
+              uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
               with:
                   pattern: engine-comparison-result-*
                   path: ${{ runner.temp }}/engine-comparison-results
@@ -130,7 +144,7 @@ jobs:
               run: pnpm --filter @pumpkin-plugins/engine-comparison benchmark:collect
 
             - name: 📤 Upload combined benchmark report
-              uses: actions/upload-artifact@v7.0.2
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   name: engine-comparison-report
                   path: ${{ runner.temp }}/engine-comparison-report
