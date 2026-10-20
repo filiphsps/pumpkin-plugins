@@ -1,25 +1,26 @@
-name: Issue form validation
+name: Issue form and label validation
 
 on:
     pull_request:
         paths:
             - '.github/ISSUE_TEMPLATE/**'
-            - '.github/scripts/issue-form-rules.mjs'
-            - '.github/scripts/issue-forms.mjs'
-            - '.github/scripts/validate-issue-forms.mjs'
+            - '.github/scripts/**'
             - '.github/workflows/issue-forms.yml'
+            - '.github/common/bootstrap/**'
             - '.github/labels.yml'
+            - '.coderabbit.yaml'
+            - 'packages/*/package.json'
     push:
         branches:
             - master
-            - main
         paths:
             - '.github/ISSUE_TEMPLATE/**'
-            - '.github/scripts/issue-form-rules.mjs'
-            - '.github/scripts/issue-forms.mjs'
-            - '.github/scripts/validate-issue-forms.mjs'
+            - '.github/scripts/**'
             - '.github/workflows/issue-forms.yml'
+            - '.github/common/bootstrap/**'
             - '.github/labels.yml'
+            - '.coderabbit.yaml'
+            - 'packages/*/package.json'
     workflow_dispatch:
 
 permissions:
@@ -28,25 +29,22 @@ permissions:
 jobs:
     validate:
         name: 📝 Validate issue forms
-        timeout-minutes: 5
+        timeout-minutes: 10
         runs-on: ubuntu-26.04
         steps:
             - name: 🕶️ Checkout repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   persist-credentials: false
 
-            - name: ⚙️ Setup pnpm
-              uses: pnpm/action-setup@v6.1.0
-
-            - name: 🔧 Setup Node.js
-              uses: actions/setup-node@v7.1.0
-              with:
-                  node-version-file: .node-version
-                  cache: pnpm
-
-            - name: 📦 Install validator dependency
-              run: pnpm install --filter pumpkin-plugins --frozen-lockfile --ignore-scripts
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
 
             - name: ✅ Validate issue form definitions
               run: node .github/scripts/validate-issue-forms.mjs
+
+            - name: 🏷️ Check label catalog and CodeRabbit label guidance
+              run: node .github/scripts/coderabbit-labels.mjs --check
+
+            - name: 🧪 Test issue intake and label scripts
+              run: node --test .github/scripts/*.test.mjs

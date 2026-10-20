@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { inspectIssueSubmission } from './issue-form-rules.mjs';
+import { loadIssueFormPolicies, triageLabel } from './issue-forms.mjs';
 
 const markerPrefix = '<!-- pumpkin-issue-intake-validator:';
-const triageLabel = 'status: needs triage';
 const needsInfoLabel = 'status: needs info';
 const upstreamPinMarker = /<!--\s*upstream-pin:/i;
 const pageSize = 100;
@@ -197,7 +197,12 @@ async function run() {
     }
 
     const labels = labelNames(issue);
-    const { form, missingFields } = inspectIssueSubmission(issue.body ?? '', labels, getManagedFormId(managedComment));
+    const { form, missingFields } = inspectIssueSubmission(
+        await loadIssueFormPolicies(),
+        issue.body ?? '',
+        labels,
+        getManagedFormId(managedComment),
+    );
     const complete = Boolean(form) && missingFields.length === 0;
     if (!complete) {
         await updateIssueLabels(apiBase, token, repositoryPath, issueNumber, labels, false);
