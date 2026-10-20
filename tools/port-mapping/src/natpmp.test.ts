@@ -21,6 +21,13 @@ describe('NAT-PMP packets', () => {
         expect(() => parseExternalAddress(reply([0, 128, 0, 99, 0, 0, 0, 1, 0, 0, 0, 0]))).toThrow('code 99');
     });
 
+    it('reads the short error replies of RFC 6886', () => {
+        expect(() => parseExternalAddress(reply([0, 128, 0, 1, 0, 0, 0, 1]))).toThrow('version');
+        expect(() => parseMapping(reply([0, 130, 0, 1, 0, 0, 0, 1]), 'tcp', 25565)).toThrow('version');
+        expect(() => parseMapping(reply([0, 129, 0, 5, 0, 0, 0, 1]), 'udp', 25565)).toThrow('does not support');
+        expect(parseMapping(reply([0, 130, 0, 0, 0, 0, 0, 1]), 'tcp', 25565)).toBeUndefined();
+    });
+
     it('reads a mapping answer for the right protocol and port only', () => {
         const answer = reply([0, 130, 0, 0, 0, 0, 0, 5, 99, 221, 99, 222, 0, 0, 14, 16]);
         expect(parseMapping(answer, 'tcp', 25565)).toEqual({ externalPort: 25566, lifetime: 3600 });

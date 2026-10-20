@@ -14,11 +14,11 @@ the router cannot use the requested external port, the mapper tries another one.
 the port is no longer needed; the router is told to close it on a later tick. During shutdown, use
 `releaseAll` and let it finish so the mapper can clean up its open ports.
 
-The mapper renews a lease halfway through its lifetime. If discovery or a mapping operation fails,
-it retries with increasing delays and searches for the router again. A machine with its own public
-address does not need a router mapping; the mapper reports that address directly. If the router's
-internet-side address is not public, such as behind carrier-grade NAT, an inbound mapping cannot
-make the server reachable.
+The mapper renews a lease halfway through its lifetime, or after five minutes if that comes first.
+If discovery or a mapping operation fails, it retries with increasing delays and searches for the
+router again. A machine with its own public address does not need a router mapping; the mapper
+reports that address directly. If the router's internet-side address is not public, such as behind
+carrier-grade NAT, an inbound mapping cannot make the server reachable.
 
 ## Network adapter and router screening
 
@@ -29,10 +29,10 @@ resulting work through `tick`, so callers can make progress without blocking a g
 
 When both protocols are enabled, the UPnP SSDP search and device-description reads finish before
 NAT-PMP discovery starts. The UPnP SOAP and NAT-PMP requests then run together, and UPnP is preferred
-when both find a router. If you provide a router-identification `screen`, the library probes the
-router's web interface first, then checks UPnP descriptions before sending protocol requests. A
-screen can refuse routers it recognizes as unsupported; routers that cannot be identified are left
-alone.
+when both find a router. If you provide a router-identification `screen`, the library checks UPnP
+descriptions before sending protocol requests. When neither protocol finds a router, it probes the
+web interface at the usual router addresses so a recognized router can be named. A screen can refuse
+routers it recognizes as unsupported; routers that cannot be identified are left alone.
 
 The package includes fake network and router implementations for deterministic tests. They let you
 exercise discovery and mapping behavior without a live router.

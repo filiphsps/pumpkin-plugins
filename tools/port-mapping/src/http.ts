@@ -36,7 +36,6 @@ export function* httpRequest(net: Network, to: Endpoint, request: HttpRequest, t
     try {
         const connectionError = `could not connect to ${formatIpv4(to.address)}:${to.port}`;
         for (;;) {
-            throwIfPastDeadline(net, deadline, connectionError);
             connection = dial.poll();
             throwIfPastDeadline(net, deadline, connectionError);
             if (connection) break;
@@ -48,7 +47,6 @@ export function* httpRequest(net: Network, to: Endpoint, request: HttpRequest, t
         let receivedLength = 0;
         const progress: ResponseProgress = { headSearchFrom: 0 };
         for (;;) {
-            throwIfPastDeadline(net, deadline, 'the response took too long');
             const chunk = connection.read(READ_CHUNK);
             throwIfPastDeadline(net, deadline, 'the response took too long');
             if (chunk === 'closed') break;
@@ -62,9 +60,7 @@ export function* httpRequest(net: Network, to: Endpoint, request: HttpRequest, t
             }
             yield;
         }
-        const response = parseResponse(received.subarray(0, receivedLength));
-        throwIfPastDeadline(net, deadline, 'the response took too long');
-        return { ...response, localAddress: connection.localAddress };
+        return { ...finish(received, receivedLength, progress), localAddress: connection.localAddress };
     } finally {
         if (connection) connection.close();
         else dial.abort();
@@ -74,16 +70,11 @@ export function* httpRequest(net: Network, to: Endpoint, request: HttpRequest, t
 function* send(net: Network, connection: Connection, bytes: Uint8Array, deadline: number): Steps<void> {
     let sent = 0;
     while (sent < bytes.length) {
-        throwIfPastDeadline(net, deadline, 'could not send the request');
         const room = Math.min(connection.writable(), bytes.length - sent);
+        if (room > 0) connection.write(bytes.subarray(sent, sent + room));
         throwIfPastDeadline(net, deadline, 'could not send the request');
-        if (room > 0) {
-            connection.write(bytes.subarray(sent, sent + room));
-            throwIfPastDeadline(net, deadline, 'could not send the request');
-            sent += room;
-        } else {
-            yield;
-        }
+        if (room > 0) sent += room;
+        else yield;
     }
 }
 
@@ -118,15 +109,19 @@ function appendResponse(buffer: Uint8Array, length: number, chunk: Uint8Array, n
     return buffer;
 }
 
-function headEnd(bytes: Uint8Array, length = bytes.length, from = 0): number {
-    for (let i = from; i + 3 < length; i++) {
-        if (bytes[i] === 13 && bytes[i + 1] === 10 && bytes[i + 2] === 13 && bytes[i + 3] === 10) return i;
+/** Where the head ends and the body starts. Lines may end in CRLF or, from sloppy devices, a bare LF. */
+function headEnd(bytes: Uint8Array, length: number, from: number): { head: number; body: number } | undefined {
+    for (let i = from; i + 1 < length; i++) {
+        if (bytes[i] !== 10) continue;
+        const head = i > 0 && bytes[i - 1] === 13 ? i - 1 : i;
+        if (bytes[i + 1] === 10) return { head, body: i + 2 };
+        if (i + 2 < length && bytes[i + 1] === 13 && bytes[i + 2] === 10) return { head, body: i + 3 };
     }
-    return -1;
+    return undefined;
 }
 
 function headers(head: string): { status: number; fields: Record<string, string> } {
-    const [statusLine = '', ...lines] = head.split('\r\n');
+    const [statusLine = '', ...lines] = head.split(/\r?\n/);
     const status = Number(/^HTTP\/1\.[01] (\d{3})/.exec(statusLine)?.[1]);
     if (!status) throw new Error('the answer is not HTTP');
     const fields: Record<string, string> = {};
@@ -138,10 +133,11 @@ function headers(head: string): { status: number; fields: Record<string, string>
 }
 
 interface ResponseProgress {
+    bodyStart?: number;
     chunked?: ChunkedProgress;
     expectedBodyLength?: number;
-    headEnd?: number;
     headSearchFrom: number;
+    status?: number;
 }
 
 interface ChunkedProgress {
@@ -150,23 +146,27 @@ interface ChunkedProgress {
     lineSearchFrom: number;
     lineStart: number;
     phase: 'size' | 'data' | 'trailer' | 'done';
+    /** Where each chunk's data starts and ends in the received bytes. */
+    pieces: [number, number][];
 }
 
 /** Whether the received prefix completes the response, advancing only over newly arrived bytes. */
 function isComplete(bytes: Uint8Array, length: number, progress: ResponseProgress): boolean {
-    if (progress.headEnd === undefined) {
+    if (progress.bodyStart === undefined) {
         const end = headEnd(bytes, length, progress.headSearchFrom);
         progress.headSearchFrom = Math.max(0, length - 3);
-        if (end === -1) return false;
-        const { fields } = headers(strFromU8(bytes.subarray(0, end), true));
-        progress.headEnd = end;
+        if (!end) return false;
+        const { status, fields } = headers(strFromU8(bytes.subarray(0, end.head), true));
+        progress.status = status;
+        progress.bodyStart = end.body;
         if (fields['transfer-encoding']?.toLowerCase() === 'chunked') {
-            const cursor = end + 4;
+            const cursor = end.body;
             progress.chunked = {
                 chunkSize: 0,
                 cursor,
                 lineSearchFrom: cursor,
                 lineStart: cursor,
+                pieces: [],
                 phase: 'size',
             };
         } else {
@@ -175,7 +175,7 @@ function isComplete(bytes: Uint8Array, length: number, progress: ResponseProgres
     }
 
     if (progress.chunked) return isChunkedComplete(bytes, length, progress.chunked);
-    const bodyLength = length - progress.headEnd - 4;
+    const bodyLength = length - progress.bodyStart;
     return progress.expectedBodyLength !== undefined && bodyLength >= progress.expectedBodyLength;
 }
 
@@ -216,6 +216,7 @@ function isChunkedComplete(bytes: Uint8Array, length: number, progress: ChunkedP
         if (bytes[delimiter] !== 13 || bytes[delimiter + 1] !== 10) {
             throw new Error('invalid chunk delimiter');
         }
+        progress.pieces.push([progress.cursor, delimiter]);
         progress.cursor = delimiter + 2;
         progress.lineStart = progress.cursor;
         progress.lineSearchFrom = progress.cursor;
@@ -231,23 +232,25 @@ function findLineEnd(bytes: Uint8Array, length: number, from: number): number {
     return -1;
 }
 
-function parseResponse(bytes: Uint8Array): { status: number; body: string } {
-    const end = headEnd(bytes);
-    if (end === -1) throw new Error('the answer is not HTTP');
-    const { status, fields } = headers(strFromU8(bytes.subarray(0, end), true));
-    let body = bytes.subarray(end + 4);
-    if (fields['transfer-encoding']?.toLowerCase() === 'chunked') {
-        const decoded = decodeChunked(body);
-        if (decoded === undefined) throw new Error('truncated chunked body');
-        body = decoded;
-    } else {
-        const expected = contentLength(fields);
-        if (expected !== undefined) {
-            if (body.length < expected) throw new Error('truncated Content-Length body');
-            body = body.subarray(0, expected);
+/** The status and body of a response read to its end, from what `isComplete` worked out on the way. */
+function finish(bytes: Uint8Array, length: number, progress: ResponseProgress): { status: number; body: string } {
+    const { bodyStart, chunked, expectedBodyLength: expected, status } = progress;
+    if (bodyStart === undefined || status === undefined) throw new Error('the answer is not HTTP');
+    if (chunked) {
+        if (chunked.phase !== 'done') throw new Error('truncated chunked body');
+        const body = new Uint8Array(chunked.pieces.reduce((total, [from, to]) => total + to - from, 0));
+        let at = 0;
+        for (const [from, to] of chunked.pieces) {
+            body.set(bytes.subarray(from, to), at);
+            at += to - from;
         }
+        return { status, body: strFromU8(body) };
     }
-    return { status, body: strFromU8(body) };
+    if (expected !== undefined && length - bodyStart < expected) throw new Error('truncated Content-Length body');
+    return {
+        status,
+        body: strFromU8(bytes.subarray(bodyStart, expected === undefined ? length : bodyStart + expected)),
+    };
 }
 
 function contentLength(fields: Record<string, string>): number | undefined {
@@ -257,45 +260,6 @@ function contentLength(fields: Record<string, string>): number | undefined {
         throw new Error('invalid Content-Length');
     }
     return Number(token);
-}
-
-/** Joins the pieces of a chunked body, or returns undefined while the last chunk hasn't arrived. */
-function decodeChunked(bytes: Uint8Array): Uint8Array | undefined {
-    const pieces: Uint8Array[] = [];
-    let decodedLength = 0;
-    let at = 0;
-    for (;;) {
-        const lineEnd = findLineEnd(bytes, bytes.length, at);
-        if (lineEnd === -1) return undefined;
-        const size = parseChunkSize(strFromU8(bytes.subarray(at, lineEnd)));
-        if (size === 0) {
-            let trailer = lineEnd + 2;
-            for (;;) {
-                const end = findLineEnd(bytes, bytes.length, trailer);
-                if (end === -1) return undefined;
-                if (end === trailer) {
-                    const decoded = new Uint8Array(decodedLength);
-                    let decodedAt = 0;
-                    for (const piece of pieces) {
-                        decoded.set(piece, decodedAt);
-                        decodedAt += piece.length;
-                    }
-                    return decoded;
-                }
-                if (!isChunkTrailer(strFromU8(bytes.subarray(trailer, end)))) throw new Error('invalid chunk trailer');
-                trailer = end + 2;
-            }
-        }
-        const start = lineEnd + 2;
-        if (size > bytes.length - start - 2) return undefined;
-        const delimiter = start + size;
-        if (bytes[delimiter] !== 13 || bytes[delimiter + 1] !== 10) {
-            throw new Error('invalid chunk delimiter');
-        }
-        pieces.push(bytes.subarray(start, delimiter));
-        decodedLength += size;
-        at = delimiter + 2;
-    }
 }
 
 function parseChunkSize(line: string): number {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PortInUseError } from './gateway.ts';
 import { FakeIgd } from './testing/fake-igd.ts';
 import { FakeNetwork, runSteps } from './testing/fake-network.ts';
 import { parseDescription, parseIdentity, parseSoapResponse, soapEnvelope, UpnpError, UpnpGateway } from './upnp.ts';
@@ -19,6 +20,17 @@ describe('parseIdentity', () => {
             name: 'FRITZ!Box 7590',
             source: 'upnp',
         });
+    });
+
+    it('keeps what a device says about itself to one short line without chat formatting', () => {
+        const hostile = `§4Router\n[12:00:00 WARN]: forged line\u2028${'x'.repeat(200)}`;
+        const xml = `<root><device><friendlyName>${hostile}</friendlyName><manufacturer>§kAVM</manufacturer></device></root>`;
+        const identity = parseIdentity(xml);
+        expect(identity?.manufacturer).toContain('AVM');
+        expect(identity?.manufacturer).not.toContain('§');
+        expect(identity?.name).toContain('Router [12:00:00 WARN]: forged line x');
+        expect(identity?.name).not.toMatch(/[§\n\u2028]/);
+        expect(identity?.name?.length).toBeLessThanOrEqual(64);
     });
 
     it('is undefined when the device says nothing about itself or the document is not a description', () => {
@@ -136,6 +148,35 @@ describe('SOAP', () => {
             ),
         ).toEqual({ externalPort: 8123, leaseSeconds: 3600 });
         expect(net.leaks).toBe(0);
+    });
+
+    it.each([
+        [718, true],
+        [729, true],
+        [724, false],
+        [727, false],
+    ])('reports UPnP error %i as a taken port: %s', (code, taken) => {
+        const igd = new FakeIgd({ failMappingWith: code });
+        const net = new FakeNetwork([igd]);
+        const gateway = new UpnpGateway(net, {
+            serviceType: 'urn:x:service:S:1',
+            controlUrl: 'http://192.168.1.1:5000/ctl/IPConn',
+        });
+        const request = {
+            protocol: 'tcp',
+            internalPort: 25565,
+            externalPort: 25565,
+            description: 'x',
+            leaseSeconds: 60,
+        } as const;
+        let error: unknown;
+        try {
+            runSteps(net, gateway.addMapping(request, [192, 168, 1, 50]));
+        } catch (err) {
+            error = err;
+        }
+        expect(error instanceof PortInUseError).toBe(taken);
+        expect(String(error)).toContain(`(${code})`);
     });
 
     it('reads response fields and turns faults into UpnpError', () => {

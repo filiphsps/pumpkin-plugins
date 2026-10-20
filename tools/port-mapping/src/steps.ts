@@ -2,12 +2,6 @@ import { type Endpoint, sameIpv4 } from './ipv4.ts';
 import type { Datagram, DatagramSocket, Network } from './network.ts';
 import type { Steps } from './task.ts';
 
-/** Waits for `ms` milliseconds. */
-export function* sleep(net: Network, ms: number): Steps<void> {
-    const until = net.now() + ms;
-    while (net.now() < until) yield;
-}
-
 /**
  * Sends a datagram and waits for an answer, sending again after each timeout.
  * @param accept - Reads a datagram that arrived, returning undefined for ones that aren't the answer.

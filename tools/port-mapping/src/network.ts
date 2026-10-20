@@ -55,4 +55,10 @@ export interface Network {
     now(): number;
     /** Opens a UDP socket bound to any free port. */
     openDatagram(): DatagramSocket;
+    /**
+     * Blocks the caller for about `ms` milliseconds without using the CPU. Only for code that is
+     * allowed to block, such as a shutdown waiting for the router. Without it such code polls in
+     * a loop.
+     */
+    pause?(ms: number): void;
 }

@@ -45,8 +45,9 @@ export function mappingRequest(
  * @throws {Error} When the router answered with an error code.
  */
 export function parseExternalAddress(data: Uint8Array): Ipv4 | undefined {
-    if (data.length !== 12 || data[0] !== 0 || data[1] !== 128) return undefined;
+    if (!isReply(data, 128)) return undefined;
     checkResult(data);
+    if (data.length !== 12) return undefined;
     return [data[8] as number, data[9] as number, data[10] as number, data[11] as number];
 }
 
@@ -60,11 +61,23 @@ export function parseMapping(
     protocol: 'tcp' | 'udp',
     internalPort: number,
 ): { externalPort: number; lifetime: number } | undefined {
-    if (data.length !== 16 || data[0] !== 0 || data[1] !== 128 + (protocol === 'udp' ? 1 : 2)) return undefined;
+    if (!isReply(data, 128 + (protocol === 'udp' ? 1 : 2))) return undefined;
+    if (data.length !== 16) {
+        checkResult(data);
+        return undefined;
+    }
     const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
     if (view.getUint16(8) !== internalPort) return undefined;
     checkResult(data);
     return { externalPort: view.getUint16(10), lifetime: view.getUint32(12) };
+}
+
+/**
+ * Whether the datagram is a version 0 reply to the opcode. Error replies may stop after the result
+ * code and epoch: RFC 6886 answers an unsupported version with 8 bytes.
+ */
+function isReply(data: Uint8Array, opcode: number): boolean {
+    return data.length >= 8 && data[0] === 0 && data[1] === opcode;
 }
 
 function checkResult(data: Uint8Array): void {

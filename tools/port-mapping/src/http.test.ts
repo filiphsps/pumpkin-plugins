@@ -40,6 +40,13 @@ describe('httpRequest', () => {
         );
     });
 
+    it('reads a response whose lines end in a bare LF', () => {
+        const { net } = scripted([text('HTTP/1.1 200 OK\nContent-Length: 2\n\nok')]);
+        expect(runSteps(net, httpRequest(net, to, get))).toMatchObject({ status: 200, body: 'ok' });
+        const closing = scripted([text('HTTP/1.1 200 OK\nServer: x\n\nall of it'), 'closed']);
+        expect(runSteps(closing.net, httpRequest(closing.net, to, get)).body).toBe('all of it');
+    });
+
     it('reads a body that ends when the peer closes', () => {
         const { net } = scripted([text('HTTP/1.1 200 OK\r\n\r\nall of it'), 'closed']);
         expect(runSteps(net, httpRequest(net, to, get)).body).toBe('all of it');
