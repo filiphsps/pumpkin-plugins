@@ -1,3 +1,21 @@
+Subject: [PATCH] Add WASI runtime compatibility layer
+
+Add OSCompatWASI.cpp with WASI versions of the oscompat memory, page
+size, thread and process helpers. Large aligned allocations use
+aligned_alloc with the size rounded up to the alignment, and queries WASI
+cannot answer return std::errc::operation_not_supported. Keep the date
+cache, sampling profiler and process statistics on paths WASI supports.
+
+Upstream: not submitted. Needed only for a WASI target.
+---
+ include/hermes/VM/JSLib/DateCache.h           |   4 +
+ .../hermes/VM/Profiler/SamplingProfilerDefs.h |   2 +-
+ lib/Support/OSCompatPosix.cpp                 |   2 +-
+ lib/Support/OSCompatWASI.cpp                  | 288 ++++++++++++++++++
+ lib/VM/Instrumentation/ProcessStats.cpp       |   2 +-
+ 5 files changed, 295 insertions(+), 3 deletions(-)
+ create mode 100644 lib/Support/OSCompatWASI.cpp
+
 diff --git a/include/hermes/VM/JSLib/DateCache.h b/include/hermes/VM/JSLib/DateCache.h
 index 404b6ab..a6867be 100644
 --- a/include/hermes/VM/JSLib/DateCache.h

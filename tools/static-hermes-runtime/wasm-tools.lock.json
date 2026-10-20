@@ -1,0 +1,29 @@
+{
+    "repository": "https://github.com/bytecodealliance/wasm-tools",
+    "assets": {
+        "darwin/arm64": {
+            "name": "wasm-tools-1.261.0-aarch64-macos.tar.gz",
+            "sha256": "94c4fc9baeada6e793f0d4adeca537633b5d93e9dc6bf718be2f478f4afe0296"
+        },
+        "darwin/x64": {
+            "name": "wasm-tools-1.261.0-x86_64-macos.tar.gz",
+            "sha256": "354a84ffeede30ba11f29bc72de76875a977cf43bf1c5bdc3e91e2313e8a854b"
+        },
+        "linux/arm64": {
+            "name": "wasm-tools-1.261.0-aarch64-linux.tar.gz",
+            "sha256": "6f19389a69e21c7dbd2a4e7ae72f807dc999988b48782c706c4102bad3e44487"
+        },
+        "linux/x64": {
+            "name": "wasm-tools-1.261.0-x86_64-linux.tar.gz",
+            "sha256": "ad62b2176037e93e1348cb65d6212d128ca9f097b63d155569f25215818ff7b1"
+        },
+        "win32/arm64": {
+            "name": "wasm-tools-1.261.0-aarch64-windows.zip",
+            "sha256": "284a9010b7d8bf35270c7814f853c4d0e87b0c9a697d696b3273e5bf07565d23"
+        },
+        "win32/x64": {
+            "name": "wasm-tools-1.261.0-x86_64-windows.zip",
+            "sha256": "250c6ee7d8073865a5cb42e1077f4246c72516af9b09d41d8a2734985ae673fd"
+        }
+    }
+}

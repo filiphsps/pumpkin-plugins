@@ -11,12 +11,18 @@ outputs:
     hermes-cache-key:
         description: Cache key to use when saving the prepared Static Hermes build
         value: ${{ steps.hermes-workspace-cache.outputs.cache-primary-key }}
+    hermes-cache-hit:
+        description: Whether the prepared Static Hermes build was restored from an exact cache key match
+        value: ${{ steps.hermes-workspace-cache.outputs.cache-hit }}
     cmake-version:
         description: Pinned CMake version for Static Hermes builds
         value: ${{ steps.versions.outputs.cmake-version }}
     ninja-version:
         description: Pinned Ninja version for Static Hermes builds
         value: ${{ steps.versions.outputs.ninja-version }}
+    rust-toolchain-version:
+        description: Pinned Rust toolchain version from toolchain-versions.json
+        value: ${{ steps.versions.outputs.rust-toolchain-version }}
 
 runs:
     using: composite
@@ -29,18 +35,20 @@ runs:
           run: |
               config="$GITHUB_WORKSPACE/$TOOLCHAIN_CONFIG_ROOT"
               wasi_sdk_version="$(jq -er '.version' "$config/wasi-sdk.lock.json")"
+              cmake_version="$(jq -er '.tools.cmake' "$config/toolchain-versions.json")"
+              ninja_version="$(jq -er '.tools.ninja' "$config/toolchain-versions.json")"
               wit_bindgen_version="$(jq -er '.tools["wit-bindgen"]' "$config/toolchain-versions.json")"
               rust_toolchain_version="$(jq -er '.tools.rust' "$config/toolchain-versions.json")"
               {
-                  echo "cmake-version=4.4.4"
-                  echo "ninja-version=1.13.2"
+                  echo "cmake-version=$cmake_version"
+                  echo "ninja-version=$ninja_version"
                   echo "wasi-sdk-version=$wasi_sdk_version"
                   echo "wit-bindgen-version=$wit_bindgen_version"
                   echo "rust-toolchain-version=$rust_toolchain_version"
               } >> "$GITHUB_OUTPUT"
 
         - name: 🐍 Setup Python for pinned host tools
-          uses: actions/setup-python@v6.1.0
+          uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
           with:
               python-version: '3.13'
 
@@ -53,7 +61,7 @@ runs:
 
         - name: 💾 Cache pinned CMake and Ninja
           id: host-tools-cache
-          uses: actions/cache@v6.1.0
+          uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
           with:
               path: ${{ runner.temp }}/host-tools
               key: static-hermes-host-tools-v1-cmake-${{ steps.versions.outputs.cmake-version }}-ninja-${{ steps.versions.outputs.ninja-version }}-python-${{ steps.host-python.outputs.version }}-${{ runner.os }}-${{ runner.arch }}
@@ -101,32 +109,26 @@ runs:
 
         - name: 💾 Cache wit-bindgen ${{ steps.versions.outputs.wit-bindgen-version }}
           id: wit-bindgen-cache
-          uses: actions/cache@v6.1.0
+          uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
           with:
               path: ${{ runner.temp }}/wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}
               key: static-hermes-wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}-${{ runner.os }}-${{ runner.arch }}-rust-${{ steps.versions.outputs.rust-toolchain-version }}
 
         - name: 🦀 Install Rust ${{ steps.versions.outputs.rust-toolchain-version }} and wit-bindgen ${{ steps.versions.outputs.wit-bindgen-version }}
+          if: steps['wit-bindgen-cache'].outputs['cache-hit'] != 'true'
           shell: bash
           env:
               RUST_TOOLCHAIN_VERSION: ${{ steps.versions.outputs.rust-toolchain-version }}
               WIT_BINDGEN_VERSION: ${{ steps.versions.outputs.wit-bindgen-version }}
           run: |
               set -euo pipefail
-              install_root="$RUNNER_TEMP/wit-bindgen-$WIT_BINDGEN_VERSION"
-              wit_bindgen="$install_root/bin/wit-bindgen"
-              if [[ "$RUNNER_OS" == 'Windows' ]]; then
-                  wit_bindgen="$wit_bindgen.exe"
-              fi
               rustup toolchain install "$RUST_TOOLCHAIN_VERSION" --profile minimal
-              if [[ ! -f "$wit_bindgen" ]]; then
-                  cargo "+$RUST_TOOLCHAIN_VERSION" install wit-bindgen-cli --version "$WIT_BINDGEN_VERSION" --locked \
-                      --root "$install_root"
-              fi
+              cargo "+$RUST_TOOLCHAIN_VERSION" install wit-bindgen-cli --version "$WIT_BINDGEN_VERSION" --locked \
+                  --root "$RUNNER_TEMP/wit-bindgen-$WIT_BINDGEN_VERSION"
 
         - name: 💾 Cache Static Hermes build
           id: hermes-workspace-cache
-          uses: actions/cache/restore@v6.1.0
+          uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
           with:
               path: ${{ github.workspace }}/.cache/hermes
               key: static-hermes-workspace-cache-v6-cmake-${{ steps.versions.outputs.cmake-version }}-ninja-${{ steps.versions.outputs.ninja-version }}-wasi-sdk-${{ steps.versions.outputs.wasi-sdk-version }}-wit-bindgen-${{ steps.versions.outputs.wit-bindgen-version }}-rust-${{ steps.versions.outputs.rust-toolchain-version }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(format('{0}/wasi-sdk.lock.json', inputs['toolchain-config-root']), format('{0}/toolchain-versions.json', inputs['toolchain-config-root'])) }}-${{ hashFiles(format('{0}/hermes-source.lock.json', inputs['toolchain-config-root']), format('{0}/hermes-patches/*.patch', inputs['toolchain-config-root']), format('{0}/cmake/**', inputs['toolchain-config-root']), format('{0}/src/hermes/**', inputs['toolchain-config-root']), format('{0}/src/cli.ts', inputs['toolchain-config-root'])) }}

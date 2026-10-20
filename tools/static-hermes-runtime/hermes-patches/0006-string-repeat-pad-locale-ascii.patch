@@ -1,3 +1,17 @@
+Subject: [PATCH] Keep ASCII results compact in repeat, pad and toLocaleString
+
+String.prototype.repeat, padStart, padEnd and
+Array.prototype.toLocaleString know when their inputs are ASCII and now
+build compact one-byte results.
+
+Performance only; results do not change.
+
+Upstream: not submitted.
+---
+ lib/VM/JSLib/Array.cpp  | 5 ++++-
+ lib/VM/JSLib/String.cpp | 8 ++++++--
+ 2 files changed, 10 insertions(+), 3 deletions(-)
+
 diff --git a/lib/VM/JSLib/Array.cpp b/lib/VM/JSLib/Array.cpp
 index 8947108..3e4ad8c 100644
 --- a/lib/VM/JSLib/Array.cpp

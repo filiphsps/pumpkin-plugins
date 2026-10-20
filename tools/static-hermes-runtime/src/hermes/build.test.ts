@@ -7,7 +7,10 @@ import {
     acquireHermesBuildLock,
     buildHermes,
     hermesBuildFingerprint,
+    hermesCMakeCommands,
+    isHermesBuildCacheCurrent,
     requiredHermesArtifacts,
+    saveHermesBuildCache,
     withHermesBuildLock,
 } from './build.ts';
 import { type HermesFileSystem, type HermesProcessRunner, hermesFileSystem } from './system.ts';
@@ -19,42 +22,51 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-it('fingerprints Hermes source modules deterministically and invalidates when one changes', () => {
+it('keeps the Hermes build fingerprint when runtime sources change but CMake inputs do not', () => {
     const { options, packageRoot } = fixture();
-    const sourceFile = path.join(packageRoot, 'src/hermes/build.ts');
-    fs.writeFileSync(sourceFile, 'export const version = 1;\n');
-
+    const sources = ['src/hermes/build.ts', 'src/hermes/toolchain-environment.ts', 'src/cli.ts'].map((filename) =>
+        path.join(packageRoot, filename),
+    );
+    for (const source of sources) fs.writeFileSync(source, 'export const version = 1;\n');
     const original = hermesBuildFingerprint(options);
+
+    for (const source of sources) fs.writeFileSync(source, 'export const version = 2;\n');
 
     expect(hermesBuildFingerprint(options)).toBe(original);
-    fs.writeFileSync(sourceFile, 'export const version = 2;\n');
+});
+
+it('keeps the Hermes build fingerprint when another GC variant rewrites the same host compiler imports', () => {
+    const { options } = fixture();
+    const imports = path.join(options.hostBuild, 'ImportHostCompilers.cmake');
+    fs.mkdirSync(options.hostBuild, { recursive: true });
+    fs.writeFileSync(imports, 'add_executable(imported-hermesc IMPORTED)\n');
+    const original = hermesBuildFingerprint(options);
+
+    // Every variant reconfigures the shared host build, and CMake rewrites this file each time.
+    const later = new Date(Date.now() + 60_000);
+    fs.utimesSync(imports, later, later);
+    expect(hermesBuildFingerprint(options)).toBe(original);
+
+    fs.writeFileSync(imports, 'add_executable(imported-shermes IMPORTED)\n');
     expect(hermesBuildFingerprint(options)).not.toBe(original);
 });
 
-it('does not invalidate the Hermes build fingerprint when a colocated test source changes', () => {
-    const { options, packageRoot } = fixture();
-    const testSources = ['build.test.ts', 'build.spec.ts'].map((filename) =>
-        path.join(packageRoot, 'src/hermes', filename),
+it('changes the Hermes build fingerprint when a CMake argument changes', () => {
+    const { options } = fixture();
+    const original = hermesBuildFingerprint(options);
+
+    expect(hermesBuildFingerprint({ ...options, environment: { STATIC_HERMES_ENABLE_JSI_EXTENSIONS: '1' } })).not.toBe(
+        original,
     );
-    for (const testSource of testSources) fs.writeFileSync(testSource, 'export const testVersion = 1;\n');
-
-    const original = hermesBuildFingerprint(options);
-
-    for (const testSource of testSources) {
-        fs.writeFileSync(testSource, 'export const testVersion = 2;\n');
-        expect(hermesBuildFingerprint(options)).toBe(original);
-    }
+    expect(hermesBuildFingerprint({ ...options, gcVariant: 'malloc' })).not.toBe(original);
 });
 
-it('includes the compiled CLI source in the Hermes build fingerprint', () => {
-    const { options, packageRoot } = fixture();
-    const cliSource = path.join(packageRoot, 'src/cli.ts');
-    fs.writeFileSync(cliSource, 'export const version = 1;\n');
+it('marks only the WASI configure step as a WASI target', () => {
+    const { options } = fixture();
+    const [hostConfigure, , wasiConfigure] = hermesCMakeCommands(options, {});
 
-    const original = hermesBuildFingerprint(options);
-    fs.writeFileSync(cliSource, 'export const version = 2;\n');
-
-    expect(hermesBuildFingerprint(options)).not.toBe(original);
+    expect(wasiConfigure).toContain('-DHERMES_WASI_TARGET=ON');
+    expect(hostConfigure?.some((argument) => argument.startsWith('-DHERMES_WASI_TARGET'))).toBe(false);
 });
 
 it('builds missing archives, reuses a current cache, and rebuilds when settings change', async () => {
@@ -96,6 +108,30 @@ it('keeps Hades and malloc build artifacts cached independently', async () => {
     expect(fs.existsSync(path.join(options.cacheRoot, 'prepared-build-hades.json'))).toBe(true);
     expect(fs.existsSync(path.join(options.cacheRoot, 'prepared-build-malloc.json'))).toBe(true);
     expect(cmakeCalls(calls)).toHaveLength(8);
+});
+
+it('builds with a read-only WASI SDK that already has the libc++ include marker', async () => {
+    const { options, calls } = fixture();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const marker = path.join(options.wasiSdk, 'share/wasi-sysroot/include/c++/v1');
+    fs.mkdirSync(marker, { recursive: true });
+    options.filesystem = readOnlyBelow(options.wasiSdk);
+
+    await buildHermes(options);
+
+    expect(cmakeCalls(calls)).toHaveLength(4);
+});
+
+it('names the missing libc++ include marker when the WASI SDK is read-only', async () => {
+    const { options, calls } = fixture();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    options.filesystem = readOnlyBelow(options.wasiSdk);
+
+    const failure = await buildHermes(options).catch((error: unknown) => error);
+
+    expect(String(failure)).toContain(path.join(options.wasiSdk, 'share/wasi-sysroot/include/c++/v1'));
+    expect(String(failure)).toMatch(/libc\+\+ headers/);
+    expect(cmakeCalls(calls)).toHaveLength(0);
 });
 
 it('releases the preparation lock when a CMake build fails', async () => {
@@ -424,6 +460,43 @@ it('omits GNU-only host compiler flags when configuring Hermes with MSVC', async
     expect(hostConfigure?.args).not.toContain('-DCMAKE_CXX_FLAGS_RELEASE=-Os -DNDEBUG -Wno-unused-template');
 });
 
+it('validates and atomically saves the build cache fingerprint', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-build-cache-'));
+    directories.push(root);
+    const artifact = path.join(root, 'hermesvm.a');
+    const state = path.join(root, 'prepared-build.json');
+    fs.writeFileSync(artifact, 'archive');
+    saveHermesBuildCache('a'.repeat(64), state, root);
+
+    expect(isHermesBuildCacheCurrent('a'.repeat(64), state, [artifact])).toBe(true);
+    expect(isHermesBuildCacheCurrent('b'.repeat(64), state, [artifact])).toBe(false);
+    fs.writeFileSync(state, '{ invalid json');
+    expect(isHermesBuildCacheCurrent('a'.repeat(64), state, [artifact])).toBe(false);
+});
+
+it('removes stale build locks, waits for live owners, and times out cleanly', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-build-cache-'));
+    directories.push(root);
+    const staleLock = path.join(root, 'stale.lock');
+    fs.writeFileSync(staleLock, JSON.stringify({ pid: 99999999, startedAt: 1 }));
+    await acquireHermesBuildLock(staleLock, { isProcessAlive: () => false, wait: async () => undefined });
+    expect(JSON.parse(fs.readFileSync(staleLock, 'utf8')).pid).toBe(process.pid);
+
+    const liveLock = path.join(root, 'live.lock');
+    fs.writeFileSync(liveLock, JSON.stringify({ pid: 2, startedAt: 1 }));
+    let time = 0;
+    await expect(
+        acquireHermesBuildLock(liveLock, {
+            timeoutMs: 250,
+            isProcessAlive: () => true,
+            now: () => time,
+            wait: async (delay) => {
+                time += delay;
+            },
+        }),
+    ).rejects.toThrow(`Timed out waiting for Hermes build lock: ${liveLock}`);
+});
+
 function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
     options: HermesBuildOptions;
     packageRoot: string;
@@ -558,6 +631,21 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
         setPlatform(platform) {
             optionsPlatform = platform;
             options.platform = platform;
+        },
+    };
+}
+
+/** Return a filesystem that refuses to create directories inside the given directory, like a read-only mount. */
+function readOnlyBelow(directory: string): HermesFileSystem {
+    return {
+        ...hermesFileSystem,
+        mkdirSync(target, mkdirOptions) {
+            if (!path.relative(directory, String(target)).startsWith('..')) {
+                throw Object.assign(new Error(`EACCES: permission denied, mkdir '${String(target)}'`), {
+                    code: 'EACCES',
+                });
+            }
+            return hermesFileSystem.mkdirSync(target, mkdirOptions);
         },
     };
 }

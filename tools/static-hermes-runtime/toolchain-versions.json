@@ -1,6 +1,8 @@
 {
     "$schema": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/toolchain-versions.schema.json",
     "tools": {
+        "cmake": "4.4.4",
+        "ninja": "1.13.2",
         "wasm-tools": "1.261.0",
         "wit-bindgen": "0.62.0",
         "rust": "1.99.0"

@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -6,9 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
 
 const runtimeDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const workspaceRoot = path.resolve(runtimeDir, '../..');
 const runtimeCli = path.join(runtimeDir, 'dist/cli.js');
-const pinnedHermesCommit = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'hermes-source.lock.json'), 'utf8')).commit;
 
 it('routes the prepare-hermes package script through the compiled CLI', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(runtimeDir, 'package.json'), 'utf8'));
@@ -64,7 +62,7 @@ it('does not apply Windows host defines to WASI Hermes builds', () => {
         'utf8',
     );
 
-    expect(patch).toContain('+if (WIN32 AND NOT CMAKE_TOOLCHAIN_FILE MATCHES "wasi-sdk-hermes-p2.cmake")');
+    expect(patch).toContain('+if (WIN32 AND NOT HERMES_WASI_TARGET)');
     expect(patch).toContain('+if (WIN32 AND NOT CMAKE_SYSTEM_NAME STREQUAL "WASI")');
     expect(patch).toContain('-else (WIN32)\n-  if (FUCHSIA OR UNIX)\n+else ()');
     expect(patch).toContain('-  endif (FUCHSIA OR UNIX)\n-endif (WIN32)\n+  endif ()\n+endif ()');
@@ -112,300 +110,212 @@ it('reuses shared LLVH Unix helpers instead of copying them into the WASI tree',
 });
 
 it('builds patched Hermes once, reuses the cache, and invalidates it when settings change', async () => {
-    const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-prepare-'));
+    const fixture = prepareFixture();
     try {
-        const fakeBin = path.join(temporaryDir, 'bin');
-        const source = path.join(temporaryDir, 'source');
-        const wasiSdk = path.join(temporaryDir, 'wasi-sdk');
-        fs.mkdirSync(fakeBin, { recursive: true });
-        fs.mkdirSync(source, { recursive: true });
-        fs.mkdirSync(path.join(wasiSdk, 'bin'), { recursive: true });
-        writeExecutable(path.join(wasiSdk, 'bin', 'wasm32-wasip2-clang'), "printf 'WASI SDK fake 34\\n'\n");
-        writeExecutable(path.join(wasiSdk, 'bin', 'wasm32-wasip2-clang++'), "printf 'WASI SDK fake 34\\n'\n");
-
-        const fakeGit = path.join(fakeBin, 'git');
-        fs.writeFileSync(
-            fakeGit,
-            `#!/bin/sh
-args=" $* "
-patch_contents=
-case "$args" in *" apply "*) patch_contents=$(cat) ;; esac
-case "$args" in
-  *" rev-parse --git-dir "*) printf '.git\\n' ;;
-  *" rev-parse HEAD "*) printf '${pinnedHermesCommit}\\n' ;;
-  *" status --porcelain"*) printf ' M cmake/modules/Hermes.cmake\\0' ;;
-  *" apply --check --reverse "*)
-    case "$patch_contents" in
-      *"include/hermes/VM/JSLib/DateCache.h"*)
-        if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 0; else exit 1; fi
-        ;;
-      *) exit 0 ;;
-    esac
-    ;;
-  *" apply --check "*) exit 0 ;;
-  *" apply "*)
-    case "$patch_contents" in
-      *"include/hermes/VM/JSLib/DateCache.h"*) touch "$STATIC_HERMES_TEST_PATCHED_0004" ;;
-    esac
-    exit 0
-    ;;
-  *) exit 0 ;;
-esac
-`,
-        );
-        fs.chmodSync(fakeGit, 0o755);
-        const fakeCmake = path.join(fakeBin, 'cmake');
-        const cmakeLog = path.join(temporaryDir, 'cmake.log');
-        fs.writeFileSync(
-            fakeCmake,
-            `#!/bin/sh
-printf "%s\\n" "$*" >> "$STATIC_HERMES_FAKE_CMAKE_LOG"
-if [ "$1" = "--version" ]; then printf 'cmake version 3.test\\n'; exit 0; fi
-if [ "$1" = "--build" ]; then
-  if [ "$4" = "shermes" ]; then
-    mkdir -p "$2/bin"
-    printf 'fake compiler' > "$2/bin/shermes"
-    printf 'fake compiler' > "$2/bin/hermesc"
-    printf 'fake host imports' > "$2/ImportHostCompilers.cmake"
-  else
-    mkdir -p "$2/lib" "$2/jsi"
-    printf 'fake archive' > "$2/lib/libhermesvm_a.a"
-    printf 'fake archive' > "$2/lib/libhermesvmlean_a.a"
-    printf 'fake archive' > "$2/jsi/libjsi.a"
-  fi
-fi
-exit 0
-`,
-        );
-        fs.chmodSync(fakeCmake, 0o755);
-
-        const environment = {
-            ...process.env,
-            PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ''}`,
-            STATIC_HERMES_CACHE_DIR: path.join(temporaryDir, 'cache'),
-            STATIC_HERMES_SOURCE_DIR: source,
-            STATIC_HERMES_HOST_BUILD_DIR: path.join(temporaryDir, 'build-host'),
-            STATIC_HERMES_WASI_BUILD_DIR: path.join(temporaryDir, 'build-wasip2'),
-            STATIC_HERMES_WASI_SDK_PATH: wasiSdk,
-            STATIC_HERMES_TEST_PATCHED_0004: path.join(temporaryDir, 'patch-0004-applied'),
-            STATIC_HERMES_FAKE_CMAKE_LOG: cmakeLog,
-        };
-        const [result, concurrent] = await Promise.all([runPrepare(environment), runPrepare(environment)]);
+        const source = path.join(fixture.root, 'source');
+        git(fixture.root, ['clone', '--quiet', fixture.upstream, source]);
+        const environment = fixture.environment({ STATIC_HERMES_SOURCE_DIR: source });
+        const [result, concurrent] = await Promise.all([
+            runPrepare(fixture, environment),
+            runPrepare(fixture, environment),
+        ]);
 
         expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
         expect(concurrent.status, concurrent.stderr).toBe(0);
         expect(result.stdout).toContain('Static Hermes is ready.');
         expect(concurrent.stdout).toContain('Static Hermes is ready.');
-        expect(fs.readFileSync(cmakeLog, 'utf8')).toContain('--build');
-        expect(fs.readFileSync(cmakeLog, 'utf8')).toContain('--target shermes hermesc --parallel');
-        expect(fs.readFileSync(cmakeLog, 'utf8')).toContain('--target hermesvm_a hermesvmlean_a jsi --parallel');
-        expect(fs.readFileSync(cmakeLog, 'utf8')).toContain(
-            '-DCMAKE_CXX_FLAGS_RELEASE=-Os -DNDEBUG -Wno-unused-template',
-        );
-        expect(fs.readFileSync(cmakeLog, 'utf8')).toContain(
+        expect(fs.readFileSync(path.join(source, 'lines.txt'), 'utf8')).toBe(patchedLines);
+        const cmakeLog = () => fs.readFileSync(fixture.cmakeLog, 'utf8');
+        expect(cmakeLog()).toContain('--target shermes hermesc --parallel');
+        expect(cmakeLog()).toContain('--target hermesvm_a hermesvmlean_a jsi --parallel');
+        expect(cmakeLog()).toContain('-DCMAKE_CXX_FLAGS_RELEASE=-Os -DNDEBUG -Wno-unused-template');
+        expect(cmakeLog()).toContain(
             '-DCMAKE_CXX_FLAGS_MINSIZEREL=-Oz -DNDEBUG -ffunction-sections -fdata-sections -Wno-unused-template',
         );
 
-        const firstBuildCount = fs
-            .readFileSync(cmakeLog, 'utf8')
-            .split('\n')
-            .filter((line) => line.startsWith('--build ')).length;
+        const buildCount = () =>
+            cmakeLog()
+                .split('\n')
+                .filter((line) => line.startsWith('--build ')).length;
+        const firstBuildCount = buildCount();
         expect(firstBuildCount).toBe(2);
 
-        const cached = await runPrepare(environment);
+        const cached = await runPrepare(fixture, environment);
         expect(cached.status, cached.stderr).toBe(0);
         expect(cached.stdout).toContain('Hermes build cache is current; skipping rebuild.');
-        expect(
-            fs
-                .readFileSync(cmakeLog, 'utf8')
-                .split('\n')
-                .filter((line) => line.startsWith('--build ')),
-        ).toHaveLength(firstBuildCount);
+        expect(buildCount()).toBe(firstBuildCount);
 
-        const changedSettings = await runPrepare({ ...environment, STATIC_HERMES_ENABLE_JSI_EXTENSIONS: '1' });
+        const changedSettings = await runPrepare(fixture, { ...environment, STATIC_HERMES_ENABLE_JSI_EXTENSIONS: '1' });
         expect(changedSettings.status, changedSettings.stderr).toBe(0);
         expect(changedSettings.stdout).not.toContain('Hermes build cache is current; skipping rebuild.');
-        expect(fs.readFileSync(cmakeLog, 'utf8')).toContain('-DHERMES_ENABLE_CORE_EXTENSIONS=ON');
-        expect(
-            fs
-                .readFileSync(cmakeLog, 'utf8')
-                .split('\n')
-                .filter((line) => line.startsWith('--build ')),
-        ).toHaveLength(firstBuildCount * 2);
+        expect(cmakeLog()).toContain('-DHERMES_ENABLE_CORE_EXTENSIONS=ON');
+        expect(buildCount()).toBe(firstBuildCount * 2);
     } finally {
-        fs.rmSync(temporaryDir, { recursive: true, force: true });
+        fixture.remove();
     }
-}, 20_000);
+}, 30_000);
 
-it('rebuilds a stale source cache when a managed Hermes patch no longer applies', () => {
-    const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-stale-cache-'));
+it('rebuilds a stale source cache when a managed Hermes patch no longer applies', async () => {
+    const fixture = prepareFixture();
     try {
-        const fakeBin = path.join(temporaryDir, 'bin');
-        const source = path.join(temporaryDir, 'source');
-        const wasiSdk = path.join(temporaryDir, 'wasi-sdk');
-        fs.mkdirSync(fakeBin, { recursive: true });
-        fs.mkdirSync(source, { recursive: true });
-        fs.mkdirSync(path.join(wasiSdk, 'bin'), { recursive: true });
-        writeExecutable(path.join(wasiSdk, 'bin', 'wasm32-wasip2-clang'), "printf 'WASI SDK fake 34\\n'\n");
-        writeExecutable(path.join(wasiSdk, 'bin', 'wasm32-wasip2-clang++'), "printf 'WASI SDK fake 34\\n'\n");
+        const source = path.join(fixture.cache, 'source');
+        git(fixture.root, ['clone', '--quiet', fixture.upstream, source]);
+        fs.writeFileSync(path.join(source, 'lines.txt'), 'a\nb\nold patch\nd\n');
 
-        const fakeGit = path.join(fakeBin, 'git');
-        fs.writeFileSync(
-            fakeGit,
-            `#!/bin/sh
-args=" $* "
-repo=
-if [ "$1" = "-C" ]; then repo="$2"; fi
-patch_contents=
-case "$args" in *" apply "*) patch_contents=$(cat) ;; esac
-case "$args" in
-  *" clone "*)
-    target=
-    for arg do target=$arg; done
-    mkdir -p "$target/.git"
-    case "$target" in *source.rebuild-*) touch "$STATIC_HERMES_TEST_FRESH_SOURCE" ;; esac
-    ;;
-  *" rev-parse --git-dir "*) printf '.git\\n' ;;
-  *" rev-parse HEAD "*) printf '${pinnedHermesCommit}\\n' ;;
-  *" status --porcelain"*)
-    case "$repo" in *source.rebuild-*) exit 0 ;; esac
-    printf ' M cmake/modules/Hermes.cmake\\0'
-    ;;
-  *" apply --check --reverse "*)
-    case "$patch_contents" in
-      *"include/hermes/VM/JSLib/DateCache.h"*)
-        if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 0; fi
-        case "$repo" in *source.rebuild-*) exit 1 ;; esac
-        exit 1
-        ;;
-      *)
-        case "$repo" in *source.rebuild-*) exit 1 ;; esac
-        exit 0
-        ;;
-    esac
-    ;;
-  *" apply --check "*)
-    case "$patch_contents" in
-      *"include/hermes/VM/JSLib/DateCache.h"*)
-        if [ -f "$STATIC_HERMES_TEST_PATCHED_0004" ]; then exit 1; fi
-        if [ -f "$STATIC_HERMES_TEST_FRESH_SOURCE" ]; then exit 0; fi
-        exit 1
-        ;;
-      *) exit 0 ;;
-    esac
-    ;;
-  *" apply "*)
-    case "$patch_contents" in
-      *"include/hermes/VM/JSLib/DateCache.h"*) touch "$STATIC_HERMES_TEST_PATCHED_0004" ;;
-    esac
-    exit 0
-    ;;
-  *) exit 0 ;;
-esac
-`,
-        );
-        fs.chmodSync(fakeGit, 0o755);
-        const fakeCmake = path.join(fakeBin, 'cmake');
-        const cmakeLog = path.join(temporaryDir, 'cmake.log');
-        fs.writeFileSync(fakeCmake, '#!/bin/sh\nprintf "%s\\n" "$*" >> "$STATIC_HERMES_FAKE_CMAKE_LOG"\nexit 0\n');
-        fs.chmodSync(fakeCmake, 0o755);
-
-        const result = spawnSync(process.execPath, [runtimeCli, 'hermes', 'prepare'], {
-            cwd: workspaceRoot,
-            encoding: 'utf8',
-            env: {
-                ...process.env,
-                PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ''}`,
-                STATIC_HERMES_CACHE_DIR: path.join(temporaryDir, 'cache'),
-                STATIC_HERMES_SOURCE_DIR: source,
-                STATIC_HERMES_HOST_BUILD_DIR: path.join(temporaryDir, 'build-host'),
-                STATIC_HERMES_WASI_BUILD_DIR: path.join(temporaryDir, 'build-wasip2'),
-                STATIC_HERMES_WASI_SDK_PATH: wasiSdk,
-                STATIC_HERMES_TEST_PATCHED_0004: path.join(temporaryDir, 'patch-0004-applied'),
-                STATIC_HERMES_TEST_FRESH_SOURCE: path.join(temporaryDir, 'fresh-source'),
-                STATIC_HERMES_FAKE_CMAKE_LOG: cmakeLog,
-            },
-        });
+        const result = await runPrepare(fixture, fixture.environment());
 
         expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
         expect(result.stdout).toContain('Rebuilt stale Hermes source cache');
-        expect(fs.existsSync(source)).toBe(true);
-        expect(fs.readdirSync(temporaryDir).some((name) => name.startsWith('source.rebuild-'))).toBe(false);
-        expect(fs.readFileSync(cmakeLog, 'utf8')).toContain('--build');
+        expect(fs.readFileSync(path.join(source, 'lines.txt'), 'utf8')).toBe(patchedLines);
+        expect(fs.readdirSync(fixture.cache).some((name) => name.startsWith('source.'))).toBe(false);
+        expect(fs.readFileSync(fixture.cmakeLog, 'utf8')).toContain('--build');
     } finally {
-        fs.rmSync(temporaryDir, { recursive: true, force: true });
+        fixture.remove();
     }
 }, 30_000);
 
-it('refreshes the managed Hermes checkout when its pinned commit changes', () => {
-    const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-pin-refresh-'));
+it('refreshes the managed Hermes checkout when its pinned commit changes', async () => {
+    const fixture = prepareFixture();
     try {
-        const fakeBin = path.join(temporaryDir, 'bin');
-        const cache = path.join(temporaryDir, 'cache');
-        const source = path.join(cache, 'source');
-        const wasiSdk = path.join(temporaryDir, 'wasi-sdk');
-        fs.mkdirSync(fakeBin, { recursive: true });
-        fs.mkdirSync(source, { recursive: true });
-        writeExecutable(path.join(wasiSdk, 'bin/wasm32-wasip2-clang'), "printf 'WASI SDK fake 34\\n'\n");
-        writeExecutable(path.join(wasiSdk, 'bin/wasm32-wasip2-clang++'), "printf 'WASI SDK fake 34\\n'\n");
+        const source = path.join(fixture.cache, 'source');
+        git(fixture.root, ['clone', '--quiet', fixture.upstream, source]);
+        git(source, ['checkout', '--quiet', '--detach', fixture.oldCommit]);
 
-        const fakeGit = path.join(fakeBin, 'git');
-        fs.writeFileSync(
-            fakeGit,
-            `#!/bin/sh
-args=" $* "
-repo=
-if [ "$1" = "-C" ]; then repo="$2"; fi
-case "$args" in
-  *" clone "*)
-    target=
-    for arg do target=$arg; done
-    mkdir -p "$target/.git"
-    touch "$target/.hermes-pinned"
-    ;;
-  *" rev-parse --git-dir "*) printf '.git\\n' ;;
-  *" rev-parse HEAD "*)
-    if [ -f "$repo/.hermes-pinned" ]; then
-      printf '${pinnedHermesCommit}\\n'
-    else
-      printf '1111111111111111111111111111111111111111\\n'
-    fi
-    ;;
-  *" apply --check "*) exit 0 ;;
-  *) exit 0 ;;
-esac
-`,
-        );
-        fs.chmodSync(fakeGit, 0o755);
-        const fakeCmake = path.join(fakeBin, 'cmake');
-        fs.writeFileSync(
-            fakeCmake,
-            `#!/bin/sh
-if [ "$1" = "--version" ]; then printf 'cmake version 3.test\\n'; fi
+        const result = await runPrepare(fixture, fixture.environment());
+
+        expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+        expect(result.stdout).toContain('Rebuilt stale Hermes source cache from the pinned commit.');
+        expect(git(source, ['rev-parse', 'HEAD']).trim()).toBe(fixture.commit);
+        expect(fs.readFileSync(path.join(source, 'lines.txt'), 'utf8')).toBe(patchedLines);
+        expect(fs.readdirSync(fixture.cache).some((name) => name.startsWith('source.'))).toBe(false);
+    } finally {
+        fixture.remove();
+    }
+}, 30_000);
+
+const fixtureRepository = 'https://hermes-fixture.invalid/hermes.git';
+const patchedLines = 'a\nB\nc\nd\n';
+
+/**
+ * Create a runtime package copy with a fixture pin and patch, a local upstream Git repository that the pin's HTTPS
+ * URL is rewritten to, a fake WASI SDK, and a fake CMake that records its arguments.
+ */
+function prepareFixture() {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-prepare-'));
+    const packageRoot = path.join(root, 'runtime');
+    fs.mkdirSync(packageRoot);
+    for (const entry of [
+        'dist',
+        'cmake',
+        'package.json',
+        'toolchain-versions.json',
+        'wasi-sdk.lock.json',
+        'wasm-tools.lock.json',
+    ]) {
+        fs.cpSync(path.join(runtimeDir, entry), path.join(packageRoot, entry), { recursive: true });
+    }
+    fs.symlinkSync(path.join(runtimeDir, 'node_modules'), path.join(packageRoot, 'node_modules'), 'junction');
+
+    const working = path.join(root, 'working');
+    fs.mkdirSync(working);
+    git(working, ['init', '--quiet']);
+    fs.writeFileSync(path.join(working, 'lines.txt'), 'a\nb\nc\nd\n');
+    git(working, ['add', '.']);
+    git(working, ['commit', '--quiet', '-m', 'old pinned source']);
+    const oldCommit = git(working, ['rev-parse', 'HEAD']).trim();
+    fs.writeFileSync(path.join(working, 'other.txt'), 'other\n');
+    git(working, ['add', '.']);
+    git(working, ['commit', '--quiet', '-m', 'pinned source']);
+    const commit = git(working, ['rev-parse', 'HEAD']).trim();
+    fs.writeFileSync(path.join(working, 'lines.txt'), patchedLines);
+    fs.mkdirSync(path.join(packageRoot, 'hermes-patches'));
+    fs.writeFileSync(path.join(packageRoot, 'hermes-patches/0001-fixture.patch'), git(working, ['diff']));
+    fs.writeFileSync(
+        path.join(packageRoot, 'hermes-source.lock.json'),
+        JSON.stringify({ repository: fixtureRepository, branch: 'main', commit }),
+    );
+    const upstream = path.join(root, 'upstream.git');
+    git(root, ['clone', '--quiet', '--bare', working, upstream]);
+    const gitConfig = path.join(root, 'gitconfig');
+    fs.writeFileSync(
+        gitConfig,
+        `[url "${upstream.replaceAll('\\', '/')}"]\n\tinsteadOf = ${fixtureRepository}\n[user]\n\tname = Hermes test\n\temail = hermes-test@example.com\n[commit]\n\tgpgsign = false\n`,
+    );
+
+    const fakeBin = path.join(root, 'bin');
+    const wasiSdk = path.join(root, 'wasi-sdk');
+    writeExecutable(path.join(wasiSdk, 'bin', 'wasm32-wasip2-clang'), "printf 'WASI SDK fake 34\\n'\n");
+    writeExecutable(path.join(wasiSdk, 'bin', 'wasm32-wasip2-clang++'), "printf 'WASI SDK fake 34\\n'\n");
+    writeExecutable(
+        path.join(fakeBin, 'cmake'),
+        `printf "%s\\n" "$*" >> "$STATIC_HERMES_FAKE_CMAKE_LOG"
+case " $* " in *" --version "*) printf 'cmake version 3.test\\n'; exit 0 ;; esac
+build=
+previous=
+for arg do
+  if [ "$previous" = "--build" ]; then build=$arg; fi
+  previous=$arg
+done
+[ -n "$build" ] || exit 0
+case " $* " in *" shermes "*)
+  mkdir -p "$build/bin"
+  printf 'fake compiler' > "$build/bin/shermes"
+  printf 'fake compiler' > "$build/bin/hermesc"
+  printf 'fake host imports' > "$build/ImportHostCompilers.cmake"
+;; esac
+case " $* " in *" hermesvm_a "*)
+  mkdir -p "$build/lib" "$build/jsi"
+  printf 'fake archive' > "$build/lib/libhermesvm_a.a"
+  printf 'fake archive' > "$build/lib/libhermesvmlean_a.a"
+  printf 'fake archive' > "$build/jsi/libjsi.a"
+;; esac
 exit 0
 `,
-        );
-        fs.chmodSync(fakeCmake, 0o755);
+    );
 
-        const result = spawnSync(process.execPath, [runtimeCli, 'hermes', 'prepare'], {
-            cwd: workspaceRoot,
-            encoding: 'utf8',
-            env: {
+    const cache = path.join(root, 'cache');
+    const cmakeLog = path.join(root, 'cmake.log');
+    return {
+        root,
+        packageRoot,
+        upstream,
+        cache,
+        cmakeLog,
+        commit,
+        oldCommit,
+        environment(overrides = {}) {
+            return {
                 ...process.env,
+                GIT_CONFIG_GLOBAL: gitConfig,
+                GIT_CONFIG_NOSYSTEM: '1',
                 PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ''}`,
                 STATIC_HERMES_CACHE_DIR: cache,
+                STATIC_HERMES_HOST_BUILD_DIR: path.join(root, 'build-host'),
+                STATIC_HERMES_WASI_BUILD_DIR: path.join(root, 'build-wasip2'),
                 STATIC_HERMES_WASI_SDK_PATH: wasiSdk,
-            },
-        });
+                STATIC_HERMES_FAKE_CMAKE_LOG: cmakeLog,
+                ...overrides,
+            };
+        },
+        remove() {
+            fs.rmSync(root, { recursive: true, force: true });
+        },
+    };
+}
 
-        expect(result.status, result.stderr).toBe(0);
-        expect(result.stdout).toContain('Rebuilt stale Hermes source cache from the pinned commit.');
-        expect(fs.existsSync(path.join(source, '.hermes-pinned'))).toBe(true);
-        expect(fs.readdirSync(cache).some((name) => name.startsWith('source.rebuild-'))).toBe(false);
-    } finally {
-        fs.rmSync(temporaryDir, { recursive: true, force: true });
-    }
-}, 30_000);
+function git(cwd, args) {
+    return execFileSync('git', ['-c', 'commit.gpgsign=false', '-C', cwd, ...args], {
+        encoding: 'utf8',
+        env: {
+            ...process.env,
+            GIT_AUTHOR_NAME: 'Hermes test',
+            GIT_AUTHOR_EMAIL: 'hermes-test@example.com',
+            GIT_COMMITTER_NAME: 'Hermes test',
+            GIT_COMMITTER_EMAIL: 'hermes-test@example.com',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+    });
+}
 
 function writeExecutable(file, body = 'exit 0\n') {
     fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -413,9 +323,12 @@ function writeExecutable(file, body = 'exit 0\n') {
     fs.chmodSync(file, 0o755);
 }
 
-function runPrepare(env) {
+function runPrepare(fixture, env) {
     return new Promise((resolve, reject) => {
-        const child = spawn(process.execPath, [runtimeCli, 'hermes', 'prepare'], { cwd: workspaceRoot, env });
+        const child = spawn(process.execPath, [path.join(fixture.packageRoot, 'dist/cli.js'), 'hermes', 'prepare'], {
+            cwd: fixture.root,
+            env,
+        });
         let stdout = '';
         let stderr = '';
         child.stdout.setEncoding('utf8').on('data', (chunk) => {

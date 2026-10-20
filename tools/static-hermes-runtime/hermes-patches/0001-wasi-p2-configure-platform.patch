@@ -1,14 +1,36 @@
+Subject: [PATCH] Configure CMake for a WASI preview 2 target
+
+Hermes picks its platform from WIN32, UNIX and FUCHSIA, none of which
+describe WASI. Treat WASI as a Unix-like LLVH target without threads or
+link version scripts, add OSCompatWASI.cpp to the support library, and
+keep _WINDOWS out of WASI builds on Windows hosts. That last check runs
+before project(), so it reads HERMES_WASI_TARGET, which the runtime's
+build passes, instead of CMAKE_SYSTEM_NAME.
+
+Upstream: not submitted. Hermes has no WASI target.
+---
+ CMakeLists.txt               |  3 ++-
+ cmake/modules/Hermes.cmake   | 18 ++++++++++++------
+ external/llvh/CMakeLists.txt |  6 +++++-
+ lib/Support/CMakeLists.txt   |  1 +
+ 4 files changed, 20 insertions(+), 8 deletions(-)
+
 diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 66cb429..87235fd 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -62,3 +62,3 @@
+@@ -59,7 +59,8 @@ if(HERMES_APPLE_TARGET_PLATFORM MATCHES "catalyst")
+   set(THREADS_PREFER_PTHREAD_FLAG ON)
+ endif()
+
 -if (WIN32)
-+if (WIN32 AND NOT CMAKE_TOOLCHAIN_FILE MATCHES "wasi-sdk-hermes-p2.cmake")
++# This runs before project(), so CMAKE_SYSTEM_NAME is not set yet; the WASI build passes HERMES_WASI_TARGET=ON.
++if (WIN32 AND NOT HERMES_WASI_TARGET)
  add_definitions(-D_WINDOWS)
  endif()
 
 diff --git a/cmake/modules/Hermes.cmake b/cmake/modules/Hermes.cmake
-index 466b01d98..0820cdc1a 100644
+index 466b01d..0820cdc 100644
 --- a/cmake/modules/Hermes.cmake
 +++ b/cmake/modules/Hermes.cmake
 @@ -39,7 +39,7 @@ elseif (MINGW) # FIXME: Also cygwin?
@@ -51,9 +73,8 @@ index 466b01d98..0820cdc1a 100644
  
  # Set C++ exception handling and RTTI flags for a target.
  # Uses generator expressions to apply flags only to C++ source files,
-
 diff --git a/external/llvh/CMakeLists.txt b/external/llvh/CMakeLists.txt
-index 5944b9c0e..6e4fc052f 100644
+index 5944b9c..6e4fc05 100644
 --- a/external/llvh/CMakeLists.txt
 +++ b/external/llvh/CMakeLists.txt
 @@ -11,7 +11,11 @@ set(PACKAGE_NAME "LLVH")
@@ -70,7 +91,7 @@ index 5944b9c0e..6e4fc052f 100644
    set(LLVM_ENABLE_REVERSE_ITERATION 1)
  endif ()
 diff --git a/lib/Support/CMakeLists.txt b/lib/Support/CMakeLists.txt
-index ea2f227bf..a6421d633 100644
+index ea2f227..a6421d6 100644
 --- a/lib/Support/CMakeLists.txt
 +++ b/lib/Support/CMakeLists.txt
 @@ -35,6 +35,7 @@ add_hermes_library(hermesSupport

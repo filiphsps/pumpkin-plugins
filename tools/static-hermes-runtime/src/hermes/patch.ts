@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { parseHermesGitStatusPaths } from './git-status.ts';
 import { type HermesFileSystem, type HermesProcessRunner, hermesFileSystem, hermesProcess } from './system.ts';
@@ -74,11 +76,28 @@ export function affectedHermesPaths(patches: readonly HermesPatch[]): string[] {
     return [...new Set(patches.flatMap(({ affectedPaths }) => affectedPaths))];
 }
 
+/** Raised when the checkout matches no prefix of the patch series, or a patch does not apply in sequence. */
+export class HermesPatchConflictError extends Error {
+    /** Absolute path of the first patch that could not be applied. */
+    readonly patch: string;
+
+    constructor(patch: string) {
+        super(`Hermes patch does not apply to the pinned source (conflict or partial application): ${patch}`);
+        this.name = 'HermesPatchConflictError';
+        this.patch = patch;
+    }
+}
+
 /**
  * Apply each unapplied patch in numeric order, rejecting unrelated source edits or conflicts.
  *
+ * @remarks
+ * Patches are checked in sequence, so a patch may depend on context added by an earlier one. A checkout that already
+ * holds the first few patches gets only the rest.
+ *
  * @param options - Source checkout, validated patch series, and optional commit and test dependencies.
- * @throws {Error} If the checkout has the wrong commit, unrelated edits, or a patch conflict.
+ * @throws {HermesPatchConflictError} If the managed files match no applied prefix or a patch does not apply.
+ * @throws {Error} If the checkout has the wrong commit or unrelated edits.
  */
 export function applyHermesPatchSeries(options: ApplyHermesPatchesOptions): void {
     const runner = options.process ?? hermesProcess;
@@ -90,24 +109,16 @@ export function applyHermesPatchSeries(options: ApplyHermesPatchesOptions): void
     }
     ensurePatchOnlyChanges(options.source, options.patches, runner);
     const filesystem = options.filesystem ?? hermesFileSystem;
-    const states = options.patches.map((patch) => {
-        const contents = readPatchContents(filesystem, patch.filename);
-        return {
-            patch,
-            contents,
-            applied: canApply(runner, options.source, contents, true),
-            applicable: canApply(runner, options.source, contents, false),
-        };
-    });
-    for (const { patch, contents, applied, applicable } of states) {
-        if (applied) continue;
-        if (!applicable) {
-            throw new Error(
-                `Hermes patch does not apply to the pinned source (conflict or partial application): ${patch.filename}`,
-            );
+    const contents = options.patches.map((patch) => readPatchContents(filesystem, patch.filename));
+    const applied = appliedPatchCount(options.source, options.patches, contents, runner);
+    if (applied < 0) throw new HermesPatchConflictError(options.patches[0]?.filename ?? options.source);
+    options.patches.slice(applied).forEach((patch, index) => {
+        try {
+            runner.run('git', ['-C', options.source, 'apply'], { input: contents[applied + index], stdio: 'pipe' });
+        } catch {
+            throw new HermesPatchConflictError(patch.filename);
         }
-        runner.run('git', ['-C', options.source, 'apply'], { input: contents, stdio: 'pipe' });
-    }
+    });
 }
 
 /**
@@ -115,7 +126,7 @@ export function applyHermesPatchSeries(options: ApplyHermesPatchesOptions): void
  *
  * @param source - Hermes source checkout to inspect.
  * @param patches - Validated patch series that must already be applied.
- * @param runner - Git command runner used to check each patch in reverse.
+ * @param runner - Git command runner used to replay the series on a temporary index.
  * @param filesystem - File system used to read patch contents.
  * @throws {Error} If any patch is missing from the checkout.
  */
@@ -125,12 +136,10 @@ export function verifyHermesPatchSeriesApplied(
     runner: HermesProcessRunner = hermesProcess,
     filesystem: HermesFileSystem = hermesFileSystem,
 ): void {
-    for (const patch of patches) {
-        const contents = readPatchContents(filesystem, patch.filename);
-        if (!canApply(runner, source, contents, true)) {
-            throw new Error(`Hermes patch is not applied: ${patch.filename}; run hermes patch first`);
-        }
-    }
+    const contents = patches.map((patch) => readPatchContents(filesystem, patch.filename));
+    const applied = appliedPatchCount(source, patches, contents, runner);
+    const missing = patches[Math.max(applied, 0)];
+    if (missing) throw new Error(`Hermes patch is not applied: ${missing.filename}; run hermes patch first`);
 }
 
 /**
@@ -164,15 +173,47 @@ function patchPaths(contents: string): string[] {
         .filter((filename): filename is string => filename !== undefined && filename !== '/dev/null');
 }
 
-function canApply(runner: HermesProcessRunner, source: string, contents: string, reverse: boolean): boolean {
+/**
+ * Count how many leading patches the checkout holds by replaying the series on a temporary index.
+ *
+ * The index starts at HEAD and takes one patch at a time. After each step the managed files in the working tree are
+ * compared with it, so overlapping patches are checked in the same order they are applied.
+ *
+ * @returns The length of the longest matching prefix, or -1 when the managed files match none.
+ */
+function appliedPatchCount(
+    source: string,
+    patches: readonly HermesPatch[],
+    contents: readonly string[],
+    runner: HermesProcessRunner,
+): number {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-patch-index-'));
+    const env = { ...process.env, GIT_INDEX_FILE: path.join(directory, 'index') };
+    const paths = affectedHermesPaths(patches);
+    const git = (args: string[], input?: string): string =>
+        runner.output('git', ['-C', source, ...args], { env, input, stdio: 'pipe' });
+    const matches = (): boolean => {
+        try {
+            git(['diff', '--quiet', '--', ...paths]);
+        } catch {
+            return false;
+        }
+        return git(['ls-files', '-z', '--others', '--', ...paths]) === '';
+    };
     try {
-        runner.run('git', ['-C', source, 'apply', '--check', ...(reverse ? ['--reverse'] : [])], {
-            input: contents,
-            stdio: 'pipe',
-        });
-        return true;
-    } catch {
-        return false;
+        git(['read-tree', 'HEAD']);
+        let applied = matches() ? 0 : -1;
+        for (const [index, patch] of contents.entries()) {
+            try {
+                git(['apply', '--cached'], patch);
+            } catch {
+                break;
+            }
+            if (matches()) applied = index + 1;
+        }
+        return applied;
+    } finally {
+        fs.rmSync(directory, { recursive: true, force: true });
     }
 }
 
