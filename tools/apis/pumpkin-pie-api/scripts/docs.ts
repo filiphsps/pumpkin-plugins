@@ -1,7 +1,7 @@
 import { code, table } from '@pumpkin-plugins/docs/markdown';
 import type { LIMITS } from '../src/protocol.ts';
 import type { SESSION_TIMING } from '../src/session-timing.ts';
-import type { PIE_RELEASE } from '../test/provider.ts';
+import type { PIE_RELEASE } from '../test/release.ts';
 
 interface Metadata {
     license: string;

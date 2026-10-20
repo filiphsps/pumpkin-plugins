@@ -40,8 +40,10 @@ export class PieSession {
     private stopped = false;
     private reachable = false;
     private readonly interval: number;
+    private readonly options: SessionOptions;
     /** One session per calling plugin; no global timers or watcher per line. */
-    constructor(private readonly options: SessionOptions) {
+    constructor(options: SessionOptions) {
+        this.options = options;
         this.interval = options.pingIntervalMs ?? SESSION_TIMING.defaultPingMs;
         if (
             !Number.isFinite(this.interval) ||

@@ -5,7 +5,7 @@
 [![npm license](https://img.shields.io/npm/l/%40pumpkin-plugins%2Fpumpkin-pie-api)](https://www.npmjs.com/package/@pumpkin-plugins/pumpkin-pie-api)
 
 <!-- docs:begin overview -->
-<!-- Generated from protocol/session constants, test/provider.ts and package.json. Run `pnpm readme`. -->
+<!-- Generated from protocol/session constants, test/release.ts and package.json. Run `pnpm readme`. -->
 
 Host-independent TypeScript client, expansion router and recovery session for
 [PumpkinPIE (EXTERNAL)](https://github.com/Rennex07/PumpkinPIE) protocol 0.
