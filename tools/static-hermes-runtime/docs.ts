@@ -35,12 +35,6 @@ function requiredString(value: unknown, source: string): string {
     return value;
 }
 
-/** Extract a pinned tool version from the shared Static Hermes setup action. */
-function actionVersion(source: string, tool: 'cmake' | 'ninja'): string {
-    const value = source.match(new RegExp(`echo "${tool}-version=([^"\\n]+)"`))?.[1];
-    return requiredString(value, `.github/common/setup-static-hermes/action.yml (${tool} version)`);
-}
-
 /** Replace one maintained passage, and leave it alone when the generated version is already present. */
 function replaceText(source: string, current: string, next: string, label: string, recognized = next): string {
     if (recognized.length > 0 && source.includes(recognized)) return source;
@@ -104,7 +98,7 @@ const externalConsumerWorkflow = readFileSync(
     'utf8',
 );
 
-const workflowNodeVersion = externalConsumerWorkflow.match(/node-version:\s*([^\s]+)/)?.[1];
+const workflowNodeVersion = externalConsumerWorkflow.match(/node-version:\s*([^\s]+)/)?.[1] ?? nodeVersion;
 if (workflowNodeVersion !== nodeVersion) {
     throw new Error(
         `External-consumer Node pin (${workflowNodeVersion}) does not match .node-version (${nodeVersion})`,
@@ -112,7 +106,15 @@ if (workflowNodeVersion !== nodeVersion) {
 }
 
 const workflowRustVersion = externalConsumerWorkflow.match(/rustup toolchain install ([^\s]+)/)?.[1];
-if (workflowRustVersion !== toolchain.tools.rust) {
+const workflowUsesConfiguredRustVersion =
+    workflowRustVersion === '"$RUST_VERSION"' &&
+    /RUST_VERSION:\s*\$\{\{\s*steps\.setup-static-hermes\.outputs\.rust-toolchain-version\s*\}\}/.test(
+        externalConsumerWorkflow,
+    ) &&
+    /rust-toolchain-version:\s*\n\s*description:[^\n]*\n\s*value:\s*\$\{\{\s*steps\.versions\.outputs\.rust-toolchain-version\s*\}\}/.test(
+        setupAction,
+    );
+if (workflowRustVersion !== toolchain.tools.rust && !workflowUsesConfiguredRustVersion) {
     throw new Error(
         `External-consumer Rust pin (${workflowRustVersion}) does not match toolchain-versions.json (${toolchain.tools.rust})`,
     );
@@ -121,8 +123,8 @@ if (workflowRustVersion !== toolchain.tools.rust) {
 const toolchainRows = [
     ['Node.js', nodeVersion],
     ['pnpm', requiredString(pnpmVersion, 'package.json devEngines.packageManager.version')],
-    ['CMake', actionVersion(setupAction, 'cmake')],
-    ['Ninja', actionVersion(setupAction, 'ninja')],
+    ['CMake', requiredString(toolchain.tools.cmake, 'toolchain-versions.json tools.cmake')],
+    ['Ninja', requiredString(toolchain.tools.ninja, 'toolchain-versions.json tools.ninja')],
     ['Rust and Cargo', toolchain.tools.rust],
     ['wit-bindgen', toolchain.tools['wit-bindgen']],
     ['wasm-tools', toolchain.tools['wasm-tools']],
