@@ -23,36 +23,6 @@ describe('waypoint model', () => {
         });
     });
 
-    it('exposes the metadata defaults used for waypoint fields omitted at creation', async () => {
-        const defaults = Reflect.get(await import('./model.ts'), 'WAYPOINT_METADATA_DEFAULTS') as unknown;
-        expect(defaults).toEqual({
-            label: undefined,
-            description: undefined,
-            color: '#FFFFFF',
-            icon: undefined,
-            visibilityRange: undefined,
-            enabled: true,
-            access: { mode: 'restricted', grants: [] },
-        });
-        if (typeof defaults !== 'object' || defaults === null) return;
-
-        const waypoint = createWaypoint({
-            id,
-            name: 'Home',
-            dimension: 'world',
-            position: { x: 1, y: 2, z: 3 },
-        });
-        expect({
-            label: waypoint.label,
-            description: waypoint.description,
-            color: waypoint.color,
-            icon: waypoint.icon,
-            visibilityRange: waypoint.visibilityRange,
-            enabled: waypoint.enabled,
-            access: waypoint.access,
-        }).toEqual(defaults);
-    });
-
     it.each([
         ['label', { label: null }],
         ['description', { description: null }],
@@ -85,10 +55,17 @@ describe('waypoint model', () => {
         expect(() => normalizeWaypointName(name)).toThrow();
     });
 
+    it('accepts the outermost teleportable position', () => {
+        const position = { x: 30_000_000, y: -20_000_000, z: -30_000_000 };
+        expect(createWaypoint({ id, name: 'Edge', dimension: 'world', position }).position).toEqual(position);
+    });
+
     it.each([
         [{ x: Number.NaN, y: 0, z: 0 }],
         [{ x: 30_000_001, y: 0, z: 0 }],
         [{ x: 0, y: Number.POSITIVE_INFINITY, z: 0 }],
+        [{ x: 0, y: 20_000_001, z: 0 }],
+        [{ x: 0, y: -1e300, z: 0 }],
         [{ x: 0, y: 0, z: -30_000_001 }],
     ])('rejects invalid positions %j', (position) => {
         expect(() => createWaypoint({ id, name: 'Home', dimension: 'world', position })).toThrow();

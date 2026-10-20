@@ -4,7 +4,7 @@ import { PLUGIN_NAME } from '../name.ts';
 /** Permission node for player-readable waypoint commands. */
 export const COMMAND_PERMISSION = `${PLUGIN_NAME}:command.use` as const;
 
-/** Command-tree default for mutations; handlers still verify actual Pumpkin operator status. */
+/** Permission node that handlers check before any waypoint mutation. */
 export const ADMIN_PERMISSION = `${PLUGIN_NAME}:command.admin` as const;
 
 const ADMIN_DEFAULT = { tag: 'op', val: 'three' } as const;
@@ -18,6 +18,7 @@ const item = { name: 'item', type: 'item' } as const;
 const label = { name: 'label', type: 'string', mode: 'greedy' } as const;
 const description = { name: 'description', type: 'string', mode: 'greedy' } as const;
 const coordinate = { min: -30_000_000, max: 30_000_000 } as const;
+const height = { min: -20_000_000, max: 20_000_000 } as const;
 
 function admin<const Arguments extends readonly [CommandArgumentSpec, ...CommandArgumentSpec[]]>(
     description_: string,
@@ -36,7 +37,7 @@ const namedCoordinateVariants = [
     [
         name,
         { name: 'x', type: 'double', ...coordinate },
-        { name: 'y', type: 'double' },
+        { name: 'y', type: 'double', ...height },
         { name: 'z', type: 'double', ...coordinate },
     ],
 ] as const;
@@ -71,7 +72,7 @@ export const commands = defineCommands(PLUGIN_NAME, {
             list: { description: 'List enabled waypoints you can access' },
             info: { description: 'Show details for an enabled waypoint you can access', arguments: [name] },
             teleport: {
-                description: 'Teleport to a waypoint or, as an operator, teleport selected players',
+                description: 'Teleport to a waypoint or, as an admin, teleport selected players',
                 argumentVariants: teleportVariants,
             },
             tp: {
@@ -98,7 +99,7 @@ export const commands = defineCommands(PLUGIN_NAME, {
                     revoke: {
                         description: 'Remove an access grant',
                         subcommands: {
-                            player: admin('Revoke an online player grant', [name, player]),
+                            player: admin('Revoke a player grant by online name or UUID', [name, player]),
                             permission: admin('Revoke a permission node grant', [name, permission]),
                             group: admin('Revoke a permission marker group grant', [name, group]),
                         },
@@ -118,7 +119,7 @@ export const commands = defineCommands(PLUGIN_NAME, {
                     ]),
                 },
             },
-            reset: admin('Reset one mutable waypoint property to its default', [
+            reset: admin('Reset a label, description, color, icon, or visibility range', [
                 { name: 'property', type: 'string', mode: 'single-word' },
                 name,
             ]),

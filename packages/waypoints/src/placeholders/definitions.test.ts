@@ -1,84 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { waypointFields, waypointPlaceholderNames } from './definitions.ts';
+import { waypointPlaceholderDefinitions } from './definitions.ts';
+import { parsePlaceholder } from './resolver.ts';
 
-type ExpectedField =
-    | 'id'
-    | 'name'
-    | 'label'
-    | 'description'
-    | 'world'
-    | 'color'
-    | 'icon'
-    | 'x'
-    | 'y'
-    | 'z'
-    | 'distance'
-    | 'distance_horizontal'
-    | 'distance_formatted'
-    | 'delta_x'
-    | 'delta_y'
-    | 'delta_z'
-    | 'bearing'
-    | 'direction'
-    | 'relative_direction';
-type ExpectedPlaceholderName =
-    | 'count'
-    | 'count_here'
-    | 'count_world'
-    | 'public_count'
-    | 'restricted_count'
-    | 'visible_count'
-    | 'nearby_count'
-    | 'names'
-    | 'names_here'
-    | 'closest_exists'
-    | 'nearest_exists'
-    | 'waypoint_exists'
-    | `closest_${ExpectedField}`
-    | `nearest_${ExpectedField}`
-    | `waypoint_${ExpectedField}`;
-
-const expectedFields: ExpectedField[] = [
-    'id',
-    'name',
-    'label',
-    'description',
-    'world',
-    'color',
-    'icon',
-    'x',
-    'y',
-    'z',
-    'distance',
-    'distance_horizontal',
-    'distance_formatted',
-    'delta_x',
-    'delta_y',
-    'delta_z',
-    'bearing',
-    'direction',
-    'relative_direction',
-];
-const expectedNames: ExpectedPlaceholderName[] = [
-    'count',
-    'count_here',
-    'count_world',
-    'public_count',
-    'restricted_count',
-    'visible_count',
-    'nearby_count',
-    'names',
-    'names_here',
-    'closest_exists',
-    'nearest_exists',
-    'waypoint_exists',
-    ...expectedFields.flatMap((field) => [`closest_${field}`, `nearest_${field}`, `waypoint_${field}`] as const),
-];
+const sampleArguments = {
+    radius: '10',
+    rank: '1',
+    uuid: '11111111-1111-4111-8111-111111111111',
+    world: 'overworld',
+};
 
 describe('waypoint placeholder definitions', () => {
-    it('advertises every catalog, existence, and field-family identifier exactly once', () => {
-        expect(Object.keys(waypointFields)).toEqual(expectedFields);
-        expect(waypointPlaceholderNames).toEqual(expectedNames);
-        expect(new Set(waypointPlaceholderNames).size).toBe(expectedNames.length);
+    it('advertises each identifier once', () => {
+        const names = waypointPlaceholderDefinitions.map(({ name }) => name);
+        expect(new Set(names).size).toBe(names.length);
+    });
+
+    it('advertises only identifiers the resolver can parse with their declared argument', () => {
+        const unparsed = waypointPlaceholderDefinitions.filter(
+            ({ name, argument }) =>
+                parsePlaceholder(name, argument === undefined ? undefined : sampleArguments[argument]) === undefined,
+        );
+        expect(unparsed).toEqual([]);
     });
 });

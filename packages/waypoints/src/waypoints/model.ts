@@ -6,6 +6,8 @@ const PERMISSION_NODE = /^[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+$/;
 const GROUP_SLUG = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const CONTROL = /\p{Cc}/u;
 const MAX_HORIZONTAL_COORDINATE = 30_000_000;
+// Vanilla /tp rejects a Y beyond this.
+const MAX_VERTICAL_COORDINATE = 20_000_000;
 const MAX_VISIBILITY_RANGE = 30_000_000;
 
 /** A location in a named Pumpkin world. */
@@ -62,20 +64,19 @@ export interface NewWaypoint {
     readonly visibilityRange?: number;
 }
 
-/** Runtime defaults for waypoint metadata, shared by creation and operator reset commands. */
+/** Defaults for waypoint metadata, shared by creation and `/wp reset`. */
 export const WAYPOINT_METADATA_DEFAULTS = {
     label: undefined,
     description: undefined,
     color: '#FFFFFF',
     icon: undefined,
     visibilityRange: undefined,
-    enabled: true,
-    access: { mode: 'restricted', grants: [] },
-} as const satisfies Partial<
-    Pick<Waypoint, 'label' | 'description' | 'color' | 'icon' | 'visibilityRange' | 'enabled' | 'access'>
->;
+} as const satisfies Partial<Pick<Waypoint, 'label' | 'description' | 'color' | 'icon' | 'visibilityRange'>>;
 
-/** A metadata key with a canonical default value. */
+// Enabled state and access have their own commands, so `/wp reset` leaves them alone.
+const DEFAULT_ACCESS: WaypointAccess = { mode: 'restricted', grants: [] };
+
+/** A metadata key that `/wp reset` can restore to its default. */
 export type WaypointMetadataKey = keyof typeof WAYPOINT_METADATA_DEFAULTS;
 
 /** Normalizes a waypoint key while preserving its display spelling. */
@@ -123,7 +124,7 @@ export function createWaypoint(input: NewWaypoint): Waypoint {
     if (input.enabled !== undefined && typeof input.enabled !== 'boolean') {
         throw new TypeError('Waypoint enabled state must be boolean.');
     }
-    const access = normalizeAccess(input.access ?? WAYPOINT_METADATA_DEFAULTS.access);
+    const access = normalizeAccess(input.access ?? DEFAULT_ACCESS);
     const waypoint: Waypoint = {
         id: input.id.toLowerCase(),
         name,
@@ -134,7 +135,7 @@ export function createWaypoint(input: NewWaypoint): Waypoint {
         color,
         ...(icon === undefined ? {} : { icon }),
         ...(visibilityRange === undefined ? {} : { visibilityRange }),
-        enabled: input.enabled ?? WAYPOINT_METADATA_DEFAULTS.enabled,
+        enabled: input.enabled ?? true,
         access,
     };
     if (!isWaypoint(waypoint)) throw new TypeError('Waypoint data is invalid.');
@@ -202,6 +203,9 @@ function normalizePosition(value: WaypointPosition): WaypointPosition {
     if (Math.abs(x as number) > MAX_HORIZONTAL_COORDINATE || Math.abs(z as number) > MAX_HORIZONTAL_COORDINATE) {
         throw new RangeError(`Waypoint x and z must be within ${MAX_HORIZONTAL_COORDINATE} blocks of the origin.`);
     }
+    if (Math.abs(y as number) > MAX_VERTICAL_COORDINATE) {
+        throw new RangeError(`Waypoint y must be within ${MAX_VERTICAL_COORDINATE} blocks of 0.`);
+    }
     return { x: x as number, y: y as number, z: z as number };
 }
 
@@ -232,10 +236,20 @@ function normalizeAccess(value: WaypointAccess): WaypointAccess {
     }
     const grants = new Map<string, AccessGrant>();
     for (const grant of value.grants) {
-        if (!isAccessGrant(grant)) throw new TypeError('Waypoint access grant is invalid.');
+        if (!isAccessGrant(grant)) throw new TypeError(invalidGrantMessage(grant));
         grants.set(grantKey(grant), { ...grant });
     }
     return { mode: value.mode, grants: [...grants.values()] };
+}
+
+function invalidGrantMessage(grant: unknown): string {
+    const type = isRecord(grant) ? grant.type : undefined;
+    if (type === 'player') return 'Player grants need a player UUID.';
+    if (type === 'permission') return 'Permission grants need a node in the form namespace:node.';
+    if (type === 'group') {
+        return 'Group names need 1 to 64 lowercase letters, digits, hyphens or underscores, starting with a letter or digit.';
+    }
+    return 'Waypoint access grant is invalid.';
 }
 
 function isPosition(value: unknown): value is WaypointPosition {
@@ -286,7 +300,8 @@ function isAccessGrant(value: unknown): value is AccessGrant {
     );
 }
 
-function grantKey(grant: AccessGrant): string {
+/** Identifies a grant for deduplication; player UUIDs compare case-insensitively. */
+export function grantKey(grant: AccessGrant): string {
     switch (grant.type) {
         case 'player':
             return `player:${grant.playerId.toLowerCase()}`;

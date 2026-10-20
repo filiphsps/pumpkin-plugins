@@ -1,3 +1,4 @@
+import { formatDistance } from '../waypoints/format.ts';
 import type { Waypoint, WaypointPosition } from '../waypoints/model.ts';
 import type { WaypointHudPlacement } from './layout.ts';
 
@@ -76,8 +77,7 @@ export function createWaypointHudTextJson(waypoint: Waypoint, distanceBlocks: nu
         characters.length > MAX_LABEL_CHARACTERS
             ? `${characters.slice(0, MAX_LABEL_CHARACTERS - 1).join('')}…`
             : characters.join('');
-    const distanceText =
-        distanceBlocks >= 1000 ? `${(distanceBlocks / 1000).toFixed(1)}km` : `${Math.round(distanceBlocks)}m`;
+    const distanceText = formatDistance(distanceBlocks);
     const extra = detailed
         ? [
               { text: label, color: waypoint.color, bold: true },

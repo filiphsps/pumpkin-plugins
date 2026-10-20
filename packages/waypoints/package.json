@@ -42,6 +42,7 @@
     "scripts": {
         "build": "pumpkin-plugins-build",
         "build:parse-ts": "pumpkin-plugins-build --parse-ts",
+        "icons": "node scripts/generate-icon-sprites.mjs",
         "readme": "pumpkin-plugins-docs && pumpkin-plugins-docs generate docs.ts",
         "readme:check": "pumpkin-plugins-docs --check && pumpkin-plugins-docs generate docs.ts --check",
         "test": "vitest run --project unit",
@@ -52,6 +53,7 @@
     },
     "dependencies": {
         "@pumpkin-plugins/docs": "workspace:*",
+        "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@pumpkin-plugins/pumpkin-pie-api": "catalog:",

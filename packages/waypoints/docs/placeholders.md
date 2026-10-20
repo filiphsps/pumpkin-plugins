@@ -1,6 +1,3 @@
-<!-- docs:begin placeholders -->
-<!-- Generated from src/placeholders/definitions.ts and the PumpkinPIE session timing constants. Run `pnpm readme`. -->
-
 # PumpkinPIE placeholders
 
 Waypoints optionally registers the `waypoints` namespace with [PumpkinPIE](https://github.com/Rennex07/PumpkinPIE).
@@ -37,6 +34,9 @@ metadata from another world, but cross-world distances and directions are unreso
 
 ## Catalog values
 
+<!-- docs:begin catalog -->
+<!-- Generated from src/placeholders/definitions.ts and the PumpkinPIE session timing constants. Run `pnpm readme`. -->
+
 | Token | Description |
 | --- | --- |
 | `%waypoints_count%` | Accessible enabled waypoint count across all worlds. |
@@ -48,6 +48,7 @@ metadata from another world, but cross-world distances and directions are unreso
 | `%waypoints_nearby_count:128%` | Same-world count within the 3D radius in blocks. |
 | `%waypoints_names%` | Accessible waypoint names across worlds, joined by comma and space. |
 | `%waypoints_names_here%` | Accessible same-world waypoint names, joined by comma and space. |
+<!-- docs:end catalog -->
 
 Name lists sort by Waypoints' normalized, case-insensitive name key, then UUID. They are display
 text, not escaped identifiers; waypoint names can contain commas. Disabled, denied and
@@ -56,19 +57,26 @@ name list resolves to an empty string.
 
 ## Existence lookups
 
+<!-- docs:begin exists -->
+<!-- Generated from src/placeholders/definitions.ts and the PumpkinPIE session timing constants. Run `pnpm readme`. -->
+
 | Token | Description |
 | --- | --- |
 | `%waypoints_closest_exists%` | Whether an accessible same-world closest waypoint exists. |
 | `%waypoints_nearest_exists:2%` | Whether the requested accessible same-world rank exists. |
 | `%waypoints_waypoint_exists:11111111-1111-4111-8111-111111111111%` | Whether the enabled UUID is accessible to the viewer. |
+<!-- docs:end exists -->
 
 ## Waypoint fields
 
 Substitute any field below in a closest, nearest or explicit UUID token. The same field rules apply
 to all three families.
 
+<!-- docs:begin fields -->
+<!-- Generated from src/placeholders/definitions.ts and the PumpkinPIE session timing constants. Run `pnpm readme`. -->
+
 | Field | Meaning | Output |
-| --- | --- |
+| --- | --- | --- |
 | `id` | Canonical waypoint UUID. | canonical lowercase UUID |
 | `name` | Complete saved waypoint name. | text |
 | `label` | Saved display label, falling back to the name. | text |
@@ -81,13 +89,14 @@ to all three families.
 | `z` | Saved Z coordinate. | locale-independent number; negative zero is 0 |
 | `distance` | Raw three-dimensional distance. | blocks to one decimal, no suffix |
 | `distance_horizontal` | Raw X/Z distance. | blocks to one decimal, no suffix |
-| `distance_formatted` | Human-readable distance. | rounded integer meters below 1000 blocks; otherwise one decimal kilometer |
+| `distance_formatted` | Human-readable distance. | whole meters while it rounds below 1000; otherwise kilometers to one decimal |
 | `delta_x` | Destination X minus viewer X. | blocks to one decimal |
 | `delta_y` | Destination Y minus viewer Y. | blocks to one decimal |
 | `delta_z` | Destination Z minus viewer Z. | blocks to one decimal |
 | `bearing` | Horizontal compass bearing, north at zero. | degrees to one decimal |
 | `direction` | Eight-point compass direction. | N, NE, E, SE, S, SW, W, NW, UP, DOWN, or HERE |
 | `relative_direction` | Eight-point direction relative to the viewer yaw. | front, front_right, right, back_right, back, back_left, left, front_left, UP, DOWN, or HERE |
+<!-- docs:end fields -->
 
 Compass sectors are 45 degrees wide; a boundary belongs to the clockwise sector. Relative direction
 uses the viewer's Minecraft yaw convention, where yaw zero faces south. If horizontal displacement
@@ -151,8 +160,11 @@ The callback returns plain text only. It does not resolve nested tokens, escape 
 components or truncate oversized names. Waypoints logs a bounded identifier and reason once while a
 query failure remains active; stored waypoint text and host errors are never logged.
 
+<!-- docs:begin timing -->
+<!-- Generated from src/placeholders/definitions.ts and the PumpkinPIE session timing constants. Run `pnpm readme`. -->
+
 PumpkinPIE is optional. Provider retries use bounded exponential backoff capped at 5 minutes;
 after reaching the cap, probes are no more frequent than once every 5 minutes. A ready
 integration sends its registration heartbeat every 30 seconds and recovers automatically when
 PumpkinPIE becomes available.
-<!-- docs:end placeholders -->
+<!-- docs:end timing -->

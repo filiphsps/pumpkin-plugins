@@ -9,15 +9,15 @@ export interface WaypointViewer extends WaypointAccessContext {
 
 /** Returns enabled, authorized, same-dimension waypoints within their optional 3D range. */
 export function projectWaypointsForViewer(waypoints: readonly Waypoint[], viewer: WaypointViewer): Waypoint[] {
-    return waypoints.filter((waypoint) => {
-        if (!waypoint.enabled || waypoint.dimension !== viewer.dimension || !canAccessWaypoint(waypoint, viewer)) {
-            return false;
-        }
-        return (
-            waypoint.visibilityRange === undefined ||
-            distance(viewer.position, waypoint.position) <= waypoint.visibilityRange
-        );
-    });
+    // Access runs last: permission checks are host calls, while the other checks are local.
+    return waypoints.filter(
+        (waypoint) =>
+            waypoint.enabled &&
+            waypoint.dimension === viewer.dimension &&
+            (waypoint.visibilityRange === undefined ||
+                distance(viewer.position, waypoint.position) <= waypoint.visibilityRange) &&
+            canAccessWaypoint(waypoint, viewer),
+    );
 }
 
 function distance(left: WaypointPosition, right: WaypointPosition): number {

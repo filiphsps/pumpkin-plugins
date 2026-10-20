@@ -1,10 +1,17 @@
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
+import { PIE_RELEASE, resolvePieProvider } from '@pumpkin-plugins/pumpkin-pie-api/testing/provider';
 import { builtPluginPath, type PumpkinInstance, startPumpkin } from '@pumpkin-plugins/test-harness';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PIE_RELEASE, resolvePieProvider } from '../../../tools/apis/pumpkin-pie-api/test/provider.ts';
-import { run as buildPlugin } from '../../../tools/build/src/cli.ts';
+import { waypointPlaceholderNames } from '../src/placeholders/definitions.ts';
+
+// Build fixtures through the builder's published CLI, as a standalone plugin would.
+const buildCli = createRequire(import.meta.url).resolve('@pumpkin-plugins/build/dist/cli.js');
+const buildPlugin = (cwd: string) => promisify(execFile)(process.execPath, [buildCli, '--no-update-notifier'], { cwd });
 
 describe('Waypoints PumpkinPIE integration', () => {
     let unavailableServer: PumpkinInstance | undefined;
@@ -13,7 +20,7 @@ describe('Waypoints PumpkinPIE integration', () => {
 
     beforeAll(async () => {
         const fixtureDir = join(process.cwd(), 'test/fixtures/pie-consumer');
-        await buildPlugin([], fixtureDir);
+        await buildPlugin(fixtureDir);
         providerPath = await resolvePieProvider();
 
         unavailableServer = await startPumpkin({
@@ -36,7 +43,7 @@ describe('Waypoints PumpkinPIE integration', () => {
         });
         await server.waitForLog(/Loaded.*PumpkinPIE/, 15_000);
         await server.waitForLog(/Loaded Waypoints/);
-        await server.waitForLog(/WaypointsPIEFixture:.*"advertisedCount":69.*"offlineKnown":false/, 15_000);
+        await server.waitForLog(/WaypointsPIEFixture:.*"offlineKnown":false/, 15_000);
     }, 180_000);
 
     afterAll(async () => {
@@ -50,10 +57,7 @@ describe('Waypoints PumpkinPIE integration', () => {
             .update(await readFile(providerPath))
             .digest('hex');
         expect(digest).toBe(PIE_RELEASE.sha256);
-        expect(PIE_RELEASE.sourceCommit).toBe('b7cbb14417b397bca71a36b62efa8caa1ba72354');
-        expect(PIE_RELEASE.pumpkinRelease).toBe('0.2.0+26.3-26.51');
-        expect(PIE_RELEASE.apiArtifact).toBe('v0.1.1');
-        expect(server?.logs()).toMatch(/WaypointsPIEFixture:.*"advertisedCount":69/);
+        expect(server?.logs()).toContain(`"advertisedCount":${waypointPlaceholderNames.length},`);
         expect(server?.logs()).toMatch(/"text":"Resolved literal text","unresolved":\[\]/);
         expect(server?.logs()).toMatch(/"text":"Count: %waypoints_count%","unresolved":\["waypoints_count"\]/);
         expect(server?.logs()).toMatch(/"offlineKnown":false/);

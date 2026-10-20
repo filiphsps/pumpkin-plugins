@@ -33,7 +33,7 @@ export const waypointFields = {
     distance_horizontal: { description: 'Raw X/Z distance.', output: 'blocks to one decimal, no suffix' },
     distance_formatted: {
         description: 'Human-readable distance.',
-        output: 'rounded integer meters below 1000 blocks; otherwise one decimal kilometer',
+        output: 'whole meters while it rounds below 1000; otherwise kilometers to one decimal',
     },
     delta_x: { description: 'Destination X minus viewer X.', output: 'blocks to one decimal' },
     delta_y: { description: 'Destination Y minus viewer Y.', output: 'blocks to one decimal' },

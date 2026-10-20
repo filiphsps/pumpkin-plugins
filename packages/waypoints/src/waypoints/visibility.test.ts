@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createWaypoint } from './model.ts';
 import { projectWaypointsForViewer } from './visibility.ts';
 
@@ -66,5 +66,39 @@ describe('waypoint viewer projection', () => {
                 position: { x: 0, y: 0, z: 0 },
             }),
         ).toEqual([unlimited]);
+    });
+
+    it('checks permissions only for waypoints in the viewer dimension and range', () => {
+        const access = {
+            mode: 'restricted' as const,
+            grants: [{ type: 'permission' as const, node: 'Waypoints:use' }],
+        };
+        const farAway = createWaypoint({
+            id: '77777777-7777-4777-8777-777777777777',
+            name: 'Far away',
+            dimension: 'world',
+            position: { x: 100, y: 0, z: 0 },
+            visibilityRange: 10,
+            access,
+        });
+        const elsewhere = createWaypoint({
+            id: '88888888-8888-4888-8888-888888888888',
+            name: 'Elsewhere',
+            dimension: 'nether',
+            position: { x: 0, y: 0, z: 0 },
+            access,
+        });
+        const hasPermission = vi.fn(() => true);
+
+        const visible = projectWaypointsForViewer([farAway, elsewhere], {
+            playerId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            isOperator: false,
+            hasPermission,
+            dimension: 'world',
+            position: { x: 0, y: 0, z: 0 },
+        });
+
+        expect(visible).toEqual([]);
+        expect(hasPermission).not.toHaveBeenCalled();
     });
 });

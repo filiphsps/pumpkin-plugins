@@ -12,6 +12,9 @@ const program = new Command()
 const [clientArchive] = program.args;
 // Only texture identifiers are emitted; no Minecraft artwork is copied.
 const assets = unzipSync(readFileSync(clientArchive));
+if (assets['version.json'] === undefined)
+    throw new Error(`${clientArchive} has no version.json; pass a Minecraft client JAR`);
+const { name: minecraftVersion } = JSON.parse(strFromU8(assets['version.json']));
 const sprites = {};
 /** Resolves inherited item model textures from the supplied Minecraft client archive. */
 function textures(model, seen = new Set()) {
@@ -47,8 +50,8 @@ for (const file of Object.keys(assets).sort()) {
 const output = fileURLToPath(new URL('../src/rendering/icon-sprites.ts', import.meta.url));
 writeFileSync(
     output,
-    '// Generated from Minecraft 26.3 by scripts/generate-icon-sprites.mjs.\n' +
+    `// Generated from Minecraft ${minecraftVersion} by scripts/generate-icon-sprites.mjs.\n` +
         '/** Vanilla items whose representative sprite differs from item/{registry path}. */\n' +
-        `export const BLOCK_ICON_SPRITES: { readonly [key: string]: string } = ${JSON.stringify(sprites, null, 4)};\n`,
+        `export const ITEM_ICON_SPRITES: { readonly [key: string]: string } = ${JSON.stringify(sprites, null, 4)};\n`,
 );
 execFileSync('pnpm', ['exec', 'biome', 'format', '--write', output]);

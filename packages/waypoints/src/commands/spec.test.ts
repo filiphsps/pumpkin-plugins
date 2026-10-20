@@ -42,7 +42,6 @@ describe('waypoint commands', () => {
             '/wp set visibility-range <name> <range>',
             '/wp reset <property> <name>',
         ]);
-        expect(usages.some((usage) => /mark|locator|send|show|admin/.test(usage))).toBe(false);
     });
 
     it('separates player-readable commands from operator-guarded mutations', () => {

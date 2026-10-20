@@ -1,4 +1,5 @@
 import { canAccessWaypoint } from '../waypoints/access.ts';
+import { formatDistance, formatOneDecimal } from '../waypoints/format.ts';
 import type { Waypoint, WaypointPosition } from '../waypoints/model.ts';
 import { waypointNameKey } from '../waypoints/model.ts';
 import { projectWaypointsForViewer, type WaypointViewer } from '../waypoints/visibility.ts';
@@ -102,12 +103,8 @@ export function formatWaypointField(
             return formatOneDecimal(geometry(viewer.position, waypoint.position).distance);
         case 'distance_horizontal':
             return formatOneDecimal(geometry(viewer.position, waypoint.position).horizontal);
-        case 'distance_formatted': {
-            const distance = geometry(viewer.position, waypoint.position).distance;
-            return distance < 1000
-                ? `${formatInteger(Math.round(distance))}m`
-                : `${formatOneDecimal(distance / 1000)}km`;
-        }
+        case 'distance_formatted':
+            return formatDistance(geometry(viewer.position, waypoint.position).distance);
         case 'delta_x':
             return formatOneDecimal(delta(viewer.position.x, waypoint.position.x));
         case 'delta_y':
@@ -243,33 +240,6 @@ function normalizeDegrees(degrees: number): number {
 
 function formatCoordinate(value: number): string {
     return String(value === 0 ? 0 : value);
-}
-
-function formatOneDecimal(value: number): string {
-    if (!Number.isFinite(value)) throw new RangeError('Waypoint number is nonfinite');
-    if (Math.abs(value) >= 1e21) return `${expandExponential(value.toString())}.0`;
-    const formatted = value.toFixed(1);
-    return formatted === '-0.0' ? '0.0' : formatted;
-}
-
-function formatInteger(value: number): string {
-    if (!Number.isFinite(value)) throw new RangeError('Waypoint number is nonfinite');
-    if (Math.abs(value) >= 1e21) return expandExponential(value.toString());
-    return String(value);
-}
-
-function expandExponential(value: string): string {
-    const [coefficient = '', exponentText] = value.toLowerCase().split('e');
-    if (exponentText === undefined) return coefficient;
-    const exponent = Number(exponentText);
-    const sign = coefficient.startsWith('-') ? '-' : '';
-    const unsigned = sign ? coefficient.slice(1) : coefficient;
-    const point = unsigned.indexOf('.') < 0 ? unsigned.length : unsigned.indexOf('.');
-    const digits = unsigned.replace('.', '');
-    const targetPoint = point + exponent;
-    if (targetPoint <= 0) return `${sign}0.${'0'.repeat(-targetPoint)}${digits}`;
-    if (targetPoint >= digits.length) return `${sign}${digits}${'0'.repeat(targetPoint - digits.length)}`;
-    return `${sign}${digits.slice(0, targetPoint)}.${digits.slice(targetPoint)}`;
 }
 
 function compareIds(left: string, right: string): number {

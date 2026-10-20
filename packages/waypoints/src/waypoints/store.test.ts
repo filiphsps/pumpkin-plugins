@@ -73,13 +73,16 @@ describe(WaypointStore.name, () => {
                 waypoints: [record, { ...record, id: lower.toUpperCase(), name: 'Other' }],
             });
             const files = new MemoryFiles().put('waypoints.json', original);
-            const invalid = new WaypointStore(files, new MemoryLogger());
+            const logger = new MemoryLogger();
+            const invalid = new WaypointStore(files, logger);
             expect(invalid.isAvailable).toBe(false);
-            expect(invalid.error).toContain('duplicate waypoint UUID');
+            expect(logger.of('error')).toEqual([expect.stringContaining('duplicate waypoint UUID')]);
             expect(files.text('waypoints.json')).toBe(original);
             expect(files.text('waypoints.v1.json')).toBeUndefined();
             files.put('waypoints.v1.json', 'existing backup');
-            expect(new WaypointStore(files, new MemoryLogger()).error).toContain('duplicate waypoint UUID');
+            const backupLogger = new MemoryLogger();
+            expect(new WaypointStore(files, backupLogger).isAvailable).toBe(false);
+            expect(backupLogger.of('error')).toEqual([expect.stringContaining('duplicate waypoint UUID')]);
             expect(files.text('waypoints.v1.json')).toBe('existing backup');
 
             const activeFiles = new MemoryFiles();
