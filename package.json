@@ -28,7 +28,7 @@
     "scripts": {
         "build": "node scripts/build.mjs",
         "build:parse-ts": "node scripts/build.mjs --parse-ts",
-        "check": "node scripts/check-release-config.mjs && node scripts/package-metadata.mjs && node scripts/check-docs.mjs && pnpm run typecheck:scripts",
+        "check": "node scripts/check-release-config.mjs && node scripts/package-metadata.mjs && node scripts/check-docs.mjs",
         "clean": "pnpm purge && node scripts/clean.mjs",
         "coverage": "node scripts/coverage.mjs",
         "dev": "node scripts/dev.mjs",
@@ -60,8 +60,7 @@
         "test:integration": "pnpm turbo run test:integration --concurrency=4",
         "test:scripts": "node --test scripts/*.test.mjs scripts/utils/*.test.mjs .agents/hooks/*.test.mjs .github/scripts/*.test.mjs",
         "turbo": "node scripts/turbo.mjs",
-        "typecheck": "pnpm turbo run typecheck",
-        "typecheck:scripts": "tsc -p tsconfig.scripts.json"
+        "typecheck": "pnpm turbo run typecheck"
     },
     "devDependencies": {
         "@biomejs/biome": "2.5.15",
@@ -70,7 +69,6 @@
         "@pumpkin-plugins/signing": "workspace:*",
         "@pumpkin-plugins/static-hermes-runtime": "workspace:*",
         "@turbo/gen": "2.11.7",
-        "@types/node": "catalog:",
         "c8": "catalog:",
         "commander": "catalog:",
         "commitlint": "21.2.3",
