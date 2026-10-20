@@ -1,8 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { code, generatedBlocks, table } from '@pumpkin-plugins/docs/markdown';
+import { code, table } from '@pumpkin-plugins/docs/markdown';
 import type { DocumentSpec } from '@pumpkin-plugins/docs/node';
+import { parse } from 'yaml';
 
 interface PackageManifest {
     dependencies?: Record<string, string>;
@@ -13,6 +14,10 @@ interface PackageManifest {
 
 interface RootPackage {
     devEngines?: { packageManager?: { name?: string; version?: string } };
+}
+
+interface Workflow {
+    jobs?: Record<string, { 'runs-on'?: unknown }>;
 }
 
 interface PlatformRow {
@@ -31,92 +36,19 @@ function requiredString(value: unknown, label: string): string {
     return value.trim();
 }
 
-function workflowNodeVersion(workflow: string, nodePin: string): string {
-    const versions = [...workflow.matchAll(/^\s+node-version:\s*([^\s#]+)\s*$/gm)].map((match) => match[1]);
-    if (versions.length > 1) {
-        throw new Error(
-            `.github/workflows/external-consumer.yml: expected at most one node-version pin, found ${versions.length}`,
-        );
-    }
-    return versions.length === 0
-        ? nodePin
-        : requiredString(versions[0], '.github/workflows/external-consumer.yml node-version');
-}
+const WORKFLOW_FILE = '.github/workflows/external-consumer.yml';
 
-function parsePlatformMatrix(workflow: string): PlatformRow[] {
-    const lines = workflow.split(/\r?\n/);
-    const includeIndex = lines.findIndex((line) => /^\s*include:\s*$/.test(line));
-    if (includeIndex < 0) {
-        const defaultPlatforms = workflow.match(/^\s+default:\s*'([^']+)'\s*$/m)?.[1];
-        const runnerMapSource = workflow.match(/runs-on:[^\r\n]*fromJSON\('({.*})'\)\[matrix\.platform\]/)?.[1];
-        if (!defaultPlatforms || !runnerMapSource) {
-            throw new Error('.github/workflows/external-consumer.yml: platform matrix not found');
-        }
-
-        const platforms: unknown = JSON.parse(defaultPlatforms);
-        const runnerMap: unknown = JSON.parse(runnerMapSource);
-        if (!Array.isArray(platforms) || platforms.some((platform) => typeof platform !== 'string')) {
-            throw new Error('.github/workflows/external-consumer.yml: platform defaults must be a string array');
-        }
-        if (typeof runnerMap !== 'object' || runnerMap === null || Array.isArray(runnerMap)) {
-            throw new Error('.github/workflows/external-consumer.yml: runner map must be an object');
-        }
-
-        return platforms.map((platform) => ({
-            platform,
-            runner: requiredString(
-                (runnerMap as Record<string, unknown>)[platform],
-                `.github/workflows/external-consumer.yml ${platform} runner`,
-            ),
-        }));
-    }
-
-    const includeIndent = lines[includeIndex].search(/\S/);
-    const rows: PlatformRow[] = [];
-    let pendingPlatform: string | undefined;
-
-    for (const line of lines.slice(includeIndex + 1)) {
-        if (line.trim().length === 0 || line.trim().startsWith('#')) continue;
-        const indent = line.search(/\S/);
-        if (indent <= includeIndent) break;
-
-        const content = line.trim();
-        const platform = content.match(/^[-]\s+platform:\s*(.+)$/);
-        if (platform) {
-            if (pendingPlatform !== undefined) {
-                throw new Error(`.github/workflows/external-consumer.yml: ${pendingPlatform} has no runner`);
-            }
-            pendingPlatform = yamlValue(platform[1], 'platform');
-            continue;
-        }
-
-        const runner = content.match(/^os:\s*(.+)$/);
-        if (runner && pendingPlatform !== undefined) {
-            rows.push({ platform: pendingPlatform, runner: yamlValue(runner[1], `${pendingPlatform} runner`) });
-            pendingPlatform = undefined;
-        }
-    }
-
-    if (pendingPlatform !== undefined) {
-        throw new Error(`.github/workflows/external-consumer.yml: ${pendingPlatform} has no runner`);
-    }
-
-    const declaredPlatforms = [...workflow.matchAll(/^\s+-\s+platform:/gm)].length;
-    if (rows.length === 0 || rows.length !== declaredPlatforms) {
-        throw new Error(
-            `.github/workflows/external-consumer.yml: parsed ${rows.length} platform rows from ${declaredPlatforms} declarations`,
-        );
-    }
-
+/** Reads the platform-to-runner map that the external consumer job's `runs-on` looks up. */
+function platformRunners(workflow: Workflow): PlatformRow[] {
+    const runsOn = requiredString(workflow.jobs?.['external-consumer']?.['runs-on'], `${WORKFLOW_FILE} runs-on`);
+    const map = runsOn.match(/^\$\{\{\s*fromJSON\('(\{[^']+\})'\)\[matrix\.platform\]\s*\}\}$/)?.[1];
+    if (!map) throw new Error(`${WORKFLOW_FILE}: runs-on platform map not found`);
+    const rows = Object.entries(JSON.parse(map) as Record<string, unknown>).map(([platform, runner]) => ({
+        platform,
+        runner: requiredString(runner, `${WORKFLOW_FILE} ${platform} runner`),
+    }));
+    if (rows.length === 0) throw new Error(`${WORKFLOW_FILE}: runs-on platform map is empty`);
     return rows;
-}
-
-function yamlValue(value: string | undefined, label: string): string {
-    const unquoted = requiredString(value, `.github/workflows/external-consumer.yml ${label}`).replace(
-        /^(['"])(.*)\1$/,
-        '$2',
-    );
-    return requiredString(unquoted, `.github/workflows/external-consumer.yml ${label}`);
 }
 
 function nodeRequirementRows(requirements: Array<{ name: string; version: string }>): string[][] {
@@ -153,33 +85,13 @@ function isAtLeast(candidate: string, minimum: string): boolean | undefined {
     return true;
 }
 
-function updatePassage(source: string, current: string, next: string, label: string, recognized = next): string {
-    if (source.split(/\r?\n/).includes(recognized)) return source;
-    const occurrences = source.split(current).length - 1;
-    if (occurrences !== 1) throw new Error(`${label}: expected one source passage, found ${occurrences}`);
-    return source.replace(current, next);
-}
-
-function updateBlock(source: string, name: string, body: string, note: string): string {
-    const matches = generatedBlocks(source).filter((block) => block.name === name && block.markers === 'docs');
-    if (matches.length !== 1) throw new Error(`Expected one generated block named ${name}, found ${matches.length}`);
-    const block = matches[0];
-    const begin = `<!-- docs:begin ${name} -->`;
-    const end = `<!-- docs:end ${name} -->`;
-    return `${source.slice(0, block.start)}${begin}\n${note}\n\n${body}\n${end}${source.slice(block.end)}`;
-}
-
 const rootPackage = readJson<RootPackage>(new URL('../../package.json', import.meta.url));
 const creatorPackage = readJson<PackageManifest>(new URL('./package.json', import.meta.url));
 const nodePin = requiredString(
     fs.readFileSync(new URL('../../.node-version', import.meta.url), 'utf8'),
     '.node-version',
 );
-const workflow = fs.readFileSync(new URL('../../.github/workflows/external-consumer.yml', import.meta.url), 'utf8');
-const workflowNode = workflowNodeVersion(workflow, nodePin);
-if (workflowNode !== nodePin) {
-    throw new Error(`External-consumer Node pin (${workflowNode}) does not match .node-version (${nodePin})`);
-}
+const workflow = parse(fs.readFileSync(new URL(`../../${WORKFLOW_FILE}`, import.meta.url), 'utf8')) as Workflow;
 
 const templateRoot = fileURLToPath(new URL('./templates/', import.meta.url));
 const templateNames = fs
@@ -212,8 +124,8 @@ const nodeRequirements = [
 
 for (const { name, version } of nodeRequirements) {
     const minimum = version.match(/^>=(\d+\.\d+\.\d+)$/)?.[1];
-    const satisfies = minimum ? isAtLeast(workflowNode, minimum) : undefined;
-    if (satisfies === false) throw new Error(`${name} requires Node ${version}, but CI pins ${workflowNode}`);
+    const satisfies = minimum ? isAtLeast(nodePin, minimum) : undefined;
+    if (satisfies === false) throw new Error(`${name} requires Node ${version}, but CI pins ${nodePin}`);
 }
 
 const packageManagerName = requiredString(
@@ -228,9 +140,9 @@ const packageManagerVersion = requiredString(
 
 const supportRows = [
     ...nodeRequirementRows(nodeRequirements),
-    ['CI Node.js pin', code(workflowNode)],
+    ['CI Node.js pin', code(nodePin)],
     ['Packed-consumer package manager', `${code(packageManagerName)} ${code(packageManagerVersion)}`],
-    ...parsePlatformMatrix(workflow).map(({ platform, runner }) => [`${platform} runner`, code(runner)]),
+    ...platformRunners(workflow).map(({ platform, runner }) => [`${platform} runner`, code(runner)]),
 ];
 
 const templateRows = templateNames.map((templateName) => {
@@ -259,50 +171,17 @@ const supportNote =
 const templateNote =
     '<!-- Generated from templates/*/package.json and each starter entry point. Run `pnpm --filter create-pumpkin-plugin readme`. -->';
 
+const templateTable = table(['Starter', 'Package version', 'Package dependencies', 'Host WIT imports'], templateRows);
+
+// Each block carries its own source note, so the document-wide note is empty.
 const documents = [
     {
         file: 'README.md',
-        transform(source) {
-            let next = updatePassage(
-                source,
-                'Create a minimal standalone Pumpkin plugin in TypeScript or JavaScript. The CLI requires Node.js `24.21.0` or newer.',
-                'Create a minimal standalone Pumpkin plugin in TypeScript or JavaScript.',
-                'README introduction',
-            );
-            next = updatePassage(
-                next,
-                "These launch forms follow the official [pnpm create](https://pnpm.io/cli/create), [npm init](https://docs.npmjs.com/cli/v11/commands/npm-init/), [Yarn Classic create](https://classic.yarnpkg.com/en/docs/cli/create/), [Yarn Modern CLI migration guide](https://yarnpkg.com/migration/guide#cli-changes), and [Bun create](https://bun.sh/docs/runtime/templating/create) references. The repository's packed-consumer CI contract validates pnpm only; the other rows document invocation syntax.",
-                'These launch forms follow the official [pnpm create](https://pnpm.io/cli/create), [npm init](https://docs.npmjs.com/cli/v11/commands/npm-init/), [Yarn Classic create](https://classic.yarnpkg.com/en/docs/cli/create/), [Yarn Modern CLI migration guide](https://yarnpkg.com/migration/guide#cli-changes), and [Bun create](https://bun.sh/docs/runtime/templating/create) references.',
-                'README package-manager examples',
-            );
-            next = updatePassage(
-                next,
-                "Add `--skip-install` to create the files without installing packages. Existing destinations are rejected and left untouched. Templates depend on `@pumpkin-plugins/pumpkin-api` and `@pumpkin-plugins/build`; they do not include the monorepo's `plugin-kit` scaffold.",
-                "Add `--skip-install` to create the files without installing packages. Existing destinations are rejected and left untouched. When launched by a supported package manager, the creator uses it to install dependencies. If it cannot detect one, it prints pnpm commands. Generated projects do not include the monorepo's `plugin-kit` scaffold.",
-                'README template dependencies',
-            );
-            next = updatePassage(
-                next,
-                '## Node.js and package manager support\n\nThe generator uses Node.js type stripping and requires Node `24.21.0` or newer. It runs the package manager entrypoint that launched it when installing dependencies; otherwise use the commands it prints after creation. The packed-consumer CI matrix targets pnpm `12.11.2` on Linux x64, macOS arm64 and Windows x64.',
-                '## Node.js and CI support\n\n<!-- docs:begin support-contract -->\n<!-- docs:end support-contract -->',
-                'README Node.js and CI support',
-                '## Node.js and CI support',
-            );
-            next = updatePassage(
-                next,
-                '## API and ABI versions\n\nThe templates start with package version `0.1.0` and Pumpkin plugin WIT ABI `0.1.0`. These versions are separate. Keep the API package and Pumpkin server ABI aligned when upgrading.',
-                '## Starter package defaults\n\n<!-- docs:begin template-defaults -->\n<!-- docs:end template-defaults -->\n\nThe npm package dependency range and host WIT interface version identify separate compatibility layers. See the [ABI and runtime guide](../../docs/plugin-api/abi-and-runtime.md) for compatibility with Pumpkin server releases.',
-                'README template defaults',
-                '## Starter package defaults',
-            );
-            next = updateBlock(next, 'support-contract', table(['Contract', 'Value'], supportRows), supportNote);
-            return updateBlock(
-                next,
-                'template-defaults',
-                table(['Starter', 'Package version', 'Package dependencies', 'Host WIT imports'], templateRows),
-                templateNote,
-            );
+        blocks: {
+            'support-contract': `${supportNote}\n\n${table(['Contract', 'Value'], supportRows)}`,
+            'template-defaults': `${templateNote}\n\n${templateTable}`,
         },
+        note: '',
     },
 ] satisfies DocumentSpec[];
 
