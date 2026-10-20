@@ -71,6 +71,7 @@
         "readme": "pumpkin-plugins-docs generate docs.ts",
         "readme:check": "pumpkin-plugins-docs generate docs.ts --check",
         "test": "pnpm build && vitest run",
+        "test:coverage": "vitest run --coverage",
         "test:integration": "pnpm build && vitest run --config vitest.integration.config.ts",
         "typecheck": "tsc --noEmit"
     },
@@ -85,6 +86,7 @@
         "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@pumpkin-plugins/wasi-capabilities": "catalog:",
+        "@vitest/coverage-v8": "catalog:",
         "vitest": "catalog:"
     },
     "engines": {

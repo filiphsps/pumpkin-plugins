@@ -122,7 +122,7 @@ which reuses cached results for packages that haven't changed.
 | `pnpm lint:commits` | Check the latest commit message against the Conventional Commits rules used by CI. |
 | `pnpm typecheck` | Typecheck every package in the workspace. |
 | `pnpm test` | Run the workspace unit tests. |
-| `pnpm coverage` | Run unit tests with V8 coverage; LCOV reports go under package and action coverage directories. |
+| `pnpm coverage` | Run the unit tests of every package outside `extensions/`, then the script and action tests, with V8 coverage; LCOV reports go under package and action coverage directories. |
 | `pnpm test:scripts` | Run the tests for repository checks, release scripts and agent hooks. |
 | `pnpm test:integration` | Build the plugins, then run their tests against a real Pumpkin server. Set `PUMPKIN_BIN` to choose the server binary; see [Testing](docs/testing.md). |
 | `pnpm readme` | Regenerate component READMEs, catalogs and documentation references. |

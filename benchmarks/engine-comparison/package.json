@@ -20,6 +20,7 @@
         "readme": "pnpm --dir ../.. exec pumpkin-plugins-docs generate benchmarks/engine-comparison/docs.ts",
         "readme:check": "pnpm --dir ../.. exec pumpkin-plugins-docs generate benchmarks/engine-comparison/docs.ts --check",
         "test": "vitest run --project unit",
+        "test:coverage": "vitest run --project unit --coverage",
         "typecheck": "pnpm types && tsc --noEmit",
         "types": "node ../../tools/pumpkin-api/scripts/gen-types.mjs build/types"
     },
@@ -31,6 +32,7 @@
         "@pumpkin-plugins/static-hermes-runtime": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
         "@types/node": "catalog:",
+        "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
     }

@@ -6,5 +6,11 @@ export default defineConfig({
         fsModuleCachePath: 'node_modules/.vitest-cache',
         include: ['{src,test}/**/*.test.{ts,mjs}'],
         globalSetup: ['./test/pinned-inputs.mjs'],
+        coverage: {
+            provider: 'v8',
+            include: ['src/**/*.ts'],
+            exclude: ['src/**/*.test.ts', 'src/**/*.d.ts'],
+            reporter: ['text', 'lcov'],
+        },
     },
 });

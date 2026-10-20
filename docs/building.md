@@ -244,7 +244,8 @@ The `@pumpkin-plugins/build` build and test tasks also build `@pumpkin-plugins/s
 and `@pumpkin-plugins/wasi-capabilities` first. The build tool imports their compiled package
 entries, so both public tools declare their `dist/**` output for Turbo to restore when those builds
 come from cache. Its typecheck builds `@pumpkin-plugins/static-hermes-runtime` first, because that
-package's declarations come from `dist/`.
+package's declarations come from `dist/`. The runtime's own coverage task depends on its `build` task
+instead of building in its script, so it doesn't rewrite `dist/` while the builder's tests import it.
 
 Run `pnpm clean` to remove workspace `node_modules`, root and workspace `build/` and `dist/` output,
 and `.turbo/cache/`. It preserves `.cache/`.

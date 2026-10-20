@@ -15,6 +15,13 @@
                 "@pumpkin-plugins/wasi-capabilities#build"
             ]
         },
+        "test:coverage": {
+            "dependsOn": [
+                "transit",
+                "@pumpkin-plugins/static-analysis#build",
+                "@pumpkin-plugins/wasi-capabilities#build"
+            ]
+        },
         "typecheck": {
             "dependsOn": [
                 "transit",
