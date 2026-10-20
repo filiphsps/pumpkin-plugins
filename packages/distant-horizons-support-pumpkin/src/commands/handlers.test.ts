@@ -3,7 +3,6 @@ import { commandInfos } from '@pumpkin-plugins/docs';
 import type { CommandHost } from '@pumpkin-plugins/plugin-kit/commands';
 import { buildCommands } from '@pumpkin-plugins/plugin-kit/commands';
 import { FakeCommandHost, type FakeNode, MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
-import { unavailableChunkLoader, unavailableTerrainGenerator } from '@pumpkin-plugins/terrain';
 import { describe, expect, it, vi } from 'vitest';
 import { readSettings } from '../config/load.ts';
 import { info } from '../info.ts';
@@ -33,8 +32,6 @@ function setup() {
         terrain: {
             minY: 0,
             height: 1,
-            chunkLoader: unavailableChunkLoader,
-            terrainGenerator: unavailableTerrainGenerator,
             sample: () => ({ material: 'minecraft:stone', skyLight: 15, blockLight: 0 }),
         },
         borderBounds: { minX: -1_000_000, maxX: 1_000_000, minZ: -1_000_000, maxZ: 1_000_000 },
