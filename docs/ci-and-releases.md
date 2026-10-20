@@ -16,23 +16,32 @@ work outside this monorepo.
 On eligible `master` pushes, `.github/workflows/release.yml` handles releases after the main CI
 workflow's `ci-result` job passes. An operator can also run CI manually for an explicit commit on
 `master`. The `🧪 Test` job runs script, hook and action suites; `.github/workflows/extensions.yml`
-checks changed extensions. `.github/workflows/docs.yml` checks the documentation and publishes the
-VitePress site, then mirrors it to `gh-pages`. GitHub workflow validation runs separately in
-`.github/workflows/actionlint.yml`. `.github/workflows/issue-forms.yml` validates the chooser and
-required fields; `.github/workflows/issue-intake.yml` checks new and edited issue bodies and manages
-`status: needs info` and `status: needs triage` for incomplete submissions.
+checks changed extensions. `.github/workflows/docs.yml` checks the documentation and, outside forks,
+publishes the VitePress site, then mirrors it to `gh-pages`. GitHub workflow validation runs separately in
+`.github/workflows/actionlint.yml`. `.github/workflows/issue-forms.yml` validates the chooser, the
+issue forms and the label catalog; `.github/workflows/issue-intake.yml` checks new and edited issue
+bodies and manages `status: needs info` and `status: needs triage` for incomplete submissions.
 
 Most jobs use the shared setup in `.github/common/bootstrap` for pnpm, Node, dependencies and the
 Turborepo cache. Most CI jobs run on `ubuntu-26.04`; external-consumer checks also run on `macos-15`
 and `windows-2025`.
 
-Cache keys separate runner OS, architecture and job. Engine comparison adds its matrix variant as a
-`cache-suffix`, so parallel variants do not reuse each other's build outputs. Restores first look for
-the same job and variant from an earlier commit, then fall back to shared task caches. Turbo still
+Only default-branch pushes save the pnpm store and Turborepo caches; pull requests and other runs
+restore those entries without saving their own, because a pull request's cache is visible only to
+that pull request. Cache keys separate runner OS, architecture and job. Engine comparison adds its
+matrix variant as a `cache-suffix`, so parallel variants do not reuse each other's build outputs.
+Restores first look for the same job and variant from an earlier commit, then fall back to shared
+task caches. Turbo still
 checks each task's inputs before reusing outputs. The benchmark's real-server tests run even when a
 build comes from cache. Malloc variants keep their WASI archives and prepared-build fingerprint in
 a separate cache keyed to the pinned Static Hermes toolchain. This keeps those files separate from
-the shared Hades snapshot.
+the shared Hades snapshot. Building malloc also rewrites the host build's compiler export, which the
+malloc fingerprint records, so that cache holds the export too and is restored after the Hades
+build check.
+
+Build saves the prepared Static Hermes build only when no cache matched its key exactly, so
+Integration and Generator can restore it later in the same run. External consumer saves its pnpm
+store and Static Hermes build only on `master` pushes, once per key; pull requests only restore them.
 
 Release Please branches (`release-please--branches--...`) skip the CI, Docs, Actionlint and benchmark
 comment jobs. The commits being released have already passed validation. Release PR updates add the
@@ -43,36 +52,38 @@ pins.
 
 | Job | When it runs | What happens |
 | --- | --- | --- |
-| 🔍 Changed files | CI-triggering changes | Classifies plugin and repository code, action and extension directories, documentation, and label configuration. It also selects integration suites and generator smoke checks, and detects generated README refresh commits. |
+| 🔍 Changed files | CI-triggering changes | Classifies plugin and repository code, action and extension directories, documentation, and label configuration. It also selects integration suites and generator smoke checks, detects generated README refresh commits, and writes the list of jobs the change needs. |
 | 🔍 Lint GitHub workflows | Pull requests, default-branch pushes, and manual runs | `actionlint` checks the workflow files. It skips Release Please branches and changes limited to label configuration. |
 | 💬 Commit messages | Pull requests that change code, actions, extensions, or generated READMEs | Checks every commit with `commitlint.config.mjs`. |
-| 📋 Lint | Code changes | Runs `pnpm lint`, which runs Biome followed by the JSDoc check (see [Code style](code-style.md)). |
+| 📋 Lint | Code or action code changes | Runs `pnpm lint`, which runs Biome followed by the JSDoc check (see [Code style](code-style.md)). |
 | ✅ Typecheck | Code changes | Runs `pnpm typecheck`. |
 | 🧪 Test | Plugin, repository or action code changes | Runs workspace behavior suites and script, hook and action tests with `pnpm coverage`. Merges Node process coverage with package reports in Codecov and retains coverage evidence. Tooling coverage is gated with a 1 percentage-point tolerance; plugin guest coverage is informational until WASM execution can be measured. |
-| 📦 External consumer | Code changes | Packs public tools with their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters and runs `pumpkin-codemod list` outside the repository. Pull requests run Linux x64 for code changes; changes to a packed public tool, its build dependencies, or the consumer workflow add macOS arm64 and Windows x64. Ordinary code pushes to `master` run all three platforms; release merges skip the expensive suites. Node and pnpm versions are pinned. |
+| 📦 External consumer | Code changes | Packs public tools with their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters and runs `pumpkin-codemod list` outside the repository. Pull requests run Linux x64 for code changes; changes to a public tool, its workspace build dependencies, or the consumer workflow add macOS arm64 and Windows x64. Code pushes to `master` run all three platforms; release merges skip the expensive suites. Node and pnpm versions are pinned. |
 | 🧪 Extension tests | Extension changes that need checks | The reusable workflow lints, typechecks, tests and packages each changed extension. |
 | 📝 Docs and config | Code, action, extension, generated README, or docs-only `master` pushes | Checks that generated READMEs are current and runs `pnpm check` for release configuration, package metadata and docs-to-code links. |
-| 🔨 Build | Code changes, after change classification | Prepares Static Hermes while lint and typecheck run, then builds each production plugin with its configured engine (Static Hermes by default). It runs a Static Hermes smoke test, signs and verifies the collected plugin artifacts with a run-only CI key, and uploads them. |
-| 📊 Engine comparison | Benchmark changes and code pushes to `master`, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`. Nine engine configurations run in parallel; a report job validates and combines their results from real Pumpkin servers. |
-| 📈 Engine comparison comment | Successful PR CI runs with a benchmark report | Compares the report with the latest matching default-branch run, updates one PR comment, and embeds an SVG chart of timing changes. |
+| 🔨 Build | Code changes, after change classification | Prepares Static Hermes while lint and typecheck run, then builds each production plugin with its configured engine (Static Hermes by default). It loads one Static Hermes plugin on a real server as a smoke test, then signs and verifies the artifacts. |
+| 📊 Engine comparison | Changes to the benchmarks or the packages and workflow they build and run, and every code push to `master`; after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`. The matrix includes one benchmark job per engine variant and Static Hermes stack-guard jobs for its runtime profiles. A report job validates and combines results from real Pumpkin servers. |
+| 📈 Engine comparison comment | Successful PR CI runs with a benchmark report, including runs for pull requests from forks | Finds the open pull request whose head matches the run, compares the report with the latest matching default-branch run, updates one PR comment, and embeds an SVG chart of timing changes. |
 | 🎃 Integration | Plugin or suite-dependency changes, workspace-wide build configuration, or shared integration setup changes; after build | Runs affected packages and their dependents against the pinned Pumpkin release. Workspace-wide or shared integration changes run the full suite. The job reuses WASM files from Build. |
 | 🧬 Generator | Scaffold, generator setup, or generated-plugin dependency changes; after lint and build | Reuses Build's Static Hermes cache, generates a throwaway plugin, action and extension, checks release registration and READMEs, tests the action and extension, and typechecks, builds and integration-tests the plugin. |
 | 🛡️ CI result | Every CI run outside Release Please branches, after the jobs in its `needs` list; Engine comparison runs separately | The single required check. It fails when a selected dependency does not succeed, or when any dependency fails or is cancelled. Engine comparison is not a dependency and does not block release. |
 | 🚢 Release | Eligible `master` pushes after CI result passes, including docs-only pushes | Calls the reusable release workflow. It catches up pending releases and refreshes every open release PR; Actions get GitHub releases, extensions get VSIX assets, public tools publish npm tarballs, and plugins get signed artifacts and Market listings. |
 | 📝 Prepare release PR | Every open release PR on a release run | Refreshes plugin and extension READMEs, action README examples, starter dependency ranges and first-release pins. |
-| 🔏 Sign, 📎 Attach, 🛒 Market | Each released plugin | Confirms the tag points to the commit built in this run, signs and uploads that artifact, publishes it to an existing Market listing, and syncs its description and commands. |
+| 📎 Publish | Each released plugin | Runs `publish-plugin-release.yml`, which the `Recover plugin release` workflow also uses for one tag. It confirms the tag points to the release commit, signs, verifies and uploads the artifact unless the release already has it, publishes it to an existing Market listing, and syncs its description and commands. |
 
 The signed `plugins` build artifact stays available from the run summary for one day; the build job
-summary includes a direct download link. Other CI artifacts follow their configured retention
-periods; the main CI workflow no longer deletes integration WASM files after their consumer jobs
-finish. The release workflow deletes its handoff artifacts only after a successful run, which leaves
-them available when you need to rerun a failed release. Failure logs remain available for diagnosis.
+summary includes a direct download link. The integration WASM files and their fixture also expire
+after one day rather than being deleted. The release workflow deletes its handoff artifacts only after
+a successful run, leaving them available when you need to rerun a failed release. Failure logs remain
+available for diagnosis.
 
-The Docs workflow deletes its `docs-site` and `github-pages` artifacts after publishing succeeds or
-is skipped, and keeps them when publishing fails. The benchmark-comment workflow keeps the combined
-report for its post-CI run and stores chart SVGs on the `benchmark-charts` branch, outside Actions
-artifact cleanup. Fork and Dependabot pull requests use read-only tokens, so their artifacts remain
-until their configured retention periods expire.
+The Docs workflow uploads its `docs-site` and GitHub Pages artifacts only on pushes, where the
+publish job uses them, and lets them expire after one day. The benchmark-comment workflow keeps the
+combined report for its post-CI run and stores chart SVGs on the `benchmark-charts` branch, where
+artifact expiry doesn't remove them. Each publish replaces that branch with a single parentless
+commit containing charts for the newest 100 runs, so it never grows a history; PR comments from
+older runs lose their chart image. Fork and Dependabot pull requests use read-only tokens, so their
+artifacts remain until the configured retention period expires.
 
 ## Reading CI results
 
@@ -83,13 +94,14 @@ or unfamiliar reporter output for details; use the step logs for failure annotat
 diagnostics. Cached suites and Node test results are labeled separately, so they aren't counted as
 fresh Vitest passes.
 
-The Build summary lists component builds, the Static Hermes smoke check, plugin names and versions,
+The Build summary lists component builds, the runtime smoke check, plugin names and versions,
 component sizes and the signed artifact download. Its signing note identifies a run-only CI key and
-says those artifacts cannot be published. The smoke test doesn't create a separate Vitest report.
-Extension checks link the VSIX download, the Docs workflow links the published site, release
+says those artifacts cannot be published. The Build smoke test doesn't create a separate Vitest
+report. Extension checks link the VSIX download, the Docs workflow links the published site, release
 orchestration lists released components and release PR counts, and upstream-pin jobs link the source
 diff. Before expensive checks start, the selected-checks summary explains why each job is in scope.
-Expand a workflow step to tell a failure, cancellation, intentional skip or tolerated error apart.
+Step failures, cancellations, skips and tolerated errors appear in the job's step list; expand a step
+for the full diagnostics.
 
 `scripts/ci-run.mjs` captures summaries from child processes while keeping their console output,
 annotations and command failures. `scripts/ci-summary.mjs` and `.github/common/job-summary` can then
@@ -119,9 +131,9 @@ The classifier scopes checks this way:
 - Changes under `actions/{name}/` and `extensions/{name}/` are selected separately from plugin and
   repository code. Both skip the plugin build and integration suites. An extension change calls its
   reusable workflow, which lints, typechecks, tests and packages changed extensions. Action code
-  changes run the full coverage job, so Codecov receives a complete tooling report; extension-only
-  changes skip that job. Changes to a shared action helper test `actions/common/` and every action
-  that imports a helper from `actions/common/`.
+  changes run Lint and the full coverage job, which tests every action and gives Codecov a complete
+  tooling report; extension-only changes skip that job. Changes to a shared action helper test
+  `actions/common/` and every action that imports a helper from `actions/common/`.
   Action tests live beside the implementation in `actions/{name}/src/*.test.mjs`, and shared-helper
   tests live in `actions/common/src/*.test.mjs`. The `common` helper isn't a release component.
   README, changelog and version-file-only changes skip action tests.
@@ -137,8 +149,10 @@ changes select the importer packages and their dependents; catalog-only workspac
 same importer scope. Other workspace-wide
 changes, lockfile changes without importer-level changes, and changes to the integration workflow or
 its local actions run the full suite. Unrelated scripts and workflow files skip integration.
-Benchmark-only changes use Engine comparison. Biome, the type checker and unit tests don't read docs,
-so documentation-only changes cannot fail those checks.
+Benchmark-only changes use Engine comparison instead. On pull requests, Engine comparison runs only
+when the benchmark packages, their workspace dependencies or the comparison workflow change; every
+code push to `master` runs it so pull requests have a baseline. Biome, the type checker and unit
+tests don't read docs, so documentation-only changes cannot fail those checks.
 
 The main CI `📝 Docs and config` job runs for code, action and extension changes, the automatic
 `docs: update generated READMEs` commit, docs-only `master` pushes, and included README changes. A
@@ -149,13 +163,15 @@ Pull requests that change only guide pages or other Markdown outside the include
 the main CI workflow entirely.
 
 On `master`, a push made up only of `chore(master): release ...`,
-`chore: retire first-release pins`, and generated README commits skips unit and script tests,
-external-consumer tests, real-server integration, generator smoke tests and Engine comparison. The
-selection map leaves those jobs unselected, so `ci-result` accepts their intentional skips. Build,
-lint, typecheck, Docs and config checks, and release processing still run when needed.
+`chore: retire first-release pins`, starter tool version sync and generated README commits skips
+unit and script tests, external-consumer tests, real-server integration, generator smoke tests and
+Engine comparison. `scripts/changed-areas.mjs` recognizes those commit subjects, and
+`scripts/ci-gate.mjs` holds the job-selection rules used by each workflow job and CI result. The
+selection map leaves the expensive jobs unselected, so CI result accepts their intentional skips.
+Build, lint, typecheck, Docs and config checks, and release processing still run when needed.
 
-Docs-only pushes also run Docs and config plus the release workflow after `ci-result` passes.
-This lets a documentation fix trigger release catch-up and rebase the open Release Please PRs without
+Docs-only pushes also run Docs and config plus the release workflow after CI result passes. This
+lets a documentation fix trigger release catch-up and rebase the open Release Please PRs without
 running plugin builds or tests.
 
 Before a push can release, `ci-result` must pass. It checks every selected job in its `needs` list
@@ -169,20 +185,26 @@ skipped by the selection map. Version-only action and extension changes can skip
 their matrices are empty. Release Please only creates a release for a component with releasable
 changes, so running it after an action code change doesn't create an empty release.
 
-When changing a job condition, keep its downstream jobs in mind: if a required job is skipped, the
-jobs that need it are skipped too. For example, gating `📋 Lint` without also gating `🔨 Build` could
-leave a release without an artifact to attach and no job to report that problem.
+To add a CI job, add its row to the table in `scripts/ci-gate.mjs`, read it in the job's `if:`, and
+add the job to the `needs` of `🛡️ CI result`; `scripts/workflows.test.mjs` fails when one of these
+is missing. Keep downstream jobs in mind: if a selected job is skipped, the jobs that need it are
+skipped too, and CI result reports each of them.
 
 ## Label management
 
 `.github/labels.yml` is the full label catalog for the repository. Add `ai_apply_when` only to labels
-CodeRabbit is allowed to apply. Before syncing labels, the label-sync workflow removes this custom
-field and leaves labels outside the catalog untouched.
+CodeRabbit is allowed to apply. Each plugin package needs a `plugin: <Name>` label whose
+`ai_apply_when` names `packages/<dir>/`.
 
-After a catalog change reaches `master`, the workflow updates the CodeRabbit label instructions and
-commits `.coderabbit.yaml` directly with the Release GitHub App token. CodeRabbit applies labels
-using those instructions. The `ready-for-agent` and `ready-for-human` labels remain outside its
-eligible set.
+`reviews.labeling_instructions` in `.coderabbit.yaml` is generated from the catalog. After editing
+`.github/labels.yml`, run `node .github/scripts/coderabbit-labels.mjs` and commit both files.
+Issue form validation runs the same script with `--check` on pull requests and fails when the
+catalog is invalid, a plugin has no label, or `.coderabbit.yaml` is out of date.
+CodeRabbit applies labels using those instructions. The `ready-for-agent` and `ready-for-human`
+labels remain outside its eligible set.
+
+After a catalog change reaches `master`, the label-sync workflow drops `ai_apply_when`, syncs the
+labels to GitHub and leaves labels outside the catalog untouched.
 
 ## Updating upstream runtime pins
 
@@ -193,9 +215,10 @@ validate an update.
 
 The workflow compares each pin with its branch tip, validates any update, and refreshes a dedicated
 pull request. If validation fails, it closes that PR and creates or updates an issue. When
-validation passes again, it closes the issue and reopens or creates the PR. Both include the
+validation passes again, it closes the issue and opens a new PR. Both include the
 configured labels and a compare link. Static Hermes validation prepares the pinned runtime by
-checking out its source and applying the patch series in order.
+checking out its source and applying the patch series in order. It uses the same pinned CMake and
+Ninja setup as CI.
 
 ## Merging
 
@@ -307,21 +330,19 @@ merges, which prevents conflicts in the shared manifest and release configuratio
 PR goes through README and pin preparation again. Separate release PRs let you hold one plugin back
 without holding another release.
 
-The release, release-PR preparation and benchmark-comment jobs use short-lived GitHub App
-installation tokens. Install the App on this repository with `actions` read and `contents`, `issues`
-and `pull-requests` write permissions. Store its Client ID in the `RELEASE_APP_CLIENT_ID` repository
-variable and its private key in the `RELEASE_APP_PRIVATE_KEY` repository secret. Each job creates its
-own repository-scoped token. The release-PR job uses its token to push prepared README and pin
+The release, release-PR preparation and benchmark-comment jobs use short-lived installation tokens
+from the release GitHub App; [GitHub settings](#github-settings) describes its setup. Each job creates
+its own repository-scoped token. The release-PR job uses its token to push prepared README and pin
 updates, which then trigger normal pull request checks. The benchmark-comment job uses its token to
 read artifacts from earlier runs and publish the SVG as a GitHub attachment in the PR comment.
 
-`scripts/release.mjs` runs the pinned Release Please version through `pnpm dlx` and applies the
-pre-1.0.0 version policy to every configured component. Below `1.0.0`, breaking changes bump the
-minor version (`0.0.8` to `0.1.0`), while features, fixes and performance improvements bump the
-patch. At `1.0.0` and later, normal SemVer applies: breaking changes bump major, features bump minor,
-and fixes and performance improvements bump patch. The release-config check requires
-`bump-minor-pre-major` and `bump-patch-for-minor-pre-major` and rejects package overrides that turn
-either option off.
+`scripts/release.mjs` runs the pinned Release Please version through `pnpm dlx`. The root of
+`release-please-config.json` sets the pre-1.0.0 version policy for every configured component.
+Below `1.0.0`, breaking changes bump the minor version (`0.0.8` to `0.1.0`), while features, fixes
+and performance improvements bump the patch. At `1.0.0` and later, normal SemVer applies: breaking
+changes bump major, features bump minor, and fixes and performance improvements bump patch. The
+release-config check requires `bump-minor-pre-major` and `bump-patch-for-minor-pre-major` and
+rejects package overrides that turn either option off.
 
 Before Release Please calculates versions and changelogs, `scripts/utils/release-commits.mjs` adds
 shared commits through its plugin hook. If a shipped dependency changes, every plugin that bundles
@@ -359,8 +380,10 @@ replace the existing files automatically.
 Signing lets Pumpkin detect whether a plugin file has changed. A signed `.wasm` carries two custom
 sections: `pumpkin.metadata` records the plugin name, version, developer and issue time; and
 `wasm_signature` contains an Ed25519 signature over the code and metadata, plus the public key.
-Pumpkin warns when it loads an unsigned plugin unless its config sets `allow_unsigned = false`.
-Local signing is optional.
+By default Pumpkin loads an unsigned plugin and logs a warning. If the server config sets
+`allow_unsigned = false`, globally or in a plugin's override, Pumpkin skips unsigned or invalid files
+instead of loading them. Local signing is optional, but unsigned local builds won't load on a server
+with that setting.
 
 `pnpm package` builds each production plugin with its configured engine (Static Hermes by default),
 copies the result into `dist/` and writes checksums. It doesn't sign files or warn that they're
@@ -370,12 +393,13 @@ plugin from a metadata manifest. It then runs the
 [`verify-pumpkin-plugin` action](../actions/verify-pumpkin-plugin/README.md) against that manifest,
 pinning verification to the public key derived from the same run's signing key.
 
-CI build artifacts always use an ephemeral, run-only key, including on pushes. Those artifacts are
-for checks and cannot be published. The release workflow signs published artifacts with the
-repository's `PLUGIN_SIGNING_KEY` after confirming its tag points to the commit that produced the
-build. It uploads the signed `.wasm` and refreshed `.sha256` to the GitHub release. Before uploading
-to Pumpkin Market, CI verifies the artifact's expected plugin name and version and removes the
-publisher's signing sections. Market signs each public download itself.
+CI signs build artifacts on pull requests and pushes with an ephemeral, run-only key. The verified
+files go to integration tests and cannot be published; the repository release key never reaches the
+build job. The reusable release workflow confirms the tag points to the commit that produced the
+build, then signs published artifacts with the repository's `PLUGIN_SIGNING_KEY`. It uploads the
+signed `.wasm` and refreshed `.sha256` to the GitHub release. Before upload to Pumpkin Market, the
+release job verifies the repository signature and the expected plugin name and version, then removes
+the publisher's signing sections. Market signs each public download itself.
 
 | Situation | Result |
 | --- | --- |
@@ -406,13 +430,12 @@ key remain valid because each file carries its signing key; only the published p
 
 A plugin is tracked for releases only when it appears in **both** Release Please files.
 `pnpm gen` adds it to both. If a package isn't ready to release, leave it out of those files and add
-its path and a reason to `release-please-paused.json`. The release-config check verifies that each
-paused path exists and isn't tracked. To resume a package, remove it from the paused file and add it
-to both Release Please files.
-
-A first release has no previous tag to mark the history boundary, so the release helper scans the
-full history. Pausing an unreleased plugin keeps it from triggering that scan on every release run;
-the package stays in the workspace and continues through normal build and test workflows.
+its path and a reason to `release-please-paused.json`. Write the reason as a full sentence that
+names what blocks the release: the plugin's README shows it in place of the download link, and the
+root README marks the plugin as unreleased. The release-config check verifies that each paused path
+exists and isn't tracked. To resume a package, remove it from the paused file and add it to both
+Release Please files. A paused package stays in the workspace and continues through normal build and
+test workflows.
 
 `pnpm gen` handles release registration for you. If you create a plugin by hand, make these three
 updates:
@@ -485,14 +508,15 @@ plugin in `🧬 Generator`, so the generated setup stays compatible with reposit
 
 | Script | Fails when |
 | --- | --- |
-| `scripts/check-release-config.mjs` | A plugin, action or public tool is missing from either Release Please file; a paused plugin is still tracked; an action uses a strategy other than `simple`; `component` differs from the folder name; the manifest and package or version file disagree; or a component is missing a required first-release pin or still has one after release. |
+| `scripts/check-release-config.mjs` | A plugin, action, extension or public tool is missing from either Release Please file; either file lists a path that isn't a release component, such as a private benchmark; a paused plugin is still tracked; an action uses a strategy other than `simple`; `component` differs from the folder name; the manifest and package or version file disagree; or a component is missing a required first-release pin or still has one after release. |
 | `scripts/package-metadata.mjs` | A `package.json` has the wrong derived license, homepage, repository or bugs field; has no short description; or a library is missing `sideEffects`, `module` or `types`. Public npm tool engines must match `.node-version`. Use `--fix` to write derived fields. |
 | `scripts/check-docs.mjs` | A package has no README; a documentation link, heading or path doesn't exist; a `pnpm` command isn't a script; a doc page is missing from the docs index; a root script isn't documented; or a CI job is missing from the table above. |
+| `pnpm typecheck:scripts` | The JSDoc types of a release or publish script disagree with its code or its callers. It checks the scripts listed in `tsconfig.scripts.json`. |
 
 `pnpm test:scripts` tests those three scripts, `scripts/unpin-release-as.mjs`,
-`scripts/changed-areas.mjs`, the bundled release-commit selector and the agent hooks, using fixtures
-and throwaway repositories. The docs package tests action README generation and example-version
-updates with `pnpm --filter @pumpkin-plugins/docs test`. See [Keep docs in sync with code](code-style.md#keep-docs-in-sync-with-code).
+`scripts/changed-areas.mjs`, the bundled release-commit selector, the agent hooks and the issue-form
+and label scripts in `.github/scripts`, using fixtures and throwaway repositories. The docs package
+tests action README generation and example-version updates with `pnpm --filter @pumpkin-plugins/docs test`. See [Keep docs in sync with code](code-style.md#keep-docs-in-sync-with-code).
 
 ## Publishing to market.pumpkinmc.org
 
@@ -515,9 +539,11 @@ In this repository, the `market` job downloads the `.wasm` built earlier and res
 canonical name from its info module. It passes the plugin's Release Please version and changelog to
 the action by local path. After a successful publish, the job builds a localized description from
 `info.description` and the plugin README, then builds command metadata from `info.commands`. The
-description excludes generated README blocks and the `Installation` and `Commands` sections. The
-job passes the numeric listing ID returned by the publisher to the metadata action. That action
-sends a patch, leaving the listing's other fields for the Market listing editor.
+description excludes generated README blocks and the `Installation` and `Commands` sections.
+Relative links and images in the README become GitHub URLs at the plugin's release tag. The job
+passes the numeric listing ID returned by the publisher to the metadata action. In its default
+`patch` mode, that action sends a partial `PUT` with the description and commands, leaving the
+listing's other fields for the Market listing editor.
 
 Builds aren't byte-reproducible, so the job uploads the Build artifact instead of rebuilding the
 plugin. When you select a listing by name, the action searches a limited result set for an exact
@@ -551,3 +577,7 @@ Set these once in GitHub; the workflows can't configure them for you:
    Codecov's tokenless upload setting. The existing `codecov.yml` default project status gates
    tooling coverage against the base commit with a 1 percentage-point tolerance. The separate guest
    status is informational because Node coverage cannot measure plugin execution inside WASM.
+
+Forks have neither the release App nor these secrets, so each job that needs them starts its `if:`
+with `!github.event.repository.fork` and skips in a fork; `scripts/workflows.test.mjs` fails when one
+doesn't.

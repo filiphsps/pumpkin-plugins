@@ -1,0 +1,267 @@
+name: Publish plugin release
+
+# Attaches the signed plugin to an existing GitHub release and publishes it to Pumpkin Market.
+# release.yml calls this for each released plugin; recover-plugin-release.yml calls it for one tag.
+
+on:
+    workflow_call:
+        inputs:
+            tag:
+                description: Plugin release tag to publish
+                required: true
+                type: string
+            release_sha:
+                description: >-
+                    Commit the tag must point at. Leave empty to use the tag's own commit. When it is
+                    this run's commit, the job reuses the workspace and the run's `plugins` artifact.
+                required: false
+                type: string
+                default: ''
+            market_warn:
+                description: Warn instead of failing when Market credentials or the Market listing are missing
+                required: false
+                type: boolean
+                default: false
+
+permissions:
+    contents: read
+
+jobs:
+    publish:
+        name: 📎 Publish ${{ inputs.tag }}
+        if: ${{ !github.event.repository.fork }}
+        timeout-minutes: 90
+        runs-on: ubuntu-26.04
+        permissions:
+            contents: write
+        env:
+            TAG: ${{ inputs.tag }}
+            RELEASE_SHA: ${{ inputs.release_sha }}
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            GH_REPO: ${{ github.repository }}
+            CURRENT_SOURCE: ${{ inputs.release_sha == github.sha }}
+            SOURCE_ROOT: ${{ inputs.release_sha == github.sha && github.workspace || format('{0}/release-source', github.workspace) }}
+        steps:
+            - name: 🕶️ Checkout workflow and publishing actions
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+
+            - name: 🚀 Bootstrap
+              uses: ./.github/common/bootstrap
+
+            - name: 📥 Checkout the released source
+              if: env.CURRENT_SOURCE != 'true'
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  ref: ${{ inputs.tag }}
+                  path: release-source
+                  persist-credentials: false
+
+            - name: 🟢 Setup Node for the released source
+              if: env.CURRENT_SOURCE != 'true'
+              uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+              with:
+                  node-version-file: release-source/.node-version
+                  cache: pnpm
+                  cache-dependency-path: release-source/pnpm-lock.yaml
+
+            - name: 📥 Install released source dependencies
+              if: env.CURRENT_SOURCE != 'true'
+              run: pnpm --dir release-source install --frozen-lockfile
+
+            - name: 🧾 Resolve and validate release source
+              id: plugin
+              run: node scripts/resolve-plugin-release.mjs "$TAG" "$SOURCE_ROOT"
+
+            - name: 🔎 Verify the GitHub release and tag
+              id: release
+              env:
+                  WASM_NAME: ${{ steps.plugin.outputs.wasm_file }}
+              run: |
+                  set -euo pipefail
+                  source_sha="$(git -C "$SOURCE_ROOT" rev-parse 'HEAD^{commit}')"
+                  expected="${RELEASE_SHA:-$source_sha}"
+                  if [[ "$source_sha" != "$expected" ]]; then
+                      echo "::error::Checked out $source_sha for $TAG, but the release commit is $expected."
+                      exit 1
+                  fi
+                  node scripts/verify-release-tag.mjs "$TAG" "$expected"
+
+                  release="$(gh api "repos/$GH_REPO/releases/tags/$TAG")"
+                  if [[ "$(jq -r '.draft' <<< "$release")" != false ]]; then
+                      echo "::error::GitHub release $TAG is still a draft."
+                      exit 1
+                  fi
+
+                  wasm_name="$(basename "$WASM_NAME")"
+                  checksum_name="$wasm_name.sha256"
+                  has_wasm="$(jq --arg name "$wasm_name" 'any(.assets[]; .name == $name)' <<< "$release")"
+                  has_checksum="$(jq --arg name "$checksum_name" 'any(.assets[]; .name == $name)' <<< "$release")"
+                  if [[ "$has_wasm" != "$has_checksum" ]]; then
+                      echo "::error::Release $TAG has only one of $wasm_name and $checksum_name; repair the partial asset set before retrying."
+                      exit 1
+                  fi
+                  if [[ "$has_wasm" == false && "$(jq -r '.immutable' <<< "$release")" == true ]]; then
+                      echo "::error::Release $TAG is immutable and cannot accept the missing plugin assets."
+                      exit 1
+                  fi
+
+                  echo "assets_present=$has_wasm" >> "$GITHUB_OUTPUT"
+                  notes="$(jq -r '.body // ""' <<< "$release")"
+                  marker="release_notes_$(date +%s)_$RANDOM"
+                  {
+                      echo "market_release_notes<<$marker"
+                      printf '%s\n' "$notes"
+                      echo "$marker"
+                  } >> "$GITHUB_OUTPUT"
+                  echo "Verified $TAG at $source_sha; matching release assets present: $has_wasm."
+
+            - name: 🔧 Setup Static Hermes toolchain
+              id: setup-hermes
+              if: >-
+                  steps.release.outputs.assets_present == 'false' &&
+                  env.CURRENT_SOURCE != 'true' &&
+                  steps.plugin.outputs.engine == 'static-hermes'
+              uses: ./.github/common/setup-static-hermes
+              with:
+                  toolchain-config-root: release-source/tools/static-hermes-runtime
+
+            - name: 🏗️ Prepare Static Hermes
+              id: prepare-hermes
+              if: steps.setup-hermes.outcome == 'success'
+              working-directory: release-source
+              run: pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
+
+            # Only default-branch caches are shared with other branches, and an exact hit has nothing new.
+            - name: 💾 Save Static Hermes build cache
+              if: >-
+                  steps.prepare-hermes.outcome == 'success' &&
+                  steps.setup-hermes.outputs.hermes-cache-hit != 'true' &&
+                  github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+              uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: ${{ github.workspace }}/.cache/hermes
+                  key: ${{ steps.setup-hermes.outputs.hermes-cache-key }}
+
+            - name: 🔨 Build and collect the released plugin
+              if: steps.release.outputs.assets_present == 'false' && env.CURRENT_SOURCE != 'true'
+              working-directory: release-source
+              run: |
+                  pnpm run build
+                  node scripts/collect-plugins.mjs
+
+            - name: 📥 Download this run's plugin build
+              if: steps.release.outputs.assets_present == 'false' && env.CURRENT_SOURCE == 'true'
+              uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+              with:
+                  name: plugins
+                  path: dist/
+
+            - name: 📥 Download existing release assets
+              if: steps.release.outputs.assets_present == 'true'
+              env:
+                  WASM_NAME: ${{ steps.plugin.outputs.wasm_file }}
+              run: |
+                  mkdir -p "$SOURCE_ROOT/dist"
+                  wasm_name="$(basename "$WASM_NAME")"
+                  gh release download "$TAG" --dir "$SOURCE_ROOT/dist" \
+                      --pattern "$wasm_name" --pattern "$wasm_name.sha256"
+
+            - name: 🔏 Sign the plugin artifact
+              if: steps.release.outputs.assets_present == 'false'
+              uses: ./actions/sign-pumpkin-plugin
+              with:
+                  plugin-name: ${{ steps.plugin.outputs.plugin_name }}
+                  version: ${{ steps.plugin.outputs.version }}
+                  wasm-file: ${{ env.SOURCE_ROOT }}/${{ steps.plugin.outputs.wasm_file }}
+                  developer-name: Filiph Sandström
+                  signing-key: ${{ secrets.PLUGIN_SIGNING_KEY }}
+
+            - name: 🔑 Resolve expected signing public key
+              id: signing-key
+              env:
+                  PLUGIN_SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY }}
+              run: |
+                  node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+                  import { publicKeyOf } from './tools/signing/src/index.ts';
+                  const signingKey = process.env.PLUGIN_SIGNING_KEY.replaceAll(/\s/g, '');
+                  console.log(`public-key=${publicKeyOf(signingKey)}`);
+                  NODE
+
+            - name: ✅ Verify signed plugin metadata and checksum
+              uses: ./actions/verify-pumpkin-plugin
+              with:
+                  wasm-file: ${{ env.SOURCE_ROOT }}/${{ steps.plugin.outputs.wasm_file }}
+                  plugin-name: ${{ steps.plugin.outputs.plugin_name }}
+                  version: ${{ steps.plugin.outputs.version }}
+                  expected-public-key: ${{ steps.signing-key.outputs.public-key }}
+
+            - name: 🔎 Check release checksum
+              env:
+                  WASM_NAME: ${{ steps.plugin.outputs.wasm_file }}
+              run: |
+                  wasm_name="$(basename "$WASM_NAME")"
+                  (cd "$SOURCE_ROOT/dist" && sha256sum --check "$wasm_name.sha256")
+
+            - name: 📤 Attach signed artifacts to the GitHub release
+              if: steps.release.outputs.assets_present == 'false'
+              env:
+                  WASM_NAME: ${{ steps.plugin.outputs.wasm_file }}
+              run: |
+                  wasm_file="$SOURCE_ROOT/$WASM_NAME"
+                  gh release upload "$TAG" "$wasm_file" "$wasm_file.sha256"
+
+            # The GitHub release keeps its publisher signature. Market signs each public download,
+            # so send it the verified component without the publisher's signing sections.
+            - name: 🔏 Prepare component for Market signing
+              env:
+                  WASM_NAME: ${{ steps.plugin.outputs.wasm_file }}
+                  PLUGIN_NAME: ${{ steps.plugin.outputs.plugin_name }}
+                  PLUGIN_VERSION: ${{ steps.plugin.outputs.version }}
+                  PLUGIN_SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY }}
+              run: node scripts/prepare-market-plugin.mjs "$SOURCE_ROOT/$WASM_NAME" "$PLUGIN_NAME" "$PLUGIN_VERSION"
+
+            # With market_warn, missing credentials or a not-yet-published listing produce a warning
+            # and leave the GitHub release intact. API failures still fail the job so it can be retried.
+            - name: 🛒 Publish to Pumpkin Market
+              id: publish
+              uses: ./actions/publish-to-pumpkin-market
+              with:
+                  plugin-name: ${{ steps.plugin.outputs.plugin_name }}
+                  version: ${{ steps.plugin.outputs.version }}
+                  wasm-file: ${{ env.SOURCE_ROOT }}/${{ steps.plugin.outputs.wasm_file }}
+                  api-token: ${{ secrets.MARKET_API_TOKEN }}
+                  release-notes: ${{ steps.release.outputs.market_release_notes }}
+                  warn: ${{ inputs.market_warn }}
+
+            - name: 🧾 Generate Market description and commands
+              if: steps.publish.outputs.status == 'success'
+              env:
+                  PLUGIN_DIRECTORY: ${{ env.SOURCE_ROOT }}/${{ steps.plugin.outputs.path }}
+                  METADATA_FILE: ${{ runner.temp }}/market-listing-metadata.json
+              run: node scripts/market-plugin-metadata.mjs "$PLUGIN_DIRECTORY" > "$METADATA_FILE"
+
+            - name: 📝 Update Pumpkin Market listing metadata
+              if: steps.publish.outputs.status == 'success'
+              uses: ./actions/update-pumpkin-market-listing
+              with:
+                  plugin-id: ${{ steps.publish.outputs.listing-id }}
+                  metadata-file: ${{ runner.temp }}/market-listing-metadata.json
+                  api-token: ${{ secrets.MARKET_API_TOKEN }}
+                  update-mode: patch
+
+            - name: 📋 Publish summary
+              if: always()
+              uses: ./.github/common/job-summary
+              with:
+                  title: Plugin release
+                  artifact-url: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ inputs.tag }}
+                  link-label: Open the GitHub release
+                  facts: |
+                      {
+                        "Tag": ${{ toJSON(inputs.tag) }},
+                        "Plugin": ${{ toJSON(steps.plugin.outputs.plugin_name) }},
+                        "Version": ${{ toJSON(steps.plugin.outputs.version) }},
+                        "Assets already present": ${{ toJSON(steps.release.outputs.assets_present) }}
+                      }
