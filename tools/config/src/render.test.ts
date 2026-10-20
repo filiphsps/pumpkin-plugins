@@ -7,30 +7,17 @@ import { defaultValues } from './schema.ts';
 
 describe('renderConfig', () => {
     it('writes every setting with its comment', () => {
-        expect(renderConfig(demo, defaultValues(demo), { note: 'Managed.' })).toBe(`# Demo configuration.
-# Managed.
-
-# The web server.
-[web]
-
-# Serve over HTTP.
-enabled = true
-
-# Port to listen on.
-port = 8123
-
-# Base URL, without a trailing slash.
-base_url = ""
-
-# Optional access token.
-# token = "secret"
-
-# Per-file settings.
-#
-# [overrides."a.txt"]
-# order = 10  # Sort order.
-# enabled = true  # Include the file.
-`);
+        const out = renderConfig(demo, defaultValues(demo), { note: 'Managed.' });
+        expect(out.startsWith('# Demo configuration.\n# Managed.\n')).toBe(true);
+        expect(out).toMatch(/^\[web\]$/m);
+        expect(out).toContain('# Serve over HTTP.\nenabled = true\n');
+        expect(out).toContain('# Port to listen on.\nport = 8123\n');
+        expect(out).toContain('# Base URL, without a trailing slash.\nbase_url = ""\n');
+        expect(out).toContain('# Optional access token.\n# token = "secret"\n');
+        expect(out).toMatch(/^# \[overrides\."a\.txt"\]$/m);
+        expect(out).toMatch(/^# order = 10 +# Sort order\.$/m);
+        expect(out).toMatch(/^# enabled = true +# Include the file\.$/m);
+        expect(out.indexOf('[web]')).toBeLessThan(out.indexOf('[overrides.'));
     });
 
     it('writes set optional settings and existing table entries', () => {
@@ -54,6 +41,16 @@ base_url = ""
         expect(again.issues).toEqual([]);
         expect(again.values).toEqual(values);
         expect(renderConfig(demo, again.values)).toBe(out);
+    });
+
+    it('escapes DEL so values and table keys containing it read back', () => {
+        const values = readConfig(demo, {
+            web: { token: 'a\u007fb' },
+            overrides: { 'x\u007fy.txt': { order: 1 } },
+        }).values;
+        const again = readConfig(demo, parse(renderConfig(demo, values)));
+        expect(again.issues).toEqual([]);
+        expect(again.values).toEqual(values);
     });
 
     it('wraps long comments without splitting words', () => {

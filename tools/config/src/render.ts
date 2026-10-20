@@ -1,4 +1,4 @@
-import type { Fields } from './fields.ts';
+import { type Fields, tomlString } from './fields.ts';
 import type { ConfigSchema, ConfigValues, SectionNode, TableNode } from './schema.ts';
 
 /** Longest comment line the renderer produces. */
@@ -69,7 +69,7 @@ function renderSection(name: string, node: SectionNode, values: Record<string, u
 }
 
 function renderTable(name: string, node: TableNode, entries: Record<string, unknown>): string[][] {
-    const header = JSON.stringify(node.exampleKey);
+    const header = tomlString(node.exampleKey);
     const example = [
         ...commentLines(node.description),
         '#',
@@ -78,10 +78,7 @@ function renderTable(name: string, node: TableNode, entries: Record<string, unkn
     ];
     const blocks = [example];
     for (const [key, entry] of Object.entries(entries)) {
-        blocks.push([
-            `[${name}.${JSON.stringify(key)}]`,
-            ...renderEntry(node.fields, entry as Record<string, unknown>),
-        ]);
+        blocks.push([`[${name}.${tomlString(key)}]`, ...renderEntry(node.fields, entry as Record<string, unknown>)]);
     }
     return blocks;
 }

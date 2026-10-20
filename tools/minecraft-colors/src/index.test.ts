@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { ansi, color, colorTable, minecraftColorTable } from './index.ts';
+import {
+    ansi,
+    ansiColorTable,
+    type ColorApi,
+    color,
+    colorTable,
+    minecraftColorTable,
+    type TextFormatter,
+} from './index.ts';
 
 describe('Minecraft string formatting', () => {
     it('returns legacy codes that can be embedded in a message string', () => {
@@ -21,6 +29,15 @@ describe('Minecraft string formatting', () => {
 
     it('rejects hex colors that are not six hexadecimal digits', () => {
         expect(() => color.hex('#12abc')).toThrow('Expected a six-digit hex color');
+    });
+
+    it('restores the outer style after a nested formatted segment', () => {
+        expect(color.red.bold(`Failed for ${color.gold('Bert')} at spawn`)).toBe(
+            '§c§lFailed for §6Bert§r§c§l at spawn§r',
+        );
+        expect(ansi.red.bold(`Failed for ${ansi.gold('Bert')} at spawn`)).toBe(
+            '\u001b[1;91mFailed for \u001b[33mBert\u001b[0m\u001b[1;91m at spawn\u001b[0m',
+        );
     });
 
     it('leaves text unchanged when no style is selected', () => {
@@ -56,6 +73,12 @@ describe('Minecraft string formatting', () => {
         expect(ansi.red.bold.underline('Warning')).toBe('\u001b[1;4;91mWarning\u001b[0m');
         expect(ansi.hex('#12aBcD').italic('Custom')).toBe('\u001b[3;38;2;18;171;205mCustom\u001b[0m');
         expect(ansi('Plain')).toBe('Plain');
+    });
+
+    it('keeps obfuscated text visible in terminal output', () => {
+        expect(ansi.obfuscated('token')).toBe('token');
+        expect(ansi.red.obfuscated('token')).toBe('\u001b[91mtoken\u001b[0m');
+        expect(color.obfuscated('token')).toBe('§ktoken§r');
     });
 
     it('returns a Minecraft table with each color shown normally and in bold', () => {
@@ -111,7 +134,7 @@ describe('Minecraft string formatting', () => {
             ['white', 97],
         ] as const;
         const nameWidth = 11;
-        const lines = colorTable().split('\n');
+        const lines = ansiColorTable().split('\n');
 
         expect(lines).toHaveLength(colors.length + 2);
         expect(lines[0]).toBe('Color       | Bold');
@@ -122,5 +145,16 @@ describe('Minecraft string formatting', () => {
                 return `\u001b[${code}m${name}\u001b[0m${padding} | \u001b[1;${code}m${name}\u001b[0m`;
             }),
         );
+    });
+
+    it('keeps colorTable as an alias of ansiColorTable', () => {
+        expect(colorTable).toBe(ansiColorTable);
+    });
+
+    it('accepts either formatter where a formatter type is expected', () => {
+        const warn = (formatter: TextFormatter) => formatter('Warning');
+        const apis: ColorApi[] = [color, ansi];
+
+        expect(apis.map((api) => warn(api.named.error))).toEqual(['§4§lWarning§r', '\u001b[1;31mWarning\u001b[0m']);
     });
 });
