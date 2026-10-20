@@ -1,5 +1,3 @@
-import type { ChunkLoader, TerrainGenerator } from './chunks.ts';
-
 /** A rectangular area expressed in absolute block coordinates. */
 export interface TerrainRegion {
     depth: number;
@@ -26,19 +24,16 @@ export interface TerrainSource {
     top?(x: number, z: number): number;
 }
 
-/** Terrain source plus the platform capabilities used to prepare missing chunks. */
+/** Terrain source plus an optional check that a region can be sampled. */
 export interface TerrainAccess extends TerrainSource {
-    chunkLoader: ChunkLoader;
     prepare?(region: TerrainRegion): TerrainPreparationResult;
-    terrainGenerator: TerrainGenerator;
 }
 
 /** Whether a rectangular terrain region is ready to sample. */
 export type TerrainPreparationResult =
     | { status: 'ready' }
     | { status: 'pending' }
-    | { status: 'unavailable'; reason: string }
-    | { status: 'failed'; reason: string };
+    | { status: 'unavailable'; reason: string };
 
 /** One run of material and light values within a captured column. */
 export interface TerrainSegment {
@@ -77,6 +72,7 @@ export class TerrainCapture {
     private column = 0;
     private y: number;
     private segmentCount = 0;
+    private sampled = 0;
 
     /**
      * Initializes an empty capture that starts at the highest Y of the first column.
@@ -127,6 +123,7 @@ export class TerrainCapture {
             const x = this.region.originX + Math.floor(this.column / this.region.depth);
             const z = this.region.originZ + (this.column % this.region.depth);
             const sample = source.sample(x, this.region.minY + this.y, z);
+            this.sampled++;
             let span = 1;
             if (this.y === this.region.height - 1 && source.top && this.isEmpty(sample.material)) {
                 const top = source.top(x, z);
@@ -169,6 +166,11 @@ export class TerrainCapture {
             }
         }
         return this.column === this.area;
+    }
+
+    /** Returns how many blocks all steps have sampled so far, for budgets that track work per sample. */
+    samples(): number {
+        return this.sampled;
     }
 
     /** Returns the fraction of the region covered, including any collapsed spans. */

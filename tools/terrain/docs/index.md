@@ -1,6 +1,6 @@
 # Terrain capture
 
-`@pumpkin-plugins/terrain` provides reusable terrain capture and chunk-access contracts. It does
+`@pumpkin-plugins/terrain` provides reusable terrain capture and host access contracts. It does
 not depend on Pumpkin APIs or Minecraft wire formats, so your plugin can connect it to its own world
 data and encode the captured result for its needs.
 
@@ -17,18 +17,17 @@ If your source provides a column height with `top()` and you identify empty mate
 plugin can spread a large capture across server ticks instead of sampling the whole region at once.
 
 `AdaptiveWorkBudget` chooses a work limit from recent server MSPT and the measured time per work
-unit. Call `observe()` after each step to update its cost estimate, and pass your configured maximum
-to `next()`; the returned limit will not exceed it. The budget leaves a configurable portion of the
-tick for the server and other plugins, making it useful for incremental work that should slow down
-when the server is busy.
+unit. Call `observe()` after each step with the blocks it sampled to update its cost estimate;
+`TerrainCapture.samples()` returns the running total, so the difference across a step is that
+count. Pass your configured maximum to `next()`; the returned limit will not exceed it. The budget
+leaves a configurable portion of the tick for the server and other plugins, making it useful for
+incremental work that should slow down when the server is busy.
 
-## Chunk access adapters
+## Region readiness
 
-`ChunkLoader` and `TerrainGenerator` describe optional host capabilities. `acquireChunk` first checks
-for an already-loaded chunk, then asks the loader to load a saved chunk. It requests generation when
-loading reports that the chunk is missing or loading is unavailable. A provider may report that an
-operation is pending, unavailable, or failed, so your caller can decide how to handle each outcome.
-The exported unavailable providers let a platform expose unsupported operations explicitly.
+`TerrainAccess` adds an optional `prepare(region)` check to a source. Your host adapter returns
+`ready` when the region can be sampled, `pending` to try again later, or `unavailable` with a reason,
+so your caller can defer a capture instead of sampling missing terrain.
 
 These helpers do not choose a platform's world-data adapter or an output format. Your plugin supplies
-the providers and source, then decides how to store the captured columns or send them to clients.
+the source, then decides how to store the captured columns or send them to clients.
