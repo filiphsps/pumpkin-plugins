@@ -46,6 +46,25 @@ body:
           description: Include the server version if it may be relevant.
       validations:
           required: false
+    - type: dropdown
+      id: client-edition
+      attributes:
+          label: Minecraft client edition (optional)
+          description: Choose the edition of the client that showed the problem.
+          options:
+              - Java
+              - Bedrock
+              - Both
+              - Unknown
+      validations:
+          required: false
+    - type: input
+      id: client-version
+      attributes:
+          label: Minecraft client version (optional)
+          description: The version shown on the client's title screen.
+      validations:
+          required: false
     - type: input
       id: plugin-version
       attributes:

@@ -2,11 +2,11 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
-import { formPolicies } from './issue-form-rules.mjs';
 
 const repositoryRoot = fileURLToPath(new URL('../..', import.meta.url));
 const issueTemplateDirectory = '.github/ISSUE_TEMPLATE';
-const triageLabel = 'status: needs triage';
+/** Label every issue form applies so new issues enter the triage queue. */
+export const triageLabel = 'status: needs triage';
 const supportedFieldTypes = new Set(['checkboxes', 'dropdown', 'input', 'markdown', 'textarea', 'upload']);
 
 function isRecord(value) {
@@ -36,6 +36,31 @@ export async function loadIssueForms(rootDirectory = repositoryRoot) {
 }
 
 /**
+ * Derives the intake rules for one issue form from its template: the labels of its required fields
+ * and the category label it applies next to the triage label.
+ */
+export function issueFormPolicy({ id, fileName, definition }) {
+    const labels = Array.isArray(definition?.labels) ? definition.labels : [];
+    const fields = Array.isArray(definition?.body) ? definition.body : [];
+    return {
+        id,
+        fileName,
+        categoryLabel: labels.find((label) => label !== triageLabel),
+        requiredFields: fields
+            .filter((field) => field?.type !== 'markdown' && field?.validations?.required === true)
+            .map((field) => field.attributes?.label)
+            .filter((label) => typeof label === 'string'),
+    };
+}
+
+/**
+ * Loads the intake rules of every issue form, as issue intake applies them.
+ */
+export async function loadIssueFormPolicies(rootDirectory = repositoryRoot) {
+    return (await loadIssueForms(rootDirectory)).map(issueFormPolicy);
+}
+
+/**
  * Checks the issue forms against the repository's intake rules and label catalog.
  */
 export async function validateIssueFormDefinitions(rootDirectory = repositoryRoot) {
@@ -51,12 +76,8 @@ export async function validateIssueFormDefinitions(rootDirectory = repositoryRoo
         };
     }
 
-    const expectedFileNames = [...formPolicies.keys()].sort();
-    const actualFileNames = forms.map((form) => form.fileName).sort();
-    if (JSON.stringify(actualFileNames) !== JSON.stringify(expectedFileNames)) {
-        errors.push(
-            `Expected issue form files ${expectedFileNames.join(', ')}; found ${actualFileNames.join(', ') || 'none'}.`,
-        );
+    if (forms.length === 0) {
+        errors.push(`${issueTemplateDirectory} must contain at least one issue form.`);
     }
 
     let config;
@@ -99,13 +120,8 @@ export async function validateIssueFormDefinitions(rootDirectory = repositoryRoo
     const formNames = new Set();
     for (const form of forms) {
         const { definition } = form;
-        const policy = formPolicies.get(form.fileName);
         const prefix = `${issueTemplateDirectory}/${form.fileName}`;
 
-        if (!policy) {
-            errors.push(`${prefix} is not part of the configured issue form set.`);
-            continue;
-        }
         if (!isRecord(definition)) {
             errors.push(`${prefix} must contain a YAML mapping.`);
             continue;
@@ -128,13 +144,14 @@ export async function validateIssueFormDefinitions(rootDirectory = repositoryRoo
             errors.push(`${prefix} must not assign a default owner.`);
         }
 
-        const expectedLabels = [policy.categoryLabel, triageLabel];
         if (
             !Array.isArray(definition.labels) ||
-            expectedLabels.some((label) => !definition.labels.includes(label)) ||
-            definition.labels.some((label) => !expectedLabels.includes(label))
+            new Set(definition.labels).size !== 2 ||
+            definition.labels.length !== 2 ||
+            !definition.labels.includes(triageLabel) ||
+            definition.labels.some((label) => typeof label !== 'string')
         ) {
-            errors.push(`${prefix} must apply exactly these labels: ${expectedLabels.join(', ')}.`);
+            errors.push(`${prefix} must apply "${triageLabel}" and exactly one category label.`);
         }
         for (const label of Array.isArray(definition.labels) ? definition.labels : []) {
             if (!labelNames.has(label)) {
@@ -148,7 +165,6 @@ export async function validateIssueFormDefinitions(rootDirectory = repositoryRoo
         }
 
         const fieldIds = new Set();
-        const requiredLabels = [];
         let hasOptionalComponent = false;
         for (const [index, field] of definition.body.entries()) {
             const fieldPrefix = `${prefix} body[${index}]`;
@@ -190,9 +206,6 @@ export async function validateIssueFormDefinitions(rootDirectory = repositoryRoo
                 errors.push(`${fieldPrefix} validations.required must be a boolean.`);
             }
 
-            if (field.validations?.required === true && typeof field.attributes.label === 'string') {
-                requiredLabels.push(field.attributes.label);
-            }
             if (field.id === 'affected-component') {
                 hasOptionalComponent = field.validations?.required === false;
             }
@@ -210,8 +223,8 @@ export async function validateIssueFormDefinitions(rootDirectory = repositoryRoo
             }
         }
 
-        if (JSON.stringify(requiredLabels) !== JSON.stringify(policy.requiredFields)) {
-            errors.push(`${prefix} required fields must be: ${policy.requiredFields.join('; ')}.`);
+        if (issueFormPolicy(form).requiredFields.length === 0) {
+            errors.push(`${prefix} must have at least one required field so issue intake can recognize it.`);
         }
         if (!hasOptionalComponent) {
             errors.push(`${prefix} must have an optional field with id "affected-component".`);
