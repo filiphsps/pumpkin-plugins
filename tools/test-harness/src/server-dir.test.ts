@@ -107,9 +107,10 @@ describe('prepareServerDir', () => {
         const outsideFile = path.join(outsideDir, 'outside.txt');
         fs.writeFileSync(outsideFile, 'original');
 
-        const validationRoot = path.join(os.tmpdir(), 'pumpkin-test-validation-root');
-        const relativePath = path.relative(validationRoot, outsideFile);
-        const nestedRelativePath = ['nested', path.relative(path.join(validationRoot, 'nested'), outsideFile)].join(
+        // Server directories are created directly in the temp directory, like this sibling.
+        const serverDir = path.join(os.tmpdir(), 'pumpkin-test-sibling');
+        const relativePath = path.relative(serverDir, outsideFile);
+        const nestedRelativePath = ['nested', path.relative(path.join(serverDir, 'nested'), outsideFile)].join(
             path.sep,
         );
         const windowsRelativePath = relativePath.split(path.sep).join(path.win32.sep);

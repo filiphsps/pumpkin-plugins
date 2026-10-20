@@ -1,4 +1,5 @@
-import { type ChildProcessWithoutNullStreams, spawnSync } from 'node:child_process';
+import { type ChildProcessWithoutNullStreams, spawn, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -119,7 +120,79 @@ try {
     return { result, leftovers: fs.readdirSync(temp), logs: fs.existsSync(logs) ? fs.readdirSync(logs) : [] };
 }
 
+function isRunning(pid: number): boolean {
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Starts a server from a separate test process, ends that process with a signal and reports
+ * whether the server outlived it. The stand-in server ignores stdin closing, like Pumpkin does.
+ * @param signal - The signal that ends the test process.
+ */
+async function signalProbe(signal: 'SIGINT' | 'SIGTERM') {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-signal-probe-'));
+    made.push(dir);
+    const temp = path.join(dir, 'temp');
+    fs.mkdirSync(temp);
+    const pidFile = path.join(dir, 'server.pid');
+    const binary = path.join(dir, 'pumpkin');
+    fs.writeFileSync(
+        binary,
+        `#!/usr/bin/env node
+require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));
+console.log('Server is now running');
+setInterval(() => {}, 1000);
+`,
+        { mode: 0o755 },
+    );
+    const module = pathToFileURL(path.join(import.meta.dirname, 'instance.ts')).href;
+    const program = `
+import { startPumpkin } from ${JSON.stringify(module)};
+await startPumpkin({ readyTimeoutMs: 3_000 });
+console.log('PROBE_READY');
+setInterval(() => {}, 1000);
+`;
+    const probe = spawn(
+        process.execPath,
+        ['--experimental-transform-types', '--input-type=module', '--eval', program],
+        {
+            env: { ...process.env, TMPDIR: temp, PUMPKIN_BIN: binary, PUMPKIN_KEEP_DIR: '', PUMPKIN_TEST_LOG_DIR: '' },
+            stdio: ['ignore', 'pipe', 'inherit'],
+        },
+    );
+    let serverPid: number | undefined;
+    try {
+        probe.stdout.setEncoding('utf8');
+        for await (const chunk of probe.stdout) if (String(chunk).includes('PROBE_READY')) break;
+        serverPid = Number(fs.readFileSync(pidFile, 'utf8'));
+        const exited = once(probe, 'exit');
+        probe.kill(signal);
+        const [, exitSignal] = (await exited) as [number | null, NodeJS.Signals | null];
+        const deadline = Date.now() + 3_000;
+        while (isRunning(serverPid) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 50));
+        return { exitSignal, serverOutlived: isRunning(serverPid) };
+    } finally {
+        probe.kill('SIGKILL');
+        if (serverPid !== undefined && isRunning(serverPid)) process.kill(serverPid, 'SIGKILL');
+    }
+}
+
 describe('startPumpkin', () => {
+    it.skipIf(process.platform === 'win32').each(['SIGINT', 'SIGTERM'] as const)(
+        'stops its servers when the test process is ended by %s',
+        async (signal) => {
+            const probe = await signalProbe(signal);
+            expect(probe.serverOutlived).toBe(false);
+            expect(probe.exitSignal).toBe(signal);
+        },
+        10_000,
+    );
+
     it.each([
         ['EACCES', /EACCES/],
         ['interpreter', /ENOENT/],
@@ -169,6 +242,17 @@ describe('startPumpkin', () => {
         const server = await startPumpkin();
         try {
             expect(server.logs()).toContain('fake RUST_LOG=info');
+        } finally {
+            await server.stop();
+        }
+    });
+
+    it('passes a requested log level to the server, for tests that wait on debug logs', async () => {
+        fakePumpkin(0, [], true);
+
+        const server = await startPumpkin({ logLevel: 'debug' });
+        try {
+            expect(server.logs()).toContain('fake RUST_LOG=debug');
         } finally {
             await server.stop();
         }
