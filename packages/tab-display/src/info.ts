@@ -3,11 +3,7 @@ import { commands } from './commands/spec.ts';
 import { configInfo } from './config.ts';
 import { PLUGIN_NAME } from './name.ts';
 
-/**
- * What the plugin is and offers. Feeds both its Pumpkin metadata and its generated README. Declare
- * commands with `defineCommands` and list them here with `commandInfos`, so they are documented from
- * what is registered (see docs/plugin-info-and-readmes.md).
- */
+/** TabDisplay metadata and README source: data-folder permissions, commands and config settings. */
 export const info = {
     name: PLUGIN_NAME,
     description: 'TabDisplay formats Java player-list names, headers, and footers. It leaves Bedrock lists unchanged.',

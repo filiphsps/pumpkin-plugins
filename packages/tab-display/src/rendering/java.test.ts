@@ -100,7 +100,6 @@ function javaPlayer(id: string, version = 'v-26-3') {
     const player = {
         getId: () => ({ value: id }),
         getName: () => `Player-${id}`,
-        getPing: () => 36,
         asJava: () => ({
             getVersion: () => version,
             [Symbol.dispose]: () => {
@@ -119,7 +118,6 @@ function javaPlayer(id: string, version = 'v-26-3') {
             transferTextComponent(header);
             transferTextComponent(footer);
         }),
-        setTabListOrder: vi.fn(),
         [Symbol.dispose]: () => {
             playerDisposals += 1;
         },
@@ -144,12 +142,10 @@ function bedrockPlayer(id: string) {
     const player = {
         getId: () => ({ value: id }),
         getName: () => `Player-${id}`,
-        getPing: () => 0,
         asJava: () => undefined,
         asBedrock: () => ({ [Symbol.dispose]: () => (bedrockDisposals += 1) }),
         setTabListName: vi.fn(),
         setTabListHeaderFooter: vi.fn(),
-        setTabListOrder: vi.fn(),
         [Symbol.dispose]: () => {
             playerDisposals += 1;
         },
@@ -160,7 +156,6 @@ function bedrockPlayer(id: string) {
         bedrockDisposals: () => bedrockDisposals,
         setTabListName: player.setTabListName,
         setTabListHeaderFooter: player.setTabListHeaderFooter,
-        setTabListOrder: player.setTabListOrder,
     };
 }
 
@@ -186,8 +181,8 @@ describe('Java tab display host', () => {
         host.setServer(fakeServer([java.player, bedrock.player]));
 
         expect(host.snapshotPlayers(10)).toEqual([
-            { uuid: 'java', name: 'Player-java', edition: 'java', javaVersion: 'v-26-3', ping: 36 },
-            { uuid: 'bedrock', name: 'Player-bedrock', edition: 'bedrock', ping: 0 },
+            { uuid: 'java', name: 'Player-java', edition: 'java', javaVersion: 'v-26-3' },
+            { uuid: 'bedrock', name: 'Player-bedrock', edition: 'bedrock' },
         ]);
         expect(java.javaHandleDisposals()).toBe(1);
         expect(java.playerDisposals()).toBe(0);
@@ -308,19 +303,14 @@ describe('Java tab display host', () => {
         host.endTick();
     });
 
-    it('does not claim native ordering until direction is verified on a Java client', () => {
-        const player = javaPlayer('java');
+    it('formats Java players on any protocol version the server accepts', () => {
+        const player = javaPlayer('java', 'v-26-4');
         const host = new JavaTabDisplayHost();
         host.setServer(fakeServer([player.player]));
         host.snapshotPlayers(10);
 
-        expect(host.setOrder('java', 0)).toMatchObject({
-            kind: 'unsupported',
-            reason: expect.stringContaining('direction'),
-        });
-        expect(
-            (player.player as unknown as { setTabListOrder: ReturnType<typeof vi.fn> }).setTabListOrder,
-        ).not.toHaveBeenCalled();
+        expect(host.setEntryName('java', { text: 'Name' })).toEqual({ kind: 'applied' });
+        expect(host.setHeaderFooter('java', [{ text: 'Header' }], [])).toEqual({ kind: 'applied' });
         host.endTick();
     });
 
@@ -331,10 +321,8 @@ describe('Java tab display host', () => {
         host.snapshotPlayers(10);
 
         expect(host.setEntryName('bedrock', { text: 'Name' })).toMatchObject({ kind: 'unsupported' });
-        expect(host.setOrder('bedrock', 0)).toMatchObject({ kind: 'unsupported' });
         expect(host.setHeaderFooter('bedrock', [], [])).toMatchObject({ kind: 'unsupported' });
         expect(player.setTabListName).not.toHaveBeenCalled();
-        expect(player.setTabListOrder).not.toHaveBeenCalled();
         expect(player.setTabListHeaderFooter).not.toHaveBeenCalled();
         host.endTick();
     });

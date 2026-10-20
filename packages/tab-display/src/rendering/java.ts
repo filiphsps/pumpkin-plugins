@@ -3,20 +3,8 @@ import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { type RgbColor, TextComponent } from 'pumpkin:plugin/text@0.1.0';
 import * as uuid from 'pumpkin:plugin/uuid@0.1.0';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
-import { type ApplyResult, JAVA_DISPLAY_VERSION, type PlayerSnapshot, type RenderedLine } from '../model.ts';
+import type { ApplyResult, PlayerSnapshot, RenderedLine } from '../model.ts';
 import type { TabDisplayHost } from '../service.ts';
-
-/** Java client version currently allowed through the adapter gate. */
-export { JAVA_DISPLAY_VERSION };
-
-/** Unsupported reason while the native Java client ordering direction lacks a live probe. */
-export const SORT_DIRECTION_UNVERIFIED = 'Native Java tab order direction is not verified on a client.';
-
-/** Options gated by an observed Java client contract. */
-export interface JavaTabDisplayHostOptions {
-    /** Java clients display lower order values first. Keep unset until a client probe proves this. */
-    readonly orderDirection?: 'ascending' | 'descending';
-}
 
 interface ActivePlayer {
     readonly player: Player;
@@ -35,24 +23,16 @@ export class JavaTabDisplayHost implements TabDisplayHost {
     private activeResources: Player[] = [];
     private readonly nameOwnership = new Map<string, NameOwnership>();
     private readonly headerOwnership = new Set<string>();
-    private readonly orderOwnership = new Set<string>();
-
-    constructor(private readonly options: JavaTabDisplayHostOptions = {}) {}
 
     /** Supplies the server handle only for the duration of one scheduled callback. */
     setServer(server: Server): void {
         this.server = server;
     }
 
-    /** Drops the transient server handle after one scheduled callback. */
-    clearServer(): void {
-        this.server = undefined;
-    }
-
     /** Releases player resources and the server handle before the callback returns. */
     endTick(): void {
         this.releaseActivePlayers();
-        this.clearServer();
+        this.server = undefined;
     }
 
     /** Copies at most `limit + 1` snapshots; the extra record reports capacity overflow. */
@@ -94,8 +74,6 @@ export class JavaTabDisplayHost implements TabDisplayHost {
     setEntryName(uuidValue: string, value: RenderedLine | undefined): ApplyResult {
         const active = this.activePlayers.get(uuidValue);
         if (active === undefined) return { kind: 'failed', error: 'Player is not in the current display snapshot' };
-        const supported = javaDisplaySupport(active.snapshot);
-        if (supported.kind === 'unsupported') return supported;
         if (active.snapshot.edition !== 'java') return bedrockUnsupported('row names');
 
         const owner = this.nameOwnership.get(uuidValue);
@@ -134,35 +112,10 @@ export class JavaTabDisplayHost implements TabDisplayHost {
         }
     }
 
-    /** Applies one native order value only after protocol support and direction are verified. */
-    setOrder(uuidValue: string, order: number): ApplyResult {
-        const active = this.activePlayers.get(uuidValue);
-        if (active === undefined) return { kind: 'failed', error: 'Player is not in the current display snapshot' };
-        if (active.snapshot.edition !== 'java') return bedrockUnsupported('row ordering');
-        if (!supportsNativeOrder(active.snapshot.javaVersion)) {
-            return { kind: 'unsupported', reason: 'Native Java tab ordering requires client protocol 1.21.2 or later' };
-        }
-        if (this.options.orderDirection === undefined)
-            return { kind: 'unsupported', reason: SORT_DIRECTION_UNVERIFIED };
-        if (!Number.isSafeInteger(order) || order < 0 || order > 2_147_483_647)
-            return { kind: 'failed', error: 'Tab order exceeds signed-32-bit range' };
-
-        const nativeOrder = this.options.orderDirection === 'ascending' ? order : -order;
-        try {
-            active.player.setTabListOrder(nativeOrder);
-            this.orderOwnership.add(uuidValue);
-            return { kind: 'applied' };
-        } catch {
-            return { kind: 'failed', error: 'Could not apply the Java tab row order' };
-        }
-    }
-
     /** Applies viewer-specific header and footer text without calling Java-only fields on Bedrock. */
     setHeaderFooter(uuidValue: string, header: readonly RenderedLine[], footer: readonly RenderedLine[]): ApplyResult {
         const active = this.activePlayers.get(uuidValue);
         if (active === undefined) return { kind: 'failed', error: 'Player is not in the current display snapshot' };
-        const supported = javaDisplaySupport(active.snapshot);
-        if (supported.kind === 'unsupported') return supported;
         if (active.snapshot.edition !== 'java') return bedrockUnsupported('header and footer');
 
         let headerComponent: TextComponent | undefined;
@@ -181,7 +134,7 @@ export class JavaTabDisplayHost implements TabDisplayHost {
         }
     }
 
-    /** Restores only owned names; order resets to the pinned API's default zero, headers clear. */
+    /** Restores only owned names and clears owned headers and footers. */
     resetOwned(uuidValue: string): void {
         const active = this.activePlayers.get(uuidValue);
         if (active === undefined) {
@@ -205,11 +158,6 @@ export class JavaTabDisplayHost implements TabDisplayHost {
                 disposeWasiResource(emptyHeader);
                 disposeWasiResource(emptyFooter);
             }
-        }
-
-        if (this.orderOwnership.has(uuidValue)) {
-            active.player.setTabListOrder(0);
-            this.orderOwnership.delete(uuidValue);
         }
     }
 
@@ -246,11 +194,7 @@ export class JavaTabDisplayHost implements TabDisplayHost {
     }
 
     private retainOwnership(current: ReadonlySet<string>): void {
-        for (const uuidValue of new Set([
-            ...this.nameOwnership.keys(),
-            ...this.headerOwnership,
-            ...this.orderOwnership,
-        ])) {
+        for (const uuidValue of new Set([...this.nameOwnership.keys(), ...this.headerOwnership])) {
             if (current.has(uuidValue)) continue;
             this.dropOwnership(uuidValue);
         }
@@ -259,50 +203,26 @@ export class JavaTabDisplayHost implements TabDisplayHost {
     private dropOwnership(uuidValue: string): void {
         this.nameOwnership.delete(uuidValue);
         this.headerOwnership.delete(uuidValue);
-        this.orderOwnership.delete(uuidValue);
     }
-}
-
-/** Returns whether a Java protocol version has the list-order field. */
-export function supportsNativeOrder(version: string | undefined): boolean {
-    if (version === undefined || version === 'unknown') return false;
-    const match = /^v-(\d+)-(\d+)(?:-(\d+))?$/.exec(version);
-    if (match === null) return false;
-    const major = Number(match[1]);
-    const minor = Number(match[2]);
-    const patch = Number(match[3] ?? 0);
-    return major > 1 || (major === 1 && (minor > 21 || (minor === 21 && patch >= 2)));
 }
 
 function readPlayer(player: Player): PlayerSnapshot {
     const id = uuid.toString(player.getId());
     const name = player.getName();
-    const ping = player.getPing();
     let java = undefined as ReturnType<Player['asJava']>;
     let bedrock = undefined as ReturnType<Player['asBedrock']>;
     try {
         java = player.asJava();
         if (java !== undefined) {
             const javaVersion = java.getVersion();
-            return { uuid: id, name, edition: 'java', javaVersion, ping };
+            return { uuid: id, name, edition: 'java', javaVersion };
         }
         bedrock = player.asBedrock();
-        return { uuid: id, name, edition: bedrock === undefined ? 'unknown' : 'bedrock', ping };
+        return { uuid: id, name, edition: bedrock === undefined ? 'unknown' : 'bedrock' };
     } finally {
         disposeWasiResource(java);
         disposeWasiResource(bedrock);
     }
-}
-
-function javaDisplaySupport(snapshot: PlayerSnapshot): ApplyResult {
-    if (snapshot.edition !== 'java') return bedrockUnsupported('Java tab display fields');
-    if (snapshot.javaVersion !== JAVA_DISPLAY_VERSION) {
-        return {
-            kind: 'unsupported',
-            reason: `Java tab display calls are gated to ${JAVA_DISPLAY_VERSION}; live client behavior is unverified`,
-        };
-    }
-    return { kind: 'applied' };
 }
 
 function bedrockUnsupported(feature: string): ApplyResult {

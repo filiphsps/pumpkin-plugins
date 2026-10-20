@@ -9,8 +9,7 @@
         "plugin",
         "tab-display",
         "tab-list",
-        "bedrock",
-        "geyser"
+        "bedrock"
     ],
     "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/packages/tab-display#readme",
     "bugs": {
@@ -40,8 +39,8 @@
     "scripts": {
         "build": "pumpkin-plugins-build",
         "build:parse-ts": "pumpkin-plugins-build --parse-ts",
-        "readme": "pumpkin-plugins-docs && pumpkin-plugins-docs generate docs.ts",
-        "readme:check": "pumpkin-plugins-docs --check && pumpkin-plugins-docs generate docs.ts --check",
+        "readme": "pumpkin-plugins-docs",
+        "readme:check": "pumpkin-plugins-docs --check",
         "test": "vitest run --project unit",
         "test:coverage": "vitest run --project unit --coverage",
         "test:integration": "vitest run --project integration",
@@ -51,6 +50,7 @@
     "dependencies": {
         "@pumpkin-plugins/config": "workspace:*",
         "@pumpkin-plugins/docs": "workspace:*",
+        "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
         "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@pumpkin-plugins/pumpkin-pie-api": "catalog:",
