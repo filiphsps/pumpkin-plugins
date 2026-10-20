@@ -318,6 +318,23 @@ test('keeps disabled browser modules terminal instead of reading their source', 
     expect(graph.files.map((file) => file.path)).toEqual([join(root, 'main.ts')]);
 });
 
+test('checks disabled browser modules per importer directory', async () => {
+    const root = await project({
+        'main.ts': "import './a/index'; import './b/index';",
+        'a/package.json': '{"browser":{"./disabled.ts":false}}',
+        'a/index.ts': "import './disabled';",
+        'a/disabled.ts': 'export {};',
+        'b/index.ts': "import './disabled';",
+        'b/disabled.ts': 'export {};',
+    });
+    const graph = await analyzeModuleGraph({ projectRoot: root, entryPoints: ['main.ts'] });
+    const target = (importer: string) =>
+        graph.edges.find((edge) => edge.importer === join(root, importer) && edge.specifier === './disabled')
+            ?.resolution;
+    expect(target('a/index.ts')).toEqual({ status: 'external', path: join(root, 'a/disabled') });
+    expect(target('b/index.ts')).toEqual({ status: 'resolved', path: join(root, 'b/disabled.ts') });
+});
+
 test('rejects invalid roots, reports malformed source, and keeps other roots available', async () => {
     const root = await project({ 'broken.ts': "import './ok'; const value = ;", 'ok.ts': 'export {};' });
     await expect(analyzeModuleGraph({ projectRoot: root, entryPoints: [] })).rejects.toThrow('At least one');

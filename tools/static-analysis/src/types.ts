@@ -21,7 +21,9 @@ export type ResolutionSettings = Pick<
 export interface AnalyzeModuleGraphOptions {
     /** Nonempty project-relative file paths; paths escaping the project are rejected. */
     entryPoints: readonly string[];
+    /** Project directory, resolved against the current directory; esbuild's working directory. */
     projectRoot: string;
+    /** esbuild resolver settings from the consuming build; esbuild defaults apply when omitted. */
     resolution?: ResolutionSettings;
 }
 

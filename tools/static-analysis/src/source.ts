@@ -14,6 +14,9 @@ const defaultLoaders: Record<string, string> = {
     '.cjs': 'js',
 };
 
+// One host serves every file; each program swaps in its own parsed source.
+const compilerHost = ts.createCompilerHost({});
+
 /** Parses code loaders and returns recoverable syntax/read diagnostics; other assets are leaves. */
 export async function readSource(file: string, settings: ResolutionSettings, diagnostics: AnalysisDiagnostic[]) {
     const extension = extname(file);
@@ -48,7 +51,7 @@ export async function readSource(file: string, settings: ResolutionSettings, dia
         [file],
         { noResolve: true, noLib: true, allowJs: true, noEmit: true },
         {
-            ...ts.createCompilerHost({}),
+            ...compilerHost,
             getSourceFile: (path) => (path === file ? source : undefined),
         },
     );

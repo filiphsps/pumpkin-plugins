@@ -28,36 +28,40 @@ for (const diagnostic of graph.diagnostics) {
 
 ## Inputs and resolution
 
-`analyzeModuleGraph(options)` returns a `Promise<ModuleGraph>`. `projectRoot` resolves relative to the
-current directory. `entryPoints` must contain at least one project-relative file path; absolute paths
-and lexical paths escaping the project are rejected. Symlink targets and transitive dependencies may
-live outside the project. Missing roots produce diagnostics while valid roots are still analyzed.
+`analyzeModuleGraph(options)` returns a `Promise<ModuleGraph>`.
 
-Pass the resolution-affecting settings from the consumer's esbuild build in `resolution`:
-`alias`, `conditions`, `external`, `packages`, `platform`, `mainFields`, `resolveExtensions`,
-`nodePaths`, `preserveSymlinks`, `tsconfig`, `tsconfigRaw`, and `loader`. Defaults match esbuild,
-including its default browser platform. Paths in these settings use the project root as esbuild's
-working directory. An explicit `tsconfig` path is relative to that root; otherwise the nearest
-`tsconfig.json` is discovered for each importer. `tsconfigRaw` accepts an object or JSONC string.
-Inherited TypeScript configuration and path mappings are supported.
+`projectRoot` is resolved against the current directory. `entryPoints` needs at least one file path
+relative to the project root. The function rejects absolute entry paths and paths that lead outside
+the project. Symlink targets and transitive dependencies can still live outside the project. A
+missing entry adds a diagnostic, and the other entries are still analyzed.
 
-Runtime edges use esbuild's resolver with the original import/require mode. Type-only edges respect
-esbuild's external boundary, then use TypeScript's resolver (bundler mode by default) with the consumer's tsconfig,
-aliases, conditions and symlink setting to find declarations. Explicit TypeScript module-resolution
-settings are preserved; platform and implicit esbuild conditions also apply to declaration exports. When TypeScript finds no target,
-esbuild's resolved file is used. A declaration cannot rescue an unresolved **runtime** import.
-Package exports may consequently select a JavaScript runtime file and a distinct declaration file
-for the same mixed import. This is dependency analysis, not a TypeScript semantic typecheck.
+Pass the consumer's esbuild settings that affect resolution in `resolution`: `alias`, `conditions`,
+`external`, `packages`, `platform`, `mainFields`, `resolveExtensions`, `nodePaths`,
+`preserveSymlinks`, `tsconfig`, `tsconfigRaw` and `loader`. Defaults match esbuild, so the platform
+is `browser` unless you set it. esbuild uses the project root as its working directory for these
+settings. An explicit `tsconfig` path is relative to the project root. Without one, each importer
+uses its nearest `tsconfig.json`. `tsconfigRaw` takes an object or a JSONC string. `extends` and
+`paths` in TypeScript configs work.
 
-Bundled packages and their transitive dependencies are followed. Externals (including Node builtins
-on the Node platform, package-wide externals and wildcard patterns) are terminal edges. Browser
-mappings disabled with `false` are also terminals. Their paths retain esbuild's resolver spelling;
-an external path need not be absolute or name an existing file.
+esbuild resolves runtime edges with the same import or require mode as the source. A type-only edge
+to an esbuild external stays external. Other type-only edges go through TypeScript's resolver to
+find declarations. That resolver uses the consumer's tsconfig, aliases, conditions and symlink
+setting. Its module resolution defaults to `bundler`, and an explicit `moduleResolution` in the
+tsconfig wins. The platform and esbuild's implicit conditions also apply to declaration exports. If
+TypeScript finds no target, the edge uses esbuild's resolved file. A declaration file never resolves
+a runtime import that esbuild cannot resolve. So one mixed import can point to a JavaScript file for
+its runtime edge and a different declaration file for its type-only edge. The analyzer does not
+type-check source.
 
-Custom esbuild plugins are not accepted: loading consumer plugins would execute project tooling.
-JS/JSX/TS/TSX loaders are parsed; other assets are file leaves. CSS dependencies and source embedded
-inside non-code assets are outside this JavaScript/TypeScript graph. No bundle is emitted or project
-module executed.
+The analyzer follows bundled packages and their dependencies. Externals end an edge. These include
+Node builtins on the `node` platform, `packages: 'external'` and wildcard patterns. Modules disabled
+with `false` in a package's `browser` field also end an edge. A terminal edge keeps esbuild's
+spelling of the path, which need not be absolute or name an existing file.
+
+`resolution` does not accept esbuild plugins, because loading them would run project code. The
+analyzer parses files with the JS, JSX, TS and TSX loaders. Files with other loaders are leaves. CSS
+imports and code inside non-code assets are not part of the graph. The analyzer emits no bundle and
+runs no project module.
 
 ## Graph and reachability
 
@@ -95,20 +99,23 @@ computed expressions are not evaluated or expanded into guesses.
 
 ## Diagnostics
 
-Locations use one-based `line` and `column`, and zero-based UTF-16 `offset` and `length` in the source.
-Import locations cover the module literal (including quotes) or computed argument. Root/read
-failures use line 1, column 1, offset 0, length 0.
+`line` and `column` are one-based. `offset` and `length` are zero-based UTF-16 positions in the
+source. An import location covers the module string, including its quotes, or the computed
+argument. Entry and read failures use line 1, column 1, offset 0 and length 0.
 
-- `unresolved-import`: a literal dependency has no target; its unresolved edge and specifier remain.
-- `nonliteral-import`: an import/require target is computed or missing; an unresolved edge remains
-  without a specifier. No constant folding or glob expansion is attempted.
-- `unresolved-entry`: an entry could not be resolved; its unresolved root remains.
-- `unreadable-file`: a resolved code file could not be read; it remains in the graph as a leaf.
-- `parse-error`: source syntax is malformed; recoverable dependencies are still followed.
+- `unresolved-import`: a literal import has no target. Its edge stays in the graph as unresolved,
+  with its specifier.
+- `nonliteral-import`: an import or require target is computed or missing. Its edge stays in the
+  graph as unresolved, without a specifier. The analyzer does not fold constants or expand globs.
+- `unresolved-entry`: an entry point could not be resolved. Its root stays in the graph as
+  unresolved.
+- `unreadable-file`: a resolved code file could not be read. It stays in the graph as a leaf.
+- `parse-error`: the source has a syntax error. The analyzer still follows the dependencies it can
+  read.
 
-All diagnostics accompany the partial graph. They are data, not thrown resolution errors. Invalid
-API arguments or invalid esbuild/TypeScript resolver configuration reject the promise. Callers must
-inspect diagnostics before treating the graph as complete.
+Diagnostics come back with the partial graph instead of rejecting the promise. Check them before
+you treat the graph as complete. Invalid arguments and invalid esbuild or TypeScript configuration
+reject the promise.
 
 ## Publishing
 

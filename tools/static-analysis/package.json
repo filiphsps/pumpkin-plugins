@@ -53,7 +53,7 @@
     "scripts": {
         "build": "tsc -p tsconfig.build.json",
         "prepack": "pnpm build",
-        "test": "vitest run",
+        "test": "vitest run --fsModuleCachePath node_modules/.vitest-cache",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
