@@ -1,7 +1,7 @@
-import { createPrivateKey, createPublicKey, type KeyObject, sign, verify } from 'node:crypto';
+import { createPublicKey, type KeyObject, verify } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { generateKeyPair, publicKeyOf, signWasm, verifyWasm } from './sign.ts';
-import { METADATA, minimalWasm, SEED } from './testing/fixtures.ts';
+import { METADATA, minimalWasm, SEED, signedMetadata } from './testing/fixtures.ts';
 import { appendCustomSections, parseSections, stripSignature } from './wasm.ts';
 
 const SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
@@ -10,31 +10,6 @@ const SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 const KNOWN_PUBLIC_KEY = '03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8';
 const KNOWN_SIGNATURE =
     'baff55fcd5f0a601e81f227ee00f104dfd15696fdee83936f90e058d9a57d05003dc9b7bb29c5c116d7ac667c29100bff29e638fc31e749de0128084f97c9a07';
-
-function signedMetadata(json: string): Buffer {
-    const wasm = minimalWasm();
-    const metadata = Buffer.from(json);
-    const key = createPrivateKey({
-        key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), Buffer.from(SEED, 'hex')]),
-        format: 'der',
-        type: 'pkcs8',
-    });
-    const signature = sign(null, Buffer.concat([wasm, metadata]), key);
-    return appendCustomSections(wasm, [
-        ['pumpkin.metadata', metadata],
-        [
-            'wasm_signature',
-            Buffer.from(
-                JSON.stringify({
-                    version: 1,
-                    algorithm: 'Ed25519',
-                    public_key_hex: publicKeyOf(SEED),
-                    signature_hex: signature.toString('hex'),
-                }),
-            ),
-        ],
-    ]);
-}
 
 describe('keys', () => {
     it('generates a usable pair', () => {
@@ -158,6 +133,21 @@ describe('signWasm', () => {
         },
     );
 
+    it.each([
+        ['marketplace_url', undefined],
+        ['plugin_name', undefined],
+        ['version', 1],
+        ['dev_name', null],
+        ['issued_at', new Date(0)],
+        ['is_paid', 'yes'],
+        ['is_paid', undefined],
+        ['license_key', 42],
+    ])('rejects a wrong-type %s (%o) instead of signing metadata the host cannot parse', (field, value) => {
+        const metadata = { ...METADATA, [field]: value } as unknown as typeof METADATA;
+
+        expect(() => signWasm(wasm, metadata, SEED)).toThrow(new RegExp(`metadata\\.${field} must be`));
+    });
+
     it('drops fields that are not part of the format', () => {
         const extra = signWasm(wasm, { ...METADATA, extra: 1 } as typeof METADATA, SEED);
         expect(verifyWasm(extra).metadata).toEqual({
@@ -225,6 +215,29 @@ describe('verifyWasm', () => {
             },
             publicKeyHex: publicKeyOf(SEED),
         });
+    });
+
+    it('accepts a signature in a pumpkin.signature section like the host', () => {
+        const { clean, trailing } = stripSignature(signed);
+        const renamed = appendCustomSections(clean, [
+            ['pumpkin.metadata', trailing[0]?.data ?? Buffer.alloc(0)],
+            ['pumpkin.signature', trailing[1]?.data ?? Buffer.alloc(0)],
+        ]);
+
+        expect(verifyWasm(renamed)).toMatchObject({ signed: true, valid: true, publicKeyHex: publicKeyOf(SEED) });
+    });
+
+    it('accepts uppercase envelope hex like the host and reports the key in lowercase', () => {
+        const { clean, trailing } = stripSignature(signed);
+        const envelope = JSON.parse(Buffer.from(trailing[1]?.data ?? []).toString('utf8'));
+        envelope.public_key_hex = envelope.public_key_hex.toUpperCase();
+        envelope.signature_hex = envelope.signature_hex.toUpperCase();
+        const uppercase = appendCustomSections(clean, [
+            ['pumpkin.metadata', trailing[0]?.data ?? Buffer.alloc(0)],
+            ['wasm_signature', Buffer.from(JSON.stringify(envelope))],
+        ]);
+
+        expect(verifyWasm(uppercase)).toMatchObject({ signed: true, valid: true, publicKeyHex: publicKeyOf(SEED) });
     });
 
     it.each(['{}', '[]', 'null'])(
@@ -399,6 +412,20 @@ describe('verifyWasm', () => {
             ['wasm_signature', Buffer.from(JSON.stringify(envelope))],
         ]);
         expect(verifyWasm(swapped).valid).toBe(false);
+    });
+
+    it('rejects a file signed by another key when the expected signer is pinned', () => {
+        const other = generateKeyPair();
+        const resigned = signWasm(wasm, METADATA, other.secretKeyHex);
+
+        expect(verifyWasm(resigned).valid).toBe(true);
+        expect(verifyWasm(resigned, publicKeyOf(SEED))).toMatchObject({
+            signed: true,
+            valid: false,
+            error: expect.stringContaining('unexpected signer'),
+            publicKeyHex: other.publicKeyHex,
+        });
+        expect(verifyWasm(signed, publicKeyOf(SEED).toUpperCase()).valid).toBe(true);
     });
 });
 

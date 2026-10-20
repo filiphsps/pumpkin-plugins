@@ -1,6 +1,12 @@
 /** The WASI version plugins import. The server's runtime provides it; it must not be newer than the server's. */
 export const WASI_VERSION = '0.2.3';
 
+/**
+ * Import specifiers the builder leaves out of plugin bundles. The Pumpkin runtime provides these
+ * modules, so tools that follow a plugin's imports stop at them too.
+ */
+export const EXTERNAL_MODULES = ['pumpkin:plugin/*', 'wasi:*'] as const;
+
 /** WASI interfaces a plugin can opt into, by the name used in `pumpkinPlugin.wasi`. */
 export const CAPABILITIES = {
     http: ['http/types', 'http/outgoing-handler'],

@@ -44,13 +44,14 @@ const ANSI_COLORS = {
     white: 97,
 } as const satisfies Record<keyof typeof COLORS, number>;
 
+// Terminals have no obfuscated style, and SGR 8 (conceal) would hide text that log files still keep.
 const ANSI_FORMATS = {
-    obfuscated: 8,
+    obfuscated: undefined,
     bold: 1,
     strikethrough: 9,
     underline: 4,
     italic: 3,
-} as const satisfies Record<keyof typeof FORMATS, number>;
+} as const satisfies Record<keyof typeof FORMATS, number | undefined>;
 
 const NAMED_COLORS = {
     error: { color: 'darkRed', format: 'bold' },
@@ -69,13 +70,18 @@ const NAMED_COLORS = {
 type MinecraftColor = keyof typeof COLORS;
 type MinecraftFormat = keyof typeof FORMATS;
 type MinecraftNamedRole = keyof typeof NAMED_COLORS;
-type TextFormatter = ((text: string | number) => string) & {
+/**
+ * Formats text with the style chained so far. Each color or modifier property returns a new
+ * formatter that adds that style, and `hex()` sets an RGB color.
+ */
+export type TextFormatter = ((text: string | number) => string) & {
     readonly [Key in MinecraftColor | MinecraftFormat]: TextFormatter;
 } & {
     hex(color: string): TextFormatter;
 };
 type NamedFormatters = { readonly [Role in MinecraftNamedRole]: TextFormatter };
-type ColorApi = TextFormatter & { readonly named: NamedFormatters };
+/** The shape of the `color` and `ansi` exports: a formatter with `named` role formatters. */
+export type ColorApi = TextFormatter & { readonly named: NamedFormatters };
 type FormatterOutput = 'minecraft' | 'ansi';
 
 interface FormatterState {
@@ -92,14 +98,22 @@ function createFormatter(output: FormatterOutput, state: FormatterState = { form
             return text;
 
         const formats = (Object.keys(FORMATS) as MinecraftFormat[]).filter((format) => state.formats.includes(format));
+        let open: string;
+        let reset: string;
         if (output === 'ansi') {
-            const codes: number[] = formats.map((format) => ANSI_FORMATS[format]);
+            const codes: number[] = formats.flatMap((format) => ANSI_FORMATS[format] ?? []);
             if (state.ansiColorPrefix !== undefined) codes.push(...state.ansiColorPrefix.split(';').map(Number));
-            return `\u001b[${codes.join(';')}m${text}\u001b[0m`;
+            if (codes.length === 0) return text;
+            open = `\u001b[${codes.join(';')}m`;
+            reset = '\u001b[0m';
+        } else {
+            const formatCodes = formats.map((format) => `§${FORMATS[format]}`).join('');
+            open = `${state.legacyColorPrefix ?? ''}${formatCodes}`;
+            reset = '§r';
         }
 
-        const formatCodes = formats.map((format) => `§${FORMATS[format]}`).join('');
-        return `${state.legacyColorPrefix ?? ''}${formatCodes}${text}§r`;
+        // A nested formatted segment ends with a reset; reopen this style after it.
+        return `${open}${text.replaceAll(reset, `${reset}${open}`)}${reset}`;
     }) as TextFormatter;
 
     for (const color of Object.keys(COLORS) as MinecraftColor[]) {
@@ -167,9 +181,16 @@ addNamedFormatters(color, 'minecraft');
 addNamedFormatters(ansi, 'ansi');
 
 /** Returns a terminal table previewing every color in normal and bold text. */
-export function colorTable(): string {
+export function ansiColorTable(): string {
     return makeColorTable(ansi);
 }
+
+/**
+ * Returns a terminal table previewing every color in normal and bold text.
+ *
+ * @deprecated Use `ansiColorTable()`; this name will be removed in the next breaking release.
+ */
+export const colorTable = ansiColorTable;
 
 /** Returns a table previewing every color with Minecraft's legacy codes. */
 export function minecraftColorTable(): string {

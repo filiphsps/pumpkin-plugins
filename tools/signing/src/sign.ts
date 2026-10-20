@@ -4,8 +4,10 @@ import { appendCustomSections, METADATA_SECTION, SIGNATURE_SECTION, stripSignatu
 const PKCS8_PREFIX = Buffer.from('302e020100300506032b657004220420', 'hex');
 const SPKI_PREFIX = Buffer.from('302a300506032b6570032100', 'hex');
 const SECRET_PATTERN = /^[0-9a-fA-F]{64}$/;
-const PUBLIC_PATTERN = /^[0-9a-f]{64}$/;
-const SIGNATURE_PATTERN = /^[0-9a-f]{128}$/;
+const PUBLIC_PATTERN = /^[0-9a-fA-F]{64}$/;
+const SIGNATURE_PATTERN = /^[0-9a-fA-F]{128}$/;
+// Pumpkin reads its legacy `pumpkin.signature` section name as a signature too.
+const SIGNATURE_SECTIONS = [SIGNATURE_SECTION, 'pumpkin.signature'];
 
 /** An ID in Pumpkin signing metadata. Numbers must be safe integers; bigints support the full s64 range. */
 export type SigningId = bigint | number;
@@ -107,23 +109,30 @@ export function generateKeyPair(): KeyPair {
  * @param metadata - What to embed; only the documented fields are written, in order.
  * @param secretKeyHex - The 32-byte seed as 64 hex characters.
  * @returns The binary with `pumpkin.metadata` and `wasm_signature` sections appended.
- * @throws {Error} When the key or bytes are invalid, or a metadata ID is unsafe or outside the s64 range.
+ * @throws {Error} When the key or bytes are invalid, a metadata field has the wrong type, or a metadata ID is
+ *   unsafe or outside the s64 range.
  */
 export function signWasm(wasm: Uint8Array, metadata: SigningMetadata, secretKeyHex: string): Buffer {
     const key = secretKey(secretKeyHex);
     const { clean } = stripSignature(wasm);
     const fields: [string, string][] = [
-        ['marketplace_url', jsonString(metadata.marketplace_url)],
+        ['marketplace_url', serializeString(metadata.marketplace_url, 'marketplace_url')],
         ['plugin_id', serializeMetadataId(metadata.plugin_id, 'plugin_id')],
-        ['plugin_name', jsonString(metadata.plugin_name)],
-        ['version', jsonString(metadata.version)],
+        ['plugin_name', serializeString(metadata.plugin_name, 'plugin_name')],
+        ['version', serializeString(metadata.version, 'version')],
         ['dev_id', serializeMetadataId(metadata.dev_id, 'dev_id')],
-        ['dev_name', jsonString(metadata.dev_name)],
-        ['is_paid', String(metadata.is_paid)],
+        ['dev_name', serializeString(metadata.dev_name, 'dev_name')],
+        ['is_paid', serializeBoolean(metadata.is_paid, 'is_paid')],
         ['user_id', serializeMetadataId(metadata.user_id, 'user_id')],
     ];
-    if (metadata.license_key !== undefined) fields.push(['license_key', jsonString(metadata.license_key)]);
-    fields.push(['issued_at', jsonString(metadata.issued_at)]);
+    if (metadata.license_key !== undefined) {
+        const licenseKey = metadata.license_key;
+        fields.push([
+            'license_key',
+            licenseKey === null ? 'null' : serializeString(licenseKey, 'license_key', 'a string or null'),
+        ]);
+    }
+    fields.push(['issued_at', serializeString(metadata.issued_at, 'issued_at')]);
     const metadataJson = Buffer.from(
         `{${fields.map(([name, value]) => `${JSON.stringify(name)}:${value}`).join(',')}}`,
         'utf8',
@@ -144,16 +153,23 @@ export function signWasm(wasm: Uint8Array, metadata: SigningMetadata, secretKeyH
     ]);
 }
 
-function last(sections: WasmSection[], name: string): WasmSection | undefined {
-    return [...sections].reverse().find((s) => s.name === name);
+function last(sections: WasmSection[], names: readonly string[]): WasmSection | undefined {
+    return [...sections].reverse().find((s) => s.name !== undefined && names.includes(s.name));
 }
 
 const ID_FIELDS = ['plugin_id', 'dev_id', 'user_id'];
 const MIN_I64 = -(1n << 63n);
 const MAX_I64 = (1n << 63n) - 1n;
 
-function jsonString(value: string | null): string {
-    return JSON.stringify(value) ?? 'null';
+// JS callers aren't type-checked, so check the types here rather than sign metadata the host can't parse.
+function serializeString(value: unknown, field: string, expected = 'a string'): string {
+    if (typeof value !== 'string') throw new Error(`metadata.${field} must be ${expected}`);
+    return JSON.stringify(value);
+}
+
+function serializeBoolean(value: unknown, field: string): string {
+    if (typeof value !== 'boolean') throw new Error(`metadata.${field} must be a boolean`);
+    return String(value);
 }
 
 function serializeMetadataId(value: SigningId, field: string): string {
@@ -213,18 +229,27 @@ function isSigningMetadata(
 
 /**
  * Checks the signature of a wasm binary. Never throws: problems are reported in the result.
+ *
+ * Like Pumpkin, it reads the signature from a `wasm_signature` or `pumpkin.signature` section and
+ * accepts hex in either case. It still differs from Pumpkin in three ways: it reads only the signing
+ * sections at the end of the file, it requires a version 1 Ed25519 JSON envelope where Pumpkin also
+ * accepts raw signature bytes, and it keeps the last value of a repeated JSON key where Pumpkin
+ * rejects the section.
  * @param wasm - The binary to check.
+ * @param expectedPublicKeyHex - The trusted signer's public key in hex. When set, a file signed by any
+ *   other key is reported as invalid. Without it, a valid result only means the file agrees with its
+ *   own envelope, so compare `publicKeyHex` with a key you trust.
  * @returns Whether it is signed, whether the signature is valid, and what it says.
  */
-export function verifyWasm(wasm: Uint8Array): VerifyResult {
+export function verifyWasm(wasm: Uint8Array, expectedPublicKeyHex?: string): VerifyResult {
     let stripped: ReturnType<typeof stripSignature>;
     try {
         stripped = stripSignature(wasm);
     } catch (error) {
         return { signed: false, valid: false, error: (error as Error).message };
     }
-    const metadataSection = last(stripped.trailing, METADATA_SECTION);
-    const signatureSection = last(stripped.trailing, SIGNATURE_SECTION);
+    const metadataSection = last(stripped.trailing, [METADATA_SECTION]);
+    const signatureSection = last(stripped.trailing, SIGNATURE_SECTIONS);
     if (!signatureSection?.data) return { signed: false, valid: false, error: 'no signature found' };
     if (!metadataSection?.data) {
         return { signed: true, valid: false, error: `signature without a ${METADATA_SECTION} section` };
@@ -236,18 +261,19 @@ export function verifyWasm(wasm: Uint8Array): VerifyResult {
     const envelope = parseJson(signatureSection.data);
     const base = { signed: true, valid: false, ...(metadata ? { metadata } : {}) };
     if (!envelope) return { ...base, error: 'signature envelope is not a JSON object' };
-    const publicKeyHex = envelope.public_key_hex;
+    const rawPublicKeyHex = envelope.public_key_hex;
     const signatureHex = envelope.signature_hex;
     if (envelope.version !== 1) return { ...base, error: `unsupported signature version ${String(envelope.version)}` };
     if (envelope.algorithm !== 'Ed25519') {
         return { ...base, error: `unsupported signature algorithm ${String(envelope.algorithm)}` };
     }
-    if (typeof publicKeyHex !== 'string' || !PUBLIC_PATTERN.test(publicKeyHex)) {
-        return { ...base, error: 'public_key_hex must be 64 lowercase hex characters' };
+    if (typeof rawPublicKeyHex !== 'string' || !PUBLIC_PATTERN.test(rawPublicKeyHex)) {
+        return { ...base, error: 'public_key_hex must be 64 hex characters' };
     }
     if (typeof signatureHex !== 'string' || !SIGNATURE_PATTERN.test(signatureHex)) {
-        return { ...base, error: 'signature_hex must be 128 lowercase hex characters' };
+        return { ...base, error: 'signature_hex must be 128 hex characters' };
     }
+    const publicKeyHex = rawPublicKeyHex.toLowerCase();
     const withKey = { ...base, publicKeyHex };
     const key = createPublicKey({
         key: Buffer.concat([SPKI_PREFIX, Buffer.from(publicKeyHex, 'hex')]),
@@ -257,6 +283,9 @@ export function verifyWasm(wasm: Uint8Array): VerifyResult {
     const payload = Buffer.concat([stripped.clean, metadataSection.data]);
     if (!verify(null, payload, key, Buffer.from(signatureHex, 'hex'))) {
         return { ...withKey, error: 'signature does not match the file contents' };
+    }
+    if (expectedPublicKeyHex !== undefined && publicKeyHex !== expectedPublicKeyHex.trim().toLowerCase()) {
+        return { ...withKey, error: `unexpected signer ${publicKeyHex}` };
     }
     if (!metadata) return { ...withKey, error: 'metadata does not match the Pumpkin host schema' };
     return { signed: true, valid: true, metadata, publicKeyHex };

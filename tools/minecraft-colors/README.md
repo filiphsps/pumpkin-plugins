@@ -5,9 +5,11 @@
 [![npm license](https://img.shields.io/npm/l/%40pumpkin-plugins%2Fminecraft-colors)](https://www.npmjs.com/package/@pumpkin-plugins/minecraft-colors)
 
 Format Minecraft chat text and server-console output with familiar Chalk-style color chains. The package has no runtime dependencies.
+The published package contains compiled JavaScript and type declarations, so plain Node scripts can
+import it as well as bundled plugin builds.
 
 ```ts
-import { ansi, color, colorTable, minecraftColorTable } from '@pumpkin-plugins/minecraft-colors';
+import { ansi, ansiColorTable, color, minecraftColorTable } from '@pumpkin-plugins/minecraft-colors';
 
 console.log(`Memory cache: ${color.aqua('100 B')}`);
 console.log(color.gold.bold('The server is restarting'));
@@ -15,7 +17,7 @@ console.log(color.hex('#12abef').underline('Custom color'));
 console.log(color.named.name('Pumpkin'));
 console.log(color.named.permission('plugin.manage'));
 console.log(ansi.named.name('Pumpkin')); // ANSI color for console logs.
-console.log(colorTable()); // Terminal palette for debugging.
+console.log(ansiColorTable()); // Terminal palette for debugging.
 console.log(minecraftColorTable()); // Legacy codes for Minecraft text.
 ```
 
@@ -23,16 +25,23 @@ console.log(minecraftColorTable()); // Legacy codes for Minecraft text.
 `ansi` returns ANSI terminal codes for console output. Both formatters use Minecraft's 16 legacy
 colors and share the same named roles. `color.hex()` emits the `§x` RGB format; `ansi.hex()` emits
 ANSI true color. Modifiers are `bold`, `italic`, `underline`, `strikethrough` and `obfuscated`.
-Styled strings end with the appropriate reset code for their output format.
+Terminals have no obfuscated style, so `ansi.obfuscated` adds no code and leaves the text readable.
+Styled strings end with the appropriate reset code for their output format. A styled string can be
+nested inside another, as in ``color.red(`Failed for ${color.gold(name)}`)``; the outer style
+resumes after the nested part ends.
 
 Colors and modifiers can be chained in either order. When multiple colors are chained, the last
 color wins. Invalid hex colors throw a `RangeError`.
 
 Use `color.named` for common value roles: `value` is gold, `name` and `url` are dark aqua,
 `namespace` is dark green, `version` is green, `number` is blue, `permission` is bold yellow,
-`port`, `uuid` and `identifier` are yellow, and `error` is bold dark red. `colorTable()` returns a
-multiline terminal table with every color shown in its own color, both normally and in bold.
-`minecraftColorTable()` returns the same table with Minecraft legacy codes.
+`port`, `uuid` and `identifier` are yellow, and `error` is bold dark red. `ansiColorTable()` returns
+a multiline terminal table with every color shown in its own color, both normally and in bold.
+`minecraftColorTable()` returns the same table with Minecraft legacy codes. `colorTable()` is a
+deprecated alias of `ansiColorTable()`.
+
+The `TextFormatter` and `ColorApi` types describe the formatters, so a function can take `color`,
+`ansi` or any chained formatter as a parameter.
 
 Pumpkin's native `TextComponent` API can style components directly with named colors, RGB, gradients
 and rainbow effects. The plugin-kit command helpers parse returned strings with
