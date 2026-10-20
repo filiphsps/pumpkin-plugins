@@ -75,7 +75,7 @@ describe('unpin-release-as', () => {
             component: 'waiting',
             'release-as': '0.0.1',
         });
-        assert.match(result.out, /No plugin is past its first release|packages\/released/);
+        assert.match(result.out, /packages\/released/);
     });
 
     it('leaves first-release pins on unreleased actions', () => {

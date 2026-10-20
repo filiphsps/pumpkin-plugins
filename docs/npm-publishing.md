@@ -62,7 +62,9 @@ window.
 Every normal release run also checks earlier non-draft tool releases on the target commit's
 first-parent history. If an earlier version is missing from npm, the workflow publishes it from its
 original release commit, oldest first, before publishing the current tools. This catches up a release
-when a newer push replaces an older pending CI run.
+when a newer push replaces an older pending CI run. A version lower than the package's current
+`latest` is published with the `backfill` dist-tag, so `latest` stays on the newest release. The
+workflow doesn't publish prerelease versions.
 
 Release PR titles use the full `@pumpkin-plugins/<name>` for scoped tools, but their tags use the
 Release Please component name (the tool folder name). The `create-pumpkin-plugin` title remains

@@ -1,22 +1,20 @@
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
     assertPublicToolPackage,
     assertPublicToolPackageContents,
+    compareVersions,
     discoverPublicToolPackages,
-    embeddedPackageManifestEntries,
     getPublicToolReleasePrerequisites,
     nodeEngineRange,
     orderPublicToolReleasePaths,
-    parseTarEntries,
+    packAndInspect,
     publicToolPackageVersions,
 } from './utils/tool-packages.mjs';
 
-const rootDirectory = fileURLToPath(new URL('..', import.meta.url));
+const rootDirectory = path.resolve(import.meta.dirname, '..');
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const REGISTRY_VISIBILITY_RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 20_000, 30_000, 30_000, 30_000];
 
@@ -32,11 +30,11 @@ function wait(milliseconds) {
  * @param {string} options.root - Repository root that contains the selected tool packages.
  * @param {string[]} options.selectedPaths - Released workspace paths from Release Please.
  * @param {Record<string, unknown>} options.releaseMetadata - Release Please outputs keyed by path and field.
- * @param {(packagePath: string, root: string) => Promise<object>} [options.packPackage] - Creates and inspects one package tarball.
+ * @param {(packagePath: string, root: string) => object | Promise<object>} [options.packPackage] - Creates and inspects one package tarball.
  * @param {(packageName: string, version: string) => Promise<string | null>} [options.getRegistryIntegrity] - Reads one exact version; null means it is not currently visible.
- * @param {(release: object) => Promise<void>} [options.publishPackage] - Publishes one verified tarball.
+ * @param {(release: object) => void | Promise<void>} [options.publishPackage] - Publishes one verified tarball.
  * @param {(message: string) => void} [options.log] - Receives progress messages.
- * @param options.waitForRegistry - Waits for a delay in milliseconds before retrying a missing prerequisite.
+ * @param {(milliseconds: number) => Promise<void>} [options.waitForRegistry] - Waits for a delay in milliseconds before retrying a missing prerequisite.
  * @returns {Promise<void>} Resolves after every selected package is published or verified as identical.
  * @throws {Error} When release metadata, package contents, dependencies, registry responses, or integrity disagree.
  */
@@ -46,7 +44,7 @@ export async function publishToolPackages({
     releaseMetadata,
     packPackage = packPublicToolPackage,
     getRegistryIntegrity = getNpmRegistryIntegrity,
-    publishPackage = publishNpmTarball,
+    publishPackage = publishToNpm,
     log = console.log,
     waitForRegistry = wait,
 }) {
@@ -239,33 +237,17 @@ function assertVersion(version, label) {
 }
 
 /**
- * Reads one exact public npm version after confirming its package exists on the public registry.
+ * Reads the integrity of one exact public npm version from its package document.
  *
  * @param {string} packageName - npm package name, including its scope when present.
  * @param {string} version - Exact semantic version to query.
  * @param {typeof fetch} [fetchImpl] - Fetch implementation used for the registry request.
- * @returns {Promise<string | null>} Registry integrity, or null only when the existing package's exact version returns 404.
- * @throws {Error} When the registry is unavailable or returns an unsuccessful or malformed response.
+ * @returns {Promise<string | null>} Registry integrity, or null when the existing package does not list the version.
+ * @throws {Error} When the package is missing, or the registry is unavailable or returns a malformed response.
  */
 export async function getNpmRegistryIntegrity(packageName, version, fetchImpl = fetch) {
-    const packageUrl = encodeURIComponent(packageName);
-    const versionUrl = encodeURIComponent(version);
-    const packageResponse = await fetchImpl(`https://registry.npmjs.org/${packageUrl}`);
-    if (packageResponse.status === 404) {
-        throw new Error(
-            `npm registry returned HTTP 404: package ${packageName} was not found; refusing to publish its first version from the automated publisher`,
-        );
-    }
-    assertRegistryResponseOk(packageResponse);
-    const packageDocument = await readRegistryJson(packageResponse);
-    if (packageDocument?.name !== packageName) {
-        throw new Error(`npm registry package lookup did not identify ${packageName}`);
-    }
-
-    const versionResponse = await fetchImpl(`https://registry.npmjs.org/${packageUrl}/${versionUrl}`);
-    if (versionResponse.status === 404) return null;
-    assertRegistryResponseOk(versionResponse);
-    const registryPackage = await readRegistryJson(versionResponse);
+    const registryPackage = (await readNpmPackument(packageName, fetchImpl)).versions[version];
+    if (registryPackage === undefined) return null;
 
     const integrity = registryPackage?.dist?.integrity;
     if (typeof integrity !== 'string' || integrity.length === 0) {
@@ -290,26 +272,25 @@ export async function getNpmRegistryIntegrity(packageName, version, fetchImpl = 
  * @throws {Error} When the package is missing or the registry response is unsuccessful or malformed.
  */
 export async function getNpmRegistryVersions(packageName, fetchImpl = fetch) {
-    const packageUrl = encodeURIComponent(packageName);
-    const response = await fetchImpl(`https://registry.npmjs.org/${packageUrl}`);
+    return Object.keys((await readNpmPackument(packageName, fetchImpl)).versions);
+}
+
+async function readNpmPackument(packageName, fetchImpl) {
+    const response = await fetchImpl(`https://registry.npmjs.org/${encodeURIComponent(packageName)}`);
     if (response.status === 404) {
         throw new Error(
             `npm registry returned HTTP 404: package ${packageName} was not found; refusing to publish its first version from the automated publisher`,
         );
     }
     assertRegistryResponseOk(response);
-    const packageDocument = await readRegistryJson(response);
-    if (packageDocument?.name !== packageName) {
+    const packument = await readRegistryJson(response);
+    if (packument?.name !== packageName) {
         throw new Error(`npm registry package lookup did not identify ${packageName}`);
     }
-    if (
-        !packageDocument.versions ||
-        typeof packageDocument.versions !== 'object' ||
-        Array.isArray(packageDocument.versions)
-    ) {
+    if (!packument.versions || typeof packument.versions !== 'object' || Array.isArray(packument.versions)) {
         throw new Error(`npm registry response has no valid versions map for ${packageName}`);
     }
-    return Object.keys(packageDocument.versions);
+    return packument;
 }
 
 function assertRegistryResponseOk(response) {
@@ -329,33 +310,29 @@ async function readRegistryJson(response) {
 function packPublicToolPackage(packagePath, root) {
     const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-tool-package-'));
     try {
-        const packageDirectory = path.join(root, packagePath);
-        execFileSync('pnpm', ['pack', '--pack-destination', temporaryDirectory], {
-            cwd: packageDirectory,
-            encoding: 'utf8',
-            stdio: ['ignore', 'pipe', 'pipe'],
-        });
-        const tarballs = fs.readdirSync(temporaryDirectory).filter((file) => file.endsWith('.tgz'));
-        if (tarballs.length !== 1) {
-            throw new Error(`pnpm pack produced ${tarballs.length} tarballs for ${packagePath}; expected exactly one`);
-        }
-        const tarballPath = path.join(temporaryDirectory, tarballs[0]);
-        const entries = parseTarEntries(execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' }));
-        const packageJson = readPackedJson(tarballPath, 'package/package.json');
-        const embeddedPackageJsons = embeddedPackageManifestEntries(entries).map((entry) =>
-            readPackedJson(tarballPath, entry),
-        );
-        const integrity = `sha512-${createHash('sha512').update(fs.readFileSync(tarballPath)).digest('base64')}`;
-        return { temporaryDirectory, tarballPath, entries, packageJson, embeddedPackageJsons, integrity };
+        return { temporaryDirectory, ...packAndInspect(path.join(root, packagePath), temporaryDirectory) };
     } catch (error) {
         fs.rmSync(temporaryDirectory, { recursive: true, force: true });
         throw error;
     }
 }
 
-function readPackedJson(tarballPath, entry) {
-    const contents = execFileSync('tar', ['-xOzf', tarballPath, entry], { encoding: 'utf8' });
-    return JSON.parse(contents);
+/**
+ * Picks the npm dist-tag for a release so that publishing an older version leaves `latest` alone.
+ *
+ * @param {string} version - Version being published.
+ * @param {string | undefined} latestVersion - The registry's current `latest` dist-tag, if any.
+ * @returns {'latest' | 'backfill'} `latest` for a version above the current latest, otherwise `backfill`.
+ * @throws {Error} When the version is a prerelease, which the automated publisher does not tag.
+ */
+export function npmDistTag(version, latestVersion) {
+    if (version.split('+')[0].includes('-')) throw new Error(`prerelease ${version} has no automated npm dist-tag`);
+    return latestVersion === undefined || compareVersions(version, latestVersion) > 0 ? 'latest' : 'backfill';
+}
+
+async function publishToNpm({ packageName, version, tarballPath }) {
+    const latestVersion = (await readNpmPackument(packageName, fetch))['dist-tags']?.latest;
+    publishNpmTarball({ tarballPath, distTag: npmDistTag(version, latestVersion) });
 }
 
 /**
@@ -363,11 +340,12 @@ function readPackedJson(tarballPath, entry) {
  *
  * @param {object} release - Verified package tarball.
  * @param {string} release.tarballPath - Path to the package tarball.
+ * @param {string} release.distTag - npm dist-tag the version receives.
  * @returns {void} Completes after npm accepts the publish.
  * @throws {Error} When npm fails to publish the tarball.
  */
-export function publishNpmTarball({ tarballPath }) {
-    execFileSync('npm', ['publish', tarballPath, '--access', 'public', '--provenance'], {
+export function publishNpmTarball({ tarballPath, distTag }) {
+    execFileSync('npm', ['publish', tarballPath, '--access', 'public', '--provenance', '--tag', distTag], {
         cwd: path.dirname(tarballPath),
         stdio: 'inherit',
     });
@@ -383,7 +361,7 @@ async function main() {
     });
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (import.meta.main) {
     main().catch((error) => {
         console.error(error instanceof Error ? error.message : String(error));
         process.exitCode = 1;

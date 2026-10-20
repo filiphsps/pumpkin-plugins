@@ -1,4 +1,4 @@
 {
-    "packages/bedrock-addon-manager": "Not ready for its first release",
-    "packages/tab-display": "Internal demo plugin"
+    "packages/bedrock-addon-manager": "It doesn't send resource-pack offers yet, so players can't download packs from the server.",
+    "packages/tab-display": "Its player-list changes haven't been checked with a Java client yet."
 }

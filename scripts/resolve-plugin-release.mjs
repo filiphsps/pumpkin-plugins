@@ -1,7 +1,7 @@
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
-import { basename, isAbsolute, join, relative, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { basename, join, resolve } from 'node:path';
 import { Command } from 'commander';
+import { isInside, loadPluginInfo } from './utils/plugin-info.mjs';
 
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
@@ -39,13 +39,7 @@ export async function resolvePluginRelease(root, tag) {
         throw new Error(`${packagePath} declares an unsupported plugin engine: ${JSON.stringify(engine)}`);
     }
 
-    const infoPath = resolve(packageDirectory, packageJson.pumpkinPlugin?.info ?? 'src/info.ts');
-    if (!isInside(packageDirectory, infoPath)) throw new Error(`${packagePath} plugin info path escapes the package`);
-    const infoModule = await import(pathToFileURL(infoPath).href);
-    const pluginName = (infoModule.info ?? infoModule.default)?.name;
-    if (typeof pluginName !== 'string' || !pluginName.trim() || /[\r\n]/.test(pluginName)) {
-        throw new Error(`${infoPath} must export an info object with a single-line name`);
-    }
+    const pluginName = (await loadPluginInfo(packageDirectory, packageJson)).info.name;
 
     const output = packageJson.pumpkinPlugin?.output;
     if (typeof output !== 'string' || !output.endsWith('.wasm')) {
@@ -69,17 +63,7 @@ function readJson(file) {
     return JSON.parse(readFileSync(file, 'utf8'));
 }
 
-function isInside(parent, child) {
-    const childPath = relative(parent, child);
-    return (
-        childPath !== '' &&
-        childPath !== '..' &&
-        !childPath.startsWith(`..${process.platform === 'win32' ? '\\' : '/'}`) &&
-        !isAbsolute(childPath)
-    );
-}
-
-if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
+if (import.meta.main) {
     const program = new Command()
         .name('resolve-plugin-release')
         .description('Resolve a plugin release tag using the source tree at that tag.')

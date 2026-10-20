@@ -10,6 +10,7 @@ function fixture({
     manifestVersion = '0.0.8',
     engine,
     includeStaticHermesRuntime = true,
+    pluginName = 'UPnPumpkin',
 } = {}) {
     const root = mkdtempSync(join(tmpdir(), 'resolve-plugin-release-'));
     mkdirSync(join(root, 'packages/upnpumpkin/src'), { recursive: true });
@@ -35,7 +36,10 @@ function fixture({
             pumpkinPlugin: { info: 'src/info.mjs', output: 'build/upnpumpkin.wasm', engine },
         }),
     );
-    writeFileSync(join(root, 'packages/upnpumpkin/src/info.mjs'), 'export const info = { name: "UPnPumpkin" };\n');
+    writeFileSync(
+        join(root, 'packages/upnpumpkin/src/info.mjs'),
+        `export const info = { name: ${JSON.stringify(pluginName)} };\n`,
+    );
     return root;
 }
 
@@ -99,6 +103,15 @@ it('rejects tags whose manifest and package versions disagree', async () => {
     const root = fixture({ manifestVersion: '0.0.7' });
     try {
         await assert.rejects(resolvePluginRelease(root, 'upnpumpkin-v0.0.8'), /manifest version is 0\.0\.7/);
+    } finally {
+        rmSync(root, { recursive: true, force: true });
+    }
+});
+
+it('rejects a plugin name with a Unicode line separator', async () => {
+    const root = fixture({ pluginName: 'UPnPumpkin\u2028plugin_name=Other' });
+    try {
+        await assert.rejects(resolvePluginRelease(root, 'upnpumpkin-v0.0.8'), /single-line name/);
     } finally {
         rmSync(root, { recursive: true, force: true });
     }

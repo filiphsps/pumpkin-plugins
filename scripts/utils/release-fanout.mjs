@@ -101,3 +101,32 @@ export async function collectReleaseFanout({
         },
     };
 }
+
+/**
+ * Builds the workflow outputs that route releases to their publish jobs.
+ *
+ * @param {Array<{ path: string, recovered?: boolean }>} releases - Releases selected for this commit.
+ * @param {ReturnType<typeof partitionReleasePaths>} paths - Release paths grouped by publisher.
+ * @returns {Record<string, unknown>} Output values by name; non-string values are written as JSON.
+ */
+export function releaseOutputs(releases, paths) {
+    const outputs = {
+        paths_released: JSON.stringify(paths.pluginPaths),
+        action_paths_released: JSON.stringify(paths.actionPaths),
+        tool_paths_released: JSON.stringify(paths.toolPaths),
+        extension_paths_released: JSON.stringify(paths.extensionPaths),
+        release_count: String(releases.length),
+    };
+    const releaseMetadata = {};
+    for (const release of releases) {
+        outputs[`${release.path}--release_created`] = !release.recovered;
+        if (release.recovered) outputs[`${release.path}--release_recovered`] = true;
+        for (const [name, value] of Object.entries(release)) {
+            const key = { tagName: 'tag_name', uploadUrl: 'upload_url', notes: 'body', url: 'html_url' }[name] ?? name;
+            outputs[`${release.path}--${key}`] = value;
+            if (key === 'tag_name' || key === 'sha') releaseMetadata[`${release.path}--${key}`] = value;
+        }
+    }
+    outputs.release_metadata = JSON.stringify(releaseMetadata);
+    return outputs;
+}
