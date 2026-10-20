@@ -18,6 +18,7 @@ describe('terrain capture', () => {
 
         expect(capture.step(source, 5)).toBe(false);
         expect(reads).toBe(5);
+        expect(capture.samples()).toBe(5);
         expect(capture.progress()).toBeCloseTo(5 / 12);
         expect(() => capture.result()).toThrow('incomplete');
         while (!capture.step(source, 7)) {}
@@ -80,6 +81,7 @@ describe('terrain capture', () => {
         );
 
         expect(reads).toBeLessThan(20);
+        expect(optimized.samples()).toBe(reads);
         expect(optimized.result()).toEqual(baseline.result());
     });
 
