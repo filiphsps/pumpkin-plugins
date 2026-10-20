@@ -9,7 +9,7 @@ import {
     section,
 } from '@pumpkin-plugins/config';
 import { PLUGIN_NAME } from '../name.ts';
-import { ipv4Endpoint } from './fields.ts';
+import { ipv4Endpoint, pluginNames } from './fields.ts';
 
 /** Name of the config file in the plugin's data folder. */
 export const CONFIG_FILE = 'config.toml';
@@ -28,7 +28,7 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
             nat_pmp: bool({ description: 'Look for routers that speak NAT-PMP.', default: true }),
             lease_seconds: int({
                 description:
-                    'How long the router keeps a port open without hearing from the plugin. It is renewed at half this time and closed again when the server stops.',
+                    'How long the router keeps a port open without hearing from the plugin. It is renewed at half this time, or after five minutes if that comes first, and closed again when the server stops.',
                 default: 3600,
                 min: 120,
                 max: 86400,
@@ -54,9 +54,10 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
         },
     }),
     bedrock: section({
-        description: 'The Bedrock Edition port (UDP).',
+        description:
+            'The Bedrock Edition port. It is opened for UDP and TCP: Bedrock players connect over UDP, and the connection is set up over TCP on the same port.',
         fields: {
-            enabled: bool({ description: 'Open the Bedrock Edition port.', default: true }),
+            enabled: bool({ description: 'Open the Bedrock Edition port for UDP and TCP.', default: true }),
             port: int({ description: 'Port of the Bedrock Edition listener.', default: 19132, min: 1, max: 65535 }),
         },
     }),
@@ -67,6 +68,11 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
                 description:
                     'Let other plugins ask for ports to be opened, for example BedrockAddonManager for its pack downloads. They are closed again when the plugin stops asking.',
                 default: true,
+            }),
+            allowed: pluginNames({
+                description:
+                    'The plugins that may ask for ports. Any port a plugin asks for is opened to the internet, so only list plugins you trust with that.',
+                default: ['BedrockAddonManager'],
             }),
             max_requests_per_plugin: int({
                 description: 'How many ports each plugin may keep open at once. Every plugin has its own limit.',

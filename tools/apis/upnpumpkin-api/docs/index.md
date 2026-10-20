@@ -25,3 +25,8 @@ releases the mapping immediately; pass `{ releasePort: false }` only when you wa
 keep it temporarily. If your plugin stops unexpectedly, UPnPumpkin removes requests after five
 minutes without a refresh. It also limits how many ports each plugin can request, as configured by
 [`plugins.max_requests_per_plugin`](../../../../packages/upnpumpkin/README.md#configuration).
+
+UPnPumpkin only opens ports for plugins listed in
+[`plugins.allowed`](../../../../packages/upnpumpkin/README.md#configuration), which lists only
+BedrockAddonManager by default. Any other plugin gets a `failed` state whose reason names that
+setting, so tell server owners to add your plugin's name to the list.

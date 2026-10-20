@@ -1,31 +1,43 @@
+import * as dgram from 'node:dgram';
 import * as fs from 'node:fs/promises';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { isPublicIpv4, parseIpv4 } from '@pumpkin-plugins/port-mapping/ipv4';
 import { describe, expect, it } from 'vitest';
 import { PLUGIN_NAME, routerConfig, upnpServers } from './running.ts';
 
 const { router: startRouter, start } = upnpServers();
 
+/** The address this machine uses toward the internet, found the way the plugin finds it. No packet is sent. */
+async function defaultRouteAddress(): Promise<string | undefined> {
+    const socket = dgram.createSocket('udp4');
+    try {
+        await new Promise<void>((resolve, reject) => {
+            socket.once('error', reject);
+            socket.connect(9, '8.8.8.8', resolve);
+        });
+        return socket.address().address;
+    } catch {
+        return undefined;
+    } finally {
+        socket.close();
+    }
+}
+
 // A machine with a public address needs no mapping, which is the right behavior but not what these tests check.
-const hasPublicAddress = Object.values(os.networkInterfaces())
-    .flat()
-    .some(
-        (i) =>
-            i?.family === 'IPv4' &&
-            !i.internal &&
-            !/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|169\.254\.)/.test(
-                i.address,
-            ),
-    );
+const local = parseIpv4((await defaultRouteAddress()) ?? '');
+const hasPublicAddress = local !== undefined && isPublicIpv4(local);
 
 describe.skipIf(hasPublicAddress)('port forwarding', () => {
     it('opens the Java and Bedrock ports through UPnP and closes them when the server stops', async () => {
         const router = await startRouter({ natPmp: false });
         const server = await start('upnp', routerConfig(router));
-        await server.waitForLog(/Opened TCP port 25565 as 93\.184\.216\.34:25565 \(upnp\)/);
+        await server.waitForLog(
+            new RegExp(`${PLUGIN_NAME}: Opened TCP port 25565 as 93\\.184\\.216\\.34:25565 \\(upnp\\)`),
+        );
         await server.waitForLog(/Opened UDP port 19132 as 93\.184\.216\.34:19132 \(upnp\)/);
+        await server.waitForLog(/Opened TCP port 19132 as 93\.184\.216\.34:19132 \(upnp\)/);
 
-        expect([...router.igd.mappings.keys()].sort()).toEqual(['tcp:25565', 'udp:19132']);
+        expect([...router.igd.mappings.keys()].sort()).toEqual(['tcp:19132', 'tcp:25565', 'udp:19132']);
         expect(router.igd.mappings.get('tcp:25565')).toMatchObject({
             internalPort: 25565,
             description: 'Pumpkin Java Edition',
@@ -68,11 +80,15 @@ describe.skipIf(hasPublicAddress)('port forwarding', () => {
         await server.waitForLog(/Opened TCP port 25565/);
         await fs.writeFile(
             path.join(server.pluginDataDir(PLUGIN_NAME), 'config.toml'),
-            routerConfig(router, '\nlease_seconds = 600\n[java]\nport = 25570\n[bedrock]\nenabled = false\n'),
+            routerConfig(router, '\nnat_pmp = false\n[java]\nport = 25570\n[bedrock]\nenabled = false\n'),
         );
         const from = server.lines.length;
         server.command('upnp reload');
-        await server.waitForLog(/Reloaded the config\. 1 port is being kept open\./, 10_000, from);
+        await server.waitForLog(
+            /Reloaded the config\. 1 port requested; \/upnp status shows which are open\./,
+            10_000,
+            from,
+        );
         await server.waitForLog(/Opened TCP port 25570/, 10_000, from);
         expect([...router.igd.mappings.keys()]).toEqual(['tcp:25570']);
         expect(router.igd.actions.filter((a) => a === 'DeletePortMapping')).toHaveLength(1);

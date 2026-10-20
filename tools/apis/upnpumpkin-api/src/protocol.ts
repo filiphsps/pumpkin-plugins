@@ -59,8 +59,14 @@ const MAX_DESCRIPTION = 100;
 
 const isPort = (value: unknown): value is number =>
     typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 65535;
+// C0 and C1 controls and the Unicode line breaks: they would forge server log lines, and most of
+// them are not allowed in the XML sent to a UPnP router.
+const isControl = (character: string) => {
+    const code = character.codePointAt(0) ?? 0;
+    return code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
+};
 const isText = (value: unknown, max: number): value is string =>
-    typeof value === 'string' && value.length > 0 && value.length <= max;
+    typeof value === 'string' && value.length > 0 && value.length <= max && ![...value].some(isControl);
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -128,17 +134,19 @@ export function decodeRequest(bytes: Uint8Array): { request: Request } | { error
             return { request: { op: 'info' } };
         case 'status':
         case 'release':
-            if (!isText(value.key, MAX_KEY)) return { error: 'key must be a short non-empty string' };
+            if (!isText(value.key, MAX_KEY))
+                return { error: 'key must be a short non-empty string without control characters' };
             return { request: { op: value.op, key: value.key } };
         case 'ensure': {
-            if (!isText(value.key, MAX_KEY)) return { error: 'key must be a short non-empty string' };
+            if (!isText(value.key, MAX_KEY))
+                return { error: 'key must be a short non-empty string without control characters' };
             if (value.protocol !== 'tcp' && value.protocol !== 'udp')
                 return { error: 'protocol must be "tcp" or "udp"' };
             if (!isPort(value.port)) return { error: 'port must be a number from 1 to 65535' };
             if (value.externalPort !== undefined && !isPort(value.externalPort))
                 return { error: 'externalPort must be a number from 1 to 65535' };
             if (!isText(value.description, MAX_DESCRIPTION))
-                return { error: 'description must be a short non-empty string' };
+                return { error: 'description must be a short non-empty string without control characters' };
             return {
                 request: {
                     op: 'ensure',
