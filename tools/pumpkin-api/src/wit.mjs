@@ -36,21 +36,11 @@ export function ensurePumpkinWit({ lockFile, cacheRoot }) {
 
     try {
         const checkout = path.join(stagingDirectory, 'checkout');
-        // Fetch only the pinned commit and only the blobs under the WIT subdirectory. End option
-        // parsing so a validated remote cannot be interpreted as a Git option.
+        // Fetch only the pinned commit, blobs included. A blob filter leaves the WIT files for the
+        // checkout to fetch lazily, which Git for Windows' FSCache breaks (git-for-windows/git#2590).
+        // End option parsing so a validated remote cannot be interpreted as a Git option.
         runGit(['init', '--quiet', checkout]);
-        runGit([
-            '-C',
-            checkout,
-            'fetch',
-            '--quiet',
-            '--depth',
-            '1',
-            '--filter=blob:none',
-            '--',
-            pin.repository,
-            pin.commit,
-        ]);
+        runGit(['-C', checkout, 'fetch', '--quiet', '--depth', '1', '--', pin.repository, pin.commit]);
 
         const fetchedCommit = runGit(['-C', checkout, 'rev-parse', 'FETCH_HEAD']).toLowerCase();
         if (fetchedCommit !== pin.commit) {

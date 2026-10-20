@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { digestWitDirectory, ensurePumpkinWit, parsePumpkinWitPin } from '../src/wit.mjs';
 
 const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -13,6 +13,7 @@ const upstreamGitPinSchemaUrl =
     'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/schemas/upstream-git-pin.schema.json';
 
 afterEach(() => {
+    vi.unstubAllEnvs();
     for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 
@@ -71,6 +72,19 @@ it('fetches a local WIT pin and reuses its verified cache without the Git source
 
     fs.rmSync(directory.repository, { recursive: true, force: true });
     expect(ensurePumpkinWit({ lockFile: directory.lockFile, cacheRoot: directory.cacheRoot })).toBe(witRoot);
+});
+
+it('fetches the WIT files with the pinned commit when Git cannot fetch missing objects lazily', () => {
+    const directory = createLocalWitPin();
+    // Honor blob filters as GitHub does; a local server ignores them by default.
+    runGit(directory.repository, ['config', 'uploadpack.allowFilter', 'true']);
+    // Git for Windows' FSCache hides the packs that `git checkout -- <path>` fetches lazily
+    // (git-for-windows/git#2590). Disabling lazy fetches reproduces that failure on any platform.
+    vi.stubEnv('GIT_NO_LAZY_FETCH', '1');
+
+    const witRoot = ensurePumpkinWit({ lockFile: directory.lockFile, cacheRoot: directory.cacheRoot });
+
+    expect(fs.readFileSync(path.join(witRoot, 'plugin.wit'), 'utf8')).toBe('package pumpkin:plugin@0.1.0;\n');
 });
 
 it('refetches a cached WIT file when its contents no longer match the integrity manifest', () => {
