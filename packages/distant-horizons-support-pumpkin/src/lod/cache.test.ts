@@ -262,6 +262,19 @@ describe('LOD cache', () => {
         expect(new LodCache(files, 2, 2).get(key)).toBeUndefined();
         expect(files.list('cache')).toHaveLength(0);
     });
+    it('deletes temporary files left by an interrupted write on startup', () => {
+        const files = new MemoryFiles();
+        new LodCache(files, 0, 2).put('kept', lod(1));
+        const name = files.list('cache')[0] ?? '';
+        files.put(`cache/${name}.tmp.0`, new Uint8Array(10));
+        files.put('cache/0123abcd.lod.tmp.17', new Uint8Array(10));
+        files.put('cache/notes.txt', new Uint8Array(1));
+
+        const cache = new LodCache(files, 0, 2);
+
+        expect(files.list('cache').sort()).toEqual([name, 'notes.txt'].sort());
+        expect(cache.get('kept')).toEqual(lod(1));
+    });
     it('checks whether a section is cached without reading or promoting disk entries', () => {
         const files = new MemoryFiles();
         const cache = new LodCache(files, 1, 2);
@@ -297,6 +310,34 @@ describe('LOD cache', () => {
         expect(cache.stats()).toMatchObject({ memoryEntries: 1, diskEntries: 2 });
         expect(cache.get('a')).toBeUndefined();
         expect(cache.get('b')).toEqual(lod(2));
+    });
+    it('evicts the oldest memory entries above the byte budget', () => {
+        const files = new MemoryFiles(),
+            cache = new LodCache(files, -1, 0, 250);
+        cache.put('a', lod(1));
+        cache.put('b', lod(2));
+        cache.get('a');
+        cache.put('c', lod(3));
+
+        expect(cache.stats()).toMatchObject({ memoryEntries: 2, memoryBytes: 200, memoryByteLimit: 250 });
+        expect(cache.get('b')).toBeUndefined();
+        expect(cache.get('a')).toEqual(lod(1));
+        expect(cache.get('c')).toEqual(lod(3));
+
+        cache.remove('a');
+        cache.clearMemory();
+        expect(cache.stats()).toMatchObject({ memoryEntries: 0, memoryBytes: 0 });
+    });
+    it('keeps an entry larger than the byte budget only on disk', () => {
+        const files = new MemoryFiles(),
+            cache = new LodCache(files, -1, 2, 150);
+        cache.put('small', lod(1));
+        const large = { updated: 2, data: new Uint8Array(200).fill(2) };
+        cache.put('large', large);
+
+        expect(cache.stats()).toMatchObject({ memoryEntries: 1, memoryBytes: 100, diskEntries: 2 });
+        expect(cache.get('large')).toEqual(large);
+        expect(cache.stats()).toMatchObject({ memoryEntries: 1, memoryBytes: 100 });
     });
     it('supports disabled and unlimited tiers', () => {
         const files = new MemoryFiles();

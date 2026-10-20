@@ -9,6 +9,9 @@ function fixture(height = 1) {
     const cache = new LodCache(files, 128, 4096);
     const reports: string[] = [];
     let samples = 0;
+    // The forced-work budget adapts to how long samples take. A fake clock where each sample costs
+    // 1 µs keeps that cost the same on a fast or a loaded machine.
+    let clock = 0;
     const peer: ForcedLodPeer = {
         name: 'Alice',
         level: 'world',
@@ -17,6 +20,7 @@ function fixture(height = 1) {
             height,
             sample: () => {
                 samples++;
+                clock += 0.001;
                 return { material: 'minecraft:plains_DH-BSW_minecraft:stone', skyLight: 15, blockLight: 0 };
             },
         },
@@ -31,7 +35,12 @@ function fixture(height = 1) {
             return true;
         },
     };
-    const generation = new ForcedLodGeneration(cache, logger, () => 1234);
+    const generation = new ForcedLodGeneration(
+        cache,
+        logger,
+        () => 1234,
+        () => clock,
+    );
     return { files, cache, generation, logger, peer, peers, reports, samples: () => samples };
 }
 
@@ -58,6 +67,11 @@ describe('forced LOD generation', () => {
                 // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI color codes start with the ESC control character.
                 .replace(/\u001b\[[0-9;]*m/g, ''),
         ).toContain('Built forced LOD for Alice at world section 0, 0 (origin 0, 0 blocks)');
+        for (const line of f.logger.of('info')) {
+            // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI color codes start with the ESC control character.
+            expect(line).toMatch(/\u001b\[[0-9;]*mAlice/);
+        }
+        expect(f.logger.of('info')).toHaveLength(2);
     });
 
     it('uses the full forced-work budget and reports partial progress during a capture', () => {
@@ -74,6 +88,40 @@ describe('forced LOD generation', () => {
         expect(f.samples()).toBe(65_536);
         expect(f.cache.has('world:0:0')).toBe(true);
         expect(f.reports.at(-1)).toContain('complete: 1 built, 0 skipped');
+    });
+
+    it('pauses forced sampling while the server has no spare tick time', () => {
+        const f = fixture();
+        f.generation.start(f.peer, 32, 32);
+
+        f.generation.tick(f.peers, 46);
+        expect(f.samples()).toBe(0);
+        expect(f.cache.has('world:0:0')).toBe(false);
+
+        f.generation.tick(f.peers, 10);
+        expect(f.cache.has('world:0:0')).toBe(true);
+    });
+
+    it('scales forced sampling to the measured cost of a sample', () => {
+        const f = fixture(16);
+        let clock = 0;
+        const sample = f.peer.terrain.sample;
+        f.peer.terrain.sample = (x, y, z) => {
+            clock += 0.01;
+            return sample(x, y, z);
+        };
+        const generation = new ForcedLodGeneration(
+            f.cache,
+            f.logger,
+            () => 1234,
+            () => clock,
+        );
+        generation.start(f.peer, 32, 32);
+
+        generation.tick(f.peers);
+        expect(f.samples()).toBe(32_768);
+        generation.tick(f.peers);
+        expect(f.samples() - 32_768).toBeLessThan(5_000);
     });
 
     it('skips sections whose chunks are unavailable and reports the final count', () => {
@@ -116,6 +164,24 @@ describe('forced LOD generation', () => {
         expect(f.cache.stats().memoryEntries).toBe(9);
         expect(f.samples()).toBe(8 * 4096);
         expect(f.reports.at(-1)).toContain('complete: 8 built, 1 skipped (1 already generated)');
+    });
+
+    it('skips a section whose cache entry cannot be read and keeps generating the others', () => {
+        const f = fixture();
+        f.cache.put('world:0:0', { updated: 1, data: new Uint8Array(64) });
+        f.cache.clearMemory();
+        const [unreadable] = f.files.list('cache');
+        const stat = f.files.stat.bind(f.files);
+        vi.spyOn(f.files, 'stat').mockImplementation((path) => {
+            if (path === `cache/${unreadable}`) throw new Error('stat failed');
+            return stat(path);
+        });
+
+        f.generation.start(f.peer, 32, 32, 1);
+        f.generation.tick(f.peers);
+
+        expect(f.generation.status()).toBeUndefined();
+        expect(f.reports.at(-1)).toContain('complete: 8 built, 1 skipped (0 already generated)');
     });
 
     it('reports an entirely cached selection after worker verification', () => {

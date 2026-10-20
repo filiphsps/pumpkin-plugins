@@ -1,5 +1,5 @@
 import type { DocumentSpec } from '@pumpkin-plugins/docs/node';
-import { SESSION_TIMING } from '../../tools/apis/pumpkin-pie-api/src/session-timing.ts';
+import { SESSION_TIMING } from '@pumpkin-plugins/pumpkin-pie-api';
 import { dhsPlaceholderDefinitions } from './src/placeholders/definitions.ts';
 
 const generatedNote =

@@ -21,6 +21,7 @@ Unknown names and supplied arguments are declined.
 | `%dhs_memory_entries%` | Number of entries in the memory cache. |
 | `%dhs_memory_bytes%` | Cached LOD payload byte lengths in memory, excluding JavaScript object overhead. |
 | `%dhs_memory_limit%` | Memory cache entry limit; -1 means unlimited and 0 means disabled. |
+| `%dhs_memory_byte_limit%` | Memory cache byte limit set by memory_cache_mb. |
 | `%dhs_disk_entries%` | Number of entries indexed in the disk cache. |
 | `%dhs_disk_bytes%` | Bytes indexed in the disk cache. |
 | `%dhs_disk_limit%` | Disk cache entry limit; -1 means unlimited and 0 means disabled. |

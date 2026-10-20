@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import {
-    DEFAULT_LOD_GENERATION_RADIUS,
-    iterateLodSectionsAround,
-    listLodSectionsAround,
-    sectionKey,
-} from './generation.ts';
+import { DEFAULT_LOD_GENERATION_RADIUS, iterateLodSectionsWithin, sectionKey } from './generation.ts';
+
+const everywhere = {
+    minX: Number.MIN_SAFE_INTEGER,
+    maxX: Number.MAX_SAFE_INTEGER,
+    minZ: Number.MIN_SAFE_INTEGER,
+    maxZ: Number.MAX_SAFE_INTEGER,
+};
+const iterateLodSectionsAround = (blockX: number, blockZ: number, radius: number) =>
+    iterateLodSectionsWithin(blockX, blockZ, radius, everywhere);
+const listLodSectionsAround = (blockX: number, blockZ: number, radius: number) => [
+    ...iterateLodSectionsAround(blockX, blockZ, radius),
+];
 
 describe('forced LOD section selection', () => {
     it('centers on the containing section and lists surrounding sections in outward rings', () => {

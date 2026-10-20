@@ -5,9 +5,9 @@ import { PLUGIN_NAME } from '../name.ts';
 
 /** Permission node required to use the `/dhs` commands. */
 export const COMMAND_PERMISSION = `${PLUGIN_NAME}:command.dhs` as const;
-const mapRadiusLimit = MAX_LOD_MAP_RADIUS.toLocaleString('en-US').replace(/,/g, '_');
-const generationRadiusLimit = MAX_LOD_GENERATION_RADIUS.toLocaleString('en-US').replace(/,/g, '_');
-const generationSectionsLimit = MAX_LOD_GENERATION_SECTIONS.toLocaleString('en-US').replace(/,/g, '_');
+const mapRadiusLimit = MAX_LOD_MAP_RADIUS.toLocaleString('en-US');
+const generationRadiusLimit = MAX_LOD_GENERATION_RADIUS.toLocaleString('en-US');
+const generationSectionsLimit = MAX_LOD_GENERATION_SECTIONS.toLocaleString('en-US');
 
 /** Operator commands for inspecting DH work and managing cached terrain. */
 export const commands = defineCommands(PLUGIN_NAME, {

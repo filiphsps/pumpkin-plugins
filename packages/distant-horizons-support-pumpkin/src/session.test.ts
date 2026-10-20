@@ -1,11 +1,9 @@
-import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { readSettings } from './config/load.ts';
 import { LodCache } from './lod/cache.ts';
-import { PLUGIN_NAME } from './name.ts';
-import { Reader } from './protocol/bytes.ts';
-import { packet } from './protocol/messages.ts';
+import { Reader, Writer } from './protocol/bytes.ts';
+import { encodeSection, packet } from './protocol/messages.ts';
 import { type Peer, Sessions } from './session.ts';
 
 function fixture(measureNow = () => 1000, now = () => 1000) {
@@ -38,21 +36,22 @@ function fixture(measureNow = () => 1000, now = () => 1000) {
         send: (bytes) => sent.push(bytes),
         report: (message) => reports.push(message),
     };
-    const peers = {
-        withPeer: (name: string, use: (p: Peer) => void) => {
-            if (name !== peer.name) return false;
-            use(peer);
-            return true;
-        },
+    const withPeer = (name: string, use: (p: Peer) => void) => {
+        if (name !== peer.name) return false;
+        use(peer);
+        return true;
     };
-    const request = (tracker = 1, level = 'world', x = 0, timestamp?: number) =>
-        packet(7)
+    const peers = { withPeer, withTerrain: withPeer };
+    const request = (tracker = 1, level = 'world', x = 0, timestamp?: number) => {
+        const section = encodeSection(x, 0);
+        return packet(7)
             .int(tracker)
             .string(level)
-            .words((x & 0x0fff_ffff) >>> 24, (((x & 0x0fff_ffff) << 8) | 6) >>> 0)
+            .words(section.high, section.low)
             .bool(timestamp !== undefined)
             .bytes(timestamp === undefined ? new Uint8Array() : packet(0).timestamp(timestamp).finish().subarray(4))
             .finish();
+    };
     sessions.receive(peer, packet(3).string(peer.dimension).finish());
     sent.length = 0;
     const ids = () =>
@@ -62,6 +61,21 @@ function fixture(measureNow = () => 1000, now = () => 1000) {
             return r.short();
         });
     return { files, settings, cache, sessions, peer, peers, sent, reports, request, ids, log, reads: () => reads };
+}
+
+/** Adds a second Java player in the fixture's world, with its own DH session and sent packets. */
+function joinPlayer(f: ReturnType<typeof fixture>, name: string) {
+    const sent: Uint8Array[] = [];
+    const player: Peer = { ...f.peer, name, send: (bytes) => sent.push(bytes) };
+    const withPeer = (peerName: string, use: (peer: Peer) => void) => {
+        const peer = peerName === f.peer.name ? f.peer : peerName === name ? player : undefined;
+        if (!peer) return false;
+        use(peer);
+        return true;
+    };
+    f.sessions.receive(player, packet(3).string(player.dimension).finish());
+    sent.length = 0;
+    return { player, sent, peers: { withPeer, withTerrain: withPeer } };
 }
 
 function clientConfig(
@@ -256,9 +270,7 @@ describe('DH protocol contracts', () => {
         f.sessions.receive(f.peer, packet(3).string(dimension).finish());
 
         const message = f.log.of('debug').at(-1) ?? '';
-        expect(message).toBe(
-            `${ansi.named.name(PLUGIN_NAME)} Ignored DH initialization for a dimension other than the current player dimension.`,
-        );
+        expect(message).toBe('Ignored DH initialization for a dimension other than the current player dimension.');
     });
 
     it('continues cached delivery while forced capture work is active', () => {
@@ -419,14 +431,13 @@ describe('DH protocol contracts', () => {
         f.cache.put('world:1:0', { updated: 0, data: new Uint8Array(60_000).fill(2) });
         const bobSent: Uint8Array[] = [];
         const bob: Peer = { ...f.peer, name: 'Bob', send: (bytes) => bobSent.push(bytes) };
-        const peers = {
-            withPeer: (name: string, use: (peer: Peer) => void) => {
-                const peer = name === f.peer.name ? f.peer : name === bob.name ? bob : undefined;
-                if (!peer) return false;
-                use(peer);
-                return true;
-            },
+        const withPeer = (name: string, use: (peer: Peer) => void) => {
+            const peer = name === f.peer.name ? f.peer : name === bob.name ? bob : undefined;
+            if (!peer) return false;
+            use(peer);
+            return true;
         };
+        const peers = { withPeer, withTerrain: withPeer };
         f.sessions.receive(bob, packet(3).string(bob.dimension).finish());
         f.sessions.receive(f.peer, clientConfig({ bandwidthKbps: 1 }));
         f.sessions.receive(bob, clientConfig({ bandwidthKbps: 1 }));
@@ -531,14 +542,13 @@ describe('DH protocol contracts', () => {
         f.cache.put('world:1:0', { updated: 1000, data: new Uint8Array(64).fill(2) });
         const bobSent: Uint8Array[] = [];
         const bob: Peer = { ...f.peer, name: 'Bob', send: (bytes) => bobSent.push(bytes) };
-        const peers = {
-            withPeer: (name: string, use: (peer: Peer) => void) => {
-                const peer = name === f.peer.name ? f.peer : name === bob.name ? bob : undefined;
-                if (!peer) return false;
-                use(peer);
-                return true;
-            },
+        const withPeer = (name: string, use: (peer: Peer) => void) => {
+            const peer = name === f.peer.name ? f.peer : name === bob.name ? bob : undefined;
+            if (!peer) return false;
+            use(peer);
+            return true;
         };
+        const peers = { withPeer, withTerrain: withPeer };
         f.sessions.receive(bob, packet(3).string(bob.dimension).finish());
         f.sent.length = 0;
         bobSent.length = 0;
@@ -726,6 +736,47 @@ describe('DH sessions', () => {
         expect(f.reads()).toBe(32768);
     });
 
+    it('runs forced captures for an operator without a DH session channel', () => {
+        const f = fixture();
+        f.peer.terrain.height = 16;
+        f.sessions.forceGenerate(f.peer, 32, 32);
+        const bedrockPeers = { withPeer: () => false, withTerrain: f.peers.withTerrain };
+
+        f.sessions.tick(bedrockPeers);
+
+        expect(f.reads()).toBe(32768);
+        expect(f.sessions.status()).toContain('Forced LOD capture for Alice: 50%');
+    });
+    it('ends only the failing DH session when a player callback throws', () => {
+        const f = fixture();
+        f.cache.put('world:0:0', { updated: 1000, data: new Uint8Array(64).fill(1) });
+        f.sessions.receive(f.peer, f.request());
+        f.peer.send = () => {
+            throw new Error('connection closed');
+        };
+
+        expect(() => f.sessions.tick(f.peers)).not.toThrow();
+
+        expect(f.sessions.hasClient('Alice')).toBe(false);
+        expect(f.log.of('warn').join('\n')).toContain('connection closed');
+    });
+    it('cancels forced work with the real reason when terrain access throws', () => {
+        const f = fixture();
+        f.peer.terrain.height = 16;
+        f.sessions.forceGenerate(f.peer, 32, 32);
+        const failing = {
+            withPeer: f.peers.withPeer,
+            withTerrain: () => {
+                throw new Error('world unavailable');
+            },
+        };
+
+        expect(() => f.sessions.tick(failing)).not.toThrow();
+
+        expect(f.sessions.status()).not.toContain('Forced LOD capture');
+        expect(f.log.of('warn').join('\n')).toContain('world unavailable');
+        expect(f.log.of('info').join('\n')).not.toContain('no longer available');
+    });
     it('keeps forced work running when only the DH protocol session closes', () => {
         const f = fixture();
         f.peer.terrain.height = 16;
@@ -843,6 +894,17 @@ describe('DH sessions', () => {
         f.sessions.tick(f.peers);
         expect(f.sessions.status()).toContain('1 served');
     });
+    it('shows capture progress for a later request while an earlier one waits for terrain', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 64;
+        f.peer.terrain.prepare = (region) => (region.originX === 0 ? { status: 'pending' } : { status: 'ready' });
+        f.sessions.receive(f.peer, f.request(1, 'world', 0));
+        f.sessions.receive(f.peer, f.request(2, 'world', 1));
+
+        f.sessions.tick(f.peers);
+
+        expect(f.sessions.status()).toContain('Capturing world 1, 0: 1.6%');
+    });
     it('stops pending captures and drops queued transfers when the client disables LOD requests', () => {
         const disabled = packet(4)
             .byte(3)
@@ -929,6 +991,44 @@ describe('DH sessions', () => {
         expect(f.files.list('cache')).toHaveLength(2);
         expect(f.ids().filter((id) => id === 8)).toHaveLength(2);
     });
+    it('captures a section once when its player asks for it again during the capture', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 1024;
+        f.sessions.receive(f.peer, f.request(1));
+        f.sessions.tick(f.peers);
+        f.sessions.receive(f.peer, f.request(2));
+
+        for (let tick = 0; tick < 8; tick++) f.sessions.tick(f.peers);
+
+        expect(answered(f.sent)).toEqual([1, 2]);
+        expect(f.reads()).toBe(4096);
+    });
+    it('captures a section once when two players ask for it', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 1024;
+        const bob = joinPlayer(f, 'Bob');
+        f.sessions.receive(f.peer, f.request(1));
+        f.sessions.receive(bob.player, f.request(2));
+
+        for (let tick = 0; tick < 8; tick++) f.sessions.tick(bob.peers);
+
+        expect(answered(f.sent)).toEqual([1]);
+        expect(answered(bob.sent)).toEqual([2]);
+        expect(f.reads()).toBe(4096);
+    });
+    it('captures for a waiting request when the capture it waited for is cancelled', () => {
+        const f = fixture();
+        f.settings.blocks_per_tick = 1024;
+        const bob = joinPlayer(f, 'Bob');
+        f.sessions.receive(f.peer, f.request(1));
+        f.sessions.receive(bob.player, f.request(2));
+        f.sessions.tick(bob.peers);
+        f.sessions.receive(f.peer, packet(5).int(1).finish());
+
+        for (let tick = 0; tick < 8; tick++) f.sessions.tick(bob.peers);
+
+        expect(answered(bob.sent)).toEqual([2]);
+    });
     it('scales capture work with server MSPT and the measured cost of block samples', () => {
         const times = [0, 0, 0, 0, 5, 5, 5, 5, 10, 10];
         const f = fixture(() => times.shift() ?? 10);
@@ -956,6 +1056,26 @@ describe('DH sessions', () => {
         expect(reads).toBe(40960);
         expect(f.sessions.status()).toContain('1 served');
         expect(f.sessions.status()).toContain('Capture budget 32768/32768');
+    });
+    it('measures capture cost from block sampling alone, not from storing the result', () => {
+        let clock = 0;
+        const f = fixture(() => clock);
+        f.peer.terrain.sample = () => {
+            clock += 0.001;
+            return { material: 'minecraft:plains_DH-BSW_minecraft:stone', skyLight: 15, blockLight: 0 };
+        };
+        const put = f.cache.put.bind(f.cache);
+        f.cache.put = (key, value) => {
+            clock += 1000;
+            put(key, value);
+        };
+        f.sessions.receive(f.peer, f.request());
+
+        f.sessions.tick(f.peers, 0);
+        f.sessions.tick(f.peers, 0);
+
+        expect(f.ids()).toContain(10);
+        expect(f.sessions.status()).toContain('Capture budget 16384/16384');
     });
     it('captures loaded terrain, sends split data and reuses the persisted capture', () => {
         const f = fixture();
@@ -1065,15 +1185,14 @@ describe('DH sessions', () => {
         const bob: Peer = { ...f.peer, name: 'Bob', send: (bytes) => bobSent.push(bytes) };
         const carolSent: Uint8Array[] = [];
         const carol: Peer = { ...f.peer, name: 'Carol', send: (bytes) => carolSent.push(bytes) };
-        const peers = {
-            withPeer: (name: string, use: (peer: Peer) => void) => {
-                const peer =
-                    name === f.peer.name ? f.peer : name === bob.name ? bob : name === carol.name ? carol : undefined;
-                if (!peer) return false;
-                use(peer);
-                return true;
-            },
+        const withPeer = (name: string, use: (peer: Peer) => void) => {
+            const peer =
+                name === f.peer.name ? f.peer : name === bob.name ? bob : name === carol.name ? carol : undefined;
+            if (!peer) return false;
+            use(peer);
+            return true;
         };
+        const peers = { withPeer, withTerrain: withPeer };
         sessions.receive(f.peer, packet(3).string(f.peer.dimension).finish());
         sessions.receive(bob, packet(3).string(bob.dimension).finish());
         sessions.receive(carol, packet(3).string(carol.dimension).finish());
@@ -1140,6 +1259,16 @@ describe('DH sessions', () => {
         expect(f.ids()).toEqual([6]);
         expect(f.sessions.status()).toContain('2 pending');
     });
+    it('reports the actual reason when a queued request stops being valid', () => {
+        const f = fixture();
+        f.sessions.receive(f.peer, f.request());
+        f.peer.insideBorder = () => false;
+
+        f.sessions.tick(f.peers);
+
+        expect(f.ids()).toEqual([6]);
+        expect(f.sessions.status()).toContain('Last rejection: Section outside request range or world border.');
+    });
     it('cancels requests, forgets disconnected clients and refuses unloaded terrain', () => {
         const f = fixture();
         f.sessions.receive(f.peer, f.request());
@@ -1153,10 +1282,22 @@ describe('DH sessions', () => {
         f.sessions.tick(f.peers);
         expect(f.ids()).toEqual([6]);
         expect(f.files.list('cache')).toHaveLength(0);
-        f.sessions.left('Alice');
+        f.sessions.endSession('Alice');
         expect(f.sessions.status()).toContain('0 Distant Horizons client');
     });
-    it('enforces work and transfer budgets and prevents obsolete captures after changes', () => {
+    it('serves a queued request after a block change in its section without rejecting it', () => {
+        const f = fixture();
+        f.sessions.receive(f.peer, f.request());
+        f.sessions.changed('world', 10, 10);
+
+        f.sessions.tick(f.peers);
+        f.sessions.tick(f.peers);
+
+        expect(f.ids()).not.toContain(6);
+        expect(f.ids()).toContain(10);
+        expect(f.sessions.status()).toContain('1 served, 0 rejected');
+    });
+    it('enforces work and transfer budgets and restarts captures after changes', () => {
         const f = fixture();
         f.settings.blocks_per_tick = 64;
         f.sessions.receive(f.peer, f.request());
@@ -1168,9 +1309,10 @@ describe('DH sessions', () => {
             { x: 63, z: 63 },
         ]);
         f.sessions.tick(f.peers);
-        expect(f.ids()).toEqual([6]);
+        expect(f.sent).toHaveLength(0);
+        expect(f.sessions.status()).toContain('Capturing world 0, 0: 1.6%');
         expect(f.files.list('cache')).toHaveLength(0);
-        f.sent.length = 0;
+        f.sessions.receive(f.peer, packet(5).int(1).finish());
         f.settings.blocks_per_tick = 16384;
         f.settings.packets_per_tick = 1;
         f.sessions.receive(f.peer, f.request(2));
@@ -1198,6 +1340,39 @@ describe('DH sessions', () => {
         expect(f.cache.has('world:0:0')).toBe(false);
         expect(f.cache.has('world:1:0')).toBe(true);
     });
+    it('closes sessions in a world without a known height and names the setting once', () => {
+        const f = fixture();
+        f.peer.level = 'custom';
+        f.peer.dimension = 'example:custom';
+        f.peer.terrain.height = 0;
+        const init = packet(3).string('example:custom').finish();
+
+        f.sessions.receive(f.peer, init);
+        f.sessions.receive(f.peer, init);
+
+        expect(f.sessions.hasClient('Alice')).toBe(false);
+        expect(f.ids()).toEqual([1, 1]);
+        expect(f.log.of('warn')).toHaveLength(1);
+        expect(f.log.of('warn')[0]).toContain('[worlds."custom"]');
+    });
+    it('warns once with both protocol numbers when a client uses another DH protocol', () => {
+        const f = fixture();
+        const otherProtocol = new Writer().short(15).short(3).string('minecraft:overworld').finish();
+
+        f.sessions.receive(f.peer, otherProtocol);
+        f.sessions.receive(f.peer, otherProtocol);
+
+        expect(f.log.of('warn')).toHaveLength(1);
+        expect(
+            // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI color codes start with the ESC control character.
+            f.log.of('warn')[0]?.replace(/\u001b\[[0-9;]*m/g, ''),
+        ).toMatch(/\b15\b.*\b16\b/);
+        expect(f.sessions.hasClient('Alice')).toBe(false);
+        const close = new Reader(f.sent[0] ?? new Uint8Array());
+        close.short();
+        expect(close.short()).toBe(1);
+        expect(close.string()).not.toContain('RangeError');
+    });
     it('resets pending requests on a world change and closes malformed sessions', () => {
         const f = fixture();
         f.sessions.receive(f.peer, f.request());
@@ -1212,6 +1387,15 @@ describe('DH sessions', () => {
         expect(f.sessions.status()).toContain('0 Distant Horizons client');
     });
 });
+
+/** Trackers of the final LOD responses in sent packets, in send order. */
+function answered(sent: Uint8Array[]): number[] {
+    return sent.flatMap((bytes) => {
+        const input = new Reader(bytes);
+        input.short();
+        return input.short() === 8 ? [input.int()] : [];
+    });
+}
 
 function readFragment(bytes: Uint8Array): { buffer: number; data: Uint8Array; first: boolean } {
     const input = new Reader(bytes);

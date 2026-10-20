@@ -9,10 +9,13 @@
  */
 /** Writes the big-endian integers and UTF-8 strings used by DH. */
 export class Writer {
-    private readonly data: number[] = [];
+    private data = new Uint8Array(64);
+    private view = new DataView(this.data.buffer);
+    private length = 0;
     /** Appends one byte. */
     byte(value: number): this {
-        this.data.push(value & 255);
+        this.reserve(1);
+        this.data[this.length++] = value;
         return this;
     }
     /** Appends a boolean. */
@@ -21,11 +24,17 @@ export class Writer {
     }
     /** Appends a 16-bit integer. */
     short(value: number): this {
-        return this.byte(value >>> 8).byte(value);
+        this.reserve(2);
+        this.view.setUint16(this.length, value & 0xffff);
+        this.length += 2;
+        return this;
     }
     /** Appends a 32-bit integer. */
     int(value: number): this {
-        return this.short(value >>> 16).short(value);
+        this.reserve(4);
+        this.view.setUint32(this.length, value >>> 0);
+        this.length += 4;
+        return this;
     }
     /** Appends an exact 64-bit bit pattern as two 32-bit words. */
     words(high: number, low: number): this {
@@ -38,7 +47,9 @@ export class Writer {
     }
     /** Appends bytes without a length prefix. */
     bytes(value: Uint8Array): this {
-        for (const b of value) this.data.push(b);
+        this.reserve(value.length);
+        this.data.set(value, this.length);
+        this.length += value.length;
         return this;
     }
     /** Appends bytes prefixed by a 32-bit length. */
@@ -47,29 +58,44 @@ export class Writer {
     }
     /** Appends UTF-8 prefixed by its byte length, matching the DH protocol. */
     string(value: string): this {
-        const out = new Writer();
+        const start = this.length;
+        this.short(0);
         for (const character of value) {
             let c = character.codePointAt(0) ?? 0;
             if (c >= 0xd800 && c <= 0xdfff) c = 0xfffd;
-            if (c < 128) out.byte(c);
-            else if (c < 2048) out.byte(192 | (c >>> 6)).byte(128 | (c & 63));
+            if (c < 128) this.byte(c);
+            else if (c < 2048) this.byte(192 | (c >>> 6)).byte(128 | (c & 63));
             else if (c < 65536)
-                out.byte(224 | (c >>> 12))
+                this.byte(224 | (c >>> 12))
                     .byte(128 | ((c >>> 6) & 63))
                     .byte(128 | (c & 63));
             else
-                out.byte(240 | (c >>> 18))
+                this.byte(240 | (c >>> 18))
                     .byte(128 | ((c >>> 12) & 63))
                     .byte(128 | ((c >>> 6) & 63))
                     .byte(128 | (c & 63));
         }
-        const bytes = out.finish();
-        if (bytes.length > 65535) throw new RangeError('DH string is too long');
-        return this.short(bytes.length).bytes(bytes);
+        const size = this.length - start - 2;
+        if (size > 65535) {
+            this.length = start;
+            throw new RangeError('DH string is too long');
+        }
+        this.view.setUint16(start, size);
+        return this;
     }
-    /** Returns the encoded bytes. */
+    /** Returns a copy of the encoded bytes. */
     finish(): Uint8Array {
-        return new Uint8Array(this.data);
+        return this.data.slice(0, this.length);
+    }
+    private reserve(size: number): void {
+        const needed = this.length + size;
+        if (needed <= this.data.length) return;
+        let capacity = this.data.length * 2;
+        while (capacity < needed) capacity *= 2;
+        const data = new Uint8Array(capacity);
+        data.set(this.data.subarray(0, this.length));
+        this.data = data;
+        this.view = new DataView(data.buffer);
     }
 }
 

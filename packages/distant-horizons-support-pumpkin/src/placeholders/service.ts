@@ -81,6 +81,8 @@ export class DistantHorizonsPlaceholderService {
                 return String(this.options.cache.stats().memoryBytes);
             case 'memory_limit':
                 return String(this.options.cache.stats().memoryLimit);
+            case 'memory_byte_limit':
+                return String(this.options.cache.stats().memoryByteLimit);
             case 'disk_entries':
                 return String(this.options.cache.stats().diskEntries);
             case 'disk_bytes':

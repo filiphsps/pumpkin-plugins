@@ -3,8 +3,12 @@
 ## The client disconnects or never opens a session
 
 Check the plugin README for the supported Distant Horizons release and make sure the client is
-running it. If the protocol versions differ, the plugin closes the session. Only Java Edition
-players can open Distant Horizons sessions.
+running it. If the protocol versions differ, the plugin closes the session and logs a warning with
+the client's and the server's protocol numbers. Only Java Edition players can open Distant Horizons
+sessions.
+
+Worlds in a custom dimension need a height in the plugin config. Without one, the plugin closes DH
+sessions in that world and logs the `[worlds."<world>"]` key to add once per world.
 
 ## Requests stay pending because terrain is unavailable
 
@@ -18,22 +22,36 @@ configured queue. See the plugin README for the section size and capture require
 
 The plugin keeps serving a cached capture until it reaches its configured refresh age. It rebuilds
 an expired capture in the background when the server has the terrain loaded; otherwise, the older
-capture remains available. Block placement and breaking invalidate affected captures, while other
-world changes are picked up on a later refresh. If you replace world data or change a dimension's
-height, stop the server, remove this plugin's cache folder, and restart the server. The plugin README
-lists commands for clearing either cache tier or both.
+capture remains available. Blocks placed or broken by players, crop growth and fire spread clear
+the affected captures right away. Other changes can show up only after a later refresh. To rebuild
+one wrong section now, use `/dhs cache recover <x> <z>` as described in
+[Manage the LOD cache](cache.md#rebuild-one-wrong-section).
+
+If you replace world data or change a dimension's height, stop the server, remove this plugin's
+`cache/` folder, and restart the server.
 
 ## Requests stay queued or progress is slow
 
-Run `/dhs status` to see pending requests, queued responses and retained response bytes, DH packet
-bytes sent, capture progress, completed and rejected requests, and the last rejection reason.
-Requests for unavailable terrain retry with increasing delays. If the last rejection is `LOD request
-limit reached`, the bounded request queue is full. Cached sections can still be delivered while a
-forced capture pauses ordinary sampling.
+Run `/dhs status` to see worker ticks, capture progress, the capture budget, Pumpkin's reported
+MSPT, queued responses and their bytes, DH packet bytes sent, and the served, rejected and
+cancelled request counts. The counts start at zero when the plugin loads.
 
-The client's ETA includes time spent waiting since submission, so it doesn't measure network
-throughput. A nonzero client bandwidth limit controls outgoing fragments: each waits until enough
-byte credit is available, and the credit bucket can hold one full DH fragment message. A bandwidth
-limit of zero means unlimited. When the client changes its configuration, generation and sync
-settings are acknowledged independently. See the plugin README for current queue and transfer
-settings; their defaults remain provisional until real-runtime measurements are complete.
+- If worker ticks stay at zero, the plugin's tick handler isn't running. Check the server log for
+  plugin errors.
+- If worker ticks and capture progress keep rising, the plugin is working through the queue. The
+  client can keep adding requests while it does.
+- If rejections rise with `Chunk ... is not loaded`, the requested terrain is still unavailable.
+  See [Requests stay pending because terrain is unavailable](#requests-stay-pending-because-terrain-is-unavailable).
+- If the last rejection is `LOD request limit reached`, the request queue is full. It drains as
+  captures finish, or you can raise `pending_requests`.
+- If cancellations rise, the client is dropping requests it no longer needs.
+
+The capture budget shrinks as the server gets busier and drops to zero when Pumpkin reports 45
+MSPT or more. Cached sections still go out while sampling is paused, including during a forced
+capture. On the pinned Pumpkin release, the reported MSPT doesn't include this plugin's own tick
+handler, so `/dhs status` also shows how long that handler took last tick.
+
+The client's ETA counts time since the request was sent, including time in the queue, so it doesn't
+measure network speed. A nonzero client bandwidth limit paces outgoing fragments, and zero means
+unlimited. The defaults for the queue and transfer settings in the plugin README are provisional
+until they have been measured on real servers.

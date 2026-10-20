@@ -1,3 +1,4 @@
+import type { TerrainRegion } from '@pumpkin-plugins/terrain';
 import { SECTION_SIZE_BLOCKS } from '../protocol/constants.ts';
 
 /** Radius used when a forced LOD capture does not specify one. */
@@ -39,28 +40,7 @@ export interface LodSectionBounds {
     minZ: number;
 }
 
-/** Iterates the containing section first, followed by the surrounding square in outward rings. */
-export function* iterateLodSectionsAround(
-    blockX: number,
-    blockZ: number,
-    radius = DEFAULT_LOD_GENERATION_RADIUS,
-): Generator<LodSectionCoordinate> {
-    lodGenerationSectionCount(radius);
-    if (!Number.isSafeInteger(blockX) || !Number.isSafeInteger(blockZ)) {
-        throw new RangeError('Block coordinates must be safe integers.');
-    }
-
-    const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
-    const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
-    yield* iterateRings(centerX, centerZ, radius, {
-        minX: centerX - radius,
-        maxX: centerX + radius,
-        minZ: centerZ - radius,
-        maxZ: centerZ + radius,
-    });
-}
-
-/** Iterates only the selected ring coordinates inside an inclusive section rectangle. */
+/** Iterates the containing section first, then the surrounding square in outward rings, clipped to the bounds. */
 export function* iterateLodSectionsWithin(
     blockX: number,
     blockZ: number,
@@ -83,13 +63,16 @@ export function* iterateLodSectionsWithin(
     yield* iterateRings(centerX, centerZ, radius, clipped);
 }
 
-/** Materializes the selected sections; use the iterator for a large radius. */
-export function listLodSectionsAround(
-    blockX: number,
-    blockZ: number,
-    radius = DEFAULT_LOD_GENERATION_RADIUS,
-): LodSectionCoordinate[] {
-    return [...iterateLodSectionsAround(blockX, blockZ, radius)];
+/** Block region of one LOD section over the full world height. */
+export function sectionRegion(section: LodSectionCoordinate, world: { minY: number; height: number }): TerrainRegion {
+    return {
+        originX: section.x * SECTION_SIZE_BLOCKS,
+        originZ: section.z * SECTION_SIZE_BLOCKS,
+        width: SECTION_SIZE_BLOCKS,
+        depth: SECTION_SIZE_BLOCKS,
+        minY: world.minY,
+        height: world.height,
+    };
 }
 
 /** Stable cache key scoped to the world name and signed section coordinates. */
