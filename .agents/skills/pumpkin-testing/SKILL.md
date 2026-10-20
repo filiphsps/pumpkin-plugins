@@ -28,8 +28,10 @@ all server suites. Hook/script/docs-only changes don't need real-server tests.
 
 ## Add meaningful coverage
 
-Use the interfaces and fakes exported by `@pumpkin-plugins/plugin-kit/testing` for pure logic and
-adapters' callers. Put unit tests beside code and `*.itest.ts` in the package's `test/` directory.
+Follow the [testing policy](../../../AGENTS.md#testing-policy): show that a feature works with a
+real-server or CLI test, and write unit tests first for logic you can run in isolation. For those unit
+tests, use the interfaces and fakes exported by `@pumpkin-plugins/plugin-kit/testing` for pure logic
+and adapters' callers. Put unit tests beside code and `*.itest.ts` in the package's `test/` directory.
 A regression test should fail without the fix; cover observable failure handling, not implementation
 spelling or guarantees TypeScript already makes. Generate binary fixtures in code.
 

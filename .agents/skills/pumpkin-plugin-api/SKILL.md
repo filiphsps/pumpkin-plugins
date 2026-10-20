@@ -62,10 +62,13 @@ handler and task IDs remain `u32` (`number`).
 | Need | Use |
 | --- | --- |
 | Commands and their permissions, documented in the README from the same declaration | `defineCommands` from `@pumpkin-plugins/docs`, `registerCommands` from `@pumpkin-plugins/plugin-kit/register-commands` |
-| Logging, repeating tasks, command callbacks | `@pumpkin-plugins/plugin-kit/host` |
+| Logging, repeating tasks, command callbacks | `@pumpkin-plugins/plugin-kit/host`; wrap `hostLogger` with `taggedLogger` from `/logger` so every line names the plugin |
 | The plugin's data folder | `@pumpkin-plugins/plugin-kit/data-dir` (behind the `DataFiles` interface in `/files`) |
 | Messages to other plugins | `@pumpkin-plugins/plugin-kit/ipc` |
 | Errors from WASI calls | `@pumpkin-plugins/plugin-kit/wasi-error` |
+| Socket steps that report `would-block`, and IPv4 socket addresses | `@pumpkin-plugins/plugin-kit/wasi-socket` |
+| Monotonic time in milliseconds; WASI `u64` values as numbers | `@pumpkin-plugins/plugin-kit/wasi-clock`, `/wasi-number` |
+| Parsing and formatting IPv4 addresses | `@pumpkin-plugins/port-mapping/ipv4` |
 | Settings | `@pumpkin-plugins/config` ([Plugin config](../../../docs/plugin-config.md)) |
 | Opening a router port | `@pumpkin-plugins/upnpumpkin-api` ([Port forwarding](../../../docs/port-forwarding.md)) |
 | Fakes of all of the above for unit tests | `@pumpkin-plugins/plugin-kit/testing` |
@@ -82,9 +85,12 @@ tested without a server.
 
 ## Permissions
 
-A plugin that asks for permissions is prompted for them on the server console the first time it loads, and a
-hot reload denies them, so test with a restart. Command permissions are declared with the command, and their
-names are typed against the ones Pumpkin knows ([Plugin info and READMEs](../../../docs/plugin-info-and-readmes.md)).
+Pumpkin asks the operator to approve a plugin's permissions on the server console unless its plugin config
+pre-allows them or turns `ask_permission_confirmation` off. It remembers the answer for that plugin file and
+permission list, so a rebuilt `.wasm` or a changed list asks again. A hot reload can't show the prompt, so a
+plugin that would need one is denied and skipped; test with a restart. Names in `info.permissions` are typed
+against `PUMPKIN_PERMISSIONS`. Command permission nodes are declared with the command and must start with
+`<PluginName>:` ([Plugin info and READMEs](../../../docs/plugin-info-and-readmes.md)).
 
 ## When the API doesn't have what you need
 

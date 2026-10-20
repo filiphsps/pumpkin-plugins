@@ -2,16 +2,13 @@
 // Adapts Codex lifecycle hooks to the repository's client-neutral protocol.
 import * as path from 'node:path';
 import { handle } from './run.mjs';
-import { hookScope } from './scope.mjs';
+import { completionIdentity, hookScope } from './scope.mjs';
 
 const MAX_FAILURE_REPORT_LENGTH = 6000;
 
-/** Convert a Codex tool name to the portable runner's aliases. */
+/** Convert a Codex tool name to the portable runner's aliases. Codex sends every file edit as `apply_patch`. */
 function portableTool(name) {
-    if (name === 'Bash') return 'bash';
-    if (name === 'Edit') return 'edit';
-    if (name === 'Write') return 'write';
-    return name;
+    return name === 'Bash' ? 'bash' : name;
 }
 
 /** Return a Codex response that blocks a tool call with a visible reason. */
@@ -107,11 +104,10 @@ export async function handleCodexHook(request, runner = handle, scope = hookScop
             );
         }
         try {
-            const identity =
-                request.hook_event_name === 'SubagentStop'
-                    ? `subagent:${request.agent_id ?? request.turn_id ?? 'unknown'}`
-                    : 'root';
-            const files = await scope.files(request.session_id, request.turn_id, { retrying, identity });
+            const files = await scope.files(request.session_id, request.turn_id, {
+                retrying,
+                identity: completionIdentity(request),
+            });
             const result = await runner({ event: 'check', cwd: request.cwd, files });
             await scope.finish?.(request, files, result?.ok === true);
             if (result?.ok === true) return { continue: true };

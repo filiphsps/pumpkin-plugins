@@ -1,318 +1,100 @@
 ---
 name: typescript-advanced-types
-description: Use when implementing complex type logic, creating reusable type utilities, or ensuring compile-time type safety in TypeScript projects.
+description: Use when writing or changing generic, conditional, mapped or template-literal types in this repository, such as typed declarations that keep their literals or types derived from a schema or command tree.
 ---
 
-# TypeScript Advanced Types
+# Advanced types in this repository
 
-Comprehensive guidance for mastering TypeScript's advanced type system including generics, conditional types, mapped types, template literal types, and utility types for building robust, type-safe applications.
+The repository uses advanced types for one job: derive types from a single declaration so that the
+runtime value, the README and the handlers can't drift apart. Use them when a declaration already
+exists and callers should get compile errors for names it doesn't contain. Don't add type machinery
+that nothing derives from; a plain interface is easier to read and to change.
 
-## When to Use This Skill
+Code samples follow [`biome.json`](../../../biome.json) and [code style](../../../docs/code-style.md):
+no `any` (use `unknown` and narrow it), `import type` for type-only imports, `T[]` instead of
+`Array<T>`, and `readonly` on declared data. The [TypeScript handbook](https://www.typescriptlang.org/docs/handbook/2/types-from-types.html)
+covers the language features themselves.
 
-- Building type-safe libraries or frameworks
-- Creating reusable generic components
-- Implementing complex type inference logic
-- Designing type-safe API clients
-- Building form validation systems
-- Creating strongly-typed configuration objects
-- Implementing type-safe state management
-- Migrating JavaScript codebases to TypeScript
+## Keep literals from a declaration
 
-## Core Concepts
-
-### 1. Generics
-
-**Purpose:** Create reusable, type-flexible components while maintaining type safety.
-
-**Basic Generic Function:**
+Declare lists of names `as const` and derive the union from the value, as `tools/docs/src/permissions.ts`
+does for `PumpkinPermission`. Check object literals with `satisfies` so they keep their literal types
+instead of widening to the annotation, as every plugin's `src/info.ts` does with
+`satisfies PluginInfo<typeof PLUGIN_NAME>`.
 
 ```typescript
-function identity<T>(value: T): T {
-  return value;
+/** Every color the plugin can show. */
+export const COLORS = ['red', 'green', 'blue'] as const;
+/** One of `COLORS`. */
+export type Color = (typeof COLORS)[number];
+
+/** Whether a string from a player or a file names a known color. */
+export function isColor(value: string): value is Color {
+    return (COLORS as readonly string[]).includes(value);
+}
+```
+
+When a function returns its argument for later inference, use `const` type parameters so callers
+don't need `as const`. `defineCommands` in `tools/docs/src/commands.ts` works this way.
+
+## Constrain strings with template literals
+
+Template literal types state a naming rule the compiler can check. Command permission nodes must
+start with the plugin name, so `defineCommands` takes the name as a type parameter and constrains the
+tree to `` `${Name}:${string}` ``:
+
+```typescript
+interface Command<Node extends string> {
+    readonly description: string;
+    readonly permission: Node;
 }
 
-const num = identity<number>(42); // Type: number
-const str = identity<string>("hello"); // Type: string
-const auto = identity(true); // Type inferred: boolean
-```
-
-**Generic Constraints:**
-
-```typescript
-interface HasLength {
-  length: number;
+/** Declares commands whose permission nodes start with the plugin name. */
+export function defineCommands<
+    const Name extends string,
+    const T extends Readonly<Record<string, Command<`${Name}:${string}`>>>,
+>(_pluginName: Name, tree: T): T {
+    return tree;
 }
 
-function logLength<T extends HasLength>(item: T): T {
-  console.log(item.length);
-  return item;
-}
-
-logLength("hello"); // OK: string has length
-logLength([1, 2, 3]); // OK: array has length
-logLength({ length: 10 }); // OK: object has length
-// logLength(42);             // Error: number has no length
+defineCommands('Demo', { demo: { description: 'Shows a demo.', permission: 'Demo:command.demo' } });
+// @ts-expect-error the node does not start with "Demo:"
+defineCommands('Demo', { demo: { description: 'Shows a demo.', permission: 'Other:command.demo' } });
 ```
 
-**Multiple Type Parameters:**
+## Derive types from a schema or tree
+
+Mapped and conditional types turn a declaration into the shape code works with:
+
+- `ConfigValues<S>` in `tools/config/src/schema.ts` maps a config schema to its parsed values.
+- `CommandArgumentValues` maps declared arguments to handler arguments, using key remapping
+  (`as Argument['name']`) and a conditional per argument type.
+- `CommandHandlers<T>` walks a command tree recursively and requires one handler per runnable path.
+
+Use `infer` with an `extends` constraint (`infer Nested extends SubcommandTree`) instead of a second
+conditional. To make options mutually exclusive, use a union whose members mark the other keys
+`?: never`, as `CommandBehavior` does.
+
+Keep these types next to the runtime code that reads the same declaration, and export only the ones
+callers name. Types check code at compile time only: validate data from files, the network or the
+host at runtime, as the config validators do.
+
+## Test the types
+
+Type-level behavior that callers depend on needs a test. Use Vitest's `expectTypeOf` for the
+derived type and `// @ts-expect-error <reason>` for inputs that must not compile, as
+`tools/docs/src/commands.test.ts` does. The package's `typecheck` task compiles the test files, and
+that compile is what enforces both.
 
 ```typescript
-function merge<T, U>(obj1: T, obj2: U): T & U {
-  return { ...obj1, ...obj2 };
-}
+import { expectTypeOf, it } from 'vitest';
+import { COLORS, type Color } from './colors.ts';
 
-const merged = merge({ name: "John" }, { age: 30 });
-// Type: { name: string } & { age: number }
+it('derives the color names', () => {
+    expectTypeOf<Color>().toEqualTypeOf<'red' | 'green' | 'blue'>();
+    // @ts-expect-error not a declared color
+    const unknownColor: Color = 'purple';
+    expectTypeOf(COLORS).toEqualTypeOf<readonly ['red', 'green', 'blue']>();
+    void unknownColor;
+});
 ```
-
-### 2. Conditional Types
-
-**Purpose:** Create types that depend on conditions, enabling sophisticated type logic.
-
-**Basic Conditional Type:**
-
-```typescript
-type IsString<T> = T extends string ? true : false;
-
-type A = IsString<string>; // true
-type B = IsString<number>; // false
-```
-
-**Extracting Return Types:**
-
-```typescript
-type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
-
-function getUser() {
-  return { id: 1, name: "John" };
-}
-
-type User = ReturnType<typeof getUser>;
-// Type: { id: number; name: string; }
-```
-
-**Distributive Conditional Types:**
-
-```typescript
-type ToArray<T> = T extends any ? T[] : never;
-
-type StrOrNumArray = ToArray<string | number>;
-// Type: string[] | number[]
-```
-
-**Nested Conditions:**
-
-```typescript
-type TypeName<T> = T extends string
-  ? "string"
-  : T extends number
-    ? "number"
-    : T extends boolean
-      ? "boolean"
-      : T extends undefined
-        ? "undefined"
-        : T extends Function
-          ? "function"
-          : "object";
-
-type T1 = TypeName<string>; // "string"
-type T2 = TypeName<() => void>; // "function"
-```
-
-### 3. Mapped Types
-
-**Purpose:** Transform existing types by iterating over their properties.
-
-**Basic Mapped Type:**
-
-```typescript
-type Readonly<T> = {
-  readonly [P in keyof T]: T[P];
-};
-
-interface User {
-  id: number;
-  name: string;
-}
-
-type ReadonlyUser = Readonly<User>;
-// Type: { readonly id: number; readonly name: string; }
-```
-
-**Optional Properties:**
-
-```typescript
-type Partial<T> = {
-  [P in keyof T]?: T[P];
-};
-
-type PartialUser = Partial<User>;
-// Type: { id?: number; name?: string; }
-```
-
-**Key Remapping:**
-
-```typescript
-type Getters<T> = {
-  [K in keyof T as `get${Capitalize<string & K>}`]: () => T[K];
-};
-
-interface Person {
-  name: string;
-  age: number;
-}
-
-type PersonGetters = Getters<Person>;
-// Type: { getName: () => string; getAge: () => number; }
-```
-
-**Filtering Properties:**
-
-```typescript
-type PickByType<T, U> = {
-  [K in keyof T as T[K] extends U ? K : never]: T[K];
-};
-
-interface Mixed {
-  id: number;
-  name: string;
-  age: number;
-  active: boolean;
-}
-
-type OnlyNumbers = PickByType<Mixed, number>;
-// Type: { id: number; age: number; }
-```
-
-### 4. Template Literal Types
-
-**Purpose:** Create string-based types with pattern matching and transformation.
-
-**Basic Template Literal:**
-
-```typescript
-type EventName = "click" | "focus" | "blur";
-type EventHandler = `on${Capitalize<EventName>}`;
-// Type: "onClick" | "onFocus" | "onBlur"
-```
-
-**String Manipulation:**
-
-```typescript
-type UppercaseGreeting = Uppercase<"hello">; // "HELLO"
-type LowercaseGreeting = Lowercase<"HELLO">; // "hello"
-type CapitalizedName = Capitalize<"john">; // "John"
-type UncapitalizedName = Uncapitalize<"John">; // "john"
-```
-
-**Path Building:**
-
-```typescript
-type Path<T> = T extends object
-  ? {
-      [K in keyof T]: K extends string ? `${K}` | `${K}.${Path<T[K]>}` : never;
-    }[keyof T]
-  : never;
-
-interface Config {
-  server: {
-    host: string;
-    port: number;
-  };
-  database: {
-    url: string;
-  };
-}
-
-type ConfigPath = Path<Config>;
-// Type: "server" | "database" | "server.host" | "server.port" | "database.url"
-```
-
-### 5. Utility Types
-
-**Built-in Utility Types:**
-
-```typescript
-// Partial<T> - Make all properties optional
-type PartialUser = Partial<User>;
-
-// Required<T> - Make all properties required
-type RequiredUser = Required<PartialUser>;
-
-// Readonly<T> - Make all properties readonly
-type ReadonlyUser = Readonly<User>;
-
-// Pick<T, K> - Select specific properties
-type UserName = Pick<User, "name" | "email">;
-
-// Omit<T, K> - Remove specific properties
-type UserWithoutPassword = Omit<User, "password">;
-
-// Exclude<T, U> - Exclude types from union
-type T1 = Exclude<"a" | "b" | "c", "a">; // "b" | "c"
-
-// Extract<T, U> - Extract types from union
-type T2 = Extract<"a" | "b" | "c", "a" | "b">; // "a" | "b"
-
-// NonNullable<T> - Exclude null and undefined
-type T3 = NonNullable<string | null | undefined>; // string
-
-// Record<K, T> - Create object type with keys K and values T
-type PageInfo = Record<"home" | "about", { title: string }>;
-```
-
-## Detailed worked examples and patterns
-
-Detailed sections (starting with `## Advanced Patterns`) live in `references/details.md`. Read that file when the navigation summary above is insufficient.
-
-## Best Practices
-
-1. **Use `unknown` over `any`**: Enforce type checking
-2. **Prefer `interface` for object shapes**: Better error messages
-3. **Use `type` for unions and complex types**: More flexible
-4. **Leverage type inference**: Let TypeScript infer when possible
-5. **Create helper types**: Build reusable type utilities
-6. **Use const assertions**: Preserve literal types
-7. **Avoid type assertions**: Use type guards instead
-8. **Document complex types**: Add JSDoc comments
-9. **Use strict mode**: Enable all strict compiler options
-10. **Test your types**: Use type tests to verify type behavior
-
-## Type Testing
-
-```typescript
-// Type assertion tests
-type AssertEqual<T, U> = [T] extends [U]
-  ? [U] extends [T]
-    ? true
-    : false
-  : false;
-
-type Test1 = AssertEqual<string, string>; // true
-type Test2 = AssertEqual<string, number>; // false
-type Test3 = AssertEqual<string | number, string>; // false
-
-// Expect error helper
-type ExpectError<T extends never> = T;
-
-// Example usage
-type ShouldError = ExpectError<AssertEqual<string, number>>;
-```
-
-## Common Pitfalls
-
-1. **Over-using `any`**: Defeats the purpose of TypeScript
-2. **Ignoring strict null checks**: Can lead to runtime errors
-3. **Too complex types**: Can slow down compilation
-4. **Not using discriminated unions**: Misses type narrowing opportunities
-5. **Forgetting readonly modifiers**: Allows unintended mutations
-6. **Circular type references**: Can cause compiler errors
-7. **Not handling edge cases**: Like empty arrays or null values
-
-## Performance Considerations
-
-- Avoid deeply nested conditional types
-- Use simple types when possible
-- Cache complex type computations
-- Limit recursion depth in recursive types
-- Use build tools to skip type checking in production
