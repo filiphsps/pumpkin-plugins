@@ -62,6 +62,25 @@ describe('Codex hook scope', () => {
         assert.deepEqual(scope.files('session-a', 'turn-a'), []);
     });
 
+    it('does not scan the working tree for a tool call without file targets', () => {
+        const scope = new HookScope({
+            directory: temporaryDirectory(),
+            snapshot: () => assert.fail('must not scan the working tree'),
+        });
+        const request = {
+            session_id: 'session-a',
+            turn_id: 'turn-a',
+            tool_use_id: 'tool-a',
+            tool_name: 'Bash',
+            tool_input: { command: 'pnpm test:scripts' },
+        };
+
+        scope.beforeTool(request);
+        scope.afterTool(request);
+
+        assert.deepEqual(scope.files('session-a', 'turn-a'), []);
+    });
+
     it('limits shell output changes to the file targeted by the command', () => {
         const directory = temporaryDirectory();
         let current = new Map();
@@ -92,8 +111,8 @@ describe('Codex hook scope', () => {
             session_id: 'session-a',
             turn_id: 'turn-a',
             tool_use_id: 'tool-a',
-            tool_name: 'Edit',
-            tool_input: { path: 'packages/p/src/shared.ts' },
+            tool_name: 'apply_patch',
+            tool_input: { command: '*** Begin Patch\n*** Update File: packages/p/src/shared.ts\n*** End Patch' },
         };
 
         scope.beforeTool(request);
@@ -158,5 +177,7 @@ describe('Codex hook scope', () => {
         fs.writeFileSync(path.join(directory, 'untracked file.ts'), 'new');
 
         assert.deepEqual([...snapshotWorkingTree(directory).keys()].sort(), ['tracked.ts', 'untracked file.ts']);
+        assert.deepEqual([...snapshotWorkingTree(directory, ['untracked file.ts']).keys()], ['untracked file.ts']);
+        assert.deepEqual([...snapshotWorkingTree(directory, []).keys()], []);
     });
 });

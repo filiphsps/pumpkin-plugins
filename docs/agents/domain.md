@@ -8,40 +8,17 @@ description: "How agents use glossaries and ADRs to keep terms and decisions ali
 Use the glossary to keep domain language consistent, and check relevant ADRs before proposing or changing an architectural decision.
 
 This repository is an ecosystem umbrella with multiple domain contexts, not a single product domain.
-Read [GLOSSARY-MAP.md](../../GLOSSARY-MAP.md) for their boundaries and relationships. The root
+[GLOSSARY-MAP.md](../../GLOSSARY-MAP.md) describes their boundaries and relationships. The root
 [`GLOSSARY.md`](../../GLOSSARY.md) covers only the Pumpkin Plugin API; add a glossary for another
 context only when shared project vocabulary warrants one.
 
 ## Before you explore
 
-1. Check the repository root for `GLOSSARY-MAP.md`. If it exists, read it and then read the glossary files for the contexts relevant to your work. Otherwise, read the root `GLOSSARY.md` if it exists.
-2. Read the ADRs in `docs/adr/` that cover the area you're working on. For a context-specific decision, check for ADRs near that context's code or docs; repository contexts don't all follow a `src/<context>/` layout.
+1. Read [GLOSSARY-MAP.md](../../GLOSSARY-MAP.md), then the glossaries it lists for the contexts your
+   work touches.
+2. Read the ADRs in `docs/adr/` that cover the area you're working on.
 
-Missing files don't block the work. Continue without calling out their absence or proposing their creation before there's a term or decision to record. The `/domain-modeling` skill, called by `/grill-with-docs` and `/improve-codebase-architecture`, creates a glossary when a term needs recording and offers an ADR only for a choice that's hard to reverse, surprising without context, and came from a real tradeoff.
-
-## Common layouts
-
-In a single-context repository, the glossary and ADRs usually sit at the root:
-
-```text
-/
-├── GLOSSARY.md
-├── docs/
-│   └── adr/
-└── src/
-```
-
-A root `GLOSSARY-MAP.md` signals a multi-context repository. It points to each context's glossary; ADRs can be system-wide or scoped to one context:
-
-```text
-/
-├── GLOSSARY-MAP.md
-├── docs/adr/              # system-wide decisions
-└── src/
-    └── <context>/
-        ├── GLOSSARY.md
-        └── docs/adr/      # context-specific decisions
-```
+Many contexts have no glossary and many areas have no ADR. Continue without calling out their absence or proposing their creation before there's a term or decision to record. The `/domain-modeling` skill, called by `/grill-with-docs` and `/improve-codebase-architecture`, creates a glossary when a term needs recording and offers an ADR only for a choice that's hard to reverse, surprising without context, and came from a real tradeoff.
 
 ## Use the glossary's terms
 

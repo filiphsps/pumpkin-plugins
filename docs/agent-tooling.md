@@ -32,8 +32,9 @@ pnpm run lint:actions
 the runner collects all staged, unstaged and untracked paths from `git status`, including deletions
 and renames, then checks the applicable files and packages and adds repository-wide metadata checks.
 If you pass paths, it checks only those files and their packages; deleted paths are allowed, but
-repository-wide checks are skipped. Either mode runs `pnpm readme:check` when the selected changes
-include any non-generated files.
+repository-wide checks are skipped. Either mode checks generated READMEs when the selected changes
+include any non-generated files: only the affected plugins' READMEs when nothing but plugin source
+changed, otherwise all of `pnpm readme:check`.
 
 Checks don't apply fixes. If you need to fix lint issues, use the scoped `pnpm exec biome check
 --write` and `pnpm exec eslint --fix` commands on files you own.
@@ -46,8 +47,9 @@ Checks don't apply fixes. If you need to fix lint issues, use the scoped `pnpm e
 | Package code | Typecheck and unit tests for that package and workspace dependents |
 | Shared root build inputs or lockfile | Typecheck and unit tests for all packages |
 | Deleted package | All package typechecks and unit tests, to catch remaining imports |
-| Scripts or hook code | `pnpm test:scripts` |
-| Any non-generated change | `pnpm readme:check` |
+| Scripts, hook code, generators, `.github/`, `.codex/`, root `package.json` or `turbo.json`, release-please config | `pnpm test:scripts` |
+| Only plugin source (no `package.json` or Markdown) | Generated READMEs of those plugins and their workspace dependents |
+| Any other non-generated change | `pnpm readme:check` |
 | No-path run with non-generated changes | `pnpm check`, plus the applicable file and package checks |
 | Only generated output | No checks |
 
@@ -74,21 +76,22 @@ include it in its built-in runner list.
 ## How Codex scopes automatic checks
 
 When you run `check.mjs` without paths, Git status supplies the files to check. Codex's completion
-hooks use a narrower scope: they compare the working tree around each tool call and record only
-changed paths explicitly targeted by `Edit`, `Write`, `apply_patch` or a shell output redirection.
-A shell command that changes files as an implicit side effect has no attributable path. The root
-agent and each subagent also have separate scopes, so one agent's completion report doesn't include
-another agent's work.
+hooks use a narrower scope: around each tool call they compare only the paths it explicitly
+targets through `apply_patch` or a shell output redirection, and record the ones that changed. Codex
+sends every file edit as `apply_patch`; `Edit` and `Write` are only matcher aliases for it. A shell
+command that changes files as an implicit side effect has no attributable path. The root agent and
+each subagent also have separate scopes, so one agent's completion report doesn't include another
+agent's work.
 
 Completion checks pass explicit paths, which means they skip repository-wide metadata checks. They
-still run `pnpm readme:check` when the scoped changes include non-generated files. Passing these fast
+still check generated READMEs when the scoped changes include non-generated files. Passing these fast
 checks doesn't prove runtime behavior, correct prose or the full CI workflow. See the
 [Codex Hooks guide](https://learn.chatgpt.com/docs/hooks) for the current trust flow and hook
 behavior: project hooks load only for trusted projects, and Codex requires review and trust for each
 non-managed hook definition before it runs.
 
 The Codex adapter in `.agents/hooks/codex.mjs`, registered by `.codex/hooks.json`, sends
-`PreToolUse` shell, edit, write and patch calls through the portable guard. `PostToolUse` records
+`PreToolUse` shell and patch calls through the portable guard. `PostToolUse` records
 changed paths. `Stop` and `SubagentStop` check that agent's recorded paths and request one
 continuation when checks fail. The scope uses the Codex session ID and `turn_id`, with a separate
 identity for each subagent.
@@ -108,8 +111,8 @@ repository root.
 | `check` | Optional `files` array and `cwd` | `ok`, `files`, `failures`, readable `report` |
 
 For `plan` and `check`, explicit `files` keep file and package checks scoped to those paths.
-`pnpm readme:check` still runs when the selected files include a non-generated file. Omit `files` to
-discover all dirty files and include repository-wide metadata checks.
+Generated READMEs are still checked when the selected files include a non-generated file. Omit
+`files` to discover all dirty files and include repository-wide metadata checks.
 
 For example, this request previews checks for the hook runner without running them:
 
@@ -141,6 +144,8 @@ blocks in READMEs and custom guides. It doesn't parse shell commands or provide 
 shell matching is a heuristic, and shell-based file writes bypass the edit guard. Patches to a Markdown
 file containing generated blocks are refused as a whole because the guard can't reconstruct their
 hunks. Use a precise edit outside the generated block, or edit its source and regenerate the document.
+Before `pnpm install`, the shell and path guards still work, but an edit to an existing Markdown file
+is refused with a request to run `pnpm install`, since the block check needs workspace packages.
 
 Plain Turbo runs receive `--output-logs=errors-only` unless they choose a log level or use shell
 syntax. Git authorization remains in `AGENTS.md`; the guard can't infer what the user authorized.

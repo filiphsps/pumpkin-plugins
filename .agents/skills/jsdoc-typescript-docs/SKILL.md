@@ -50,10 +50,7 @@ The signature and summary are enough when they already explain the contract:
 /**
  * Returns the first item that matches the predicate.
  */
-export function findFirst<T>(
-    items: readonly T[],
-    matches: (item: T) => boolean
-): T | undefined {
+export function findFirst<T>(items: readonly T[], matches: (item: T) => boolean): T | undefined {
     return items.find(matches);
 }
 ```
@@ -68,10 +65,7 @@ Add tags when they explain semantics that types alone do not convey:
  * @param matches - Returns true for a matching section.
  * @returns The first matching section in input order, or undefined when none match.
  */
-export function findFirstMatchingSection<T>(
-    sections: readonly T[],
-    matches: (section: T) => boolean
-): T | undefined {
+export function findFirstMatchingSection<T>(sections: readonly T[], matches: (section: T) => boolean): T | undefined {
     return sections.find(matches);
 }
 ```

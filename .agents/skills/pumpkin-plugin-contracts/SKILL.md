@@ -37,5 +37,6 @@ updates. For new host permissions or WASI capabilities, also read
 ## Refresh derived content
 
 Run `pnpm readme` and inspect generated changes. Don't edit inside `docs:begin`/`docs:end` markers.
-Update handwritten explanations for changed behavior, then run `pnpm check` and `pnpm readme:check`
-(or the fast check runner, which includes both). Runtime changes need the affected server tests too.
+Update handwritten explanations for changed behavior, then run `pnpm check` and `pnpm readme:check`.
+The fast check runner runs both when called without paths; with explicit paths it skips `pnpm check`.
+Runtime changes need the affected server tests too.

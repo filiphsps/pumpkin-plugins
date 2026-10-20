@@ -9,6 +9,6 @@ When commenting on the user's behalf you must disclose that you're an AI model. 
 
 ```markdown
 > [!NOTE]
-> This commented was orchestrated by and posted on the behalf of {FIRST_NAME/@USERNAME} by {MODEL_NAME}.
+> This comment was orchestrated by and posted on behalf of {FIRST_NAME/@USERNAME} by {MODEL_NAME}.
 ```
 

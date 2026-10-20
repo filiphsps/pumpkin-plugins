@@ -36,5 +36,6 @@ composite action only when the implementation needs to orchestrate workflow step
 metadata in this monorepo is usable by path, but is not automatically listed in GitHub Marketplace.
 
 After implementation, run the action's tests and `node .agents/hooks/check.mjs` with the changed
-files. Inspect the generated release entries and README table, and review the final diff. Commit and
-push only when the user explicitly asks.
+files. Inspect the generated release entries and README table, and review the final diff. Commit each
+completed slice locally, following [commit-discipline](../commit-discipline/SKILL.md); push only when
+the user asks.

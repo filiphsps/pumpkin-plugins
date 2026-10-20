@@ -20,7 +20,7 @@ read [pumpkin-plugin-api](../pumpkin-plugin-api/SKILL.md) before introducing hos
 [pumpkin-plugin-contracts](../pumpkin-plugin-contracts/SKILL.md) when adding config or commands.
 `src/info.ts` must remain importable by Node without Pumpkin or WASI imports.
 
-The generated load test proves only that the plugin loads. Add tests for the requested behavior and
-failure paths. Use [pumpkin-testing](../pumpkin-testing/SKILL.md) for validation; include the new plugin's
-real-server suite. If scaffolding partially fails, inspect what it wrote before retrying; don't delete
-other work or rerun into an existing folder blindly.
+The generated real-server test proves only that the plugin loads and answers its starter command. Add
+tests for the requested behavior and failure paths. Use [pumpkin-testing](../pumpkin-testing/SKILL.md)
+for validation; include the new plugin's real-server suite. If scaffolding partially fails, inspect what
+it wrote before retrying; don't delete other work or rerun into an existing folder blindly.
