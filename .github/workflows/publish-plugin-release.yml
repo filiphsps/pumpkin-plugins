@@ -37,7 +37,6 @@ jobs:
         env:
             TAG: ${{ inputs.tag }}
             RELEASE_SHA: ${{ inputs.release_sha }}
-            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             GH_REPO: ${{ github.repository }}
             CURRENT_SOURCE: ${{ inputs.release_sha == github.sha }}
             SOURCE_ROOT: ${{ inputs.release_sha == github.sha && github.workspace || format('{0}/release-source', github.workspace) }}
@@ -77,6 +76,7 @@ jobs:
             - name: 🔎 Verify the GitHub release and tag
               id: release
               env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   WASM_NAME: ${{ steps.plugin.outputs.wasm_file }}
               run: |
                   set -euo pipefail
@@ -161,6 +161,7 @@ jobs:
             - name: 📥 Download existing release assets
               if: steps.release.outputs.assets_present == 'true'
               env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   WASM_NAME: ${{ steps.plugin.outputs.wasm_file }}
               run: |
                   mkdir -p "$SOURCE_ROOT/dist"
@@ -207,6 +208,7 @@ jobs:
             - name: 📤 Attach signed artifacts to the GitHub release
               if: steps.release.outputs.assets_present == 'false'
               env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   WASM_NAME: ${{ steps.plugin.outputs.wasm_file }}
               run: |
                   wasm_file="$SOURCE_ROOT/$WASM_NAME"
