@@ -1,10 +1,13 @@
-import * as fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { requiredEnvironment, setOutput } from './utils/ci-output.mjs';
+import { apiHeaders, encodeRepository, normalizeBaseUrl, readJsonResponse } from './utils/github-api.mjs';
 
-const API_VERSION = '2022-11-28';
+const REPORT_ARTIFACT = 'engine-comparison-report';
+// Report artifacts expire after 90 days, which keeps the listing short; the cap only stops a runaway listing.
+const MAX_REPORT_ARTIFACT_PAGES = 10;
 
 /** Finds the current benchmark report and the newest successful matching default-branch baseline. */
-export async function discoverBenchmarkArtifacts(input, { fetchImpl = fetch, writeOutput = writeGitHubOutput } = {}) {
+export async function discoverBenchmarkArtifacts(input, { fetchImpl = fetch, writeOutput = setOutput } = {}) {
     const repositoryPath = encodeRepository(input.repository);
     const apiBaseUrl = normalizeBaseUrl(input.apiUrl, 'GitHub API URL');
     const headers = apiHeaders(input.token);
@@ -32,48 +35,16 @@ export async function discoverBenchmarkArtifacts(input, { fetchImpl = fetch, wri
             pullRequestNumber: input.pullRequestNumber,
             repositoryPath,
         }));
-    const workflowRunsUrl = new URL(`repos/${repositoryPath}/actions/workflows/ci.yml/runs`, apiBaseUrl);
-    workflowRunsUrl.searchParams.set('branch', input.defaultBranch);
-    workflowRunsUrl.searchParams.set('event', 'push');
-    workflowRunsUrl.searchParams.set('status', 'success');
-    workflowRunsUrl.searchParams.set('per_page', '100');
-    let workflowRunsResponse = await fetchImpl(workflowRunsUrl, { headers });
-    let workflowRuns = await readJsonResponse(workflowRunsResponse, `GitHub API request ${workflowRunsUrl.pathname}`);
-
-    let baselineRunId = '';
-    let baselineSha = '';
-    const visitedWorkflowRunPages = new Set([workflowRunsUrl.href]);
-    while (true) {
-        for (const run of Array.isArray(workflowRuns.workflow_runs) ? workflowRuns.workflow_runs : []) {
-            if (typeof run?.id !== 'number' || typeof run.head_sha !== 'string' || !run.head_sha) continue;
-
-            const comparisonUrl = new URL(
-                `repos/${repositoryPath}/compare/${encodeURIComponent(run.head_sha)}...${encodeURIComponent(prBaseSha)}`,
-                apiBaseUrl,
-            );
-            const comparison = await getJson(fetchImpl, comparisonUrl, headers);
-            if (comparison.status !== 'identical' && comparison.status !== 'ahead') continue;
-
-            const baselineArtifacts = await getJson(
-                fetchImpl,
-                new URL(`repos/${repositoryPath}/actions/runs/${run.id}/artifacts?per_page=100`, apiBaseUrl),
-                headers,
-            );
-            if (!findReportArtifact(baselineArtifacts)) continue;
-
-            baselineRunId = String(run.id);
-            baselineSha = run.head_sha;
-            break;
-        }
-
-        if (baselineRunId) break;
-
-        const nextPageUrl = getNextPageUrl(workflowRunsResponse, workflowRunsUrl, apiBaseUrl);
-        if (!nextPageUrl || visitedWorkflowRunPages.has(nextPageUrl.href)) break;
-        visitedWorkflowRunPages.add(nextPageUrl.href);
-        workflowRunsResponse = await fetchImpl(nextPageUrl, { headers });
-        workflowRuns = await readJsonResponse(workflowRunsResponse, `GitHub API request ${nextPageUrl.pathname}`);
-    }
+    const baseline = await findBaseline({
+        apiBaseUrl,
+        defaultBranch: input.defaultBranch,
+        fetchImpl,
+        headers,
+        prBaseSha,
+        repositoryPath,
+    });
+    const baselineRunId = baseline ? String(baseline.runId) : '';
+    const baselineSha = baseline?.headSha ?? '';
 
     await writeOutput('has_report', 'true');
     await writeOutput('pr_base_sha', prBaseSha);
@@ -89,29 +60,54 @@ export async function discoverBenchmarkArtifacts(input, { fetchImpl = fetch, wri
     };
 }
 
-function encodeRepository(repository) {
-    const parts = requireString(repository, 'GitHub repository').split('/');
-    if (parts.length !== 2 || parts.some((part) => !part)) throw new Error(`Invalid GitHub repository: ${repository}`);
-    return parts.map(encodeURIComponent).join('/');
-}
+/**
+ * Walks the repository's report artifacts newest first and returns the first one from a successful
+ * default-branch push run at or before the PR base. Listing artifacts by name skips runs that never
+ * produced a report, so only candidate commits cost a compare request.
+ */
+async function findBaseline({ apiBaseUrl, defaultBranch, fetchImpl, headers, prBaseSha, repositoryPath }) {
+    const artifactsUrl = new URL(`repos/${repositoryPath}/actions/artifacts`, apiBaseUrl);
+    artifactsUrl.searchParams.set('name', REPORT_ARTIFACT);
+    artifactsUrl.searchParams.set('per_page', '100');
+    const comparedShas = new Map();
+    const checkedRuns = new Set();
+    let pageUrl = artifactsUrl;
+    for (let page = 0; pageUrl && page < MAX_REPORT_ARTIFACT_PAGES; page++) {
+        const response = await fetchImpl(pageUrl, { headers });
+        const payload = await readJsonResponse(response, `GitHub API request ${pageUrl.pathname}`);
+        for (const artifact of Array.isArray(payload.artifacts) ? payload.artifacts : []) {
+            const run = artifact?.workflow_run;
+            if (artifact?.name !== REPORT_ARTIFACT || artifact.expired !== false) continue;
+            if (typeof run?.id !== 'number' || typeof run.head_sha !== 'string' || !run.head_sha) continue;
+            if (run.head_branch !== defaultBranch || run.head_repository_id !== run.repository_id) continue;
+            if (checkedRuns.has(run.id)) continue;
+            checkedRuns.add(run.id);
 
-function normalizeBaseUrl(value, description) {
-    let url;
-    try {
-        url = new URL(requireString(value, description));
-    } catch {
-        throw new Error(`${description} must be a valid URL`);
+            if (!comparedShas.has(run.head_sha)) {
+                const comparison = await getJson(
+                    fetchImpl,
+                    new URL(
+                        `repos/${repositoryPath}/compare/${encodeURIComponent(run.head_sha)}...${encodeURIComponent(prBaseSha)}`,
+                        apiBaseUrl,
+                    ),
+                    headers,
+                );
+                comparedShas.set(run.head_sha, comparison.status === 'identical' || comparison.status === 'ahead');
+            }
+            if (!comparedShas.get(run.head_sha)) continue;
+
+            const workflowRun = await getJson(
+                fetchImpl,
+                new URL(`repos/${repositoryPath}/actions/runs/${run.id}`, apiBaseUrl),
+                headers,
+            );
+            if (workflowRun.event === 'push' && workflowRun.conclusion === 'success') {
+                return { runId: run.id, headSha: run.head_sha };
+            }
+        }
+        pageUrl = getNextPageUrl(response, artifactsUrl, apiBaseUrl);
     }
-    if (url.protocol !== 'https:') throw new Error(`${description} must use HTTPS`);
-    return new URL(url.href.endsWith('/') ? url.href : `${url.href}/`);
-}
-
-function apiHeaders(token) {
-    return {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${requireString(token, 'GitHub App token')}`,
-        'X-GitHub-Api-Version': API_VERSION,
-    };
+    return undefined;
 }
 
 async function getPullRequestBaseSha({ apiBaseUrl, fetchImpl, headers, pullRequestNumber, repositoryPath }) {
@@ -131,7 +127,7 @@ async function getJson(fetchImpl, url, headers) {
     return readJsonResponse(response, `GitHub API request ${url.pathname}`);
 }
 
-function getNextPageUrl(response, workflowRunsUrl, apiBaseUrl) {
+function getNextPageUrl(response, listUrl, apiBaseUrl) {
     const linkHeader = response.headers.get('link');
     if (!linkHeader) return undefined;
 
@@ -143,9 +139,9 @@ function getNextPageUrl(response, workflowRunsUrl, apiBaseUrl) {
         const relationValue = relation?.[1] ?? relation?.[2] ?? relation?.[3] ?? '';
         if (!relationValue.toLowerCase().split(/\s+/).includes('next')) continue;
 
-        const nextPageUrl = new URL(target[1], workflowRunsUrl);
-        if (nextPageUrl.origin !== apiBaseUrl.origin || nextPageUrl.pathname !== workflowRunsUrl.pathname) {
-            throw new Error('GitHub workflow-runs pagination URL changed endpoint');
+        const nextPageUrl = new URL(target[1], listUrl);
+        if (nextPageUrl.origin !== apiBaseUrl.origin || nextPageUrl.pathname !== listUrl.pathname) {
+            throw new Error('GitHub pagination URL changed endpoint');
         }
         return nextPageUrl;
     }
@@ -153,39 +149,9 @@ function getNextPageUrl(response, workflowRunsUrl, apiBaseUrl) {
     return undefined;
 }
 
-async function readJsonResponse(response, description) {
-    if (!response.ok) {
-        const body = await response.text();
-        const detail = body ? `: ${body.slice(0, 500)}` : '';
-        throw new Error(`${description} failed with HTTP ${response.status}${detail}`);
-    }
-    try {
-        return await response.json();
-    } catch {
-        throw new Error(`${description} returned invalid JSON`);
-    }
-}
-
 function findReportArtifact(payload) {
     if (!Array.isArray(payload.artifacts)) return undefined;
-    return payload.artifacts.find(
-        (artifact) => artifact?.name === 'engine-comparison-report' && artifact.expired === false,
-    );
-}
-
-function requireString(value, description) {
-    if (typeof value !== 'string' || !value.trim()) throw new Error(`${description} is required`);
-    return value.trim();
-}
-
-function writeGitHubOutput(name, value) {
-    const outputPath = process.env.GITHUB_OUTPUT;
-    if (!outputPath) throw new Error('GITHUB_OUTPUT is required');
-    fs.appendFileSync(outputPath, `${name}=${value}\n`);
-}
-
-function requiredEnvironment(name) {
-    return requireString(process.env[name], name);
+    return payload.artifacts.find((artifact) => artifact?.name === REPORT_ARTIFACT && artifact.expired === false);
 }
 
 async function runCli() {

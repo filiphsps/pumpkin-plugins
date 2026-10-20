@@ -2,11 +2,12 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
+import { readParseTypeScript } from '../src/build-log.ts';
 import {
     createEngineComparisonMatrix,
     createEngineVariants,
     getEngineVariantBuildOutput,
-} from '../test/engine-variants.ts';
+} from '../src/engine-variants.ts';
 
 const benchmarkDir = path.resolve(import.meta.dirname, '..');
 const repositoryDir = path.resolve(benchmarkDir, '../..');
@@ -50,6 +51,7 @@ try {
             path.join(benchmarkDir, 'src/benchmark-workloads.ts'),
             path.join(sourceDir, 'benchmark-workloads.ts'),
         );
+        fs.cpSync(path.join(benchmarkDir, 'src/workloads'), path.join(sourceDir, 'workloads'), { recursive: true });
 
         const wasmPath = buildPlugin(packageDir, variant.label, variant.parseTypeScript, false);
         publishComponent(wasmPath, getEngineVariantBuildOutput(benchmarkDir, variant.id));
@@ -127,14 +129,15 @@ function buildPlugin(packageDir: string, label: string, parseTypeScript: boolean
         env: {
             ...process.env,
             PUMPKIN_DEV_MODE: developmentMode ? '1' : '0',
+            PUMPKIN_PLUGINS_BUILD_LOG_FORMAT: 'json',
             STATIC_HERMES_CACHE_DIR: hermesCacheDir,
         },
         maxBuffer: 16 * 1024 * 1024,
     });
-    if (buildOutput.includes('-parse-ts') !== parseTypeScript) {
+    console.log(`${label} build:\n${buildOutput.trim()}`);
+    if (readParseTypeScript(buildOutput) !== parseTypeScript) {
         throw new Error(`${label} build selected an unexpected parser mode`);
     }
-    console.log(`${label} build:\n${buildOutput.trim()}`);
     return path.join(packageDir, 'build/plugin.wasm');
 }
 
