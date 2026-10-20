@@ -4,14 +4,12 @@ import { createRequire } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { digestWitDirectory, ensurePumpkinWit, parsePumpkinWitPin } from '@pumpkin-plugins/pumpkin-api/wit';
+import { digestWitDirectory, parsePumpkinWitPin } from '@pumpkin-plugins/pumpkin-api/wit';
 import { CAPABILITIES, wasiInterfaces } from '@pumpkin-plugins/wasi-capabilities';
-import { afterEach, expect, it } from 'vitest';
-import { cacheDir } from '../../build/src/repo.ts';
-import { ensureWasiWit, readLock } from '../../build/src/wasi-wit.ts';
+import { afterEach, expect, inject, it } from 'vitest';
+import { readLock } from '../../build/src/wasi-wit.ts';
 import { prepareWit } from '../../build/src/wit.ts';
 import { PUMPKIN_RELEASE } from '../../test-harness/src/pumpkin-version.ts';
-import { setupHermesToolchainEnvironment } from '../src/hermes/toolchain-environment.ts';
 import { analyzeWitUsage } from '../src/wit/analysis.ts';
 import { emitPumpkinMethodDispatch, emitWasiAdapterDispatch } from '../src/wit/emitters.ts';
 import { generateWitOutputs, readGeneratedFreeFunctions } from '../src/wit/generation.ts';
@@ -40,14 +38,11 @@ afterEach(() => {
 it('generates facades and native adapters for the full pinned Pumpkin and WASI WIT surface', async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-wit-coverage-'));
     directories.push(directory);
-    const apiWitDir = ensurePumpkinWit({
-        lockFile: witLockFile,
-        cacheRoot: cacheDir(import.meta.dirname),
-    });
+    const apiWitDir = inject('pumpkinWitDir');
     const sourceWit = parsePumpkinWitPin(fs.readFileSync(witLockFile, 'utf8'), witLockFile);
 
     const lock = readLock();
-    const wasiWit = await ensureWasiWit({ cacheDir: cacheDir(import.meta.dirname), lock });
+    const wasiWit = inject('wasiWitDir');
     const imports = wasiInterfaces(Object.keys(CAPABILITIES));
     const witDir = prepareWit({
         apiWit: apiWitDir,
@@ -119,14 +114,7 @@ it('generates facades and native adapters for the full pinned Pumpkin and WASI W
     expect(count(eventDispatch, /data\.setProperty\(runtime,/g)).toBeGreaterThanOrEqual(eventFieldCount);
     expect(eventDispatch).toContain('switch (event->tag)');
 
-    const workspaceRoot = path.resolve(import.meta.dirname, '../../..');
-    const toolchain = await setupHermesToolchainEnvironment({
-        workspaceRoot,
-        includeWasiSdk: false,
-        includeWitBindgen: false,
-        includeWasmTools: true,
-    });
-    const wasmTools = process.env.WASM_TOOLS ?? toolchain.WASM_TOOLS;
+    const wasmTools = inject('wasmTools');
     const declarationOrder = readInterfaceDeclarationOrder(witDir);
     const document = readWitToolsDocument(witDir, { executable: wasmTools });
     const resolved = resolveWitDocument(document, declarationOrder);
