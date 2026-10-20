@@ -15,9 +15,7 @@ Value hostFunction(Runtime &runtime, const char *, unsigned int, Callback callba
     return callback(runtime, Value{}, nullptr, 0);
 }
 
-enum class ResourceKind { Wit };
 struct ResourceState {
-    ResourceKind kind;
     int32_t handle;
     bool owned;
     std::string interfaceName;
@@ -58,7 +56,7 @@ bool wasi_http_types_method_incoming_response_consume(
 int main() {
     Runtime runtime;
     auto response = std::make_shared<ResourceState>(ResourceState{
-        ResourceKind::Wit, 41, false, "types", "incoming-response", "wasi:http"});
+        41, false, "types", "incoming-response", "wasi:http"});
     const Value result = generatedWasiResourceMethod(
         runtime, "wasi:http", "types", "incoming-response", "consume", response);
     assert(consumedResponseHandle == 41);
@@ -66,7 +64,6 @@ int main() {
     const auto body = std::dynamic_pointer_cast<WitResourceHostObject>(
         result.asObject(runtime).getHostObject(runtime));
     assert(body);
-    assert(body->state->kind == ResourceKind::Wit);
     assert(body->state->handle == 73);
     assert(body->state->owned);
     assert(body->state->interfaceName == "types");

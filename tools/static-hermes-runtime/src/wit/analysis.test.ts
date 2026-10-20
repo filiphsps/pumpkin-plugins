@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest';
-import { analyzeWitUsage, selectWitEventFields } from '../src/wit/analysis.ts';
-import { parseWitToolsJson } from '../src/wit/model.ts';
-import { resolveWitDocument } from '../src/wit/resolver.ts';
-import type { WitApiPackage } from '../src/wit/types.ts';
+import { analyzeWitUsage, selectWitEventFields } from './analysis.ts';
+import { parseWitToolsJson } from './model.ts';
+import { resolveWitDocument } from './resolver.ts';
+import type { WitApiPackage } from './types.ts';
 
 const wasiGraph = {
     worlds: [{ name: 'plugin', package: 0, imports: { 'interface-0': { interface: { id: 0 } } } }],

@@ -225,3 +225,26 @@ export interface WitApiAdapterPlan {
     /** Fully resolved result type. */
     resultType: ResolvedWitType;
 }
+
+/** List the resources a resolved type holds, at any depth. */
+export function resourcesIn(type: ResolvedWitType | undefined): Extract<ResolvedWitType, { kind: 'resource' }>[] {
+    if (!type) return [];
+    switch (type.kind) {
+        case 'resource':
+            return [type];
+        case 'borrow':
+        case 'list':
+        case 'option':
+            return resourcesIn(type.item);
+        case 'tuple':
+            return type.items.flatMap(resourcesIn);
+        case 'record':
+            return type.fields.flatMap(({ resolvedType }) => resourcesIn(resolvedType));
+        case 'variant':
+            return type.cases.flatMap(({ resolvedType }) => resourcesIn(resolvedType));
+        case 'result':
+            return [...resourcesIn(type.ok), ...resourcesIn(type.error)];
+        default:
+            return [];
+    }
+}

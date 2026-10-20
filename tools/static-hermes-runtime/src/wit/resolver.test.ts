@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import { parseWitToolsJson, type WitToolsDocument } from '../src/wit/model.ts';
-import { resolvePluginApi, resolveWitDocument } from '../src/wit/resolver.ts';
+import { parseWitToolsJson, type WitToolsDocument } from './model.ts';
+import { resolvePluginApi, resolveWitDocument } from './resolver.ts';
 
 const document = {
     worlds: [

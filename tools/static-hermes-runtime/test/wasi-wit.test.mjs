@@ -2,10 +2,34 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
-import { generateWasiEsmFacade, readWasiWitImports } from './oracles/wit-api.mjs';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { setupHermesToolchainEnvironment } from '../src/hermes/toolchain-environment.ts';
+import { emitWasiFacade } from '../src/wit/emitters.ts';
+import { readInterfaceDeclarationOrder, readPluginImportOrder, readWitToolsDocument } from '../src/wit/parser.ts';
+import { resolveWasiImports, resolveWitDocument } from '../src/wit/resolver.ts';
 
 const directories = [];
+let wasmTools;
+
+beforeAll(async () => {
+    const toolchain = await setupHermesToolchainEnvironment({
+        workspaceRoot: path.resolve(import.meta.dirname, '../../..'),
+        includeWasiSdk: false,
+        includeWitBindgen: false,
+        includeWasmTools: true,
+    });
+    wasmTools = process.env.WASM_TOOLS ?? toolchain.WASM_TOOLS;
+}, 120_000);
+
+/** Resolve the plugin world's WASI imports the way `codegen generate` does. */
+function readWasiWitImports(root, requestedImports) {
+    const importOrder = readPluginImportOrder(root);
+    const resolved = resolveWitDocument(
+        readWitToolsDocument(root, { executable: wasmTools }),
+        readInterfaceDeclarationOrder(root),
+    );
+    return resolveWasiImports(resolved, requestedImports, importOrder);
+}
 
 function fixture() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-wasi-wit-'));
@@ -38,6 +62,7 @@ function fixture() {
         `
         package wasi:filesystem@0.2.3;
         interface types {
+            record descriptor-stat { size: u64 }
             resource descriptor {
                 stat: func() -> descriptor-stat;
                 open-at: func(path: string) -> descriptor;
@@ -51,7 +76,7 @@ function fixture() {
         'deps/http/outgoing-handler.wit',
         `
         interface outgoing-handler {
-            use types.{outgoing-request, request-options};
+            use types.{outgoing-request, request-options, future-incoming-response};
             handle: func(request: outgoing-request, options: option<request-options>) -> result<future-incoming-response>;
         }
     `,
@@ -64,7 +89,7 @@ function fixture() {
             resource fields { constructor(); set: func(name: string, value: string); }
             resource outgoing-request { constructor(headers: fields); }
             resource request-options { constructor(); }
-            resource future-incoming-response { subscribe: func() -> pollable; }
+            resource future-incoming-response;
         }
     `,
     );
@@ -112,7 +137,7 @@ function write(root, relativePath, contents) {
 
 async function loadFacade(root, apiInterface, name) {
     const modulePath = path.join(root, `${name}-facade.mjs`);
-    fs.writeFileSync(modulePath, generateWasiEsmFacade(apiInterface));
+    fs.writeFileSync(modulePath, emitWasiFacade(apiInterface));
     return import(pathToFileURL(modulePath).href);
 }
 

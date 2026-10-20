@@ -1,6 +1,7 @@
 import type { WitEventFieldSelection } from './analysis.ts';
+import { cFieldIdentifier, cIdentifier, enumValue, jsName, jsVariantTag, pascalCase } from './names.ts';
 import { generateWitExportValue } from './native-adapters.ts';
-import type { ResolvedWitType, WitApiPackage, WitOwnedType, WitRecord, WitRecordField } from './types.ts';
+import type { ResolvedWitType, WitApiPackage, WitRecord, WitRecordField } from './types.ts';
 
 interface EventGenerationContext {
     apiPackage: WitApiPackage;
@@ -11,18 +12,7 @@ interface GeneratedEventValue {
     setup: string[];
 }
 
-interface EventResourceAdapter {
-    host: 'PlayerObject' | 'WorldObject' | 'TextObject';
-    kind: 'Player' | 'World' | 'Text';
-}
-
 type ScalarEventConversion = (value: string) => string;
-
-const C_RESERVED_FIELD_NAMES = new Set(
-    'alignas alignof and and_eq asm atomic_cancel atomic_commit atomic_noexcept auto bitand bitor bool break case catch char char8_t char16_t char32_t class compl concept const consteval constexpr constinit const_cast continue co_await co_return co_yield decltype default delete do double dynamic_cast else enum explicit export extern false float for friend goto if inline int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static static_assert static_cast struct switch synchronized template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq'.split(
-        /\s+/,
-    ),
-);
 
 /**
  * Generate native event payload conversion without pruning nested JavaScript record fields.
@@ -86,13 +76,6 @@ const scalarEventConversions = new Map<string, ScalarEventConversion>([
     ['string', (value) => `jsString(runtime, wasiStringValue(${value}))`],
 ]);
 
-/** Map WIT event resource types to their native host object wrappers. */
-const eventResourceAdapters = new Map<string, EventResourceAdapter>([
-    ['player:player', { kind: 'Player', host: 'PlayerObject' }],
-    ['world:world', { kind: 'World', host: 'WorldObject' }],
-    ['text:text-component', { kind: 'Text', host: 'TextObject' }],
-]);
-
 /** Generate native event field conversion code for resolved WIT value shapes. */
 function generateEventField(
     field: WitRecordField,
@@ -146,20 +129,13 @@ function generateRecursiveEventValue(
             return { setup, expression: `std::move(${name})` };
         }
         case 'resource': {
-            const adapter = eventResourceAdapters.get(`${type.interfaceName}:${type.name}`);
             const state = `${name}State`;
-            const resourceState = adapter
-                ? `ResourceState{ResourceKind::${adapter.kind}, ${source}.__handle, true}`
-                : `ResourceState{ResourceKind::Wit, ${source}.__handle, true, ${JSON.stringify(type.interfaceName)}, ${JSON.stringify(type.name)}}`;
-            const hostObject = adapter
-                ? `std::make_shared<${adapter.host}>(${state})`
-                : `makeWitResourceObject(${state})`;
             return {
                 setup: [
-                    `auto ${state} = std::make_shared<ResourceState>(${resourceState});`,
+                    `auto ${state} = std::make_shared<ResourceState>(ResourceState{${source}.__handle, true, ${JSON.stringify(type.interfaceName)}, ${JSON.stringify(type.name)}});`,
                     `ownedResources->push_back(${state});`,
                 ],
-                expression: `wrapResourceObject(runtime, ${hostObject})`,
+                expression: `wrapResourceObject(runtime, makeWitResourceObject(${state}))`,
             };
         }
         case 'borrow':
@@ -303,39 +279,6 @@ function indent(value: string, spaces: number): string {
         .split('\n')
         .map((line) => `${prefix}${line}`)
         .join('\n');
-}
-
-function enumValue(apiPackage: WitApiPackage, type: WitOwnedType, value: string): string {
-    return `${cIdentifier(type.packageName || apiPackage.packageName).toUpperCase()}_${cIdentifier(type.interfaceName).toUpperCase()}_${cIdentifier(type.name).toUpperCase()}_${cIdentifier(value).toUpperCase()}`;
-}
-
-function cFieldIdentifier(name: string): string {
-    const identifier = cIdentifier(name).replace(/[A-Z]/g, (character) => character.toLowerCase());
-    return C_RESERVED_FIELD_NAMES.has(identifier) ? `${identifier}_` : identifier;
-}
-
-function pascalCase(value: string): string {
-    return value
-        .split(/[^a-zA-Z0-9]+/)
-        .filter(Boolean)
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join('');
-}
-
-function jsName(witName: string): string {
-    return witName.replace(/^%/, '').replace(/-([a-zA-Z0-9])/g, (_match, character: string) => character.toUpperCase());
-}
-
-function jsVariantTag(witName: string): string {
-    return witName.replace(/^%/, '');
-}
-
-function cIdentifier(witName: string): string {
-    return witName
-        .replace(/^%/, '')
-        .replace(/[^a-zA-Z0-9_]/g, '_')
-        .replace(/_+/g, '_')
-        .toLowerCase();
 }
 
 /** Generate event return lowering, committing owned resources only after the payload converts. */

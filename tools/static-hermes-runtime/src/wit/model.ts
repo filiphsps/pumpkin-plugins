@@ -369,16 +369,15 @@ function typeReferenceAt(value: unknown, at: string): WitToolsTypeReference {
 }
 
 function validateReferences(document: WitToolsDocument): void {
-    for (const [index, world] of document.worlds.entries()) {
+    for (const world of document.worlds) {
         assertIndex(world.package, document.packages.length, `world ${world.name} package`);
         for (const [name, imported] of Object.entries(world.imports)) {
             if ('interface' in imported)
                 assertIndex(imported.interface.id, document.interfaces.length, `world ${world.name} import ${name}`);
             else assertIndex(imported.type, document.types.length, `world ${world.name} import ${name}`);
         }
-        void index;
     }
-    for (const [index, apiInterface] of document.interfaces.entries()) {
+    for (const apiInterface of document.interfaces) {
         assertIndex(apiInterface.package, document.packages.length, `interface ${apiInterface.name} package`);
         for (const [name, id] of Object.entries(apiInterface.types))
             assertIndex(id, document.types.length, `interface ${apiInterface.name} type ${name}`);
@@ -398,7 +397,6 @@ function validateReferences(document: WitToolsDocument): void {
                 assertIndex(resourceId, document.types.length, `function ${apiInterface.name}.${name} resource`);
             }
         }
-        void index;
     }
     for (const [index, type] of document.types.entries()) {
         if (type.owner && 'interface' in type.owner)

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import { generateWitEventDispatch, generateWitEventResultDispatch } from '../src/wit/event-dispatch.ts';
-import type { WitApiPackage } from '../src/wit/types.ts';
+import { generateWitEventDispatch, generateWitEventResultDispatch } from './event-dispatch.ts';
+import type { WitApiPackage } from './types.ts';
 
 it('reports the source of an unsupported resolved event field type', () => {
     const apiPackage: WitApiPackage = {
@@ -145,7 +145,8 @@ it('transfers returned event allocations to Pumpkin instead of freeing them on s
         { event: 'server-command-event', record: 'server-command-event-data', fields: ['command', 'cancelled'] },
     ]);
 
-    expect(dispatch.indexOf('returnedEventCleanup.release();')).toBeGreaterThan(
-        dispatch.indexOf('*ret = returnedEvent;'),
-    );
+    const transfer = dispatch.indexOf('*ret = returnedEvent;');
+    const release = dispatch.indexOf('returnedEventCleanup.release();');
+    expect(transfer).toBeGreaterThanOrEqual(0);
+    expect(release).toBeGreaterThan(transfer);
 });

@@ -1,9 +1,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { WitAnalysis } from './analysis.ts';
-import { emitEventDispatch, emitPumpkinMethodDispatch, emitWasiAdapterDispatch } from './emitters.ts';
-import { generateWitEventResultDispatch } from './event-dispatch.ts';
+import { generateWitEventDispatch, generateWitEventResultDispatch } from './event-dispatch.ts';
+import { generatePumpkinMethodDispatch } from './pumpkin-dispatch.ts';
 import type { WitApiPackage, WitWasiInterface } from './types.ts';
+import { generateWasiAdapterDispatch } from './wasi-dispatch.ts';
 
 /** Resolved WIT analysis and source fragments used to generate component runtime files. */
 export interface WitGenerationInput {
@@ -36,7 +37,7 @@ export interface WitGenerationOutput {
  */
 export function generateWitOutputs(input: WitGenerationInput): WitGenerationOutput {
     const availableFreeFunctions = readGeneratedFreeFunctions(input.pluginHeader);
-    const wasiRuntime = emitWasiAdapterDispatch(input.wasiInterfaces, input.analysis, availableFreeFunctions);
+    const wasiRuntime = generateWasiAdapterDispatch(input.wasiInterfaces, input.analysis, availableFreeFunctions);
     let runtimeSource = input.runtimeTemplate;
     runtimeSource = replaceMarker(runtimeSource, '/* <PUMPKIN_WASI_RUNTIME> */', wasiRuntime);
     runtimeSource = replaceMarker(
@@ -47,20 +48,18 @@ export function generateWitOutputs(input: WitGenerationInput): WitGenerationOutp
     runtimeSource = replaceMarker(
         runtimeSource,
         '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
-        emitPumpkinMethodDispatch(input.apiPackage, input.analysis),
+        generatePumpkinMethodDispatch(input.apiPackage, input.analysis),
     );
     runtimeSource = replaceMarker(
         runtimeSource,
         '/* <PUMPKIN_WIT_EVENT_DISPATCH> */',
-        emitEventDispatch(input.apiPackage, input.analysis),
+        generateWitEventDispatch(input.apiPackage, input.analysis.eventFields),
     );
-    if (runtimeSource.includes('/* <PUMPKIN_WIT_EVENT_RESULT> */')) {
-        runtimeSource = replaceMarker(
-            runtimeSource,
-            '/* <PUMPKIN_WIT_EVENT_RESULT> */',
-            generateWitEventResultDispatch(input.apiPackage, input.analysis.eventFields),
-        );
-    }
+    runtimeSource = replaceMarker(
+        runtimeSource,
+        '/* <PUMPKIN_WIT_EVENT_RESULT> */',
+        generateWitEventResultDispatch(input.apiPackage, input.analysis.eventFields),
+    );
     return {
         runtimeSource,
         apiEnumHeader: generateApiEnumHeader(input.apiPackage, input.pluginHeader),
