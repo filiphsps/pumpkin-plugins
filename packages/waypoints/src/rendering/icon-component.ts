@@ -1,4 +1,4 @@
-import { BLOCK_ICON_SPRITES } from './icon-sprites.ts';
+import { ITEM_ICON_SPRITES } from './icon-sprites.ts';
 
 /** Adds a centered icon line without passing sprite objects through Pumpkin's text parser. */
 export function appendWaypointIcon(labelNbt: Uint8Array, icon: string | undefined): Uint8Array {
@@ -6,7 +6,7 @@ export function appendWaypointIcon(labelNbt: Uint8Array, icon: string | undefine
     if (labelNbt[0] !== 10) throw new TypeError('Waypoint label must be a network-NBT compound.');
     const [namespace, path] = icon.split(':');
     const spritePath =
-        namespace === 'minecraft' && Object.hasOwn(BLOCK_ICON_SPRITES, path) ? BLOCK_ICON_SPRITES[path] : undefined;
+        namespace === 'minecraft' && Object.hasOwn(ITEM_ICON_SPRITES, path) ? ITEM_ICON_SPRITES[path] : undefined;
     const atlas = spritePath?.startsWith('block/') ? 'minecraft:blocks' : 'minecraft:items';
     const sprite = `${namespace}:${spritePath ?? `item/${path}`}`;
     // An unnamed root compound containing three compound children: label, line break, sprite.

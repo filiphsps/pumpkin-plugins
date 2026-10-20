@@ -360,17 +360,17 @@ describe('waypoint placeholder queries', () => {
         expect(formatWaypointField(destination, 'direction', context())).toBeUndefined();
     });
 
-    it('formats the meter and kilometer boundary from raw distance', () => {
-        const meterBoundary = waypoint(ids.one, 'Meters', { x: 999.5, y: 64, z: 0 });
-        const kilometerBoundary = waypoint(ids.two, 'Kilometers', { x: 1000, y: 64, z: 0 });
+    it('switches to kilometers once the distance rounds to 1000 meters, like the HUD', () => {
+        const meters = waypoint(ids.one, 'Meters', { x: 999.4, y: 64, z: 0 });
+        const kilometers = waypoint(ids.two, 'Kilometers', { x: 999.5, y: 64, z: 0 });
 
-        expect(formatWaypointField(meterBoundary, 'distance_formatted', context())).toBe('1000m');
-        expect(formatWaypointField(kilometerBoundary, 'distance_formatted', context())).toBe('1.0km');
+        expect(formatWaypointField(meters, 'distance_formatted', context())).toBe('999m');
+        expect(formatWaypointField(kilometers, 'distance_formatted', context())).toBe('1.0km');
     });
 
     it('rejects partial selection when geometry becomes nonfinite', () => {
-        const extreme = waypoint(ids.one, 'Extreme', { x: 0, y: 1e308, z: 0 });
-        const farViewer = context({ position: { x: 0, y: -1e308, z: 0 } });
+        const extreme = waypoint(ids.one, 'Extreme', { x: 0, y: 20_000_000, z: 0 });
+        const farViewer = context({ position: { x: -Number.MAX_VALUE, y: -Number.MAX_VALUE, z: 0 } });
 
         expect(() => closestWaypoint([extreme], farViewer)).toThrow(RangeError);
         expect(() => formatWaypointField(extreme, 'distance', farViewer)).toThrow(RangeError);

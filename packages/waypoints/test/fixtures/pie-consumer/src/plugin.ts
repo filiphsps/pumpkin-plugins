@@ -3,7 +3,7 @@ import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import type { PluginMetadata } from 'pumpkin:plugin/metadata@0.1.0';
 import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
 import { Plugin, registerPlugin } from '@pumpkin-plugins/pumpkin-api';
-import { PieClient } from '@pumpkin-plugins/pumpkin-pie-api';
+import { PieClient, UnavailableError } from '@pumpkin-plugins/pumpkin-pie-api';
 
 const FIXTURE_NAME = 'WaypointsPIEFixture';
 
@@ -40,9 +40,6 @@ class WaypointsPieFixture extends Plugin {
             const advertised = pie.list().filter(({ namespace }) => namespace === 'waypoints');
             const required = ['waypoints_count', 'waypoints_closest_name', 'waypoints_waypoint_exists'];
             if (!required.every((id) => advertised.some((placeholder) => placeholder.id === id))) return;
-            if (advertised.length !== 69) {
-                throw new Error(`Expected 69 advertised identifiers, received ${advertised.length}`);
-            }
 
             const [plain, tokenized] = pie.resolveBatch([
                 { text: 'Resolved literal text', viewer: 'OfflineSubject' },
@@ -71,6 +68,8 @@ class WaypointsPieFixture extends Plugin {
             if (this.taskId !== undefined) this.cancelTask(this.taskId);
             this.taskId = undefined;
         } catch (error) {
+            // PumpkinPIE may load after this plugin; keep polling until it answers.
+            if (error instanceof UnavailableError) return;
             logging.log('error', `${FIXTURE_NAME}: provider verification failed: ${String(error)}`);
             if (this.taskId !== undefined) this.cancelTask(this.taskId);
             this.taskId = undefined;

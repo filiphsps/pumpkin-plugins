@@ -8,15 +8,20 @@ import type { Waypoint } from '../waypoints/model.ts';
 import { JAVA_DISPLAY_VERSION } from './java-version.ts';
 import { WaypointHudRenderer } from './renderer.ts';
 
-/** Error reporting for a viewer whose host resource or packet send failed. */
+/** Callbacks for viewers the HUD cannot serve. */
 export interface WaypointHudServiceOptions {
+    /** Called when a viewer's host resource or packet send failed. */
     readonly onError?: (viewerId: string, error: unknown) => void;
+    /** Called once per online session for a Java viewer whose client version has no HUD. */
+    readonly onUnsupportedVersion?: (viewerId: string, version: string) => void;
 }
 
 /** Adapts Pumpkin player events and resources to the per-viewer Java HUD renderer. */
 export class WaypointHudService {
     private readonly renderer: WaypointHudRenderer;
     private readonly onError: (viewerId: string, error: unknown) => void;
+    private readonly onUnsupportedVersion: (viewerId: string, version: string) => void;
+    private readonly unsupportedViewers = new Set<string>();
 
     constructor(
         private readonly server: Server,
@@ -24,6 +29,7 @@ export class WaypointHudService {
         options: WaypointHudServiceOptions = {},
     ) {
         this.onError = options.onError ?? (() => undefined);
+        this.onUnsupportedVersion = options.onUnsupportedVersion ?? (() => undefined);
         this.renderer = new WaypointHudRenderer({ onError: this.onError });
     }
 
@@ -51,6 +57,7 @@ export class WaypointHudService {
                 }
             }
             this.renderer.retainViewers(online);
+            for (const id of this.unsupportedViewers) if (!online.has(id)) this.unsupportedViewers.delete(id);
         } catch (error) {
             this.report('*', error);
         } finally {
@@ -74,6 +81,7 @@ export class WaypointHudService {
         let id: string | undefined;
         try {
             id = playerKey(player);
+            this.unsupportedViewers.delete(id);
             java = player.asJava();
             if (java == null) {
                 this.renderer.forgetViewer(id);
@@ -108,6 +116,7 @@ export class WaypointHudService {
             this.report('*', error);
         } finally {
             this.renderer.clear();
+            this.unsupportedViewers.clear();
         }
     }
 
@@ -142,8 +151,13 @@ export class WaypointHudService {
                 this.renderer.forgetViewer(id);
                 return;
             }
-            if (java.getVersion() !== JAVA_DISPLAY_VERSION) {
+            const version = java.getVersion();
+            if (version !== JAVA_DISPLAY_VERSION) {
                 this.renderer.removeViewer(id, (packet) => java?.sendPacket(packet));
+                if (!this.unsupportedViewers.has(id)) {
+                    this.unsupportedViewers.add(id);
+                    this.reportUnsupported(id, version);
+                }
                 return;
             }
 
@@ -153,6 +167,16 @@ export class WaypointHudService {
             const [x, y, z] = player.getPosition();
             const [eyeX, eyeY, eyeZ] = entity.getEyePosition();
             const uuidValue = player.getId();
+            // Restricted waypoints often share a grant, and each check is a host call.
+            const permissions = new Map<string, boolean>();
+            const hasPermission = (node: string): boolean => {
+                let allowed = permissions.get(node);
+                if (allowed === undefined) {
+                    allowed = player.hasPermission(node);
+                    permissions.set(node, allowed);
+                }
+                return allowed;
+            };
             let isOperator = false;
             try {
                 isOperator = opManager?.isOp(uuidValue) ?? false;
@@ -168,7 +192,7 @@ export class WaypointHudService {
                     yaw: player.getYaw(),
                     pitch: player.getPitch(),
                     isOperator,
-                    hasPermission: (node) => player.hasPermission(node),
+                    hasPermission,
                     createEntityUuid: uuid.generate,
                     encodeTextComponent,
                     sendPacket: (packet) => java?.sendPacket(packet),
@@ -190,6 +214,14 @@ export class WaypointHudService {
             else group.push(waypoint);
         }
         return grouped;
+    }
+
+    private reportUnsupported(viewerId: string, version: string): void {
+        try {
+            this.onUnsupportedVersion(viewerId, version);
+        } catch {
+            // Logging must not stop another viewer's HUD from updating.
+        }
     }
 
     private report(viewerId: string, error: unknown): void {

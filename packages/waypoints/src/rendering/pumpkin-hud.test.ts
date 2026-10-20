@@ -4,7 +4,7 @@ import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WaypointCatalog } from '../waypoints/catalog.ts';
 import { WaypointStore } from '../waypoints/store.ts';
-import type { WaypointHudService } from './pumpkin-hud.ts';
+import type { WaypointHudService, WaypointHudServiceOptions } from './pumpkin-hud.ts';
 
 const viewerId = '11111111-1111-4111-8111-111111111111';
 const restrictedId = '22222222-2222-4222-8222-222222222222';
@@ -47,14 +47,14 @@ const WaypointHudServiceConstructor = serviceModule.WaypointHudService as
     | (new (
           server: Server,
           catalog: WaypointCatalog,
-          options?: { onError?: (viewerId: string, error: unknown) => void },
+          options?: WaypointHudServiceOptions,
       ) => WaypointHudService)
     | undefined;
 
 function createService(
     server: Server,
     catalog: WaypointCatalog,
-    options?: { onError?: (viewerId: string, error: unknown) => void },
+    options?: WaypointHudServiceOptions,
 ): WaypointHudService {
     if (WaypointHudServiceConstructor === undefined) throw new Error('Waypoint HUD service is unavailable.');
     return new WaypointHudServiceConstructor(server, catalog, options);
@@ -133,6 +133,57 @@ describe('WaypointHudService', () => {
         expect(JSON.parse(encodedText).extra[1]).toMatchObject({ text: ' (10m)' });
         expect(uuidMocks.disposedTextComponents).toBe(1);
         expect(generatedEntityUuid).toEqual({ high: 3n, low: 4n });
+    });
+
+    it('checks each permission node once per viewer per tick', () => {
+        const client = makePlayer(viewerId, 'v-26-3');
+        const hasPermission = vi.fn(() => true);
+        client.player.hasPermission = hasPermission;
+        const server = {
+            getAllPlayers: () => [client.player],
+            getOpManager: () => ({ isOp: () => false, [Symbol.dispose]: vi.fn() }),
+        } as unknown as Server;
+        const catalog = new WaypointCatalog(new WaypointStore(new MemoryFiles(), new MemoryLogger()));
+        for (const [id, z] of [
+            ['88888888-8888-4888-8888-888888888888', 10],
+            ['99999999-9999-4999-8999-999999999999', 20],
+        ] as const) {
+            catalog.create({
+                id,
+                name: `Builders ${z}`,
+                dimension: 'overworld',
+                position: { x: 0, y: 64, z },
+                access: { mode: 'restricted', grants: [{ type: 'permission', node: 'Waypoints:build' }] },
+            });
+        }
+        const service = createService(server, catalog);
+
+        service.tick();
+        expect(hasPermission).toHaveBeenCalledOnce();
+        service.tick();
+        expect(hasPermission).toHaveBeenCalledTimes(2);
+        expect(client.packets.filter(({ tag }) => tag === 'c-spawn-entity')).toHaveLength(2);
+    });
+
+    it('reports a Java viewer without HUD support once until they leave', () => {
+        const oldClient = makePlayer(viewerId, 'v-26-2');
+        const server = {
+            getAllPlayers: () => [oldClient.player],
+            getOpManager: () => ({ isOp: () => false, [Symbol.dispose]: vi.fn() }),
+        } as unknown as Server;
+        const catalog = new WaypointCatalog(new WaypointStore(new MemoryFiles(), new MemoryLogger()));
+        const reports: [string, string][] = [];
+        const service = createService(server, catalog, {
+            onUnsupportedVersion: (id, version) => reports.push([id, version]),
+        });
+
+        service.tick();
+        service.tick();
+        expect(reports).toEqual([[viewerId, 'v-26-2']]);
+        service.left(oldClient.player);
+        service.joined(oldClient.player);
+        expect(reports).toHaveLength(2);
+        expect(oldClient.packets).toEqual([]);
     });
 
     it('releases online displays and ignores a per-viewer send failure during unload', () => {

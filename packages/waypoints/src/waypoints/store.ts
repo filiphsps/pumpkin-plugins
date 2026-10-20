@@ -22,7 +22,6 @@ const INT32_MAX = 2_147_483_647;
 export class WaypointStore {
     private waypoints = new Map<string, Waypoint>();
     private available = true;
-    private invalidReason: string | undefined;
 
     /** Loads and validates the store once. Invalid files remain untouched and disable writes. */
     constructor(
@@ -37,11 +36,6 @@ export class WaypointStore {
         return this.available;
     }
 
-    /** An actionable explanation when an existing store could not be loaded. */
-    get error(): string | undefined {
-        return this.invalidReason;
-    }
-
     /** Returns a defensive snapshot of records in insertion order. */
     list(): Waypoint[] {
         return [...this.waypoints.values()].map(cloneWaypoint);
@@ -53,7 +47,6 @@ export class WaypointStore {
         if (!replacement.available) return false;
         this.waypoints = replacement.waypoints;
         this.available = true;
-        this.invalidReason = undefined;
         return true;
     }
 
@@ -206,10 +199,8 @@ export class WaypointStore {
 
     private disable(error: unknown): void {
         this.available = false;
-        this.invalidReason = error instanceof Error ? error.message : String(error);
-        this.logger.error(
-            `Could not load ${STORE_FILE}; preserving the file and refusing waypoint writes: ${this.invalidReason}`,
-        );
+        const reason = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Could not load ${STORE_FILE}; preserving the file and refusing waypoint writes: ${reason}`);
     }
 }
 

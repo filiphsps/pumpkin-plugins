@@ -106,6 +106,20 @@ describe(WaypointCatalog.name, () => {
         expect(catalog.list()).toEqual([]);
     });
 
+    it('explains why a change is invalid', () => {
+        const { catalog } = setup();
+        catalog.create({ id, name: 'Home', dimension: 'world', position: { x: 0, y: 0, z: 0 } });
+
+        expect(catalog.rename('Home', 'x'.repeat(65))).toMatchObject({
+            status: 'invalid',
+            reason: expect.stringContaining('1 to 64'),
+        });
+        expect(catalog.update('Home', { label: 'bad\u0007label' })).toMatchObject({
+            status: 'invalid',
+            reason: expect.stringContaining('label'),
+        });
+    });
+
     it('does not report a saved mutation when persistence fails', () => {
         const { catalog, files } = setup();
         vi.spyOn(files, 'writeFile').mockImplementation(() => {
