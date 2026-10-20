@@ -114,9 +114,15 @@ export function ensureHermesSource(options: EnsureHermesSourceOptions): string {
  *
  * @param options - Pin, checkout path, and the paths owned by the configured patch series.
  * @returns The refreshed Hermes source path.
- * @throws {Error} If the checkout is not at the pinned commit or contains changes outside managed paths.
+ * @throws {Error} If the checkout is a custom source path, is not at the pinned commit, or contains
+ * changes outside managed paths.
  */
 export function refreshHermesSource(options: EnsureHermesSourceOptions): string {
+    if (!options.managedSource) {
+        throw new Error(
+            `The patch series conflicts with the custom Hermes source at ${options.source}; reset it to the pinned commit ${options.pin.commit} and run again`,
+        );
+    }
     const filesystem = options.filesystem ?? hermesFileSystem;
     const process = options.process ?? hermesProcess;
     if (!hasGitDirectory(options.source, process)) {

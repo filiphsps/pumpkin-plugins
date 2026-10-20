@@ -1,5 +1,21 @@
+Subject: [PATCH] Keep ASCII results compact in join and integer toString
+
+Array.prototype.join tracks whether every part is ASCII so the result can
+use compact one-byte storage. Number.prototype.toString with a radix
+converts safe integers with integer division instead of the general
+floating-point path.
+
+Plugins build many strings this way. These are performance changes with
+no change to results; drop them if upstream Hermes adds the same paths.
+
+Upstream: not submitted.
+---
+ lib/VM/JSLib/Array.cpp | 13 +++++++++----
+ lib/VM/Operations.cpp  | 22 ++++++++++++++++++++++
+ 2 files changed, 31 insertions(+), 4 deletions(-)
+
 diff --git a/lib/VM/JSLib/Array.cpp b/lib/VM/JSLib/Array.cpp
-index 9bde39065..8947108c7 100644
+index 9bde390..8947108 100644
 --- a/lib/VM/JSLib/Array.cpp
 +++ b/lib/VM/JSLib/Array.cpp
 @@ -1115,6 +1115,8 @@ CallResult<HermesValue> arrayPrototypeJoin(void *, Runtime &runtime) {
@@ -11,7 +27,7 @@ index 9bde39065..8947108c7 100644
  
    // 1. Fast Path: Process as many elements as possible quickly.
    if (JSArray *arr = dyn_vmcast<JSArray>(lv.O.get());
-@@ -1133,9 +1134,11 @@ CallResult<HermesValue> arrayPrototypeJoin(void *, Runtime &runtime) {
+@@ -1133,9 +1135,11 @@ CallResult<HermesValue> arrayPrototypeJoin(void *, Runtime &runtime) {
      for (i = 0; i < len; ++i) {
        SmallHermesValue elem = storage->at(i); // Direct access
        uint32_t elemLen;
@@ -26,7 +42,7 @@ index 9bde39065..8947108c7 100644
          elemLen = 0;
        else
          break;
-@@ -1221,6 +1224,7 @@ CallResult<HermesValue> arrayPrototypeJoin(void *, Runtime &runtime) {
+@@ -1221,6 +1225,7 @@ CallResult<HermesValue> arrayPrototypeJoin(void *, Runtime &runtime) {
            return ExecutionStatus::EXCEPTION;
  
          StringPrimitive *s = strRes.getValue().get();
@@ -34,7 +50,7 @@ index 9bde39065..8947108c7 100644
          size.add(s->getStringLength());
  
          lv.strings->set(
-@@ -1239,7 +1243,7 @@ CallResult<HermesValue> arrayPrototypeJoin(void *, Runtime &runtime) {
+@@ -1239,7 +1244,7 @@ CallResult<HermesValue> arrayPrototypeJoin(void *, Runtime &runtime) {
    }
  
    // Allocate the complete result.
@@ -44,7 +60,7 @@ index 9bde39065..8947108c7 100644
      return ExecutionStatus::EXCEPTION;
    }
 diff --git a/lib/VM/Operations.cpp b/lib/VM/Operations.cpp
-index ea2484f10..d3fe15390 100644
+index ea2484f..d3fe153 100644
 --- a/lib/VM/Operations.cpp
 +++ b/lib/VM/Operations.cpp
 @@ -1384,6 +1384,28 @@ numberToStringWithRadix(Runtime &runtime, double number, unsigned radix) {

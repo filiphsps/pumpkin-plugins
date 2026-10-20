@@ -39,12 +39,12 @@
     "type": "module",
     "exports": {
         ".": {
-            "types": "./src/index.ts",
+            "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
         }
     },
     "module": "./dist/index.js",
-    "types": "./src/index.ts",
+    "types": "./dist/index.d.ts",
     "bin": {
         "static-hermes-runtime": "dist/cli.js"
     },
@@ -56,10 +56,10 @@
         "dist",
         "cmake",
         "hermes-patches",
-        "schemas",
         "hermes-source.lock.json",
         "toolchain-versions.json",
         "wasi-sdk.lock.json",
+        "wasm-tools.lock.json",
         "README.md"
     ],
     "scripts": {
@@ -69,7 +69,7 @@
         "prepare-hermes": "pnpm build && node dist/cli.js hermes prepare",
         "readme": "pumpkin-plugins-docs generate docs.ts",
         "readme:check": "pumpkin-plugins-docs generate docs.ts --check",
-        "test": "pnpm build && vitest run src/component/analyze.test.ts src/component/build.test.ts src/component/generate.test.ts src/esbuild-plugin.test.ts src/hermes/build.test.ts src/hermes/prepare.test.ts src/hermes/toolchain-environment.test.ts src/index.test.ts src/wit/facades.test.ts src/wit/wasi-dispatch.test.ts src/workspace-root.test.ts test/bundle-diagnostics.test.mjs test/callback-resource-drops.test.mjs test/component-compile.test.ts test/embed-bytecode.test.mjs test/generate-api-enums.test.mjs test/generate-runtime.test.mjs test/hermes-source-patch.test.ts test/package-types.test.mjs test/prepare-hermes.test.mjs test/static-hermes-cli.test.ts test/toolchain-environment.test.mjs test/wasi-wit.test.mjs test/wit-api.test.mjs test/wit-api-coverage.test.mjs test/wit-analysis.test.ts test/wit-event-dispatch.test.ts test/wit-resolver.test.ts test/wit-tools-model.test.ts test/wit-tools-reader.test.ts",
+        "test": "pnpm build && vitest run",
         "test:integration": "pnpm build && vitest run --config vitest.integration.config.ts",
         "typecheck": "tsc --noEmit"
     },

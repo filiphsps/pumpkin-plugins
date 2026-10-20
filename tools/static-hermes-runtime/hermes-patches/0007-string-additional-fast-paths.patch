@@ -1,7 +1,29 @@
+Subject: [PATCH] Keep ASCII results compact in more string builders
+
+atob, String.fromCharCode, toLowerCase and toUpperCase, replace and
+replaceAll, and the TypedArray join and toLocaleString methods start with
+compact one-byte storage when their output is ASCII and widen only when a
+non-ASCII character appears.
+
+Adds a JSLibTest case for mixed ASCII and Unicode output. The runtime's
+WASI build does not compile Hermes unit tests; run it from a host Hermes
+build with HERMES_ENABLE_TEST_SUITE=ON.
+
+Performance only; results do not change.
+
+Upstream: not submitted.
+---
+ lib/VM/JSLib/Base64.cpp           |  4 ++-
+ lib/VM/JSLib/String.cpp           | 13 ++++---
+ lib/VM/JSLib/TypedArray.cpp       | 10 ++++--
+ unittests/VMRuntime/JSLibTest.cpp | 56 +++++++++++++++++++++++++++++++
+ 4 files changed, 76 insertions(+), 7 deletions(-)
+
 diff --git a/lib/VM/JSLib/Base64.cpp b/lib/VM/JSLib/Base64.cpp
+index 58a8b08..7267b0a 100644
 --- a/lib/VM/JSLib/Base64.cpp
 +++ b/lib/VM/JSLib/Base64.cpp
-@@ -78,7 +78,9 @@
+@@ -78,7 +78,9 @@ CallResult<HermesValue> atob(void *, Runtime &runtime) {
      return runtime.raiseError("Not a valid base64 encoded string length");
    }
    CallResult<StringBuilder> builder =
@@ -13,9 +35,10 @@ diff --git a/lib/VM/JSLib/Base64.cpp b/lib/VM/JSLib/Base64.cpp
      return ExecutionStatus::EXCEPTION;
    }
 diff --git a/lib/VM/JSLib/String.cpp b/lib/VM/JSLib/String.cpp
+index 6a59243..8042b44 100644
 --- a/lib/VM/JSLib/String.cpp
 +++ b/lib/VM/JSLib/String.cpp
-@@ -435,7 +435,9 @@
+@@ -435,7 +435,9 @@ CallResult<HermesValue> stringFromCharCode(void *, Runtime &runtime) {
      char16_t ch = res->getNumber();
      return runtime.getCharacterString(ch).getHermesValue();
    }
@@ -26,7 +49,7 @@ diff --git a/lib/VM/JSLib/String.cpp b/lib/VM/JSLib/String.cpp
    if (builder == ExecutionStatus::EXCEPTION) {
      return ExecutionStatus::EXCEPTION;
    }
-@@ -984,7 +986,8 @@
+@@ -984,7 +986,8 @@ static CallResult<HermesValue> convertCase(
        }
  
        SafeUInt32 len(S->getStringLength());
@@ -36,7 +59,7 @@ diff --git a/lib/VM/JSLib/String.cpp b/lib/VM/JSLib/String.cpp
        if (builder == ExecutionStatus::EXCEPTION) {
          return ExecutionStatus::EXCEPTION;
        }
-@@ -1978,7 +1981,8 @@
+@@ -1978,7 +1981,8 @@ CallResult<HermesValue> stringPrototypeReplaceAll(void *, Runtime &runtime) {
      stringView.slice(endOfLastMatch).appendUTF16String(result);
    }
    // 16. Return result.
@@ -46,7 +69,7 @@ diff --git a/lib/VM/JSLib/String.cpp b/lib/VM/JSLib/String.cpp
  }
  
  CallResult<HermesValue> stringPrototypeMatch(void *, Runtime &runtime) {
-@@ -2317,7 +2321,8 @@
+@@ -2317,7 +2321,8 @@ CallResult<HermesValue> stringPrototypeReplace(void *, Runtime &runtime) {
        .appendUTF16String(newString);
    strView.slice(tailPos).appendUTF16String(newString);
    // 15. Return newString.
@@ -57,9 +80,10 @@ diff --git a/lib/VM/JSLib/String.cpp b/lib/VM/JSLib/String.cpp
  
  CallResult<HermesValue> stringPrototypeSearch(void *, Runtime &runtime) {
 diff --git a/lib/VM/JSLib/TypedArray.cpp b/lib/VM/JSLib/TypedArray.cpp
+index 171c816..63e98f7 100644
 --- a/lib/VM/JSLib/TypedArray.cpp
 +++ b/lib/VM/JSLib/TypedArray.cpp
-@@ -1817,6 +1817,8 @@
+@@ -1817,6 +1817,8 @@ CallResult<HermesValue> typedArrayPrototypeJoin(void *, Runtime &runtime) {
    // Final size of the resultant string.
    // Its safe to multiply as overflow check is done above
    SafeUInt32 size(sepLength * (len - 1));
@@ -68,7 +92,7 @@ diff --git a/lib/VM/JSLib/TypedArray.cpp b/lib/VM/JSLib/TypedArray.cpp
  
    // Storage for the strings for each element.
    auto arrRes = JSArray::create(runtime, len, 0);
-@@ -1844,6 +1846,7 @@
+@@ -1844,6 +1846,7 @@ CallResult<HermesValue> typedArrayPrototypeJoin(void *, Runtime &runtime) {
          lv.elem = std::move(*res2);
        }
        auto stringPtr = vmcast<StringPrimitive>(lv.elem.getHermesValue());
@@ -76,7 +100,7 @@ diff --git a/lib/VM/JSLib/TypedArray.cpp b/lib/VM/JSLib/TypedArray.cpp
        size.add(stringPtr->getStringLength());
        if (LLVM_UNLIKELY(
                JSArray::setElementAt(
-@@ -1857,7 +1860,7 @@
+@@ -1857,7 +1860,7 @@ CallResult<HermesValue> typedArrayPrototypeJoin(void *, Runtime &runtime) {
    }
  
    // Allocate the complete result.
@@ -85,7 +109,7 @@ diff --git a/lib/VM/JSLib/TypedArray.cpp b/lib/VM/JSLib/TypedArray.cpp
    if (builder == ExecutionStatus::EXCEPTION) {
      return ExecutionStatus::EXCEPTION;
    }
-@@ -2220,6 +2223,8 @@
+@@ -2220,6 +2223,8 @@ CallResult<HermesValue> typedArrayPrototypeToLocaleString(
  
    // Final size of the result string. Initialize to account for the separators.
    SafeUInt32 size(len - 1);
@@ -94,7 +118,7 @@ diff --git a/lib/VM/JSLib/TypedArray.cpp b/lib/VM/JSLib/TypedArray.cpp
  
    struct : public Locals {
      PinnedValue<JSArray> strings;
-@@ -2282,6 +2287,7 @@
+@@ -2282,6 +2287,7 @@ CallResult<HermesValue> typedArrayPrototypeToLocaleString(
          return ExecutionStatus::EXCEPTION;
        }
        lv.elementStr = std::move(*strRes);
@@ -102,7 +126,7 @@ diff --git a/lib/VM/JSLib/TypedArray.cpp b/lib/VM/JSLib/TypedArray.cpp
        if (LLVM_UNLIKELY(
                JSArray::setElementAt(lv.strings, runtime, i, lv.elementStr) ==
                ExecutionStatus::EXCEPTION))
-@@ -2293,7 +2299,7 @@
+@@ -2293,7 +2299,7 @@ CallResult<HermesValue> typedArrayPrototypeToLocaleString(
      gcScope.flushToMarker(marker);
    }
  
@@ -112,14 +136,13 @@ diff --git a/lib/VM/JSLib/TypedArray.cpp b/lib/VM/JSLib/TypedArray.cpp
      return ExecutionStatus::EXCEPTION;
    }
 diff --git a/unittests/VMRuntime/JSLibTest.cpp b/unittests/VMRuntime/JSLibTest.cpp
+index bf67741..4dfdb19 100644
 --- a/unittests/VMRuntime/JSLibTest.cpp
 +++ b/unittests/VMRuntime/JSLibTest.cpp
-@@ -950,6 +950,62 @@
- 
-   // Make sure the prototype is correct.
+@@ -952,6 +952,62 @@ TEST_F(JSLibTest, CreateStringTest) {
    ASSERT_EQ(prototype.get(), newStr->getParent(runtime));
-+}
-+
+ }
+
 +TEST_F(JSLibTest, StringFastPathResultsUseCompactASCIIStorage) {
 +  auto runRes = runtime.run(
 +      R"(
@@ -174,6 +197,8 @@ diff --git a/unittests/VMRuntime/JSLibTest.cpp b/unittests/VMRuntime/JSLibTest.c
 +  expectString(10, createUTF16Ref(u"\u03bb,\u03bb"), false);
 +  expectString(11, createUTF16Ref(u"X\u03bbB"), false);
 +  expectString(12, createUTF16Ref(u"\u0080"), false);
- }
- 
++}
++
  TEST_F(JSLibTest, SmallSortTest) {
+   // Small test, with some duplication
+   struct StringByLength : public SortModel {

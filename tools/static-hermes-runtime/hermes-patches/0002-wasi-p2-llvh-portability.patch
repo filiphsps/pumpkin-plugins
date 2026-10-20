@@ -1,5 +1,30 @@
+Subject: [PATCH] Port LLVH support code to WASI
+
+WASI libc has no process spawning, mapped memory, password database or
+signals. Guard the LLVH code that needs them: mapped-memory and mapped-file
+calls return an unsupported error, ~user expansion and the main executable
+lookup do nothing, and Program.cpp, Signals.cpp and Watchdog.cpp include
+WASI implementations (Signals.inc and Watchdog.inc come in the next patch).
+Also add the <exception> and <type_traits> includes that the WASI libc++
+headers do not pull in.
+
+Upstream: not submitted. Needed only for a WASI target.
+---
+ .../include/llvh/Demangle/ItaniumDemangle.h   |   2 +
+ external/llvh/include/llvh/Demangle/Utility.h |   1 +
+ external/llvh/lib/Support/Program.cpp         |   4 +
+ external/llvh/lib/Support/Signals.cpp         |   4 +
+ external/llvh/lib/Support/Unix/Memory.inc     |  39 ++++
+ external/llvh/lib/Support/Unix/Path.inc       |  23 +-
+ external/llvh/lib/Support/Unix/Process.inc    |  13 +-
+ external/llvh/lib/Support/Unix/Unix.h         |   2 +
+ external/llvh/lib/Support/Wasi/Program.inc    | 203 ++++++++++++++++++
+ external/llvh/lib/Support/Watchdog.cpp        |   4 +
+ 10 files changed, 292 insertions(+), 3 deletions(-)
+ create mode 100644 external/llvh/lib/Support/Wasi/Program.inc
+
 diff --git a/external/llvh/include/llvh/Demangle/ItaniumDemangle.h b/external/llvh/include/llvh/Demangle/ItaniumDemangle.h
-index 4b56f9d5e..5b346b9ef 100644
+index 4b56f9d..5b346b9 100644
 --- a/external/llvh/include/llvh/Demangle/ItaniumDemangle.h
 +++ b/external/llvh/include/llvh/Demangle/ItaniumDemangle.h
 @@ -23,6 +23,8 @@
@@ -12,7 +37,7 @@ index 4b56f9d5e..5b346b9ef 100644
  #include <utility>
  
 diff --git a/external/llvh/include/llvh/Demangle/Utility.h b/external/llvh/include/llvh/Demangle/Utility.h
-index da4a0c050..664f5f581 100644
+index da4a0c0..664f5f5 100644
 --- a/external/llvh/include/llvh/Demangle/Utility.h
 +++ b/external/llvh/include/llvh/Demangle/Utility.h
 @@ -16,6 +16,7 @@
@@ -24,7 +49,7 @@ index da4a0c050..664f5f581 100644
  #include <iterator>
  #include <limits>
 diff --git a/external/llvh/lib/Support/Program.cpp b/external/llvh/lib/Support/Program.cpp
-index b5bf65883..522f6e0b0 100644
+index b5bf658..522f6e0 100644
 --- a/external/llvh/lib/Support/Program.cpp
 +++ b/external/llvh/lib/Support/Program.cpp
 @@ -75,9 +75,13 @@ bool sys::commandLineFitsWithinSystemLimits(StringRef Program,
@@ -42,7 +67,7 @@ index b5bf65883..522f6e0b0 100644
  #endif
 +#endif
 diff --git a/external/llvh/lib/Support/Signals.cpp b/external/llvh/lib/Support/Signals.cpp
-index 483d0c95c..3ab76c0eb 100644
+index 483d0c9..3ab76c0 100644
 --- a/external/llvh/lib/Support/Signals.cpp
 +++ b/external/llvh/lib/Support/Signals.cpp
 @@ -240,9 +240,13 @@ static bool printSymbolizedStackTrace(StringRef Argv0, void **StackTrace,
@@ -60,7 +85,7 @@ index 483d0c95c..3ab76c0eb 100644
  #endif
 +#endif
 diff --git a/external/llvh/lib/Support/Unix/Memory.inc b/external/llvh/lib/Support/Unix/Memory.inc
-index e1e514712..7351aa896 100644
+index e1e5147..7351aa8 100644
 --- a/external/llvh/lib/Support/Unix/Memory.inc
 +++ b/external/llvh/lib/Support/Unix/Memory.inc
 @@ -43,6 +43,43 @@ extern "C" void sys_icache_invalidate(const void *Addr, size_t len);
@@ -114,7 +139,7 @@ index e1e514712..7351aa896 100644
 +
 +#endif // defined(__wasi__)
 diff --git a/external/llvh/lib/Support/Unix/Path.inc b/external/llvh/lib/Support/Unix/Path.inc
-index dd5560522..5c242300b 100644
+index dd55605..5c24230 100644
 --- a/external/llvh/lib/Support/Unix/Path.inc
 +++ b/external/llvh/lib/Support/Unix/Path.inc
 @@ -33,7 +33,9 @@
@@ -212,7 +237,7 @@ index dd5560522..5c242300b 100644
      return false;
  
 diff --git a/external/llvh/lib/Support/Unix/Process.inc b/external/llvh/lib/Support/Unix/Process.inc
-index 90981b52e..0a1a1ff27 100644
+index 90981b5..0a1a1ff 100644
 --- a/external/llvh/lib/Support/Unix/Process.inc
 +++ b/external/llvh/lib/Support/Unix/Process.inc
 @@ -30,7 +30,7 @@
@@ -259,7 +284,7 @@ index 90981b52e..0a1a1ff27 100644
  
  bool Process::StandardInIsUserInput() {
 diff --git a/external/llvh/lib/Support/Unix/Unix.h b/external/llvh/lib/Support/Unix/Unix.h
-index b1735fd73..61450ec09 100644
+index b1735fd..61450ec 100644
 --- a/external/llvh/lib/Support/Unix/Unix.h
 +++ b/external/llvh/lib/Support/Unix/Unix.h
 @@ -30,7 +30,9 @@
@@ -272,28 +297,9 @@ index b1735fd73..61450ec09 100644
  
  #ifdef HAVE_UNISTD_H
  #include <unistd.h>
-diff --git a/external/llvh/lib/Support/Watchdog.cpp b/external/llvh/lib/Support/Watchdog.cpp
-index 06f585f17..73491aae1 100644
---- a/external/llvh/lib/Support/Watchdog.cpp
-+++ b/external/llvh/lib/Support/Watchdog.cpp
-@@ -15,9 +15,13 @@
- #include "llvh/Config/llvm-config.h"
- 
- // Include the platform-specific parts of this class.
-+#ifdef __wasi__
-+#include "Wasi/Watchdog.inc"
-+#else
- #ifdef LLVM_ON_UNIX
- #include "Unix/Watchdog.inc"
- #endif
- #ifdef _WIN32
- #include "Windows/Watchdog.inc"
- #endif
-+#endif
-
 diff --git a/external/llvh/lib/Support/Wasi/Program.inc b/external/llvh/lib/Support/Wasi/Program.inc
 new file mode 100644
-index 000000000..8b6e9cf42
+index 0000000..8b6e9cf
 --- /dev/null
 +++ b/external/llvh/lib/Support/Wasi/Program.inc
 @@ -0,0 +1,203 @@
@@ -500,3 +506,21 @@ index 000000000..8b6e9cf42
 +  return true;
 +}
 +}
+diff --git a/external/llvh/lib/Support/Watchdog.cpp b/external/llvh/lib/Support/Watchdog.cpp
+index 06f585f..73491aa 100644
+--- a/external/llvh/lib/Support/Watchdog.cpp
++++ b/external/llvh/lib/Support/Watchdog.cpp
+@@ -15,9 +15,13 @@
+ #include "llvh/Config/llvm-config.h"
+
+ // Include the platform-specific parts of this class.
++#ifdef __wasi__
++#include "Wasi/Watchdog.inc"
++#else
+ #ifdef LLVM_ON_UNIX
+ #include "Unix/Watchdog.inc"
+ #endif
+ #ifdef _WIN32
+ #include "Windows/Watchdog.inc"
+ #endif
++#endif
