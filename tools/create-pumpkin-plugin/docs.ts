@@ -31,20 +31,45 @@ function requiredString(value: unknown, label: string): string {
     return value.trim();
 }
 
-function workflowNodeVersion(workflow: string): string {
+function workflowNodeVersion(workflow: string, nodePin: string): string {
     const versions = [...workflow.matchAll(/^\s+node-version:\s*([^\s#]+)\s*$/gm)].map((match) => match[1]);
-    if (versions.length !== 1) {
+    if (versions.length > 1) {
         throw new Error(
-            `.github/workflows/external-consumer.yml: expected one node-version pin, found ${versions.length}`,
+            `.github/workflows/external-consumer.yml: expected at most one node-version pin, found ${versions.length}`,
         );
     }
-    return requiredString(versions[0], '.github/workflows/external-consumer.yml node-version');
+    return versions.length === 0
+        ? nodePin
+        : requiredString(versions[0], '.github/workflows/external-consumer.yml node-version');
 }
 
 function parsePlatformMatrix(workflow: string): PlatformRow[] {
     const lines = workflow.split(/\r?\n/);
     const includeIndex = lines.findIndex((line) => /^\s*include:\s*$/.test(line));
-    if (includeIndex < 0) throw new Error('.github/workflows/external-consumer.yml: matrix include list not found');
+    if (includeIndex < 0) {
+        const defaultPlatforms = workflow.match(/^\s+default:\s*'([^']+)'\s*$/m)?.[1];
+        const runnerMapSource = workflow.match(/runs-on:[^\r\n]*fromJSON\('({.*})'\)\[matrix\.platform\]/)?.[1];
+        if (!defaultPlatforms || !runnerMapSource) {
+            throw new Error('.github/workflows/external-consumer.yml: platform matrix not found');
+        }
+
+        const platforms: unknown = JSON.parse(defaultPlatforms);
+        const runnerMap: unknown = JSON.parse(runnerMapSource);
+        if (!Array.isArray(platforms) || platforms.some((platform) => typeof platform !== 'string')) {
+            throw new Error('.github/workflows/external-consumer.yml: platform defaults must be a string array');
+        }
+        if (typeof runnerMap !== 'object' || runnerMap === null || Array.isArray(runnerMap)) {
+            throw new Error('.github/workflows/external-consumer.yml: runner map must be an object');
+        }
+
+        return platforms.map((platform) => ({
+            platform,
+            runner: requiredString(
+                (runnerMap as Record<string, unknown>)[platform],
+                `.github/workflows/external-consumer.yml ${platform} runner`,
+            ),
+        }));
+    }
 
     const includeIndent = lines[includeIndex].search(/\S/);
     const rows: PlatformRow[] = [];
@@ -151,7 +176,7 @@ const nodePin = requiredString(
     '.node-version',
 );
 const workflow = fs.readFileSync(new URL('../../.github/workflows/external-consumer.yml', import.meta.url), 'utf8');
-const workflowNode = workflowNodeVersion(workflow);
+const workflowNode = workflowNodeVersion(workflow, nodePin);
 if (workflowNode !== nodePin) {
     throw new Error(`External-consumer Node pin (${workflowNode}) does not match .node-version (${nodePin})`);
 }

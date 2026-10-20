@@ -2,6 +2,11 @@ name: External consumer
 
 on:
     workflow_call:
+        inputs:
+            platforms:
+                description: JSON array of platforms to test, from "Linux x64", "macOS arm64" and "Windows x64"
+                type: string
+                default: '["Linux x64", "macOS arm64", "Windows x64"]'
 
 env:
     CI: true
@@ -17,28 +22,16 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                include:
-                    - platform: Linux x64
-                      os: ubuntu-26.04
-                    - platform: macOS arm64
-                      os: macos-15
-                    - platform: Windows x64
-                      os: windows-2025
-        runs-on: ${{ matrix.os }}
+                platform: ${{ fromJSON(inputs.platforms) }}
+        runs-on: ${{ fromJSON('{"Linux x64":"ubuntu-26.04","macOS arm64":"macos-15","Windows x64":"windows-2025"}')[matrix.platform] }}
         steps:
             - name: 🕶️ Checkout repository
               id: checkout-repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: 🚀 Bootstrap
               id: bootstrap
               uses: ./.github/common/bootstrap
-
-            - name: 🟢 Pin external consumer Node
-              id: pin-external-consumer-node
-              uses: actions/setup-node@v7.1.0
-              with:
-                  node-version: 24.21.0
 
             - name: 📂 Prepare external consumer caches
               id: prepare-external-consumer-caches
@@ -47,12 +40,10 @@ jobs:
 
             - name: 💾 Restore external consumer pnpm store
               id: external-consumer-pnpm-cache
-              uses: actions/cache/restore@v6.1.0
+              uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
                   path: .cache/external-consumer/pnpm-store
-                  key: external-consumer-pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}-${{ github.sha }}
-                  restore-keys: |
-                      external-consumer-pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}-
+                  key: external-consumer-pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
 
             - name: 🔧 Setup Static Hermes cache
               id: setup-static-hermes
@@ -61,7 +52,7 @@ jobs:
             - name: 🪟 Setup MSVC 2022 toolset 14.44
               id: setup-msvc-2022-toolset-14-44
               if: runner.os == 'Windows'
-              uses: ilammy/msvc-dev-cmd@v1.13.0
+              uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
               with:
                   arch: x64
                   toolset: '14.44'
@@ -90,6 +81,7 @@ jobs:
               env:
                   CMAKE_VERSION: ${{ steps.setup-static-hermes.outputs.cmake-version }}
                   NINJA_VERSION: ${{ steps.setup-static-hermes.outputs.ninja-version }}
+                  RUST_VERSION: ${{ steps.setup-static-hermes.outputs.rust-toolchain-version }}
               shell: bash
               run: |
                   test "$(cmake --version | head -n 1)" = "cmake version $CMAKE_VERSION"
@@ -98,9 +90,9 @@ jobs:
                       "$NINJA_VERSION"|"$NINJA_VERSION".*|"$NINJA_VERSION"+*|"$NINJA_VERSION"-*) ;;
                       *) echo "Expected Ninja $NINJA_VERSION, got '$ninja_version'" >&2; exit 1 ;;
                   esac
-                  rustup toolchain install 1.99.0 --profile minimal
-                  rustc +1.99.0 --version
-                  cargo +1.99.0 --version
+                  rustup toolchain install "$RUST_VERSION" --profile minimal
+                  rustc "+$RUST_VERSION" --version
+                  cargo "+$RUST_VERSION" --version
                   if [[ "$RUNNER_OS" == Windows ]]; then
                       printf 'int main(void) { return 0; }\n' > "$RUNNER_TEMP/cl-smoke.c"
                       MSYS_NO_PATHCONV=1 cl /Bv /nologo /c "$RUNNER_TEMP/cl-smoke.c" /Fo"$RUNNER_TEMP/cl-smoke.obj"
@@ -116,16 +108,26 @@ jobs:
 
             - name: 💾 Save external consumer pnpm store
               id: save-external-consumer-pnpm-store
-              if: steps.external-consumer.outcome == 'success' && steps.external-consumer-pnpm-cache.outputs.cache-hit != 'true'
-              uses: actions/cache/save@v6.1.0
+              if: >-
+                  ${{
+                    github.event_name == 'push' &&
+                    steps.external-consumer.outcome == 'success' &&
+                    steps.external-consumer-pnpm-cache.outputs.cache-hit != 'true'
+                  }}
+              uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
                   path: .cache/external-consumer/pnpm-store
-                  key: external-consumer-pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}-${{ github.sha }}
+                  key: external-consumer-pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
 
             - name: 💾 Save Static Hermes cache
               id: save-static-hermes-cache
-              if: steps.external-consumer.outcome == 'success'
-              uses: actions/cache/save@v6.1.0
+              if: >-
+                  ${{
+                    github.event_name == 'push' &&
+                    steps.external-consumer.outcome == 'success' &&
+                    steps.setup-static-hermes.outputs.hermes-cache-hit != 'true'
+                  }}
+              uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
                   path: ${{ github.workspace }}/.cache/hermes
                   key: ${{ steps.setup-static-hermes.outputs.hermes-cache-key }}
@@ -136,5 +138,4 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: External consumers (${{ matrix.platform }})
-                  steps: ${{ toJSON(steps) }}
                   note: Checks public package metadata, TypeScript and JavaScript starters, and the standalone codemod outside this repository.
