@@ -9,10 +9,10 @@ import {
     assertPublicToolPackage,
     assertPublicToolPackageContents,
     assertPublicToolTemplateDependencies,
+    compareVersions,
     discoverPublicToolPackages,
-    embeddedPackageManifestEntries,
     nodeVersion,
-    parseTarEntries,
+    packAndInspect,
 } from './utils/tool-packages.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -30,9 +30,10 @@ const creatorTool = publicTools.find(({ packageJson }) =>
     Object.hasOwn(packageJson.bin ?? {}, 'create-pumpkin-plugin'),
 );
 const codemodTool = publicTools.find(({ packageJson }) => Object.hasOwn(packageJson.bin ?? {}, 'pumpkin-codemod'));
+const docsTool = publicTools.find(({ packageJson }) => Object.hasOwn(packageJson.bin ?? {}, 'pumpkin-plugins-docs'));
 const pumpkinApiTool = publicTools.find(({ packageJson }) => Object.hasOwn(packageJson.exports ?? {}, './wit'));
-if (!buildCliOnly && (!creatorTool || !codemodTool || !pumpkinApiTool)) {
-    throw new Error('Public tool manifests must declare the creator, codemod, and Pumpkin API capabilities');
+if (!buildCliOnly && (!creatorTool || !codemodTool || !docsTool || !pumpkinApiTool)) {
+    throw new Error('Public tool manifests must declare the creator, codemod, docs, and Pumpkin API capabilities');
 }
 const packagePaths = buildCliOnly ? dependencyClosure([buildTool], publicTools) : publicTools.map(({ path }) => path);
 const requiredNodeVersion = nodeVersion(repositoryRoot);
@@ -43,7 +44,7 @@ if (typeof requiredPnpmVersion !== 'string') {
     throw new Error('Root package.json must set devEngines.packageManager.version');
 }
 
-if (compareSemver(process.version, requiredNodeVersion) < 0) {
+if (compareVersions(process.version, requiredNodeVersion) < 0) {
     throw new Error(`External consumer requires Node v${requiredNodeVersion} or later; received ${process.version}`);
 }
 
@@ -77,35 +78,21 @@ try {
 
     const packedPackages = new Map();
     for (const packagePath of packagePaths) {
-        const packageDirectory = path.join(repositoryRoot, packagePath);
-        await run(
-            packageManager.command,
-            [...packageManager.args, 'pack', '--pack-destination', tarballDirectory],
-            packageDirectory,
-            process.env,
-            ['ignore', 'ignore', 'inherit'],
-        );
         const packageJson = publicToolsByPath.get(packagePath).packageJson;
-        const tarball = fs
-            .readdirSync(tarballDirectory)
-            .find((filename) => filename.startsWith(tarballName(packageJson.name)));
-        if (!tarball) throw new Error(`pnpm pack did not create a tarball for ${packageJson.name}`);
-        const tarballPath = path.join(tarballDirectory, tarball);
-        const packedPackageJson = JSON.parse(
-            execFileSync('tar', ['-xOf', tarballPath, 'package/package.json'], { encoding: 'utf8' }),
-        );
+        const {
+            tarballPath,
+            entries,
+            packageJson: packedPackageJson,
+            embeddedPackageJsons,
+        } = packAndInspect(path.join(repositoryRoot, packagePath), tarballDirectory, packageManager);
         if (packedPackageJson.name !== packageJson.name) {
             throw new Error(`Packed package name changed from ${packageJson.name} to ${packedPackageJson.name}`);
         }
         assertPublicToolPackage(packedPackageJson, packageJson.name, repositoryRoot);
-        const entries = parseTarEntries(execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' }));
         assertPublicToolPackageContents(entries, packagePath, packedPackageJson);
-        const embeddedPackageJsons = embeddedPackageManifestEntries(entries).map((entry) =>
-            JSON.parse(execFileSync('tar', ['-xOf', tarballPath, entry], { encoding: 'utf8' })),
-        );
         packedPackages.set(packedPackageJson.name, {
             packageJson: packedPackageJson,
-            filename: tarball,
+            filename: path.basename(tarballPath),
             bytes: fs.readFileSync(tarballPath),
             embeddedPackageJsons,
         });
@@ -215,6 +202,22 @@ try {
             environment,
         );
 
+        const docsReadme = path.join(consumerDirectory, 'README.md');
+        fs.writeFileSync(docsReadme, '# Consumer\n\n<!-- docs:begin facts -->\n<!-- docs:end facts -->\n');
+        fs.writeFileSync(
+            path.join(consumerDirectory, 'docs.mjs'),
+            `import { code } from '${docsTool.name}/markdown';\nexport const documents = [{ file: 'README.md', blocks: { facts: code('packed') }, note: '' }];\n`,
+        );
+        await capture(
+            packageManager.command,
+            [...packageManager.args, 'exec', Object.keys(docsTool.packageJson.bin)[0], 'generate', 'docs.mjs'],
+            consumerDirectory,
+            environment,
+        );
+        if (!fs.readFileSync(docsReadme, 'utf8').includes('`packed`')) {
+            throw new Error('Packed docs CLI did not fill the generated README block');
+        }
+
         for (const name of packedPackages.keys()) {
             const installedPath = path.join(consumerDirectory, 'node_modules', ...name.split('/'));
             const resolvedPath = fs.realpathSync(installedPath);
@@ -296,10 +299,6 @@ try {
     } finally {
         fs.rmSync(temporaryRoot, { recursive: true, force: true });
     }
-}
-
-function tarballName(name) {
-    return `${name.replace(/^@/, '').replaceAll('/', '-')}-`;
 }
 
 function dependencyClosure(roots, publicTools) {
@@ -403,39 +402,6 @@ function isWithin(parent, child) {
     return (
         relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative))
     );
-}
-
-function compareSemver(left, right) {
-    const parse = (version) => {
-        const match = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(version);
-        if (!match) throw new Error(`Invalid Node version: ${version}`);
-        return { core: match.slice(1, 4).map(Number), prerelease: match[4]?.split('.') };
-    };
-
-    const leftVersion = parse(left);
-    const rightVersion = parse(right);
-    for (let index = 0; index < leftVersion.core.length; index++) {
-        const difference = leftVersion.core[index] - rightVersion.core[index];
-        if (difference !== 0) return difference;
-    }
-
-    if (!leftVersion.prerelease) return rightVersion.prerelease ? 1 : 0;
-    if (!rightVersion.prerelease) return -1;
-    for (let index = 0; index < Math.max(leftVersion.prerelease.length, rightVersion.prerelease.length); index++) {
-        const leftIdentifier = leftVersion.prerelease[index];
-        const rightIdentifier = rightVersion.prerelease[index];
-        if (leftIdentifier === undefined) return -1;
-        if (rightIdentifier === undefined) return 1;
-        if (leftIdentifier === rightIdentifier) continue;
-
-        const leftIsNumeric = /^\d+$/.test(leftIdentifier);
-        const rightIsNumeric = /^\d+$/.test(rightIdentifier);
-        if (leftIsNumeric && rightIsNumeric) return Number(leftIdentifier) - Number(rightIdentifier);
-        if (leftIsNumeric) return -1;
-        if (rightIsNumeric) return 1;
-        return leftIdentifier < rightIdentifier ? -1 : 1;
-    }
-    return 0;
 }
 
 function packageManagerInvocation() {
