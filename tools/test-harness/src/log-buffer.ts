@@ -59,7 +59,11 @@ export class LogBuffer {
     async waitFor(pattern: RegExp, options: WaitOptions): Promise<string> {
         const deadline = Date.now() + options.timeoutMs;
         for (;;) {
-            const hit = this.lines.slice(options.fromIndex).find((l) => pattern.test(l));
+            const hit = this.lines.slice(options.fromIndex).find((l) => {
+                // Global and sticky patterns start where the last test stopped.
+                pattern.lastIndex = 0;
+                return pattern.test(l);
+            });
             if (hit) return hit;
             if (options.isOver())
                 throw new Error(`${options.process} exited before ${pattern} appeared\n${this.tail()}`);

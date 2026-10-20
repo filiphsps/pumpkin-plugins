@@ -29,23 +29,13 @@ export interface ServerDir {
 }
 
 function resolveServerFilePath(dir: string, relative: string): string {
-    const file = path.resolve(dir, relative);
-    const relativeToDir = path.relative(dir, file);
-    const windowsRoot = 'C:\\pumpkin-test-validation-root';
-    const windowsFile = path.win32.resolve(windowsRoot, relative);
-    const relativeToWindowsRoot = path.win32.relative(windowsRoot, windowsFile);
-    const hasRoot = path.isAbsolute(relative) || path.win32.parse(relative).root !== '';
-    const escapesDirectory =
-        relativeToDir === '..' ||
-        relativeToDir.startsWith(`..${path.sep}`) ||
-        relativeToWindowsRoot === '..' ||
-        relativeToWindowsRoot.startsWith(`..${path.win32.sep}`);
-
-    if (hasRoot || escapesDirectory) {
+    // Windows rules treat both / and \ as separators and see every root, POSIX ones included, so a
+    // path that is rooted or escapes on any system is rejected on all of them.
+    const normalized = path.win32.normalize(relative);
+    if (path.win32.parse(relative).root !== '' || normalized === '..' || normalized.startsWith('..\\')) {
         throw new Error(`Seeded file path must be relative to and remain inside the server directory: ${relative}`);
     }
-
-    return file;
+    return path.resolve(dir, relative);
 }
 
 function assertUniquePluginBasenames(plugins: readonly string[]): void {
@@ -91,9 +81,6 @@ export async function prepareServerDir(options: ServerDirOptions = {}): Promise<
     assertUniquePluginBasenames(plugins);
 
     const files = Object.entries(options.files ?? {});
-    const validationRoot = path.join(os.tmpdir(), 'pumpkin-test-validation-root');
-    for (const [relative] of files) resolveServerFilePath(validationRoot, relative);
-
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-test-'));
     try {
         const javaPort = await freePort();

@@ -20,8 +20,18 @@ export function deepMerge(base: Obj, over: Obj): Obj {
     return out;
 }
 
-/** Name of the release asset for a platform, as published by Pumpkin-MC/Pumpkin. */
-export function assetName(platform: NodeJS.Platform, arch: string): string {
+/** Whether this process runs on Linux with musl instead of glibc, as on Alpine. */
+export function isMuslLinux(): boolean {
+    if (process.platform !== 'linux') return false;
+    const report = process.report.getReport() as { header?: { glibcVersionRuntime?: string } };
+    return report.header?.glibcVersionRuntime === undefined;
+}
+
+/**
+ * Name of the release asset for a platform, as published by Pumpkin-MC/Pumpkin.
+ * @param musl - Whether a Linux host uses musl; ignored on other platforms.
+ */
+export function assetName(platform: NodeJS.Platform, arch: string, musl = false): string {
     const key = `${platform}-${arch}`;
     const names: Record<string, string> = {
         'darwin-arm64': 'pumpkin-ARM64-macOS',
@@ -32,7 +42,7 @@ export function assetName(platform: NodeJS.Platform, arch: string): string {
     };
     const name = names[key];
     if (!name) throw new Error(`No Pumpkin release binary for ${key}; set PUMPKIN_BIN to a local build`);
-    return name;
+    return platform === 'linux' && musl ? `${name}-musl` : name;
 }
 
 /** Parses `sha256sum` output into a map of file name to hex digest. */
