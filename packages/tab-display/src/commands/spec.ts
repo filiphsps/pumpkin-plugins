@@ -11,17 +11,17 @@ export const commands = defineCommands(PLUGIN_NAME, {
         defaultPermission: operatorOnly,
         subcommands: {
             status: {
-                description: 'Show provider state and display capabilities',
+                description: 'Show PumpkinPIE state, players and recent problems',
                 permission: `${PLUGIN_NAME}:command.status`,
                 defaultPermission: operatorOnly,
             },
             reload: {
-                description: 'Validate and atomically reload config.toml',
+                description: 'Reload config.toml',
                 permission: `${PLUGIN_NAME}:command.reload`,
                 defaultPermission: operatorOnly,
             },
             inspect: {
-                description: 'Inspect safe context for one online player',
+                description: "Show a player's placeholder IDs",
                 permission: `${PLUGIN_NAME}:command.inspect`,
                 defaultPermission: operatorOnly,
                 arguments: [{ name: 'player', type: 'players' }],

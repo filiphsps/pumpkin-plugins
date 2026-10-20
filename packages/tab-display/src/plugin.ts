@@ -1,25 +1,26 @@
-import type { CommandSender, ConsumedArgs } from 'pumpkin:plugin/command@0.1.0';
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
-import * as logging from 'pumpkin:plugin/logging@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
-import { now as monotonicNow } from 'wasi:clocks/monotonic-clock@0.2.3';
+import { type ConfigStore, defaultValues } from '@pumpkin-plugins/config';
+import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { WasiDataDir } from '@pumpkin-plugins/plugin-kit/data-dir';
-import { cancelTask, runCommand as runHostCommand, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
+import { cancelTask, hostLogger, scheduleRepeating } from '@pumpkin-plugins/plugin-kit/host';
 import { ipcSend } from '@pumpkin-plugins/plugin-kit/ipc';
+import { taggedLogger } from '@pumpkin-plugins/plugin-kit/logger';
 import { PluginBase, registerPlugin } from '@pumpkin-plugins/plugin-kit/plugin';
 import { registerCommands } from '@pumpkin-plugins/plugin-kit/register-commands';
+import { monotonicMs } from '@pumpkin-plugins/plugin-kit/wasi-clock';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
-import { handleCommand as apiHandleCommand } from '@pumpkin-plugins/pumpkin-api';
 import { PieSession } from '@pumpkin-plugins/pumpkin-pie-api';
 import { strFromU8, strToU8 } from 'fflate';
 import { commandHandlers } from './commands/handlers.ts';
 import { commands } from './commands/spec.ts';
-import { CONFIG_FILE, loadTabDisplayConfig, type TabDisplayConfig } from './config.ts';
-import { createConfigTransaction } from './config-store.ts';
+import { CONFIG_FILE, configSchema, loadTabDisplayConfig, type TabDisplayConfig } from './config.ts';
 import { info } from './info.ts';
 import { PLUGIN_NAME } from './name.ts';
 import { JavaTabDisplayHost } from './rendering/java.ts';
 import { TabDisplayService } from './service.ts';
+
+const log = taggedLogger(`${PLUGIN_NAME}:`, hostLogger);
 
 /** The plugin. Pumpkin creates it once and calls `onLoad` when the server starts. */
 class TabDisplay extends PluginBase {
@@ -36,15 +37,15 @@ class TabDisplay extends PluginBase {
     /** Loads validated config, starts one PIE session and registers operator diagnostics. */
     protected onPluginLoad(ctx: Context): void {
         this.files = WasiDataDir.open();
-        if (this.files === undefined) logging.log('error', `${PLUGIN_NAME}: data-folder permissions are unavailable`);
+        if (this.files === undefined) log.error('data-folder permissions are unavailable');
 
         const config = this.loadStartupConfig();
         const host = new JavaTabDisplayHost();
         const session = new PieSession({
             provider: config.placeholders.provider,
             send: ipcSend,
-            now: monotonicMilliseconds,
-            onTransition: (state) => logging.log('info', `${PLUGIN_NAME}: PumpkinPIE provider is ${state.kind}`),
+            now: monotonicMs,
+            onTransition: (state) => log.info(`PumpkinPIE provider is ${ansi.named.value(state.kind)}`),
         });
         const service = new TabDisplayService({
             host,
@@ -54,9 +55,9 @@ class TabDisplay extends PluginBase {
                 },
                 resolveBatch: (requests) => session.client.resolveBatch(requests),
             },
-            now: monotonicMilliseconds,
+            now: monotonicMs,
             config,
-            log: (message) => logging.log('warn', `${PLUGIN_NAME}: ${message}`),
+            log: (message) => log.warn(message),
         });
 
         this.host = host;
@@ -98,10 +99,7 @@ class TabDisplay extends PluginBase {
                 this.host.snapshotPlayers(5000);
                 this.service.shutdown();
             } catch (error) {
-                logging.log(
-                    'warn',
-                    `${PLUGIN_NAME}: could not restore owned tab fields during unload: ${errorMessage(error)}`,
-                );
+                log.warn(`could not restore owned tab fields during unload: ${errorMessage(error)}`);
             } finally {
                 this.host.endTick();
                 disposeWasiResource(server);
@@ -125,7 +123,7 @@ class TabDisplay extends PluginBase {
             session.tick();
             service.tick();
         } catch (error) {
-            logging.log('warn', `${PLUGIN_NAME}: display tick failed: ${errorMessage(error)}`);
+            log.warn(`display tick failed: ${errorMessage(error)}`);
         } finally {
             host.endTick();
         }
@@ -133,55 +131,44 @@ class TabDisplay extends PluginBase {
 
     private loadStartupConfig(): TabDisplayConfig {
         try {
-            const transaction = this.configTransaction();
-            const loaded = loadTabDisplayConfig(transaction.store);
-            transaction.commit();
+            const loaded = loadTabDisplayConfig(this.configStore());
+            for (const warning of loaded.warnings) log.warn(`${ansi.named.name(CONFIG_FILE)}: ${warning}`);
             return loaded.config;
         } catch (error) {
-            logging.log(
-                'error',
-                `${PLUGIN_NAME}: invalid or unavailable config; using defaults: ${errorMessage(error)}`,
+            log.error(
+                `${ansi.named.name(CONFIG_FILE)} is invalid or unavailable; using defaults: ${errorMessage(error)}`,
             );
-            return loadTabDisplayConfig({ read: () => undefined, write: () => undefined }).config;
+            return defaultValues(configSchema);
         }
     }
 
+    // A reload with invalid values keeps the running config, so the command reports them instead.
     private reloadConfig(): { readonly kind: 'applied' } | { readonly kind: 'failed'; readonly reason: string } {
-        const files = this.files;
         const service = this.service;
-        if (files === undefined || service === undefined) {
-            return { kind: 'failed', reason: 'data folder is unavailable' };
-        }
+        if (service === undefined) return { kind: 'failed', reason: 'data folder is unavailable' };
         try {
-            const transaction = this.configTransaction();
-            const loaded = loadTabDisplayConfig(transaction.store);
-            transaction.commit();
-            const result = service.setConfig(loaded.config);
-            return result.kind === 'applied'
-                ? { kind: 'applied' }
-                : { kind: 'failed', reason: result.kind === 'failed' ? result.error : 'configuration was not applied' };
+            const loaded = loadTabDisplayConfig(this.configStore());
+            if (loaded.warnings.length > 0) return { kind: 'failed', reason: loaded.warnings.join('; ') };
+            service.setConfig(loaded.config);
+            return { kind: 'applied' };
         } catch (error) {
             return { kind: 'failed', reason: errorMessage(error) };
         }
     }
 
-    private configTransaction() {
+    private configStore(): ConfigStore {
         const files = this.files;
         if (files === undefined) throw new Error('data folder is unavailable');
-        return createConfigTransaction(
-            () => {
+        return {
+            read: () => {
                 const file = files.stat(CONFIG_FILE);
                 if (file === undefined) return undefined;
                 if (file.kind !== 'file') throw new Error(`${CONFIG_FILE} is not a file`);
                 return strFromU8(files.readFile(CONFIG_FILE));
             },
-            (text) => files.writeFile(CONFIG_FILE, strToU8(text)),
-        );
+            write: (text) => files.writeFile(CONFIG_FILE, strToU8(text)),
+        };
     }
-}
-
-function monotonicMilliseconds(): number {
-    return Number(monotonicNow() / 1_000_000n);
 }
 
 function errorMessage(error: unknown): string {
@@ -190,11 +177,6 @@ function errorMessage(error: unknown): string {
 
 registerPlugin(new TabDisplay());
 
-export { handleTask } from '@pumpkin-plugins/plugin-kit/plugin';
-
-/** Dispatches registered TabDisplay commands before delegating to Pumpkin's API package. */
-export function handleCommand(id: number, sender: CommandSender, server: Server, args: ConsumedArgs): number {
-    return runHostCommand(id, sender, args) ?? apiHandleCommand(id, sender, server, args);
-}
+export { handleCommand, handleTask } from '@pumpkin-plugins/plugin-kit/plugin';
 
 export * from '@pumpkin-plugins/pumpkin-api';

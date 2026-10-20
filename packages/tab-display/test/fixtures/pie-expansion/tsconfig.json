@@ -1,5 +1,0 @@
-{
-    "extends": "../../../../../tsconfig.base.json",
-    "compilerOptions": { "types": ["node"] },
-    "include": ["src", "../../../build/types/bindings/**/*.d.ts", "../../../../../tools/build/globals.d.ts"]
-}
