@@ -1,7 +1,7 @@
 import { commands, window, type ExtensionContext } from 'vscode';
 import { registerHelloWorld } from './command.js';
 
-/** Registers the sample Hello World command for {{displayName}}. */
+/** Registers the sample Hello World command for {{{ displayName }}}. */
 export function activate(context: ExtensionContext): void {
     registerHelloWorld(context, commands.registerCommand, window.showInformationMessage, '{{name}}.helloWorld', {{{ helloWorld displayName }}});
 }

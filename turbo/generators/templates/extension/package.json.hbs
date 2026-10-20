@@ -5,30 +5,9 @@
     "private": true,
     "description": {{{ json description }}},
     "categories": ["Other"],
-    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/extensions/{{name}}#readme",
-    "bugs": {
-        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
-    },
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
-        "directory": "extensions/{{name}}"
-    },
-    "funding": [
-        {
-            "type": "github",
-            "url": "https://github.com/sponsors/filiphsps"
-        },
-        {
-            "type": "custom",
-            "url": "https://paypal.me/filiph"
-        }
-    ],
-    "license": "MIT",
-    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
-    "contributors": [
-        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
-    ],
+    "funding": {{{ json rootPackage.funding }}},
+    "author": {{{ json rootPackage.author }}},
+    "contributors": {{{ json rootPackage.contributors }}},
     "publisher": "filiph",
     "main": "./dist/extension.js",
     "scripts": {
@@ -52,6 +31,6 @@
         "vitest": "catalog:"
     },
     "engines": {
-        "vscode": "^1.140.0"
+        "vscode": "^{{ vscodeVersion }}"
     }
 }
