@@ -1,7 +1,7 @@
 import { ansi } from '@pumpkin-plugins/minecraft-colors';
+import type { DataFiles, RandomAccessFile } from '@pumpkin-plugins/plugin-kit/files';
+import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import type { Config } from '../config/schema.ts';
-import type { DataFiles, RandomAccessFile } from '../platform/files.ts';
-import type { Logger } from '../platform/logger.ts';
 import { type BuiltEntries, buildEntries, type PackEntry } from './entries.ts';
 import { PackScanner, type ScanResult } from './scanner.ts';
 

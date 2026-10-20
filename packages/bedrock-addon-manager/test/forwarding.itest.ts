@@ -21,7 +21,7 @@ describe('port forwarding through UPnPumpkin', () => {
             name: 'forwarding',
             plugins: [builtPluginPath(process.cwd()), builtPluginPath(upnpumpkin)],
             files: {
-                'plugins/data/BedrockAddonManager/config.toml': `[web]\nport = ${port}\n`,
+                'plugins/data/BedrockAddonManager/config.toml': `[web]\nport = ${port}\nport_forwarding = true\n`,
                 'plugins/data/BedrockAddonManager/packs/a.mcpack': makeMcpack(),
                 'plugins/data/UPnPumpkin/config.toml': routerConfig(
                     router,

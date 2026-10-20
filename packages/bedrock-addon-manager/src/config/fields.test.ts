@@ -8,6 +8,11 @@ describe('ipv4Address', () => {
         expect(f.parse('localhost')).toEqual({ ok: false });
         expect(f.parse('::1')).toEqual({ ok: false });
     });
+
+    it('trims spaces so the address matches what the web server binds', () => {
+        const f = ipv4Address({ description: 'd', default: '0.0.0.0' });
+        expect(f.parse(' 0.0.0.0 ')).toEqual({ ok: true, value: '0.0.0.0' });
+    });
 });
 
 describe('httpUrl', () => {

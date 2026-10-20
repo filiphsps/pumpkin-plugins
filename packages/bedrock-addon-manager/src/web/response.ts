@@ -1,5 +1,5 @@
+import type { RandomAccessFile } from '@pumpkin-plugins/plugin-kit/files';
 import { strToU8 } from 'fflate';
-import type { RandomAccessFile } from '../platform/files.ts';
 import { type ByteRange, type HttpRequest, parseRange, responseHead, routePack } from './http.ts';
 
 /** An open pack file. */

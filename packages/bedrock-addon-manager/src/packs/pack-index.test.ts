@@ -1,8 +1,7 @@
 import { defaultValues } from '@pumpkin-plugins/config';
+import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { describe, expect, it } from 'vitest';
 import { makeMcpack, manifestJson } from '../../test/fixtures.ts';
-import { MemoryLogger } from '../../test/logger.ts';
-import { MemoryFiles } from '../../test/memory-files.ts';
 import { type Config, configSchema } from '../config/schema.ts';
 import { PackIndex } from './pack-index.ts';
 

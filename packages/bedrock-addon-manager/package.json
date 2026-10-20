@@ -2,7 +2,7 @@
     "name": "@pumpkin-plugins/bedrock-addon-manager",
     "version": "0.0.0",
     "private": true,
-    "description": "Hosts Bedrock packs over HTTP; it does not offer them to players",
+    "description": "Hosts Bedrock packs over HTTP and exports their pumpkin.toml entries",
     "keywords": [
         "minecraft",
         "pumpkin",
@@ -55,14 +55,15 @@
         "@pumpkin-plugins/docs": "workspace:*",
         "@pumpkin-plugins/minecraft-colors": "workspace:*",
         "@pumpkin-plugins/plugin-kit": "workspace:*",
+        "@pumpkin-plugins/port-mapping": "workspace:*",
         "@pumpkin-plugins/pumpkin-api": "catalog:",
         "@pumpkin-plugins/upnpumpkin-api": "workspace:*",
         "fflate": "catalog:"
     },
     "devDependencies": {
         "@pumpkin-plugins/build": "workspace:*",
-        "@pumpkin-plugins/port-mapping": "workspace:*",
         "@pumpkin-plugins/test-harness": "workspace:*",
+        "@pumpkin-plugins/upnpumpkin": "workspace:*",
         "@types/node": "catalog:",
         "@vitest/coverage-v8": "catalog:",
         "smol-toml": "1.9.0",

@@ -1,12 +1,18 @@
+import { MemoryFiles } from '@pumpkin-plugins/plugin-kit/testing';
 import { strToU8, zipSync } from 'fflate';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { makeMcpack, manifestJson, noise } from '../../test/fixtures.ts';
-import { MemoryFiles } from '../../test/memory-files.ts';
 import { readManifest } from './manifest.ts';
 import { PackScanner } from './scanner.ts';
 
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const pack = (n: number) => makeMcpack(manifestJson({ uuid: uuid(n) }));
+
+/** Counts how often each file is loaded, whole or opened for reads at offsets. */
+function loads(files: MemoryFiles): (path: string) => number {
+    const open = vi.spyOn(files, 'open');
+    return (path) => (files.reads.get(path) ?? 0) + open.mock.calls.filter(([opened]) => opened === path).length;
+}
 
 describe('PackScanner', () => {
     it('finds .mcpack files in name order and ignores everything else', () => {
@@ -38,15 +44,16 @@ describe('PackScanner', () => {
 
     it('only rereads packs whose size or modification time changed', () => {
         const files = new MemoryFiles().put('packs/a.mcpack', pack(1)).put('packs/b.mcpack', pack(2));
+        const loaded = loads(files);
         const scanner = new PackScanner(files);
         scanner.scan('packs');
         scanner.scan('packs');
-        expect([files.reads.get('packs/a.mcpack'), files.reads.get('packs/b.mcpack')]).toEqual([1, 1]);
+        expect([loaded('packs/a.mcpack'), loaded('packs/b.mcpack')]).toEqual([1, 1]);
 
         files.put('packs/a.mcpack', makeMcpack(manifestJson({ uuid: uuid(9), version: [2, 0, 0] })));
         const { packs } = scanner.scan('packs');
-        expect(files.reads.get('packs/a.mcpack')).toBe(2);
-        expect(files.reads.get('packs/b.mcpack')).toBe(1);
+        expect(loaded('packs/a.mcpack')).toBe(2);
+        expect(loaded('packs/b.mcpack')).toBe(1);
         expect(packs.find((p) => p.fileName === 'a.mcpack')?.manifest).toMatchObject({
             uuid: uuid(9),
             version: '2.0.0',
@@ -78,15 +85,16 @@ describe('PackScanner', () => {
                 return info?.kind === 'file' ? { ...info, modified: 42 } : info;
             };
             expect(files.stat(`first/same.${extension}`)).toEqual(files.stat(`second/same.${extension}`));
+            const loaded = loads(files);
             const scanner = new PackScanner(files);
             expect(scanner.scan('first').packs[0].manifest.uuid).toBe(uuid(1));
             const second = scanner.scan('second').packs[0];
             expect(second.manifest.uuid).toBe(uuid(2));
             expect(second.path.startsWith('second/')).toBe(true);
             expect(readManifest(files.readFile(second.path)).uuid).toBe(uuid(2));
-            const reads = files.reads.get(`second/same.${extension}`);
+            const reads = loaded(`second/same.${extension}`);
             expect(scanner.scan('second').packs[0]).toEqual(second);
-            expect(files.reads.get(`second/same.${extension}`)).toBe(reads);
+            expect(loaded(`second/same.${extension}`)).toBe(reads);
             const first = scanner.scan('first').packs[0];
             expect(first.path.startsWith('first/')).toBe(true);
             expect(first.manifest.uuid).toBe(uuid(1));
@@ -95,27 +103,51 @@ describe('PackScanner', () => {
 
     it('remembers a broken pack too, instead of reparsing it every scan', () => {
         const files = new MemoryFiles().put('packs/broken.mcpack', 'not a zip');
+        const loaded = loads(files);
         const scanner = new PackScanner(files);
         scanner.scan('packs');
         expect(scanner.scan('packs').problems).toEqual(['broken.mcpack: not a valid zip archive']);
-        expect(files.reads.get('packs/broken.mcpack')).toBe(1);
+        expect(loaded('packs/broken.mcpack')).toBe(1);
     });
 
     it('notices removed packs and forgets them', () => {
         const files = new MemoryFiles().put('packs/a.mcpack', pack(1));
+        const loaded = loads(files);
         const scanner = new PackScanner(files);
         expect(scanner.scan('packs').packs).toHaveLength(1);
         files.remove('packs/a.mcpack');
         expect(scanner.scan('packs').packs).toHaveLength(0);
         files.put('packs/a.mcpack', pack(1));
         scanner.scan('packs');
-        expect(files.reads.get('packs/a.mcpack')).toBe(2);
+        expect(loaded('packs/a.mcpack')).toBe(2);
     });
 
     it('reads the size from the folder, so big packs are listed with their real size', () => {
         const big = makeMcpack(manifestJson(), { files: { 'a.bin': noise(100_000) } });
         const files = new MemoryFiles().put('packs/big.mcpack', big);
         expect(new PackScanner(files).scan('packs').packs[0].size).toBe(big.length);
+    });
+
+    it('reads only the manifest of a large .mcpack, not the whole file', () => {
+        const big = makeMcpack(manifestJson({ uuid: uuid(1) }), { files: { 'a.bin': noise(2_000_000) } });
+        const files = new MemoryFiles().put('packs/big.mcpack', big);
+        const open = files.open.bind(files);
+        let bytesRead = 0;
+        vi.spyOn(files, 'open').mockImplementation((path) => {
+            const file = open(path);
+            return {
+                size: file.size,
+                close: () => file.close(),
+                read: (offset, length) => {
+                    const chunk = file.read(offset, length);
+                    bytesRead += chunk.length;
+                    return chunk;
+                },
+            };
+        });
+        expect(new PackScanner(files).scan('packs').packs[0]?.manifest.uuid).toBe(uuid(1));
+        expect(files.reads.get('packs/big.mcpack')).toBeUndefined();
+        expect(bytesRead).toBeLessThan(big.length / 10);
     });
 
     describe('.mcaddon bundles', () => {
@@ -199,6 +231,20 @@ describe('PackScanner', () => {
                 'OnlyBp.mcaddon: left out BP (data, not a resource pack)',
                 'OnlyBp.mcaddon: has no resource pack',
             ]);
+        });
+
+        it('reports a bundle that is too large to unpack without reading it', () => {
+            const files = new MemoryFiles().put('packs/Huge.mcaddon', addon({ 'RP/manifest.json': manifest(1) }));
+            const stat = files.stat.bind(files);
+            files.stat = (path) => {
+                const info = stat(path);
+                return path === 'packs/Huge.mcaddon' && info ? { ...info, size: 2 ** 31 } : info;
+            };
+            const { packs, problems } = new PackScanner(files).scan('packs');
+            expect(packs).toEqual([]);
+            expect(problems).toHaveLength(1);
+            expect(problems[0]).toMatch(/^Huge\.mcaddon: .*too large/);
+            expect(files.reads.get('packs/Huge.mcaddon')).toBeUndefined();
         });
 
         it('extracts a bundle once, and again when it changes', () => {

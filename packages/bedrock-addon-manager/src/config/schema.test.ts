@@ -18,7 +18,7 @@ describe('configSchema', () => {
                 bind: '0.0.0.0',
                 port: 8123,
                 public_url: '',
-                port_forwarding: true,
+                port_forwarding: false,
             },
             packs: { directory: 'packs', force: false },
             overrides: {},

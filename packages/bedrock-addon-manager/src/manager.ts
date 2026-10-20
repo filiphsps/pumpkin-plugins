@@ -1,4 +1,6 @@
 import { ansi } from '@pumpkin-plugins/minecraft-colors';
+import type { DataFiles } from '@pumpkin-plugins/plugin-kit/files';
+import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import {
     MappingWatcher,
     openUrl,
@@ -11,8 +13,6 @@ import type { Config } from './config/schema.ts';
 import type { PackEntry } from './packs/entries.ts';
 import { publicBaseUrl } from './packs/entries.ts';
 import { PackIndex } from './packs/pack-index.ts';
-import type { DataFiles } from './platform/files.ts';
-import type { Logger } from './platform/logger.ts';
 import type { WebServer, WebServerSettings } from './web/server.ts';
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
@@ -188,11 +188,11 @@ export class PackManager {
         this.announce();
     }
 
-    /** Logs the selected pack count. This plugin does not send pack offers to players. */
+    /** Says how to get the packs offered, since Pumpkin only offers the packs listed in `pumpkin.toml`. PackIndex logs the count. */
     private announce(): void {
-        const count = this.index.entries.length;
+        if (this.index.entries.length === 0) return;
         this.log.info(
-            `Found ${ansi.named.number(count)} Bedrock pack${count === 1 ? '' : 's'}. This plugin does not send pack offers to players.`,
+            'To offer the packs to Bedrock players, run /baddon export on the server console and paste its output into pumpkin.toml.',
         );
     }
 

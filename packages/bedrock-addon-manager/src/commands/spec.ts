@@ -13,7 +13,10 @@ export const commands = defineCommands(PLUGIN_NAME, {
             list: {
                 description: 'List detected packs and their effective settings',
                 permission: `${COMMAND_PERMISSION}.list`,
-                defaultPermission: { tag: 'allow' },
+            },
+            export: {
+                description: 'Print the `pumpkin.toml` block that makes Pumpkin offer the listed packs',
+                permission: `${COMMAND_PERMISSION}.export`,
             },
             reload: {
                 description: 'Reload `config.toml` and rescan the packs folder',

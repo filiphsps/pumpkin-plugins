@@ -23,6 +23,11 @@ export interface SessionOptions {
     chunkSize: number;
     /** A connection that makes no progress for this long is dropped. */
     idleTimeoutMs: number;
+    /**
+     * Bytes that count as progress while sending. A client that reads less than this per
+     * `idleTimeoutMs` is dropped, so slow readers can't hold a connection open forever.
+     */
+    minProgressBytes: number;
     /** The current time in milliseconds. */
     now: () => number;
     /** Most bytes sent per tick, so one big download can't stall the server tick. */
@@ -45,6 +50,8 @@ export class HttpSession {
     private received: Uint8Array = new Uint8Array(0);
     private head: Uint8Array = new Uint8Array(0);
     private headSent = 0;
+    /** Bytes sent since the idle timer last restarted. */
+    private sentSinceProgress = 0;
     private body: ResponseBody | undefined;
     private lastProgress: number;
     private readonly headDeadline: number;
@@ -147,6 +154,7 @@ export class HttpSession {
                 quota.bytes -= n;
                 this.transport.write(this.head.subarray(this.headSent, this.headSent + n));
                 this.headSent += n;
+                this.sentSinceProgress += n;
                 budget -= n;
             } else if (this.body && this.body.remaining > 0) {
                 const n = Math.min(space, budget, this.options.chunkSize, this.body.remaining);
@@ -158,15 +166,20 @@ export class HttpSession {
                 this.transport.write(data);
                 this.body.offset += data.length;
                 this.body.remaining -= data.length;
+                this.sentSinceProgress += data.length;
                 budget -= data.length;
             } else {
                 break;
             }
-            this.lastProgress = this.options.now();
         }
 
         const bodyDone = !this.body || this.body.remaining === 0;
-        if (this.headSent === this.head.length && bodyDone) {
+        const done = this.headSent === this.head.length && bodyDone;
+        if (done || this.sentSinceProgress >= this.options.minProgressBytes) {
+            this.lastProgress = this.options.now();
+            this.sentSinceProgress = 0;
+        }
+        if (done) {
             this.body?.file.close();
             this.body = undefined;
             this.state = 'finish';

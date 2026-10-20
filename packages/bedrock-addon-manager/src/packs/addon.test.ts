@@ -31,10 +31,10 @@ describe('readAddon', () => {
         const { packs } = readAddon(
             zipSync({ 'RP/manifest.json': manifest(RP, ['resources']), 'RP/textures/a.png': texture }),
         );
-        const inner = readAddon(packs[0].bytes.length ? zipSync({ 'x.mcpack': packs[0].bytes }) : packs[0].bytes);
-        expect(inner.packs).toHaveLength(1);
-        expect(packs[0].bytes.length).toBeGreaterThan(texture.length);
         expect(unzipSync(packs[0].bytes)['textures/a.png']).toEqual(texture);
+        // The repackaged pack also works as a nested .mcpack in another bundle.
+        const inner = readAddon(zipSync({ 'x.mcpack': packs[0].bytes }));
+        expect(inner.packs.map((p) => p.manifest.uuid)).toEqual([RP]);
     });
 
     it('extracts nested .mcpack archives as they are', () => {
@@ -81,6 +81,15 @@ describe('readAddon', () => {
         expect(packs.map((p) => p.name)).toEqual(['Good']);
         expect(skipped).toHaveLength(1);
         expect(skipped[0]).toMatch(/^Broken: .*not valid JSON/);
+    });
+
+    it('rejects a bundle whose files unpack to more than the limit', () => {
+        const addon = zipSync({
+            'RP/manifest.json': manifest(RP, ['resources']),
+            'RP/textures/a.png': new Uint8Array(10_000),
+        });
+        expect(() => readAddon(addon, 5_000)).toThrow(/too large/);
+        expect(readAddon(addon, 20_000).packs).toHaveLength(1);
     });
 
     it('rejects something that is not a zip', () => {

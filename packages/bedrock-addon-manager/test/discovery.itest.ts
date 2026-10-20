@@ -14,13 +14,14 @@ describe('pack discovery', () => {
         await r.server.waitForLog(/No packs in packs\//);
 
         r.put('packs/late.mcpack', bigPack);
-        await new Promise((resolve) => setTimeout(resolve, 2500));
-        expect(r.server.lines.some((l) => l.includes('late.mcpack'))).toBe(false);
+        const before = r.server.lines.length;
+        r.server.command('baddon list');
+        await r.server.waitForLog(/No Bedrock packs are listed/, 10_000, before);
 
         const from = r.server.lines.length;
         r.server.command('baddon reload');
         await r.server.waitForLog(/Found 1 Bedrock pack: late\.mcpack/, 15_000, from);
-        await r.server.waitForLog(/This plugin does not send pack offers to players\./, 15_000, from);
+        await r.server.waitForLog(/run \/baddon export on the server console/, 15_000, from);
 
         const res = await fetch(r.url('/packs/late.mcpack'));
         expect(new Uint8Array(await res.arrayBuffer())).toEqual(bigPack);
@@ -36,6 +37,16 @@ describe('pack discovery', () => {
         await r.server.waitForLog(/bad\.mcpack: not a valid zip archive/);
     });
 
+    it('lists packs that share a UUID only once', async () => {
+        const r = await start({
+            name: 'duplicates',
+            config: (port) => portConfig(port),
+            files: { 'packs/a.mcpack': makeMcpack(), 'packs/b.mcpack': makeMcpack() },
+        });
+        await r.server.waitForLog(/b\.mcpack has the same UUID as a\.mcpack; skipping it/);
+        await r.server.waitForLog(/Found 1 Bedrock pack/);
+    });
+
     it('serves the resource pack of a .mcaddon and leaves out its behavior pack', async () => {
         const addon = zipSync({
             'RP/manifest.json': manifest(SAMPLE_UUID, ['resources']),
@@ -49,7 +60,7 @@ describe('pack discovery', () => {
         });
         await r.server.waitForLog(/Found 1 Bedrock pack: Cool Addon\.mcpack/);
         await r.server.waitForLog(/Cool Addon\.mcaddon: left out BP \(data, not a resource pack\)/);
-        await r.server.waitForLog(/This plugin does not send pack offers to players\./);
+        await r.server.waitForLog(/run \/baddon export on the server console/);
 
         const res = await fetch(r.url('/packs/Cool%20Addon.mcpack'));
         expect(res.status).toBe(200);

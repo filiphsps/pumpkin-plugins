@@ -1,8 +1,7 @@
 import { defaultValues } from '@pumpkin-plugins/config';
 import { ansi } from '@pumpkin-plugins/minecraft-colors';
+import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { describe, expect, it } from 'vitest';
-import { MemoryLogger } from '../../test/logger.ts';
-import { MemoryFiles } from '../../test/memory-files.ts';
 import { loadPluginConfig } from './load.ts';
 import { CONFIG_FILE, configSchema } from './schema.ts';
 
