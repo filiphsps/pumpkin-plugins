@@ -38,12 +38,12 @@ aren't listed here.
 
 - [Agent tooling](agent-tooling.md) — Agent guidance, skills, portable hooks and scoped check diagnostics
 - [CI and releases](ci-and-releases.md) — Which checks run for each change, how releases are prepared, and how plugins reach the Market
+- [Pumpkin Market API](pumpkin-market-api.md) — Market listing lookup, metadata updates, current publisher behavior and API findings
 
 ### Server operations
 
 - [Checking for plugin updates](plugin-updates.md) — How plugin update checks work and how to test them
 - [Port forwarding](port-forwarding.md) — UPnP and NAT-PMP for plugins: the engine, UPnPumpkin, its API and how to test them
-- [Pumpkin Market API](pumpkin-market-api.md) — Market listing lookup, metadata updates, current publisher behavior and API findings
 
 ## Docs
 
