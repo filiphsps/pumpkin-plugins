@@ -22,9 +22,12 @@ const SHARED = [
     /^pnpm-workspace\.yaml$/,
     /^tsconfig\.base\.json$/,
     /^turbo\.json$/,
-    /^turbo\/generators\//,
     /^pnpm-lock\.yaml$/,
 ];
+
+/** Files the script tests run or read: scripts, hooks, generators, workflows and release config. */
+const SCRIPT_TEST_INPUTS =
+    /^(scripts|\.agents\/hooks|turbo\/generators|\.github|\.codex)\/|^(package|turbo)\.json$|^release-please-(config|paused)\.json$|^\.release-please-manifest\.json$/;
 
 const LINT_CONFIG = /^(biome\.json|eslint\.config\.mjs)$/;
 
@@ -91,25 +94,30 @@ export function planChecks(files, exists = defaultExists, packageName = defaultP
         // Include workspace consumers, including plugins that depend on another plugin.
         if (!file.endsWith('.md')) filters.add(`...${name}`);
     }
+    const filterArgs = [...filters].sort().map((f) => `--filter=${f}`);
     if (everything || filters.size > 0) {
         steps.push({
             name: 'Typecheck and unit tests',
-            args: [
-                'turbo',
-                'run',
-                'typecheck',
-                'test',
-                '--output-logs=errors-only',
-                ...(everything ? [] : [...filters].sort().map((f) => `--filter=${f}`)),
-            ],
+            args: ['turbo', 'run', 'typecheck', 'test', '--output-logs=errors-only', ...(everything ? [] : filterArgs)],
         });
     }
 
-    if (relevant.some((f) => /^(scripts|\.agents\/hooks)\/|^package\.json$/.test(f))) {
+    if (relevant.some((f) => SCRIPT_TEST_INPUTS.test(f))) {
         steps.push({ name: 'Script tests', args: ['test:scripts'] });
     }
     if (options.includeRepositoryChecks !== false) steps.push({ name: 'Repo checks', args: ['check'] });
-    steps.push({ name: 'Generated READMEs', args: ['readme:check'] });
+    // Root docs read package.json files, docs/ folders and everything outside packages/, so only plugin
+    // source changes can skip them and check just the affected READMEs.
+    const pluginSourceOnly = relevant.every(
+        (f) => /^packages\/[^/]+\//.test(f) && !/(^|\/)package\.json$|\.md$/i.test(f),
+    );
+    steps.push({
+        name: 'Generated READMEs',
+        args:
+            pluginSourceOnly && !everything
+                ? ['turbo', 'run', 'readme:check', '--output-logs=errors-only', ...filterArgs]
+                : ['readme:check'],
+    });
     return steps;
 }
 

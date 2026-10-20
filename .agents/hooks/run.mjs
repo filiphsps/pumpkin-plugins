@@ -55,7 +55,7 @@ export async function handle(request, checks = { changedFiles, runChecks }) {
         }
         for (const { file, change } of targets) {
             const rel = repoPath(file, cwd);
-            const reason = checkEdit(rel, change, read);
+            const reason = await checkEdit(rel, change, read);
             if (reason) return { ok: false, reason: `${rel}: ${reason}` };
         }
         return { ok: true, input };

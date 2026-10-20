@@ -45,7 +45,7 @@ describe('checkEdit', () => {
     ].join('\n');
     const read = (file) => (file === 'packages/p/README.md' ? readme : undefined);
 
-    it('refuses the lockfile, build output, caches and release-please files', () => {
+    it('refuses the lockfile, build output, caches and release-please files', async () => {
         for (const file of [
             'pnpm-lock.yaml',
             'packages/p/build/p.wasm',
@@ -58,33 +58,36 @@ describe('checkEdit', () => {
             'tools/config/CHANGELOG.md',
             '.release-please-manifest.json',
         ]) {
-            assert.ok(checkEdit(file, {}, read), file);
+            assert.ok(await checkEdit(file, {}, read), file);
         }
-        assert.equal(checkEdit('packages/p/src/build.ts', {}, read), undefined);
-        assert.equal(checkEdit('tools/build/src/cli.ts', {}, read), undefined);
-        assert.equal(checkEdit('release-please-config.json', {}, read), undefined);
+        assert.equal(await checkEdit('packages/p/src/build.ts', {}, read), undefined);
+        assert.equal(await checkEdit('tools/build/src/cli.ts', {}, read), undefined);
+        assert.equal(await checkEdit('release-please-config.json', {}, read), undefined);
     });
 
-    it('refuses edits inside a generated README block and allows the rest', () => {
-        assert.match(checkEdit('packages/p/README.md', { oldString: '| Command | |' }, read) ?? '', /pnpm readme/);
+    it('refuses edits inside a generated README block and allows the rest', async () => {
         assert.match(
-            checkEdit('packages/p/README.md', { oldString: 'intro.\n\n<!-- docs:begin' }, read) ?? '',
+            (await checkEdit('packages/p/README.md', { oldString: '| Command | |' }, read)) ?? '',
             /pnpm readme/,
         );
-        assert.equal(checkEdit('packages/p/README.md', { oldString: 'Hand-written outro.' }, read), undefined);
+        assert.match(
+            (await checkEdit('packages/p/README.md', { oldString: 'intro.\n\n<!-- docs:begin' }, read)) ?? '',
+            /pnpm readme/,
+        );
+        assert.equal(await checkEdit('packages/p/README.md', { oldString: 'Hand-written outro.' }, read), undefined);
     });
 
-    it('refuses patch-style edits to READMEs with generated blocks', () => {
-        assert.match(checkEdit('packages/p/README.md', {}, read) ?? '', /pnpm readme/);
+    it('refuses patch-style edits to READMEs with generated blocks', async () => {
+        assert.match((await checkEdit('packages/p/README.md', {}, read)) ?? '', /pnpm readme/);
     });
 
-    it('refuses a rewrite that changes a generated block and allows one that keeps it', () => {
+    it('refuses a rewrite that changes a generated block and allows one that keeps it', async () => {
         const kept = readme.replace('Hand-written intro.', 'A better intro.');
-        assert.equal(checkEdit('packages/p/README.md', { content: kept }, read), undefined);
+        assert.equal(await checkEdit('packages/p/README.md', { content: kept }, read), undefined);
         const changed = readme.replace('| Command | |', '| Command | Notes |');
-        assert.match(checkEdit('packages/p/README.md', { content: changed }, read) ?? '', /pnpm readme/);
+        assert.match((await checkEdit('packages/p/README.md', { content: changed }, read)) ?? '', /pnpm readme/);
         const dropped = '# Plugin\n';
-        assert.match(checkEdit('packages/p/README.md', { content: dropped }, read) ?? '', /pnpm readme/);
+        assert.match((await checkEdit('packages/p/README.md', { content: dropped }, read)) ?? '', /pnpm readme/);
     });
 
     it('lists the files a patch touches', () => {
@@ -154,6 +157,22 @@ describe('planChecks', () => {
         );
     });
 
+    it('checks generated READMEs only for changed plugins when nothing else changed', () => {
+        const readme = (files) => plan(files).find((s) => s.name === 'Generated READMEs')?.args;
+        const scoped = readme(['packages/upnpumpkin/src/forwarder.ts']);
+        assert.equal(scoped?.[0], 'turbo');
+        assert.ok(scoped?.includes('--filter=...@pumpkin-plugins/upnpumpkin'));
+        for (const files of [
+            ['packages/upnpumpkin/package.json'],
+            ['packages/upnpumpkin/docs/usage.md'],
+            ['tools/config/src/load.ts'],
+            ['packages/upnpumpkin/src/forwarder.ts', 'docs/testing.md'],
+            ['packages/upnpumpkin/src/forwarder.ts', 'tsconfig.base.json'],
+        ]) {
+            assert.deepEqual(readme(files), ['readme:check'], files.join(', '));
+        }
+    });
+
     it('checks the dependents of a changed tool', () => {
         assert.ok(turbo(plan(['tools/config/src/load.ts']))?.includes('--filter=...@pumpkin-plugins/config'));
     });
@@ -181,6 +200,10 @@ describe('planChecks', () => {
         assert.deepEqual(plan(['tools/apis/upnpumpkin-api/build/generated.d.ts']), []);
     });
 
+    it('leaves package checks out of generator template changes', () => {
+        assert.equal(turbo(plan(['turbo/generators/templates/plugin/src/plugin.ts.hbs'])), undefined);
+    });
+
     it('checks every package when a shared file changes', () => {
         const args = turbo(plan(['tsconfig.base.json', 'packages/upnpumpkin/src/x.ts']));
         assert.ok(args);
@@ -193,6 +216,21 @@ describe('planChecks', () => {
     it('runs the script tests when a script or hook changes', () => {
         assert.ok(plan(['scripts/check-docs.mjs']).some((s) => s.name === 'Script tests'));
         assert.ok(plan(['.agents/hooks/guard.mjs']).some((s) => s.name === 'Script tests'));
+        for (const file of [
+            '.github/workflows/ci.yml',
+            '.github/common/setup/action.yml',
+            '.codex/hooks.json',
+            'turbo/generators/config.ts',
+            'turbo.json',
+            'release-please-config.json',
+            'release-please-paused.json',
+            '.release-please-manifest.json',
+        ]) {
+            assert.ok(
+                plan([file]).some((s) => s.name === 'Script tests'),
+                file,
+            );
+        }
         assert.equal(
             plan(['docs/testing.md']).some((s) => s.name === 'Script tests'),
             false,
@@ -280,13 +318,19 @@ describe('parseStatus', () => {
     });
 });
 
-it('protects generated action sections and custom guide blocks', () => {
+it('protects generated action sections and custom guide blocks', async () => {
     const action = '<!-- action-inputs:start -->\nTable\n<!-- action-inputs:end -->';
-    assert.match(checkEdit('actions/example/README.md', { oldString: 'Table' }, () => action) ?? '', /pnpm readme/);
+    assert.match(
+        (await checkEdit('actions/example/README.md', { oldString: 'Table' }, () => action)) ?? '',
+        /pnpm readme/,
+    );
     const guide = '<!-- docs:begin limits -->\nLimits\n<!-- docs:end limits -->';
-    assert.match(checkEdit('tools/example/docs/index.md', { oldString: 'Limits' }, () => guide) ?? '', /pnpm readme/);
+    assert.match(
+        (await checkEdit('tools/example/docs/index.md', { oldString: 'Limits' }, () => guide)) ?? '',
+        /pnpm readme/,
+    );
     assert.equal(
-        checkEdit('tools/example/docs/index.md', { oldString: 'Written prose' }, () => `Written prose\n${guide}`),
+        await checkEdit('tools/example/docs/index.md', { oldString: 'Written prose' }, () => `Written prose\n${guide}`),
         undefined,
     );
 });

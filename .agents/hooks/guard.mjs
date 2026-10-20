@@ -1,7 +1,6 @@
 // Decides whether an agent's tool call should be refused, and says what to do instead. Pure functions:
 // run.mjs passes in the normalized tool input and a way to read files.
 
-import { generatedBlocks } from '@pumpkin-plugins/docs/markdown';
 import { isGeneratedPath } from './check.mjs';
 
 /** Matches the start of a command: the beginning of the line or after `&&`, `||`, `;`, `|` or `(`. */
@@ -40,6 +39,16 @@ const PROTECTED_PATHS = [
 const GENERATED_DOCUMENT =
     'This is a generated documentation block. Edit its source instead (a plugin README comes from `src/info.ts`, the package tables from each `package.json`), then run `pnpm readme`.';
 
+/** Load the Markdown block reader only when needed, so the other guards work before `pnpm install`. */
+async function loadGeneratedBlocks() {
+    try {
+        return (await import('@pumpkin-plugins/docs/markdown')).generatedBlocks;
+    } catch (error) {
+        if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error;
+        throw new Error(`Run \`pnpm install\`: the Markdown guard needs workspace packages. ${error.message}`);
+    }
+}
+
 /**
  * Why a change to `file` must not be made, or undefined when it may.
  *
@@ -48,9 +57,9 @@ const GENERATED_DOCUMENT =
  *   new file content (writes). Patches pass neither, so generated Markdown blocks cannot be safely
  *   inspected and the whole document is refused when it contains one.
  * @param {(file: string) => string | undefined} read Current content of a repo file, if it exists.
- * @returns {string | undefined}
+ * @returns {Promise<string | undefined>}
  */
-export function checkEdit(file, change, read) {
+export async function checkEdit(file, change, read) {
     if (isGeneratedPath(file)) return 'This is build output or a cache. Change the source and rebuild instead.';
     const rule = PROTECTED_PATHS.find((r) => r.pattern.test(file));
     if (rule) return rule.reason;
@@ -58,6 +67,7 @@ export function checkEdit(file, change, read) {
 
     const current = read(file);
     if (current === undefined) return;
+    const generatedBlocks = await loadGeneratedBlocks();
     const blocks = generatedBlocks(current);
     if (blocks.length === 0) return;
 

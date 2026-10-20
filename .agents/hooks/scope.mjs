@@ -51,9 +51,16 @@ function parseSnapshot(root, output) {
     return snapshot;
 }
 
-/** Capture changed paths and their current content/status fingerprints. */
-export function snapshotWorkingTree(root = ROOT) {
-    const result = spawnSync('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all'], {
+/**
+ * Capture changed paths and their current content/status fingerprints.
+ *
+ * @param {string} [root]
+ * @param {string[]} [files] Limit the snapshot to these repo paths; all changed paths when omitted.
+ */
+export function snapshotWorkingTree(root = ROOT, files) {
+    if (files?.length === 0) return new Map();
+    const pathspecs = files === undefined ? [] : ['--', ...files.map((file) => `:(literal)${file}`)];
+    const result = spawnSync('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all', ...pathspecs], {
         cwd: root,
         encoding: 'buffer',
     });
@@ -80,9 +87,6 @@ function toolTargets(root, request) {
     if (request.tool_name === 'apply_patch') {
         const patch = typeof input === 'string' ? input : (input.patchText ?? input.patch ?? input.command);
         if (typeof patch === 'string') files = patchedFiles(patch);
-    } else if (request.tool_name === 'Edit' || request.tool_name === 'Write') {
-        const file = input.path ?? input.filePath ?? input.file_path;
-        if (typeof file === 'string') files = [file];
     } else if (request.tool_name === 'Bash' && typeof input.command === 'string') {
         files = shellOutputTargets(input.command);
     }
@@ -104,10 +108,9 @@ function toolKey(request) {
     };
 }
 
-function completionIdentity(request) {
-    return request?.hook_event_name === 'SubagentStop'
-        ? `subagent:${request.agent_id ?? request.turn_id ?? 'unknown'}`
-        : 'root';
+/** The completion scope a Stop or SubagentStop request belongs to: the root agent or one subagent. */
+export function completionIdentity(request) {
+    return request?.hook_event_name === 'SubagentStop' ? `subagent:${request.agent_id ?? request.turn_id}` : 'root';
 }
 
 /**
@@ -115,7 +118,7 @@ function completionIdentity(request) {
  */
 export class HookScope {
     /**
-     * @param {{ root?: string, directory?: string, snapshot?: (root: string) => Map<string, string> }} [options]
+     * @param {{ root?: string, directory?: string, snapshot?: (root: string, files: string[]) => Map<string, string> }} [options]
      */
     constructor(options = {}) {
         this.root = options.root ?? ROOT;
@@ -123,16 +126,17 @@ export class HookScope {
         this.snapshot = options.snapshot ?? snapshotWorkingTree;
     }
 
-    /** Save a pre-tool snapshot for a later PostToolUse comparison. */
+    /** Save a pre-tool snapshot of the tool's file targets for a later PostToolUse comparison. */
     beforeTool(request) {
         const key = toolKey(request);
-        if (!key) return;
+        const targets = toolTargets(this.root, request);
+        if (!key || targets.size === 0) return;
 
         const directory = path.join(this.directory, key.turnDirectory, 'pending');
         fs.mkdirSync(directory, { recursive: true });
         const pending = path.join(directory, `${key.tool}.json`);
         const temporary = `${pending}.${process.pid}.tmp`;
-        fs.writeFileSync(temporary, JSON.stringify([...this.snapshot(this.root)]));
+        fs.writeFileSync(temporary, JSON.stringify([...this.snapshot(this.root, [...targets])]));
         fs.renameSync(temporary, pending);
     }
 
@@ -145,12 +149,11 @@ export class HookScope {
         const pending = path.join(turnDirectory, 'pending', `${key.tool}.json`);
         if (!fs.existsSync(pending)) return;
 
-        const before = new Map(JSON.parse(fs.readFileSync(pending, 'utf8')));
-        const after = this.snapshot(this.root);
-        const filesDirectory = path.join(turnDirectory, 'files');
-        const candidates = changedPaths(before, after);
         const targets = toolTargets(this.root, request);
-        const changed = candidates.filter((file) => targets.has(file));
+        const before = new Map(JSON.parse(fs.readFileSync(pending, 'utf8')));
+        const after = this.snapshot(this.root, [...targets]);
+        const filesDirectory = path.join(turnDirectory, 'files');
+        const changed = changedPaths(before, after).filter((file) => targets.has(file));
         if (changed.length > 0) fs.mkdirSync(filesDirectory, { recursive: true });
         for (const file of changed) {
             const marker = path.join(filesDirectory, Buffer.from(file).toString('base64url'));
