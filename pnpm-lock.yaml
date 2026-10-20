@@ -598,6 +598,9 @@ importers:
       '@pumpkin-plugins/docs':
         specifier: workspace:*
         version: link:../../tools/docs
+      '@pumpkin-plugins/minecraft-colors':
+        specifier: workspace:*
+        version: link:../../tools/minecraft-colors
       '@pumpkin-plugins/plugin-kit':
         specifier: workspace:*
         version: link:../../tools/plugin-kit

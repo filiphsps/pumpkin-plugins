@@ -18,15 +18,12 @@ export type WaypointMutationStatus =
     | 'conflict'
     | 'invalid';
 
-/** Mutable waypoint fields that can be set or reset by an operator. */
-export type WaypointMetadataPatch = Partial<Pick<Waypoint, WaypointMetadataKey>>;
+/** Waypoint fields an admin can change in place. */
+export type WaypointMetadataPatch = Partial<Pick<Waypoint, WaypointMetadataKey | 'enabled' | 'access'>>;
 
 /** Owns name lookup and persisted mutations while keeping waypoint identity stable. */
 export class WaypointCatalog {
-    constructor(
-        private readonly store: WaypointStore,
-        private readonly onChange?: (waypointId: string) => void,
-    ) {}
+    constructor(private readonly store: WaypointStore) {}
 
     /** Whether the canonical waypoint store can be read and written. */
     get isAvailable(): boolean {
@@ -65,8 +62,8 @@ export class WaypointCatalog {
         let waypoint: Waypoint;
         try {
             waypoint = createWaypoint(input);
-        } catch {
-            return { status: 'invalid' };
+        } catch (error) {
+            return invalid(error);
         }
         if (this.store.get(waypoint.id) !== undefined || this.getByName(waypoint.name) !== undefined) {
             return { status: 'conflict' };
@@ -76,7 +73,6 @@ export class WaypointCatalog {
         } catch {
             return { status: 'unavailable' };
         }
-        this.onChange?.(waypoint.id);
         return { status: 'created', waypoint };
     }
 
@@ -100,8 +96,8 @@ export class WaypointCatalog {
         try {
             const candidate = typeof change === 'function' ? change(current) : { ...current, ...change };
             changed = createWaypoint(candidate);
-        } catch {
-            return { status: 'invalid' };
+        } catch (error) {
+            return invalid(error);
         }
         const duplicate = this.getByName(changed.name);
         if (duplicate !== undefined && duplicate.id !== current.id) return { status: 'conflict' };
@@ -112,7 +108,6 @@ export class WaypointCatalog {
         } catch {
             return { status: 'unavailable' };
         }
-        this.onChange?.(current.id);
         return { status: 'updated', waypoint: changed };
     }
 
@@ -134,13 +129,18 @@ export class WaypointCatalog {
         } catch {
             return { status: 'unavailable' };
         }
-        this.onChange?.(waypoint.id);
         return { status: 'removed', waypoint };
     }
 }
 
 /** Result of a catalog mutation. */
 export interface MutationResult {
+    /** Why an `invalid` change was rejected, written for the admin who made it. */
+    readonly reason?: string;
     readonly status: WaypointMutationStatus;
     readonly waypoint?: Waypoint;
+}
+
+function invalid(error: unknown): MutationResult {
+    return { status: 'invalid', ...(error instanceof Error ? { reason: error.message } : {}) };
 }

@@ -18,14 +18,24 @@ settings.
 
 ## Create and use waypoints
 
-Operators can create a waypoint at their exact position with `/wp create "Home Base"`, or provide
-absolute coordinates with `/wp create "Home Base" 120.5 64 -30`. Names are unique across all dimensions.
+Admins can create a waypoint at their exact position with `/wp create "Home Base"`, or provide
+absolute coordinates with `/wp create "Home Base" 120.5 64 -30`. X and Z must be within 30,000,000
+blocks of the origin and Y within 20,000,000, the limits of vanilla `/tp`. Names are unique across
+all dimensions.
 Use `/wp list` to see enabled waypoints you can access, `/wp info <name>` for details, and
-`/wp tp <name>` to teleport yourself. Operators can use `/wp tp <name> @a` to teleport a player selector.
+`/wp tp <name>` to teleport yourself. Admins can use `/wp tp <name> @a` to teleport a player selector.
 
-Only server operators can create, edit, enable, disable, grant, or delete waypoints. Every
-administrative handler checks Pumpkin's operator list even if a command permission was manually
-granted. Player grants resolve online names and store UUIDs. A group grant checks the permission
+Creating, editing, enabling, disabling, granting, and deleting waypoints needs the
+`Waypoints:command.admin` permission. It defaults to operator level 3, and a permissions plugin can
+grant it to other players. Server operators can see and teleport to every enabled waypoint,
+regardless of its access rules.
+
+The server console and RCON hold every permission, so they can run the admin commands too. The
+exceptions are `/wp create` and `/wp relocate`, which use the sender's position or world and need a
+player. Over RCON, `/wp set icon` fails because Pumpkin doesn't pass the item to the plugin.
+
+Player grants resolve online names and store UUIDs. To revoke the grant of an offline player, pass
+the UUID that `/wp access list` shows. A group grant checks the permission
 marker `Waypoints:group.<slug>`; another permission provider must assign that marker to group
 members.
 
@@ -67,9 +77,12 @@ unchanged text is not resent for appearance-only updates.
 This approximates a first-person HUD: network latency, client view bobbing, and third-person camera
 offsets can still affect alignment. The server cannot read client FOV or reliably detect Java item-use
 state, so spyglass and modded zoom enlarge the labels. Other Java protocol versions do not receive the
-HUD. This HUD supports Java clients only. Waypoints does not currently render Bedrock HUDs.
+HUD; the server log notes each such player once per session.
+This HUD supports Java clients only. Waypoints does not currently render Bedrock HUDs.
 Icons use vanilla atlas textures; block items use a representative model texture, and custom item IDs
-require the corresponding `item/<path>` sprite in the client's resource pack.
+require the corresponding `item/<path>` sprite in the client's resource pack. The map of block item
+sprites comes from a Minecraft client JAR; after a Minecraft update, regenerate it with
+`pnpm --filter @pumpkin-plugins/waypoints icons <client.jar>`.
 
 Malformed or unsupported storage is preserved and disables writes. Fix the file before expecting
 changes to persist.

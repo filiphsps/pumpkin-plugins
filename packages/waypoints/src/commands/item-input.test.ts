@@ -6,6 +6,7 @@ describe('item icon command input', () => {
         ['wp set icon Pumpkin minecraft:pumpkin_pie', 'minecraft:pumpkin_pie'],
         ['/wp set icon Pumpkin pumpkin_pie', 'pumpkin_pie'],
         ['wp set icon "Bert the Great" minecraft:golden_apple', 'minecraft:golden_apple'],
+        ['/waypoints:wp set icon Pumpkin stone', 'stone'],
     ])('extracts the item identifier from %j', (command, expected) => {
         expect(itemIconInputFromCommand(command)).toBe(expected);
     });
