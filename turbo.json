@@ -124,6 +124,22 @@
             "passThroughEnv": ["NODE_V8_COVERAGE"],
             "outputs": ["coverage/**"]
         },
+        "@pumpkin-plugins/static-hermes-runtime#test:coverage": {
+            "dependsOn": ["transit", "build", "@pumpkin-plugins/wasi-capabilities#build"],
+            "inputs": [
+                "$TURBO_DEFAULT$",
+                "$TURBO_ROOT$/coverage.config.json",
+                "$TURBO_ROOT$/scripts/coverage.mjs",
+                "$TURBO_ROOT$/tools/build/src/errors.ts",
+                "$TURBO_ROOT$/tools/build/src/repo.ts",
+                "$TURBO_ROOT$/tools/build/src/wasi-wit-lock.ts",
+                "$TURBO_ROOT$/tools/build/src/wasi-wit.ts",
+                "$TURBO_ROOT$/tools/build/src/wit.ts",
+                "$TURBO_ROOT$/tools/build/wasi-wit.lock.json"
+            ],
+            "passThroughEnv": ["NODE_V8_COVERAGE"],
+            "outputs": ["coverage/**"]
+        },
         "test:integration": {
             "dependsOn": ["build", "@pumpkin-plugins/build#build"],
             "passThroughEnv": ["STATIC_HERMES_*", "WASI_SDK_PATH", "WASI_SDK", "WASM_TOOLS", "WIT_BINDGEN"],

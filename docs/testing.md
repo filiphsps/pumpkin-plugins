@@ -28,6 +28,10 @@ fresh because cached reports cannot supply their child processes' raw V8 data. T
 every suite even after one fails and exits with the first failure's code; Turborepo skips only a
 package whose own dependencies failed to build.
 
+CI runs each package's `test:coverage` script, so add one to every package with unit tests.
+`scripts/workflows.test.mjs` fails when a package outside `extensions/` has none, or when the Test
+job's coverage evidence leaves out the package's `coverage/lcov.info`.
+
 The existing `codecov/project` gate covers tooling: `tools/`, `scripts/`, `actions/` and
 `.agents/hooks/`. It compares against the base commit with a 1 percentage-point tolerance.
 CI runs the complete coverage job for action-only changes too, so a partial action-matrix upload

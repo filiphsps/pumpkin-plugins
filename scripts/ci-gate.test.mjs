@@ -2,8 +2,12 @@
 // `pnpm test:scripts`.
 
 import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { describe, it } from 'node:test';
+import { parse } from 'yaml';
 import { checkResults, selectJobs } from './ci-gate.mjs';
+import { discoverWorkspace } from './utils/workspace-discovery.mjs';
 
 /** Classifier outputs for a change that touches nothing CI checks. */
 const nothing = {
@@ -137,5 +141,35 @@ describe('checkResults', () => {
     it('fails for a job that has no selection rule', () => {
         const context = { ...needs(code, 'push', {}), 'new-job': { result: 'success' } };
         assert.match(checkResults(context).join('\n'), /new-job/);
+    });
+});
+
+describe('test job', () => {
+    const ci = parse(fs.readFileSync(path.join(import.meta.dirname, '../.github/workflows/ci.yml'), 'utf8'));
+    const step = (id) => ci.jobs.test.steps.find((candidate) => candidate.id === id);
+
+    it("runs every package's unit tests and keeps their coverage reports", () => {
+        assert.match(step('unit-tests-with-coverage').run, /-- pnpm run coverage$/);
+        const evidence = step('preserve-coverage-evidence')
+            .with.path.split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line !== '' && !line.startsWith('!'));
+        // Extensions run their tests in the reusable extension workflow.
+        const tested = [...discoverWorkspace(path.join(import.meta.dirname, '..')).packages.values()].filter(
+            ({ directory, manifest }) => manifest.scripts?.test && !directory.startsWith('extensions/'),
+        );
+        assert.ok(tested.length > 0, 'no workspace package has unit tests');
+        assert.deepEqual(
+            tested.filter(({ manifest }) => !manifest.scripts['test:coverage']).map(({ directory }) => directory),
+            [],
+            'packages without a test:coverage script, whose tests CI skips',
+        );
+        assert.deepEqual(
+            tested
+                .map(({ directory }) => `${directory}/coverage/lcov.info`)
+                .filter((report) => !evidence.some((glob) => path.posix.matchesGlob(report, glob))),
+            [],
+            'coverage reports missing from the coverage evidence',
+        );
     });
 });

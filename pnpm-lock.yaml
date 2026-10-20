@@ -313,6 +313,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 5.0.4(vitest@5.0.4)
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -789,6 +792,9 @@ importers:
       '@types/semver':
         specifier: 7.8.0
         version: 7.8.0
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 5.0.4(vitest@5.0.4)
       vitest:
         specifier: 'catalog:'
         version: 5.0.4(@types/node@24.19.1)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
@@ -950,6 +956,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 5.0.4(vitest@5.0.4)
       ajv:
         specifier: 8.20.0
         version: 8.20.0
@@ -990,6 +999,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 5.0.4(vitest@5.0.4)
       vitest:
         specifier: 'catalog:'
         version: 5.0.4(@types/node@24.19.1)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
@@ -1021,6 +1033,9 @@ importers:
       '@pumpkin-plugins/wasi-capabilities':
         specifier: 'catalog:'
         version: link:../wasi-capabilities
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 5.0.4(vitest@5.0.4)
       vitest:
         specifier: 'catalog:'
         version: 5.0.4(@types/node@24.19.1)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))

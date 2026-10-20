@@ -248,6 +248,7 @@ jobs:
                       coverage/verification/
                       tools/**/coverage/lcov.info
                       packages/*/coverage/lcov.info
+                      benchmarks/*/coverage/lcov.info
 
             - name: 📋 Job summary
               id: job-summary

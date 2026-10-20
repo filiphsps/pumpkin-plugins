@@ -61,6 +61,7 @@
         "readme": "pumpkin-plugins-docs generate docs.ts",
         "readme:check": "pumpkin-plugins-docs generate docs.ts --check",
         "test": "vitest run",
+        "test:coverage": "vitest run --coverage",
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
@@ -77,6 +78,7 @@
         "@pumpkin-plugins/docs": "workspace:*",
         "@types/node": "catalog:",
         "@types/semver": "7.8.0",
+        "@vitest/coverage-v8": "catalog:",
         "vitest": "catalog:"
     },
     "engines": {
