@@ -63,4 +63,3 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Action verification (${{ matrix.action }})
-                  steps: ${{ toJSON(steps) }}

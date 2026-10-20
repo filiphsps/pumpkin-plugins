@@ -240,7 +240,6 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Plugin release recovery
-                  steps: ${{ toJSON(steps) }}
                   artifact-url: ${{ github.server_url }}/${{ github.repository }}/releases
                   link-label: Browse release artifacts
                   facts: |

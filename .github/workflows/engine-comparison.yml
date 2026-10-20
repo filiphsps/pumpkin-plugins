@@ -102,7 +102,6 @@ jobs:
               with:
                   title: Engine comparison (${{ matrix.variant }})
                   tests: 'true'
-                  steps: ${{ toJSON(steps) }}
 
     report:
         name: 📋 Collect and display results

@@ -136,37 +136,6 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Release orchestration
-                  steps: |
-                      {
-                        "checkout-repository": {
-                          "outcome": ${{ toJSON(steps.checkout-repository.outcome) }},
-                          "conclusion": ${{ toJSON(steps.checkout-repository.conclusion) }}
-                        },
-                        "bootstrap": {
-                          "outcome": ${{ toJSON(steps.bootstrap.outcome) }},
-                          "conclusion": ${{ toJSON(steps.bootstrap.conclusion) }}
-                        },
-                        "restore-release-please-commit-file-cache": {
-                          "outcome": ${{ toJSON(steps.restore-release-please-commit-file-cache.outcome) }},
-                          "conclusion": ${{ toJSON(steps.restore-release-please-commit-file-cache.conclusion) }}
-                        },
-                        "app-token": {
-                          "outcome": ${{ toJSON(steps.app-token.outcome) }},
-                          "conclusion": ${{ toJSON(steps.app-token.conclusion) }}
-                        },
-                        "release": {
-                          "outcome": ${{ toJSON(steps.release.outcome) }},
-                          "conclusion": ${{ toJSON(steps.release.conclusion) }}
-                        },
-                        "save-release-please-commit-file-cache": {
-                          "outcome": ${{ toJSON(steps.save-release-please-commit-file-cache.outcome) }},
-                          "conclusion": ${{ toJSON(steps.save-release-please-commit-file-cache.conclusion) }}
-                        },
-                        "release-prs": {
-                          "outcome": ${{ toJSON(steps.release-prs.outcome) }},
-                          "conclusion": ${{ toJSON(steps.release-prs.conclusion) }}
-                        }
-                      }
                   artifact-url: ${{ github.server_url }}/${{ github.repository }}/releases
                   link-label: Browse published releases and downloads
                   facts: |

@@ -56,4 +56,3 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Workflow validation
-                  steps: ${{ toJSON(steps) }}
