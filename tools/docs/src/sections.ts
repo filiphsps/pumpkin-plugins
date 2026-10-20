@@ -50,7 +50,7 @@ function renderInstallation({ name }: PluginInfo, { output, packageName, unrelea
     if (unreleasedReason === undefined) {
         return `Download ${file} from the plugin's GitHub release, put it in your server's ${code('plugins/')} folder, and restart Pumpkin. On the first load, a full restart lets Pumpkin ask for the plugin's permissions; hot reload cannot prompt for them.`;
     }
-    return `${name} hasn't been released yet, so there is no ${file} to download. ${unreleasedReason} To try it, clone this repository, run ${code(`pnpm build --filter ${packageName}`)}, copy ${code(output)} from the plugin's folder to your server's ${code('plugins/')} folder, and restart Pumpkin.`;
+    return `${name} hasn't been released yet, so there is no ${file} to download.\n\nRelease pause reason: ${unreleasedReason}.\n\nTo try it, clone this repository, run ${code(`pnpm build --filter ${packageName}`)}, copy ${code(output)} from the plugin's folder to your server's ${code('plugins/')} folder, and restart Pumpkin.`;
 }
 
 function renderPermissions(info: PluginInfo): string {
