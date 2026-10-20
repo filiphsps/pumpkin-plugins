@@ -1,4 +1,5 @@
-import { strFromU8, unzipSync } from 'fflate';
+import { strFromU8 } from 'fflate';
+import { type ByteSource, bytesSource, listZip, readZipEntry, type ZipEntry } from './zip.ts';
 
 /** What the plugin needs to know about a pack, read from its `manifest.json`. */
 export interface PackManifest {
@@ -22,25 +23,41 @@ export class ManifestError extends Error {}
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SCRIPT_MODULES = ['script', 'client_data'];
 const ADDON_MODULES = ['data', ...SCRIPT_MODULES];
+/** Real manifests are a few KiB; anything bigger is not worth inflating. */
+const MAX_MANIFEST_BYTES = 1 << 20;
 
-/** Only the manifest is inflated: packs are megabytes and the rest of the archive is irrelevant. */
-export function readManifest(zip: Uint8Array): PackManifest {
-    let files: Record<string, Uint8Array>;
+/**
+ * Reads a pack's `manifest.json`. Only the archive's central directory and the manifest itself are
+ * read, so a large pack on disk is never loaded whole.
+ * @param zip - The `.mcpack` archive, in memory or opened for reads at offsets.
+ * @throws {ManifestError} When the archive or its manifest can't be used.
+ */
+export function readManifest(zip: Uint8Array | ByteSource): PackManifest {
+    const source = zip instanceof Uint8Array ? bytesSource(zip) : zip;
+    let manifests: ZipEntry[];
     try {
-        files = unzipSync(zip, { filter: (file) => isManifestPath(file.name) });
+        manifests = listZip(source).filter((entry) => isManifestPath(entry.name));
     } catch {
         throw new ManifestError('not a valid zip archive');
     }
 
     // `manifest.json` at the root, or the shallowest one when the archive wraps the pack in a folder.
-    const names = Object.keys(files).sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b));
-    if (names.length === 0) throw new ManifestError('no manifest.json found');
+    manifests.sort((a, b) => a.name.split('/').length - b.name.split('/').length || a.name.localeCompare(b.name));
+    const manifest = manifests[0];
+    if (!manifest) throw new ManifestError('no manifest.json found');
+    if (manifest.size > MAX_MANIFEST_BYTES) throw new ManifestError(`${manifest.name} is too large`);
 
+    let bytes: Uint8Array;
+    try {
+        bytes = readZipEntry(source, manifest);
+    } catch {
+        throw new ManifestError('not a valid zip archive');
+    }
     let json: unknown;
     try {
-        json = JSON.parse(stripJsonComments(strFromU8(files[names[0]])));
+        json = JSON.parse(stripJsonComments(strFromU8(bytes)));
     } catch {
-        throw new ManifestError(`${names[0]} is not valid JSON (encrypted packs are not supported)`);
+        throw new ManifestError(`${manifest.name} is not valid JSON`);
     }
     return fromJson(json);
 }

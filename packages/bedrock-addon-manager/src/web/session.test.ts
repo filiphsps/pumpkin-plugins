@@ -21,7 +21,14 @@ function setup(options: Partial<SessionOptions> = {}) {
             files.push(file);
             return file;
         },
-        { now: () => clock.now, idleTimeoutMs: 1000, writeBudget: 1 << 20, chunkSize: 1 << 20, ...options },
+        {
+            now: () => clock.now,
+            idleTimeoutMs: 1000,
+            minProgressBytes: 1,
+            writeBudget: 1 << 20,
+            chunkSize: 1 << 20,
+            ...options,
+        },
     );
     /** Ticks until the session ends or `maxTicks` pass, giving the transport `space` bytes each tick. */
     const run = (maxTicks = 1000, space = Number.POSITIVE_INFINITY) => {
@@ -197,6 +204,34 @@ describe('HttpSession', () => {
         expect(t.clock.now).toBeGreaterThan(1000);
         expect(t.transport.aborted).toBe(false);
         expect(t.files[0].closed).toBe(1);
+    });
+
+    it('drops a download whose client reads only a few bytes at a time', () => {
+        const t = setup({ minProgressBytes: 1000 });
+        t.transport.inbound.push(get('/packs/a.mcpack'));
+        let active = true;
+        for (let tick = 0; tick < 100 && active; tick++) {
+            t.transport.space = 10;
+            active = t.session.tick();
+            t.clock.now += 100;
+        }
+        expect(active).toBe(false);
+        expect(t.transport.aborted).toBe(true);
+        expect(t.transport.written.length).toBeLessThan(PACK.length);
+        expect(t.files.map((f) => f.closed)).toEqual([1]);
+    });
+
+    it('keeps a slow download that still moves the minimum each timeout', () => {
+        const t = setup({ minProgressBytes: 1000, chunkSize: 1200 });
+        t.transport.inbound.push(get('/packs/a.mcpack'));
+        let active = true;
+        for (let tick = 0; tick < 100 && active; tick++) {
+            t.transport.space = 1200;
+            active = t.session.tick();
+            t.clock.now += 900;
+        }
+        expect(t.transport.aborted).toBe(false);
+        expect(t.transport.response().body).toEqual(PACK);
     });
 
     it('drops a download whose client stopped reading', () => {

@@ -2,16 +2,16 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { parse } from 'smol-toml';
 import { describe, expect, it } from 'vitest';
-import { PLUGIN_NAME, pluginServers, portConfig } from './running.ts';
+import { PLUGIN_NAME } from '../src/name.ts';
+import { pluginServers, portConfig } from './running.ts';
 
 const start = pluginServers();
 
 describe('first start', () => {
     it('creates the config and the packs folder, touches nothing else, and loads without errors', async () => {
         const r = await start({ name: 'first-start' });
-        await r.server.waitForLog(/Created config\.toml with the default settings/);
+        await r.server.waitForLog(new RegExp(`${PLUGIN_NAME}: Created config\\.toml with the default settings`));
         await r.server.waitForLog(/No packs in packs\//);
-        await r.server.waitForLog(/This plugin does not send pack offers to players\./);
 
         const config = r.read('config.toml');
         expect(config).toContain('[web]');

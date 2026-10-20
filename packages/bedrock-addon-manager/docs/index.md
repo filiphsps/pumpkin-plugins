@@ -1,22 +1,20 @@
 # BedrockAddonManager
 
 BedrockAddonManager scans Bedrock `.mcpack` and `.mcaddon` files, reads their manifests, and serves
-enabled resource packs over HTTP. Use it to give Bedrock clients a URL they can reach to download
-those packs.
-
-BedrockAddonManager does not send resource-pack offers to players. Clients are not prompted to
-download packs, and `packs.force` has no effect.
+enabled resource packs over HTTP. `/baddon export` prints the `pumpkin.toml` block that makes
+Pumpkin offer those packs to Bedrock players when they join; see
+[Offer the packs to players](setup.md#offer-the-packs-to-players).
 
 ## Typical setup
 
 Install `bedrock-addon-manager.wasm` in the server's `plugins/` directory and start or restart the
 server. Put pack files in `plugins/data/BedrockAddonManager/packs/`, then run `/baddon reload` to
 scan them. Use `/baddon list` to see discovered packs and their effective settings. The plugin
-keeps its configuration in its own data folder and does not modify `pumpkin.toml`.
+keeps its configuration in its own data folder.
 
 Choose a URL Bedrock clients can reach. Set `web.public_url` when serving packs through a known
-address or reverse proxy. If it is empty, `web.bind` is `0.0.0.0`, and `web.port_forwarding` is on,
-the plugin asks UPnPumpkin to forward `web.port`. If forwarding does not succeed, it uses a loopback
+address or reverse proxy. If it is empty, `web.bind` is `0.0.0.0`, and you set
+`web.port_forwarding = true`, the plugin asks UPnPumpkin to forward `web.port`. If forwarding does not succeed, it uses a loopback
 address that works only on the server machine. See [setup](setup.md) for network and pack-format
 details, or [troubleshooting](troubleshooting.md) if clients cannot download a pack.
 

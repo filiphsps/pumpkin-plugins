@@ -1,8 +1,8 @@
 import { type ConfigStore, ConfigSyntaxError, defaultValues, loadConfig } from '@pumpkin-plugins/config';
 import { ansi } from '@pumpkin-plugins/minecraft-colors';
+import type { DataFiles } from '@pumpkin-plugins/plugin-kit/files';
+import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import { strFromU8, strToU8 } from 'fflate';
-import type { DataFiles } from '../platform/files.ts';
-import type { Logger } from '../platform/logger.ts';
 import { CONFIG_FILE, CONFIG_RENDER_OPTIONS, type Config, configSchema } from './schema.ts';
 
 /** The config file as a `ConfigStore`, backed by the plugin's data folder. */

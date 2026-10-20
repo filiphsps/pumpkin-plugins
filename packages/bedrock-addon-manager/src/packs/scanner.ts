@@ -1,7 +1,7 @@
-import type { DataFiles } from '../platform/files.ts';
-import { readAddon } from './addon.ts';
+import type { DataFiles } from '@pumpkin-plugins/plugin-kit/files';
+import { MAX_ADDON_BYTES, readAddon } from './addon.ts';
 import type { ScannedPack } from './entries.ts';
-import { ManifestError, readManifest } from './manifest.ts';
+import { ManifestError, type PackManifest, readManifest } from './manifest.ts';
 
 /** Folder inside the packs folder that holds `.mcpack` files made from `.mcaddon` bundles. */
 export const EXTRACTED_FOLDER = '.extracted';
@@ -104,15 +104,23 @@ export class PackScanner {
     ): ScanResult {
         const path = `${directory}/${source}`;
         try {
-            const bytes = this.files.readFile(path);
             if (!isMcaddon(source)) {
-                const manifest = readManifest(bytes);
+                const file = this.files.open(path);
+                let manifest: PackManifest;
+                try {
+                    manifest = readManifest(file);
+                } finally {
+                    file.close();
+                }
                 return {
                     packs: [{ fileName: source, path, size: info.size, modified: info.modified, manifest }],
                     problems: [],
                 };
             }
-            return this.extract(directory, source, info.modified, bytes, taken);
+            if (info.size > MAX_ADDON_BYTES) {
+                throw new ManifestError(`is too large: bundles over ${MAX_ADDON_BYTES >> 20} MiB are not unpacked`);
+            }
+            return this.extract(directory, source, info.modified, this.files.readFile(path), taken);
         } catch (err) {
             const reason = err instanceof ManifestError ? err.message : `could not be read (${errorText(err)})`;
             return { packs: [], problems: [`${source}: ${reason}`] };

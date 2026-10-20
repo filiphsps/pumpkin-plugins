@@ -1,8 +1,9 @@
 import * as net from 'node:net';
 import { freePort } from '@pumpkin-plugins/test-harness';
 import { describe, expect, it } from 'vitest';
+import { PLUGIN_NAME } from '../src/name.ts';
 import { makeMcpack, manifestJson, noise } from './fixtures.ts';
-import { PLUGIN_NAME, pluginServers, portConfig } from './running.ts';
+import { pluginServers, portConfig } from './running.ts';
 
 const start = pluginServers();
 

@@ -380,6 +380,9 @@ importers:
       '@pumpkin-plugins/plugin-kit':
         specifier: workspace:*
         version: link:../../tools/plugin-kit
+      '@pumpkin-plugins/port-mapping':
+        specifier: workspace:*
+        version: link:../../tools/port-mapping
       '@pumpkin-plugins/pumpkin-api':
         specifier: 'catalog:'
         version: link:../../tools/pumpkin-api
@@ -393,12 +396,12 @@ importers:
       '@pumpkin-plugins/build':
         specifier: workspace:*
         version: link:../../tools/build
-      '@pumpkin-plugins/port-mapping':
-        specifier: workspace:*
-        version: link:../../tools/port-mapping
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../../tools/test-harness
+      '@pumpkin-plugins/upnpumpkin':
+        specifier: workspace:*
+        version: link:../upnpumpkin
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1

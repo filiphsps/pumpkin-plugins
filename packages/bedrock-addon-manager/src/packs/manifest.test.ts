@@ -82,7 +82,7 @@ describe('readManifest', () => {
         };
         expect(error(strToU8('definitely not a zip'))).toBe('not a valid zip archive');
         expect(error(zipSync({ 'readme.txt': strToU8('hi') }))).toBe('no manifest.json found');
-        expect(error(makeMcpack('{ nope'))).toMatch(/not valid JSON/);
+        expect(error(makeMcpack('{ nope'))).toBe('manifest.json is not valid JSON');
         expect(error(makeMcpack('{"modules": []}'))).toBe('manifest.json has no header');
         expect(error(makeMcpack(manifestJson({ uuid: 'not-a-uuid' })))).toBe('header.uuid is missing or not a UUID');
         expect(error(makeMcpack(manifestJson({ version: [1, 0] })))).toBe(

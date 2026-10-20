@@ -1,6 +1,6 @@
 import type { CommandHandlers } from '@pumpkin-plugins/docs';
 import type { PackManager } from '../manager.ts';
-import { listLines, reloadLines } from './format.ts';
+import { exportLines, listLines, reloadLines } from './format.ts';
 import type { commands } from './spec.ts';
 
 /**
@@ -10,6 +10,7 @@ import type { commands } from './spec.ts';
 export function commandHandlers(manager: PackManager): CommandHandlers<typeof commands> {
     return {
         'baddon list': () => listLines(manager.entries),
+        'baddon export': () => exportLines(manager.entries, manager.config.packs.force),
         'baddon reload': () => {
             manager.reload();
             return reloadLines(manager.entries.length);

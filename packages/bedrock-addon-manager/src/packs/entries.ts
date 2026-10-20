@@ -13,7 +13,7 @@ export interface ScannedPack {
     size: number;
 }
 
-/** One pack as it goes into `resource_pack.bedrock.packs`. */
+/** One listed pack, with the fields `/baddon export` writes into `resource_pack.bedrock.packs`. */
 export interface PackEntry {
     addonPack: boolean;
     contentId?: string;
@@ -53,7 +53,8 @@ export function packUrl(baseUrl: string, fileName: string): string {
 
 /**
  * Applies the overrides, drops disabled packs and duplicates, and orders the rest by `order`
- * (lowest first, default 0) and then by file name.
+ * (lowest first, default 0) and then by file name. Warns about overrides that match no pack and,
+ * when the web server is off, about packs that have no `download_url`.
  * @param reachableUrl - Where port forwarding made the web server reachable, used when `public_url` is empty.
  */
 export function buildEntries(scanned: ScannedPack[], config: Config, reachableUrl?: string): BuiltEntries {
@@ -96,6 +97,11 @@ export function buildEntries(scanned: ScannedPack[], config: Config, reachableUr
         }
         seen.set(entry.uuid, entry.fileName);
         entries.push(entry);
+        if (!config.web.enabled && config.overrides[entry.fileName]?.download_url === undefined) {
+            warnings.push(
+                `${entry.fileName} has no download_url override, and the web server is turned off (web.enabled = false), so nothing serves ${entry.downloadUrl}`,
+            );
+        }
     }
     return { entries, warnings };
 }
