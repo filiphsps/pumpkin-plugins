@@ -1,7 +1,7 @@
 import type { PluginBuild } from 'esbuild';
 import { reachableFiles } from './graph.ts';
 import { dependencies } from './parse.ts';
-import { resolveDependency } from './resolve.ts';
+import { type BrowserProbeCache, resolveDependency } from './resolve.ts';
 import { readSource } from './source.ts';
 import { typeResolver } from './type-resolution.ts';
 import type { AnalyzeModuleGraphOptions, ModuleGraph } from './types.ts';
@@ -37,14 +37,39 @@ export async function collectGraph(
     }
     const seen = new Set<string>();
     const resolveType = typeResolver(projectRoot, settings);
+    const probes: BrowserProbeCache = new Map();
     for (const file of queue) {
         if (seen.has(file)) continue;
         seen.add(file);
         const source = await readSource(file, settings, graph.diagnostics);
         if (!source) continue;
-        for (const dependency of dependencies(source.source, source.checker)) {
-            const specifier = dependency.specifier;
-            if (specifier === undefined) {
+        const resolved = await Promise.all(
+            dependencies(source.source, source.checker).map(async (dependency) => {
+                const specifier = dependency.specifier;
+                if (specifier === undefined) return { dependency };
+                const require = dependency.form === 'require' || dependency.form === 'import-equals';
+                const result = await resolveDependency(
+                    builder,
+                    projectRoot,
+                    settings,
+                    probes,
+                    file,
+                    specifier,
+                    require
+                        ? 'require-call'
+                        : dependency.form === 'dynamic-import'
+                          ? 'dynamic-import'
+                          : 'import-statement',
+                );
+                const typePath =
+                    dependency.kind === 'type-only' && !result.external
+                        ? resolveType(specifier, file, require)
+                        : undefined;
+                return { dependency, specifier, result, typePath };
+            }),
+        );
+        for (const { dependency, specifier, result, typePath } of resolved) {
+            if (!result) {
                 graph.edges.push({ ...dependency, resolution: { status: 'unresolved' } });
                 graph.diagnostics.push({
                     ...dependency,
@@ -53,17 +78,6 @@ export async function collectGraph(
                 });
                 continue;
             }
-            const require = dependency.form === 'require' || dependency.form === 'import-equals';
-            const result = await resolveDependency(
-                builder,
-                projectRoot,
-                settings,
-                file,
-                specifier,
-                require ? 'require-call' : dependency.form === 'dynamic-import' ? 'dynamic-import' : 'import-statement',
-            );
-            const typePath =
-                dependency.kind === 'type-only' && !result.external ? resolveType(specifier, file, require) : undefined;
             const resolution = result.external
                 ? { status: 'external' as const, path: result.path }
                 : typePath
