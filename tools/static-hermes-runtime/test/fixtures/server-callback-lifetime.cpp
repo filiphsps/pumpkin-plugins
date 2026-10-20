@@ -7,48 +7,41 @@
 
 #include "runtime-contract-support.hpp"
 
-enum class ResourceKind { Context, Server, Player, World, JavaPlayer, Command, CommandNode, CommandSender, ConsumedArgs, Text, Wit };
 struct plugin_own_server_instance_t { std::int32_t __handle; };
 struct pumpkin_plugin_server_own_server_t { std::int32_t __handle; };
 int serverDrops = 0;
 void pumpkin_plugin_server_server_drop_own(pumpkin_plugin_server_own_server_t) { serverDrops++; }
 struct ResourceState {
-    ResourceKind kind;
     std::int32_t handle;
     bool owned;
-    bool valid = true;
     std::string interfaceName;
     std::string resourceName;
     std::string packageName;
+    bool valid = true;
     void drop() {
         if (!owned) return;
         owned = false;
         valid = false;
-        if (kind == ResourceKind::Server)
+        if (interfaceName == "server" && resourceName == "server")
             pumpkin_plugin_server_server_drop_own({handle});
     }
     void transfer() { owned = false; valid = false; }
 };
-class ResourceObject : public HostObject {
+class WitResourceObject final : public HostObject {
   public:
-    virtual const std::shared_ptr<ResourceState> &state() const = 0;
-};
-class ServerObject final : public ResourceObject {
-  public:
-    explicit ServerObject(std::shared_ptr<ResourceState> state) : state_(std::move(state)) {}
-    const std::shared_ptr<ResourceState> &state() const override { return state_; }
+    explicit WitResourceObject(std::shared_ptr<ResourceState> state) : state_(std::move(state)) {}
+    const std::shared_ptr<ResourceState> &state() const { return state_; }
   private:
     std::shared_ptr<ResourceState> state_;
 };
-Object wrapResourceObject(Runtime &runtime, std::shared_ptr<ResourceObject> resource) {
+std::shared_ptr<WitResourceObject> makeWitResourceObject(std::shared_ptr<ResourceState> state) {
+    return std::make_shared<WitResourceObject>(std::move(state));
+}
+Object wrapResourceObject(Runtime &runtime, std::shared_ptr<WitResourceObject> resource) {
     return Object::createFromHostObject(runtime, std::move(resource));
 }
 std::shared_ptr<HostObject> nativeResource(Runtime &runtime, const Value &value) {
     return value.asObject(runtime).getHostObject(runtime);
-}
-std::pair<std::string, std::string> resourceIdentity(const ResourceState &state) {
-    if (state.kind == ResourceKind::Server) return {"server", "server"};
-    return {};
 }
 std::shared_ptr<ResourceState> getWitResourceState(Runtime &runtime, const Value &value,
                                                    const std::string &interfaceName,
@@ -63,6 +56,7 @@ Object makeEvent(Runtime &runtime, plugin_event_t *, std::vector<std::shared_ptr
 void returnEvent(Runtime &, const Value &, plugin_event_t *, plugin_event_t *,
                  std::vector<std::shared_ptr<ResourceState>> *) {}
 void logPluginError(const char *) {}
+void initializeRuntime() {}
 
 Value retainedServer;
 bool dropDuringCallback = false;
@@ -70,7 +64,7 @@ Value callExport(const char *, const Value *args, std::size_t count) {
     assert(count >= 2);
     retainedServer = args[1];
     if (dropDuringCallback) {
-        const auto server = std::dynamic_pointer_cast<ServerObject>(
+        const auto server = std::dynamic_pointer_cast<WitResourceObject>(
             retainedServer.asObject(*jsRuntime).getHostObject(*jsRuntime));
         assert(server);
         server->state()->drop();

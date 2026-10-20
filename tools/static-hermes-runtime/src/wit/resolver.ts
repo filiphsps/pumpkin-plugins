@@ -76,15 +76,14 @@ export function resolveWitDocument(
         ),
         typeNames: new Map(),
     };
-    for (const [interfaceIndex, iface] of document.interfaces.entries()) {
+    // A type declared by an interface keeps its own name; any other type takes its first alias.
+    for (const iface of document.interfaces) {
         for (const [name, typeIndex] of Object.entries(iface.types)) {
             if (!context.typeNames.has(typeIndex)) context.typeNames.set(typeIndex, name);
         }
-        for (const type of document.types) {
-            if (type.owner && 'interface' in type.owner && type.owner.interface === interfaceIndex && type.name) {
-                context.typeNames.set(document.types.indexOf(type), type.name);
-            }
-        }
+    }
+    for (const [typeIndex, type] of document.types.entries()) {
+        if (type.owner && 'interface' in type.owner && type.name) context.typeNames.set(typeIndex, type.name);
     }
 
     const resolvedInterfaces = document.interfaces.map((iface, index) =>
@@ -108,7 +107,6 @@ export function resolveWitDocument(
         };
     });
 
-    resolveNamedTypes(context, resolvedInterfaces);
     return { packages, interfaces: resolvedInterfaces, raw: document };
 }
 
@@ -428,38 +426,6 @@ function resolveInterface(
     return interfaceValue;
 }
 
-function resolveNamedTypes(context: ResolutionContext, interfaces: WitApiInterface[]): void {
-    for (const iface of interfaces) {
-        for (const record of iface.records) {
-            for (const field of record.fields) {
-                if (!field.resolvedType) field.resolvedType = resolveNamedType(context, iface, field.type, new Set());
-            }
-        }
-        for (const variant of iface.variants) {
-            for (const entry of variant.cases) {
-                if (!entry.resolvedType && entry.type)
-                    entry.resolvedType = resolveNamedType(context, iface, entry.type, new Set());
-            }
-        }
-        for (const fn of iface.functions) {
-            for (const parameter of fn.parameters) {
-                if (!parameter.resolvedType)
-                    parameter.resolvedType = resolveNamedType(context, iface, parameter.type, new Set());
-            }
-            if (!fn.resolvedResult) fn.resolvedResult = resolveNamedType(context, iface, fn.result, new Set());
-        }
-        for (const resource of iface.resources) {
-            for (const fn of resource.functions) {
-                for (const parameter of fn.parameters) {
-                    if (!parameter.resolvedType)
-                        parameter.resolvedType = resolveNamedType(context, iface, parameter.type, new Set());
-                }
-                if (!fn.resolvedResult) fn.resolvedResult = resolveNamedType(context, iface, fn.result, new Set());
-            }
-        }
-    }
-}
-
 function resolveFunction(
     context: ResolutionContext,
     operation: WitToolsFunction,
@@ -706,47 +672,6 @@ function resolveReference(
     return { kind: 'unsupported', source: localName ?? `type ${reference}` };
 }
 
-function resolveNamedType(
-    context: ResolutionContext,
-    iface: WitApiInterface,
-    source: string,
-    visiting: Set<number>,
-): ResolvedWitType {
-    if (!source) return { kind: 'unit' };
-    const interfaceIndex = context.interfaces.findIndex((entry) => {
-        const identity = requireValue(context.packageNames[entry.package], `package identity ${entry.package}`);
-        return entry.name === iface.name && makeSpecifier(identity, entry.name) === iface.specifier;
-    });
-    if (interfaceIndex < 0) return { kind: 'unsupported', source };
-    const primitive = primitiveType(source);
-    if (primitive) return primitive;
-    const normalizedSource = source.replace(/%([a-zA-Z][\w-]*)/g, '$1');
-    const generic = /^([a-z-]+)<([\s\S]*)>$/.exec(normalizedSource);
-    if (generic) {
-        const [, name, content] = generic;
-        if (name === 'borrow') return { kind: 'borrow', item: resolveNamedType(context, iface, content, visiting) };
-        if (name === 'option' || name === 'list')
-            return { kind: name, item: resolveNamedType(context, iface, content, visiting) };
-        if (name === 'tuple')
-            return {
-                kind: 'tuple',
-                items: splitTopLevel(content).map((item) => resolveNamedType(context, iface, item, visiting)),
-            };
-        if (name === 'result') {
-            const [ok = '_', error = '_'] = splitTopLevel(content);
-            return {
-                kind: 'result',
-                ok: resolveNamedType(context, iface, ok, visiting),
-                error: resolveNamedType(context, iface, error, visiting),
-            };
-        }
-        return { kind: 'unsupported', source };
-    }
-    const typeIndex = context.interfaceTypes.get(interfaceIndex)?.get(normalizedSource);
-    if (typeIndex === undefined) return { kind: 'unsupported', source };
-    return resolveReference(context, typeIndex, interfaceIndex, visiting);
-}
-
 function formatReference(
     context: ResolutionContext,
     reference: WitToolsTypeReference | null,
@@ -886,31 +811,6 @@ function makeSpecifier(identity: PackageIdentity, name: string): string {
 function requireValue<T>(value: T | undefined, description: string): T {
     if (value === undefined) throw new Error(`Resolved WIT document is missing ${description}`);
     return value;
-}
-
-function primitiveType(name: string): ResolvedWitType | undefined {
-    if (['bool', 'char', 'u8', 's8', 'u16', 's16', 'u32', 's32', 'u64', 's64', 'f32', 'f64', 'string'].includes(name)) {
-        return { kind: 'primitive', name };
-    }
-    return undefined;
-}
-
-function splitTopLevel(source: string): string[] {
-    const parts: string[] = [];
-    let depth = 0;
-    let start = 0;
-    for (let index = 0; index < source.length; index += 1) {
-        const char = source[index];
-        if (char === '<' || char === '(' || char === '{') depth += 1;
-        else if (char === '>' || char === ')' || char === '}') depth -= 1;
-        else if (char === ',' && depth === 0) {
-            parts.push(source.slice(start, index).trim());
-            start = index + 1;
-        }
-    }
-    const tail = source.slice(start).trim();
-    if (tail) parts.push(tail);
-    return parts;
 }
 
 function asWasiInterface(iface: WitApiInterface): WitWasiInterface {

@@ -1,8 +1,7 @@
-import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ensurePumpkinWit, parsePumpkinWitPin } from '@pumpkin-plugins/pumpkin-api/wit';
+import { digestWitDirectory, ensurePumpkinWit, parsePumpkinWitPin } from '@pumpkin-plugins/pumpkin-api/wit';
 import {
     archiveCompatibilityMatrix,
     diffCompatibilityMatrices,
@@ -29,7 +28,7 @@ const witLockFile = path.join(apiRoot, 'wit.lock.json');
 const sourceWit = parsePumpkinWitPin(fs.readFileSync(witLockFile, 'utf8'), witLockFile);
 const apiWitDir = ensurePumpkinWit({
     lockFile: witLockFile,
-    cacheRoot: process.env.PUMPKIN_PLUGINS_CACHE_DIR ?? path.join(repositoryRoot, '.cache'),
+    cacheRoot: process.env.PUMPKIN_PLUGINS_CACHE_DIR || path.join(repositoryRoot, '.cache'),
 });
 const api = readWitPackage(apiWitDir);
 
@@ -63,7 +62,7 @@ const runtimeExports = [
     const behaviorChange = {
         Plugin: {
             migration:
-                'No call-site change in normal typed usage. The default IPC handler now throws a descriptive Error instead of a string, failed event/command registration releases its callback, and scheduled task helpers reject runtime tick values other than numbers or bigints.',
+                'Event handlers passed to registerEvent are now checked against the payload of the registered event type, so a handler typed for another payload needs a matching annotation. The default IPC handler now throws a descriptive Error instead of a string, failed event/command registration releases its callback, scheduled task helpers reject runtime tick values other than numbers or bigints, and the new cancelTask helper releases a scheduled callback.',
         },
         handleCommandSuggestion: {
             migration:
@@ -75,7 +74,11 @@ const runtimeExports = [
         },
         onUnload: {
             migration:
-                'No call-site change. Event, command, suggestion, AI-goal and chunk-generator callbacks are cleared after unload even when the plugin hook throws; scheduled callbacks were already cleared.',
+                'No call-site change. Event, command, suggestion, AI-goal, chunk-generator and scheduled-task callbacks are released after unload, even when the plugin hook throws. The old package released none of them.',
+        },
+        metadata: {
+            migration:
+                'No call-site change for plugins that call registerPlugin(). getMetadata now throws when registerPlugin() was not called, so Pumpkin rejects the plugin instead of loading it as `unknown`.',
         },
     }[name];
 
@@ -89,16 +92,32 @@ const runtimeExports = [
 
 const publicTypes = [
     'EventHandler',
+    'EventPayload',
     'CommandHandler',
     'CommandSuggestionHandler',
     'TaskHandler',
     'AiGoal',
     'ChunkGenerator',
-].map((name) => ({
-    name,
-    decision: 'retained',
-    migration: 'No call-site change; the public TypeScript signature is retained.',
-}));
+].map(
+    (name) =>
+        ({
+            EventHandler: {
+                name,
+                decision: 'improved',
+                migration:
+                    "The default payload type is now the union of event payloads instead of `any`, and the return type is `T | undefined` instead of `T | void`. Give handlers that relied on `any` a payload type such as `EventPayload<'player-join-event'>`, and remove `: void` return annotations from event handlers.",
+            },
+            EventPayload: {
+                name,
+                decision: 'added',
+                migration: 'New type; existing code does not change. Use it to name the payload of one event type.',
+            },
+        })[name] ?? {
+            name,
+            decision: 'retained',
+            migration: 'No call-site change; the public TypeScript signature is retained.',
+        },
+);
 
 const interfaces = api.interfaces.map((apiInterface) => {
     const types = [
@@ -203,7 +222,7 @@ const candidateMatrix = {
             item: 'callback cleanup after unload',
             decision: 'improved',
             rationale:
-                'Unload now clears event, command, suggestion, AI-goal and chunk-generator callbacks in a finally block, including when the plugin hook throws.',
+                'Unload now releases event, command, suggestion, AI-goal, chunk-generator and scheduled-task callbacks in a finally block, including when the plugin hook throws.',
             migration: 'No source migration. Register callbacks again during a later onLoad.',
         },
         {
@@ -221,6 +240,29 @@ const candidateMatrix = {
             migration:
                 'JavaScript callers must pass a number or bigint. TypeScript callers using the declared parameter types need no source migration.',
         },
+        {
+            item: 'typed event handlers',
+            decision: 'improved',
+            rationale:
+                'registerEvent infers the handler payload from the event type, EventHandler defaults to the union of event payloads instead of `any`, and handlers return `T | undefined` instead of `T | void`.',
+            migration:
+                'Annotate handlers that relied on `any` with `EventPayload<...>` or let registerEvent infer the payload, and remove `: void` return annotations from event handlers.',
+        },
+        {
+            item: 'Plugin.cancelTask',
+            decision: 'added',
+            rationale:
+                'Plugins can cancel a task scheduled through the facade and release its callback at once; the old package had no cancellation helper.',
+            migration:
+                'No source migration. Call this.cancelTask instead of the raw scheduler to release the callback when the task is cancelled.',
+        },
+        {
+            item: 'metadata before plugin registration',
+            decision: 'improved',
+            rationale:
+                'getMetadata throws when registerPlugin() was not called, as the Rust guest does, instead of returning metadata for a plugin named `unknown`.',
+            migration: 'Call registerPlugin() in the plugin entry point. Plugins that already do need no change.',
+        },
     ],
 };
 
@@ -235,7 +277,6 @@ if (previousMatrix && !sameRevision) archiveCompatibilityMatrix(compatibilityDir
 
 const operationInventory = {
     apiPackage: compatibilityMatrix.replacement.package,
-    apiPackageVersion: compatibilityMatrix.replacement.version,
     witPackage: compatibilityMatrix.replacement.witPackage,
     sourceWit: compatibilityMatrix.sourceWit,
     sourceWitSha256: compatibilityMatrix.sourceWitSha256,
@@ -273,20 +314,6 @@ function operationsForInterface(apiInterface) {
 function typeDeclaration(declaration, kind) {
     const { name, ...shape } = declaration;
     return { name, kind, signature: JSON.stringify(shape) };
-}
-
-function digestWitDirectory(directory) {
-    const hash = createHash('sha256');
-    for (const filename of fs
-        .readdirSync(directory)
-        .filter((name) => name.endsWith('.wit'))
-        .sort()) {
-        hash.update(filename);
-        hash.update('\0');
-        hash.update(fs.readFileSync(path.join(directory, filename)));
-        hash.update('\0');
-    }
-    return hash.digest('hex');
 }
 
 function writeJson(filename, value) {

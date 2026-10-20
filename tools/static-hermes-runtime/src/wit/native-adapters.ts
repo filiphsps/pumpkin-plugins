@@ -1,12 +1,19 @@
+import {
+    cFieldIdentifier,
+    cIdentifier,
+    enumValue,
+    jsName,
+    jsVariantTag,
+    pascalCase,
+    witOperationCFunctionName,
+} from './names.ts';
 import type {
     ResolvedWitType,
     WitApiAdapterPlan,
     WitApiInterface,
     WitApiPackage,
     WitFunction,
-    WitOwnedType,
     WitParameter,
-    WitResource,
     WitWasiAdapterPlan,
 } from './types.ts';
 
@@ -40,13 +47,11 @@ interface WitApiFunctionOptions {
     apiObjectName?: string;
     functionName?: string;
     propertyName?: string;
-    resourceDrops?: Map<string, [string, string]>;
 }
 
 interface WitResourceMethodOptions {
     includePackageName?: boolean;
     preserveArgumentCheckLine?: boolean;
-    resourceDrops?: Map<string, [string, string]>;
 }
 
 /** Annotate selected adapter types with the standalone cleanup functions declared by wit-bindgen. */
@@ -150,39 +155,18 @@ function annotateWitTypeCleanupAvailability(
     return { ...annotated, hasGeneratedFreeFunction: availableFreeFunctions.has(freeFunction) } as ResolvedWitType;
 }
 
-/** Return the generated C function name for a WASI function or resource operation. */
-function wasiOperationCFunctionName(
-    apiPackage: WitApiPackage,
-    apiInterface: WitApiInterface,
-    operation: WitFunction,
-    resource?: WitResource,
-): string {
-    const namespace = cIdentifier(apiPackage.packageName);
-    const interfaceName = cIdentifier(apiInterface.name);
-    if (!resource) return `${namespace}_${interfaceName}_${cIdentifier(operation.name)}`;
-    if (operation.name === 'constructor') {
-        return `${namespace}_${interfaceName}_constructor_${cIdentifier(resource.name)}`;
-    }
-    const kind = operation.isStatic ? 'static' : 'method';
-    return `${namespace}_${interfaceName}_${kind}_${cIdentifier(resource.name)}_${cIdentifier(operation.name)}`;
-}
-
 /** Emit the host-function branch for one resolved WASI resource method plan. */
 export function generateWitResourceMethodForResolvedPlan(
     apiPackage: WitApiPackage,
     plan: WitApiAdapterPlan | WitWasiAdapterPlan,
-    {
-        includePackageName = true,
-        preserveArgumentCheckLine = false,
-        resourceDrops = new Map<string, [string, string]>(),
-    }: WitResourceMethodOptions = {},
+    { includePackageName = true, preserveArgumentCheckLine = false }: WitResourceMethodOptions = {},
 ): string | undefined {
     const { apiInterface, operation, parameters, resultType, resource } = plan;
     if (!resource || plan.kind !== 'resource-method') {
         throw new Error(`WASI resource method plan is incomplete: ${plan.operationId}`);
     }
     const namespace = cIdentifier(apiPackage.packageName);
-    const functionName = wasiOperationCFunctionName(apiPackage, apiInterface, operation, resource);
+    const functionName = witOperationCFunctionName(apiPackage, apiInterface, operation, resource);
     const borrowType = `${namespace}_${cIdentifier(apiInterface.name)}_borrow_${cIdentifier(resource.name)}_t`;
     const inputs = [];
     const beforeCall = [];
@@ -194,7 +178,7 @@ export function generateWitResourceMethodForResolvedPlan(
         beforeCall.push(...(input.beforeCall ?? []));
         callArguments.push(input.argument);
     }
-    const result = generateWitResult(apiPackage, apiInterface, resultType, functionName, callArguments, resourceDrops);
+    const result = generateWitResult(apiPackage, apiInterface, resultType, functionName, callArguments);
     if (!result) return undefined;
 
     const methodName = jsName(operation.name);
@@ -226,10 +210,9 @@ function generateWitApiFunction(
         functionName,
         apiObjectName = `generated${pascalCase(apiInterface.name)}Api`,
         propertyName = jsName(operation.name),
-        resourceDrops = new Map(),
     }: WitApiFunctionOptions = {},
 ): string | undefined {
-    const nativeFunctionName = functionName ?? wasiOperationCFunctionName(apiPackage, apiInterface, operation);
+    const nativeFunctionName = functionName ?? witOperationCFunctionName(apiPackage, apiInterface, operation);
     const inputs = [];
     const beforeCall = [];
     const callArguments = [];
@@ -241,14 +224,7 @@ function generateWitApiFunction(
         callArguments.push(input.argument);
     }
 
-    const result = generateWitResult(
-        apiPackage,
-        apiInterface,
-        resultType,
-        nativeFunctionName,
-        callArguments,
-        resourceDrops,
-    );
+    const result = generateWitResult(apiPackage, apiInterface, resultType, nativeFunctionName, callArguments);
     if (!result) return undefined;
     const argumentCheck =
         parameters.length === 0
@@ -687,7 +663,6 @@ function generateWitResult(
     type: ResolvedWitType,
     functionName: string,
     argumentsList: string[],
-    resourceDrops: Map<string, [string, string]>,
 ): GeneratedWitResult | undefined {
     if (type.kind === 'unsupported') return undefined;
     const callArguments = [...argumentsList];
@@ -695,9 +670,6 @@ function generateWitResult(
     if (type.kind === 'result') {
         const output = type.ok;
         const error = type.error;
-        if (output.kind === 'resource') {
-            resourceDrops.set(`${output.interfaceName}.${output.name}`, [output.interfaceName, output.name]);
-        }
         const value =
             output.kind === 'resource'
                 ? undefined
@@ -721,7 +693,7 @@ function generateWitResult(
         const callExpression = `const bool callSucceeded = ${functionName}(${outputArguments.join(', ')});`;
         const errorReturn =
             error.kind === 'unit'
-                ? `Object errorValue(rt); errorValue.setProperty(rt, "tag", "err"); return errorValue;`
+                ? `Object errorValue(rt); errorValue.setProperty(rt, "__staticHermesWitError", Value::null()); return errorValue;`
                 : generateWitErrorReturn(apiPackage, apiInterface, error, 'error');
         const successReturn =
             output.kind === 'resource'
@@ -776,16 +748,7 @@ function generateWitResult(
             return: `${value.setup.join(' ')} auto converted = ${value.expression}; return converted;`,
         };
     }
-    if (type.kind === 'resource')
-        return generateWitResourceResult(
-            apiPackage,
-            apiInterface,
-            type,
-            functionName,
-            callArguments,
-            resourceDrops,
-            'resource',
-        );
+    if (type.kind === 'resource') return generateWitResourceResult(apiPackage, type, functionName, callArguments);
     if (type.kind === 'option') {
         const value = generateWitResultValue(apiPackage, apiInterface, type.item, 'result', 'resultValue');
         if (!value) return undefined;
@@ -1030,7 +993,7 @@ function generateWitResourceObject(
     const stateName = `${name}State`;
     return {
         setup: [
-            `auto ${stateName} = std::make_shared<ResourceState>(ResourceState{ResourceKind::Wit, ${expression}.__handle, true, ${JSON.stringify(type.interfaceName)}, ${JSON.stringify(type.name)}, ${JSON.stringify(ownerPackage)}});`,
+            `auto ${stateName} = std::make_shared<ResourceState>(ResourceState{${expression}.__handle, true, ${JSON.stringify(type.interfaceName)}, ${JSON.stringify(type.name)}, ${JSON.stringify(ownerPackage)}});`,
         ],
         expression: `wrapResourceObject(rt, makeWitResourceObject(${stateName}))`,
     };
@@ -1174,53 +1137,19 @@ function generateWitEnumResult(
     };
 }
 
-/** Generate resource, optional-resource, or resource-list result conversion code. */
+/** Generate the call and conversion for an operation that returns an owned resource. */
 function generateWitResourceResult(
     apiPackage: WitApiPackage,
-    apiInterface: WitApiInterface,
     type: Extract<ResolvedWitType, { kind: 'resource' }>,
     functionName: string,
     argumentsList: string[],
-    resourceDrops: Map<string, [string, string]>,
-    resultKind: 'resource' | 'option' | 'list',
 ): GeneratedWitResult {
-    const ownerInterface = type.interfaceName;
-    const resource = type.name;
-    resourceDrops.set(`${ownerInterface}.${resource}`, [ownerInterface, resource]);
-    const ownType = witCType(apiPackage, apiInterface, type);
-    /** Generate the native wrapper return statement for one owned resource. */
     const ownerPackage = apiPackage.packageName.startsWith('wasi:') ? (type.packageName ?? apiPackage.packageName) : '';
-    const create = (source: string) =>
-        `auto resource = std::make_shared<ResourceState>(ResourceState{ResourceKind::Wit, ${source}.__handle, true, ${JSON.stringify(ownerInterface)}, ${JSON.stringify(resource)}, ${JSON.stringify(ownerPackage)}}); return wrapResourceObject(rt, makeWitResourceObject(resource));`;
-    if (resultKind === 'resource') {
-        return {
-            setup: [],
-            call: `const auto result = ${functionName}(${argumentsList.join(', ')});`,
-            cleanup: [],
-            return: create('result'),
-        };
-    }
-    if (resultKind === 'option') {
-        return {
-            setup: [`${ownType} result{};`],
-            call: `const bool hasResult = ${functionName}(${[...argumentsList, '&result'].join(', ')});`,
-            cleanup: [],
-            return: `if (!hasResult) return Value::null(); ${create('result')}`,
-        };
-    }
-    const listResourceType = {
-        kind: 'list' as const,
-        item: type,
-        packageName: type.packageName ?? apiPackage.packageName,
-        interfaceName: type.declaredInterface ?? type.interfaceName ?? apiInterface.name,
-    };
-    const listType = witCType(apiPackage, apiInterface, listResourceType);
-    const freeList = `${witTypeNamespace(apiPackage, apiInterface, listResourceType)}_${witTypeName(listResourceType)}_free`;
     return {
-        setup: [`${listType} result{};`],
-        call: `${functionName}(${[...argumentsList, '&result'].join(', ')});`,
+        setup: [],
+        call: `const auto result = ${functionName}(${argumentsList.join(', ')});`,
         cleanup: [],
-        return: `Array value(rt, result.len); for (std::size_t index = 0; index < result.len; ++index) { auto resource = std::make_shared<ResourceState>(ResourceState{ResourceKind::Wit, result.ptr[index].__handle, true, ${JSON.stringify(ownerInterface)}, ${JSON.stringify(resource)}, ${JSON.stringify(ownerPackage)}}); value.setValueAtIndex(rt, index, wrapResourceObject(rt, makeWitResourceObject(resource))); } ${freeList}(&result); return value;`,
+        return: `auto resource = std::make_shared<ResourceState>(ResourceState{result.__handle, true, ${JSON.stringify(type.interfaceName)}, ${JSON.stringify(type.name)}, ${JSON.stringify(ownerPackage)}}); return wrapResourceObject(rt, makeWitResourceObject(resource));`,
     };
 }
 
@@ -1231,7 +1160,7 @@ function generateWitResourceValue(
     expression: string,
 ): string {
     const ownerPackage = apiPackage.packageName.startsWith('wasi:') ? (type.packageName ?? apiPackage.packageName) : '';
-    return `auto resourceState = std::make_shared<ResourceState>(ResourceState{ResourceKind::Wit, ${expression}.__handle, true, ${JSON.stringify(type.interfaceName)}, ${JSON.stringify(type.name)}, ${JSON.stringify(ownerPackage)}}); return wrapResourceObject(rt, makeWitResourceObject(resourceState));`;
+    return `auto resourceState = std::make_shared<ResourceState>(ResourceState{${expression}.__handle, true, ${JSON.stringify(type.interfaceName)}, ${JSON.stringify(type.name)}, ${JSON.stringify(ownerPackage)}}); return wrapResourceObject(rt, makeWitResourceObject(resourceState));`;
 }
 
 /** Return the generated C type corresponding to a resolved WIT type. */
@@ -1417,52 +1346,6 @@ function typedArrayConstructor(type: ResolvedWitType): string | undefined {
     }[type.name];
 }
 
-/** Build the generated C enum constant for a WIT enum case. */
-function enumValue(apiPackage: WitApiPackage, type: WitOwnedType, value: string): string {
-    return `${cIdentifier(type.packageName ?? apiPackage.packageName).toUpperCase()}_${cIdentifier(type.interfaceName).toUpperCase()}_${cIdentifier(type.name).toUpperCase()}_${cIdentifier(value).toUpperCase()}`;
-}
-
-/** Convert a WIT field name to a C identifier, avoiding reserved keywords. */
-function cFieldIdentifier(name: string): string {
-    const identifier = cIdentifier(name).replace(/[A-Z]/g, (character) => character.toLowerCase());
-    return C_RESERVED_FIELD_NAMES.has(identifier) ? `${identifier}_` : identifier;
-}
-
-const C_RESERVED_FIELD_NAMES = new Set(
-    'alignas alignof and and_eq asm atomic_cancel atomic_commit atomic_noexcept auto bitand bitor bool break case catch char char8_t char16_t char32_t class compl concept const consteval constexpr constinit const_cast continue co_await co_return co_yield decltype default delete do double dynamic_cast else enum explicit export extern false float for friend goto if inline int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static static_assert static_cast struct switch synchronized template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq'.split(
-        /\s+/,
-    ),
-);
-
-/** Convert a separator-delimited identifier to PascalCase. */
-function pascalCase(value: string): string {
-    return value
-        .split(/[^a-zA-Z0-9]+/)
-        .filter(Boolean)
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join('');
-}
-
-/** Convert a WIT identifier to a JavaScript camelCase name. */
-function jsName(witName: string): string {
-    return witName.replace(/^%/, '').replace(/-([a-zA-Z0-9])/g, (_match, character) => character.toUpperCase());
-}
-
-/** Preserve WIT case names as JavaScript variant tags; only functions and fields use camelCase. */
-function jsVariantTag(witName: string): string {
-    return witName.replace(/^%/, '');
-}
-
-/** Convert a WIT identifier to a C-compatible identifier. */
-function cIdentifier(witName: string): string {
-    return witName
-        .replace(/^%/, '')
-        .replace(/[^a-zA-Z0-9_]/g, '_')
-        .replace(/_+/g, '_')
-        .toLowerCase();
-}
-
-/** Convert a WIT identifier to a JavaScript class name. */
 function requireResolvedFieldType(field: WitParameter): ResolvedWitType {
     if (!field.resolvedType) throw new Error(`WIT resolver did not resolve field ${field.name}`);
     return field.resolvedType;
