@@ -21,10 +21,6 @@ aren't listed here.
 - [Creating an action](creating-an-action.md) — Create, document, test, and release a GitHub Action in this repository
 - [Documentation site](documentation-site.md) — Adding component guides, generated API reference, local preview, and publishing
 
-### Guides
-
-- [Benchmarking](benchmarking.md) — QuickJS and the Static Hermes profile, collector and parser matrix
-
 ### Plugin development
 
 - [Building](building.md) — The shared build tool, Turborepo setup, and runtime caveats
@@ -37,6 +33,7 @@ aren't listed here.
 ### Repository maintenance
 
 - [Agent tooling](agent-tooling.md) — Agent guidance, skills, portable hooks and scoped check diagnostics
+- [Benchmarking](benchmarking.md) — QuickJS and the Static Hermes profile, collector and parser matrix
 - [CI and releases](ci-and-releases.md) — Which checks run for each change, how releases are prepared, and how plugins reach the Market
 - [Pumpkin Market API](pumpkin-market-api.md) — Market listing lookup, metadata updates, current publisher behavior and API findings
 
