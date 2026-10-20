@@ -29,7 +29,7 @@ every suite even after one fails and exits with the first failure's code; Turbor
 package whose own dependencies failed to build.
 
 CI runs each package's `test:coverage` script, so add one to every package with unit tests.
-`scripts/workflows.test.mjs` fails when a package outside `extensions/` has none, or when the Test
+`scripts/ci-gate.test.mjs` fails when a package outside `extensions/` has none, or when the Test
 job's coverage evidence leaves out the package's `coverage/lcov.info`.
 
 The existing `codecov/project` gate covers tooling: `tools/`, `scripts/`, `actions/` and
