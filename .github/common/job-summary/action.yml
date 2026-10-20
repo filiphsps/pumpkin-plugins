@@ -8,9 +8,6 @@ inputs:
     tests:
         description: Include combined counts and flaky-test details from freshly executed Vitest suites
         default: 'false'
-    steps:
-        description: JSON step outcomes, including failed or skipped actions
-        default: '{}'
     artifact-url:
         description: Download or deployment URL produced by this job
         default: ''
@@ -35,7 +32,6 @@ runs:
           env:
               CI_SUMMARY_TITLE: ${{ inputs.title }}
               CI_SUMMARY_TESTS: ${{ inputs.tests }}
-              CI_STEPS_JSON: ${{ inputs.steps }}
               CI_JOB_STATUS: ${{ job.status }}
               CI_ARTIFACT_URL: ${{ inputs.artifact-url }}
               CI_LINK_LABEL: ${{ inputs.link-label }}

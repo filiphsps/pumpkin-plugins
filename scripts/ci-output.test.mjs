@@ -6,6 +6,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, it } from 'node:test';
 import { parse } from 'yaml';
+import { requiredEnvironment, setOutput } from './utils/ci-output.mjs';
 
 const temporaryDirectories = [];
 afterEach(() => {
@@ -167,7 +168,7 @@ it('preserves signal termination as a failing exit status', () => {
     assert.match(fs.readFileSync(summary, 'utf8'), /Failed \(exit 143, SIGTERM\)/);
 });
 
-it('shows cached or skipped work honestly and indexes downloadable plugin artifacts', () => {
+it('shows cached work honestly and indexes downloadable plugin artifacts', () => {
     const { directory, summary, env } = fixture();
     const component = path.join(directory, 'sample.wasm');
     fs.writeFileSync(component, Buffer.alloc(2048));
@@ -179,10 +180,6 @@ it('shows cached or skipped work honestly and indexes downloadable plugin artifa
     assert.equal(run('ci-run.mjs', ['Cached tests', '--', process.execPath, '-e', ''], env).status, 0);
     const result = run('ci-summary.mjs', ['--title', 'Build and smoke tests', '--tests'], {
         ...env,
-        CI_STEPS_JSON: JSON.stringify({
-            skipped: { outcome: 'skipped', conclusion: 'skipped' },
-            coverage: { outcome: 'failure', conclusion: 'success' },
-        }),
         CI_ARTIFACT_URL: 'https://github.com/example/repo/actions/runs/123/artifacts/456',
         CI_LINK_LABEL: 'Download signed plugins',
         CI_SUMMARY_NOTE: 'CI key; expires after one day.',
@@ -191,9 +188,6 @@ it('shows cached or skipped work honestly and indexes downloadable plugin artifa
     assert.equal(result.status, 0, result.stderr);
     const markdown = fs.readFileSync(summary, 'utf8');
     assert.match(markdown, /Cached tests.*Passed.*—/);
-    assert.match(markdown, /skipped.*skipped/);
-    assert.match(markdown, /coverage.*failure.*conclusion: success/);
-    assert.match(markdown, /Attention: coverage/);
     assert.match(markdown, /Download signed plugins/);
     assert.match(markdown, /Sample &lt;plugin&gt;.*1\.2\.3.*2\.0 KiB.*sample\.wasm/);
     assert.match(markdown, /expires after one day/);
@@ -204,28 +198,21 @@ it('keeps large Release Please outputs out of the release summary process enviro
     const { summary, env } = fixture();
     const workflow = parse(fs.readFileSync(path.join(import.meta.dirname, '../.github/workflows/release.yml'), 'utf8'));
     const summaryStep = workflow.jobs.release.steps.find((step) => step.id === 'release-summary');
-    const summaryIndex = workflow.jobs.release.steps.indexOf(summaryStep);
-    const stepContext = Object.fromEntries(
-        workflow.jobs.release.steps
-            .slice(0, summaryIndex)
-            .map(({ id }) => [id, { outcome: 'success', conclusion: 'success' }]),
-    );
-    stepContext.release = {
-        outputs: { release_notes: 'x'.repeat(512 * 1024) },
-        outcome: 'failure',
-        conclusion: 'failure',
+    const stepContext = {
+        release: { outputs: { release_notes: 'x'.repeat(512 * 1024), release_count: '2' } },
+        'release-prs': { outputs: { open_pr_count: '1' } },
     };
-    const stepInput = summaryStep.with.steps;
-    const stepsJson = stepInput.replace(/\$\{\{\s*toJSON\((steps(?:\.[\w-]+)*)\)\s*\}\}/g, (_match, contextPath) =>
-        JSON.stringify(
-            contextPath
-                .split('.')
-                .slice(1)
-                .reduce((value, key) => value[key], stepContext),
-        ),
+    const factsJson = summaryStep.with.facts.replace(
+        /\$\{\{\s*toJSON\((steps(?:\.[\w-]+)*)\)\s*\}\}/g,
+        (_match, contextPath) =>
+            JSON.stringify(
+                contextPath
+                    .split('.')
+                    .slice(1)
+                    .reduce((value, key) => value?.[key], stepContext) ?? null,
+            ),
     );
-    assert.deepEqual(JSON.parse(stepsJson).release, { outcome: 'failure', conclusion: 'failure' });
-    assert.equal(Buffer.byteLength(stepsJson) < 128 * 1024, true);
+    assert.equal(Buffer.byteLength(factsJson) < 128 * 1024, true);
     const action = parse(
         fs.readFileSync(path.join(import.meta.dirname, '../.github/common/job-summary/action.yml'), 'utf8'),
     );
@@ -234,21 +221,21 @@ it('keeps large Release Please outputs out of the release summary process enviro
             ...env,
             CI_SUMMARY_TITLE: 'Release orchestration',
             CI_SUMMARY_TESTS: 'false',
-            CI_STEPS_JSON: stepsJson,
             CI_JOB_STATUS: 'success',
             CI_ARTIFACT_URL: '',
             CI_LINK_LABEL: 'Browse published releases and downloads',
             CI_SUMMARY_NOTE: '',
             CI_PLUGINS_MANIFEST: '',
-            CI_SUMMARY_FACTS: '{}',
+            CI_SUMMARY_FACTS: factsJson,
             GITHUB_ACTION_PATH: path.resolve(import.meta.dirname, '../.github/common/job-summary'),
         },
         encoding: 'utf8',
     });
     assert.equal(result.error, undefined, result.error?.message);
     assert.equal(result.status, 0, result.stderr);
-    assert.equal(fs.statSync(summary).size > 0, true);
-    assert.match(fs.readFileSync(summary, 'utf8'), /\| release \| failure \|/);
+    const markdown = fs.readFileSync(summary, 'utf8');
+    assert.match(markdown, /\| Release records created \| 2 \|/);
+    assert.match(markdown, /\| Open release PRs \| 1 \|/);
 });
 
 it('renders the deployment summary after the Pages mirror replaces the checkout', () => {
@@ -291,4 +278,44 @@ it('renders the deployment summary after the Pages mirror replaces the checkout'
         fs.readFileSync(summary, 'utf8'),
         /\[Open the published documentation\]\(https:\/\/example.github.io\/docs\/\)/,
     );
+});
+
+it('writes step outputs that keep line breaks and equals signs inside their values', () => {
+    const { directory } = fixture();
+    const outputFile = path.join(directory, 'output');
+    const previous = process.env.GITHUB_OUTPUT;
+    process.env.GITHUB_OUTPUT = outputFile;
+    try {
+        setOutput('report', 'first line\nsecond=line');
+        setOutput('url', 'https://example.test/chart.svg');
+    } finally {
+        if (previous === undefined) delete process.env.GITHUB_OUTPUT;
+        else process.env.GITHUB_OUTPUT = previous;
+    }
+
+    // Read the file the way the runner does: `name<<delimiter`, value lines, then the delimiter.
+    const outputs = Object.fromEntries(
+        [...fs.readFileSync(outputFile, 'utf8').matchAll(/^([\w-]+)<<(.+)\n([\s\S]*?)\n\2$/gm)].map(
+            ([, name, , value]) => [name, value],
+        ),
+    );
+    assert.deepEqual(outputs, { report: 'first line\nsecond=line', url: 'https://example.test/chart.svg' });
+
+    delete process.env.GITHUB_OUTPUT;
+    try {
+        assert.throws(() => setOutput('report', 'value'), /GITHUB_OUTPUT is required/);
+    } finally {
+        if (previous !== undefined) process.env.GITHUB_OUTPUT = previous;
+    }
+
+    process.env.CI_OUTPUT_TEST_VALUE = '  value  ';
+    process.env.CI_OUTPUT_TEST_BLANK = ' ';
+    try {
+        assert.equal(requiredEnvironment('CI_OUTPUT_TEST_VALUE'), 'value');
+        assert.throws(() => requiredEnvironment('CI_OUTPUT_TEST_BLANK'), /CI_OUTPUT_TEST_BLANK is required/);
+        assert.throws(() => requiredEnvironment('CI_OUTPUT_TEST_MISSING'), /CI_OUTPUT_TEST_MISSING is required/);
+    } finally {
+        delete process.env.CI_OUTPUT_TEST_VALUE;
+        delete process.env.CI_OUTPUT_TEST_BLANK;
+    }
 });
