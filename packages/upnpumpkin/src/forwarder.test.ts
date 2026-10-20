@@ -1,5 +1,6 @@
 import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
+import { NAT_PMP_PORT, SSDP_ADDRESS } from '@pumpkin-plugins/port-mapping';
 import { FakeIgd, FakeNetwork } from '@pumpkin-plugins/port-mapping/testing';
 import {
     decodeReply,
@@ -418,8 +419,9 @@ describe('PortForwarder with a blocked router', () => {
     };
     const telekom = () => new FakeIgd({ upnp: false, natPmp: false, webPages: speedport });
 
-    it('warns once when it starts, opens nothing and sends the router nothing', () => {
-        const { log, net, forwarder, settle } = setup(undefined, telekom());
+    it('warns once when it starts and opens no mappings for a blocked router', () => {
+        const blockedRouter = telekom();
+        const { log, net, forwarder, settle } = setup(undefined, blockedRouter);
         forwarder.start();
         settle(() => forwarder.refusal !== undefined);
         settle(() => false, 60 * 60_000);
@@ -427,7 +429,14 @@ describe('PortForwarder with a blocked router', () => {
         expect(log.of('warn')).toHaveLength(1);
         expect(log.of('warn')[0]).toContain('UPnPumpkin is disabled: Telekom Speedport');
         expect(forwarder.refusal?.identity).toMatchObject({ manufacturer: 'Telekom' });
-        expect(net.sent).toHaveLength(0);
+        expect(net.sent.length).toBeGreaterThan(0);
+        expect(
+            net.sent.every(
+                ({ to, data }) => to.port === SSDP_ADDRESS.port || (to.port === NAT_PMP_PORT && data[1] === 0),
+            ),
+        ).toBe(true);
+        expect(blockedRouter.actions).toHaveLength(0);
+        expect(blockedRouter.mappings.size).toBe(0);
         expect(forwarder.snapshot.mappings.every((m) => m.state.kind === 'failed')).toBe(true);
     });
 
