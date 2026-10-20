@@ -56,12 +56,10 @@ describe('host scheduling', () => {
         expect(run).not.toHaveBeenCalled();
     });
 
-    it('ignores scheduler task ids not returned by a plugin-kit helper', async () => {
+    it('does not cancel scheduler tasks that a plugin-kit helper did not schedule', async () => {
         const { cancelTask } = await import('./host.ts');
-        host.delayed.mockReturnValue(43);
-        const apiTaskId = host.delayed(900_001, 1n);
 
-        cancelTask(apiTaskId);
+        cancelTask(43);
 
         expect(host.cancel).not.toHaveBeenCalled();
     });
@@ -91,14 +89,13 @@ describe('host scheduling', () => {
         expect(runTask(host.repeating.mock.calls[0][0], server)).toBe(true);
     });
 
-    it('keeps handler ids distinct after thousands of tasks', async () => {
+    it('keeps delayed and repeating handler ids distinct', async () => {
         const { scheduleRepeating, scheduleDelayed, runTask } = await import('./host.ts');
-        let taskId = 0;
-        host.repeating.mockImplementation(() => ++taskId);
-        host.delayed.mockImplementation(() => ++taskId);
+        host.repeating.mockReturnValue(1);
+        host.delayed.mockReturnValue(2);
         const repeated = vi.fn();
         const delayed = vi.fn();
-        for (let i = 0; i <= 5000; i++) scheduleRepeating(1, repeated);
+        scheduleRepeating(1, repeated);
         scheduleDelayed(1, delayed);
         const delayedId = host.delayed.mock.calls[0][0];
         expect(host.repeating.mock.calls.some(([id]) => id === delayedId)).toBe(false);

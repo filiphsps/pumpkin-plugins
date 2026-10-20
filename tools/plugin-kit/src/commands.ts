@@ -14,9 +14,6 @@ import {
 /** Command resources from the pinned WIT API used while building a tree. */
 export type CommandNodeLike = Command | CommandNode;
 
-/** An argument node that can request dynamic completions. */
-export type CommandArgumentNodeLike = CommandNode;
-
 /** The input context Pumpkin provides when a client requests argument suggestions. */
 export interface CommandSuggestionRequest {
     readonly cursor: number;
@@ -31,7 +28,7 @@ export type CommandSuggestionHandler<Sender> = (sender: Sender, request: Command
 /** What building commands needs from the host. `registerCommands` implements it with Pumpkin's command classes. */
 export interface CommandHost<Sender> {
     /** Creates a typed argument below a node. */
-    argument(spec: CommandArgumentSpec): CommandArgumentNodeLike;
+    argument(spec: CommandArgumentSpec): CommandNode;
     /** Makes the running command fail with a message, the way the server reports a failed command. Never returns. */
     fail(text: string): never;
     /** Checks whether a sender has a command permission. */
@@ -67,6 +64,8 @@ export interface BuiltCommand {
  * @param host - Creates the nodes.
  * @param tree - The commands, from `defineCommands`.
  * @param handlers - What runs each command.
+ * @param suggestions - Suggestion handlers keyed by argument name. A handler applies to every argument
+ * with that name anywhere in the tree, and all of them share one host handler id.
  * @returns One entry per command.
  * @throws {Error} When a runnable command has no handler, which the types already prevent.
  */
@@ -270,6 +269,7 @@ function sameArgument(left: CommandArgumentSpec, right: CommandArgumentSpec): bo
         return left.min === right.min && left.max === right.max;
     }
     if (left.type === 'players' && right.type === 'players') return true;
+    if (left.type === 'item' && right.type === 'item') return true;
     return left.type === 'string' && right.type === 'string' && left.mode === right.mode;
 }
 

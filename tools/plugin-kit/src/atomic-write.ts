@@ -4,7 +4,10 @@ import { disposeWasiResource } from './wasi-resource.ts';
 
 let nextTempId = 0;
 
-/** Replaces a file through an exclusively created sibling, preserving existing temporary files. */
+/**
+ * Replaces a file through an exclusively created sibling, preserving existing temporary files. The
+ * sibling's data is synced to disk before it is renamed over the target.
+ */
 export function atomicWrite(root: Descriptor, path: string, content: Uint8Array): void {
     let temp: string;
     let file: Descriptor;
@@ -26,11 +29,13 @@ export function atomicWrite(root: Descriptor, path: string, content: Uint8Array)
                 if (written > BigInt(remaining)) throw new Error(`invalid write result for ${path}`);
                 offset += Number(written);
             }
+            // Flush the data before the rename, so a crash cannot leave an empty file under the target name.
+            file.syncData();
         } catch (error) {
             try {
                 disposeWasiResource(file);
             } catch {
-                // Preserve the write failure if closing the descriptor also fails.
+                // Preserve the write or sync failure if closing the descriptor also fails.
             }
             throw error;
         }

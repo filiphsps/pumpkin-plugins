@@ -301,11 +301,7 @@ describe('registerCommands', () => {
         expect(args[Symbol.dispose]).toHaveBeenCalledOnce();
     });
 
-    it.each([
-        [{ tag: 'item', val: 'minecraft:golden_apple' }, 'minecraft:golden_apple'],
-        [{ tag: 'simple', val: '' }, ''],
-        [{ tag: 'item-predicate', val: 'minecraft:golden_apple' }, ''],
-    ])('registers native item arguments and forwards the host value %j', (value, expected) => {
+    it('registers native item arguments and forwards the host item id', () => {
         const argumentTree = defineCommands('Demo', {
             icon: {
                 description: 'Set an item icon',
@@ -315,7 +311,7 @@ describe('registerCommands', () => {
         });
         const { ctx, registerCommand } = context();
         const args = {
-            getValue: vi.fn(() => value),
+            getValue: vi.fn(() => ({ tag: 'item', val: 'minecraft:golden_apple' })),
             [Symbol.dispose]: vi.fn(),
         };
         registerCommands(ctx, argumentTree, { 'icon <item>': (_sender, received) => [received.item] });
@@ -331,8 +327,38 @@ describe('registerCommands', () => {
             consumedArgs: typeof args,
         ) => number;
         expect(callback({ sendMessage } as unknown as CommandSender, args as never)).toBe(1);
-        expect(sendMessage.mock.calls.map(([component]) => component.line)).toEqual([expected]);
+        expect(sendMessage.mock.calls.map(([component]) => component.line)).toEqual(['minecraft:golden_apple']);
         expect(args.getValue).toHaveBeenCalledExactlyOnceWith('item');
+        expect(args[Symbol.dispose]).toHaveBeenCalledOnce();
+    });
+
+    it.each([
+        { tag: 'simple', val: 'minecraft:golden_apple' },
+        { tag: 'item-predicate', val: 'minecraft:golden_apple' },
+    ])('fails item arguments that the host sends as %j without running the handler', (value) => {
+        const argumentTree = defineCommands('Demo', {
+            icon: {
+                description: 'Set an item icon',
+                permission: 'Demo:command.icon',
+                arguments: [{ name: 'item', type: 'item' }],
+            },
+        });
+        const handler = vi.fn(() => []);
+        registerCommands(context().ctx, argumentTree, { 'icon <item>': handler });
+        const args = { getValue: () => value, [Symbol.dispose]: vi.fn() };
+        const callback = host.onCommand.mock.calls[0]?.[0] as (
+            sender: CommandSender,
+            consumedArgs: typeof args,
+        ) => number;
+
+        let failure: unknown;
+        try {
+            callback({} as CommandSender, args as never);
+        } catch (error) {
+            failure = error;
+        }
+        expect(failure).toMatchObject({ tag: 'command-failed' });
+        expect(handler).not.toHaveBeenCalled();
         expect(args[Symbol.dispose]).toHaveBeenCalledOnce();
     });
 
