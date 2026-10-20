@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -9,6 +9,7 @@ import * as buildModule from './build.mjs';
 import {
     buildTaskEnvironment,
     hasStaticHermesBuild,
+    loadStaticHermesRuntime,
     normalizeTurboArgs,
     prepareHermesInIsolatedEnvironment,
     runStaticHermesPreparation,
@@ -190,6 +191,7 @@ describe('prepareHermesInIsolatedEnvironment', () => {
             workspaceRoot: '/workspace',
             env,
             setupEnvironment: async () => ({ STATIC_HERMES_CACHE_DIR: '/cache/hermes' }),
+            loadRuntime: () => import('../tools/static-hermes-runtime/src/index.ts'),
             runPrepare: async (environment) => {
                 prepareEnvironment = environment;
             },
@@ -203,8 +205,73 @@ describe('prepareHermesInIsolatedEnvironment', () => {
     });
 });
 
+describe('build.mjs on a fresh clone', () => {
+    it('prints help before the Static Hermes runtime package is built', () => {
+        // The script runs its CLI only when argv[1] matches its real path, and macOS links the temp folder.
+        const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pnpm-build-fresh-')));
+        temporaryRoots.push(root);
+        for (const script of ['build.mjs', 'utils/turbo-args.mjs']) {
+            fs.mkdirSync(path.dirname(path.join(root, 'scripts', script)), { recursive: true });
+            fs.copyFileSync(path.join(workspaceRoot, 'scripts', script), path.join(root, 'scripts', script));
+        }
+        const runtimeDirectory = path.join(root, 'tools/static-hermes-runtime');
+        fs.mkdirSync(runtimeDirectory, { recursive: true });
+        fs.copyFileSync(
+            path.join(workspaceRoot, 'tools/static-hermes-runtime/package.json'),
+            path.join(runtimeDirectory, 'package.json'),
+        );
+        fs.mkdirSync(path.join(root, 'node_modules/@pumpkin-plugins'), { recursive: true });
+        fs.symlinkSync(runtimeDirectory, path.join(root, 'node_modules/@pumpkin-plugins/static-hermes-runtime'));
+        fs.symlinkSync(
+            fs.realpathSync(path.join(workspaceRoot, 'node_modules/commander')),
+            path.join(root, 'node_modules/commander'),
+        );
+
+        const result = spawnSync(process.execPath, [path.join(root, 'scripts/build.mjs'), '--help'], {
+            encoding: 'utf8',
+        });
+
+        assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+        assert.match(result.stdout, /Usage:/);
+    });
+});
+
+describe('loadStaticHermesRuntime', () => {
+    it('builds the runtime package before importing it', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pnpm-build-runtime-'));
+        temporaryRoots.push(root);
+        const env = { STATIC_HERMES_CACHE_DIR: '/cache/hermes' };
+        const calls = [];
+
+        const runtime = await loadStaticHermesRuntime(root, env, (command, args, options) => {
+            calls.push({ command, args, cwd: options.cwd, env: options.env });
+            const distDirectory = path.join(root, 'tools/static-hermes-runtime/dist');
+            fs.mkdirSync(distDirectory, { recursive: true });
+            fs.writeFileSync(path.join(distDirectory, 'index.js'), "export const prepareStaticHermesBuild = 'built';");
+            return { status: 0 };
+        });
+
+        assert.equal(runtime.prepareStaticHermesBuild, 'built');
+        assert.deepEqual(calls, [
+            {
+                command: 'pnpm',
+                args: ['--filter', '@pumpkin-plugins/static-hermes-runtime', 'build'],
+                cwd: root,
+                env,
+            },
+        ]);
+    });
+
+    it('stops when the runtime package build fails', async () => {
+        await assert.rejects(
+            loadStaticHermesRuntime('/workspace', {}, () => ({ status: 2 })),
+            /Static Hermes runtime build exited with 2/,
+        );
+    });
+});
+
 describe('runStaticHermesPreparation', () => {
-    it('builds the runtime package and invokes Hermes preparation through dist/cli.js', () => {
+    it('invokes Hermes preparation through dist/cli.js', () => {
         const calls = [];
         const env = { STATIC_HERMES_CACHE_DIR: '/cache/hermes' };
 
@@ -220,11 +287,6 @@ describe('runStaticHermesPreparation', () => {
                 options: { cwd: options.cwd, env: options.env },
             })),
             [
-                {
-                    command: 'pnpm',
-                    args: ['--filter', '@pumpkin-plugins/static-hermes-runtime', 'build'],
-                    options: { cwd: '/workspace', env },
-                },
                 {
                     command: process.execPath,
                     args: ['/workspace/tools/static-hermes-runtime/dist/cli.js', 'hermes', 'prepare'],
@@ -266,5 +328,24 @@ describe('Turbo WASM_TOOLS environment', () => {
         const task = resolvedTurboTask('test:integration', '@pumpkin-plugins/tab-display');
 
         assert.ok(task.passThroughEnv.includes('WASM_TOOLS'));
+    });
+});
+
+describe('Turbo size-limit environment', () => {
+    it('passes PUMPKIN_PLUGINS_FAIL_ON_SIZE_LIMIT to plugin and benchmark builds and keys their cache on it', () => {
+        for (const [task, packageName] of [
+            ['build', '@pumpkin-plugins/tab-display'],
+            ['benchmark:build', '@pumpkin-plugins/engine-comparison'],
+        ]) {
+            assert.ok(resolvedTurboTask(task, packageName).env.includes('PUMPKIN_PLUGINS_FAIL_ON_SIZE_LIMIT'), task);
+        }
+    });
+});
+
+describe('Turbo builder typecheck', () => {
+    it('builds the Static Hermes runtime first, because its declarations come from dist', () => {
+        const task = resolvedTurboTask('typecheck', '@pumpkin-plugins/build');
+
+        assert.ok(task.dependsOn.includes('@pumpkin-plugins/static-hermes-runtime#build'));
     });
 });

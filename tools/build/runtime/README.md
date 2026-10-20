@@ -84,10 +84,12 @@ pinned values and the artifact against its recorded hash. `verify` checks the
 shipped artifact against the pinned hash. Neither command independently rebuilds
 source.
 
-CI compares two isolated builds on the same runner and loads the candidate in
-real Pumpkin integration tests before permitting a code release. This checks
-same-runner repeatability and runtime behavior; it does not guarantee matching
-bytes across build environments.
+CI does not rebuild the runtime. The build package's unit tests run
+`src/runtime-provenance.test.ts`, which checks the vendored artifact against its
+pinned hash and exercises `build.sh` and `provenance.mjs` with stub tools.
+Comparing two clean builds and loading the candidate in real Pumpkin integration
+tests are manual steps for a runtime update. Matching bytes across build
+environments are not guaranteed.
 
 Future runtime updates must review the source patch/license, refresh the manifest
 and repeat clean builds plus bundle and real-server checks. Replacing the shipped

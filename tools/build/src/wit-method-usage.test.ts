@@ -2,8 +2,10 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import * as esbuild from 'esbuild';
 import { afterEach, describe, expect, it } from 'vitest';
-import { findUsedPumpkinWitMethods, findUsedWasiWitMethods, findUsedWitMethods } from './wit-method-usage.ts';
+import { BuildError } from './errors.ts';
+import { findUsedWitMethods, type UsedWitMethods } from './wit-method-usage.ts';
 
 const directories: string[] = [];
 
@@ -167,12 +169,41 @@ function pluginKitFixture(): { entry: string; generatedTypes: string } {
     return { entry: path.join(sourceDirectory, 'register-commands.ts'), generatedTypes };
 }
 
+/** Bundles a fixture as the plugin build does and analyzes the files esbuild included. */
+async function analyze(entry: string, typesDir?: string, witDir?: string): Promise<UsedWitMethods | undefined> {
+    const result = await esbuild.build({
+        entryPoints: [entry],
+        bundle: true,
+        write: false,
+        metafile: true,
+        logLevel: 'silent',
+        plugins: [
+            {
+                name: 'host-modules',
+                setup(build) {
+                    build.onResolve({ filter: /^(?:pumpkin|wasi):|\/build\/types\/bindings\// }, (args) => ({
+                        path: args.path,
+                        external: true,
+                    }));
+                },
+            },
+        ],
+    });
+    const inputs = Object.keys(result.metafile.inputs).map((input) => path.resolve(input));
+    return findUsedWitMethods({
+        entry,
+        inputs,
+        ...(typesDir === undefined ? {} : { typesDir }),
+        ...(witDir === undefined ? {} : { witDir }),
+    });
+}
+
 afterEach(() => {
     for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 
-describe('findUsedPumpkinWitMethods', () => {
-    it('selects only statically registered events and ignores the generic Plugin forwarding method', () => {
+describe('findUsedWitMethods Pumpkin operations', () => {
+    it('selects only statically registered events and ignores the generic Plugin forwarding method', async () => {
         const entry = fixture();
         fs.writeFileSync(
             entry,
@@ -189,14 +220,14 @@ class RuntimePlugin extends Plugin {
 `,
         );
 
-        expect(findUsedWitMethods(entry)).toEqual({
+        expect(await analyze(entry)).toEqual({
             pumpkinMethods: [],
             wasiMethods: [],
             eventTypes: ['tick'],
         });
     }, 60_000);
 
-    it('falls back when a Plugin forwarding method registers through a bound context alias', () => {
+    it('falls back when a Plugin forwarding method registers through a bound context alias', async () => {
         const entry = fixture();
         fs.writeFileSync(
             entry,
@@ -214,10 +245,10 @@ class RuntimePlugin extends Plugin {
 `,
         );
 
-        expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
+        expect((await analyze(entry))?.eventTypes).toBeUndefined();
     }, 60_000);
 
-    it('falls back when a Plugin forwarding method registers through a destructured context alias', () => {
+    it('falls back when a Plugin forwarding method registers through a destructured context alias', async () => {
         const entry = fixture();
         fs.writeFileSync(
             entry,
@@ -235,10 +266,10 @@ class RuntimePlugin extends Plugin {
 `,
         );
 
-        expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
+        expect((await analyze(entry))?.eventTypes).toBeUndefined();
     });
 
-    it('retains all typed dynamic events and falls back when a registration name is untyped', () => {
+    it('retains all typed dynamic events and falls back when a registration name is untyped', async () => {
         const entry = fixture();
         fs.writeFileSync(
             entry,
@@ -252,10 +283,10 @@ class RuntimePlugin extends Plugin {
 `,
         );
 
-        expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
+        expect((await analyze(entry))?.eventTypes).toBeUndefined();
     });
 
-    it('falls back when a computed method could invoke event registration', () => {
+    it('falls back when a computed method could invoke event registration', async () => {
         const entry = fixture();
         fs.writeFileSync(
             entry,
@@ -273,11 +304,11 @@ class RuntimePlugin extends Plugin {
 `,
         );
 
-        expect(findUsedWitMethods(entry)?.eventTypes).toBeUndefined();
+        expect((await analyze(entry))?.eventTypes).toBeUndefined();
     });
 
-    it('reports called methods by their declared Pumpkin interface and resource', () => {
-        const methods = findUsedPumpkinWitMethods(fixture());
+    it('reports called methods by their declared Pumpkin interface and resource', async () => {
+        const methods = (await analyze(fixture()))?.pumpkinMethods;
 
         expect(methods).toEqual([
             'command.command.constructor',
@@ -292,60 +323,140 @@ class RuntimePlugin extends Plugin {
         ]);
     }, 30_000);
 
+    it('maps jco names with single-letter segments back to their WIT names', async () => {
+        const entry = fixture();
+        const root = path.dirname(entry);
+        fs.writeFileSync(
+            path.join(root, 'build/types/bindings/interfaces/pumpkin-plugin-world.d.ts'),
+            'export class World { getXY(): number; }\nexport function getABC(): number;\n',
+        );
+        const witDir = path.join(root, 'wit');
+        fs.mkdirSync(witDir);
+        fs.writeFileSync(
+            path.join(witDir, 'world.wit'),
+            'package pumpkin:plugin@0.1.0;\n\ninterface %world {\n    resource %world {\n        get-x-y: func() -> f64;\n    }\n    get-a-b-c: func() -> u32;\n}\n',
+        );
+        fs.writeFileSync(
+            entry,
+            'import { type World, getABC } from "./build/types/bindings/interfaces/pumpkin-plugin-world"; declare const world: World; world.getXY(); getABC();',
+        );
+
+        expect((await analyze(entry, undefined, witDir))?.pumpkinMethods).toEqual([
+            'world.get-a-b-c',
+            'world.world.get-x-y',
+        ]);
+    });
+
     it.each([
         'player["getPosition"]();',
         'const read = player.getPosition.bind(player); read();',
         'const read = player.getPosition; read.call(player);',
         'const { getPosition: read } = player; read.call(player);',
-    ])('includes resource methods referenced through %s', (usage) => {
+    ])('includes resource methods referenced through %s', async (usage) => {
         const entry = fixture();
         fs.writeFileSync(
             entry,
             `import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; ${usage}`,
         );
-        expect(findUsedPumpkinWitMethods(entry)).toContain('player.player.get-position');
+        expect((await analyze(entry))?.pumpkinMethods).toContain('player.player.get-position');
     });
 
-    it('includes all possible resource methods for a dynamic member key', () => {
+    const playerImport =
+        'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; import * as ipc from "./build/types/bindings/interfaces/pumpkin-plugin-ipc"; declare const player: Player; declare const players: Player[]; declare const holder: { player: Player };';
+    it.each([
+        [
+            'a typed parameter',
+            'function send({ sendIpcMessage }: typeof ipc) { sendIpcMessage("plugin", new Uint8Array()); } send(ipc);',
+            'ipc.send-ipc-message',
+        ],
+        [
+            'a contextually typed parameter',
+            'players.forEach(({ getPosition }) => getPosition.call(player));',
+            'player.player.get-position',
+        ],
+        ['for-of', 'for (const { getPosition } of players) getPosition.call(player);', 'player.player.get-position'],
+        [
+            'a nested pattern',
+            'const { player: { getWorld } } = holder; getWorld.call(player);',
+            'player.player.get-world',
+        ],
+        [
+            'an assignment',
+            'let send; ({ sendIpcMessage: send } = ipc); send("plugin", new Uint8Array());',
+            'ipc.send-ipc-message',
+        ],
+    ])('includes methods destructured in %s', async (_form, usage, method) => {
+        const entry = fixture();
+        fs.writeFileSync(entry, `${playerImport} ${usage}`);
+
+        expect((await analyze(entry))?.pumpkinMethods).toContain(method);
+    });
+
+    it('follows members read from an untyped rest parameter in a JavaScript dependency', async () => {
+        const entry = fixture();
+        fs.writeFileSync(
+            path.join(path.dirname(entry), 'helper.js'),
+            'export function read({ id, ...player }) { return player.getPosition(); }',
+        );
+        fs.writeFileSync(
+            entry,
+            'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; import { read } from "./helper.js"; declare const player: Player; read(player);',
+        );
+
+        expect((await analyze(entry))?.pumpkinMethods).toEqual(['player.player.get-position']);
+    });
+
+    it.each([
+        ['a nested assignment', 'let read; ({ player: { getWorld: read } } = holder); read.call(player);'],
+        ['a for-of assignment', 'let read; for ({ getPosition: read } of players) read.call(player);'],
+        ['an array assignment', 'let read; [{ getPosition: read }] = players; read.call(player);'],
+    ])('falls back to full adapters for methods destructured in %s', async (_form, usage) => {
+        const entry = fixture();
+        fs.writeFileSync(entry, `${playerImport} ${usage}`);
+
+        expect(await analyze(entry)).toBeUndefined();
+    });
+
+    it('includes all possible resource methods for a dynamic member key', async () => {
         const entry = fixture();
         fs.writeFileSync(
             entry,
             'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; declare const key: keyof Player; player[key]();',
         );
-        expect(findUsedPumpkinWitMethods(entry)).toEqual([
+        expect((await analyze(entry))?.pumpkinMethods).toEqual([
             'player.player.as-java',
             'player.player.get-position',
             'player.player.get-world',
         ]);
     });
 
-    it('includes constructors referenced through namespace imports', () => {
+    it('includes constructors referenced through namespace imports', async () => {
         const entry = fixture();
         fs.writeFileSync(
             entry,
             'import * as commands from "./build/types/bindings/interfaces/pumpkin-plugin-command"; new commands.Command(["say"], "Send");',
         );
-        expect(findUsedPumpkinWitMethods(entry)).toContain('command.command.constructor');
+        expect((await analyze(entry))?.pumpkinMethods).toContain('command.command.constructor');
     });
 
     it.each([
         'import { Command } from "./build/types/bindings/interfaces/pumpkin-plugin-command"; const Create = Command; new Create(["say"], "Send");',
         'import * as commands from "./build/types/bindings/interfaces/pumpkin-plugin-command"; const Create = commands.Command; new Create(["say"], "Send");',
-    ])('retains constructors referenced through local aliases: %s', (usage) => {
+    ])('retains constructors referenced through local aliases: %s', async (usage) => {
         const entry = fixture();
         fs.writeFileSync(entry, usage);
 
-        expect(findUsedPumpkinWitMethods(entry)).toContain('command.command.constructor');
+        expect((await analyze(entry))?.pumpkinMethods).toContain('command.command.constructor');
     });
 
-    it('falls back to full adapters when a constructor alias has an unknown type', () => {
+    it('falls back to full adapters when a constructor alias has an unknown type', async () => {
         const entry = fixture();
         fs.writeFileSync(entry, 'declare const Create: any; new Create();');
 
-        expect(findUsedWitMethods(entry)).toBeUndefined();
+        expect(await analyze(entry)).toBeUndefined();
     });
 
-    it('ignores generic dynamic indexing and constructors in runtime dependencies', () => {
+    it('ignores generic dynamic indexing and constructors in runtime dependencies', async () => {
         const entry = fixture();
         const dependency = path.join(path.dirname(entry), 'node_modules/generic-library');
         fs.mkdirSync(dependency, { recursive: true });
@@ -358,7 +469,7 @@ class RuntimePlugin extends Plugin {
             'import { clone, create } from "./node_modules/generic-library/index.js"; import { Command } from "./build/types/bindings/interfaces/pumpkin-plugin-command"; clone([]); create({}, "codec"); create({ Command }, "Command");',
         );
 
-        expect(findUsedWitMethods(entry)).toEqual({
+        expect(await analyze(entry)).toEqual({
             pumpkinMethods: ['command.command.constructor'],
             wasiMethods: [],
             eventTypes: [],
@@ -368,7 +479,7 @@ class RuntimePlugin extends Plugin {
     it.each([
         'export function invoke(value, key) { return value[key](); }',
         'export function invoke(value, key) { const method = value[key]; return method(); }',
-    ])('falls back when a runtime dependency dynamically invokes an unknown member: %s', (implementation) => {
+    ])('falls back when a runtime dependency dynamically invokes an unknown member: %s', async (implementation) => {
         const entry = fixture();
         const dependency = path.join(path.dirname(entry), 'node_modules/generic-library');
         fs.mkdirSync(dependency, { recursive: true });
@@ -378,20 +489,33 @@ class RuntimePlugin extends Plugin {
             'import { invoke } from "./node_modules/generic-library/index.js"; declare const resource: any; invoke(resource, "unknown");',
         );
 
-        expect(findUsedWitMethods(entry)).toBeUndefined();
+        expect(await analyze(entry)).toBeUndefined();
     });
 
-    it('analyzes the requested entry even when its tsconfig excludes it', () => {
+    it('analyzes the requested entry even when its tsconfig excludes it', async () => {
         const entry = fixture();
         const excludedEntry = path.join(path.dirname(entry), 'excluded.ts');
         fs.writeFileSync(
             excludedEntry,
             'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; player.getWorld();',
         );
-        expect(findUsedPumpkinWitMethods(excludedEntry)).toContain('player.player.get-world');
+        expect((await analyze(excludedEntry))?.pumpkinMethods).toContain('player.player.get-world');
     });
 
-    it('analyzes a plugin entry without tsconfig using generated WIT declarations', () => {
+    it.each([
+        ['unparseable JSON', '{ "compilerOptions": '],
+        ['an invalid option', JSON.stringify({ compilerOptions: { target: 'not-a-target' } })],
+    ])('reports a tsconfig with %s as a build error', (_label, config) => {
+        const entry = fixture();
+        const configPath = path.join(path.dirname(entry), 'tsconfig.json');
+        fs.writeFileSync(configPath, config);
+
+        // esbuild rejects some of these first; the analysis must still report its own failure clearly.
+        expect(() => findUsedWitMethods({ entry, inputs: [entry] })).toThrow(BuildError);
+        expect(() => findUsedWitMethods({ entry, inputs: [entry] })).toThrow(configPath);
+    });
+
+    it('analyzes a plugin entry without tsconfig using generated WIT declarations', async () => {
         const entry = fixture();
         fs.rmSync(path.join(path.dirname(entry), 'tsconfig.json'));
         fs.writeFileSync(
@@ -399,24 +523,24 @@ class RuntimePlugin extends Plugin {
             'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; player.getPosition();',
         );
 
-        expect(findUsedWitMethods(entry, path.join(path.dirname(entry), 'build/types/bindings'))).toEqual({
+        expect(await analyze(entry, path.join(path.dirname(entry), 'build/types/bindings'))).toEqual({
             pumpkinMethods: ['player.player.get-position'],
             wasiMethods: [],
             eventTypes: [],
         });
     });
 
-    it('scans imported JavaScript implementations even when allowJs is disabled', () => {
+    it('scans imported JavaScript implementations even when allowJs is disabled', async () => {
         const entry = fixture();
         fs.writeFileSync(
             path.join(path.dirname(entry), 'helper.js'),
             'import { sendIpcMessage } from "./build/types/bindings/interfaces/pumpkin-plugin-ipc"; export function send() { sendIpcMessage("plugin", new Uint8Array()); }',
         );
         fs.writeFileSync(entry, 'import { send } from "./helper.js"; send();');
-        expect(findUsedPumpkinWitMethods(entry)).toContain('ipc.send-ipc-message');
+        expect((await analyze(entry))?.pumpkinMethods).toContain('ipc.send-ipc-message');
     });
 
-    it('scans dependency implementations shadowed by declarations', () => {
+    it('scans dependency implementations shadowed by declarations', async () => {
         const entry = fixture();
         fs.writeFileSync(path.join(path.dirname(entry), 'helper.d.ts'), 'export function send(): void;');
         fs.writeFileSync(
@@ -424,10 +548,35 @@ class RuntimePlugin extends Plugin {
             'import { sendIpcMessage } from "./build/types/bindings/interfaces/pumpkin-plugin-ipc"; export function send() { sendIpcMessage("plugin", new Uint8Array()); }',
         );
         fs.writeFileSync(entry, 'import { send } from "./helper.js"; send();');
-        expect(findUsedWitMethods(entry)?.pumpkinMethods).toContain('ipc.send-ipc-message');
+        expect((await analyze(entry))?.pumpkinMethods).toContain('ipc.send-ipc-message');
     });
 
-    it('retains host methods called on untyped JavaScript dependency parameters', () => {
+    it('analyzes the browser build of a dependency that esbuild bundles', async () => {
+        const entry = fixture();
+        const dependency = path.join(path.dirname(entry), 'node_modules/split-dependency');
+        fs.mkdirSync(dependency, { recursive: true });
+        fs.writeFileSync(
+            path.join(dependency, 'package.json'),
+            JSON.stringify({ name: 'split-dependency', main: './node.js', browser: './browser.js' }),
+        );
+        fs.writeFileSync(path.join(dependency, 'node.js'), 'export function send() {}\n');
+        fs.writeFileSync(
+            path.join(dependency, 'browser.js'),
+            'import { sendIpcMessage } from "../../build/types/bindings/interfaces/pumpkin-plugin-ipc"; export function send() { sendIpcMessage("plugin", new Uint8Array()); }\n',
+        );
+        fs.writeFileSync(entry, 'import { send } from "split-dependency"; send();');
+
+        expect((await analyze(entry))?.pumpkinMethods).toContain('ipc.send-ipc-message');
+    });
+
+    it('falls back to full adapters when a bundled input is not a source file', async () => {
+        const entry = fixture();
+        fs.writeFileSync(entry, 'export {};');
+
+        expect(findUsedWitMethods({ entry, inputs: [entry, 'virtual-plugin:generated-module'] })).toBeUndefined();
+    });
+
+    it('retains host methods called on untyped JavaScript dependency parameters', async () => {
         const entry = fixture();
         fs.writeFileSync(
             path.join(path.dirname(entry), 'helper.js'),
@@ -437,25 +586,25 @@ class RuntimePlugin extends Plugin {
             entry,
             'import type { Player } from "./build/types/bindings/interfaces/pumpkin-plugin-player"; import { read } from "./helper.js"; declare const player: Player; read(player);',
         );
-        expect(findUsedPumpkinWitMethods(entry)).toEqual(['player.player.get-position']);
+        expect((await analyze(entry))?.pumpkinMethods).toEqual(['player.player.get-position']);
     });
 
-    it('falls back to full adapters for unknown dynamic resource members', () => {
+    it('falls back to full adapters for unknown dynamic resource members', async () => {
         const entry = fixture();
         fs.writeFileSync(entry, 'declare const resource: any; declare const key: string; resource[key]();');
-        expect(findUsedWitMethods(entry)).toBeUndefined();
+        expect(await analyze(entry)).toBeUndefined();
     });
 
-    it('retains namespace constructors accessed with string keys', () => {
+    it('retains namespace constructors accessed with string keys', async () => {
         const entry = fixture();
         fs.writeFileSync(
             entry,
             'import * as commands from "./build/types/bindings/interfaces/pumpkin-plugin-command"; new commands["Command"](["say"], "Send");',
         );
-        expect(findUsedPumpkinWitMethods(entry)).toContain('command.command.constructor');
+        expect((await analyze(entry))?.pumpkinMethods).toContain('command.command.constructor');
     });
 
-    it('analyzes runtime entries inside directories named test', () => {
+    it('analyzes runtime entries inside directories named test', async () => {
         const entry = fixture();
         const testEntry = path.join(path.dirname(entry), 'test', 'plugin.ts');
         fs.mkdirSync(path.dirname(testEntry));
@@ -463,25 +612,25 @@ class RuntimePlugin extends Plugin {
             testEntry,
             'import type { Player } from "../build/types/bindings/interfaces/pumpkin-plugin-player"; declare const player: Player; player.getPosition();',
         );
-        expect(findUsedPumpkinWitMethods(testEntry)).toContain('player.player.get-position');
+        expect((await analyze(testEntry))?.pumpkinMethods).toContain('player.player.get-position');
     });
 
-    it('falls back when imported WIT bindings cannot be resolved', () => {
+    it('falls back when imported WIT bindings cannot be resolved', async () => {
         const entry = fixture();
         fs.writeFileSync(
             entry,
             'import { Command } from "pumpkin:plugin/command@0.1.0"; new Command(["say"], "Send");',
         );
-        expect(findUsedWitMethods(entry)).toBeUndefined();
+        expect(await analyze(entry)).toBeUndefined();
     });
 
-    it('falls back when imported WASI bindings cannot be resolved', () => {
+    it('falls back when imported WASI bindings cannot be resolved', async () => {
         const entry = fixture();
         fs.writeFileSync(entry, 'import { connect } from "wasi:sockets/unknown@0.2.3"; connect();');
-        expect(findUsedWitMethods(entry)).toBeUndefined();
+        expect(await analyze(entry)).toBeUndefined();
     });
 
-    it('falls back when a wildcard declaration hides an unresolved Pumpkin import', () => {
+    it('falls back when a wildcard declaration hides an unresolved Pumpkin import', async () => {
         const entry = fixture();
         fs.writeFileSync(
             path.join(path.dirname(entry), 'build/types/bindings/interfaces/host-modules.d.ts'),
@@ -491,28 +640,21 @@ class RuntimePlugin extends Plugin {
             entry,
             'import { Command } from "pumpkin:plugin/command@0.1.0"; new Command(["say"], "Send");',
         );
-        expect(findUsedWitMethods(entry)).toBeUndefined();
+        expect(await analyze(entry)).toBeUndefined();
     });
 
-    it('ignores unresolved type-only Pumpkin imports when selecting adapters', () => {
+    it('ignores unresolved type-only Pumpkin imports when selecting adapters', async () => {
         const entry = fixture();
         fs.writeFileSync(
             entry,
             'import type { Command } from "pumpkin:plugin/command@0.1.0"; type PluginCommand = Command;',
         );
-        expect(findUsedWitMethods(entry)).toEqual({ pumpkinMethods: [], wasiMethods: [], eventTypes: [] });
+        expect(await analyze(entry)).toEqual({ pumpkinMethods: [], wasiMethods: [], eventTypes: [] });
     });
 
-    it('falls back to full adapters when a runtime dependency has only declarations', () => {
-        const entry = fixture();
-        fs.writeFileSync(path.join(path.dirname(entry), 'helper.d.ts'), 'export function send(): void;');
-        fs.writeFileSync(entry, 'import { send } from "./helper.js"; send();');
-        expect(findUsedWitMethods(entry)).toBeUndefined();
-    });
-
-    it('includes command-node methods used through plugin-kit structural adapters', () => {
+    it('includes command-node methods used through plugin-kit structural adapters', async () => {
         const { entry, generatedTypes } = pluginKitFixture();
-        const methods = findUsedPumpkinWitMethods(entry, generatedTypes);
+        const methods = (await analyze(entry, generatedTypes))?.pumpkinMethods;
 
         expect(methods).toBeDefined();
         expect(methods).toContain('command.command-node.execute-with-handler-id');
@@ -522,9 +664,9 @@ class RuntimePlugin extends Plugin {
     }, 15_000);
 });
 
-describe('findUsedWasiWitMethods', () => {
-    it('reports only called functions and resource methods from WASI declarations', () => {
-        const methods = findUsedWasiWitMethods(fixture());
+describe('findUsedWitMethods WASI operations', () => {
+    it('reports only called functions and resource methods from WASI declarations', async () => {
+        const methods = (await analyze(fixture()))?.wasiMethods;
 
         expect(methods).toEqual([
             'wasi:sockets/instance-network@0.2.3#instance-network',
@@ -532,10 +674,10 @@ describe('findUsedWasiWitMethods', () => {
         ]);
     });
 
-    it('uses isolated generated declarations when package build types are absent', () => {
+    it('uses isolated generated declarations when package build types are absent', async () => {
         const { entry, generatedTypes } = isolatedWasiFixture();
 
-        expect(findUsedWasiWitMethods(entry, generatedTypes)).toEqual([
+        expect((await analyze(entry, generatedTypes))?.wasiMethods).toEqual([
             'wasi:sockets/tcp@0.2.3#tcp-socket.constructor',
             'wasi:sockets/tcp@0.2.3#tcp-socket.start-connect',
         ]);

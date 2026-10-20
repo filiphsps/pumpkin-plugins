@@ -3,79 +3,75 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { BuildError } from './errors.ts';
 
-const WIT_LOCK_TIMEOUT_MS = 30_000;
-const WIT_LOCK_RETRY_MS = 25;
-const WIT_LOCK_STALE_MS = 60_000;
+const LOCK_TIMEOUT_MS = 30_000;
+const LOCK_RETRY_MS = 25;
+const LOCK_STALE_MS = 60_000;
 
 /**
- * Run an operation while holding the exclusive WASI WIT cache lock.
+ * Runs an operation while holding an exclusive lock file shared with other build processes.
  *
  * @internal
- * @param lockPath - Cache lock file path.
+ * @param lockPath - Lock file path.
  * @param operation - Operation to execute while holding the lock.
  * @returns The result returned by the operation.
  */
-export async function withWasiWitFileLock<T>(lockPath: string, operation: () => T | Promise<T>): Promise<T> {
+export async function withFileLock<T>(lockPath: string, operation: () => T | Promise<T>): Promise<T> {
     fs.mkdirSync(path.dirname(lockPath), { recursive: true });
     const ownerToken = randomUUID();
     const reclaimLockPath = `${lockPath}.reclaim`;
-    const deadline = Date.now() + WIT_LOCK_TIMEOUT_MS;
+    const deadline = Date.now() + LOCK_TIMEOUT_MS;
 
     while (true) {
         try {
-            writeWasiWitLock(lockPath, ownerToken);
+            writeLock(lockPath, ownerToken);
             break;
         } catch (error) {
             if (errorCode(error) !== 'EEXIST') throw error;
-            if (isStaleWasiWitLock(lockPath)) {
-                const reclaimToken = tryAcquireWasiWitReclaimLock(reclaimLockPath);
+            if (isStaleLock(lockPath)) {
+                const reclaimToken = tryAcquireReclaimLock(reclaimLockPath);
                 if (reclaimToken !== null) {
                     let acquiredLock = false;
                     try {
-                        if (isStaleWasiWitLock(lockPath)) {
+                        if (isStaleLock(lockPath)) {
                             fs.rmSync(lockPath, { force: true });
                             try {
-                                writeWasiWitLock(lockPath, ownerToken);
+                                writeLock(lockPath, ownerToken);
                                 acquiredLock = true;
                             } catch (writeError) {
                                 if (errorCode(writeError) !== 'EEXIST') throw writeError;
                             }
                         }
                     } finally {
-                        releaseWasiWitFileLock(reclaimLockPath, reclaimToken);
+                        releaseFileLock(reclaimLockPath, reclaimToken);
                     }
-                    if (acquiredLock) return operationWithWasiWitLock(lockPath, ownerToken, operation);
+                    if (acquiredLock) return operationWithLock(lockPath, ownerToken, operation);
                     continue;
                 }
             }
             if (Date.now() >= deadline) {
                 if (fs.existsSync(reclaimLockPath)) {
                     throw new BuildError(
-                        `timed out waiting for the WASI WIT cache lock at ${lockPath}; inspect recovery claim ${reclaimLockPath} and remove it only after confirming no recovery is active`,
+                        `timed out waiting for the lock at ${lockPath}; inspect recovery claim ${reclaimLockPath} and remove it only after confirming no recovery is active`,
                     );
                 }
-                throw new BuildError(`timed out waiting for the WASI WIT cache lock at ${lockPath}`);
+                throw new BuildError(`timed out waiting for the lock at ${lockPath}`);
             }
-            await new Promise<void>((resolve) => setTimeout(resolve, WIT_LOCK_RETRY_MS));
+            await new Promise<void>((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
         }
     }
 
-    return operationWithWasiWitLock(lockPath, ownerToken, operation);
+    return operationWithLock(lockPath, ownerToken, operation);
 }
 
-async function operationWithWasiWitLock<T>(
-    lockPath: string,
-    ownerToken: string,
-    operation: () => T | Promise<T>,
-): Promise<T> {
+async function operationWithLock<T>(lockPath: string, ownerToken: string, operation: () => T | Promise<T>): Promise<T> {
     try {
         return await operation();
     } finally {
-        releaseWasiWitFileLock(lockPath, ownerToken);
+        releaseFileLock(lockPath, ownerToken);
     }
 }
 
-function writeWasiWitLock(lockPath: string, ownerToken: string): void {
+function writeLock(lockPath: string, ownerToken: string): void {
     const fileDescriptor = fs.openSync(lockPath, 'wx');
     let createdFile: fs.Stats | undefined;
 
@@ -92,18 +88,22 @@ function writeWasiWitLock(lockPath: string, ownerToken: string): void {
 
         if (createdFile !== undefined) {
             try {
-                removeWasiWitLockIfOwned(lockPath, createdFile);
+                removeLockIfOwned(lockPath, createdFile);
             } catch (cleanupError) {
-                throw new AggregateError([error, cleanupError], 'failed to write and clean up the WASI WIT lock', {
-                    cause: error,
-                });
+                throw new AggregateError(
+                    [error, cleanupError],
+                    `failed to write and clean up the lock at ${lockPath}`,
+                    {
+                        cause: error,
+                    },
+                );
             }
         }
         throw error;
     }
 }
 
-function removeWasiWitLockIfOwned(lockPath: string, createdFile: fs.Stats): void {
+function removeLockIfOwned(lockPath: string, createdFile: fs.Stats): void {
     let currentFile: fs.Stats;
     try {
         currentFile = fs.lstatSync(lockPath);
@@ -117,16 +117,16 @@ function removeWasiWitLockIfOwned(lockPath: string, createdFile: fs.Stats): void
     }
 }
 
-function tryAcquireWasiWitReclaimLock(lockPath: string): string | null {
+function tryAcquireReclaimLock(lockPath: string): string | null {
     const ownerToken = randomUUID();
     try {
-        writeWasiWitLock(lockPath, ownerToken);
+        writeLock(lockPath, ownerToken);
         return ownerToken;
     } catch (error) {
         if (errorCode(error) !== 'EEXIST') throw error;
-        if (!removeStaleWasiWitLock(lockPath)) return null;
+        if (!removeStaleLock(lockPath)) return null;
         try {
-            writeWasiWitLock(lockPath, ownerToken);
+            writeLock(lockPath, ownerToken);
             return ownerToken;
         } catch (writeError) {
             if (errorCode(writeError) === 'EEXIST') return null;
@@ -135,7 +135,7 @@ function tryAcquireWasiWitReclaimLock(lockPath: string): string | null {
     }
 }
 
-function removeStaleWasiWitLock(lockPath: string): boolean {
+function removeStaleLock(lockPath: string): boolean {
     let originalFile: fs.Stats;
     try {
         originalFile = fs.lstatSync(lockPath);
@@ -151,7 +151,7 @@ function removeStaleWasiWitLock(lockPath: string): boolean {
         if (errorCode(error) === 'ENOENT') return true;
         throw error;
     }
-    if (!isStaleWasiWitLock(lockPath)) return false;
+    if (!isStaleLock(lockPath)) return false;
 
     let currentFile: fs.Stats;
     try {
@@ -169,13 +169,13 @@ function removeStaleWasiWitLock(lockPath: string): boolean {
         if (errorCode(error) === 'ENOENT') return true;
         throw error;
     }
-    if (currentContents !== originalContents || !isStaleWasiWitLock(lockPath)) return false;
+    if (currentContents !== originalContents || !isStaleLock(lockPath)) return false;
 
     fs.rmSync(lockPath, { force: true });
     return true;
 }
 
-function isStaleWasiWitLock(lockPath: string): boolean {
+function isStaleLock(lockPath: string): boolean {
     let contents: string;
     try {
         contents = fs.readFileSync(lockPath, 'utf8');
@@ -198,10 +198,10 @@ function isStaleWasiWitLock(lockPath: string): boolean {
         if (!(error instanceof SyntaxError)) throw error;
     }
 
-    return Date.now() - fs.statSync(lockPath).mtimeMs > WIT_LOCK_STALE_MS;
+    return Date.now() - fs.statSync(lockPath).mtimeMs > LOCK_STALE_MS;
 }
 
-function releaseWasiWitFileLock(lockPath: string, ownerToken: string): void {
+function releaseFileLock(lockPath: string, ownerToken: string): void {
     let contents: string;
     try {
         contents = fs.readFileSync(lockPath, 'utf8');

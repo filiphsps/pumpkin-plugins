@@ -3,7 +3,6 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { prepareStaticHermesBuild } from '@pumpkin-plugins/static-hermes-runtime';
 import { Command } from 'commander';
 import { withDefaultTurboFlags } from './utils/turbo-args.mjs';
 
@@ -67,14 +66,16 @@ export function normalizeBuildRequest(args) {
 }
 
 /**
- * Build the runtime package CLI and use it to prepare pinned Hermes artifacts.
+ * Build the runtime package, then import it. The package exports only `dist/`, which a fresh clone
+ * does not have, so a static import would fail before any build could run.
  *
  * @param root - Workspace root that owns the runtime package.
- * @param env - Isolated environment for the runtime build and Hermes preparation.
+ * @param env - Isolated environment for the runtime build.
  * @param spawn - Process runner, injectable for unit tests.
- * @throws {Error} If the CLI build or Hermes preparation exits unsuccessfully.
+ * @returns The built runtime package module.
+ * @throws {Error} If the runtime build exits unsuccessfully.
  */
-export function runStaticHermesPreparation(root, env, spawn = spawnSync) {
+export async function loadStaticHermesRuntime(root, env, spawn = spawnSync) {
     const build = spawn('pnpm', ['--filter', '@pumpkin-plugins/static-hermes-runtime', 'build'], {
         cwd: root,
         env,
@@ -83,11 +84,20 @@ export function runStaticHermesPreparation(root, env, spawn = spawnSync) {
     });
     if (build.error) throw build.error;
     if (build.status !== 0) {
-        throw new Error(
-            `Static Hermes runtime CLI build exited with ${build.signal ?? build.status ?? 'unknown status'}`,
-        );
+        throw new Error(`Static Hermes runtime build exited with ${build.signal ?? build.status ?? 'unknown status'}`);
     }
+    return import(pathToFileURL(path.join(root, 'tools/static-hermes-runtime/dist/index.js')).href);
+}
 
+/**
+ * Prepare pinned Hermes artifacts with the built runtime package CLI.
+ *
+ * @param root - Workspace root that owns the runtime package.
+ * @param env - Isolated environment for Hermes preparation.
+ * @param spawn - Process runner, injectable for unit tests.
+ * @throws {Error} If Hermes preparation exits unsuccessfully.
+ */
+export function runStaticHermesPreparation(root, env, spawn = spawnSync) {
     const staticHermesCli = path.join(root, 'tools/static-hermes-runtime/dist/cli.js');
     const result = spawn(process.execPath, [staticHermesCli, 'hermes', 'prepare'], {
         cwd: root,
@@ -101,18 +111,20 @@ export function runStaticHermesPreparation(root, env, spawn = spawnSync) {
 }
 
 /** Prepare Hermes in an isolated environment so toolchain defaults do not change Turbo cache keys.
- * Accepts an optional workspace root, base environment, setup hook, and preparation runner.
+ * Accepts an optional workspace root, base environment, setup hook, runtime loader, and preparation runner.
  * @returns The environment prepared for the selected Turbo build.
  */
 export async function prepareHermesInIsolatedEnvironment({
     workspaceRoot: root = workspaceRoot,
     env = process.env,
     setupEnvironment,
+    loadRuntime = (runtimeEnvironment) => loadStaticHermesRuntime(root, runtimeEnvironment),
     runPrepare = (prepareEnvironment) => runStaticHermesPreparation(root, prepareEnvironment),
 }) {
     const prepareEnvironment = Object.fromEntries(
         Object.entries(env).filter(([name]) => name !== alreadyPreparedVariable),
     );
+    const { prepareStaticHermesBuild } = await loadRuntime(prepareEnvironment);
     await prepareStaticHermesBuild({
         workspaceRoot: root,
         env: prepareEnvironment,
