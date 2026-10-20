@@ -52,7 +52,7 @@ pins.
 | 📦 External consumer | Code changes | Packs public tools with their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters and runs `pumpkin-codemod list` outside the repository. The matrix covers Linux, macOS arm64 and Windows x64 with pinned Node and pnpm versions. |
 | 🧪 Extension tests | Extension changes that need checks | The reusable workflow lints, typechecks, tests and packages each changed extension. |
 | 📝 Docs and config | Code, action, extension, generated README, or docs-only `master` pushes | Checks that generated READMEs are current and runs `pnpm check` for release configuration, package metadata and docs-to-code links. |
-| 🔨 Build | Code changes, after change classification | Prepares Static Hermes while lint and typecheck run, then builds each production plugin with its configured engine (Static Hermes by default). It runs integration checks and rebuilds release artifacts with the same runtime before signing and verification. |
+| 🔨 Build | Code changes, after change classification | Prepares Static Hermes while lint and typecheck run, then builds each production plugin with its configured engine (Static Hermes by default). It runs a Static Hermes smoke test, signs and verifies the collected plugin artifacts with a run-only CI key, and uploads them. |
 | 📊 Engine comparison | Benchmark changes and code pushes to `master`, after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`. Nine engine configurations run in parallel; a report job validates and combines their results from real Pumpkin servers. |
 | 📈 Engine comparison comment | Successful PR CI runs with a benchmark report | Compares the report with the latest matching default-branch run, updates one PR comment, and embeds an SVG chart of timing changes. |
 | 🎃 Integration | Plugin or suite-dependency changes, workspace-wide build configuration, or shared integration setup changes; after build | Runs affected packages and their dependents against the pinned Pumpkin release. Workspace-wide or shared integration changes run the full suite. The job reuses WASM files from Build. |
@@ -83,13 +83,13 @@ or unfamiliar reporter output for details; use the step logs for failure annotat
 diagnostics. Cached suites and Node test results are labeled separately, so they aren't counted as
 fresh Vitest passes.
 
-The Build summary lists component builds, the runtime smoke check, plugin names and versions,
-component sizes and the signed artifact download. Its signing note distinguishes a CI-only key from
-the repository release key. The Build smoke test doesn't create a separate Vitest report. Extension
-checks link the VSIX download, the Docs workflow links the published site, release orchestration
-lists released components and release PR counts, and upstream-pin jobs link the source diff. Before
-expensive checks start, the selected-checks summary explains why each job is in scope. Expand a
-workflow step to tell a failure, cancellation, intentional skip or tolerated error apart.
+The Build summary lists component builds, the Static Hermes smoke check, plugin names and versions,
+component sizes and the signed artifact download. Its signing note identifies a run-only CI key and
+says those artifacts cannot be published. The smoke test doesn't create a separate Vitest report.
+Extension checks link the VSIX download, the Docs workflow links the published site, release
+orchestration lists released components and release PR counts, and upstream-pin jobs link the source
+diff. Before expensive checks start, the selected-checks summary explains why each job is in scope.
+Expand a workflow step to tell a failure, cancellation, intentional skip or tolerated error apart.
 
 `scripts/ci-run.mjs` captures summaries from child processes while keeping their console output,
 annotations and command failures. `scripts/ci-summary.mjs` and `.github/common/job-summary` can then
@@ -120,8 +120,8 @@ The classifier scopes checks this way:
   repository code. Both skip the plugin build and integration suites. An extension change calls its
   reusable workflow, which lints, typechecks, tests and packages changed extensions. Action code
   changes run the full coverage job, so Codecov receives a complete tooling report; extension-only
-  changes skip that job. Changes to a shared action helper test `actions/common/` and all four public
-  consumers.
+  changes skip that job. Changes to a shared action helper test `actions/common/` and every action
+  that imports a helper from `actions/common/`.
   Action tests live beside the implementation in `actions/{name}/src/*.test.mjs`, and shared-helper
   tests live in `actions/common/src/*.test.mjs`. The `common` helper isn't a release component.
   README, changelog and version-file-only changes skip action tests.
