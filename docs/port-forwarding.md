@@ -49,21 +49,17 @@ point to another host are skipped.
 
 ### Telling routers apart
 
-The engine can identify routers before asking them to open ports. Pass a `screen` function in the
-discovery options; it receives the router's `RouterIdentity` (manufacturer, model, model number,
-and name) and can return a reason to reject it. A rejected router is not used or queried again;
-mapping requests fail with that reason and `info().refused` is set. Without a `screen`, the engine
-does not identify routers. Screening happens in this order:
-
-1. The router's web interface. A router without UPnP can't describe itself, so `identify.ts` has a
-   short list of recognizable pages (`WEB_FINGERPRINTS`), currently Telekom's Speedport login
-   page. The engine probes port 80 at the first and last address of the local /24, or at the
-   configured NAT-PMP gateway, with a short timeout.
-2. UPnP device descriptions. The engine checks `manufacturer`, `modelName`, `modelNumber`, and
-   `friendlyName` from each response before sending any SOAP action.
-3. Protocol requests. UPnP SOAP actions and NAT-PMP requests run side by side. NAT-PMP waits for
-   the UPnP search and description-screening pass to finish, so discovery can take longer than the
-   search window alone.
+The engine can identify and reject some routers. Pass a `screen` function in the discovery options;
+it receives a router's `RouterIdentity` (manufacturer, model, model number, and name) and can return
+a reason to reject it. UPnP device descriptions are screened before the engine sends any SOAP
+action. SSDP and NAT-PMP discovery requests may run before a web interface is recognized; those
+requests only discover the router or read its external address. When neither protocol finds a usable
+router, the engine probes port 80 at the first and last address of the local /24, or at the
+configured NAT-PMP gateway, with a short timeout. It recognizes a few web pages (`WEB_FINGERPRINTS`),
+currently Telekom's Speedport login page. Checking the page after protocol discovery lets another
+router that answers be used, even if a different gateway address shows a blocked router's page.
+When the `screen` rejects a router, UPnPumpkin reports the reason, fails mapping requests, and sets
+`info().refused`. Without a `screen`, the engine does not identify routers.
 
 NAT-PMP has no identity query, so a NAT-PMP-only router can be recognized only through its web
 interface. The engine won't reject a router it can't identify.
