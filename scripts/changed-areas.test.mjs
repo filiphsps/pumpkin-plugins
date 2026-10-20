@@ -272,6 +272,14 @@ describe('changed-areas', () => {
         assertOutputs(result.outputs, 'code=true\ngenerator=true\nintegration_scope=all\n');
     });
 
+    it('ignores unrelated root JSON files when locating the Turborepo config', () => {
+        const dir = repo({ 'a.json': '{\n  "trailingComma": true,\n}\n' });
+        const base = change(dir, { 'scripts/check.mjs': 'export const changed = true;\n' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.match(result.outputs, /^code=true$/m);
+    });
+
     /** A repo with a benchmark package that builds with the build tool, plus one unrelated plugin. */
     function benchmarkRepo(files = {}) {
         return repo({
