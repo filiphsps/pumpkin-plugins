@@ -8,7 +8,7 @@ TypeScript facade for PumpkinMC plugins. The package preserves the v0.1.1 API su
 
 The npm package version and host ABI version are independent. The active [compatibility matrix](compatibility/v0.1.1.json) records the exact WIT revision, ABI package, and Pumpkin release currently under audit. The builder generates guest declarations from the fetched WIT; generated declarations are not checked in as a second source of truth. The first fetch, and any lockfile change, requires Git and network access unless that exact lock digest is cached already.
 
-`pnpm test` runs the offline unit suite, including local-Git coverage for WIT fetching and caching. Run `pnpm test:upstream` to fetch the pinned Pumpkin WIT commit into a temporary cache and verify its compatibility digests against upstream; that check always needs Git and network access.
+`pnpm test` runs the unit suite, including local-Git coverage for WIT fetching and caching. The type generation test reads the pinned WIT from the repository `.cache`, so the suite fetches it before the tests start when that lock digest isn't cached yet. Run `pnpm test:upstream` to fetch the pinned Pumpkin WIT commit into a temporary cache and verify its compatibility digests against upstream; that check always needs Git and network access.
 
 See the [Plugin API guide](../../docs/plugin-api/) for setup, lifecycle behavior and ABI alignment, and the [migration guide](docs/migration.md) to move from `@pumpkinmc/pumpkin-api-ts`. The complete v0.1.1 item inventory is in [compatibility/v0.1.1.json](compatibility/v0.1.1.json).
 
