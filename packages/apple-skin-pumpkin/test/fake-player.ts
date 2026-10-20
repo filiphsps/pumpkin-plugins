@@ -25,20 +25,33 @@ class FakeJavaClient {
     }
 }
 
-/** The world a fake player is in, which only answers the game rule the plugin asks about. */
-class FakeWorld {
-    constructor(private readonly player: FakePlayer) {}
+/** A world, which only answers the game rule the plugin asks about and its name. */
+export class FakeWorld {
+    /** The host's own handle for this world, which is what the plugin is written against. */
+    readonly host = this as unknown as World;
+
+    /** Whether the world heals players by food. */
+    naturalRegeneration = true;
+
+    /** How many times the plugin has read the game rule, since each read is a host call. */
+    ruleReads = 0;
+
+    /** How many of this world's handles the plugin has released. Anything it keeps is a leak. */
+    disposals = 0;
+
+    constructor(readonly name = 'world') {}
 
     getGameRule(): GameRuleValue {
-        return { tag: 'bool', val: this.player.naturalRegeneration };
+        this.ruleReads++;
+        return { tag: 'bool', val: this.naturalRegeneration };
     }
 
     getName(): string {
-        return this.player.worldName;
+        return this.name;
     }
 
     [Symbol.dispose](): void {
-        this.player.disposals++;
+        this.disposals++;
     }
 }
 
@@ -65,11 +78,8 @@ export class FakePlayer {
     /** Their exhaustion level, which a test moves to fake sprinting. */
     exhaustion = 0.4;
 
-    /** Whether the player's world heals them by food. */
-    naturalRegeneration = true;
-
-    /** The name of the world they are in, which shows up in the log when regeneration is off. */
-    worldName = 'world';
+    /** The world they are in. A test moves them to another one to fake a world transition. */
+    world = new FakeWorld();
 
     /** Set this to play a Bedrock Edition player, who has no Java client to sync. */
     bedrock = false;
@@ -111,7 +121,7 @@ export class FakePlayer {
     }
 
     getWorld(): World {
-        return new FakeWorld(this) as unknown as World;
+        return this.world.host;
     }
 
     asJava(): JavaPlayer | undefined {
@@ -123,14 +133,18 @@ export class FakePlayer {
     }
 }
 
-/** A server that hands out a fixed set of players. */
+/** A server that hands out a fixed set of players, and the worlds they are in. */
 export class FakeServer {
     /** The host's own handle for this server, which is what the plugin is written against. */
     readonly host = this as unknown as Server;
 
     constructor(readonly players: FakePlayer[] = []) {}
 
-    getAllPlayers(): Player[] {
-        return this.players as unknown as Player[];
+    getAllWorlds(): World[] {
+        return [...new Set(this.players.map((player) => player.world.host))];
+    }
+
+    getPlayersInWorld(world: World): Player[] {
+        return this.players.filter((player) => player.world.host === world).map((player) => player.host);
     }
 }

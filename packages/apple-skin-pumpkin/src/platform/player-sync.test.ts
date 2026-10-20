@@ -1,7 +1,7 @@
 import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
 import { describe, expect, it } from 'vitest';
-import { FakePlayer, FakeServer } from '../../test/fake-player.ts';
+import { FakePlayer, FakeServer, FakeWorld } from '../../test/fake-player.ts';
 import { PlayerSync } from './player-sync.ts';
 
 const SATURATION = 'appleskin:saturation';
@@ -36,7 +36,7 @@ describe('PlayerSync', () => {
         expect(player.channels).toEqual([SATURATION, EXHAUSTION, REGENERATION]);
         expect(player.floats(SATURATION)).toEqual([5]);
         expect(player.floats(EXHAUSTION)).toEqual([Math.fround(0.4)]);
-        expect(player.disposals).toBe(5);
+        expect(player.disposals).toBe(4);
     });
 
     it.each([SATURATION, EXHAUSTION])('retries unchanged hunger after a join send fails on %s', (channel) => {
@@ -45,14 +45,14 @@ describe('PlayerSync', () => {
             if (sent === channel) throw new Error('fixture join failure');
         };
         expect(() => sync.joined(player.host)).not.toThrow();
-        expect(player.disposals).toBe(2);
+        expect(player.disposals).toBe(1);
         player.beforeSend = undefined;
         player.sent.length = 0;
 
         sync.tick(server.host);
 
         expect(player.channels).toEqual([SATURATION, EXHAUSTION]);
-        expect(player.disposals).toBe(5);
+        expect(player.disposals).toBe(3);
     });
 
     it.each([SATURATION, EXHAUSTION, REGENERATION])(
@@ -68,8 +68,8 @@ describe('PlayerSync', () => {
             expect(() => sync.tick(server.host)).not.toThrow();
 
             expect(later.channels).toEqual([SATURATION, EXHAUSTION, REGENERATION]);
-            expect(later.disposals).toBe(3);
-            expect(player.disposals).toBe(channel === REGENERATION ? 3 : 2);
+            expect(later.disposals).toBe(2);
+            expect(player.disposals).toBe(2);
             player.beforeSend = undefined;
             player.sent.length = 0;
             later.sent.length = 0;
@@ -87,11 +87,12 @@ describe('PlayerSync', () => {
             throw new Error('join regeneration failure');
         };
         expect(() => sync.joined(player.host)).not.toThrow();
-        expect(player.disposals).toBe(2);
+        expect(player.disposals).toBe(1);
+        expect(player.world.disposals).toBe(1);
         player.beforeSend = undefined;
         sync.tick(server.host);
         expect(player.channels).toEqual([SATURATION, EXHAUSTION, REGENERATION]);
-        expect(player.disposals).toBe(5);
+        expect(player.disposals).toBe(3);
     });
 
     it.each([
@@ -99,9 +100,8 @@ describe('PlayerSync', () => {
         ['java', 1],
         ['saturation', 2],
         ['exhaustion', 2],
-        ['world', 2],
-        ['rule', 3],
-        ['dispose', 3],
+        ['rule', 2],
+        ['dispose', 2],
     ] as const)('continues after a player %s failure', (failure, disposals) => {
         const { player, sync } = setup();
         const later = new FakePlayer('grace');
@@ -112,12 +112,8 @@ describe('PlayerSync', () => {
         else if (failure === 'java') player.asJava = fail;
         else if (failure === 'saturation') player.getSaturation = fail;
         else if (failure === 'exhaustion') player.getExhaustion = fail;
-        else if (failure === 'world') player.getWorld = fail;
-        else if (failure === 'rule') {
-            const world = player.getWorld();
-            world.getGameRule = fail;
-            player.getWorld = () => world;
-        } else
+        else if (failure === 'rule') player.world.getGameRule = fail;
+        else
             Object.defineProperty(player, Symbol.dispose, {
                 value: () => {
                     player.disposals++;
@@ -126,7 +122,7 @@ describe('PlayerSync', () => {
             });
         expect(() => sync.tick(new FakeServer([player, later]).host)).not.toThrow();
         expect(later.channels).toEqual([SATURATION, EXHAUSTION, REGENERATION]);
-        expect(later.disposals).toBe(3);
+        expect(later.disposals).toBe(2);
         expect(player.disposals).toBe(disposals);
     });
 
@@ -142,7 +138,7 @@ describe('PlayerSync', () => {
         expect(() => sync.tick(new FakeServer([player, later]).host)).not.toThrow();
         expect(later.channels).toEqual([SATURATION, EXHAUSTION, REGENERATION]);
         expect(player.disposals).toBe(2);
-        expect(later.disposals).toBe(3);
+        expect(later.disposals).toBe(2);
     });
 
     it('reports one bounded warning per failure streak and resumes silent successful ticks', () => {
@@ -167,7 +163,7 @@ describe('PlayerSync', () => {
 
     it('tells the client whether natural regeneration is on in the world it joined', () => {
         const { player, sync } = setup();
-        player.worldName = 'arena';
+        player.world = new FakeWorld('arena');
 
         sync.joined(player.host);
 
@@ -179,15 +175,47 @@ describe('PlayerSync', () => {
         sync.joined(player.host);
         player.sent.length = 0;
 
-        player.naturalRegeneration = false;
+        player.world.naturalRegeneration = false;
         sync.tick(server.host);
 
-        player.naturalRegeneration = true;
-        player.worldName = 'world_nether';
+        player.world = new FakeWorld('world_nether');
         sync.tick(server.host);
         sync.tick(server.host);
 
         expect(player.flags(REGENERATION)).toEqual([false, true]);
+    });
+
+    it('reads the game rule once per world on a tick, however many players are in it', () => {
+        const ada = new FakePlayer('ada');
+        const grace = new FakePlayer('grace');
+        const linus = new FakePlayer('linus');
+        grace.world = ada.world;
+        ada.world.naturalRegeneration = false;
+        linus.world = new FakeWorld('world_nether');
+        const sync = new PlayerSync(new MemoryLogger());
+
+        sync.tick(new FakeServer([ada, grace, linus]).host);
+
+        expect(ada.world.ruleReads).toBe(1);
+        expect(linus.world.ruleReads).toBe(1);
+        expect(ada.flags(REGENERATION)).toEqual([false]);
+        expect(grace.flags(REGENERATION)).toEqual([false]);
+        expect(linus.flags(REGENERATION)).toEqual([true]);
+    });
+
+    it('still sends hunger to everyone in a world whose game rule cannot be read', () => {
+        const { player, log } = setup();
+        const grace = new FakePlayer('grace');
+        grace.world = player.world;
+        player.world.getGameRule = () => {
+            throw new Error('fixture rule failure');
+        };
+        const sync = new PlayerSync(log);
+
+        sync.tick(new FakeServer([player, grace]).host);
+
+        for (const each of [player, grace]) expect(each.channels).toEqual([SATURATION, EXHAUSTION]);
+        expect(log.of('warn')).toHaveLength(2);
     });
 
     it('sends a value on the tick it changes, and only then', () => {
@@ -213,12 +241,10 @@ describe('PlayerSync', () => {
     it('syncs players when host handles have no explicit disposal method', () => {
         const { player, server, sync } = setup();
         Object.defineProperty(player, Symbol.dispose, { value: undefined });
-        const world = player.getWorld();
         const java = player.asJava();
         if (java === undefined) throw new Error('Expected a Java client');
-        Object.defineProperty(world, Symbol.dispose, { value: undefined });
+        Object.defineProperty(player.world, Symbol.dispose, { value: undefined });
         Object.defineProperty(java, Symbol.dispose, { value: undefined });
-        player.getWorld = () => world;
         player.asJava = () => java;
 
         expect(() => sync.tick(server.host)).not.toThrow();
@@ -230,13 +256,15 @@ describe('PlayerSync', () => {
 
         sync.tick(server.host);
 
-        // One for the player out of the server's list, one Java client and one world handle.
-        expect(player.disposals).toBe(3);
+        // One for the player out of the world's list and one Java client, plus the world handle.
+        expect(player.disposals).toBe(2);
+        expect(player.world.disposals).toBe(1);
 
         player.saturation = 4.5;
         sync.tick(server.host);
 
-        expect(player.disposals).toBe(6);
+        expect(player.disposals).toBe(4);
+        expect(player.world.disposals).toBe(2);
     });
 
     it('releases the world handle too, when it reads the game rule', () => {
@@ -244,8 +272,8 @@ describe('PlayerSync', () => {
 
         sync.joined(player.host);
 
-        // One Java client and one world handle.
-        expect(player.disposals).toBe(2);
+        expect(player.disposals).toBe(1);
+        expect(player.world.disposals).toBe(1);
     });
 
     it('leaves Bedrock players alone, and says why once instead of every tick', () => {
@@ -256,8 +284,10 @@ describe('PlayerSync', () => {
         sync.tick(server.host);
 
         expect(player.sent).toEqual([]);
-        expect(log.of('debug')).toEqual([
-            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')} is not on Java Edition, so there is nothing to sync.`,
+        sync.tick(server.host);
+
+        expect(log.of('debug').filter((line) => line.includes('Java Edition'))).toEqual([
+            `${ansi.named.name('ada')} is not on Java Edition, so there is nothing to sync.`,
         ]);
     });
 
@@ -279,16 +309,27 @@ describe('PlayerSync', () => {
         sync.joined(player.host);
 
         expect(log.of('debug')).toEqual([
-            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')} joined, sending their current hunger.`,
-            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')}: natural regeneration is on in ${ansi.named.name('world')}.`,
-            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')}: saturation ${ansi.named.number('5')}.`,
-            `${ansi.named.name('AppleSkinPumpkin')} ${ansi.named.name('ada')}: exhaustion ${ansi.named.number('0.4')}.`,
+            `${ansi.named.name('ada')} joined, sending their current hunger.`,
+            `${ansi.named.name('ada')}: natural regeneration is on in ${ansi.named.name('world')}.`,
+            `${ansi.named.name('ada')}: saturation ${ansi.named.number('5')}.`,
+            `${ansi.named.name('ada')}: exhaustion ${ansi.named.number('0.4')}.`,
         ]);
+    });
+
+    it('says once, after its first tick, that it is syncing', () => {
+        const { sync, log } = setup();
+        const empty = new FakeServer().host;
+
+        sync.tick(empty);
+        sync.tick(empty);
+
+        expect(log.of('debug')).toEqual(['Finished the first tick, syncing hunger on every tick from now on.']);
     });
 
     it('says nothing on a tick where nothing moved, which is most of them', () => {
         const { player, server, sync, log } = setup();
         sync.joined(player.host);
+        sync.tick(server.host);
         log.lines.length = 0;
         player.sent.length = 0;
 
