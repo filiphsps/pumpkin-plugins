@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { PIE_RELEASE } from '../test/provider.ts';
+import { PIE_RELEASE } from '../test/release.ts';
 import { renderDocs } from './docs.ts';
 
 it('renders changed release pins and protocol limits without stale versions', () => {

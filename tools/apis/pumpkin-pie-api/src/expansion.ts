@@ -33,11 +33,13 @@ export class CallbackGuard {
 /** Dispatches authenticated provider callbacks to locally owned handlers. */
 export class ExpansionRouter {
     private readonly handlers = new Map<string, Map<string, ExpansionHandler>>();
+    readonly guard: CallbackGuard;
+    readonly provider: string;
     /** The guard must also be passed to this plugin's clients. */
-    constructor(
-        readonly guard: CallbackGuard,
-        readonly provider = PIE_PROVIDER,
-    ) {}
+    constructor(guard: CallbackGuard, provider = PIE_PROVIDER) {
+        this.guard = guard;
+        this.provider = provider;
+    }
     /** Claim local callback ownership and snapshot normalized handlers. */
     register(namespace: string, handlers: Readonly<Record<string, ExpansionHandler>>): readonly string[] {
         this.guard.assertOutside();

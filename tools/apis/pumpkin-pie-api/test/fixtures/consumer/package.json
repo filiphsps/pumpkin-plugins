@@ -1,0 +1,21 @@
+{
+    "name": "pumpkin-pie-consumer-fixture",
+    "version": "0.0.0",
+    "private": true,
+    "keywords": [
+        "pumpkin",
+        "pumpkin-pie",
+        "plugin",
+        "test-fixture"
+    ],
+    "type": "module",
+    "dependencies": {
+        "@pumpkin-plugins/pumpkin-api": "workspace:*"
+    },
+    "pumpkinPlugin": {
+        "entry": "src/plugin.ts",
+        "output": "pumpkin-pie-consumer-fixture.wasm",
+        "engine": "quickjs",
+        "wasi": []
+    }
+}
