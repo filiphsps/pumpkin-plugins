@@ -4,10 +4,13 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { nodeVersion } from './utils/tool-packages.mjs';
 
 const script = path.resolve(import.meta.dirname, 'test-external-consumer.mjs');
 const requiredPnpmVersion = JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, '..', 'package.json'), 'utf8'))
     .devEngines.packageManager.version;
+const pinnedNodeVersion = `v${nodeVersion()}`;
+const laterNodeVersion = `v${Number(nodeVersion().split('.')[0]) + 1}.0.0`;
 
 test('accepts a later Node version before handling a package packing failure', (t) => {
     const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-external-consumer-test-'));
@@ -23,7 +26,10 @@ else if (process.argv[2] === 'pack') { console.error('forced pack failure'); pro
 else process.exit(2);\n`,
     );
     const nodeVersionOverridePath = path.join(fixtureRoot, 'node-version.cjs');
-    fs.writeFileSync(nodeVersionOverridePath, "Object.defineProperty(process, 'version', { value: 'v25.7.0' });\n");
+    fs.writeFileSync(
+        nodeVersionOverridePath,
+        `Object.defineProperty(process, 'version', { value: '${laterNodeVersion}' });\n`,
+    );
 
     const result = spawnSync(process.execPath, ['--require', nodeVersionOverridePath, script], {
         cwd: path.resolve(import.meta.dirname, '..'),
@@ -60,7 +66,10 @@ else if (process.argv[2] === 'pack') { console.error('forced pack failure'); pro
 else process.exit(2);\n`,
     );
     const nodeVersionOverridePath = path.join(fixtureRoot, 'node-version.cjs');
-    fs.writeFileSync(nodeVersionOverridePath, "Object.defineProperty(process, 'version', { value: 'v24.21.0' });\n");
+    fs.writeFileSync(
+        nodeVersionOverridePath,
+        `Object.defineProperty(process, 'version', { value: '${pinnedNodeVersion}' });\n`,
+    );
 
     const result = spawnSync(process.execPath, ['--require', nodeVersionOverridePath, script], {
         cwd: path.resolve(import.meta.dirname, '..'),

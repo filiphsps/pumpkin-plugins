@@ -85,15 +85,25 @@ export function reconcileUpstreamPin(
     const labelArgs = input.labels.flatMap((label) => ['--label', label]);
     const addLabelArgs = input.labels.flatMap((label) => ['--add-label', label]);
 
-    const pullRequest = parseJsonArray(
-        run('gh', ['pr', 'list', '--state', 'all', '--head', branch, '--json', 'number,state']),
-    ).find(({ state }) => state !== 'MERGED');
+    // GitHub refuses to reopen a PR whose branch was deleted and pushed again, so only an open PR is reused.
+    const [pullRequest] = parseJsonArray(
+        run('gh', ['pr', 'list', '--state', 'open', '--head', branch, '--json', 'number']),
+    );
     const issue = parseJsonArray(
-        run('gh', ['issue', 'list', '--state', 'all', '--limit', '1000', '--json', 'number,body,state']),
+        run('gh', [
+            'issue',
+            'list',
+            '--state',
+            'all',
+            '--search',
+            `in:body "upstream-pin:${input.sourceId}"`,
+            '--json',
+            'number,body,state',
+        ]),
     ).find(({ body }) => (body ?? '').includes(marker));
 
     const closePullRequest = () => {
-        if (pullRequest && pullRequest.state === 'OPEN') run('gh', ['pr', 'close', String(pullRequest.number)]);
+        if (pullRequest) run('gh', ['pr', 'close', String(pullRequest.number)]);
     };
     const closeIssue = () => {
         if (issue && issue.state === 'OPEN') run('gh', ['issue', 'close', String(issue.number)]);
@@ -106,9 +116,6 @@ export function reconcileUpstreamPin(
     };
     const reopenIssueIfNeeded = () => {
         if (issue && issue.state !== 'OPEN') run('gh', ['issue', 'reopen', String(issue.number)]);
-    };
-    const reopenPullRequestIfNeeded = () => {
-        if (pullRequest && pullRequest.state !== 'OPEN') run('gh', ['pr', 'reopen', String(pullRequest.number)]);
     };
 
     if (!input.needsUpdate) {
@@ -193,7 +200,6 @@ export function reconcileUpstreamPin(
             prBodyFile,
             ...addLabelArgs,
         ]);
-        reopenPullRequestIfNeeded();
     } else {
         run('gh', [
             'pr',
