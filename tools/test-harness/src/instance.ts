@@ -7,6 +7,8 @@ import { prepareServerDir, type ServerDir, type ServerDirOptions } from './serve
 
 /** Options for `startPumpkin`. */
 export interface StartOptions extends ServerDirOptions {
+    /** The server's `RUST_LOG` level. Default `info`; `debug` shows plugins' debug logs too. */
+    logLevel?: 'info' | 'debug' | 'trace';
     /** Used in the saved log file name when PUMPKIN_TEST_LOG_DIR is set. */
     name?: string;
     /** How long to wait for the server to finish starting. Default 90 s. */
@@ -27,10 +29,20 @@ const START_ATTEMPTS = 3;
 const BASELINE_ERRORS = [/Failed to save level\.dat: Info not found!/];
 const children = new Set<ChildProcessWithoutNullStreams>();
 
-// A crashed or interrupted test run must not leave servers holding ports.
-process.once('exit', () => {
+// A crashed or interrupted test run must not leave servers holding ports. Node doesn't emit 'exit'
+// when a signal ends the process, and Pumpkin keeps running when its stdin closes.
+function killChildren(): void {
     for (const child of children) child.kill('SIGKILL');
-});
+}
+process.once('exit', killChildren);
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(signal, () => {
+        killChildren();
+        // Listening replaced the default of ending the process, so end it the default way unless
+        // someone else handles the signal.
+        if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
+    });
+}
 
 /** A running Pumpkin server in a temporary directory. Start one with `startPumpkin`. */
 export class PumpkinInstance {
@@ -91,7 +103,7 @@ export class PumpkinInstance {
                 cwd: server.dir,
                 stdio: 'pipe',
                 // Tests use INFO startup and plugin logs as observable readiness and behavior signals.
-                env: { ...process.env, RUST_LOG: 'info' },
+                env: { ...process.env, RUST_LOG: options.logLevel ?? 'info' },
             });
             const instance = new PumpkinInstance(child, server, options.name ?? 'pumpkin');
             try {

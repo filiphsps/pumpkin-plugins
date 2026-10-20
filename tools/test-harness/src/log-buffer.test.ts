@@ -48,6 +48,19 @@ describe('LogBuffer', () => {
         expect(await later).toBe('server ready');
     });
 
+    it('finds a line already there with a global or sticky pattern used before', async () => {
+        const buffer = new LogBuffer();
+        const stream = new PassThrough();
+        buffer.attach(stream);
+        stream.write('ready one\nready two\n');
+        // The process has ended, so the lines already there get exactly one look.
+        const ended = { isOver: () => true };
+        for (const pattern of [/ready/g, /ready/y]) {
+            expect(await buffer.waitFor(pattern, options(ended))).toBe('ready one');
+            expect(await buffer.waitFor(pattern, options({ ...ended, fromIndex: 1 }))).toBe('ready two');
+        }
+    });
+
     it('can ignore earlier lines', async () => {
         const buffer = new LogBuffer();
         const stream = new PassThrough();

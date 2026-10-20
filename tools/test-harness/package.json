@@ -60,11 +60,5 @@
         "@vitest/coverage-v8": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:"
-    },
-    "peerDependencies": {
-        "vitest": "catalog:"
-    },
-    "publishConfig": {
-        "access": "public"
     }
 }
