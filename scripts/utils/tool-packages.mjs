@@ -144,11 +144,13 @@ export function assertPublicToolPackage(packageJson, expectedName, root = REPOSI
         throw new Error(`Public tool package name must be ${expectedName}; received ${String(packageJson.name)}`);
     }
     if (packageJson.private === true) throw new Error(`${expectedName} must not be private`);
-    if (packageJson.publishConfig?.access !== 'public') {
+    const publishConfig = packageJson.publishConfig;
+    if (!isRecord(publishConfig) || publishConfig.access !== 'public') {
         throw new Error(`${expectedName} publishConfig.access must be public`);
     }
     const expectedEngine = nodeEngineRange(root);
-    if (packageJson.engines?.node !== expectedEngine) {
+    const engines = packageJson.engines;
+    if (!isRecord(engines) || engines.node !== expectedEngine) {
         throw new Error(`${expectedName} engines.node must be ${expectedEngine}`);
     }
     assertPackedDependencySpecs(packageJson);
@@ -343,7 +345,8 @@ export function sourcePrerequisitePaths(root, packagePath, pathsByName) {
     return new Set(names.map((name) => pathsByName.get(name)).filter(Boolean));
 }
 
-// Lifecycle scripts can print to pnpm pack's stdout; isolate the destination and find the only tarball created.
+// Lifecycle scripts such as prepack can write to pnpm pack's stdout even with --json, so isolate the output
+// in a fresh directory and find the only tarball created. --use-stderr keeps lifecycle output in the log.
 function packTarball(packageDirectory, destination, packageManager) {
     const packDirectory = fs.mkdtempSync(path.join(destination, '.pack-'));
     try {
@@ -362,6 +365,16 @@ function packTarball(packageDirectory, destination, packageManager) {
     } finally {
         fs.rmSync(packDirectory, { recursive: true, force: true });
     }
+}
+
+/**
+ * Checks whether a value is a non-array object record.
+ *
+ * @param {unknown} value - Value to inspect.
+ * @returns {value is Record<string, unknown>} Whether the value is a record.
+ */
+function isRecord(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function publicDependencies(packageJson, packageNames) {
@@ -465,14 +478,9 @@ function isPackedFile(file, patterns) {
 }
 
 function matchesFilePattern(file, pattern) {
-    const normalizedFile = file.replaceAll('\\', '/');
-    if (!pattern.includes('*')) return normalizedFile === pattern || normalizedFile.startsWith(`${pattern}/`);
-    const expressionSource = pattern
-        .split('**')
-        .map((part) => escapeRegExp(part).replaceAll('*', '[^/]*'))
-        .join('.*');
-    const expression = new RegExp(`^${expressionSource}$`);
-    return expression.test(normalizedFile);
+    // npm packs everything below a directory that a `files` pattern matches.
+    const segments = file.replaceAll('\\', '/').split('/');
+    return segments.some((_, index) => path.posix.matchesGlob(segments.slice(0, index + 1).join('/'), pattern));
 }
 
 function toWorkspacePath(root, directory) {
