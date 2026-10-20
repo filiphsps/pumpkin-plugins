@@ -26,16 +26,15 @@ Asynchronous requests time out after 15 seconds. Response bodies larger than 64 
 
 A failed update request is logged and does not interrupt plugin loading. `checkMarketUpdate` remains available for direct
 checks with an injected synchronous JSON request function, which is useful for deterministic tests.
+The `request` registration option takes the same kind of function in place of the scheduled request.
+It runs synchronously inside `onLoad` and blocks plugin loading, so use it only in tests.
 `requestMarketJsonAsync` exposes the same non-blocking transport for direct use. The synchronous
 `requestMarketJson` transport blocks and must not be called during plugin loading or server ticks.
 `marketplaceUrl` overrides the Market base URL for registration and direct version checks.
 
-<!-- docs:begin release-notes -->
-<!-- Generated from docs.ts. Run `pnpm readme`. -->
-
-When Market returns optional `release_notes`, the checker converts its Markdown to plain text for the update notice.
-The current Market check endpoint does not return this field; a Market API update must add it before plugins can show changelogs.
-<!-- docs:end release-notes -->
+When Market returns optional `release_notes`, the checker converts its Markdown to plain text for
+the update notice. The current Market check endpoint does not return this field; a Market API update
+must add it before plugins can show changelogs.
 
 For the server capability and registration setup, see the [plugin updates guide](../../docs/plugin-updates.md).
 

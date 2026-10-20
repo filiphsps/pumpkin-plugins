@@ -18,6 +18,11 @@ export function setOutput(name, value) {
     fs.appendFileSync(outputFile, `${name}<<${delimiter}\n${value}\n${delimiter}\n`);
 }
 
+/** Appends Markdown to the GitHub step summary when running under the Actions runner. */
+export function appendSummary(content) {
+    if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${content}\n`);
+}
+
 /** Escapes values so percent signs and line breaks cannot add GitHub workflow commands. */
 export function escapeWorkflowCommand(value) {
     return value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');

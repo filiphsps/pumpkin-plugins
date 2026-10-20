@@ -1,17 +1,17 @@
 // Verifies a signed GitHub release artifact, then removes publisher signing sections before Market upload.
 import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { stripSignature, verifyWasm } from '@pumpkin-plugins/signing';
+import { publicKeyOf, stripSignature, verifyWasm } from '@pumpkin-plugins/signing';
 import { Command } from 'commander';
 
 /**
  * Verifies the release artifact and returns its unsigned WebAssembly component for Market to sign.
  * @param {Uint8Array} wasm - The signed release artifact.
- * @param {{ pluginName: string, version: string }} expected - The canonical plugin name and release version.
+ * @param {{ pluginName: string, version: string, publicKeyHex: string }} expected - The canonical plugin
+ *   name, the release version and the public key of the repository signing key.
  * @returns {Buffer} The verified component without publisher signing sections.
  */
 export function prepareMarketPlugin(wasm, expected) {
-    const verification = verifyWasm(wasm);
+    const verification = verifyWasm(wasm, expected.publicKeyHex);
     if (!verification.valid || !verification.metadata) {
         throw new Error(`signed release artifact failed verification: ${verification.error ?? 'invalid signature'}`);
     }
@@ -28,17 +28,22 @@ export function prepareMarketPlugin(wasm, expected) {
     return stripSignature(wasm).clean;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
+if (import.meta.main) {
     const program = new Command()
         .name('prepare-market-plugin')
-        .description('Verify a signed release artifact and prepare it for Market signing.')
+        .description(
+            'Verify a signed release artifact and prepare it for Market signing. PLUGIN_SIGNING_KEY must hold the key it was signed with.',
+        )
         .argument('<wasm-file>', 'Signed plugin artifact')
         .argument('<plugin-name>', 'Canonical plugin name')
         .argument('<version>', 'Release version')
         .parse(process.argv);
     const [file, pluginName, version] = program.args;
+    if (!process.env.PLUGIN_SIGNING_KEY)
+        program.error('Set PLUGIN_SIGNING_KEY to the key the artifact was signed with');
+    const publicKeyHex = publicKeyOf(process.env.PLUGIN_SIGNING_KEY);
 
-    const prepared = prepareMarketPlugin(fs.readFileSync(file), { pluginName, version });
+    const prepared = prepareMarketPlugin(fs.readFileSync(file), { pluginName, version, publicKeyHex });
     fs.writeFileSync(file, prepared);
     console.log(`Prepared unsigned Market component ${file} (${pluginName} ${version})`);
 }

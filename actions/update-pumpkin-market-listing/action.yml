@@ -49,7 +49,7 @@ inputs:
         description: Market API token with listing update permission
         required: true
     api-url:
-        description: Pumpkin Market base URL
+        description: Pumpkin Market base URL; must use https
         required: false
         default: https://market.pumpkinmc.org
 outputs:

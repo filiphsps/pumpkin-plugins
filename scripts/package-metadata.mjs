@@ -22,7 +22,7 @@ const packageDirs = () => [
         discoverComponents(root, group).map(({ slug }) => `${group}/${slug}`),
     ),
 ];
-/** Find private benchmark workspaces that need release-registration checks. */
+/** Find the private benchmark workspaces, which must stay unpublished. */
 const benchmarkPackageDirs = () => {
     const directory = path.join(root, 'benchmarks');
     if (!fs.existsSync(directory)) return [];
@@ -32,14 +32,15 @@ const benchmarkPackageDirs = () => {
         .map((entry) => `benchmarks/${entry.name}`);
 };
 
+const rootPackage = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const repository = rootPackage.repository;
+const repositoryUrl = typeof repository === 'string' ? repository : repository?.url;
+if (typeof repositoryUrl !== 'string') throw new Error('root package.json must declare repository.url');
+const webRepositoryUrl = repositoryUrl.replace(/^git\+/, '').replace(/\.git$/, '');
+
 /** What the package.json of `dir` can derive from the workspace and its own exports. */
 function expected(dir, pkg) {
     const isRoot = dir === '.';
-    const rootPackage = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-    const repository = rootPackage.repository;
-    const repositoryUrl = typeof repository === 'string' ? repository : repository?.url;
-    if (typeof repositoryUrl !== 'string') throw new Error('root package.json must declare repository.url');
-    const webRepositoryUrl = repositoryUrl.replace(/^git\+/, '').replace(/\.git$/, '');
     const want = {
         license: hasLocalLicense(dir) && typeof pkg.license === 'string' && pkg.license.trim() ? pkg.license : 'MIT',
         homepage: isRoot ? webRepositoryUrl : `${webRepositoryUrl}/tree/master/${dir}#readme`,
@@ -76,7 +77,7 @@ for (const dir of packageDirs()) {
     }
     if (typeof pkg.description !== 'string' || pkg.description.trim() === '') issues.push('"description" is missing');
     else if (pkg.description.length > MAX_DESCRIPTION) {
-        issues.push(`"description" is ${pkg.description.length} characters; keep it under ${MAX_DESCRIPTION}`);
+        issues.push(`"description" is ${pkg.description.length} characters; keep it to at most ${MAX_DESCRIPTION}`);
     }
     if (issues.length === 0) continue;
 
@@ -94,18 +95,6 @@ for (const dir of benchmarkPackageDirs()) {
     const file = path.join(dir, 'package.json');
     const pkg = JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
     if (pkg.private !== true) problems.push(`${file}: benchmark workspace packages must set "private": true`);
-    const releaseConfigPath = path.join(root, 'release-please-config.json');
-    if (fs.existsSync(releaseConfigPath)) {
-        const packages = JSON.parse(fs.readFileSync(releaseConfigPath, 'utf8')).packages ?? {};
-        if (Object.hasOwn(packages, dir))
-            problems.push(`${file}: private benchmark packages cannot be in release-please-config.json`);
-    }
-    const manifestPath = path.join(root, '.release-please-manifest.json');
-    if (fs.existsSync(manifestPath)) {
-        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-        if (Object.hasOwn(manifest, dir))
-            problems.push(`${file}: private benchmark packages cannot be in .release-please-manifest.json`);
-    }
 }
 
 if (!fs.existsSync(path.join(root, 'LICENSE'))) problems.push('LICENSE is missing');

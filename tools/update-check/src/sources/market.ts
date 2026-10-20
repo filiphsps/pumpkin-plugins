@@ -1,4 +1,4 @@
-import { compareVersions, type JsonRequest, type UpdateCheck } from '../updates.ts';
+import { assertSemver, compareVersions, type JsonRequest, type UpdateCheck } from '../updates.ts';
 
 /** Settings needed to check a plugin against Pumpkin Market. */
 export interface MarketUpdateOptions {
@@ -38,7 +38,7 @@ export function checkMarketUpdate(options: MarketUpdateOptions): UpdateCheck {
     }
     const latestVersion = payload.latest_version;
     // Validate the installed version even when Market has no release to compare.
-    compareVersions(options.currentVersion, options.currentVersion);
+    assertSemver(options.currentVersion);
     return {
         currentVersion: options.currentVersion,
         latestVersion,

@@ -22,7 +22,9 @@ describe('WASI HTTP in Pumpkin', () => {
             if (!address || typeof address === 'string') throw new Error('Expected an HTTP port');
             const server = await startPumpkin({
                 plugins: [builtPluginPath(process.cwd())],
-                config: { plugins: { allowed_permissions: ['http.outbound'] } },
+                config: { plugins: { allowed_permissions: ['http.outbound', 'fs.read.data'] } },
+                // The fixture's load-time update check also goes to this server, not the real Market.
+                files: { 'plugins/data/UpdateCheckFixture/market-url.txt': `http://127.0.0.1:${address.port}` },
             });
             try {
                 for (const [path, expected] of [

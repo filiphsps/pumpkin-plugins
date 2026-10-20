@@ -15,7 +15,8 @@ version.
 ## Use the plugin-kit check
 
 `PluginBase` and `registerPlugin` enable the check as part of the normal plugin lifecycle. Export
-`handleTask` from your entry point so the plugin kit can dispatch the scheduled HTTP polls:
+the kit's `handleTask` from your entry point so the plugin kit can dispatch the scheduled HTTP polls.
+If the plugin registers commands with `registerCommands`, export `handleCommand` the same way:
 
 ```ts
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
@@ -34,7 +35,8 @@ class MyPlugin extends PluginBase {
 
 registerPlugin(new MyPlugin());
 
-export { handleTask } from '@pumpkin-plugins/plugin-kit/plugin';
+export { handleCommand, handleTask } from '@pumpkin-plugins/plugin-kit/plugin';
+export * from '@pumpkin-plugins/pumpkin-api';
 ```
 
 Add the `http` capability to `pumpkinPlugin.wasi` in `package.json`. The server must also grant the
@@ -92,6 +94,7 @@ To test the real WASI transport, use `requestMarketJsonAsync` with a scheduler t
 in later tasks. The transport polls the HTTP response without blocking; a callback that runs inline
 is not supported. `requestMarketJson` is synchronous and blocks, so keep it out of plugin loading
 and server ticks. Run the transport integration test with
-`pnpm --filter @pumpkin-plugins/update-check test:integration`; it exercises delayed, chunked
-responses and HTTP and JSON failures against a local server. The
+`pnpm --filter @pumpkin-plugins/update-check test:integration`. Against a local server, it runs the
+scheduled check that registration starts after loading, and exercises delayed, chunked responses
+and HTTP and JSON failures. The
 [`@pumpkin-plugins/update-check` README](../tools/update-check/README.md) describes the direct APIs.
