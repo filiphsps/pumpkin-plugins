@@ -61,7 +61,7 @@ export const configSchema = defineConfig(PLUGIN_NAME, {
         description: 'Controls the optional dynamic lights shown around configured entity types.',
         fields: {
             enabled: bool({
-                description: 'Whether configured entities emit temporary client-only light.',
+                description: 'Whether configured entities and dropped items emit temporary client-only light.',
                 default: true,
             }),
             refresh_interval_ticks: int({

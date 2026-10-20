@@ -9,6 +9,12 @@ describe(HeldItemLightLevels.name, () => {
         expect(levels.level('lava_bucket')).toBe(15);
     });
 
+    it('matches a source configured without its namespace', () => {
+        const levels = new HeldItemLightLevels({ torch: 14 });
+
+        expect(levels.level('minecraft:torch')).toBe(14);
+    });
+
     it('returns zero for an unsupported or empty hand', () => {
         const levels = new HeldItemLightLevels({});
 
