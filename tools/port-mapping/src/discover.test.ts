@@ -74,6 +74,14 @@ describe('SSDP search', () => {
         expect(net.closed).toBe(true);
     });
 
+    it('reads answers whose lines end in a bare LF', () => {
+        const data = new TextEncoder().encode('HTTP/1.1 200 OK\nLOCATION: http://192.168.1.1:5000/root.xml\n\n');
+        const net = new FloodNetwork([{ data, from: { address: [192, 168, 1, 1], port: 1900 } }]);
+        expect(runSteps(net, search(net, SSDP_ADDRESS, 3000))).toEqual([
+            { location: 'http://192.168.1.1:5000/root.xml', responder: [192, 168, 1, 1] },
+        ]);
+    });
+
     it('yields after a bounded batch while flood datagrams remain queued', () => {
         const net = new FloodNetwork(searchDatagrams(100));
         const steps = search(net, SSDP_ADDRESS, 3000);
@@ -164,6 +172,18 @@ describe('discover', () => {
         expect(runSteps(net, discover(net, { upnp: true, natPmp: false })).gateway.kind).toBe('upnp');
     });
 
+    it('reads device descriptions side by side, so silent devices do not add up', () => {
+        const silent = [2, 3, 4, 5].map((last) => new FakeIgd({ address: [192, 168, 1, last], natPmp: false }));
+        const net = new FakeNetwork([...silent, new FakeIgd({ natPmp: false })]);
+        const dial = net.dial.bind(net);
+        net.dial = (to) => (to.address[3] === 1 ? dial(to) : { poll: () => undefined, abort: () => {} });
+
+        const found = runSteps(net, discover(net, { upnp: true, natPmp: false }));
+        expect(found.gateway.address).toEqual([192, 168, 1, 1]);
+        // One HTTP timeout is 5 s; reading the four silent devices one after another took 20 s.
+        expect(net.time).toBeLessThan(10_000);
+    });
+
     it('does not fetch a LOCATION hosted by a different device than the SSDP responder', () => {
         const responder = new FakeIgd({ natPmp: false });
         Object.defineProperty(responder, 'location', {
@@ -176,6 +196,35 @@ describe('discover', () => {
         expect(() => runSteps(net, discover(net, { upnp: true, natPmp: false }))).toThrow('no port mapping service');
         expect(net.connections).toHaveLength(0);
         expect(net.leaks).toBe(0);
+    });
+
+    it('skips a WAN service that has no internet address and uses the next one', () => {
+        const igd = new FakeIgd({ natPmp: false });
+        const service = (type: string, path: string) =>
+            `<service><serviceType>urn:schemas-upnp-org:service:${type}</serviceType><controlURL>${path}</controlURL></service>`;
+        const external = (address: string) =>
+            `<?xml version="1.0"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:GetExternalIPAddressResponse xmlns:u="x"><NewExternalIPAddress>${address}</NewExternalIPAddress></u:GetExternalIPAddressResponse></s:Body></s:Envelope>`;
+        igd.handleHttp = (method, path) => {
+            if (method === 'GET')
+                return {
+                    status: 200,
+                    body: `<root><device><serviceList>${service('WANIPConnection:1', '/ip')}${service('WANPPPConnection:1', '/ppp')}</serviceList></device></root>`,
+                };
+            return { status: 200, body: external(path === '/ip' ? '0.0.0.0' : '93.184.216.34') };
+        };
+        const net = new FakeNetwork([igd]);
+
+        const found = runSteps(net, discover(net, { upnp: true, natPmp: false }));
+        expect(found.externalAddress).toEqual([93, 184, 216, 34]);
+
+        igd.handleHttp = (method) =>
+            method === 'GET'
+                ? {
+                      status: 200,
+                      body: `<root><device><serviceList>${service('WANIPConnection:1', '/ip')}</serviceList></device></root>`,
+                  }
+                : { status: 200, body: external('0.0.0.0') };
+        expect(() => runSteps(net, discover(net, { upnp: true, natPmp: false }))).toThrow('no internet address');
     });
 
     it('accepts a private router whose HTTP services use a different port from SSDP', () => {
@@ -192,7 +241,7 @@ describe('discover', () => {
             identity.manufacturer?.includes('Telekom') ? 'no UPnP on Telekom' : undefined;
         const speedport = { '/html/login/index.html': { body: '<title>Speedport Konfigurationsprogramm</title>' } };
 
-        it('refuses a router recognized by its web interface before sending it anything', () => {
+        it('names a router recognized by its web interface when no protocol finds a router', () => {
             const net = new FakeNetwork([new FakeIgd({ upnp: false, natPmp: false, webPages: speedport })]);
             let refusal: unknown;
             try {
@@ -202,7 +251,6 @@ describe('discover', () => {
             }
             expect(refusal).toBeInstanceOf(RouterRefusedError);
             expect(refusal).toMatchObject({ reason: 'no UPnP on Telekom', identity: { manufacturer: 'Telekom' } });
-            expect(net.sent).toHaveLength(0);
             expect(net.leaks).toBe(0);
         });
 
@@ -215,6 +263,20 @@ describe('discover', () => {
             expect(net.leaks).toBe(0);
         });
 
+        it('does not let a recognized web page hide a router that answers', () => {
+            const accessPoint = new FakeIgd({
+                address: [192, 168, 1, 254],
+                upnp: false,
+                natPmp: false,
+                webPages: speedport,
+            });
+            const net = new FakeNetwork([new FakeIgd(), accessPoint]);
+            const found = runSteps(net, discover(net, { ...both, screen: refuseTelekom }));
+            expect(found.gateway.kind).toBe('upnp');
+            expect(found.gateway.address).toEqual([192, 168, 1, 1]);
+            expect(net.leaks).toBe(0);
+        });
+
         it('passes the identity of the router it lets through on', () => {
             const net = new FakeNetwork([
                 new FakeIgd({ device: { manufacturer: 'AVM', modelName: 'FRITZ!Box 7590' } }),
@@ -223,16 +285,11 @@ describe('discover', () => {
             expect(found.identity).toMatchObject({ manufacturer: 'AVM', model: 'FRITZ!Box 7590', source: 'upnp' });
         });
 
-        it('gives NAT-PMP routers the identity from the web interface', () => {
-            const net = new FakeNetwork([
-                new FakeIgd({
-                    upnp: false,
-                    webPages: { '/html/login/index.html': { body: '<title>Speedport X</title>' } },
-                }),
-            ]);
-            const found = runSteps(net, discover(net, { ...both, screen: () => undefined }));
+        it('uses a NAT-PMP router that answers, whatever its web interface says', () => {
+            const net = new FakeNetwork([new FakeIgd({ upnp: false, webPages: speedport })]);
+            const found = runSteps(net, discover(net, { ...both, screen: refuseTelekom }));
             expect(found.gateway.kind).toBe('nat-pmp');
-            expect(found.identity).toMatchObject({ manufacturer: 'Telekom' });
+            expect(found.identity).toBeUndefined();
         });
 
         it('leaves routers alone that say nothing about themselves, and does not probe without a screen', () => {

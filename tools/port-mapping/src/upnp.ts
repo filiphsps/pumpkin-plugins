@@ -17,7 +17,8 @@ export interface ControlPoint {
     serviceType: string;
 }
 
-const normalizeErrorDescription = (description: string) => {
+/** Turns each run of control characters and line breaks into one space. */
+const singleLine = (description: string) => {
     let normalized = '';
     let inControlSequence = false;
     for (const character of description) {
@@ -45,7 +46,7 @@ export class UpnpError extends Error {
         readonly code: number,
         description: string,
     ) {
-        const singleLineDescription = normalizeErrorDescription(description);
+        const singleLineDescription = singleLine(description);
         super(`${singleLineDescription || 'UPnP error'} (${code})`);
     }
 }
@@ -54,7 +55,9 @@ const parser = new XMLParser({ removeNSPrefix: true, ignoreAttributes: true, par
 
 const WAN_SERVICE = /^urn:schemas-upnp-org:service:WAN(?:IP|PPP)Connection:\d+$/;
 const PERMANENT_LEASE_ONLY = 725;
-const CONFLICT_CODES = new Set([718, 724, 727, 729]);
+const MAX_IDENTITY_LENGTH = 64;
+/** ConflictInMappingEntry and ConflictWithOtherMechanisms: another port may work. */
+const CONFLICT_CODES = new Set([718, 729]);
 
 /** Service versions in the order to try them: IP connections first, newest first. */
 const rank = (type: string) => (type.includes('WANIPConnection:2') ? 0 : type.includes('WANIPConnection') ? 1 : 2);
@@ -117,9 +120,15 @@ export function parseIdentity(xml: string): RouterIdentity | undefined {
     const root = parser.parse(xml) as { root?: { device?: Record<string, unknown> } };
     const device = root.root?.device;
     if (typeof device !== 'object' || device === null) return undefined;
+    // Any device on the network can answer, and these end up in logs and chat.
     const field = (name: string) => {
         const value = device[name];
-        return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+        if (typeof value !== 'string') return undefined;
+        const text = Array.from(singleLine(value.replaceAll('§', '')))
+            .slice(0, MAX_IDENTITY_LENGTH)
+            .join('')
+            .trim();
+        return text || undefined;
     };
     const identity: RouterIdentity = {
         manufacturer: field('manufacturer'),

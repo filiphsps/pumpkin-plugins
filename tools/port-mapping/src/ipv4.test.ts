@@ -5,9 +5,31 @@ describe('parseIpv4', () => {
     it('reads dotted quads and rejects everything else', () => {
         expect(parseIpv4('192.168.1.1')).toEqual([192, 168, 1, 1]);
         expect(parseIpv4(' 10.0.0.1 ')).toEqual([10, 0, 0, 1]);
-        for (const bad of ['', 'localhost', '1.2.3', '1.2.3.4.5', '256.1.1.1', '1.2.3.-4', '::1'])
-            expect(parseIpv4(bad)).toBeUndefined();
+        for (const bad of [
+            '',
+            'localhost',
+            '1.2.3',
+            '1.2.3.4.5',
+            '1..3.4',
+            '1.2.3.',
+            '256.1.1.1',
+            '1.2.3.1000',
+            '1.2.3.-4',
+            '+1.2.3.4',
+            '0x7f.0.0.1',
+            '1e2.0.0.1',
+            '1. 2.3.4',
+            '1.2.3.4:80',
+            '::1',
+            '::ffff:192.168.1.1',
+            '[::1]',
+        ])
+            expect(parseIpv4(bad), bad).toBeUndefined();
         expect(formatIpv4([1, 2, 3, 4])).toBe('1.2.3.4');
+    });
+
+    it('reads octets with leading zeros as decimal, not octal', () => {
+        expect(parseIpv4('010.000.001.255')).toEqual([10, 0, 1, 255]);
     });
 });
 

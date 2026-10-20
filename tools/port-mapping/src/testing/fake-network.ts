@@ -111,6 +111,11 @@ export class FakeNetwork implements Network {
         return time;
     }
 
+    /** Moves the clock on by `ms`, as if the caller had blocked that long. */
+    pause(ms: number): void {
+        this.time += ms;
+    }
+
     localAddress(): Ipv4 | undefined {
         return this.local;
     }
@@ -158,4 +163,39 @@ export function runSteps<T>(net: FakeNetwork, steps: Steps<T>, stepMs = 10, limi
     }
     task.cancel();
     throw new Error('the steps did not finish');
+}
+
+/**
+ * Holds back the router's answer to every UPnP request for `action`, such as `DeletePortMapping`,
+ * on connections the network dials from now on. The request still reaches the router.
+ * @param shouldDelay - Checked on each read; the answer is held back only while it returns true.
+ * @returns A function that lets the held-back answers through.
+ */
+export function delayReplies(net: FakeNetwork, action: string, shouldDelay = () => true): () => void {
+    const dial = net.dial.bind(net);
+    let blocked = true;
+    net.dial = (to) => {
+        const original = dial(to);
+        return {
+            abort: () => original.abort(),
+            poll: () => {
+                const connection = original.poll();
+                if (!connection) return undefined;
+                let delayed = false;
+                return {
+                    localAddress: connection.localAddress,
+                    writable: () => connection.writable(),
+                    close: () => connection.close(),
+                    write: (bytes) => {
+                        delayed ||= strFromU8(bytes).includes(`#${action}`);
+                        connection.write(bytes);
+                    },
+                    read: (max) => (delayed && blocked && shouldDelay() ? null : connection.read(max)),
+                };
+            },
+        };
+    };
+    return () => {
+        blocked = false;
+    };
 }
