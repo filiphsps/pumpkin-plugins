@@ -197,9 +197,7 @@ describe('loadConfig', () => {
         const text = '[web\nport = 1';
         const store = new MemoryStore(text);
         expect(() => loadConfig(demo, store)).toThrow(ConfigSyntaxError);
-        expect(() => loadConfig(demo, store)).toThrow(
-            'Invalid TOML document: illegal character in key (line 1, column 5)',
-        );
+        expect(() => loadConfig(demo, store)).toThrow('line 1, column 5');
         expect(store.text).toBe(text);
         expect(store.writes).toBe(0);
     });

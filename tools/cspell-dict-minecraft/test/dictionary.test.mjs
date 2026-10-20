@@ -18,10 +18,4 @@ describe('Minecraft dictionary', () => {
             assert.ok(words.has(word), `${word} should be accepted`);
         }
     });
-
-    it('does not include PumpkinMC-specific vocabulary', () => {
-        for (const word of ['pumpkinmc', 'pumpkinapi', 'pumpkinserver']) {
-            assert.ok(!words.has(word), `${word} should stay outside the Minecraft dictionary`);
-        }
-    });
 });

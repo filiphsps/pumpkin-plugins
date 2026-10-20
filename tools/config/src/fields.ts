@@ -42,8 +42,11 @@ export interface BaseOptions<T> {
     migrateFrom?: readonly string[];
 }
 
-/** Writes a string as a TOML basic string, which JSON string syntax is a valid subset of. */
-export const tomlString = (value: string): string => JSON.stringify(value);
+/**
+ * Writes a string as a TOML basic string. JSON string syntax is a valid subset, except that TOML
+ * also requires DEL (U+007F) to be escaped.
+ */
+export const tomlString = (value: string): string => JSON.stringify(value).replaceAll('\x7f', '\\u007f');
 
 /**
  * Builds a field from custom TOML-compatible values. Prefer `bool`, `int` and `str`. Defaults that
