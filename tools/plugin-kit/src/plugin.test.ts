@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const calls = vi.hoisted(() => ({
+    apiHandleCommand: vi.fn(),
     apiLoad: vi.fn(),
     apiHandleTask: vi.fn(),
     apiUnload: vi.fn(),
-    info: vi.fn(),
     pluginLoad: vi.fn(),
     pluginUnload: vi.fn(),
     registerWithUpdates: vi.fn(),
+    runCommand: vi.fn(),
     runTask: vi.fn(),
     scheduleDelayed: vi.fn(),
 }));
@@ -22,6 +23,7 @@ vi.mock('@pumpkin-plugins/pumpkin-api', () => ({
             calls.apiUnload(ctx);
         }
     },
+    handleCommand: calls.apiHandleCommand,
     handleTask: calls.apiHandleTask,
 }));
 
@@ -30,15 +32,16 @@ vi.mock('@pumpkin-plugins/update-check', () => ({
 }));
 
 vi.mock('./host.ts', () => ({
-    hostLogger: { info: calls.info },
+    runCommand: calls.runCommand,
     runTask: calls.runTask,
     scheduleDelayed: calls.scheduleDelayed,
 }));
 
+import type { CommandSender, ConsumedArgs } from 'pumpkin:plugin/command@0.1.0';
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import { registerPluginWithUpdates } from '@pumpkin-plugins/update-check';
-import { handleTask, PluginBase, registerPlugin } from './plugin.ts';
+import { handleCommand, handleTask, PluginBase, registerPlugin } from './plugin.ts';
 
 const info = { name: 'ExamplePlugin', description: 'An example plugin.' };
 
@@ -70,7 +73,7 @@ describe('PluginBase', () => {
         });
     });
 
-    it('runs the common and plugin-specific lifecycle behavior without a duplicate load log', () => {
+    it('runs the common and plugin-specific lifecycle behavior', () => {
         const plugin = new ExamplePlugin();
         const ctx = {} as Context;
 
@@ -78,7 +81,6 @@ describe('PluginBase', () => {
         plugin.onUnload(ctx);
 
         expect(calls.apiLoad).toHaveBeenCalledWith(ctx);
-        expect(calls.info).not.toHaveBeenCalled();
         expect(calls.pluginLoad).toHaveBeenCalledWith(ctx);
         expect(calls.apiUnload).toHaveBeenCalledWith(ctx);
         expect(calls.pluginUnload).toHaveBeenCalledWith(ctx);
@@ -107,5 +109,19 @@ describe('PluginBase', () => {
         expect(calls.runTask).toHaveBeenNthCalledWith(2, 1, server);
         expect(calls.apiHandleTask).toHaveBeenCalledTimes(1);
         expect(calls.apiHandleTask).toHaveBeenCalledWith(1, server);
+    });
+
+    it('routes shared command handlers before the API command handler', () => {
+        const server = {} as Server;
+        const sender = {} as CommandSender;
+        const args = {} as ConsumedArgs;
+        calls.runCommand.mockReturnValueOnce(3).mockReturnValueOnce(undefined);
+        calls.apiHandleCommand.mockReturnValueOnce(5);
+
+        expect(handleCommand(910_000, sender, server, args)).toBe(3);
+        expect(calls.apiHandleCommand).not.toHaveBeenCalled();
+        expect(handleCommand(1, sender, server, args)).toBe(5);
+        expect(calls.runCommand).toHaveBeenNthCalledWith(2, 1, sender, args);
+        expect(calls.apiHandleCommand).toHaveBeenCalledExactlyOnceWith(1, sender, server, args);
     });
 });

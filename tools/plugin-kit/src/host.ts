@@ -22,6 +22,13 @@ interface ScheduledHandler {
 }
 
 // One registry prevents delayed and repeating handler ids from overlapping.
+// ponytail: these ranges assume the Pumpkin API's own counter, which starts at 0 and never reuses ids,
+// stays below 900_000. `handleTask` and `handleCommand` check these registries first, so an API id
+// that reaches a kit range would run the kit callback with the same number. Kit task ids also pass
+// 910_000 after 10_000 schedules; that is harmless only because tasks and commands dispatch separately.
+// Every API event, command, suggestion and task registration takes one id; a plugin that schedules
+// API tasks every tick reaches 900_000 in about 12.5 hours. Move kit scheduling onto the API package if
+// that becomes real.
 const tasks = new HandlerRegistry<ScheduledHandler>(900_000);
 const taskHandlers = new Map<number, number>();
 const commandHandlers = new HandlerRegistry<(sender: CommandSender, args: ConsumedArgs) => number>(910_000);

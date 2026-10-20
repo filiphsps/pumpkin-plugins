@@ -12,6 +12,7 @@ function fixture() {
         stat: vi.fn(() => ({ type: 'regular-file', size: 3n })),
         read: vi.fn(() => [new Uint8Array([1, 2, 3]), true]),
         write: vi.fn((bytes: Uint8Array, _offset: bigint) => BigInt(bytes.length)),
+        syncData: vi.fn(),
         readDirectory: vi.fn(() => entries),
         drop: vi.fn(),
     };
@@ -139,13 +140,24 @@ describe('WasiDataDir', () => {
         expect(root.unlinkFileAt).not.toHaveBeenCalled();
     });
 
-    it.each(['write', 'rename'])(
+    it('flushes the temporary file to disk before renaming it over the target', () => {
+        const { dir, root, file } = fixture();
+        dir.writeFile('config.toml', new Uint8Array([1, 2, 3]));
+        expect(file.syncData).toHaveBeenCalledOnce();
+        expect(file.syncData.mock.invocationCallOrder[0]).toBeLessThan(root.renameAt.mock.invocationCallOrder[0]);
+    });
+
+    it.each(['write', 'sync', 'rename'])(
         'cleans up temporary files after a %s failure and preserves the original error',
         (stage) => {
             const { dir, root, file } = fixture();
             if (stage === 'write')
                 file.write.mockImplementation(() => {
                     throw error('write failed');
+                });
+            else if (stage === 'sync')
+                file.syncData.mockImplementation(() => {
+                    throw error('sync failed');
                 });
             else
                 root.renameAt.mockImplementation(() => {

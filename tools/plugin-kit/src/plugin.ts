@@ -26,13 +26,16 @@ export abstract class PluginBase extends Plugin {
         return pluginMetadata(this.info, this.version);
     }
 
-    /** Registers the API's pending events and runs the plugin's load hook. */
+    /** Runs `onPluginLoad` when Pumpkin loads the plugin. */
     onLoad(ctx: Context): void {
         super.onLoad(ctx);
         this.onPluginLoad(ctx);
     }
 
-    /** Runs the plugin's unload hook after the API's unload handler. */
+    /**
+     * Runs `onPluginUnload` when Pumpkin unloads the plugin. The Pumpkin API clears its event, command
+     * and task handlers after this returns, so the hook can still use them.
+     */
     onUnload(ctx: Context): void {
         super.onUnload(ctx);
         this.onPluginUnload(ctx);

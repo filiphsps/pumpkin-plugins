@@ -50,7 +50,10 @@
         "./register-commands": "./src/register-commands.ts",
         "./testing": "./src/testing/index.ts",
         "./wasi-resource": "./src/wasi-resource.ts",
-        "./wasi-error": "./src/wasi-error.ts"
+        "./wasi-error": "./src/wasi-error.ts",
+        "./wasi-clock": "./src/wasi-clock.ts",
+        "./wasi-number": "./src/wasi-number.ts",
+        "./wasi-socket": "./src/wasi-socket.ts"
     },
     "files": [
         "src/**/*.ts",
@@ -83,6 +86,7 @@
     "pumpkinPlugin": {
         "wasi": [
             "filesystem",
+            "sockets",
             "http"
         ]
     }

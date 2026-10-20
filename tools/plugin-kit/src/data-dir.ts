@@ -3,6 +3,7 @@ import type { Descriptor } from 'wasi:filesystem/types@0.2.3';
 import { atomicWrite } from './atomic-write.ts';
 import type { DataFiles, FileInfo, FileKind, RandomAccessFile } from './files.ts';
 import { wasiErrorCode } from './wasi-error.ts';
+import { toSafeNumber } from './wasi-number.ts';
 import { disposeWasiResource } from './wasi-resource.ts';
 
 /** Most bytes read from a file in one call. */
@@ -156,12 +157,4 @@ export class WasiDataDir implements DataFiles {
             throw error;
         }
     }
-}
-
-function toSafeNumber(value: bigint, label: string): number {
-    const number = Number(value);
-    if (!Number.isSafeInteger(number) || number < 0) {
-        throw new RangeError(`${label} exceeds JavaScript's safe integer range`);
-    }
-    return number;
 }

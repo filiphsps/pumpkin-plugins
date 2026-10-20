@@ -328,6 +328,30 @@ describe('buildCommands', () => {
         expect(host.usages(root?.node as FakeNode)).toEqual(['/locate', '/locate <x>', '/locate <x> <targets>']);
     });
 
+    it('allows a shared item prefix across positional argument variants', () => {
+        const typedTree = defineCommands('Demo', {
+            icon: {
+                description: 'Set an icon',
+                permission: 'Demo:command.icon',
+                argumentVariants: [
+                    [{ name: 'item', type: 'item' }],
+                    [
+                        { name: 'item', type: 'item' },
+                        { name: 'label', type: 'string', mode: 'greedy' },
+                    ],
+                ],
+            },
+        });
+        const host = new FakeCommandHost();
+        const [root] = buildCommands(host, typedTree, {
+            icon: () => ['default'],
+            'icon <item>': (_sender, { item }) => [item],
+            'icon <item> <label>': (_sender, { item, label }) => [`${item}:${label}`],
+        });
+
+        expect(host.usages(root?.node as FakeNode)).toEqual(['/icon', '/icon <item>', '/icon <item> <label>']);
+    });
+
     it('rejects greedy strings before creating any command nodes unless they are final', () => {
         const invalidTree = defineCommands('Demo', {
             talk: {
