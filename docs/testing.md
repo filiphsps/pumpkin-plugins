@@ -24,7 +24,9 @@ CLI integration tests, then repository-script, agent-hook and GitHub Action test
 each package's `coverage/lcov.info`. An outer c8 collector also measures Node child processes,
 including documentation and build CLIs, and writes `coverage/process/lcov.info`. Codecov merges
 these reports so subprocess execution contributes alongside in-process tests. Coverage tasks run
-fresh because cached reports cannot supply their child processes' raw V8 data.
+fresh because cached reports cannot supply their child processes' raw V8 data. The command runs
+every suite even after one fails and exits with the first failure's code; Turborepo skips only a
+package whose own dependencies failed to build.
 
 The existing `codecov/project` gate covers tooling: `tools/`, `scripts/`, `actions/` and
 `.agents/hooks/`. It compares against the base commit with a 1 percentage-point tolerance.
