@@ -24,6 +24,8 @@ These launch forms follow the official [pnpm create](https://pnpm.io/cli/create)
 
 Add `--skip-install` to create the files without installing packages. Existing destinations are rejected and left untouched. When launched by a supported package manager, the creator uses it to install dependencies. If it cannot detect one, it prints pnpm commands. Generated projects do not include the monorepo's `plugin-kit` scaffold.
 
+The generated README uses the same package manager in its commands. Projects get a `pnpm-workspace.yaml`, which lets pnpm run esbuild's install script, only when the creator was launched by pnpm or could not detect a package manager.
+
 The TypeScript template uses `src/plugin.ts`. The JavaScript template uses `src/plugin.js`, JSDoc types and `checkJs`. Both generate guest declarations from the API package's WIT using `pumpkin-plugins-build --types-only` before typechecking.
 
 ## Node.js and CI support
