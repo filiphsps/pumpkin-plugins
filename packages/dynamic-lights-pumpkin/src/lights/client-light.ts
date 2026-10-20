@@ -100,11 +100,6 @@ export class ClientLightTracker {
         else this.viewers.set(playerId, viewer);
     }
 
-    /** Clears one player's temporary client light. */
-    remove(playerId: string, client: LightClient): void {
-        this.replaceSources(playerId, client, 'held', []);
-    }
-
     /** Restores all client blocks for a player who disables lights or unloads the plugin. */
     reset(playerId: string, client: LightClient): void {
         for (const light of this.viewers.get(playerId)?.cells.values() ?? []) client.resetBlockChange(light.position);
