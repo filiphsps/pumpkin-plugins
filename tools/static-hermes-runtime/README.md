@@ -52,7 +52,7 @@ pinned Rust toolchain through `rustup` when available). An executable that repor
 version fails setup. The files follow the
 [WASI SDK release pin schema](schemas/wasi-sdk-release-pin.schema.json),
 [upstream Git pin schema](schemas/upstream-git-pin.schema.json), and
-[toolchain versions schema](schemas/toolchain-versions.schema.json). The package also carries
+[toolchain versions schema](../../schemas/toolchain-versions.schema.json). The package also carries
 the WASI Preview 2 CMake toolchain adjustment required by Hermes. Optional paths and build settings are
 listed under [Build flags](#build-flags).
 
