@@ -21,6 +21,6 @@ because AppleSkin is a Java Edition mod.
 
 ## Diagnose updates
 
-Set `log.level` to `debug` in the Pumpkin server configuration to see the values sent and when
-players join, leave, or are skipped. Ticks without updates stay quiet. The plugin has no separate
-configuration file or player commands.
+Set `logging.level` to `debug` in the Pumpkin server configuration to see the values sent and when
+players join, leave, or are skipped. After a line for the first tick, ticks without updates stay
+quiet. The plugin has no separate configuration file or player commands.
