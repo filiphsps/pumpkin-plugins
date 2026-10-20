@@ -34,96 +34,84 @@ reviews:
     suggested_labels: true
     # Generated from .github/labels.yml by .github/scripts/coderabbit-labels.mjs.
     labeling_instructions:
-        - label: 'area: actions'
+        - label: "area: actions"
           instructions: Changes to reusable GitHub Actions under actions/.
-        - label: 'area: ci'
+        - label: "area: ci"
           instructions: Changes to GitHub Actions workflows or CI configuration.
-        - label: 'area: docs'
-          instructions: Documentation, guides, or generated references are a primary part of
-            the change.
-        - label: 'area: extension'
+        - label: "area: docs"
+          instructions: Documentation, guides, or generated references are a primary part of the change.
+        - label: "area: extension"
           instructions: Changes to a Visual Studio Code extension or its tooling.
-        - label: 'area: plugins'
+        - label: "area: plugins"
           instructions: Changes to one or more plugins under packages/.
-        - label: 'area: runtime'
+        - label: "area: runtime"
           instructions: Changes to Pumpkin API/WIT, WASI, WebAssembly, or runtime compatibility.
-        - label: 'area: tooling'
+        - label: "area: tooling"
           instructions: Changes to shared tools, scripts, generators, or repository tooling.
         - label: bug
-          instructions: Apply to changes that fix incorrect or broken behavior; pair with the
-            most specific bug subtype when one applies.
-        - label: 'bug: build/release'
-          instructions: Compilation, packaging, signing, or release artifact failures; pair
-            with bug.
-        - label: 'bug: compatibility'
-          instructions: Breaks a supported Pumpkin, API, platform, or plugin version; pair with
-            bug.
-        - label: 'bug: configuration'
-          instructions: Plugin configuration is rejected, ignored, or applied incorrectly; pair
-            with bug.
-        - label: 'bug: crash'
-          instructions: The plugin or server crashes, or the plugin fails to load or start;
-            pair with bug.
-        - label: 'bug: data loss'
-          instructions: User or server data is lost, corrupted, or not persisted; pair with
-            bug.
-        - label: 'bug: incorrect behavior'
+          instructions: Apply to changes that fix incorrect or broken behavior; pair with the most specific bug subtype
+            when one applies.
+        - label: "bug: build/release"
+          instructions: Compilation, packaging, signing, or release artifact failures; pair with bug.
+        - label: "bug: compatibility"
+          instructions: Breaks a supported Pumpkin, API, platform, or plugin version; pair with bug.
+        - label: "bug: configuration"
+          instructions: Plugin configuration is rejected, ignored, or applied incorrectly; pair with bug.
+        - label: "bug: crash"
+          instructions: The plugin or server crashes, or the plugin fails to load or start; pair with bug.
+        - label: "bug: data loss"
+          instructions: User or server data is lost, corrupted, or not persisted; pair with bug.
+        - label: "bug: incorrect behavior"
           instructions: Output or behavior is incorrect; pair with bug.
-        - label: 'bug: performance'
+        - label: "bug: performance"
           instructions: Excessive lag, CPU or memory use, or slow response; pair with bug.
-        - label: 'bug: regression'
+        - label: "bug: regression"
           instructions: Behavior that worked before is broken in a later change; pair with bug.
-        - label: 'bug: security'
+        - label: "bug: security"
           instructions: A vulnerability, unsafe access, or integrity weakness; pair with bug.
         - label: dependencies
           instructions: Dependency additions, upgrades, removals, or workspace catalog changes.
         - label: documentation
-          instructions: 'Use for documentation-focused PRs; pair with area: docs when appropriate.'
+          instructions: "Use for documentation-focused PRs; pair with area: docs when appropriate."
         - label: enhancement
           instructions: Adds a user-facing feature or capability.
         - label: maintenance
-          instructions: Internal upkeep or refactoring without a user-facing feature or bug
-            fix.
-        - label: 'plugin: Apple Skin'
+          instructions: Internal upkeep or refactoring without a user-facing feature or bug fix.
+        - label: "plugin: Apple Skin"
           instructions: Changes specifically related to packages/apple-skin-pumpkin/.
-        - label: 'plugin: Bedrock Addon Manager'
+        - label: "plugin: Bedrock Addon Manager"
           instructions: Changes specifically related to packages/bedrock-addon-manager/.
-        - label: 'plugin: Distant Horizons Support'
+        - label: "plugin: Distant Horizons Support"
           instructions: Changes specifically related to packages/distant-horizons-support-pumpkin/.
-        - label: 'plugin: Dynamic Lights'
+        - label: "plugin: Dynamic Lights"
           instructions: Changes specifically related to packages/dynamic-lights-pumpkin/.
-        - label: 'plugin: Tab Display'
+        - label: "plugin: Tab Display"
           instructions: Changes specifically related to packages/tab-display/.
-        - label: 'plugin: UPnPumpkin'
+        - label: "plugin: UPnPumpkin"
           instructions: Changes specifically related to packages/upnpumpkin/.
-        - label: 'plugin: Waypoints'
+        - label: "plugin: Waypoints"
           instructions: Changes specifically related to packages/waypoints/.
-        - label: 'priority: critical'
-          instructions: Use only for a demonstrated severe issue blocking core use or a release;
-            do not infer urgency from the diff alone.
-        - label: 'priority: high'
+        - label: "priority: critical"
+          instructions: Use only for a demonstrated severe issue blocking core use or a release; do not infer urgency from
+            the diff alone.
+        - label: "priority: high"
           instructions: Use only when clear urgency or substantial user impact is established.
-        - label: 'priority: low'
-          instructions: Use only when low priority is explicitly established; do not infer it
-            for routine changes.
-        - label: 'priority: medium'
+        - label: "priority: low"
+          instructions: Use only when low priority is explicitly established; do not infer it for routine changes.
+        - label: "priority: medium"
           instructions: Use only when a normal-priority issue or milestone is explicitly established.
-        - label: 'runtime: quickjs'
+        - label: "runtime: quickjs"
           instructions: Apply when the change specifically concerns QuickJS behavior or compatibility.
-        - label: 'runtime: static-hermes'
-          instructions: Apply when the change specifically concerns Static Hermes behavior or
-            compatibility.
+        - label: "runtime: static-hermes"
+          instructions: Apply when the change specifically concerns Static Hermes behavior or compatibility.
         - label: slop
           instructions: Managed by slop_detection; do not suggest from style or wording alone.
-        - label: 'status: blocked'
-          instructions: Use only when the PR is explicitly blocked by an unresolved decision
-            or dependency.
-        - label: 'status: needs info'
-          instructions: Use only when the PR explicitly needs information from its author or
-            reporter.
-        - label: 'status: needs triage'
-          instructions: Use only when the PR is explicitly awaiting owner, classification, or
-            priority.
+        - label: "status: blocked"
+          instructions: Use only when the PR is explicitly blocked by an unresolved decision or dependency.
+        - label: "status: needs info"
+          instructions: Use only when the PR explicitly needs information from its author or reporter.
+        - label: "status: needs triage"
+          instructions: Use only when the PR is explicitly awaiting owner, classification, or priority.
     mutually_exclusive_groups:
         # Choose at most one runtime, one status and one priority label.
         runtime:
