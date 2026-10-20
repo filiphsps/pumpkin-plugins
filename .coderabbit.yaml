@@ -13,7 +13,7 @@ reviews:
     high_level_summary_instructions: >-
         Be concise and concrete. Summarize user-visible behavior and compatibility changes; for
         shared tooling, identify affected consumers. Avoid filler and restating the file list.
-    high_level_summary_in_walkthrough: true
+    high_level_summary_in_walkthrough: false
     auto_title_instructions: >-
         Use a Conventional Commit title in the form `type(scope): imperative summary`. Choose a
         Conventional Commit type (`build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`,
