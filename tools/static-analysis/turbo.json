@@ -6,8 +6,7 @@
             "outputs": ["dist/**"]
         },
         "typecheck": {
-            "dependsOn": ["transit"],
-            "outputs": []
+            "dependsOn": ["transit"]
         }
     }
 }

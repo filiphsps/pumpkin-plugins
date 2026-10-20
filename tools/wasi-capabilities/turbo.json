@@ -4,9 +4,6 @@
         "build": {
             "dependsOn": ["transit"],
             "outputs": ["dist/**"]
-        },
-        "typecheck": {
-            "outputs": []
         }
     }
 }

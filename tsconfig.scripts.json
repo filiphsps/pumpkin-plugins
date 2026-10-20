@@ -1,0 +1,21 @@
+{
+    "extends": "./tsconfig.base.json",
+    "compilerOptions": {
+        "target": "ESNext",
+        "allowJs": true,
+        "checkJs": true,
+        "noEmit": true,
+        "types": ["node"],
+        "strict": false
+    },
+    "include": [
+        "scripts/check-release-config.mjs",
+        "scripts/publish-*.mjs",
+        "scripts/release.mjs",
+        "scripts/resolve-plugin-release.mjs",
+        "scripts/unpin-release-as.mjs",
+        "scripts/utils/release-*.mjs",
+        "scripts/utils/tool-packages.mjs"
+    ],
+    "exclude": ["scripts/**/*.test.mjs"]
+}

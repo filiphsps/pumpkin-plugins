@@ -12,34 +12,25 @@
         "blocklist",
         "catchable",
         "CGNAT",
-        "clientbound",
         "codegen",
         "codemod",
         "codemods",
         "commitlint",
         "componentizer",
-        "compostable",
         "datagrams",
-        "despawn",
         "dynamiclights",
-        "enchantable",
-        "equippable",
         "fflate",
         "frontmatter",
-        "gamemode",
-        "heightmap",
         "itest",
         "llms",
         "lockfiles",
         "mattpocock",
         "mcaddon",
         "mcpack",
-        "mooshroom",
         "mspt",
         "nethernet",
         "nojekyll",
         "outgoingdatagram",
-        "overworld",
         "pocock",
         "pollable",
         "pumpkinmc",
@@ -86,37 +77,15 @@
     "js/ts.suggestionActions.enabled": true,
     "js/ts.tsdk.additionalLocations": [
         "node_modules/.pnpm/node_modules/@tsc-rs/darwin-arm64/lib",
+        "node_modules/.pnpm/node_modules/@tsc-rs/darwin-x64/lib",
         "node_modules/.pnpm/node_modules/@tsc-rs/linux-arm64/lib",
         "node_modules/.pnpm/node_modules/@tsc-rs/linux-x64/lib",
         "node_modules/.pnpm/node_modules/@tsc-rs/win32-x64/lib",
         "node_modules/.pnpm/node_modules/@tsc-rs/win32-arm64/lib"
     ],
-    "js/ts.tsdk.path": "node_modules/.pnpm/node_modules/@tsc-rs/darwin-arm64/lib",
     "js/ts.tsserver.experimental.enableProjectDiagnostics": true,
     "js/ts.updateImportsOnFileMove.enabled": "always",
     "js/ts.updateImportsOnPaste.enabled": true,
-    "json.schemas": [
-        {
-            "fileMatch": ["tools/pumpkin-api/compatibility/**/*.json"],
-            "url": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json"
-        },
-        {
-            "fileMatch": ["tools/pumpkin-api/wit.lock.json"],
-            "url": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/schemas/upstream-git-pin.schema.json"
-        },
-        {
-            "fileMatch": ["tools/static-hermes-runtime/hermes-source.lock.json"],
-            "url": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/upstream-git-pin.schema.json"
-        },
-        {
-            "fileMatch": ["tools/static-hermes-runtime/wasi-sdk.lock.json"],
-            "url": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/wasi-sdk-release-pin.schema.json"
-        },
-        {
-            "fileMatch": ["tools/static-hermes-runtime/toolchain-versions.json"],
-            "url": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/toolchain-versions.schema.json"
-        }
-    ],
     "notebook.defaultFormatter": "biomejs.biome",
     "notebook.output.wordWrap": true,
     "npm.packageManager": "pnpm",

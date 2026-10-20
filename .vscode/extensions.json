@@ -4,8 +4,6 @@
         "biomejs.biome",
         "TypeScriptTeam.native-preview",
         "redhat.vscode-yaml",
-        "tamasfe.even-better-toml",
-        "chdsbd.github-code-owners",
         "yoavbls.pretty-ts-errors",
         "streetsidesoftware.code-spell-checker",
         "jimeh.actionlint",

@@ -1,5 +1,5 @@
 name: Bootstrap
-description: Install pnpm and Node, restore and share pnpm and Turborepo caches, then install dependencies
+description: Install pnpm and Node, restore pnpm and Turborepo caches, then install dependencies
 
 inputs:
     cache-suffix:
@@ -7,29 +7,74 @@ inputs:
         required: false
         default: ''
 
+outputs:
+    save-caches:
+        description: '`true` when this run saves caches; other runs only restore them'
+        value: ${{ steps.cache-policy.outputs.save }}
+
 runs:
     using: composite
     steps:
         - name: 📦 Setup pnpm
-          uses: pnpm/action-setup@v6.1.0
+          uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
 
         - name: 🟢 Setup Node
-          uses: actions/setup-node@v7.1.0
+          uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
           with:
               node-version-file: .node-version
-              cache: pnpm
+
+        # Pull request caches are visible only to that pull request, so saving them spends the
+        # repository quota without helping other runs. Only default-branch pushes save caches;
+        # every other run restores the default branch's entries.
+        - name: 🔎 Resolve cache policy
+          id: cache-policy
+          shell: bash
+          env:
+              SAVE_CACHES: ${{ github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+          run: |
+              set -euo pipefail
+              {
+                  echo "save=$SAVE_CACHES"
+                  echo "pnpm-store=$(pnpm store path --silent)"
+              } >> "$GITHUB_OUTPUT"
+
+        - name: ♻️ Restore and save pnpm store
+          if: steps.cache-policy.outputs.save == 'true'
+          uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          with:
+              path: ${{ steps.cache-policy.outputs.pnpm-store }}
+              key: pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+        - name: ♻️ Restore pnpm store
+          if: steps.cache-policy.outputs.save != 'true'
+          uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          with:
+              path: ${{ steps.cache-policy.outputs.pnpm-store }}
+              key: pnpm-store-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
 
         - name: 📥 Install dependencies
           shell: bash
           run: pnpm install --frozen-lockfile
 
+        # actions/cache skips the save after an exact hit, so a rerun of the same commit adds no entry.
         - name: ♻️ Restore and save shared Turborepo cache
-          uses: actions/cache@v6.1.0
+          if: steps.cache-policy.outputs.save == 'true'
+          uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
           with:
               path: .turbo
-              key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ inputs.cache-suffix }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+              key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ inputs.cache-suffix }}-${{ github.sha }}
               restore-keys: |
-                  turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ inputs.cache-suffix }}-${{ github.sha }}-
                   turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ inputs.cache-suffix }}-
-                  turbo-v2-${{ runner.os }}-${{ runner.arch }}-build-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+                  turbo-v2-${{ runner.os }}-${{ runner.arch }}-build-${{ github.sha }}
+                  turbo-v2-${{ runner.os }}-${{ runner.arch }}-
+
+        - name: ♻️ Restore shared Turborepo cache
+          if: steps.cache-policy.outputs.save != 'true'
+          uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          with:
+              path: .turbo
+              key: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ inputs.cache-suffix }}-${{ github.sha }}
+              restore-keys: |
+                  turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ github.job }}${{ inputs.cache-suffix }}-
+                  turbo-v2-${{ runner.os }}-${{ runner.arch }}-build-${{ github.sha }}
                   turbo-v2-${{ runner.os }}-${{ runner.arch }}-

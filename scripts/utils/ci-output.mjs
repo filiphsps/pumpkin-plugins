@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 /** Locate command reports outside cached workspace outputs, scoped to this job and attempt. */
@@ -57,4 +59,19 @@ export function formatTestStats(stats) {
         ...(stats.skipped ? [`${stats.skipped} skipped`] : []),
         ...(stats.todo ? [`${stats.todo} todo`] : []),
     ].join(' · ');
+}
+
+/** Append a step output with a random heredoc delimiter, so line breaks in the value stay inside it. */
+export function setOutput(name, value) {
+    const outputFile = process.env.GITHUB_OUTPUT;
+    if (!outputFile) throw new Error('GITHUB_OUTPUT is required');
+    const delimiter = `ghadelimiter_${randomUUID()}`; // cspell:disable-line
+    fs.appendFileSync(outputFile, `${name}<<${delimiter}\n${value}\n${delimiter}\n`);
+}
+
+/** Read a required environment variable, trimmed, or throw an error naming it. */
+export function requiredEnvironment(name) {
+    const value = process.env[name]?.trim();
+    if (!value) throw new Error(`${name} is required`);
+    return value;
 }

@@ -23,7 +23,6 @@ on:
     push:
         branches:
             - master
-            - main
         paths:
             - '**'
             - '!**/*.md'
@@ -79,8 +78,8 @@ jobs:
         runs-on: ubuntu-26.04
         outputs:
             code: ${{ steps.classify.outputs.code }}
-            config_only: ${{ steps.label-config-scope.outputs.config_only }}
-            skip_expensive_checks: ${{ steps.release-commits.outputs.skip_expensive_checks }}
+            config_only: ${{ steps.classify.outputs.config_only }}
+            skip_expensive_checks: ${{ steps.classify.outputs.skip_expensive_checks }}
             actions: ${{ steps.classify.outputs.actions }}
             actions_to_test: ${{ steps.classify.outputs.actions_to_test }}
             extensions: ${{ steps.classify.outputs.extensions }}
@@ -88,15 +87,18 @@ jobs:
             generated_readmes: ${{ steps.classify.outputs.generated_readmes }}
             generator: ${{ steps.classify.outputs.generator }}
             integration_scope: ${{ steps.classify.outputs.integration_scope }}
-            integration_extra: ${{ steps.classify.outputs.integration_extra }}
             integration_packages: ${{ steps.classify.outputs.integration_packages }}
+            external_consumer_full: ${{ steps.classify.outputs.external_consumer_full }}
+            jobs: ${{ steps.select.outputs.jobs }}
         steps:
             - name: 🕶️ Checkout repository
               id: checkout-repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
                   # Diffing against the base needs the history behind it, not just the one commit.
+                  # Commits and trees are enough; the few blobs read at the base are fetched on demand.
                   fetch-depth: 0
+                  filter: blob:none
 
             - name: 📥 Fetch comparison base
               id: fetch-comparison-base
@@ -104,47 +106,11 @@ jobs:
                   BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
               run: git fetch --no-tags origin "$BASE"
 
-            - name: 🧭 Check whether the change only updates label configuration
-              id: label-config-scope
-              env:
-                  BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
-                  HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-              run: node scripts/changed-areas.mjs --config-only "$BASE" "$HEAD"
-
-            - name: 🧮 Identify release-only push commits
-              id: release-commits
-              env:
-                  EVENT_NAME: ${{ github.event_name }}
-                  REF: ${{ github.ref }}
-                  BASE: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
-                  HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-              run: |
-                  set -euo pipefail
-                  skip_expensive_checks=false
-                  if [[ "$EVENT_NAME" == 'push' && "$REF" == 'refs/heads/master' ]]; then
-                      subjects="$(git log --format=%s "$BASE..$HEAD")"
-                      if [[ -n "$subjects" ]]; then
-                          skip_expensive_checks=true
-                          has_release_commit=false
-                          while IFS= read -r subject; do
-                              case "$subject" in
-                                  'chore(master): release '*|'chore: retire first-release pins')
-                                      has_release_commit=true
-                                      ;;
-                                  'docs: update generated READMEs')
-                                      ;;
-                                  *)
-                                      skip_expensive_checks=false
-                                      break
-                                      ;;
-                              esac
-                          done <<< "$subjects"
-                          if [[ "$has_release_commit" != true ]]; then
-                              skip_expensive_checks=false
-                          fi
-                      fi
-                  fi
-                  printf 'skip_expensive_checks=%s\n' "$skip_expensive_checks" >> "$GITHUB_OUTPUT"
+            - name: 🟢 Setup Node
+              id: setup-node
+              uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+              with:
+                  node-version-file: .node-version
 
             # Everything else keys off this: a change that touches only documentation can't break a
             # build, a test or a plugin, so it skips the jobs that would tell us otherwise.
@@ -155,30 +121,25 @@ jobs:
                   HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
               run: node scripts/changed-areas.mjs "$BASE" "$HEAD"
 
+            # Every job's `if:` reads this selection, and ci-result checks results against it.
+            - name: 🧭 Select CI jobs
+              id: select
+              env:
+                  CHANGES: ${{ toJSON(steps.classify.outputs) }}
+              run: node scripts/ci-gate.mjs select
+
             - name: 📋 Selected checks
               id: selected-checks
               if: always()
               uses: ./.github/common/job-summary
               with:
                   title: Selected CI checks
-                  steps: ${{ toJSON(steps) }}
                   facts: ${{ toJSON(steps.classify.outputs) }}
 
     commits:
         name: 💬 Commit messages
         needs: [changes]
-        if: >-
-            ${{
-              github.event_name == 'pull_request' &&
-              (
-                needs.changes.outputs.code == 'true' ||
-                needs.changes.outputs.actions != '[]' ||
-                needs.changes.outputs.actions_to_test != '[]' ||
-                needs.changes.outputs.extensions != '[]' ||
-                needs.changes.outputs.extensions_to_test != '[]' ||
-                needs.changes.outputs.generated_readmes == 'true'
-              )
-            }}
+        if: fromJSON(needs.changes.outputs.jobs).commits
         timeout-minutes: 5
         runs-on: ubuntu-26.04
         permissions:
@@ -186,23 +147,23 @@ jobs:
             pull-requests: read
         steps:
             - name: 🕶️ Checkout repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: 💬 Lint commits
-              uses: wagoid/commitlint-github-action@v6.2.1
+              uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed # v6.2.1
               with:
                   configFile: commitlint.config.mjs
 
     lint:
         name: 📋 Lint
         needs: [changes]
-        if: needs.changes.outputs.code == 'true'
+        if: fromJSON(needs.changes.outputs.jobs).lint
         timeout-minutes: 15
         runs-on: ubuntu-26.04
         steps:
             - name: 🕶️ Checkout repository
               id: checkout-repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: 🚀 Bootstrap
               id: bootstrap
@@ -218,18 +179,17 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Repository lint
-                  steps: ${{ toJSON(steps) }}
 
     typecheck:
         name: ✅ Typecheck
         needs: [changes]
-        if: needs.changes.outputs.code == 'true'
+        if: fromJSON(needs.changes.outputs.jobs).typecheck
         timeout-minutes: 15
         runs-on: ubuntu-26.04
         steps:
             - name: 🕶️ Checkout repository
               id: checkout-repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: 🚀 Bootstrap
               id: bootstrap
@@ -245,22 +205,17 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Workspace typecheck
-                  steps: ${{ toJSON(steps) }}
 
     test:
         name: 🧪 Test
         needs: [changes]
-        if: >-
-            ${{
-              (needs.changes.outputs.code == 'true' || needs.changes.outputs.actions_to_test != '[]') &&
-              needs.changes.outputs.skip_expensive_checks != 'true'
-            }}
+        if: fromJSON(needs.changes.outputs.jobs).test
         timeout-minutes: 15
         runs-on: ubuntu-26.04
         steps:
             - name: 🕶️ Checkout repository
               id: checkout-repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: 🚀 Bootstrap
               id: bootstrap
@@ -272,7 +227,7 @@ jobs:
 
             - name: ☂️ Upload coverage
               id: upload-coverage
-              uses: codecov/codecov-action@v7.1.1
+              uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
               with:
                   directory: .
                   flags: tooling,guest
@@ -282,7 +237,7 @@ jobs:
             - name: 📦 Preserve coverage evidence
               id: preserve-coverage-evidence
               if: ${{ !cancelled() && steps.bootstrap.outcome == 'success' }}
-              uses: actions/upload-artifact@v7.0.2
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   name: coverage-evidence
                   retention-days: 7
@@ -300,116 +255,26 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Behavior tests and coverage
-                  steps: ${{ toJSON(steps) }}
                   tests: 'true'
-
-    action-tests:
-        name: 🧪 Action tests
-        needs: [changes]
-        if: needs.changes.outputs.actions_to_test != '[]'
-        uses: ./.github/workflows/actions.yml
-        with:
-            actions: ${{ needs.changes.outputs.actions_to_test }}
-        secrets:
-            CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-    action-gate:
-        name: 🛡️ Action test gate
-        needs: [changes, action-tests]
-        if: >-
-            ${{
-              always() &&
-              needs.changes.outputs.config_only != 'true' &&
-              !startsWith(github.head_ref, 'release-please--branches--')
-            }}
-        timeout-minutes: 5
-        runs-on: ubuntu-26.04
-        steps:
-            - name: 🛡️ Require selected action suites to pass
-              env:
-                  CHANGES_RESULT: ${{ needs.changes.result }}
-                  ACTIONS: ${{ needs.changes.outputs.actions_to_test }}
-                  TEST_RESULT: ${{ needs['action-tests'].result }}
-              run: |
-                  if [[ "$CHANGES_RESULT" != 'success' ]]; then
-                      echo 'Change classification failed.' >&2
-                      exit 1
-                  fi
-                  if [[ "$ACTIONS" == '[]' && "$TEST_RESULT" == 'skipped' ]]; then
-                      exit 0
-                  fi
-                  if [[ "$ACTIONS" != '[]' && "$TEST_RESULT" == 'success' ]]; then
-                      exit 0
-                  fi
-                  echo "Required action verification did not pass: $TEST_RESULT" >&2
-                  exit 1
 
     extension-tests:
         name: 🧪 Extension tests
         needs: [changes]
-        if: needs.changes.outputs.extensions_to_test != '[]'
+        if: fromJSON(needs.changes.outputs.jobs)['extension-tests']
         uses: ./.github/workflows/extensions.yml
         with:
             extensions: ${{ needs.changes.outputs.extensions_to_test }}
 
-    extension-gate:
-        name: 🛡️ Extension test gate
-        needs: [changes, extension-tests]
-        if: >-
-            ${{
-              always() &&
-              needs.changes.outputs.config_only != 'true' &&
-              !startsWith(github.head_ref, 'release-please--branches--')
-            }}
-        timeout-minutes: 5
-        runs-on: ubuntu-26.04
-        steps:
-            - name: 🛡️ Require selected extension suites to pass
-              env:
-                  CHANGES_RESULT: ${{ needs.changes.result }}
-                  EXTENSIONS: ${{ needs.changes.outputs.extensions_to_test }}
-                  TEST_RESULT: ${{ needs['extension-tests'].result }}
-              run: |
-                  if [[ "$CHANGES_RESULT" != 'success' ]]; then
-                      echo 'Change classification failed.' >&2
-                      exit 1
-                  fi
-                  if [[ "$EXTENSIONS" == '[]' && "$TEST_RESULT" == 'skipped' ]]; then
-                      exit 0
-                  fi
-                  if [[ "$EXTENSIONS" != '[]' && "$TEST_RESULT" == 'success' ]]; then
-                      exit 0
-                  fi
-                  echo "Required extension verification did not pass: $TEST_RESULT" >&2
-                  exit 1
-
     docs:
         name: 📝 Docs and config
         needs: [changes]
-        if: >-
-            ${{
-              needs.changes.outputs.code == 'true' ||
-              needs.changes.outputs.actions != '[]' ||
-              needs.changes.outputs.actions_to_test != '[]' ||
-              needs.changes.outputs.extensions != '[]' ||
-              needs.changes.outputs.extensions_to_test != '[]' ||
-              needs.changes.outputs.generated_readmes == 'true' ||
-              (
-                github.event_name == 'push' &&
-                needs.changes.outputs.code != 'true' &&
-                needs.changes.outputs.actions == '[]' &&
-                needs.changes.outputs.actions_to_test == '[]' &&
-                needs.changes.outputs.extensions == '[]' &&
-                needs.changes.outputs.extensions_to_test == '[]' &&
-                needs.changes.outputs.config_only != 'true'
-              )
-            }}
+        if: fromJSON(needs.changes.outputs.jobs).docs
         timeout-minutes: 10
         runs-on: ubuntu-26.04
         steps:
             - name: 🕶️ Checkout repository
               id: checkout-repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: 🚀 Bootstrap
               id: bootstrap
@@ -430,18 +295,17 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Documentation and configuration
-                  steps: ${{ toJSON(steps) }}
 
     build:
         name: 🔨 Build
         needs: [changes]
-        if: needs.changes.outputs.code == 'true'
+        if: fromJSON(needs.changes.outputs.jobs).build
         timeout-minutes: 60
         runs-on: ubuntu-26.04
         steps:
             - name: 🕶️ Checkout repository
               id: checkout-repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: 🚀 Bootstrap
               id: bootstrap
@@ -455,10 +319,12 @@ jobs:
               id: prepare-hermes
               run: pnpm --filter @pumpkin-plugins/static-hermes-runtime prepare-hermes
 
+            # Integration and Generator restore this build later in the same run, so a pull request
+            # that changes the toolchain saves it too. An exact hit has nothing new to save.
             - name: 💾 Save Static Hermes build cache
               id: save-static-hermes-build-cache
-              if: steps.prepare-hermes.outcome == 'success'
-              uses: actions/cache/save@v6.1.0
+              if: steps.prepare-hermes.outcome == 'success' && steps.setup-hermes.outputs.hermes-cache-hit != 'true'
+              uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
                   path: ${{ github.workspace }}/.cache/hermes
                   key: ${{ steps.setup-hermes.outputs.hermes-cache-key }}
@@ -466,31 +332,24 @@ jobs:
             - name: 🔨 Build All
               id: build-all
               run: node scripts/ci-run.mjs "Build production components" -- pnpm run build
+              env:
+                  # Standalone builds only warn; the repository keeps every component under 5 MiB.
+                  PUMPKIN_PLUGINS_FAIL_ON_SIZE_LIMIT: '1'
 
+            # A quick check that a Static Hermes build loads on a real server before anything is
+            # signed, even when the change selects no integration suites. The test only reads build/.
             - name: 🔬 Run Static Hermes integration test
               id: run-static-hermes-integration-test
               run: node scripts/ci-run.mjs "Static Hermes smoke test" -- pnpm turbo run test:integration --filter=@pumpkin-plugins/apple-skin-pumpkin
 
-            - name: 📦 Build release artifacts
-              id: build-release-artifacts
-              run: node scripts/ci-run.mjs "Build release components" -- pnpm run build
-
-            # Fork PRs cannot access repository secrets. Sign their CI artifacts with a run-only
-            # key so the build and integration artifacts are always signed without exposing the
-            # repository release key.
+            # The release workflow signs every published asset again with the repository key, so CI
+            # signs with a run-only key and never puts the release key in this job's environment.
             - name: 🔏 Prepare signing key
               id: prepare-signing-key
-              env:
-                  PLUGIN_SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY }}
               run: |
-                  PLUGIN_SIGNING_KEY="$(printf '%s' "$PLUGIN_SIGNING_KEY" | tr -d '[:space:]')"
-                  if [ "$GITHUB_EVENT_NAME" != "push" ] || [ -z "$PLUGIN_SIGNING_KEY" ]; then
-                      PLUGIN_SIGNING_KEY="$(node --input-type=module -e 'import { generateKeyPair } from "@pumpkin-plugins/signing"; process.stdout.write(generateKeyPair().secretKeyHex);')"
-                      echo "::add-mask::$PLUGIN_SIGNING_KEY"
-                      echo "signing-mode=Signing key: run-only CI key; these artifacts cannot be published." >> "$GITHUB_OUTPUT"
-                  else
-                      echo "signing-mode=Signing key: repository release key." >> "$GITHUB_OUTPUT"
-                  fi
+                  PLUGIN_SIGNING_KEY="$(node --input-type=module -e 'import { generateKeyPair } from "@pumpkin-plugins/signing"; process.stdout.write(generateKeyPair().secretKeyHex);')"
+                  echo "::add-mask::$PLUGIN_SIGNING_KEY"
+                  echo "signing-mode=Signing key: run-only CI key; these artifacts cannot be published." >> "$GITHUB_OUTPUT"
                   echo "PLUGIN_SIGNING_KEY=$PLUGIN_SIGNING_KEY" >> "$GITHUB_ENV"
 
             - name: 📦 Collect plugin artifacts
@@ -526,7 +385,7 @@ jobs:
 
             - name: 📦 Upload build artifact
               id: upload-signed-plugins
-              uses: actions/upload-artifact@v7.0.2
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   retention-days: 1
                   overwrite: true
@@ -537,7 +396,7 @@ jobs:
 
             - name: 📦 Upload plugin builds for integration tests
               id: upload-plugin-builds-for-integration-tests
-              uses: actions/upload-artifact@v7.0.2
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   retention-days: 1
                   overwrite: true
@@ -548,7 +407,7 @@ jobs:
 
             - name: 📦 Upload update-check fixture
               id: upload-update-check-fixture
-              uses: actions/upload-artifact@v7.0.2
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   retention-days: 1
                   overwrite: true
@@ -563,7 +422,6 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Plugin build
-                  steps: ${{ toJSON(steps) }}
                   artifact-url: ${{ steps.upload-signed-plugins.outputs.artifact-url }}
                   link-label: Download signed plugins and SHA-256 checksums
                   plugins-manifest: ${{ runner.temp }}/plugins.json
@@ -572,42 +430,25 @@ jobs:
     external-consumer:
         name: 📦 External consumer
         needs: [changes]
-        if: >-
-            ${{
-              needs.changes.outputs.code == 'true' &&
-              needs.changes.outputs.skip_expensive_checks != 'true'
-            }}
+        if: fromJSON(needs.changes.outputs.jobs)['external-consumer']
         uses: ./.github/workflows/external-consumer.yml
 
     engine-comparison:
         name: 📊 Engine comparison
         needs: [changes, build]
-        if: >-
-            ${{
-              needs.changes.outputs.code == 'true' &&
-              needs.changes.outputs.skip_expensive_checks != 'true'
-            }}
+        if: fromJSON(needs.changes.outputs.jobs)['engine-comparison']
         uses: ./.github/workflows/engine-comparison.yml
 
     integration:
         name: 🎃 Integration (real Pumpkin)
         needs: [changes, build]
-        if: >-
-            ${{
-              needs.changes.outputs.skip_expensive_checks != 'true' &&
-              (
-                needs.changes.outputs.integration_scope == 'affected' ||
-                needs.changes.outputs.integration_scope == 'all'
-              )
-            }}
+        if: fromJSON(needs.changes.outputs.jobs).integration
         timeout-minutes: 60
         runs-on: ubuntu-26.04
         steps:
             - name: 🕶️ Checkout repository
               id: checkout-repository
-              uses: actions/checkout@v7.0.1
-              with:
-                  fetch-depth: 0
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: 🚀 Bootstrap
               id: bootstrap
@@ -623,14 +464,14 @@ jobs:
 
             - name: 📥 Download plugin builds
               id: download-plugin-builds
-              uses: actions/download-artifact@v8.0.2
+              uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
               with:
                   name: plugin-wasm
                   path: packages/
 
             - name: 📥 Download update-check fixture
               id: download-update-check-fixture
-              uses: actions/download-artifact@v8.0.2
+              uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
               with:
                   name: update-check-fixture
                   path: tools/update-check/build/
@@ -643,7 +484,6 @@ jobs:
               id: integration-tests
               env:
                   INTEGRATION_SCOPE: ${{ needs.changes.outputs.integration_scope }}
-                  INTEGRATION_EXTRA: ${{ needs.changes.outputs.integration_extra }}
                   INTEGRATION_PACKAGES: ${{ needs.changes.outputs.integration_packages || '[]' }}
                   PUMPKIN_TEST_LOG_DIR: ${{ runner.temp }}/pumpkin-logs
               run: |
@@ -657,9 +497,6 @@ jobs:
                       while IFS= read -r package; do
                           filters+=(--filter="...$package")
                       done < <(node -e 'for (const name of JSON.parse(process.env.INTEGRATION_PACKAGES)) console.log(name)')
-                      if [ -n "$INTEGRATION_EXTRA" ]; then
-                          filters+=(--filter="$INTEGRATION_EXTRA")
-                      fi
                       pnpm turbo run test:integration --concurrency=2 --only "${filters[@]}"
                   else
                       pnpm turbo run test:integration --concurrency=2 --only
@@ -669,9 +506,10 @@ jobs:
             - name: 📤 Upload server logs
               id: upload-server-logs
               if: failure()
-              uses: actions/upload-artifact@v7.0.2
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   retention-days: 1
+                  overwrite: true
                   name: pumpkin-logs
                   path: ${{ runner.temp }}/pumpkin-logs
                   if-no-files-found: ignore
@@ -682,61 +520,19 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Real-server integration tests
-                  steps: ${{ toJSON(steps) }}
                   tests: 'true'
-
-    integration-gate:
-        name: 🛡️ Integration gate
-        needs: [changes, integration]
-        if: >-
-            ${{
-              always() &&
-              needs.changes.outputs.config_only != 'true' &&
-              !startsWith(github.head_ref, 'release-please--branches--')
-            }}
-        timeout-minutes: 5
-        runs-on: ubuntu-26.04
-        steps:
-            - name: 🛡️ Require integration tests when relevant changes are selected
-              env:
-                  CHANGES_RESULT: ${{ needs.changes.result }}
-                  INTEGRATION_SCOPE: ${{ needs.changes.outputs.integration_scope }}
-                  SKIP_EXPENSIVE_CHECKS: ${{ needs.changes.outputs.skip_expensive_checks }}
-                  INTEGRATION_RESULT: ${{ needs.integration.result }}
-              run: |
-                  if [[ "$CHANGES_RESULT" != 'success' ]]; then
-                      echo 'Change classification failed.' >&2
-                      exit 1
-                  fi
-                  if [[ "$SKIP_EXPENSIVE_CHECKS" == 'true' && "$INTEGRATION_RESULT" == 'skipped' ]]; then
-                      exit 0
-                  fi
-                  if [[ "$INTEGRATION_SCOPE" == 'none' || "$INTEGRATION_SCOPE" == 'benchmark' ]]; then
-                      if [[ "$INTEGRATION_RESULT" == 'skipped' ]]; then
-                          exit 0
-                      fi
-                  fi
-                  if [[ ("$INTEGRATION_SCOPE" == 'affected' || "$INTEGRATION_SCOPE" == 'all') && "$INTEGRATION_RESULT" == 'success' ]]; then
-                      exit 0
-                  fi
-                  echo "Required integration verification for scope $INTEGRATION_SCOPE did not pass: $INTEGRATION_RESULT" >&2
-                  exit 1
 
     generator:
         name: 🧬 Generator
         # Build saves the prepared Static Hermes cache that this job restores.
         needs: [changes, lint, build]
-        if: >-
-            ${{
-              needs.changes.outputs.generator == 'true' &&
-              needs.changes.outputs.skip_expensive_checks != 'true'
-            }}
+        if: fromJSON(needs.changes.outputs.jobs).generator
         timeout-minutes: 60
         runs-on: ubuntu-26.04
         steps:
             - name: 🕶️ Checkout repository
               id: checkout-repository
-              uses: actions/checkout@v7.0.1
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
             - name: 🚀 Bootstrap
               id: bootstrap
@@ -796,9 +592,10 @@ jobs:
             - name: 📤 Upload server logs
               id: upload-server-logs
               if: failure()
-              uses: actions/upload-artifact@v7.0.2
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   retention-days: 1
+                  overwrite: true
                   name: generator-pumpkin-logs
                   path: ${{ runner.temp }}/pumpkin-logs
                   if-no-files-found: ignore
@@ -809,47 +606,41 @@ jobs:
               uses: ./.github/common/job-summary
               with:
                   title: Generator smoke tests
-                  steps: ${{ toJSON(steps) }}
                   tests: 'true'
 
-    generator-gate:
-        name: 🛡️ Generator gate
-        needs: [changes, generator]
-        if: >-
-            ${{
-              always() &&
-              needs.changes.outputs.config_only != 'true' &&
-              !startsWith(github.head_ref, 'release-please--branches--')
-            }}
+    # The single required status check: it fails when a job the change needs did not pass, or when
+    # any job failed. scripts/ci-gate.mjs holds the selection table that every job's `if:` reads.
+    ci-result:
+        name: 🛡️ CI result
+        needs: [changes, commits, lint, typecheck, test, extension-tests, docs, build, external-consumer, integration, generator]
+        if: ${{ always() && !startsWith(github.head_ref, 'release-please--branches--') }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04
         steps:
-            - name: 🛡️ Require the generator smoke test when selected
+            - name: 🕶️ Checkout repository
+              id: checkout-repository
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  sparse-checkout: |
+                      .node-version
+                      scripts/ci-gate.mjs
+                  sparse-checkout-cone-mode: false
+
+            - name: 🟢 Setup Node
+              id: setup-node
+              uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+              with:
+                  node-version-file: .node-version
+
+            - name: 🛡️ Require every selected job to pass
+              id: check-results
               env:
-                  CHANGES_RESULT: ${{ needs.changes.result }}
-                  GENERATOR: ${{ needs.changes.outputs.generator }}
-                  SKIP_EXPENSIVE_CHECKS: ${{ needs.changes.outputs.skip_expensive_checks }}
-                  GENERATOR_RESULT: ${{ needs.generator.result }}
-              run: |
-                  if [[ "$CHANGES_RESULT" != 'success' ]]; then
-                      echo 'Change classification failed.' >&2
-                      exit 1
-                  fi
-                  if [[ "$SKIP_EXPENSIVE_CHECKS" == 'true' && "$GENERATOR_RESULT" == 'skipped' ]]; then
-                      exit 0
-                  fi
-                  if [[ "$GENERATOR" != 'true' && "$GENERATOR_RESULT" == 'skipped' ]]; then
-                      exit 0
-                  fi
-                  if [[ "$GENERATOR" == 'true' && "$GENERATOR_RESULT" == 'success' ]]; then
-                      exit 0
-                  fi
-                  echo "Required generator verification did not pass: $GENERATOR_RESULT" >&2
-                  exit 1
+                  NEEDS: ${{ toJSON(needs) }}
+              run: node scripts/ci-gate.mjs check
 
     release:
         name: 🚢 Release
-        needs: [changes, lint, typecheck, build, external-consumer, test, docs, integration-gate, action-gate, extension-gate, generator-gate]
+        needs: [ci-result]
         if: >-
             ${{
               always() &&
@@ -859,57 +650,7 @@ jobs:
                   github.ref == 'refs/heads/master' &&
                   inputs.release_commit != ''
                 ) ||
-                (
-                  github.event_name == 'push' &&
-                  needs.changes.result == 'success' &&
-                  needs.docs.result == 'success' &&
-                  needs['action-gate'].result == 'success' &&
-                  needs['extension-gate'].result == 'success' &&
-                  needs['integration-gate'].result == 'success' &&
-                  needs['generator-gate'].result == 'success' &&
-                  (
-                    (
-                      needs.changes.outputs.code == 'true' &&
-                      needs.lint.result == 'success' &&
-                      needs.typecheck.result == 'success' &&
-                      needs.build.result == 'success' &&
-                      (
-                        needs['external-consumer'].result == 'success' ||
-                        (
-                          needs.changes.outputs.skip_expensive_checks == 'true' &&
-                          needs['external-consumer'].result == 'skipped'
-                        )
-                      ) &&
-                      (
-                        needs.test.result == 'success' ||
-                        (
-                          needs.changes.outputs.skip_expensive_checks == 'true' &&
-                          needs.test.result == 'skipped'
-                        )
-                      )
-                    ) ||
-                    (
-                      needs.changes.outputs.code != 'true' &&
-                      (
-                        needs.changes.outputs.actions_to_test == '[]' ||
-                        needs.test.result == 'success' ||
-                        (
-                          needs.changes.outputs.skip_expensive_checks == 'true' &&
-                          needs.test.result == 'skipped'
-                        )
-                      ) &&
-                      (
-                        needs.changes.outputs.actions != '[]' ||
-                        needs.changes.outputs.extensions != '[]' ||
-                        (
-                          needs.changes.outputs.actions_to_test == '[]' &&
-                          needs.changes.outputs.extensions_to_test == '[]' &&
-                          needs.changes.outputs.config_only != 'true'
-                        )
-                      )
-                    )
-                  )
-                )
+                (github.event_name == 'push' && needs['ci-result'].result == 'success')
               )
             }}
         permissions:
@@ -920,64 +661,3 @@ jobs:
             release_commit: ${{ inputs.release_commit || '' }}
             tool_only: ${{ github.event_name == 'workflow_dispatch' }}
         secrets: inherit
-
-    cleanup:
-        name: 🧹 Cleanup artifacts
-        needs: [changes, build, engine-comparison, integration, release]
-        if: >-
-            ${{
-              always() &&
-              needs.changes.outputs.config_only != 'true' &&
-              !startsWith(github.head_ref, 'release-please--branches--') &&
-              (
-                github.event_name != 'pull_request' ||
-                (
-                  github.actor != 'dependabot[bot]' &&
-                  github.event.pull_request.head.repo.full_name == github.repository
-                )
-              )
-            }}
-        timeout-minutes: 5
-        runs-on: ubuntu-26.04
-        permissions:
-            actions: write
-        steps:
-            - name: 🧹 Delete artifacts after their last consumer
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  CLEAN_INTEGRATION_ARTIFACTS: ${{ needs.integration.result == 'success' || needs.integration.result == 'skipped' }}
-                  CLEAN_RELEASE_ARTIFACTS: ${{ needs.release.result == 'success' }}
-              run: |
-                  artifact_records="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts" \
-                      --jq '.artifacts[] | [.id, .name] | @tsv')"
-                  if [ -z "$artifact_records" ]; then
-                      echo "No temporary artifacts to delete"
-                      exit 0
-                  fi
-                  while IFS=$'\t' read -r artifact_id artifact_name; do
-                      [ -z "$artifact_id" ] && continue
-                      case "$artifact_name" in
-                          # The workflow_run commenter reads the report after CI finishes. SVGs live on the chart branch.
-                          plugins|engine-comparison-report)
-                              echo "Keeping $artifact_name for run history or benchmark comments"
-                              continue
-                              ;;
-                          plugin-wasm|update-check-fixture)
-                              if [ "$CLEAN_INTEGRATION_ARTIFACTS" != true ]; then
-                                  echo "Keeping $artifact_name so the failed integration job can be retried"
-                                  continue
-                              fi
-                              ;;
-                          release-*)
-                              if [ "$CLEAN_RELEASE_ARTIFACTS" != true ]; then
-                                  echo "Keeping $artifact_name so the failed release can be retried"
-                                  continue
-                              fi
-                              ;;
-                          *)
-                              continue
-                              ;;
-                      esac
-                      gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id"
-                      echo "Deleted $artifact_name artifact $artifact_id"
-                  done <<< "$artifact_records"

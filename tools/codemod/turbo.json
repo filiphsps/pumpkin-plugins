@@ -20,8 +20,7 @@
                 "transit",
                 "@pumpkin-plugins/static-analysis#build",
                 "@pumpkin-plugins/wasi-capabilities#build"
-            ],
-            "outputs": []
+            ]
         },
         "readme": {
             "dependsOn": ["@pumpkin-plugins/static-analysis#build", "@pumpkin-plugins/wasi-capabilities#build"]

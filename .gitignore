@@ -1,5 +1,8 @@
 node_modules/
 dist/
+build/
+# The builder package is source, not build output
+!/tools/build/
 *.wasm
 *.tgz
 .DS_Store

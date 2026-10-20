@@ -4,16 +4,23 @@
     // commitlint.config.mjs and release-please reads all of them on master.
     "extends": [
         ":semanticCommits",
-        // Exact versions, the way saveExact: true in pnpm-workspace.yaml and the pinned tags of the
-        // CI actions already do it. The shared versions stay in the catalog, and Renovate edits the
-        // catalog entry instead of every `catalog:` reference.
+        // Exact versions, the way saveExact: true in pnpm-workspace.yaml already does it. The shared
+        // versions stay in the catalog, and Renovate edits the catalog entry instead of every
+        // `catalog:` reference.
         ":pinVersions",
+        // Jobs run the CI actions with write-scoped tokens and secrets, so every action stays pinned
+        // to a commit SHA with its release in a trailing comment. Renovate updates both together and
+        // pins any action that is added by tag.
+        "helpers:pinGitHubActionDigests",
         // Patch and minor updates merge themselves once CI is green. Majors come as a pull request:
         // the plugin ABI, the pinned Pumpkin release and the WASI WITs move on purpose.
         ":automergeMinor",
         // The lockfile pins a lot of transitives exactly, so give it a weekly refresh.
         ":maintainLockFilesWeekly"
     ],
+    // A new release has to be three days old before Renovate merges it, so a compromised publish
+    // has time to be pulled before CI runs it.
+    "minimumReleaseAge": "3 days",
     "labels": ["dependencies"],
     "dependencyDashboardLabels": ["dependencies"],
     "packageRules": [
@@ -25,13 +32,13 @@
             "description": "Pinned Node.js ambient types; update intentionally with the Node baseline"
         },
         {
-            // The catalog entry in pnpm-workspace.yaml is a tarball URL for one plugin ABI, and it
-            // has to change together with PUMPKIN_RELEASE in
-            // tools/test-harness/src/pumpkin-version.ts. Renovate can't see that link, so it leaves
-            // this package alone.
-            "matchPackageNames": ["@pumpkinmc/pumpkin-api-ts"],
-            "enabled": false,
-            "description": "Pinned to the Pumpkin release the integration tests run against"
+            // Release Please only releases feat, fix and perf commits. Runtime dependencies and
+            // catalog entries can end up in published packages, so their updates are fixes. The
+            // release scripts attach a catalog update only to the packages whose shipped source
+            // uses that entry.
+            "matchDepTypes": ["dependencies", "pnpm.catalog.default"],
+            "semanticCommitType": "fix",
+            "description": "Release shipped dependency updates"
         }
     ]
 }
