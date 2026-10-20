@@ -612,7 +612,7 @@ jobs:
     # any job failed. scripts/ci-gate.mjs holds the selection table that every job's `if:` reads.
     ci-result:
         name: 🛡️ CI result
-        needs: [changes, commits, lint, typecheck, test, extension-tests, docs, build, external-consumer, integration, generator]
+        needs: [changes, commits, lint, typecheck, test, extension-tests, docs, build, external-consumer, engine-comparison, integration, generator]
         if: ${{ always() && !startsWith(github.head_ref, 'release-please--branches--') }}
         timeout-minutes: 5
         runs-on: ubuntu-26.04

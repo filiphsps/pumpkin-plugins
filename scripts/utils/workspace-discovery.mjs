@@ -33,12 +33,8 @@ export function discoverWorkspace(root) {
             }
         }
     }
-    // The Turborepo configuration is the root JSON file with tasks and global dependencies.
-    const turboConfigFile = files.find((file) => {
-        if (file.includes('/') || !file.endsWith('.json')) return false;
-        const config = JSON.parse(read(file));
-        return config.tasks && Array.isArray(config.globalDependencies);
-    });
+    // Turborepo reads its configuration from the repository root.
+    const turboConfigFile = files.find((file) => file === 'turbo.json');
     return {
         files,
         read,
