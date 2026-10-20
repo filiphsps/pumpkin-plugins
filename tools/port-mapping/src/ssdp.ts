@@ -34,7 +34,7 @@ export function searchRequest(target: string, host: Endpoint = SSDP_ADDRESS): Ui
  * @returns Where its description document is, or undefined when this isn't an answer.
  */
 export function parseSearchResponse(data: Uint8Array): string | undefined {
-    const lines = strFromU8(data).split('\r\n');
+    const lines = strFromU8(data).split(/\r?\n/);
     if (!/^HTTP\/1\.1 200/i.test(lines[0] ?? '')) return undefined;
     for (const line of lines) {
         const colon = line.indexOf(':');

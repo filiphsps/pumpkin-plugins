@@ -40,7 +40,7 @@ export interface MapperInfo {
 
 /** Settings of a `PortMapper`. */
 export interface MapperOptions extends Omit<DiscoveryOptions, 'searchMs'> {
-    /** How long routers keep a mapping without a renewal. Renewed at half this time. */
+    /** How long routers keep a mapping without a renewal. Renewed at half this time, and at least every five minutes. */
     leaseSeconds: number;
     /**
      * Where messages for the server log go. Failures come with the level `warn`, and each is said
@@ -75,6 +75,9 @@ class OwnershipConflictError extends Error {}
 const RETRY_MS = 30_000;
 const MAX_RETRY_MS = 10 * 60_000;
 const LOCAL_CHECK_MS = 60_000;
+// Each renewal re-adds the mapping and re-reads the WAN address, so this bounds how long a router
+// reboot or a new WAN address goes unnoticed.
+const MAX_RENEW_MS = 5 * 60_000;
 const PORT_TRIES = 3;
 
 const sameSpec = (a: MappingSpec, b: MappingSpec) =>
@@ -87,8 +90,17 @@ const backoff = (failures: number) => Math.min(RETRY_MS * 2 ** Math.max(0, failu
 const refusedText = ({ identity, reason }: { identity: RouterIdentity; reason: string }) =>
     `${describeIdentity(identity)} cannot be used: ${reason}`;
 const reason = (err: unknown) => (err instanceof Error ? err.message : String(err));
-const nonPublicExternalAddressReason = (address: Ipv4) =>
-    `the router's address on the internet is ${formatIpv4(address)}, which is not public (your provider shares one address between customers)`;
+/** Names the likely cause of a WAN address that is not public, since each needs a different fix. */
+function nonPublicExternalAddressReason(address: Ipv4): string {
+    const [a, b] = address;
+    const prefix = `the router's address on the internet is ${formatIpv4(address)}, which is not public`;
+    if (address.every((octet) => octet === 0)) return `${prefix}: the router has no internet connection right now`;
+    if (a === 100 && b >= 64 && b <= 127) return `${prefix}: your provider shares one address between customers`;
+    if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) {
+        return `${prefix}: another router sits between it and the internet; forward the ports on that router or put it in bridge mode`;
+    }
+    return prefix;
+}
 
 /**
  * Keeps a set of ports open on the router: finds the router, opens each port, renews it before the
@@ -100,6 +112,7 @@ export class PortMapper {
     private removals: { found: Discovered; request: MappingRequest }[] = [];
     private discovered: Discovered | undefined;
     private job: Task<void> | undefined;
+    private jobIsSearch = false;
     private discoveryRetryAt = 0;
     private discoveryFailures = 0;
     private lastDiscoveryFailure: string | undefined;
@@ -186,7 +199,7 @@ export class PortMapper {
         }
         if (this.publicHost(now)) return;
         if (!this.discovered) {
-            if (this.entries.size > 0 && now >= this.discoveryRetryAt) this.start(this.search());
+            if (this.entries.size > 0 && now >= this.discoveryRetryAt) this.start(this.search(), true);
             return;
         }
         const gateway = this.discovered;
@@ -208,6 +221,8 @@ export class PortMapper {
         for (const key of [...this.entries.keys()]) this.release(key);
         let closing = false;
         try {
+            // A search leaves nothing on the router, and applied mappings carry their own router.
+            if (this.jobIsSearch) this.job?.cancel();
             // Account for creation already sent before deleting its resulting physical mapping.
             while (this.job?.poll().state === 'running') yield;
             this.job = undefined;
@@ -268,8 +283,9 @@ export class PortMapper {
         return [...this.entries.values()].some((entry) => entry.mapping === mapping);
     }
 
-    private start(steps: Steps<void>): void {
+    private start(steps: Steps<void>, isSearch = false): void {
         this.job = new Task(steps);
+        this.jobIsSearch = isSearch;
         this.job.poll();
     }
 
@@ -417,7 +433,8 @@ export class PortMapper {
             this.warned.delete(`open:${key}`);
             // Permanent leases still need recovery after router reboot or WAN address changes.
             entry.renewAt =
-                this.net.now() + (result.leaseSeconds > 0 ? (result.leaseSeconds * 1000) / 2 : LOCAL_CHECK_MS);
+                this.net.now() +
+                (result.leaseSeconds > 0 ? Math.min((result.leaseSeconds * 1000) / 2, MAX_RENEW_MS) : LOCAL_CHECK_MS);
             if (!wasOpen) {
                 this.options.log?.(
                     `Opened ${entry.spec.protocol.toUpperCase()} port ${entry.spec.port} as ${formatIpv4(address)}:${result.externalPort} (${gateway.kind}).`,
