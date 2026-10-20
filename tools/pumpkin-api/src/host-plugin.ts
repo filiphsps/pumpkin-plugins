@@ -1,6 +1,6 @@
 import * as scheduler from 'pumpkin:plugin/scheduler@0.1.0';
 import { Plugin as CorePlugin, type TaskHandler } from './core.ts';
-import { getTaskHandlerId, registerTaskHandler, releaseTaskHandler, trackTaskId } from './handler-registry.ts';
+import { getTaskHandlerId, registerTaskHandler, releaseTaskHandler, trackTaskId } from './task-registry.ts';
 
 const MAX_U64 = (1n << 64n) - 1n;
 

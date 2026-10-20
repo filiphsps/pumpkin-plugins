@@ -1,0 +1,378 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/schemas/pumpkin-api-compatibility.schema.json",
+    "title": "Pumpkin API compatibility matrix",
+    "description": "Compatibility decisions for the Pumpkin API, its upstream WIT declarations, and migration notes.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "$schema",
+        "baseline",
+        "replacement",
+        "sourceWit",
+        "sourceWitSha256",
+        "defaultExport",
+        "runtimeExports",
+        "publicTypes",
+        "inventory",
+        "interfaces",
+        "deviations",
+        "sourceChanges"
+    ],
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "format": "uri-reference",
+            "const": "https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/schemas/pumpkin-api-compatibility.schema.json",
+            "minLength": 1
+        },
+        "baseline": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["package", "version", "archive", "integrity", "pumpkinRelease", "license"],
+            "properties": {
+                "package": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "version": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "archive": {
+                    "type": "string",
+                    "format": "uri",
+                    "minLength": 1
+                },
+                "integrity": {
+                    "type": "string",
+                    "pattern": "^sha512-[A-Za-z0-9+/]+={0,2}$"
+                },
+                "pumpkinRelease": {
+                    "oneOf": [
+                        {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "string",
+                                "minLength": 1
+                            }
+                        }
+                    ]
+                },
+                "license": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "replacement": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["package", "version", "witPackage", "license"],
+            "properties": {
+                "package": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "version": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "witPackage": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "license": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "sourceWit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["repository", "branch", "commit", "subdirectory"],
+            "properties": {
+                "repository": {
+                    "type": "string",
+                    "format": "uri",
+                    "minLength": 1
+                },
+                "branch": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "commit": {
+                    "type": "string",
+                    "pattern": "^(?:[a-fA-F0-9]{40}|[a-fA-F0-9]{64})$"
+                },
+                "subdirectory": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "sourceWitSha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "defaultExport": {
+            "type": "boolean"
+        },
+        "runtimeExports": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/namedCompatibilityItem"
+            }
+        },
+        "publicTypes": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/namedCompatibilityItem"
+            }
+        },
+        "inventory": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["interfaces", "types", "operations"],
+            "properties": {
+                "interfaces": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "types": {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                "operations": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "interfaces": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/interface"
+            }
+        },
+        "deviations": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/deviation"
+            }
+        },
+        "sourceChanges": {
+            "type": "array",
+            "items": {
+                "$ref": "#/$defs/sourceChange"
+            }
+        }
+    },
+    "$defs": {
+        "decision": {
+            "type": "string",
+            "enum": ["retained", "improved", "replaced", "removed", "added", "review-required"]
+        },
+        "namedCompatibilityItem": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "decision", "migration"],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "decision": {
+                    "$ref": "#/$defs/decision"
+                },
+                "migration": {
+                    "type": "string"
+                }
+            }
+        },
+        "interface": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "specifier", "decision", "migration", "types", "operations"],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "specifier": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "decision": {
+                    "$ref": "#/$defs/decision"
+                },
+                "migration": {
+                    "type": "string"
+                },
+                "types": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/interfaceType"
+                    }
+                },
+                "operations": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/$defs/operation"
+                    }
+                }
+            }
+        },
+        "interfaceType": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "kind", "signature", "decision", "migration"],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": ["type", "record", "variant", "flags", "enum"]
+                },
+                "signature": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "decision": {
+                    "$ref": "#/$defs/decision"
+                },
+                "migration": {
+                    "type": "string"
+                }
+            }
+        },
+        "operation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "kind", "signature", "features", "decision", "migration"],
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": ["function", "resource-constructor", "resource-method", "resource-static-method"]
+                },
+                "signature": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "features": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "decision": {
+                    "$ref": "#/$defs/decision"
+                },
+                "migration": {
+                    "type": "string"
+                }
+            }
+        },
+        "deviation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["item", "decision", "rationale", "migration"],
+            "properties": {
+                "item": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "decision": {
+                    "$ref": "#/$defs/decision"
+                },
+                "rationale": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "migration": {
+                    "type": "string"
+                }
+            }
+        },
+        "sourceChange": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "change", "previousSignature", "currentSignature", "impact", "decision", "migration"],
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "change": {
+                    "type": "string",
+                    "enum": ["added", "changed", "removed"]
+                },
+                "previousSignature": {
+                    "type": ["string", "null"]
+                },
+                "currentSignature": {
+                    "type": ["string", "null"]
+                },
+                "impact": {
+                    "type": "string",
+                    "enum": ["additive", "breaking"]
+                },
+                "decision": {
+                    "$ref": "#/$defs/decision"
+                },
+                "migration": {
+                    "type": "string"
+                }
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "properties": {
+                            "change": {
+                                "const": "added"
+                            }
+                        },
+                        "required": ["change"]
+                    },
+                    "then": {
+                        "properties": {
+                            "impact": {
+                                "const": "additive"
+                            }
+                        }
+                    }
+                },
+                {
+                    "if": {
+                        "properties": {
+                            "change": {
+                                "enum": ["changed", "removed"]
+                            }
+                        },
+                        "required": ["change"]
+                    },
+                    "then": {
+                        "properties": {
+                            "impact": {
+                                "const": "breaking"
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}

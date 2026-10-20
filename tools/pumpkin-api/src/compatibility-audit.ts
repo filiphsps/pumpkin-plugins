@@ -4,11 +4,14 @@ import { COMPATIBILITY_SCHEMA_URL, validateCompatibilityMatrix } from './compati
 
 const reviewedDecisions = new Set(['retained', 'improved', 'replaced', 'removed', 'added']);
 
-/** A WIT declaration whose compatibility decision still needs review. */
+/** A compatibility decision; `review-required` marks an item that still needs one. */
+export type CompatibilityDecision = 'retained' | 'improved' | 'replaced' | 'removed' | 'added' | 'review-required';
+
+/** A WIT declaration that was added, changed or removed between two audited revisions. */
 export interface CompatibilityChange {
     change: 'added' | 'changed' | 'removed';
     currentSignature: string | null;
-    decision: string;
+    decision: CompatibilityDecision;
     id: string;
     impact: 'additive' | 'breaking';
     migration: string;
@@ -27,37 +30,62 @@ export interface CompatibilityMatrix {
         license: string;
     };
     defaultExport: boolean;
-    deviations: Array<{ item: string; decision: string; rationale: string; migration: string }>;
+    deviations: CompatibilityDeviation[];
     interfaces: CompatibilityInterface[];
     inventory: { interfaces: number; types: number; operations: number };
     publicTypes: CompatibilityItem[];
     replacement: { package: string; version: string; witPackage: string; license: string };
     runtimeExports: CompatibilityItem[];
     sourceChanges: CompatibilityChange[];
-    sourceWit: { repository: string; branch: string; commit: string; subdirectory?: string };
+    sourceWit: { repository: string; branch: string; commit: string; subdirectory: string };
     sourceWitSha256: string;
-    [key: string]: unknown;
 }
 
-/** A named item with an explicit compatibility decision. */
+/** A runtime export or public TypeScript type with an explicit compatibility decision. */
 export interface CompatibilityItem {
-    decision?: string;
-    id?: string;
-    kind?: string;
-    migration?: string;
-    name?: string;
-    signature?: string;
-    specifier?: string;
-    [key: string]: unknown;
+    decision: CompatibilityDecision;
+    migration: string;
+    name: string;
 }
 
 /** A WIT interface and its declarations in a compatibility matrix. */
-export interface CompatibilityInterface extends CompatibilityItem {
+export interface CompatibilityInterface {
+    decision: CompatibilityDecision;
+    migration: string;
     name: string;
-    operations?: CompatibilityItem[];
-    specifier?: string;
-    types?: CompatibilityItem[];
+    operations: CompatibilityOperation[];
+    specifier: string;
+    types: CompatibilityType[];
 }
+
+/** A WIT type declared by an audited interface. */
+export interface CompatibilityType {
+    decision: CompatibilityDecision;
+    kind: 'type' | 'record' | 'variant' | 'flags' | 'enum';
+    migration: string;
+    name: string;
+    signature: string;
+}
+
+/** A WIT function or resource method declared by an audited interface. */
+export interface CompatibilityOperation {
+    decision: CompatibilityDecision;
+    features: string[];
+    id: string;
+    kind: 'function' | 'resource-constructor' | 'resource-method' | 'resource-static-method';
+    migration: string;
+    signature: string;
+}
+
+/** A facade behavior change that is not tied to one export or WIT declaration. */
+export interface CompatibilityDeviation {
+    decision: CompatibilityDecision;
+    item: string;
+    migration: string;
+    rationale: string;
+}
+
+type ReviewedItem = { decision: CompatibilityDecision; migration: string };
 
 /** Compare the complete lock provenance and fetched WIT digest for two revisions. */
 export function hasSameWitRevision(
@@ -70,7 +98,7 @@ export function hasSameWitRevision(
         previous.sourceWit.repository === current.sourceWit.repository &&
         previous.sourceWit.branch === current.sourceWit.branch &&
         previous.sourceWit.commit.toLowerCase() === current.sourceWit.commit.toLowerCase() &&
-        (previous.sourceWit.subdirectory ?? 'v0.1') === (current.sourceWit.subdirectory ?? 'v0.1') &&
+        previous.sourceWit.subdirectory === current.sourceWit.subdirectory &&
         previous.sourceWitSha256.toLowerCase() === current.sourceWitSha256.toLowerCase()
     );
 }
@@ -112,10 +140,10 @@ export function reconcileCompatibilityMatrix(
     sameRevision: boolean,
 ): CompatibilityMatrix {
     const result = structuredClone(candidate);
-    const previousItems = previous ? collectMatrixItems(previous) : new Map<string, CompatibilityItem>();
+    const previousItems = previous ? collectMatrixItems(previous) : new Map<string, ReviewedItem>();
     const changedIds = new Set(changes.map(({ id }) => id));
 
-    const reconcileItem = (id: string, item: CompatibilityItem) => {
+    const reconcileItem = (id: string, item: ReviewedItem) => {
         const prior = previousItems.get(id);
         const preservePriorDecision = prior && (sameRevision || !changedIds.has(id));
         if (preservePriorDecision) {
@@ -127,27 +155,27 @@ export function reconcileCompatibilityMatrix(
         }
     };
 
-    for (const item of result.runtimeExports ?? []) reconcileItem(`runtime:${item.name}`, item);
-    for (const item of result.publicTypes ?? []) reconcileItem(`public:${item.name}`, item);
+    for (const item of result.runtimeExports) reconcileItem(`runtime:${item.name}`, item);
+    for (const item of result.publicTypes) reconcileItem(`public:${item.name}`, item);
     for (const apiInterface of result.interfaces) {
         const interfaceId = `interface:${apiInterface.name}`;
         reconcileItem(interfaceId, apiInterface);
-        for (const type of apiInterface.types ?? []) reconcileItem(`type:${apiInterface.name}.${type.name}`, type);
-        for (const operation of apiInterface.operations ?? []) {
-            reconcileItem(`operation:${qualifyOperationId(apiInterface.name, operation.id ?? '')}`, operation);
+        for (const type of apiInterface.types) reconcileItem(`type:${apiInterface.name}.${type.name}`, type);
+        for (const operation of apiInterface.operations) {
+            reconcileItem(`operation:${qualifyOperationId(apiInterface.name, operation.id)}`, operation);
         }
     }
 
-    result.sourceChanges = sameRevision && previous?.sourceChanges ? structuredClone(previous.sourceChanges) : changes;
+    result.sourceChanges = sameRevision && previous ? structuredClone(previous.sourceChanges) : changes;
     return result;
 }
 
 /** Archive a compatibility matrix under its Pumpkin release and immutable WIT revision. */
 export function archiveCompatibilityMatrix(compatibilityDirectory: string, matrix: CompatibilityMatrix): string {
     const unresolvedItem = [...collectMatrixItems(matrix)].find(
-        ([, item]) => !item.decision || !reviewedDecisions.has(item.decision) || !item.migration,
+        ([, item]) => !reviewedDecisions.has(item.decision) || !item.migration,
     );
-    const unresolvedChange = matrix.sourceChanges?.find(
+    const unresolvedChange = matrix.sourceChanges.find(
         ({ decision, migration }) => !reviewedDecisions.has(decision) || !migration,
     );
     if (unresolvedItem || unresolvedChange) {
@@ -161,7 +189,7 @@ export function archiveCompatibilityMatrix(compatibilityDirectory: string, matri
     const releaseDirectory = safePathSegment(release);
     const commit = matrix.sourceWit.commit.toLowerCase();
     const digest = matrix.sourceWitSha256.toLowerCase();
-    const subdirectory = matrix.sourceWit.subdirectory ?? 'v0.1';
+    const subdirectory = matrix.sourceWit.subdirectory;
     if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit)) {
         throw new Error(`cannot archive compatibility matrix with invalid WIT commit: ${matrix.sourceWit.commit}`);
     }
@@ -172,11 +200,7 @@ export function archiveCompatibilityMatrix(compatibilityDirectory: string, matri
     const historyDirectory = path.join(compatibilityDirectory, 'history', releaseDirectory);
     const sourceDirectory = subdirectory.split('/').map(safePathSegment);
     const archivePath = path.join(historyDirectory, ...sourceDirectory, `${commit}-${digest}.json`);
-    const archivedMatrix = {
-        ...matrix,
-        $schema: COMPATIBILITY_SCHEMA_URL,
-        sourceWit: { ...matrix.sourceWit, subdirectory },
-    };
+    const archivedMatrix = { ...matrix, $schema: COMPATIBILITY_SCHEMA_URL };
     validateCompatibilityMatrix(archivedMatrix, archivePath);
     const serialized = `${JSON.stringify(archivedMatrix, null, 4)}\n`;
     fs.mkdirSync(path.dirname(archivePath), { recursive: true });
@@ -196,15 +220,13 @@ export function archiveCompatibilityMatrix(compatibilityDirectory: string, matri
 function collectWitItems(matrix: CompatibilityMatrix) {
     const items = new Map<string, { signature: string }>();
     for (const apiInterface of matrix.interfaces) {
-        items.set(`interface:${apiInterface.name}`, { signature: apiInterface.specifier ?? '' });
-        for (const type of apiInterface.types ?? []) {
-            items.set(`type:${apiInterface.name}.${type.name}`, {
-                signature: `${type.kind ?? ''}:${type.signature ?? ''}`,
-            });
+        items.set(`interface:${apiInterface.name}`, { signature: apiInterface.specifier });
+        for (const type of apiInterface.types) {
+            items.set(`type:${apiInterface.name}.${type.name}`, { signature: `${type.kind}:${type.signature}` });
         }
-        for (const operation of apiInterface.operations ?? []) {
-            items.set(`operation:${qualifyOperationId(apiInterface.name, operation.id ?? '')}`, {
-                signature: `${operation.kind ?? ''}:${operation.signature ?? ''}:${JSON.stringify(operation.features ?? [])}`,
+        for (const operation of apiInterface.operations) {
+            items.set(`operation:${qualifyOperationId(apiInterface.name, operation.id)}`, {
+                signature: `${operation.kind}:${operation.signature}:${JSON.stringify(operation.features)}`,
             });
         }
     }
@@ -212,14 +234,14 @@ function collectWitItems(matrix: CompatibilityMatrix) {
 }
 
 function collectMatrixItems(matrix: CompatibilityMatrix) {
-    const items = new Map<string, CompatibilityItem>();
-    for (const item of matrix.runtimeExports ?? []) items.set(`runtime:${item.name}`, item);
-    for (const item of matrix.publicTypes ?? []) items.set(`public:${item.name}`, item);
+    const items = new Map<string, ReviewedItem>();
+    for (const item of matrix.runtimeExports) items.set(`runtime:${item.name}`, item);
+    for (const item of matrix.publicTypes) items.set(`public:${item.name}`, item);
     for (const apiInterface of matrix.interfaces) {
         items.set(`interface:${apiInterface.name}`, apiInterface);
-        for (const type of apiInterface.types ?? []) items.set(`type:${apiInterface.name}.${type.name}`, type);
-        for (const operation of apiInterface.operations ?? []) {
-            items.set(`operation:${qualifyOperationId(apiInterface.name, operation.id ?? '')}`, operation);
+        for (const type of apiInterface.types) items.set(`type:${apiInterface.name}.${type.name}`, type);
+        for (const operation of apiInterface.operations) {
+            items.set(`operation:${qualifyOperationId(apiInterface.name, operation.id)}`, operation);
         }
     }
     return items;

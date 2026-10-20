@@ -14,14 +14,14 @@ package version and generated TypeScript declarations cannot answer both questio
 ## Match the WIT ABI to the Pumpkin server
 
 The npm version identifies the TypeScript facade release; the WIT version identifies the host ABI.
-They are separate pins. The current alignment is:
+They are separate pins, and each file below holds the current value:
 
-| Pin | Current value | Source of truth |
-| --- | --- | --- |
-| API package | `@pumpkin-plugins/pumpkin-api` `0.1.0` | [`package.json`](../../tools/pumpkin-api/package.json) |
-| Pumpkin plugin ABI | `pumpkin:plugin@0.1.0` from WIT subdirectory `v0.1` | [`wit.lock.json`](../../tools/pumpkin-api/wit.lock.json) |
-| Pumpkin server | `0.2.0+26.3-26.51` | [`pumpkin-version.ts`](../../tools/test-harness/src/pumpkin-version.ts) |
-| Upstream WIT source | Commit `4d7a501943bb99f0f02a339128833f58ed37d0cc` | [`wit.lock.json`](../../tools/pumpkin-api/wit.lock.json) |
+| Pin | Source of truth |
+| --- | --- |
+| API package version | [`package.json`](../../tools/pumpkin-api/package.json) |
+| Pumpkin plugin ABI (WIT subdirectory) | [`wit.lock.json`](../../tools/pumpkin-api/wit.lock.json) |
+| Upstream WIT commit | [`wit.lock.json`](../../tools/pumpkin-api/wit.lock.json) |
+| Pumpkin server release | [`pumpkin-version.ts`](../../tools/test-harness/src/pumpkin-version.ts) |
 
 The API package's `wit.lock.json` pins the upstream repository, commit, and WIT subdirectory. The
 build tool fetches that exact commit on first use and when the lock changes, then stores it in the
@@ -37,13 +37,16 @@ source first, then update the lock and server pin together.
 
 ## Check support in the selected engine
 
-QuickJS and Static Hermes use different runtime paths and have different limits. For QuickJS
-caveats, see [Building](../building.md#runtime-caveats). Static Hermes implements only a subset of
-the Pumpkin API through its native JSI shim; check the [runtime coverage guide](../../tools/static-hermes-runtime/README.md#api-and-platform-coverage)
-before relying on an operation there.
+QuickJS and Static Hermes use different runtime paths and have different limits; the
+[runtime caveats](../building.md#runtime-caveats) cover both. Static Hermes generates an adapter for
+each Pumpkin API operation a plugin includes. When an operation has a WIT type the generator can't
+convert, the build fails and names the operation, so it doesn't fail later at runtime. Static Hermes
+also doesn't release resources during garbage collection, drops the resources passed to a callback
+when it returns, and runs promise jobs only inside the callback that queued them. The
+[Static Hermes caveats](../building.md#static-hermes) explain what to do about each.
 
-Generated TypeScript declarations come from the WIT ABI. They do not guarantee that every declared
-operation is implemented by Static Hermes. The pinned server also has a separate limitation: it
-does not start custom WASM AI goals, even though the Static Hermes adapter can dispatch their
-callbacks. See the [Static Hermes Runtime guide](../../tools/static-hermes-runtime/docs/index.md)
+Generated TypeScript declarations come from the WIT ABI, and a successful build means the engine
+can call the operations it includes. What the server does with a call is a separate question. For
+example, the pinned server does not start custom WASM AI goals, even though the Static Hermes
+adapter can dispatch their callbacks. See the [Static Hermes Runtime guide](../../tools/static-hermes-runtime/docs/index.md)
 for the host details and source link.

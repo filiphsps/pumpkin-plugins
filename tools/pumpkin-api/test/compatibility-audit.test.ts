@@ -5,6 +5,8 @@ import { afterEach, expect, it } from 'vitest';
 import {
     archiveCompatibilityMatrix,
     type CompatibilityMatrix,
+    type CompatibilityOperation,
+    type CompatibilityType,
     diffCompatibilityMatrices,
     hasSameWitRevision,
     reconcileCompatibilityMatrix,
@@ -25,12 +27,8 @@ it('reports same-release WIT additions, removals, and signature changes as expli
         { id: 'world.read', kind: 'function', signature: 'world.read() -> u64' },
         { id: 'world.create', kind: 'function', signature: 'world.create() -> unit' },
     ]);
-    previous.interfaces[0].types = [
-        { name: 'position', kind: 'record', signature: '{"fields":[{"name":"x","type":"u32"}]}' },
-    ];
-    current.interfaces[0].types = [
-        { name: 'position', kind: 'record', signature: '{"fields":[{"name":"x","type":"u64"}]}' },
-    ];
+    previous.interfaces[0].types = [recordType('{"fields":[{"name":"x","type":"u32"}]}')];
+    current.interfaces[0].types = [recordType('{"fields":[{"name":"x","type":"u64"}]}')];
 
     const changes = diffCompatibilityMatrices(previous, current);
 
@@ -150,9 +148,6 @@ it('treats repository, branch, subdirectory, commit, and content digest as WIT r
     };
 
     expect(hasSameWitRevision(matrix, samePin)).toBe(true);
-    const legacyMatrix = structuredClone(matrix);
-    legacyMatrix.sourceWit.subdirectory = undefined;
-    expect(hasSameWitRevision(legacyMatrix, samePin)).toBe(true);
     expect(
         hasSameWitRevision(matrix, {
             ...samePin,
@@ -193,7 +188,7 @@ it('archives each release and WIT revision without overwriting a different audit
     const archiveContents = fs.readFileSync(archivePath, 'utf8');
     const archivedMatrix = JSON.parse(archiveContents);
     expect(archivedMatrix.$schema).toBe(
-        'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json',
+        'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/schemas/pumpkin-api-compatibility.schema.json',
     );
     expect(archivedMatrix.sourceWit.subdirectory).toBe('v0.1');
     expect(archiveCompatibilityMatrix(directory, matrix)).toBe(archivePath);
@@ -213,22 +208,6 @@ it('refuses to archive a matrix that does not match the compatibility schema', (
     expect(() => archiveCompatibilityMatrix(directory, invalidMatrix as unknown as CompatibilityMatrix)).toThrow(
         /invalid Pumpkin API compatibility matrix/,
     );
-});
-
-it('records the legacy v0.1 source directory when archiving an older matrix without a subdirectory field', () => {
-    const matrix = compatibilityMatrix([]);
-    matrix.sourceWit = {
-        repository: 'https://github.com/Pumpkin-MC/pumpkin-plugin-wit',
-        branch: 'master',
-        commit: '4d7a501943bb99f0f02a339128833f58ed37d0cc',
-    } as never;
-    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-compatibility-history-'));
-    temporaryDirectories.push(directory);
-
-    const archivePath = archiveCompatibilityMatrix(directory, matrix);
-
-    expect(path.relative(directory, archivePath)).toContain(path.join('history', '0.2.0+26.3-26.51', 'v0.1'));
-    expect(JSON.parse(fs.readFileSync(archivePath, 'utf8')).sourceWit.subdirectory).toBe('v0.1');
 });
 
 it('refuses to archive a compatibility audit that still needs review', () => {
@@ -253,7 +232,7 @@ it('refuses to archive a compatibility audit with an unsupported decision', () =
             id: 'world.read',
             kind: 'function',
             signature: 'world.read() -> u32',
-            decision: 'maybe',
+            decision: 'maybe' as CompatibilityOperation['decision'],
             migration: 'This decision is not part of the compatibility vocabulary.',
         },
     ]);
@@ -263,10 +242,12 @@ it('refuses to archive a compatibility audit with an unsupported decision', () =
     expect(() => archiveCompatibilityMatrix(directory, matrix)).toThrow(/unresolved compatibility review/);
 });
 
-function compatibilityMatrix(operations: Record<string, string>[]): CompatibilityMatrix {
+function compatibilityMatrix(
+    operations: Array<Pick<CompatibilityOperation, 'id' | 'kind' | 'signature'> & Partial<CompatibilityOperation>>,
+): CompatibilityMatrix {
     return {
         $schema:
-            'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/pumpkin-api-compatibility.schema.json',
+            'https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/tools/pumpkin-api/schemas/pumpkin-api-compatibility.schema.json',
         baseline: {
             package: '@pumpkinmc/pumpkin-api-ts',
             version: '0.1.1',
@@ -312,6 +293,10 @@ function compatibilityMatrix(operations: Record<string, string>[]): Compatibilit
         deviations: [],
         sourceChanges: [],
     };
+}
+
+function recordType(signature: string): CompatibilityType {
+    return { name: 'position', kind: 'record', signature, decision: 'retained', migration: 'The type is unchanged.' };
 }
 
 function firstOperation(matrix: CompatibilityMatrix) {

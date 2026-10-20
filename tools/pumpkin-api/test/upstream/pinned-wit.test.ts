@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
-import { ensurePumpkinWit, parsePumpkinWitPin } from '../../src/wit.mjs';
+import { digestWitDirectory, ensurePumpkinWit, parsePumpkinWitPin } from '../../src/wit.mjs';
 
 const apiRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const compatibilityDirectory = path.join(apiRoot, 'compatibility');
@@ -51,17 +51,3 @@ it('resolves the pinned Pumpkin WIT and verifies its active compatibility digest
         expect(matrix.sourceWitSha256).toBe(digestWitDirectory(witRoot));
     }
 });
-
-function digestWitDirectory(directory: string) {
-    const hash = createHash('sha256');
-    for (const filename of fs
-        .readdirSync(directory)
-        .filter((name) => name.endsWith('.wit'))
-        .sort()) {
-        hash.update(filename);
-        hash.update('\0');
-        hash.update(fs.readFileSync(path.join(directory, filename)));
-        hash.update('\0');
-    }
-    return hash.digest('hex');
-}

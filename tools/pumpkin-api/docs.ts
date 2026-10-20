@@ -1,22 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { code, table } from '@pumpkin-plugins/docs/markdown';
 import type { DocumentSpec } from '@pumpkin-plugins/docs/node';
+import type { CompatibilityMatrix } from './src/compatibility-audit.ts';
 import { validateCompatibilityMatrix } from './src/compatibility-schema.ts';
-
-interface CompatibilityDefinition {
-    baseline: {
-        package: string;
-        version: string;
-        pumpkinRelease: string | string[];
-    };
-    inventory: {
-        interfaces: number;
-        types: number;
-        operations: number;
-    };
-    publicTypes: unknown[];
-    runtimeExports: unknown[];
-}
 
 const compatibilityDirectory = new URL('./compatibility/', import.meta.url);
 const compatibilityFiles = readdirSync(compatibilityDirectory, { withFileTypes: true })
@@ -30,7 +16,7 @@ if (compatibilityFiles.length === 0) {
 
 const compatibilityRows = compatibilityFiles.map((file) => {
     const compatibilityPath = new URL(`./compatibility/${file}`, import.meta.url);
-    const definition = JSON.parse(readFileSync(compatibilityPath, 'utf8')) as CompatibilityDefinition;
+    const definition = JSON.parse(readFileSync(compatibilityPath, 'utf8')) as CompatibilityMatrix;
     validateCompatibilityMatrix(definition, file);
     const pumpkinReleases = Array.isArray(definition.baseline.pumpkinRelease)
         ? definition.baseline.pumpkinRelease

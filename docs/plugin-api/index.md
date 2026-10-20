@@ -7,7 +7,7 @@ description: "Standalone API setup, lifecycle, host interfaces, ABI support and 
 
 # Plugin API
 
-Use `@pumpkin-plugins/pumpkin-api` as the runtime API in a standalone TypeScript plugin. Once both packages are published to npm, install the API and build tool:
+Use `@pumpkin-plugins/pumpkin-api` as the runtime API in a standalone TypeScript plugin. Install it with the build tool:
 
 ```sh
 pnpm add @pumpkin-plugins/pumpkin-api @pumpkin-plugins/build

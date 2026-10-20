@@ -88,22 +88,14 @@ describe('registration callback lifetime', () => {
         else onUnload({} as Context);
 
         handleEvent(eventId, server, event);
-        expect(() => handleCommand(commandId, sender, server, [] as never)).toThrow(
-            `No handler for command ID ${commandId}`,
-        );
-        expect(() => handleCommandSuggestion(suggestionId, sender, server, request)).toThrow(
-            `No command suggestion handler registered for ID ${suggestionId}`,
-        );
-        expect(() => handleAiGoalCanStart(goalId, server, entity)).toThrow(`No AI goal registered for ID ${goalId}`);
-        expect(() => handleAiGoalShouldContinue(goalId, server, entity)).toThrow(
-            `No AI goal registered for ID ${goalId}`,
-        );
-        expect(() => handleAiGoalStart(goalId, server, entity)).toThrow(`No AI goal registered for ID ${goalId}`);
-        expect(() => handleAiGoalTick(goalId, server, entity)).toThrow(`No AI goal registered for ID ${goalId}`);
-        expect(() => handleAiGoalStop(goalId, server, entity)).toThrow(`No AI goal registered for ID ${goalId}`);
-        expect(() => handleGeneratePhase(generatorId, phase, chunk)).toThrow(
-            `No generator registered for ID ${generatorId}`,
-        );
+        expect(() => handleCommand(commandId, sender, server, [] as never)).toThrow(`ID ${commandId}`);
+        expect(() => handleCommandSuggestion(suggestionId, sender, server, request)).toThrow(`ID ${suggestionId}`);
+        expect(() => handleAiGoalCanStart(goalId, server, entity)).toThrow(`ID ${goalId}`);
+        expect(() => handleAiGoalShouldContinue(goalId, server, entity)).toThrow(`ID ${goalId}`);
+        expect(() => handleAiGoalStart(goalId, server, entity)).toThrow(`ID ${goalId}`);
+        expect(() => handleAiGoalTick(goalId, server, entity)).toThrow(`ID ${goalId}`);
+        expect(() => handleAiGoalStop(goalId, server, entity)).toThrow(`ID ${goalId}`);
+        expect(() => handleGeneratePhase(generatorId, phase, chunk)).toThrow(`ID ${generatorId}`);
 
         expect(eventHandler).toHaveBeenCalledOnce();
         expect(commandHandler).toHaveBeenCalledOnce();

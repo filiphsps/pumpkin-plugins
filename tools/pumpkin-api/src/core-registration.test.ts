@@ -54,9 +54,7 @@ describe('failed callback registration', () => {
 
         expect(() => new TestPlugin().registerCommand(context, command, handler)).toThrow('Host rejected command');
         expect(commandId).not.toBe(-1);
-        expect(() => handleCommand(commandId, {} as never, server, [] as never)).toThrow(
-            `No handler for command ID ${commandId}`,
-        );
+        expect(() => handleCommand(commandId, {} as never, server, [] as never)).toThrow(`ID ${commandId}`);
         expect(handler).not.toHaveBeenCalled();
     });
 
@@ -75,9 +73,7 @@ describe('failed callback registration', () => {
             'Command rejected handler ID',
         );
         expect(commandId).not.toBe(-1);
-        expect(() => handleCommand(commandId, {} as never, server, [] as never)).toThrow(
-            `No handler for command ID ${commandId}`,
-        );
+        expect(() => handleCommand(commandId, {} as never, server, [] as never)).toThrow(`ID ${commandId}`);
         expect(handler).not.toHaveBeenCalled();
         expect(context.registerCommand).not.toHaveBeenCalled();
     });

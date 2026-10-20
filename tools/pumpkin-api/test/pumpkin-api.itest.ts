@@ -1,4 +1,14 @@
-import { cpSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import {
+    cpSync,
+    existsSync,
+    mkdirSync,
+    mkdtempSync,
+    readFileSync,
+    realpathSync,
+    rmSync,
+    symlinkSync,
+    writeFileSync,
+} from 'node:fs';
 import * as path from 'node:path';
 import { builtPluginPath, type PumpkinInstance, startPumpkin } from '@pumpkin-plugins/test-harness';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -9,7 +19,7 @@ const repositoryRoot = path.resolve(apiRoot, '../..');
 const repositoryCacheDir = path.join(repositoryRoot, '.cache');
 const fixtureSource = path.join(apiRoot, 'test/fixtures/integration-consumer');
 
-describe('Pumpkin API against a real server', () => {
+describe.each(['static-hermes', 'quickjs'])('Pumpkin API against a real server (%s)', (engine) => {
     let fixtureRoot: string | undefined;
     let server: PumpkinInstance | undefined;
 
@@ -18,6 +28,10 @@ describe('Pumpkin API against a real server', () => {
         fixtureRoot = mkdtempSync(path.join(repositoryCacheDir, 'pumpkin-api-integration-'));
         try {
             cpSync(fixtureSource, fixtureRoot, { recursive: true });
+            const manifestPath = path.join(fixtureRoot, 'package.json');
+            const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+            manifest.pumpkinPlugin.engine = engine;
+            writeFileSync(manifestPath, JSON.stringify(manifest));
 
             const apiLinkDir = path.join(fixtureRoot, 'node_modules/@pumpkin-plugins');
             mkdirSync(apiLinkDir, { recursive: true });
