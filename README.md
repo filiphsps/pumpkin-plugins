@@ -34,7 +34,7 @@ Browse the [public documentation site](https://filiphsps.github.io/pumpkin-plugi
 | Plugin | Description | License |
 | --- | --- | --- |
 | [AppleSkinPumpkin](packages/apple-skin-pumpkin) | The plugin syncs saturation and exhaustion so AppleSkin can show accurate food stats. | MIT |
-| [BedrockAddonManager](packages/bedrock-addon-manager) (unreleased) | BedrockAddonManager hosts resource packs over HTTP and reads their manifests. Players still need another way to download the packs because the plugin does not send offers. | MIT |
+| [BedrockAddonManager](packages/bedrock-addon-manager) (unreleased) | BedrockAddonManager hosts Bedrock resource packs over HTTP, reads their manifests and prints the `pumpkin.toml` block that makes Pumpkin offer them to players. | MIT |
 | [DistantHorizonsSupportPumpkin](packages/distant-horizons-support-pumpkin) | This unofficial integration lets Java players use Distant Horizons with terrain from your Pumpkin server. | [GPL-3.0-or-later](packages/distant-horizons-support-pumpkin/LICENSE) |
 | [DynamicLightsPumpkin](packages/dynamic-lights-pumpkin) | DynamicLightsPumpkin shows temporary light around supported items and nearby entities without changing the world. | MIT |
 | [TabDisplay](packages/tab-display) (unreleased) | TabDisplay formats Java player-list names, headers, and footers. It leaves Bedrock lists unchanged. | MIT |
