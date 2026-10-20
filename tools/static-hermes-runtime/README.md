@@ -35,7 +35,9 @@ pin. It caches the SDK under `.cache/hermes/` by default. It checks out the sour
 `hermesc` and the full and lean WASI 2 Hermes/JSI libraries.
 
 The cache is reused while its source pin, patches, toolchain, and build settings match. A changed
-input triggers a rebuild. Preparation refreshes the managed checkout when the source pin changes and
+input triggers a rebuild. The WASI build directory keeps its own copy of the CMake toolchain file, so
+a shared cache keeps working after the runtime package moves, is upgraded or is reinstalled.
+Preparation refreshes the managed checkout when the source pin changes and
 rejects local Hermes source changes outside the managed patch set. Concurrent preparations lock the
 cache, source checkout, host build directory, and WASI build directory by resolved path, so separate
 workspaces that share any of those directories serialize. Toolchain setup takes its own lock on
