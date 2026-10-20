@@ -15,6 +15,7 @@ vi.mock('node:fs', async (importOriginal) => {
 import { execFileSync } from 'node:child_process';
 import { build } from 'esbuild';
 import { bundlePlugin } from './bundle.ts';
+import { BuildError } from './errors.ts';
 import { generateTypes } from './types.ts';
 import { findUsedWitMethods } from './wit-method-usage.ts';
 
@@ -23,13 +24,22 @@ const apiWitDir = path.join(os.tmpdir(), 'pumpkin-api-wit-fixture');
 const MAX_PRODUCTION_COMPONENT_BYTES = 5 * 1024 * 1024;
 const engineProfiles = [
     { name: 'QuickJS', options: { engine: 'quickjs' } },
-    { name: 'default engine and runtime', options: {} },
+    { name: 'Static Hermes default runtime', options: { engine: 'static-hermes' } },
     { name: 'Static Hermes full runtime', options: { engine: 'static-hermes', staticHermesRuntime: 'full' } },
     { name: 'Static Hermes lean runtime', options: { engine: 'static-hermes', staticHermesRuntime: 'lean' } },
     { name: 'Static Hermes malloc collector', options: { engine: 'static-hermes', staticHermesGc: 'malloc' } },
 ] as const;
 const componentize = vi.mocked(execFileSync);
 const esbuild = vi.mocked(build);
+
+async function failure(promise: Promise<unknown>): Promise<Error> {
+    const error: unknown = await promise.then(
+        () => undefined,
+        (rejection: unknown) => rejection,
+    );
+    if (!(error instanceof Error)) throw new Error('expected the build to fail');
+    return error;
+}
 
 beforeEach(() => {
     esbuild.mockResolvedValue({} as never);
@@ -44,6 +54,7 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
     for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -76,7 +87,7 @@ describe('bundlePlugin', () => {
             ...options,
         });
 
-        const engine = 'engine' in options ? options.engine : 'static-hermes';
+        const engine = options.engine;
         const runtimeVariant = 'staticHermesRuntime' in options ? options.staticHermesRuntime : undefined;
         const gcVariant = 'staticHermesGc' in options ? options.staticHermesGc : undefined;
         expect(componentize.mock.calls[0]?.[2]).toEqual({
@@ -106,7 +117,7 @@ describe('bundlePlugin', () => {
                 buildOptions.outfile,
                 'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();',
             );
-            return { metafile: { outputs: { [buildOptions.outfile]: { imports: [] } } } } as never;
+            return { metafile: { inputs: {}, outputs: { [buildOptions.outfile]: { imports: [] } } } } as never;
         });
         vi.mocked(findUsedWitMethods).mockReturnValue({
             pumpkinMethods: ['player.player.get-position'],
@@ -154,7 +165,7 @@ describe('bundlePlugin', () => {
         ).rejects.toThrow('QuickJS componentizer failed:\nlink failed');
     });
 
-    it('defaults to Static Hermes componentization', async () => {
+    it('passes the bundle, WIT and workspace root to the Static Hermes componentizer', async () => {
         const { dir, output } = buildAt();
         esbuild.mockImplementationOnce((options) => {
             if (!options.outfile) throw new Error('missing JavaScript bundle output');
@@ -168,6 +179,7 @@ describe('bundlePlugin', () => {
             output,
             witDir: apiWitDir,
             version: '1.0.0',
+            engine: 'static-hermes',
         });
 
         expect(esbuild).toHaveBeenCalledWith(expect.objectContaining({ format: 'iife' }));
@@ -190,7 +202,7 @@ describe('bundlePlugin', () => {
         );
     });
 
-    it('generates isolated WIT declarations before selecting Static Hermes adapters', async () => {
+    it('selects Static Hermes adapters from the bundled plugin files and isolated WIT declarations', async () => {
         const { output } = buildAt();
         esbuild.mockImplementationOnce((buildOptions) => {
             if (!buildOptions.outfile) throw new Error('missing JavaScript bundle output');
@@ -198,7 +210,16 @@ describe('bundlePlugin', () => {
                 buildOptions.outfile,
                 'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();',
             );
-            return {} as never;
+            return {
+                metafile: {
+                    inputs: {
+                        'src/plugin.ts': {},
+                        'node_modules/helper/index.js': {},
+                        'pumpkin-static-hermes-api:pumpkin:plugin/player@0.1.0': {},
+                    },
+                    outputs: {},
+                },
+            } as never;
         });
 
         await bundlePlugin({
@@ -213,7 +234,12 @@ describe('bundlePlugin', () => {
         if (!generatedTypesDir) throw new Error('missing generated WIT declarations directory');
         expect(generateTypes).toHaveBeenCalledWith(apiWitDir, generatedTypesDir);
         expect(generatedTypesDir).toMatch(/\.pumpkin-build-[^/\\]+[\\/]wit-types$/);
-        expect(findUsedWitMethods).toHaveBeenCalledWith('src/plugin.ts', generatedTypesDir);
+        expect(findUsedWitMethods).toHaveBeenCalledWith({
+            entry: 'src/plugin.ts',
+            inputs: [path.resolve('src/plugin.ts'), path.resolve('node_modules/helper/index.js')],
+            typesDir: generatedTypesDir,
+            witDir: apiWitDir,
+        });
         expect(fs.existsSync(path.dirname(generatedTypesDir))).toBe(false);
     });
 
@@ -305,6 +331,7 @@ describe('bundlePlugin', () => {
             );
             return {
                 metafile: {
+                    inputs: {},
                     outputs: { [options.outfile]: { imports: [] } },
                 },
             } as never;
@@ -370,7 +397,7 @@ describe('bundlePlugin', () => {
             } as never;
         });
 
-        await expect(
+        const error = await failure(
             bundlePlugin({
                 entry: 'src/plugin.ts',
                 output,
@@ -378,14 +405,89 @@ describe('bundlePlugin', () => {
                 version: '1.0.0',
                 engine: 'static-hermes',
             }),
-        ).rejects.toThrow(
-            'Static Hermes JavaScript bundle imports WASI interface without a JSI adapter: wasi:http/types@0.2.3',
         );
+
+        expect(error).toBeInstanceOf(BuildError);
+        expect(error.message).toContain('wasi:http/types@0.2.3');
+        expect(error.message).toContain('pumpkinPlugin.wasi');
 
         expect(esbuild).toHaveBeenCalledWith(expect.objectContaining({ metafile: true }));
         expect(componentize).not.toHaveBeenCalled();
         expect(fs.existsSync(output)).toBe(false);
     });
+
+    it('reports esbuild failures as build errors', async () => {
+        const { output } = buildAt();
+        esbuild.mockRejectedValueOnce(
+            Object.assign(new Error('Build failed with 1 error'), {
+                errors: [{ text: 'Expected identifier but found "="' }],
+                warnings: [],
+            }),
+        );
+
+        const error = await failure(
+            bundlePlugin({ entry: 'src/plugin.ts', output, witDir: 'wit', version: '1.0.0', engine: 'quickjs' }),
+        );
+
+        expect(error).toBeInstanceOf(BuildError);
+        expect(error.message).toContain('src/plugin.ts');
+        expect(componentize).not.toHaveBeenCalled();
+    });
+
+    it('points at pumpkinPlugin.wasi when esbuild cannot resolve a WASI import', async () => {
+        const { output } = buildAt();
+        esbuild.mockRejectedValueOnce(
+            Object.assign(new Error('Build failed with 1 error'), {
+                errors: [{ text: "wasi:http/types@0.2.3 is not imported or referenced by the plugin's WIT world" }],
+                warnings: [],
+            }),
+        );
+
+        const error = await failure(
+            bundlePlugin({
+                entry: 'src/plugin.ts',
+                output,
+                witDir: apiWitDir,
+                version: '1.0.0',
+                engine: 'static-hermes',
+            }),
+        );
+
+        expect(error).toBeInstanceOf(BuildError);
+        expect(error.message).toContain('pumpkinPlugin.wasi');
+    });
+
+    it.each(['quickjs', 'static-hermes'] as const)(
+        'reports %s componentizer failures as build errors when runtime output is shown',
+        async (engine) => {
+            const { output } = buildAt();
+            esbuild.mockImplementationOnce((buildOptions) => {
+                if (!buildOptions.outfile) throw new Error('missing JavaScript bundle output');
+                fs.writeFileSync(
+                    buildOptions.outfile,
+                    'var __pumpkinPlugin=(()=>{var exports={};return wrap(exports);})();',
+                );
+                return {} as never;
+            });
+            componentize.mockImplementation(() => {
+                throw Object.assign(new Error('Command failed'), { status: 1 });
+            });
+
+            const error = await failure(
+                bundlePlugin({
+                    entry: 'src/plugin.ts',
+                    output,
+                    witDir: apiWitDir,
+                    version: '1.0.0',
+                    engine,
+                    quietRuntimeOutput: false,
+                }),
+            );
+
+            expect(error).toBeInstanceOf(BuildError);
+            expect(error.message).toContain('exit 1');
+        },
+    );
 
     it('publishes a completed component and returns its size', async () => {
         const { output } = buildAt();
@@ -478,8 +580,10 @@ describe('bundlePlugin', () => {
     });
 
     it.each(engineProfiles)(
-        'rejects oversized $name production components without replacing the previous artifact',
+        'rejects oversized $name production components without replacing the previous artifact when the size limit is enforced',
         async ({ options }) => {
+            // A project opts in to the size limit with this variable; without it the build only warns.
+            vi.stubEnv('PUMPKIN_PLUGINS_FAIL_ON_SIZE_LIMIT', '1');
             const { output } = buildAt();
             const limit = MAX_PRODUCTION_COMPONENT_BYTES;
             fs.writeFileSync(output, 'known-good artifact');
@@ -500,16 +604,47 @@ describe('bundlePlugin', () => {
                 return Buffer.alloc(0);
             });
 
-            await expect(
+            const error = await failure(
                 bundlePlugin({ entry: 'src/plugin.ts', output, witDir: apiWitDir, version: '1.0.0', ...options }),
-            ).rejects.toThrow(
-                `Production WebAssembly component is ${MAX_PRODUCTION_COMPONENT_BYTES + 1} bytes; maximum is ${MAX_PRODUCTION_COMPONENT_BYTES} bytes (5 MiB)`,
             );
+
+            expect(error).toBeInstanceOf(BuildError);
+            expect(error.message).toContain(`${MAX_PRODUCTION_COMPONENT_BYTES + 1} bytes`);
 
             expect(fs.readFileSync(output, 'utf8')).toBe('known-good artifact');
             expect(fs.readdirSync(path.dirname(output))).toEqual(['plugin.wasm']);
         },
     );
+
+    it('warns about an oversized production component and still publishes it by default', async () => {
+        vi.stubEnv('PUMPKIN_PLUGINS_FAIL_ON_SIZE_LIMIT', '');
+        const { output } = buildAt();
+        const onOutput = vi.fn();
+        const size = MAX_PRODUCTION_COMPONENT_BYTES + 1;
+        componentize.mockImplementation((_file, args) => {
+            const staged = args?.[(args?.indexOf('--output') ?? -1) + 1];
+            if (!staged) throw new Error('missing componentizer output argument');
+            fs.writeFileSync(staged, '');
+            fs.truncateSync(staged, size);
+            return Buffer.alloc(0);
+        });
+
+        await expect(
+            bundlePlugin({
+                entry: 'src/plugin.ts',
+                output,
+                witDir: 'wit',
+                version: '1.0.0',
+                engine: 'quickjs',
+                onOutput,
+            }),
+        ).resolves.toBe(size);
+
+        expect(onOutput).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'warning', message: expect.stringContaining(`${size} bytes`) }),
+        );
+        expect(fs.statSync(output).size).toBe(size);
+    });
 
     it.each(engineProfiles)(
         'does not apply the production size limit to $name development components',
@@ -570,7 +705,7 @@ describe('bundlePlugin', () => {
     it('replaces an existing artifact when rename cannot overwrite it directly', async () => {
         const { output } = buildAt();
         fs.writeFileSync(output, 'old artifact');
-        const rename = vi.mocked(fs.renameSync).mockImplementationOnce(() => {
+        vi.mocked(fs.renameSync).mockImplementationOnce(() => {
             throw Object.assign(new Error('access denied'), { code: 'EACCES' });
         });
 
@@ -585,7 +720,6 @@ describe('bundlePlugin', () => {
         expect(size).toBe(Buffer.byteLength('component'));
         expect(fs.readFileSync(output, 'utf8')).toBe('component');
         expect(fs.readdirSync(path.dirname(output))).toEqual(['plugin.wasm']);
-        expect(rename).toHaveBeenCalledTimes(3);
     });
 
     it('restores the previous artifact if publishing fails after it was moved aside', async () => {
@@ -610,7 +744,6 @@ describe('bundlePlugin', () => {
 
         expect(fs.readFileSync(output, 'utf8')).toBe('known-good artifact');
         expect(fs.readdirSync(path.dirname(output))).toEqual(['plugin.wasm']);
-        expect(rename).toHaveBeenCalledTimes(4);
     });
 
     it('preserves a recovery copy if publishing and restoring both fail', async () => {

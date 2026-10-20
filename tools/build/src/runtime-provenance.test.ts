@@ -7,19 +7,20 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const runtime = resolve(import.meta.dirname, '../runtime');
 const dirs: string[] = [];
-const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
-const commit = 'e563c6d6ae50b087980414015663ca9c948c09bb';
-const rust = 'rustc 1.99.0 (b940084d7 2026-09-28)';
-const cargo = 'cargo 1.99.0 (5f94df478 2026-08-27)';
-const clang =
-    'clang version 23.1.0-wasi-sdk (https://github.com/llvm/llvm-project 895aa2c896ada719451be2e3673c83da8ddf1141)';
-const sdkVersion = '34.0\nwasi-libc: 2e6fb9d8ee0c\nllvm: 895aa2c896ad\nllvm-version: 23.1.0\nconfig: f992bcc08219\n';
+const pinned = JSON.parse(readFileSync(join(runtime, 'provenance.json'), 'utf8'));
+const commit: string = pinned.sourceCommit;
+const rust: string = pinned.rustVersion;
+const cargo: string = pinned.cargoVersion;
+const clang: string = pinned.clangVersion;
+const sdkVersion = `${pinned.sdkVersion}\n`;
+const shippedHash: string = pinned.outputSha256;
 
 afterEach(() => {
     for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
 function fixture() {
+    const realGit = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
     const dir = mkdtempSync(join(tmpdir(), 'runtime-provenance-'));
     dirs.push(dir);
     const source = join(dir, 'source');
@@ -116,7 +117,8 @@ function rejects(f: ReturnType<typeof fixture>, message: string) {
     expect(result.stderr).toContain(message);
 }
 
-describe('runtime provenance build', () => {
+// build.sh and the tool stubs are POSIX shell scripts, so these checks cannot run on Windows.
+describe.skipIf(process.platform === 'win32')('runtime provenance build', () => {
     it('builds only locked inputs and emits a verified candidate manifest', () => {
         const f = fixture();
         const result = f.run();
@@ -124,7 +126,7 @@ describe('runtime provenance build', () => {
         expect(readFileSync(join(f.dir, 'cargo-args'), 'utf8')).toContain('--locked');
         const manifest = JSON.parse(readFileSync(join(f.output, 'provenance.json'), 'utf8'));
         expect(manifest.sourceCommit).toBe(commit);
-        expect(manifest.outputSha256).toBe('75219b89307011c7cd2bd6212e18a7d0ff1ba16d560c130d5173ccacb1880988');
+        expect(manifest.outputSha256).toBe(shippedHash);
         expect(
             createHash('sha256')
                 .update(readFileSync(join(f.output, 'quickjs-runtime-bigint.wasm')))
@@ -142,7 +144,7 @@ describe('runtime provenance build', () => {
         expect(result.status, result.stderr).toBe(0);
         const manifest = JSON.parse(readFileSync(join(f.output, 'provenance.json'), 'utf8'));
         expect(manifest.outputSha256).toBe(expectedHash);
-        expect(manifest.outputSha256).not.toBe('75219b89307011c7cd2bd6212e18a7d0ff1ba16d560c130d5173ccacb1880988');
+        expect(manifest.outputSha256).not.toBe(shippedHash);
         expect(manifest.buildHost).toBe(`${process.platform}-${process.arch}`);
         expect(manifest.buildHostRelease).toEqual(expect.any(String));
         expect(result.stdout).toContain(expectedHash);

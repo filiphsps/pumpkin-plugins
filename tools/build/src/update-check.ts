@@ -53,7 +53,7 @@ export interface BuildUpdateCheckOptions {
  * Looks for a newer published build tool and prints an optional migration notice.
  *
  * @remarks Lookup errors and missing package metadata are intentionally ignored so they cannot
- * affect a plugin build. The caller should start this promise without awaiting it.
+ * affect a plugin build. Start it before the build and await it after the build finishes.
  * @param args - Arguments passed to the build executable.
  * @param options - Eligibility, lookup, and output dependencies.
  */

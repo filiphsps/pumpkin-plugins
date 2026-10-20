@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { WASI_VERSION } from '@pumpkin-plugins/wasi-capabilities';
 import { BuildError } from './errors.ts';
+import { replaceOutput } from './replace-output.ts';
 
 /**
  * Adds WASI imports to the `plugin` world, just before its first export.
@@ -27,10 +28,10 @@ export interface PrepareWitOptions {
     apiWit: string;
     /** WASI interfaces to import. */
     interfaces: readonly string[];
-    /** Where to write the combined WIT, when there is anything to add. */
+    /** Where to write the combined WIT. Left untouched when there are no interfaces. */
     target: string;
     /** Exact WASI WIT paths from the lock, to keep stale cached files out of the component world. */
-    wasiFiles?: readonly string[];
+    wasiFiles: readonly string[];
     /** The folder `ensureWasiWit` returned. Only needed when there are interfaces. */
     wasiWit?: string;
 }
@@ -60,18 +61,10 @@ export function prepareWit(options: PrepareWitOptions): string {
             },
         );
 
-        if (options.wasiFiles) {
-            for (const rel of options.wasiFiles) {
-                const target = path.join(temporary, 'deps', rel);
-                fs.mkdirSync(path.dirname(target), { recursive: true });
-                fs.copyFileSync(path.join(wasiWit, rel), target);
-            }
-        } else {
-            const deps = path.join(temporary, 'deps');
-            retryTransientCopy(
-                () => fs.cpSync(wasiWit, deps, { recursive: true }),
-                () => fs.rmSync(deps, { recursive: true, force: true }),
-            );
+        for (const rel of options.wasiFiles) {
+            const target = path.join(temporary, 'deps', rel);
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.copyFileSync(path.join(wasiWit, rel), target);
         }
         const pluginWit = path.join(temporary, 'plugin.wit');
         fs.writeFileSync(pluginWit, injectWasiImports(fs.readFileSync(pluginWit, 'utf8'), options.interfaces));
@@ -94,34 +87,22 @@ export function publishWitSnapshot(source: string, target: string): void {
     const parent = path.dirname(target);
     fs.mkdirSync(parent, { recursive: true });
     const temporary = fs.mkdtempSync(path.join(parent, `.${path.basename(target)}-`));
-    let backup: string | undefined;
     try {
         fs.cpSync(source, temporary, { recursive: true });
 
         if (fs.existsSync(target)) {
-            backup = fs.mkdtempSync(path.join(parent, `.${path.basename(target)}-backup-`));
+            const backup = fs.mkdtempSync(path.join(parent, `.${path.basename(target)}-backup-`));
             fs.rmSync(backup, { recursive: true, force: true });
-            fs.renameSync(target, backup);
-        }
-
-        try {
+            replaceOutput(
+                temporary,
+                target,
+                backup,
+                `could not publish WIT snapshot; previous snapshot remains at ${backup}`,
+            );
+            fs.rmSync(backup, { recursive: true, force: true });
+        } else {
             fs.renameSync(temporary, target);
-        } catch (error) {
-            if (backup !== undefined) {
-                try {
-                    fs.renameSync(backup, target);
-                    backup = undefined;
-                } catch (restoreError) {
-                    throw new AggregateError(
-                        [error, restoreError],
-                        `could not publish WIT snapshot; previous snapshot remains at ${backup}`,
-                    );
-                }
-            }
-            throw error;
         }
-
-        if (backup !== undefined) fs.rmSync(backup, { recursive: true, force: true });
     } catch (error) {
         fs.rmSync(temporary, { recursive: true, force: true });
         throw error;

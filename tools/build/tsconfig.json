@@ -1,5 +1,5 @@
 {
     "extends": "../../tsconfig.base.json",
     "compilerOptions": { "types": ["node"] },
-    "include": ["src", "globals.d.ts", "vitest.config.ts"]
+    "include": ["src", "docs.ts", "globals.d.ts", "vitest.config.ts"]
 }

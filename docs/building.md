@@ -31,8 +31,8 @@ list WASI capabilities and choose an engine there:
 The engine defaults to `static-hermes`, which current plugin packages use. Set `"engine": "quickjs"`
 to choose QuickJS. Both engines are supported, but they have different runtime limits; see [Runtime
 caveats](#runtime-caveats) before choosing one. The [Static Hermes Runtime guide](../tools/static-hermes-runtime/README.md)
-covers its toolchain and supported API calls. Development, integration, and release builds all use
-the engine you select.
+covers its toolchain and how it generates API adapters. Development, integration, and release
+builds all use the engine you select.
 
 The build tool resolves the plugin's declared `@pumpkin-plugins/pumpkin-api` dependency (including an
 npm alias) and reads the WIT files from the subdirectory pinned in `wit.lock.json`. That lock must
@@ -47,12 +47,12 @@ fork of `componentize-qjs`. The fork is needed because the upstream Wasmtime 47 
 WASI HTTP types used by plugins. The pinned release's own build script uses a componentizer that
 produces 55 MB plugins and can't run the WASI socket code.
 
-Production builds are minified. When you build a plugin inside this repository, a component larger
-than 5 MiB (5,242,880 bytes) fails before the build replaces the existing `.wasm` output. If you use
-the published build package outside this repository, it warns above the same limit but still writes
-the component. Development bundles stay readable and skip the size check. Static Hermes development
-components optimize native code for size while retaining Hermes source locations and native line
-tables for backtraces.
+Production builds are minified. A component larger than 5 MiB (5,242,880 bytes) produces a warning,
+but the build still writes it. Set `PUMPKIN_PLUGINS_FAIL_ON_SIZE_LIMIT=1` to make an oversized
+component fail the build before it replaces the existing `.wasm` output; CI sets it for the
+production build. Development bundles stay readable and skip the size check. Static Hermes
+development components optimize native code for size while retaining Hermes source locations and
+native line tables for backtraces.
 
 ### Choose build outputs and options
 
@@ -107,20 +107,26 @@ consumer.
 
 ## Run all plugins on Pumpkin
 
-Run `pnpm dev` to build every plugin and start the latest stable Pumpkin release. To use Pumpkin's
-latest nightly build, run `pnpm dev --nightly` or `pnpm dev:nightly`. Stable release metadata is
-cached in `.cache/pumpkin` for 24 hours; set `PUMPKIN_REFRESH_RELEASE=1` to refresh it for one run.
-Nightly metadata refreshes at every start because the `nightly` tag is reused, and the binary cache
-uses the uploaded asset ID to detect replaced builds. Stable binaries are checked against
-`checksums.sha256`; nightly binaries are checked against their GitHub release asset SHA-256 digest.
+Run `pnpm dev` to build every plugin and start the Pumpkin release pinned in
+[`pumpkin-version.ts`](../tools/test-harness/src/pumpkin-version.ts), the same one the integration
+tests use, so the server matches the plugins' WIT ABI. It's downloaded once into `.cache/pumpkin`
+and checked against the SHA-256 pinned beside the release.
+
+To try a newer server, run `pnpm dev --latest` for the latest stable release, or run
+`pnpm dev --nightly` (or `pnpm dev:nightly`) for the latest nightly build. Plugins may fail to load
+there if that server's ABI differs from the pin. Latest-release metadata is cached in
+`.cache/pumpkin` for 24 hours; set `PUMPKIN_REFRESH_RELEASE=1` to refresh it for one run. Nightly
+metadata refreshes at every start because the `nightly` tag is reused, and the binary cache uses the
+uploaded asset ID to detect replaced builds. Stable binaries are checked against `checksums.sha256`;
+nightly binaries are checked against their GitHub release asset SHA-256 digest.
 
 Pass `--release` to use release settings for the initial build and hot-reload rebuilds. For example,
 run `pnpm dev -- --release`.
 
 To build once and run without plugin hot reload or build watchers, run `pnpm dev:no-hot-reload`. Add
-`--nightly` or use `pnpm dev:nightly:no-hot-reload` to start the latest nightly build. You can also
-pass `--release`, as in `pnpm dev:no-hot-reload -- --release`. Restart the command after changing a
-plugin.
+`--latest` or `--nightly`, or use `pnpm dev:nightly:no-hot-reload`, to start a newer server. You can
+also pass `--release`, as in `pnpm dev:no-hot-reload -- --release`. Restart the command after
+changing a plugin.
 
 The dev server lives in `.cache/pumpkin-dev`, so its world and settings remain between runs. Each
 command configures Pumpkin's plugin hot reload to match the mode you chose. In hot-reload mode,
@@ -128,10 +134,11 @@ command configures Pumpkin's plugin hot reload to match the mode you chose. In h
 file into the server's `plugins/` directory. Pumpkin watches that directory, while build output lives
 inside each package; copying the file ensures Pumpkin sees changes because a link to the build output
 would not notify it when the target changes. Automatic Market update checks are disabled in the
-default development builds and included in `--release` builds. Plugins that request permissions
-still need those permissions granted on their initial load; a hot reload can't prompt for them.
+default development builds and included in `--release` builds. Each rebuild changes the `.wasm`
+file, so a hot reload denies a plugin's permissions until you restart the server or pre-allow them
+in the dev server's `pumpkin.toml`; see [Runtime caveats](#runtime-caveats).
 
-To use a local server binary instead of downloading the latest release, set `PUMPKIN_BIN`. Set
+To use a local server binary instead of downloading one, set `PUMPKIN_BIN`. Set
 `PUMPKIN_CACHE_DIR` to change the binary cache directory. To reset the dev server's world, config,
 and plugins, stop the server and remove `.cache/pumpkin-dev`.
 
@@ -157,6 +164,12 @@ pnpm dlx @pumpkin-plugins/codemod update-build .
 
 ## Runtime caveats
 
+Pumpkin handles plugin permissions the same way for both engines. It asks the operator to approve
+them on the server console unless every requested permission is listed in `allowed_permissions`
+under `[plugins]` in `pumpkin.toml`, or `ask_permission_confirmation` is off. Pumpkin remembers the answer for
+that exact `.wasm` file and permission list, so it asks again after either one changes. A hot reload
+can't show the prompt and denies the permissions, so restart the server to answer it.
+
 ### QuickJS runtime
 
 QuickJS plugins run inside the server's WebAssembly runtime, which has a few limits to account for:
@@ -169,23 +182,40 @@ QuickJS plugins run inside the server's WebAssembly runtime, which has a few lim
   range.
 - Scheduler delays and periods are `u64` (`bigint`); handler and task IDs are `u32` (`number`). The
   plugin-kit scheduler helpers accept safe integer tick counts and pass them as `BigInt`.
-- The first time a plugin requests permissions, the server prompts for them in its console. A hot
-  reload can't show that prompt and denies the permissions, so restart the server for the first
-  load.
 - Two builds of the same source produce different bytes. If you sign or upload a build, use the
   artifact from the build job instead of rebuilding it.
 
 ### Static Hermes
 
-Static Hermes plugins use the WASI 2 C API path in `tools/static-hermes-runtime`. Its native JSI shim
-implements only part of the Pumpkin API. The runtime reads the prepared WIT directory from
-`@pumpkin-plugins/build`, which owns the WASI version and WIT files. It validates every operation in
-an imported WASI interface, including operations your plugin doesn't use, and generates native
-adapters for operations selected by build analysis. The imported WASI 0.2.3 operations cover
+Static Hermes plugins use the WASI 2 C API path in `tools/static-hermes-runtime`. The build generates
+a native adapter for each Pumpkin API operation the plugin uses, or for every operation when build
+analysis can't tell which ones it uses. If an operation has a WIT input or result type the generator
+can't convert, the build fails and names that operation, so a component that builds can call every
+operation it includes.
+
+The runtime reads the WIT directory that `@pumpkin-plugins/build` prepares from the WASI files
+pinned in its `wasi-wit.lock.json`. The WASI version itself belongs to
+`@pumpkin-plugins/wasi-capabilities`, and the lock has to match it. The runtime validates every
+operation in an imported WASI interface, including operations your plugin doesn't use, and generates
+native adapters for operations selected by build analysis. The imported WASI operations cover
 filesystem, HTTP, streams, clocks, TCP, UDP, and sockets. Selecting a feature-gated operation also
 enables its WIT feature. Event converters keep complete payload fields for statically registered
-event types; dynamic or unresolved registrations retain every event case and payload field. Static
-Hermes development builds disable the shared automatic update check. WASI 3 support is deferred.
+event types; dynamic or unresolved registrations retain every event case and payload field. WASI 3
+support is deferred.
+
+Resources and promises behave differently from QuickJS, so keep these rules in mind when you write a
+plugin for Static Hermes:
+
+- Garbage collection doesn't release Pumpkin or WASI resources, such as players, worlds, text
+  components and streams. Call `drop()` on a resource you own once you're done with it, including on
+  error paths.
+- Resources passed into a callback belong to that callback. The load context is dropped when
+  `onLoad` returns, the server, command sender and arguments when their handler returns, and an
+  event's resources go back to Pumpkin with the returned event. Using one later throws `Cannot use a
+  disposed or transferred resource`, so keep the values you need rather than the resource.
+- Promise jobs run only before the callback that queued them returns. There's no event loop between
+  callbacks, so code after an `await` that waits for a later tick, task or event never runs. Use the
+  scheduler for work that has to happen later.
 
 ## Turborepo
 
@@ -201,19 +231,20 @@ These are the tasks and outputs Turbo caches:
 | `transit` | Does no work itself; carries the hashes of a package's dependencies so their changes invalidate dependent tasks. |
 | `build` | Caches `build/**` except `build/types/**`, plus package `dist/**` output. |
 | `benchmark:build` | Caches the engine-comparison components and stack-guard fixtures, with a separate output path for each configuration. |
-| `typecheck` | Caches generated `build/types/**` declarations and restores them on a cache hit. |
+| `typecheck` | Caches the `build/types/**` declarations of packages whose typecheck generates them; other packages' typechecks produce no outputs. |
 | `test` | Caches `dist/**` for the `static-hermes-runtime` package's test build. |
 | `test:integration` | Depends on `build` and is never cached because it starts a real server. |
 | `readme`, `readme:check` | Never cached because they write or inspect files. |
 
-The build tool, signing tool, plugin creator, and test harness `typecheck` tasks run `tsc --noEmit`,
-so their package-level Turbo configurations declare no outputs. Plugin typechecks keep the root
-`build/types/**` outputs because they generate the guest declarations that builds and editors need.
+Most tool packages typecheck with plain `tsc --noEmit` and write nothing. Plugins, and tools such as
+`plugin-kit` and `pumpkin-api` that generate declarations before running `tsc`, write the guest
+declarations that builds and editors need, so their `build/types/**` output is cached.
 
 The `@pumpkin-plugins/build` build and test tasks also build `@pumpkin-plugins/static-hermes-runtime`
 and `@pumpkin-plugins/wasi-capabilities` first. The build tool imports their compiled package
 entries, so both public tools declare their `dist/**` output for Turbo to restore when those builds
-come from cache.
+come from cache. Its typecheck builds `@pumpkin-plugins/static-hermes-runtime` first, because that
+package's declarations come from `dist/`.
 
 Run `pnpm clean` to remove workspace `node_modules`, root and workspace `build/` and `dist/` output,
 and `.turbo/cache/`. It preserves `.cache/`.
@@ -227,9 +258,10 @@ prepare Hermes when needed.
 #### Keep cache keys tied to dependencies
 
 Most workspace packages are used as source because their `exports` point at `src/`; nothing is built
-before a dependent task runs, so Turborepo has no reason to look at a dependency's files. The public
-`@pumpkin-plugins/wasi-capabilities` package is compiled to `dist/` so Node can load it from
-`node_modules`, and its build runs before dependent package tasks.
+before a dependent task runs, so Turborepo has no reason to look at a dependency's files. Tools with
+a `build` script that writes `dist/`, such as `@pumpkin-plugins/build`,
+`@pumpkin-plugins/static-hermes-runtime` and `@pumpkin-plugins/wasi-capabilities`, are compiled so
+Node can load them from `node_modules`; the tasks that import them depend on their builds.
 
 The `transit` task is Turborepo's "transit nodes" pattern. It has no script and depends on
 `^transit`. The `build`, `typecheck`, and `test` tasks depend on it, so changes in a package's
@@ -239,7 +271,7 @@ need to add new tools to a central list as long as a plugin declares them in its
 
 Use `globalDependencies` only for inputs outside packages: `.node-version` (the Node version CI
 selects; Turborepo doesn't hash `process.version`), `tsconfig.base.json`, and `pnpm-workspace.yaml`
-(which pins the API package and ABI). The lockfile and root `package.json` invalidate everything.
+(the shared dependency catalog). The lockfile and root `package.json` invalidate everything.
 The packages that the root `package.json` depends on (`tools/docs` and `tools/signing`) also
 invalidate everything because Turborepo treats them as global.
 

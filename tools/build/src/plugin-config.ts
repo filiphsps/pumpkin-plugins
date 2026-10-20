@@ -11,23 +11,28 @@ export type StaticHermesRuntime = StaticHermesRuntimeVariant;
 /** Static Hermes garbage collector linked into the plugin component. */
 export type StaticHermesGc = StaticHermesGcVariant;
 
-/** What a package declares under `pumpkinPlugin` in its `package.json`. */
-export interface PluginBuildConfig {
-    /** JavaScript runtime used for the component. Defaults to Static Hermes. */
-    engine: PluginEngine;
+/** Settings every engine shares under `pumpkinPlugin`. */
+export interface PluginBuildFields {
     /** Source file to bundle. Only needed to build a `.wasm`. */
     entry?: string;
     /** Where to write the `.wasm`. Only needed to build one. */
     output?: string;
-    /** Static Hermes garbage collector. Defaults to Hades. */
-    staticHermesGc?: StaticHermesGc;
-    /** Optional Static Hermes VM profile. Lean omits runtime bytecode generation. */
-    staticHermesRuntime?: StaticHermesRuntime;
     /** The package's version, injected as `__PLUGIN_VERSION__`. */
     version: string;
     /** WASI capabilities the code uses. */
     wasi: Capability[];
 }
+
+/**
+ * What a package declares under `pumpkinPlugin` in its `package.json`, with defaults applied. The engine
+ * defaults to Static Hermes, and a Static Hermes build defaults to the Hades garbage collector. The runtime
+ * profile has no default here because the build also reads it from the environment.
+ */
+export type PluginBuildConfig = PluginBuildFields &
+    (
+        | { engine: 'quickjs' }
+        | { engine: 'static-hermes'; staticHermesGc: StaticHermesGc; staticHermesRuntime?: StaticHermesRuntime }
+    );
 
 /**
  * Reads the `pumpkinPlugin` key of a package's `package.json`.
@@ -85,7 +90,6 @@ export function readPluginConfig(pluginDir: string): PluginBuildConfig {
             throw new BuildError('"pumpkinPlugin.staticHermesGc" must be "hades" or "malloc"');
         }
     }
-    const staticHermesGc = engine === 'static-hermes' ? (configuredStaticHermesGc ?? 'hades') : undefined;
 
     const wasiValue = config.wasi === undefined ? [] : config.wasi;
     if (!Array.isArray(wasiValue)) throw new BuildError('"pumpkinPlugin.wasi" must be an array of capability names');
@@ -99,40 +103,31 @@ export function readPluginConfig(pluginDir: string): PluginBuildConfig {
         }
         wasi.push(name);
     }
+    const fields = { entry, output, wasi, version: pkg.version };
+    if (engine === 'quickjs') return { ...fields, engine };
     return {
-        entry,
-        output,
+        ...fields,
         engine,
+        staticHermesGc: configuredStaticHermesGc ?? 'hades',
         ...(staticHermesRuntime === undefined ? {} : { staticHermesRuntime }),
-        ...(staticHermesGc === undefined ? {} : { staticHermesGc }),
-        wasi,
-        version: pkg.version,
     };
 }
 
 /**
- * Checks that a config has what a full build needs.
- * @param config - The declared settings.
+ * Checks that a config read by {@link readPluginConfig} has what a full build needs.
+ * @param config - The declared settings, with paths already validated.
  * @returns The entry and output paths.
- * @throws {BuildError} When either is missing or invalid.
+ * @throws {BuildError} When either is missing.
  */
-export function requireBuildFields(config: PluginBuildConfig): { entry: string; output: string } {
+export function requireBuildFields(config: PluginBuildFields): { entry: string; output: string } {
     if (!config.entry || !config.output) {
         throw new BuildError('package.json needs "pumpkinPlugin": { "entry": ..., "output": ... } to build');
     }
-    return {
-        entry: requiredRelativePath(config.entry, 'entry'),
-        output: requiredRelativePath(config.output, 'output'),
-    };
+    return { entry: config.entry, output: config.output };
 }
 
 function optionalRelativePath(value: unknown, name: string): string | undefined {
     if (value === undefined) return undefined;
-    if (typeof value !== 'string') throw new BuildError(`"pumpkinPlugin.${name}" must be a relative path`);
-    return requiredRelativePath(value, name);
-}
-
-function requiredRelativePath(value: unknown, name: string): string {
     if (typeof value !== 'string') throw new BuildError(`"pumpkinPlugin.${name}" must be a relative path`);
     const normalized = path.posix.normalize(value.replaceAll('\\', '/'));
     if (

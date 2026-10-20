@@ -14,9 +14,9 @@ import { printBuildOutput } from './output.ts';
 import { readPluginConfig, requireBuildFields } from './plugin-config.ts';
 import { cacheDir } from './repo.ts';
 import { generateTypes } from './types.ts';
-import { isBuildUpdateCheckAllowed, startBuildUpdateCheck } from './update-check.ts';
+import { startBuildUpdateCheck } from './update-check.ts';
 import { ensureWasiWit, readLock } from './wasi-wit.ts';
-import { withWasiWitFileLock } from './wasi-wit-lock.ts';
+import { withFileLock } from './wasi-wit-lock.ts';
 import { prepareWit, publishWitSnapshot } from './wit.ts';
 
 /**
@@ -73,7 +73,6 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
                 });
             }
             generateTypes(witDir, path.join(buildDir, 'types', 'bindings'));
-            fs.rmSync(path.join(buildDir, 'types', 'wit'), { recursive: true, force: true });
         } finally {
             if (temporaryWitRoot !== undefined) fs.rmSync(temporaryWitRoot, { recursive: true, force: true });
         }
@@ -92,19 +91,19 @@ export async function run(args: string[], pluginDir: string): Promise<void> {
             target: temporaryWitRoot === undefined ? path.join(buildDir, 'wit') : path.join(temporaryWitRoot, 'wit'),
         });
         const witSnapshot = path.join(buildDir, 'wit');
-        await withWasiWitFileLock(path.join(buildDir, '.wit-publish.lock'), () => {
+        await withFileLock(path.join(buildDir, '.wit-publish.lock'), () => {
             if (temporaryWitRoot !== undefined) publishWitSnapshot(witDir, witSnapshot);
             else fs.rmSync(witSnapshot, { recursive: true, force: true });
         });
 
-        const engine = config.engine ?? 'static-hermes';
+        const { engine } = config;
         const staticHermesRuntime =
-            engine === 'static-hermes'
+            config.engine === 'static-hermes'
                 ? process.env.STATIC_HERMES_ENABLE_LEAN_ARCHIVE === '0'
                     ? 'full'
                     : (config.staticHermesRuntime ?? 'lean')
                 : undefined;
-        const staticHermesGc = engine === 'static-hermes' ? (config.staticHermesGc ?? 'hades') : undefined;
+        const staticHermesGc = config.engine === 'static-hermes' ? config.staticHermesGc : undefined;
         printBuildOutput({
             type: 'bundle',
             entry,
@@ -143,24 +142,26 @@ export interface ExecuteCliOptions {
     startUpdateCheck?: typeof startBuildUpdateCheck;
 }
 
-/** Starts an optional background update lookup and runs the build command. */
+/** Starts an optional update lookup, runs the build while it is pending, then waits for the lookup to finish. */
 export async function executeCli(args: string[], pluginDir: string, options: ExecuteCliOptions = {}): Promise<void> {
     const startUpdateCheck = options.startUpdateCheck ?? startBuildUpdateCheck;
     const environment = options.environment ?? process.env;
     const isTTY = options.isTTY ?? process.stdout.isTTY === true;
-    await startUpdateCheck(args, { environment, isTTY }).catch(() => undefined);
+    const update = startUpdateCheck(args, { environment, isTTY }).catch(() => undefined);
     await main(args, pluginDir);
+    await update;
 }
 
 /**
  * Resolves the Pumpkin API package and fetches its pinned WIT into the consumer cache.
  *
- * @remarks A declared alias takes precedence over an undeclared canonical package hoisted from a tool dependency.
- * A directly declared canonical dependency remains preferred.
+ * @remarks Only API packages the plugin declares are tried, so a copy hoisted from a tool dependency is never
+ * used. A directly declared canonical dependency is tried before declared aliases.
  * @param pluginDir - Root directory of the consuming plugin project.
  * @param resolvePackageJson - Resolver for a requested API package manifest, injectable for isolated callers.
  * @returns The cached WIT directory selected by the API package's `wit.lock.json`.
- * @throws {BuildError} If the API package, pin, Git checkout, or WIT files cannot be resolved.
+ * @throws {BuildError} If the plugin declares no API package, or the package, pin, Git checkout, or WIT files cannot
+ * be resolved.
  */
 export function resolveApiWit(
     pluginDir: string,
@@ -169,19 +170,17 @@ export function resolveApiWit(
 ): string {
     let packageJson: string;
     try {
-        const canonicalSpecifier = '@pumpkin-plugins/pumpkin-api/package.json';
         const { aliases, hasCanonicalDependency } = apiPackageSpecifiers(pluginDir);
-        const packageSpecifiers =
-            hasCanonicalDependency || aliases.length === 0
-                ? [canonicalSpecifier, ...aliases]
-                : [...aliases, canonicalSpecifier];
+        const packageSpecifiers = hasCanonicalDependency
+            ? ['@pumpkin-plugins/pumpkin-api/package.json', ...aliases]
+            : aliases;
         let resolvedPackageJson: string | undefined;
         for (const packageSpecifier of packageSpecifiers) {
             try {
                 resolvedPackageJson = resolvePackageJson(pluginDir, packageSpecifier);
                 break;
             } catch {
-                // Try another declared API alias or the canonical package name.
+                // Try the next declared API package.
             }
         }
         if (resolvedPackageJson === undefined) throw new Error('API package manifest was not resolved');

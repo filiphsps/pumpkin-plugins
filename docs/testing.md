@@ -7,6 +7,10 @@ description: "Unit tests and integration tests against a real Pumpkin server"
 
 # Testing
 
+This guide explains how to run the two kinds of tests and what the harness does. Which kind to write
+for a change, and when, is set by the repository's
+[testing policy](https://github.com/filiphsps/pumpkin-plugins/blob/master/AGENTS.md#testing-policy).
+
 Plugin packages use `definePluginVitestConfig()` from `@pumpkin-plugins/test-harness/vitest` to
 define two Vitest projects:
 
@@ -66,7 +70,8 @@ skip the integration job.
 `@pumpkin-plugins/test-harness` starts a real server for each test file. It uses a temporary
 directory and free ports, and turns off plugin permission prompts and telemetry. The harness sets
 `RUST_LOG=info` for Pumpkin so readiness checks and assertions can see startup and plugin INFO logs,
-even if your shell uses a stricter log filter:
+even if your shell uses a stricter log filter. Pass `logLevel: 'debug'` to `startPumpkin` when a test
+waits on a plugin's debug logs:
 
 ```ts
 // packages/<folder>/test/my.itest.ts
@@ -129,12 +134,13 @@ boundary without compiling the starter projects, run
 ## The server binary
 
 The release is pinned in [`pumpkin-version.ts`](../tools/test-harness/src/pumpkin-version.ts). Its
-plugin ABI should match the WIT ABI carried by `@pumpkin-plugins/pumpkin-api` in
-`pnpm-workspace.yaml`. The harness chooses the server binary in this order:
+plugin ABI should match the WIT pinned in the API package's
+[`wit.lock.json`](../tools/pumpkin-api/wit.lock.json). The harness chooses the server binary in this order:
 
 1. `PUMPKIN_BIN`, if set.
-2. If `PUMPKIN_BIN` isn't set, the pinned release, downloaded once into `.cache/pumpkin` and checked
-   against the release's `checksums.sha256`.
+2. If `PUMPKIN_BIN` isn't set, the pinned release, downloaded once into `.cache/pumpkin`. The download
+   and the cached file are checked against the SHA-256 pinned beside the release, so a cached binary
+   needs no network. Update those checksums when you change the release.
 
 | Variable | Effect |
 | --- | --- |
