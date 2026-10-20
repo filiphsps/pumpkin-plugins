@@ -33,7 +33,7 @@ export interface HermesBuildOptions {
     process?: HermesProcessRunner;
     /** Pinned Hermes source checkout. */
     source: string;
-    /** CMake toolchain file used for the WASI build. */
+    /** CMake toolchain file for the WASI build, copied into the WASI build directory before CMake reads it. */
     toolchainFile: string;
     /** CMake build directory for WASI Hermes and JSI libraries. */
     wasiBuild: string;
@@ -699,7 +699,7 @@ export function hermesCMakeCommands(options: HermesBuildOptions, environment: No
             '-G',
             'Ninja',
             '-DCMAKE_BUILD_TYPE=MinSizeRel',
-            `-DCMAKE_TOOLCHAIN_FILE=${options.toolchainFile}`,
+            `-DCMAKE_TOOLCHAIN_FILE=${wasiBuildToolchainFile(options.wasiBuild)}`,
             // Patch 0001 reads this before project(), when CMAKE_SYSTEM_NAME is not set yet.
             '-DHERMES_WASI_TARGET=ON',
             `-DWASI_SDK_PREFIX=${options.wasiSdk}`,
@@ -739,7 +739,35 @@ function configureAndBuildHermes(
     if (!filesystem.existsSync(options.toolchainFile)) {
         throw new Error(`WASI 2 Hermes toolchain file not found: ${options.toolchainFile}`);
     }
+    copyToolchainIntoWasiBuild(options, filesystem);
     for (const args of hermesCMakeCommands(options, environment)) runner.run('cmake', args);
+}
+
+/**
+ * Copy the toolchain file into the WASI build directory, and reset that directory's CMake configuration when it was
+ * set up with another toolchain path.
+ *
+ * CMake reads `CMAKE_TOOLCHAIN_FILE` only when it first configures a build directory. Later configures keep including
+ * the file recorded then, even after it was deleted, and a new value only changes the cache entry. The copy inside the
+ * build directory exists as long as the build does. The reset removes `CMakeCache.txt` and `CMakeFiles/`, as
+ * `cmake --fresh` does. Hermes compiles nothing into that top-level `CMakeFiles/`, and a fresh configure produces the
+ * same compile commands, so the reset alone makes Ninja recompile nothing.
+ */
+function copyToolchainIntoWasiBuild(options: HermesBuildOptions, filesystem: HermesFileSystem): void {
+    const toolchainFile = wasiBuildToolchainFile(options.wasiBuild);
+    const cache = path.join(options.wasiBuild, 'CMakeCache.txt');
+    const configuredToolchain = filesystem.existsSync(cache)
+        ? filesystem.readFileSync(cache, 'utf8').match(/^CMAKE_TOOLCHAIN_FILE:[^=]+=([^\r\n]+)$/m)?.[1]
+        : undefined;
+    if (configuredToolchain === undefined || path.resolve(configuredToolchain) !== toolchainFile) {
+        filesystem.rmSync(cache, { force: true });
+        filesystem.rmSync(path.join(options.wasiBuild, 'CMakeFiles'), { recursive: true, force: true });
+    }
+    filesystem.writeFileSync(toolchainFile, filesystem.readFileSync(options.toolchainFile));
+}
+
+function wasiBuildToolchainFile(wasiBuild: string): string {
+    return path.resolve(wasiBuild, 'wasi-sdk-hermes-p2.cmake');
 }
 
 /**
