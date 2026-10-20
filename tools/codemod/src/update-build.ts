@@ -26,8 +26,8 @@ export interface UpdateBuildOptions {
     lookup?: UpdateBuildVersionLookup;
     /** Release migration registry; injectable for interval and ordering tests. */
     migrations?: readonly BuildMigration[];
-    /** Resolves the builder version installed in the project root. */
-    resolveInstalledVersion?: (projectRoot: string) => string | undefined;
+    /** Resolves the builder version installed for a package directory. */
+    resolveInstalledVersion?: (packageDirectory: string) => string | undefined;
     /** Writes previewed changes when true. */
     write?: boolean;
 }
@@ -35,8 +35,10 @@ export interface UpdateBuildOptions {
 /**
  * Resolves the installed builder, fetches npm's latest release, and runs selected migrations.
  *
- * @throws {Error} If the installed builder or latest release cannot be determined, or npm's latest
- * release predates the installed version.
+ * Each file gets the migrations for the builder installed in its nearest package directory.
+ *
+ * @throws {Error} If the builder installed for an input path or the latest release cannot be
+ * determined, or npm's latest release predates an installed version.
  * @param paths - Files or directories selected by the caller.
  * @param options - Project, lookup, migration, and write configuration.
  * @returns Preview or write report from the shared codemod runner.
@@ -46,13 +48,17 @@ export async function runUpdateBuild(
     options: UpdateBuildOptions = {},
 ): Promise<CodemodRunReport> {
     const projectRoot = path.resolve(options.cwd ?? process.cwd());
-    const installedVersion = resolveInstalledBuilder(projectRoot, options.resolveInstalledVersion);
-    const validInstalledVersion = semver.valid(installedVersion);
-    if (!validInstalledVersion) {
-        throw new Error(
-            `Cannot determine a valid installed ${packageName} version; install the project dependencies first.`,
-        );
-    }
+    const inputs = paths.length > 0 ? paths : ['.'];
+    const installedVersion = installedVersionCache(options.resolveInstalledVersion);
+    const inputVersions = inputs.map((input) => {
+        const version = installedVersion(packageDirectoryOf(path.resolve(projectRoot, input)));
+        if (!version) {
+            throw new Error(
+                `Cannot determine a valid installed ${packageName} version for ${quoteForTerminal(input)}; install the project dependencies first.`,
+            );
+        }
+        return version;
+    });
 
     let registryResult: LatestVersionPackage;
     try {
@@ -73,38 +79,92 @@ export async function runUpdateBuild(
     if (!validLatestVersion) {
         throw new Error(`Could not determine a valid latest ${packageName} release from the npm registry.`);
     }
-    if (semver.lt(validLatestVersion, validInstalledVersion)) {
-        throw new Error(
-            `The latest ${packageName} version ${validLatestVersion} is older than the installed version ${validInstalledVersion}; no files were changed.`,
-        );
+    for (const version of inputVersions) {
+        if (semver.lt(validLatestVersion, version)) {
+            throw new Error(
+                `The latest ${packageName} version ${validLatestVersion} is older than the installed version ${version}; no files were changed.`,
+            );
+        }
     }
 
-    const migrations = selectBuildMigrations(
-        validInstalledVersion,
-        validLatestVersion,
-        options.migrations ?? buildMigrations,
+    const registry = options.migrations ?? buildMigrations;
+    const selected = new Map<string, BuildMigration[]>();
+    const migrationsFor = (filePath: string): BuildMigration[] => {
+        const directory = packageDirectoryOf(filePath);
+        let migrations = selected.get(directory);
+        if (!migrations) {
+            const version = installedVersion(directory);
+            migrations = version ? selectBuildMigrations(version, validLatestVersion, registry) : [];
+            selected.set(directory, migrations);
+        }
+        return migrations;
+    };
+
+    const run: UpdateRun = { latest: validLatestVersion, builderDeclared: false };
+    const codemod = composeUpdateCodemod(
+        run,
+        registry.filter(({ introducedIn }) => semver.lte(introducedIn, validLatestVersion)),
+        migrationsFor,
     );
-    const codemod = composeUpdateCodemod(validLatestVersion, migrations);
-    return runCodemod(codemod, paths.length > 0 ? paths : ['.'], {
-        cwd: projectRoot,
-        write: options.write,
-    });
+    const report = await runCodemod(codemod, inputs, { cwd: projectRoot, write: options.write });
+    if (!run.builderDeclared && run.firstManifest) {
+        report.messages.push({
+            relativePath: run.firstManifest,
+            text: `No direct ${packageName} dependency was found; no dependency was added.`,
+        });
+    }
+    return report;
+}
+
+/** State shared by the files of one update run. */
+interface UpdateRun {
+    /** Whether any scanned manifest declared the builder, directly or through an npm alias. */
+    builderDeclared: boolean;
+    /** First scanned manifest, which carries run-wide notes. */
+    firstManifest?: string;
+    latest: string;
+}
+
+/** Returns the nearest directory at or above `start` that has a package.json, or `start` itself. */
+function packageDirectoryOf(start: string): string {
+    let directory = fs.statSync(start, { throwIfNoEntry: false })?.isDirectory() ? start : path.dirname(start);
+    const first = directory;
+    while (!fs.existsSync(path.join(directory, 'package.json'))) {
+        const parent = path.dirname(directory);
+        if (parent === directory) return first;
+        directory = parent;
+    }
+    return directory;
+}
+
+/** Resolves and validates the installed builder version once per package directory. */
+function installedVersionCache(
+    resolver: ((packageDirectory: string) => string | undefined) | undefined,
+): (packageDirectory: string) => string | undefined {
+    const versions = new Map<string, string | undefined>();
+    return (packageDirectory) => {
+        if (!versions.has(packageDirectory)) {
+            const version = resolveInstalledBuilder(packageDirectory, resolver);
+            versions.set(packageDirectory, semver.valid(version) ?? undefined);
+        }
+        return versions.get(packageDirectory);
+    };
 }
 
 function resolveInstalledBuilder(
-    projectRoot: string,
-    resolver: ((projectRoot: string) => string | undefined) | undefined,
+    packageDirectory: string,
+    resolver: ((packageDirectory: string) => string | undefined) | undefined,
 ): string | undefined {
     if (resolver) {
         try {
-            return resolver(projectRoot);
+            return resolver(packageDirectory);
         } catch {
             return undefined;
         }
     }
 
     try {
-        const packageJsonPath = createRequire(path.join(projectRoot, 'package.json')).resolve(
+        const packageJsonPath = createRequire(path.join(packageDirectory, 'package.json')).resolve(
             `${packageName}/package.json`,
         );
         const packageManifest: unknown = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
@@ -115,28 +175,36 @@ function resolveInstalledBuilder(
     }
 }
 
-function composeUpdateCodemod(latest: string, migrations: readonly BuildMigration[]): CodemodDefinition {
+function composeUpdateCodemod(
+    run: UpdateRun,
+    candidates: readonly BuildMigration[],
+    migrationsFor: (filePath: string) => readonly BuildMigration[],
+): CodemodDefinition {
     return {
         id: 'update-build',
         description: 'Update the build-tool version and apply its release migrations.',
         matchesFile: (relativePath) =>
-            relativePath === 'package.json' ||
-            relativePath.endsWith('/package.json') ||
-            migrations.some(({ codemod }) => codemod.matchesFile(relativePath)),
-        transform: (context) => transformUpdateFile(context, latest, migrations),
+            isManifest(relativePath) || candidates.some(({ codemod }) => codemod.matchesFile(relativePath)),
+        transform: (context) => transformUpdateFile(context, run, migrationsFor(context.absolutePath)),
     };
+}
+
+function isManifest(relativePath: string): boolean {
+    return relativePath === 'package.json' || relativePath.endsWith('/package.json');
 }
 
 async function transformUpdateFile(
     context: TransformContext,
-    latest: string,
+    run: UpdateRun,
     migrations: readonly BuildMigration[],
 ): Promise<TransformResult> {
     let source = context.source;
     const messages: string[] = [];
 
-    if (context.relativePath === 'package.json' || context.relativePath.endsWith('/package.json')) {
-        const update = updateBuilderDeclarations(source, latest);
+    if (isManifest(context.relativePath)) {
+        run.firstManifest ??= context.relativePath;
+        const update = updateBuilderDeclarations(source, run.latest);
+        if (update.declared) run.builderDeclared = true;
         source = update.source;
         messages.push(...(update.messages ?? []));
     }
@@ -151,9 +219,9 @@ async function transformUpdateFile(
     return { source, ...(messages.length === 0 ? {} : { messages }) };
 }
 
-function updateBuilderDeclarations(source: string, latest: string): TransformResult {
+function updateBuilderDeclarations(source: string, latest: string): TransformResult & { declared: boolean } {
     const parsed = parseJsonObject(source);
-    if (!parsed.value) return { source, messages: [parsed.error ?? 'Skipped invalid package.json.'] };
+    if (!parsed.value) return { source, declared: false, messages: [parsed.error ?? 'Skipped invalid package.json.'] };
 
     let updatedSource = source;
     let declarationsFound = false;
@@ -181,6 +249,7 @@ function updateBuilderDeclarations(source: string, latest: string): TransformRes
                     updatedSource = setJsonValue(updatedSource, [field, packageName], nextSpecification, source);
                 }
             } else if (typeof specification === 'string' && /^npm:@pumpkin-plugins\/build(?:@|$)/.test(specification)) {
+                declarationsFound = true;
                 messages.push(
                     `Cannot update npm alias ${field}.${quoteForTerminal(name)} for ${packageName}; update it to ${latest} manually.`,
                 );
@@ -188,10 +257,7 @@ function updateBuilderDeclarations(source: string, latest: string): TransformRes
         }
     }
 
-    if (!declarationsFound && messages.length === 0) {
-        messages.push(`No direct ${packageName} dependency was found; no dependency was added.`);
-    }
-    return { source: updatedSource, ...(messages.length === 0 ? {} : { messages }) };
+    return { source: updatedSource, declared: declarationsFound, ...(messages.length === 0 ? {} : { messages }) };
 }
 
 function supportedRange(specification: string): { prefix: '^' | '~' | '' } | undefined {

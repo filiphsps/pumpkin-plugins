@@ -21,24 +21,31 @@ export function migrateSource(context: TransformContext): TransformResult {
         };
     }
 
-    const edits: Array<{ start: number; end: number }> = [];
+    const specifiers = new Set<ts.Node>();
+    let legacyNameLeft = false;
     const visit = (node: ts.Node): void => {
         const specifier = moduleSpecifierOf(node);
-        if (specifier?.text === LEGACY_API_PACKAGE) {
-            edits.push({ start: specifier.getStart(sourceFile), end: specifier.getEnd() });
+        if (specifier?.text === LEGACY_API_PACKAGE) specifiers.add(specifier);
+        if (ts.isStringLiteralLike(node) && !specifiers.has(node)) {
+            legacyNameLeft ||= node.text.includes(LEGACY_API_PACKAGE);
         }
         ts.forEachChild(node, visit);
     };
     visit(sourceFile);
 
-    if (edits.length === 0) return { source: context.source };
+    const edits = [...specifiers].map((specifier) => ({
+        start: specifier.getStart(sourceFile),
+        end: specifier.getEnd(),
+    }));
     let migrated = context.source;
     for (const edit of edits.sort((left, right) => right.start - left.start)) {
         const quote = migrated[edit.start];
         migrated = `${migrated.slice(0, edit.start)}${quote}${API_PACKAGE}${quote}${migrated.slice(edit.end)}`;
     }
-    return { source: migrated };
+    return legacyNameLeft ? { source: migrated, messages: [LEGACY_NAME_NOTE] } : { source: migrated };
 }
+
+const LEGACY_NAME_NOTE = `A string still names ${LEGACY_API_PACKAGE}, for example in vi.mock() or jest.mock(); the codemod rewrites only import and require specifiers, so update it by hand.`;
 
 /** Returns a module string literal from syntax that names an imported module. */
 function moduleSpecifierOf(node: ts.Node): ts.StringLiteral | undefined {
