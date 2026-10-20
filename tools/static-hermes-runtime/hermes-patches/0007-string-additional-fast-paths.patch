@@ -142,7 +142,7 @@ index bf67741..4dfdb19 100644
 @@ -952,6 +952,62 @@ TEST_F(JSLibTest, CreateStringTest) {
    ASSERT_EQ(prototype.get(), newStr->getParent(runtime));
  }
-
+ 
 +TEST_F(JSLibTest, StringFastPathResultsUseCompactASCIIStorage) {
 +  auto runRes = runtime.run(
 +      R"(
