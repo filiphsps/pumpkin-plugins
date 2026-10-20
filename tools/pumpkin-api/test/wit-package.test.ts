@@ -87,6 +87,22 @@ it('fetches the WIT files with the pinned commit when Git cannot fetch missing o
     expect(fs.readFileSync(path.join(witRoot, 'plugin.wit'), 'utf8')).toBe('package pumpkin:plugin@0.1.0;\n');
 });
 
+it('removes staging directories that builds killed more than a day ago left behind', () => {
+    const directory = createLocalWitPin();
+    const witRoot = ensurePumpkinWit({ lockFile: directory.lockFile, cacheRoot: directory.cacheRoot });
+    const cacheParent = path.join(directory.cacheRoot, 'pumpkin-api-wit');
+    const abandoned = path.join(cacheParent, '.staging-abandoned');
+    const inProgress = path.join(cacheParent, '.staging-in-progress');
+    fs.mkdirSync(path.join(abandoned, 'checkout'), { recursive: true });
+    fs.mkdirSync(inProgress);
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    fs.utimesSync(abandoned, twoDaysAgo, twoDaysAgo);
+
+    expect(ensurePumpkinWit({ lockFile: directory.lockFile, cacheRoot: directory.cacheRoot })).toBe(witRoot);
+    expect(fs.existsSync(abandoned)).toBe(false);
+    expect(fs.existsSync(inProgress)).toBe(true);
+});
+
 it('refetches a cached WIT file when its contents no longer match the integrity manifest', () => {
     const directory = createLocalWitPin();
     const witRoot = ensurePumpkinWit({ lockFile: directory.lockFile, cacheRoot: directory.cacheRoot });
