@@ -23,9 +23,9 @@ steps:
         - Fix plugin behavior
 ```
 
-The example selects a listing by name. Name lookups search up to 20 Market results for a
-case-insensitive exact match. If your workflow already has the listing's numeric database ID or
-public ID, use `plugin-id` for a direct lookup instead. Set exactly one of `plugin-name` and
+The example selects a listing by name. Name lookups read up to 10 pages of 20 Market search results
+for a case-insensitive exact match. If your workflow already has the listing's numeric database ID
+or public ID, use `plugin-id` for a direct lookup instead. Set exactly one of `plugin-name` and
 `plugin-id`.
 
 The tag in the example is this action's Release Please tag. Action releases are independent of your
@@ -43,7 +43,7 @@ action gets a new release. In this repository's own release workflows, the actio
 | `version` | Yes |  | Plugin version to publish, without a leading v |
 | `wasm-file` | Yes |  | Path to the plugin .wasm file |
 | `api-token` | No |  | Market API token with plugins:update and plugins:versions:upload scopes; required unless warn is true |
-| `api-url` | No | `https://market.pumpkinmc.org` | Pumpkin Market base URL |
+| `api-url` | No | `https://market.pumpkinmc.org` | Pumpkin Market base URL; must use https |
 | `track` | No | `stable` | Release track |
 | `release-notes` | No | `""` | Release notes to include in Market version metadata |
 | `warn` | No | `false` | Warn instead of failing when credentials or the Market listing are unavailable |
@@ -63,5 +63,6 @@ action gets a new release. In this repository's own release workflows, the actio
 Give `api-token` a GitHub secret with the `plugins:update` and `plugins:versions:upload` scopes. By
 default, an empty token or a missing or unpublished listing fails the step. Set `warn: true` when
 you want those cases to produce a warning and skip the upload instead. Lookup and upload errors
-still fail the action. When GitHub provides a step summary, the action adds a result for both
+still fail the action. If the listing already has `version`, the action skips the upload and
+reports `status: success`. When GitHub provides a step summary, the action adds a result for both
 successful uploads and skipped uploads.

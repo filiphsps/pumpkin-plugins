@@ -47,6 +47,10 @@ function contentEntries() {
     return ['package/package.json', 'package/src/index.ts'];
 }
 
+function profileJson(mode) {
+    return JSON.stringify({ name: 'test-maintainer', tfa: mode ? { pending: false, mode } : false });
+}
+
 function makeFixture({
     packagePath = 'tools/pumpkin-api',
     archiveEntries,
@@ -64,7 +68,6 @@ function makeFixture({
         registry: [],
         preflight: [],
         published: [],
-        trustChanges: [],
         removed: [],
     };
     const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'npm-bootstrap-test-'));
@@ -114,15 +117,16 @@ function makeFixture({
             install: async (sourceRoot) => events.installed.push(sourceRoot),
             pack: async (packageDirectory, destination) => {
                 events.packed.push(packageDirectory);
-                const tarball = path.join(destination, `${path.basename(packageDirectory)}-0.1.0.tgz`);
-                fs.writeFileSync(tarball, packedBytes);
-                return tarball;
+                const tarballPath = path.join(destination, `${path.basename(packageDirectory)}-0.1.0.tgz`);
+                fs.writeFileSync(tarballPath, packedBytes);
+                return {
+                    tarballPath,
+                    integrity: expectedIntegrity,
+                    entries: packedEntries ?? contentEntries(),
+                    packageJson: packedManifest ?? manifest(packagePath),
+                    embeddedPackageJsons,
+                };
             },
-            inspectPackage: async () => ({
-                entries: packedEntries ?? contentEntries(),
-                packageJson: packedManifest ?? manifest(packagePath),
-                embeddedPackageJsons,
-            }),
         },
         registry: {
             getPackage: async (name) => {
@@ -271,6 +275,29 @@ describe('npm first-release bootstrap', () => {
         assert.equal(fixture.events.removed.length, 1);
     });
 
+    it('downloads the tagged source from the repository named in the root package.json', async () => {
+        const fixture = makeFixture({ packagePath: 'tools/docs' });
+        const forkRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'npm-bootstrap-fork-'));
+        temporaryDirectories.push(forkRoot);
+        fs.writeFileSync(
+            path.join(forkRoot, 'package.json'),
+            JSON.stringify({ repository: { url: 'git+https://github.com/example-owner/example-fork.git' } }),
+        );
+        for (const file of ['.node-version', 'release-please-config.json']) {
+            fs.copyFileSync(path.join(root, file), path.join(forkRoot, file));
+        }
+        fs.mkdirSync(path.join(forkRoot, 'tools/docs'), { recursive: true });
+        fs.writeFileSync(path.join(forkRoot, 'tools/docs/package.json'), JSON.stringify(manifest('tools/docs')));
+        fixture.adapters.root = forkRoot;
+
+        await bootstrapFixture(fixture, { dryRun: true });
+
+        assert.equal(
+            fixture.events.fetch[0],
+            'https://codeload.github.com/example-owner/example-fork/tar.gz/refs/tags/docs-v0.1.0',
+        );
+    });
+
     it('rejects archive traversal entries before extracting them', async () => {
         const unsafeArchives = [
             ['pumpkin-plugins-pumpkin-api-v0.1.0/', 'pumpkin-plugins-pumpkin-api-v0.1.0/../../outside'],
@@ -356,7 +383,7 @@ describe('npm first-release bootstrap', () => {
         assert.deepEqual(fixture.events.published, []);
     });
 
-    it('dry-run validates against the registry without publishing or changing trust', async () => {
+    it('dry-run validates against the registry without publishing', async () => {
         const fixture = makeFixture();
 
         const result = await bootstrapFixture(fixture, { dryRun: true });
@@ -365,7 +392,6 @@ describe('npm first-release bootstrap', () => {
         assert.ok(fixture.events.registry.some(([kind]) => kind === 'package'));
         assert.deepEqual(fixture.events.preflight, []);
         assert.deepEqual(fixture.events.published, []);
-        assert.deepEqual(fixture.events.trustChanges, []);
     });
 
     it('treats only an npm E404 response as a definitive missing package version', async () => {
@@ -409,7 +435,7 @@ describe('npm first-release bootstrap', () => {
             assert.equal(options?.cwd, os.tmpdir());
             commands.push(args[0]);
             if (args[0] === 'whoami') return { status: 0, stdout: 'test-maintainer\n', stderr: '' };
-            if (args[0] === 'profile') return { status: 0, stdout: 'two-factor auth: auth-only\n', stderr: '' };
+            if (args[0] === 'profile') return { status: 0, stdout: profileJson('auth-only'), stderr: '' };
             if (args[0] === 'org') return { status: 0, stdout: '{"test-maintainer":"developer"}', stderr: '' };
             if (args[0] === 'publish') return { status: 0, stdout: '', stderr: '' };
             return { status: 1, stdout: '', stderr: 'unexpected npm command' };
@@ -428,7 +454,7 @@ describe('npm first-release bootstrap', () => {
         fixture.adapters.runCommand = (command, args) => {
             commands.push([command, args]);
             if (args[0] === 'whoami') return { status: 0, stdout: 'expected-owner\n', stderr: '' };
-            if (args[0] === 'profile') return { status: 0, stdout: 'two-factor auth: auth-only\n', stderr: '' };
+            if (args[0] === 'profile') return { status: 0, stdout: profileJson('auth-only'), stderr: '' };
             if (args[0] === 'owner') {
                 return { status: 0, stdout: 'unexpected-owner <owner@example.invalid>\n', stderr: '' };
             }
@@ -464,7 +490,7 @@ describe('npm first-release bootstrap', () => {
                 commands.push([command, args]);
                 if (args[0] === 'whoami') return { status: 0, stdout: 'test-maintainer\n', stderr: '' };
                 if (args[0] === 'profile') {
-                    return { status: 0, stdout: `two-factor auth: ${twoFactorMode}\n`, stderr: '' };
+                    return { status: 0, stdout: profileJson(twoFactorMode), stderr: '' };
                 }
                 if (args[0] === 'org') {
                     return { status: 0, stdout: '{"test-maintainer":"developer"}', stderr: '' };
@@ -505,7 +531,7 @@ describe('npm first-release bootstrap', () => {
         fixture.adapters.runCommand = (command, args) => {
             commands.push([command, args]);
             if (args[0] === 'whoami') return { status: 0, stdout: 'maintainer-account\n', stderr: '' };
-            if (args[0] === 'profile') return { status: 0, stdout: 'two-factor auth: auth-only\n', stderr: '' };
+            if (args[0] === 'profile') return { status: 0, stdout: profileJson('auth-only'), stderr: '' };
             if (args[0] === 'publish') {
                 assert.equal(authorizationNotes.length, 1, 'authorization confirmation must be visible before publish');
             }
@@ -533,7 +559,7 @@ describe('npm first-release bootstrap', () => {
         fixture.adapters.runCommand = (command, args) => {
             commands.push([command, args]);
             if (args[0] === 'whoami') return { status: 0, stdout: 'test-maintainer\n', stderr: '' };
-            if (args[0] === 'profile') return { status: 0, stdout: 'two-factor auth: auth-only\n', stderr: '' };
+            if (args[0] === 'profile') return { status: 0, stdout: profileJson('auth-only'), stderr: '' };
             if (args[0] === 'org') return { status: 0, stdout: '{"somebody-else":"owner"}', stderr: '' };
             return { status: 0, stdout: '', stderr: '' };
         };
@@ -546,6 +572,21 @@ describe('npm first-release bootstrap', () => {
             commands.some(([command, args]) => command === 'npm' && args[0] === 'publish'),
             false,
         );
+    });
+
+    it('does not publish when the npm account has no account-level 2FA', async () => {
+        const fixture = makeFixture();
+        fixture.adapters.npm = undefined;
+        const commands = [];
+        fixture.adapters.runCommand = (_command, args) => {
+            commands.push(args[0]);
+            if (args[0] === 'whoami') return { status: 0, stdout: 'test-maintainer\n', stderr: '' };
+            if (args[0] === 'profile') return { status: 0, stdout: profileJson(undefined), stderr: '' };
+            return { status: 0, stdout: '', stderr: '' };
+        };
+
+        await assert.rejects(bootstrapFixture(fixture), /npm account must have account-level 2FA enabled/);
+        assert.equal(commands.includes('publish'), false);
     });
 
     it('does not publish when the authenticated npm preflight fails', async () => {
@@ -586,7 +627,7 @@ describe('npm first-release bootstrap', () => {
         fixture.adapters.runCommand = (command, args) => {
             commands.push([command, args]);
             if (args[0] === 'whoami') return { status: 0, stdout: 'test-maintainer\n', stderr: '' };
-            if (args[0] === 'profile') return { status: 0, stdout: 'two-factor auth: auth-and-writes\n', stderr: '' };
+            if (args[0] === 'profile') return { status: 0, stdout: profileJson('auth-and-writes'), stderr: '' };
             if (args[0] === 'owner') {
                 return {
                     status: 0,

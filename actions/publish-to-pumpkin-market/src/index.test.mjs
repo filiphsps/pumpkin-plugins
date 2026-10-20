@@ -22,8 +22,7 @@ function fixture() {
 
 function run(dir, env = {}) {
     return new Promise((resolve, reject) => {
-        const childEnv = { ...process.env, ...env, GITHUB_STEP_SUMMARY: env.GITHUB_STEP_SUMMARY };
-        const child = spawn('node', [publisher], { cwd: dir, env: childEnv });
+        const child = spawn(process.execPath, [publisher], { cwd: dir, env: childEnv(dir, env) });
         let stdout = '';
         let stderr = '';
         child.stdout.on('data', (chunk) => (stdout += chunk));
@@ -31,6 +30,18 @@ function run(dir, env = {}) {
         child.on('error', reject);
         child.on('close', (status) => resolve({ status, stdout, stderr }));
     });
+}
+
+// Start from a minimal environment so the runner's own INPUT_* and GITHUB_* values can't reach the action.
+function childEnv(dir, env) {
+    const base = { PATH: process.env.PATH, HOME: process.env.HOME };
+    if (process.env.SystemRoot) base.SystemRoot = process.env.SystemRoot;
+    return {
+        ...base,
+        GITHUB_OUTPUT: path.join(dir, 'unread-outputs.txt'),
+        GITHUB_STEP_SUMMARY: path.join(dir, 'unread-summary.md'),
+        ...env,
+    };
 }
 
 function inputs(extra = {}) {
@@ -179,7 +190,7 @@ describe('publish-to-market action', () => {
             assert.deepEqual(
                 requests.map(({ method, url }) => [method, url]),
                 [
-                    ['GET', '/api/v1/rest/plugins?q=Published+plugin&limit=20'],
+                    ['GET', '/api/v1/rest/plugins?q=Published+plugin&limit=20&page=1'],
                     ['PUT', '/api/plugins/42'],
                 ],
             );
@@ -220,7 +231,7 @@ describe('publish-to-market action', () => {
         const requests = [];
         const market = await server((request, response) => {
             requests.push({ method: request.method, url: request.url });
-            if (request.url === '/api/v1/rest/plugins?q=Published+plugin&limit=20') {
+            if (request.url === '/api/v1/rest/plugins?q=Published+plugin&limit=20&page=1') {
                 response.statusCode = 503;
                 response.end('temporarily unavailable');
             } else response.end('{}');
@@ -241,7 +252,9 @@ describe('publish-to-market action', () => {
             assert.match(result.stderr, /Could not search Market plugins \(503\)/);
             assert.doesNotMatch(result.stdout + result.stderr, /::warning|status: skipped/);
             assert.equal(fs.existsSync(outputFile), false);
-            assert.deepEqual(requests, [{ method: 'GET', url: '/api/v1/rest/plugins?q=Published+plugin&limit=20' }]);
+            assert.deepEqual(requests, [
+                { method: 'GET', url: '/api/v1/rest/plugins?q=Published+plugin&limit=20&page=1' },
+            ]);
         } finally {
             market.instance.close();
         }
@@ -419,6 +432,36 @@ describe('publish-to-market action', () => {
         }
     });
 
+    it('skips the upload and reports success when the listing already has the version', async () => {
+        let uploads = 0;
+        const market = await server((request, response) => {
+            if (request.method === 'PUT') {
+                uploads++;
+                response.statusCode = 409;
+                response.end('{}');
+            } else response.end('[{"id":42,"name":"Published plugin","version":"1.2.3"}]');
+        });
+        try {
+            const dir = fixture();
+            const outputFile = path.join(dir, 'outputs.txt');
+            const result = await run(
+                dir,
+                inputs({ 'INPUT_API-TOKEN': 'test-token', 'INPUT_API-URL': market.url, GITHUB_OUTPUT: outputFile }),
+            );
+            assert.equal(result.status, 0, result.stderr);
+            assert.equal(uploads, 0, 'a retried job must not upload the same version again');
+            assert.match(result.stdout, /already/);
+            assert.deepEqual(readOutputs(outputFile), {
+                'listing-id': '42',
+                'listing-name': 'Published plugin',
+                status: 'success',
+                'published-version': '1.2.3',
+            });
+        } finally {
+            market.instance.close();
+        }
+    });
+
     it('does not upload a name search match whose version is null', async () => {
         let uploads = 0;
         const market = await server((request, response) => {
@@ -471,7 +514,7 @@ describe('publish-to-market action', () => {
             );
             assert.equal(result.status, 0, result.stderr);
             assert.equal(requests[0].method, 'GET');
-            assert.equal(requests[0].url, '/api/v1/rest/plugins?q=Published+plugin&limit=20');
+            assert.equal(requests[0].url, '/api/v1/rest/plugins?q=Published+plugin&limit=20&page=1');
             assert.equal(requests[1].method, 'PUT');
             assert.equal(requests[1].url, '/api/plugins/42');
             assert.equal(requests[1].headers.authorization, 'Bearer test-token');
@@ -601,6 +644,19 @@ describe('publish-to-market action', () => {
         const result = await run(dir, inputs({ 'INPUT_WASM-FILE': 'missing.wasm' }));
         assert.equal(result.status, 1);
         assert.match(result.stderr, /WASM file not found/);
+    });
+
+    it('refuses to send the token to a plain HTTP Market URL, even with warn enabled', async () => {
+        const result = await run(
+            fixture(),
+            inputs({
+                'INPUT_API-TOKEN': 'test-token',
+                'INPUT_API-URL': 'http://market.example.test',
+                INPUT_WARN: 'true',
+            }),
+        );
+        assert.equal(result.status, 1);
+        assert.match(result.stderr, /api-url must use https/);
     });
 
     for (const status of [401, 403, 429, 500]) {

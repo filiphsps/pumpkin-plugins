@@ -33,9 +33,6 @@ Asynchronous requests time out after 15 seconds. Response bodies larger than 64 
 `requestMarketJsonAsync` exposes the non-blocking transport directly. The synchronous
 `requestMarketJson` blocks, so do not call it during plugin loading or a server tick.
 
-<!-- docs:begin release-notes -->
-<!-- Generated from docs.ts. Run `pnpm readme`. -->
-
-When Market returns optional `release_notes`, the checker converts its Markdown to plain text for the update notice.
-The current Market check endpoint does not return this field; a Market API update must add it before plugins can show changelogs.
-<!-- docs:end release-notes -->
+When Market returns optional `release_notes`, the checker converts its Markdown to plain text for
+the update notice. The current Market check endpoint does not return this field; a Market API update
+must add it before plugins can show changelogs.

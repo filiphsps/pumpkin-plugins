@@ -1,16 +1,14 @@
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
     assertPublicToolPackage,
     assertPublicToolPackageContents,
     discoverPublicToolPackages,
-    embeddedPackageManifestEntries,
     getPublicToolReleasePrerequisites,
     orderPublicToolReleasePaths,
+    packAndInspect,
     parseTarEntries,
     publicToolPackageVersions,
 } from './utils/tool-packages.mjs';
@@ -113,7 +111,7 @@ export async function bootstrapPublicTool(options, injected = {}) {
     const temporaryDirectory = createTempDirectory();
     try {
         const archiveFile = path.join(temporaryDirectory, 'source.tar.gz');
-        const sourceUrl = `https://codeload.github.com/filiphsps/pumpkin-plugins/tar.gz/refs/tags/${encodeURIComponent(tag)}`;
+        const sourceUrl = `https://codeload.github.com/${githubRepository(root)}/tar.gz/refs/tags/${encodeURIComponent(tag)}`;
         await downloadSourceArchive(fetchArchive, sourceUrl, archiveFile, tag);
 
         const archiveEntries = await archive.listEntries(archiveFile);
@@ -139,15 +137,14 @@ export async function bootstrapPublicTool(options, injected = {}) {
                 )}@${String(sourceManifest.version)}`,
             );
         }
-        const taggedPrerequisiteVersions = readTaggedPrerequisiteVersions(sourceRoot);
+        const taggedPrerequisiteVersions = publicToolPackageVersions(sourceRoot);
 
         await archive.install(sourceRoot);
         const packDirectory = path.join(temporaryDirectory, 'packed');
         fs.mkdirSync(packDirectory, { recursive: true });
-        const tarball = await archive.pack(packageDirectory, packDirectory);
+        const packed = await archive.pack(packageDirectory, packDirectory);
+        const { tarballPath: tarball, integrity } = packed;
         assertPathWithin(tarball, temporaryDirectory, 'packed tarball');
-        const integrity = readTarballIntegrity(tarball);
-        const packed = await archive.inspectPackage(tarball);
 
         if (
             packed.packageJson?.name !== sourceManifest.name ||
@@ -161,9 +158,15 @@ export async function bootstrapPublicTool(options, injected = {}) {
         if (packed.packageJson.version !== FIRST_RELEASE_VERSION) {
             throw new Error(`${packageName} packed version must be ${FIRST_RELEASE_VERSION}`);
         }
-        assertPublicToolPackageContents(normalizeTarEntries(packed.entries), selectedPath, packed.packageJson);
+        assertPublicToolPackageContents(packed.entries, selectedPath, packed.packageJson);
 
-        const prerequisites = getPrerequisites(selectedPath, packed, taggedPrerequisiteVersions, sourceRoot);
+        const prerequisites = getPublicToolReleasePrerequisites(
+            selectedPath,
+            packed.packageJson,
+            taggedPrerequisiteVersions,
+            packed.embeddedPackageJsons,
+            sourceRoot,
+        );
         for (const prerequisite of prerequisites) {
             const result = await readRegistryVersion(registry, prerequisite.packageName, prerequisite.version);
             if (result.kind !== 'found') {
@@ -250,20 +253,6 @@ export async function bootstrapPublicTool(options, injected = {}) {
     }
 }
 
-function readTaggedPrerequisiteVersions(sourceRoot) {
-    return publicToolPackageVersions(sourceRoot);
-}
-
-function getPrerequisites(packagePath, packed, taggedVersions, sourceRoot) {
-    return getPublicToolReleasePrerequisites(
-        packagePath,
-        packed.packageJson,
-        taggedVersions,
-        packed.embeddedPackageJsons ?? [],
-        sourceRoot,
-    );
-}
-
 async function downloadSourceArchive(fetchArchive, sourceUrl, archiveFile, tag) {
     let response;
     try {
@@ -316,22 +305,20 @@ function assertPathWithin(target, parent, description) {
     }
 }
 
+function githubRepository(root) {
+    const { repository } = readJson(path.join(root, 'package.json'), 'package.json');
+    const url = typeof repository === 'string' ? repository : repository?.url;
+    const slug = typeof url === 'string' ? url.match(/github\.com[/:]([^/]+\/[^/]+?)(?:\.git)?$/)?.[1] : undefined;
+    if (!slug) throw new Error('package.json repository.url must name a GitHub repository');
+    return slug;
+}
+
 function readJson(file, description) {
     try {
         return JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch (error) {
         throw new Error(`${description} is missing or malformed: ${safeCause(error)}`);
     }
-}
-
-function readTarballIntegrity(tarball) {
-    let contents;
-    try {
-        contents = fs.readFileSync(tarball);
-    } catch (error) {
-        throw new Error(`packed tarball is missing or unreadable: ${safeCause(error)}`);
-    }
-    return `sha512-${createHash('sha512').update(contents).digest('base64')}`;
 }
 
 async function readRegistryPackage(registry, packageName, version) {
@@ -398,34 +385,9 @@ function createArchiveAdapter(run) {
             assertCommandSucceeded(result, 'pnpm install --frozen-lockfile');
         },
         async pack(packageDirectory, destination) {
-            const result = run('pnpm', ['pack', '--pack-destination', destination], { cwd: packageDirectory });
-            assertCommandSucceeded(result, `pnpm pack for ${path.basename(packageDirectory)}`);
-            const tarballs = fs.readdirSync(destination).filter((entry) => entry.endsWith('.tgz'));
-            if (tarballs.length !== 1)
-                throw new Error('pnpm pack did not produce exactly one selected-package tarball');
-            return path.join(destination, tarballs[0]);
-        },
-        async inspectPackage(tarball) {
-            const listing = run('tar', ['-tzf', tarball]);
-            assertCommandSucceeded(listing, `tar listing for ${path.basename(tarball)}`);
-            const entries = parseTarEntries(listing.stdout);
-            const packageJson = readTarJson(run, tarball, 'package/package.json');
-            const embeddedPackageJsons = embeddedPackageManifestEntries(entries).map((entry) =>
-                readTarJson(run, tarball, entry),
-            );
-            return { entries, packageJson, embeddedPackageJsons };
+            return packAndInspect(packageDirectory, destination);
         },
     };
-}
-
-function readTarJson(run, tarball, member) {
-    const result = run('tar', ['-xOf', tarball, member]);
-    assertCommandSucceeded(result, `read ${member} from packed tarball`);
-    try {
-        return JSON.parse(result.stdout);
-    } catch (error) {
-        throw new Error(`packed tarball member ${member} is malformed: ${safeCause(error)}`);
-    }
 }
 
 function createRegistryAdapter(run) {
@@ -485,9 +447,9 @@ function createNpmAdapter(run) {
                 throw new Error(`authenticated npm account ${username} does not match expected owner ${expectedOwner}`);
             }
 
-            const profile = runNpmCommand(run, ['profile', 'get', `--registry=${REGISTRY_URL}`]);
+            const profile = runNpmCommand(run, ['profile', 'get', '--json', `--registry=${REGISTRY_URL}`]);
             assertCommandSucceeded(profile, 'npm profile get');
-            if (!/two-factor auth:\s*auth-(?:only|and-writes)\b/i.test(profile.stdout)) {
+            if (!hasAccountTwoFactor(profile.stdout)) {
                 throw new Error('npm account must have account-level 2FA enabled');
             }
 
@@ -558,6 +520,15 @@ function parseNpmOwnerNames(output) {
     return [...new Set(names)];
 }
 
+function hasAccountTwoFactor(output) {
+    try {
+        const { tfa } = JSON.parse(output);
+        return Boolean(tfa) && !tfa.pending && ['auth-only', 'auth-and-writes'].includes(tfa.mode);
+    } catch {
+        return false;
+    }
+}
+
 function hasOrganizationMembership(output, username) {
     try {
         const membership = JSON.parse(output);
@@ -623,9 +594,7 @@ export async function main(args = process.argv.slice(2)) {
                 `${result.packageName}@${result.version} is already bootstrapped; registry integrity matches the packed tarball.`,
             );
         } else if (result.status === 'dry-run') {
-            console.log(
-                `Dry run passed for ${result.packageName}@${result.version}; no publish or trust changes were made.`,
-            );
+            console.log(`Dry run passed for ${result.packageName}@${result.version}; no package was published.`);
         } else {
             console.log(`Published ${result.packageName}@${result.version}.`);
         }
@@ -635,5 +604,4 @@ export async function main(args = process.argv.slice(2)) {
     }
 }
 
-const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : undefined;
-if (invokedPath === fileURLToPath(import.meta.url)) await main();
+if (import.meta.main) await main();

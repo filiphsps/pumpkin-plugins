@@ -79,7 +79,8 @@
         "entry": "test/fixture-plugin.ts",
         "output": "build/update-check-fixture.wasm",
         "wasi": [
-            "http"
+            "http",
+            "filesystem"
         ]
     }
 }

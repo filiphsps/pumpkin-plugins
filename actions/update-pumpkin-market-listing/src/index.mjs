@@ -1,14 +1,20 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { readBoundedJson, safeResponseBody } from '../../common/src/diagnostics.mjs';
-import { escapeMarkdownText, escapeWorkflowCommand, getInput, setOutput } from '../../common/src/utils.mjs';
+import { safeResponseBody } from '../../common/src/diagnostics.mjs';
+import { findListingById, findListingByName, marketFetch, marketUrl } from '../../common/src/market.mjs';
+import {
+    appendSummary,
+    escapeMarkdownText,
+    escapeWorkflowCommand,
+    getInput,
+    setOutput,
+} from '../../common/src/utils.mjs';
 
 const pluginName = getInput('plugin-name').trim();
 const pluginId = getInput('plugin-id').trim();
 const metadataFile = getInput('metadata-file').trim();
 const updateMode = getInput('update-mode').trim().toLowerCase() || 'patch';
 const token = getInput('api-token').trim();
-const marketUrl = (getInput('api-url').trim() || 'https://market.pumpkinmc.org').replace(/\/+$/, '');
 
 try {
     await updateListing();
@@ -21,11 +27,18 @@ try {
 async function updateListing() {
     validateInputs();
     const metadata = readMetadata();
-    const listing = pluginId ? await findListingById(pluginId) : await findListingByName(pluginName);
+    const baseUrl = marketUrl(getInput('api-url'));
+    const listing = pluginId
+        ? await findListingById(baseUrl, pluginId)
+        : await findListingByName(baseUrl, pluginName, token);
+    if (!listing) {
+        const selector = pluginId ? `with ID ${JSON.stringify(pluginId)}` : `named ${JSON.stringify(pluginName)}`;
+        throw new Error(`No Market listing ${selector} exists`);
+    }
 
     const form = new FormData();
     form.append('metadata', JSON.stringify(metadata));
-    const response = await marketFetch(`${marketUrl}/api/plugins/${listing.id}`, {
+    const response = await marketFetch(`${baseUrl}/api/plugins/${listing.id}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
         body: form,
@@ -40,7 +53,7 @@ async function updateListing() {
     setOutput('status', 'success');
     const message = `Updated metadata for Market listing ${JSON.stringify(listing.name)} (${listing.id}).`;
     console.log(message);
-    summary(`### 🛒 Updated Pumpkin Market listing\n${escapeMarkdownText(message)}\n`);
+    appendSummary(`### 🛒 Updated Pumpkin Market listing\n${escapeMarkdownText(message)}\n`);
 }
 
 function validateInputs() {
@@ -217,66 +230,10 @@ function validateMetadata(metadata) {
     if (Object.hasOwn(metadata, 'commands')) validateCommands(metadata.commands);
 }
 
-async function findListingById(id) {
-    const response = await marketFetch(`${marketUrl}/api/v1/rest/plugins/${encodeURIComponent(id)}`);
-    if (!response.ok) throw new Error(`Could not find Market listing ${JSON.stringify(id)} (${response.status})`);
-    const listing = await readListing(response);
-    if (!isRecord(listing) || !Number.isInteger(listing.id) || typeof listing.name !== 'string' || !listing.name) {
-        throw new Error('Market listing lookup returned an invalid listing');
-    }
-    return listing;
-}
-
-async function findListingByName(name) {
-    const direct = await marketFetch(`${marketUrl}/api/v1/rest/plugins/${encodeURIComponent(name)}`);
-    if (direct.ok) {
-        const listing = await readListing(direct);
-        if (isExactName(listing, name) && Number.isInteger(listing.id)) return listing;
-    }
-
-    const searchUrl = new URL(`${marketUrl}/api/v1/rest/plugins`);
-    searchUrl.searchParams.set('q', name);
-    searchUrl.searchParams.set('limit', '20');
-    const response = await marketFetch(searchUrl);
-    if (!response.ok) {
-        const body = await safeResponseBody(response, token);
-        throw new Error(`Could not search Market plugins (${response.status}): ${body}`);
-    }
-    const listings = await readBoundedJson(response);
-    if (!Array.isArray(listings)) throw new Error('Market plugin search response was not an array');
-    const matches = listings.filter((listing) => isExactName(listing, name) && Number.isInteger(listing.id));
-    if (matches.length > 1) throw new Error(`Market has multiple listings named ${JSON.stringify(name)}`);
-    if (!matches.length) throw new Error(`No Market listing named ${JSON.stringify(name)} exists`);
-    return matches[0];
-}
-
-async function readListing(response) {
-    try {
-        return await readBoundedJson(response);
-    } catch (error) {
-        if (error instanceof RangeError) throw error;
-        throw new Error(
-            `Market listing lookup returned invalid JSON: ${error instanceof Error ? error.message : error}`,
-        );
-    }
-}
-
-function isExactName(listing, name) {
-    return typeof listing?.name === 'string' && listing.name.toLowerCase() === name.toLowerCase();
-}
-
 function isRecord(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function isStringRecord(value) {
     return isRecord(value) && Object.values(value).every((entry) => typeof entry === 'string');
-}
-
-function marketFetch(url, options = {}) {
-    return fetch(url, { ...options, signal: AbortSignal.timeout(30_000) });
-}
-
-function summary(content) {
-    if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${content}\n`);
 }

@@ -2,15 +2,21 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { readBoundedJson, safeResponseBody } from '../../common/src/diagnostics.mjs';
-import { escapeMarkdownText, escapeWorkflowCommand, getInput, setOutput } from '../../common/src/utils.mjs';
+import { safeResponseBody } from '../../common/src/diagnostics.mjs';
+import { findListingById, findListingByName, marketFetch, marketUrl } from '../../common/src/market.mjs';
+import {
+    appendSummary,
+    escapeMarkdownText,
+    escapeWorkflowCommand,
+    getInput,
+    setOutput,
+} from '../../common/src/utils.mjs';
 
 const pluginName = getInput('plugin-name').trim();
 const pluginId = getInput('plugin-id').trim();
 const version = getInput('version').trim();
 const wasmFile = getInput('wasm-file').trim();
 const token = getInput('api-token').trim();
-const marketUrl = (getInput('api-url').trim() || 'https://market.pumpkinmc.org').replace(/\/+$/, '');
 const track = getInput('track').trim() || 'stable';
 const releaseNotes = getInput('release-notes').trim();
 const warnOnUnavailable = getInput('warn').trim().toLowerCase() === 'true';
@@ -35,7 +41,10 @@ async function publish() {
         return;
     }
 
-    const listing = pluginId ? await findListingById(pluginId) : await findListingByName(pluginName);
+    const baseUrl = marketUrl(getInput('api-url'));
+    const listing = pluginId
+        ? await findListingById(baseUrl, pluginId)
+        : await findListingByName(baseUrl, pluginName, token);
     if (!listing?.version) {
         const reason = listing
             ? `Market listing ${listing.id} named ${JSON.stringify(listing.name)} has not been published yet`
@@ -46,12 +55,26 @@ async function publish() {
         return;
     }
 
+    // A retried release job finds the version it uploaded on the first attempt.
+    if (listing.version === version) {
+        setListingOutputs(listing);
+        setOutput('status', 'success');
+        setOutput('published-version', version);
+        const message = `Market listing ${listing.id} already has ${listing.name} ${version}; skipped the upload.`;
+        console.log(escapeWorkflowCommand(message));
+        appendSummary(
+            `### 🛒 ${escapeMarkdownText(listing.name)} ${escapeMarkdownText(version)}: already on Pumpkin Market\n` +
+                `${escapeMarkdownText(message)}\n`,
+        );
+        return;
+    }
+
     const metadata = { version, track, releaseNotes };
     const form = new FormData();
     form.append('wasm', new Blob([fs.readFileSync(file)], { type: 'application/wasm' }), path.basename(file));
     form.append('metadata', JSON.stringify(metadata));
 
-    const response = await marketFetch(`${marketUrl}/api/plugins/${listing.id}`, {
+    const response = await marketFetch(`${baseUrl}/api/plugins/${listing.id}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
         body: form,
@@ -66,58 +89,10 @@ async function publish() {
     setOutput('published-version', version);
     const message = `Published ${listing.name} ${version} to Market listing ${listing.id}.`;
     console.log(escapeWorkflowCommand(message));
-    summary(
+    appendSummary(
         `### 🛒 ${escapeMarkdownText(listing.name)} ${escapeMarkdownText(version)}: published to Pumpkin Market\n` +
             `${escapeMarkdownText(message)}\n`,
     );
-}
-
-/** Finds a Market listing by an exact, case-insensitive name match in bounded search results. */
-async function findListingByName(name) {
-    const searchUrl = new URL(`${marketUrl}/api/v1/rest/plugins`);
-    searchUrl.searchParams.set('q', name);
-    searchUrl.searchParams.set('limit', '20');
-    const response = await marketFetch(searchUrl);
-    if (!response.ok)
-        throw new Error(
-            `Could not search Market plugins (${response.status}): ${await safeResponseBody(response, token)}`,
-        );
-    const listings = await readBoundedJson(response);
-    if (!Array.isArray(listings)) throw new Error('Market plugin search response was not an array');
-    const matches = listings.filter((listing) => isExactName(listing, name) && Number.isInteger(listing.id));
-    if (matches.some((listing) => !isValidListing(listing)))
-        throw new Error('Market plugin lookup response was not a valid listing');
-    if (matches.length > 1) throw new Error(`Market has multiple listings named ${JSON.stringify(name)}`);
-    return matches[0];
-}
-
-/** Resolves a numeric or public Market ID to the listing's numeric database ID. */
-async function findListingById(id) {
-    const response = await marketFetch(`${marketUrl}/api/v1/rest/plugins/${encodeURIComponent(id)}`);
-    if (response.status === 404) return undefined;
-    if (!response.ok) throw new Error(`Could not look up Market plugin ${JSON.stringify(id)} (${response.status})`);
-    let listing;
-    try {
-        listing = await readBoundedJson(response);
-    } catch (error) {
-        if (error instanceof RangeError) throw error;
-        throw new Error('Market plugin lookup response was not valid JSON');
-    }
-    if (!isValidListing(listing)) throw new Error('Market plugin lookup response was not a valid listing');
-    return listing;
-}
-
-function isValidListing(listing) {
-    return (
-        Number.isInteger(listing?.id) &&
-        typeof listing.name === 'string' &&
-        Boolean(listing.name) &&
-        (listing.version === null || typeof listing.version === 'string')
-    );
-}
-
-function isExactName(listing, name) {
-    return typeof listing?.name === 'string' && listing.name.toLowerCase() === name.toLowerCase();
 }
 
 function unavailable(message, listing) {
@@ -125,7 +100,7 @@ function unavailable(message, listing) {
     if (listing) setListingOutputs(listing);
     setOutput('status', 'skipped');
     console.log(`::warning title=Not published to Pumpkin Market::${escapeWorkflowCommand(message)}`);
-    summary(`### ⚠️ Not published to Pumpkin Market\n${escapeMarkdownText(message)}\n`);
+    appendSummary(`### ⚠️ Not published to Pumpkin Market\n${escapeMarkdownText(message)}\n`);
 }
 
 function displayPlugin() {
@@ -135,12 +110,4 @@ function displayPlugin() {
 function setListingOutputs(listing) {
     setOutput('listing-id', String(listing.id));
     setOutput('listing-name', listing.name);
-}
-
-function marketFetch(url, options = {}) {
-    return fetch(url, { ...options, signal: AbortSignal.timeout(30_000) });
-}
-
-function summary(content) {
-    if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${content}\n`);
 }

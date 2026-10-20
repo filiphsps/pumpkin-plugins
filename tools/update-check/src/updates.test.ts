@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareVersions } from './updates.ts';
+import { assertSemver, compareVersions } from './updates.ts';
 
 describe('compareVersions', () => {
     const ordered = [
@@ -38,4 +38,11 @@ describe('compareVersions', () => {
             expect(() => compareVersions('1.0.0', version)).toThrow('Invalid semantic version');
         },
     );
+});
+
+describe('assertSemver', () => {
+    it('accepts a valid version and rejects an invalid one', () => {
+        expect(() => assertSemver('v1.2.3-rc.1+build')).not.toThrow();
+        expect(() => assertSemver('1.2')).toThrow('Invalid semantic version: 1.2');
+    });
 });

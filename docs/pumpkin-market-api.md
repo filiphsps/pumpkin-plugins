@@ -1,6 +1,6 @@
 ---
 navigation:
-    category: Server operations
+    category: Repository maintenance
 title: "Pumpkin Market API"
 description: "Market listing lookup, metadata updates, current publisher behavior and API findings"
 ---
@@ -18,17 +18,19 @@ The public REST API is rooted at `https://market.pumpkinmc.org/api/v1/rest`.
 | Request | Use |
 | --- | --- |
 | `GET /plugins/{id}` | Resolve a numeric database ID or the listing's public ID to its listing metadata. |
-| `GET /plugins?q={name}&limit={n}` | Search listings by name. Confirm an exact name match; fail if it is ambiguous. |
+| `GET /plugins?q={name}&limit={n}&page={p}` | Search listings by name, one 1-based page at a time. Confirm an exact name match; fail if it is ambiguous. |
 
 The response includes the numeric `id`, `public_id`, `name`, `category`, `version`, and other basic
 listing information. PPM can resolve a plugin by public ID, numeric ID, exact name, or author/name
-input. This repository's publisher searches a bounded set of results and accepts a name only when it
-finds a case-insensitive exact match. In one test, `GET /plugins/TemporaryAPIExperiment` returned
+input. This repository's publisher reads up to 10 pages of 20 results and accepts a name only when it
+finds a case-insensitive exact match; past that it fails and asks for `plugin-id`. In one test, `GET /plugins/TemporaryAPIExperiment` returned
 404 while search found the listing. That single result doesn't establish how direct lookup behaves
 for every name.
 
 The publisher action accepts either a plugin name or a numeric/public ID. For a name, it searches
-first, then uses the listing's numeric database ID for the upload endpoint.
+first, then uses the listing's numeric database ID for the upload endpoint. When the listing already
+shows the version being published, as on a retried release job, the action skips the upload and
+still reports success.
 
 Both Market actions cap successful listing-lookup JSON responses at 1 MiB. If a response exceeds
 that limit, the action fails before uploading a plugin or changing listing metadata.
