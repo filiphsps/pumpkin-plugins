@@ -1,6 +1,5 @@
 import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import { MemoryFiles, MemoryLogger } from '@pumpkin-plugins/plugin-kit/testing';
-import { unavailableChunkLoader, unavailableTerrainGenerator } from '@pumpkin-plugins/terrain';
 import { describe, expect, it, vi } from 'vitest';
 import { readSettings } from './config/load.ts';
 import { LodCache } from './lod/cache.ts';
@@ -29,8 +28,6 @@ function fixture(measureNow = () => 1000, now = () => 1000) {
         terrain: {
             minY: 0,
             height: 1,
-            chunkLoader: unavailableChunkLoader,
-            terrainGenerator: unavailableTerrainGenerator,
             sample: () => {
                 reads++;
                 return { material: 'minecraft:plains_DH-BSW_minecraft:stone', skyLight: 15, blockLight: 0 };
@@ -914,8 +911,6 @@ describe('DH sessions', () => {
         f.peer.terrain = {
             minY: 0,
             height: 384,
-            chunkLoader: unavailableChunkLoader,
-            terrainGenerator: unavailableTerrainGenerator,
             prepare: () => ({ status: 'ready' as const }),
             top: () => 3,
             sample: (_x, y) => ({
@@ -942,8 +937,6 @@ describe('DH sessions', () => {
         f.peer.terrain = {
             minY: 0,
             height: 10,
-            chunkLoader: unavailableChunkLoader,
-            terrainGenerator: unavailableTerrainGenerator,
             sample: () => {
                 reads++;
                 return { material: 'minecraft:plains_DH-BSW_minecraft:stone', skyLight: 15, blockLight: 0 };

@@ -4,13 +4,7 @@ import { TextComponent } from 'pumpkin:plugin/text@0.1.0';
 import { blockStateToInfo } from 'pumpkin:plugin/world@0.1.0';
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
 import { disposeWasiResource } from '@pumpkin-plugins/plugin-kit/wasi-resource';
-import {
-    acquireChunk,
-    type TerrainAccess,
-    type TerrainRegion,
-    unavailableChunkLoader,
-    unavailableTerrainGenerator,
-} from '@pumpkin-plugins/terrain';
+import type { TerrainAccess, TerrainRegion } from '@pumpkin-plugins/terrain';
 import type { Settings } from '../config/schema.ts';
 import { PLUGIN_NAME } from '../name.ts';
 import { CHUNK_SIZE_BLOCKS } from '../protocol/constants.ts';
@@ -22,8 +16,6 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
     const java = player.asJava();
     if (!java) return false;
     let world: ReturnType<typeof player.getWorld> | undefined;
-    const chunkLoader = unavailableChunkLoader;
-    const terrainGenerator = unavailableTerrainGenerator;
     let border: ReturnType<NonNullable<typeof world>['getWorldBorder']> | undefined;
     try {
         world = player.getWorld();
@@ -72,8 +64,6 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
         const terrain: TerrainAccess = {
             minY,
             height,
-            chunkLoader,
-            terrainGenerator,
             prepare: (region: TerrainRegion) => {
                 const firstChunkX = Math.floor(region.originX / CHUNK_SIZE_BLOCKS);
                 const lastChunkX = Math.floor((region.originX + region.width - 1) / CHUNK_SIZE_BLOCKS);
@@ -81,35 +71,19 @@ export function withPlayer(player: Player, settings: Settings, use: (peer: Peer)
                 const lastChunkZ = Math.floor((region.originZ + region.depth - 1) / CHUNK_SIZE_BLOCKS);
                 for (let x = firstChunkX; x <= lastChunkX; x++) {
                     for (let z = firstChunkZ; z <= lastChunkZ; z++) {
-                        const result = (() => {
-                            try {
-                                return acquireChunk(
-                                    { x, z },
-                                    () => {
-                                        // Generated types say undefined for WIT option-none; Static Hermes lifts it as null.
-                                        const chunk = terrainWorld.getChunk(x, z);
-                                        return chunk ?? undefined;
-                                    },
-                                    chunkLoader,
-                                    terrainGenerator,
-                                );
-                            } catch (err) {
-                                // Host world resources can become unavailable while Pumpkin is stopping.
-                                return {
-                                    status: 'unavailable' as const,
-                                    reason: `Chunk ${x}, ${z} could not be checked: ${String(err)}`,
-                                };
-                            }
-                        })();
-                        if (result.status === 'ready') {
-                            disposeWasiResource(result.chunk);
-                            continue;
+                        let chunk: ReturnType<typeof terrainWorld.getChunk>;
+                        try {
+                            chunk = terrainWorld.getChunk(x, z);
+                        } catch (err) {
+                            // Host world resources can become unavailable while Pumpkin is stopping.
+                            return {
+                                status: 'unavailable',
+                                reason: `Chunk ${x}, ${z} could not be checked: ${String(err)}`,
+                            };
                         }
-                        if (result.status === 'pending') return result;
-                        return {
-                            status: result.status,
-                            reason: `Chunk ${x}, ${z} is not loaded: ${result.reason}`,
-                        };
+                        // Generated types say undefined for WIT option-none; Static Hermes lifts it as null.
+                        if (!chunk) return { status: 'unavailable', reason: `Chunk ${x}, ${z} is not loaded` };
+                        disposeWasiResource(chunk);
                     }
                 }
                 return { status: 'ready' };
