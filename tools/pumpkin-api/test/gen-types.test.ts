@@ -1,30 +1,27 @@
+import { execFileSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
-import { expect, it, vi } from 'vitest';
-
-const mocks = vi.hoisted(() => ({
-    ensurePumpkinWit: vi.fn(() => '/cached/wit'),
-    execFileSync: vi.fn(),
-}));
-
-vi.mock('../src/wit.mjs', () => ({ ensurePumpkinWit: mocks.ensurePumpkinWit }));
-vi.mock('node:child_process', () => ({ execFileSync: mocks.execFileSync }));
+import { afterEach, expect, it } from 'vitest';
 
 const apiRoot = path.resolve(import.meta.dirname, '..');
+const temporaryDirectories: string[] = [];
 
-it('uses the repository cache by default when generating API types', async () => {
-    const previousCacheOverride = process.env.PUMPKIN_PLUGINS_CACHE_DIR;
-    delete process.env.PUMPKIN_PLUGINS_CACHE_DIR;
-
-    try {
-        const { generateTypes } = await import(new URL('../scripts/gen-types.mjs', import.meta.url).href);
-        generateTypes(['node', 'gen-types.mjs']);
-
-        expect(mocks.ensurePumpkinWit).toHaveBeenCalledWith({
-            lockFile: path.join(apiRoot, 'wit.lock.json'),
-            cacheRoot: path.resolve(apiRoot, '../..', '.cache'),
-        });
-    } finally {
-        if (previousCacheOverride === undefined) delete process.env.PUMPKIN_PLUGINS_CACHE_DIR;
-        else process.env.PUMPKIN_PLUGINS_CACHE_DIR = previousCacheOverride;
-    }
+afterEach(() => {
+    for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
+
+it('writes guest types for the pinned WIT and keeps an empty cache override out of the working directory', () => {
+    const workingDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'pumpkin-api-gen-types-'));
+    temporaryDirectories.push(workingDirectory);
+    const outputDirectory = path.join(workingDirectory, 'types');
+
+    execFileSync(process.execPath, [path.join(apiRoot, 'scripts/gen-types.mjs'), outputDirectory], {
+        cwd: workingDirectory,
+        env: { ...process.env, PUMPKIN_PLUGINS_CACHE_DIR: '' },
+        stdio: 'pipe',
+    });
+
+    expect(fs.readFileSync(path.join(outputDirectory, 'index.d.ts'), 'utf8')).toMatch(/pumpkin:plugin\/event@/);
+    expect(fs.readdirSync(workingDirectory)).toEqual(['types']);
+}, 60_000);

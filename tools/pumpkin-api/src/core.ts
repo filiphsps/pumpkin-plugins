@@ -1,9 +1,10 @@
-/** biome-ignore-all lint/correctness/noUnusedFunctionParameters: the abstract class `Public`  shouldn't need to use the `_` prefix for parameters */
+/** biome-ignore-all lint/correctness/noUnusedFunctionParameters: the default methods of the abstract class `Plugin` keep their parameter names without the `_` prefix */
 import type {
     Command,
     CommandSender,
     CommandSuggestions,
     ConsumedArgs,
+    CommandError as PumpkinCommandError,
     SuggestionRequest,
 } from 'pumpkin:plugin/command@0.1.0';
 import type { Context } from 'pumpkin:plugin/context@0.1.0';
@@ -12,10 +13,14 @@ import type { IpcMessage, PluginId } from 'pumpkin:plugin/ipc@0.1.0';
 import type { PluginMetadata } from 'pumpkin:plugin/metadata@0.1.0';
 import type { Server } from 'pumpkin:plugin/server@0.1.0';
 import type { ChunkBuffer, Entity, GenerationPhase } from 'pumpkin:plugin/world@0.1.0';
-import { clearTaskHandlers, dispatchTask, getNextHandlerId } from './handler-registry.ts';
+import { clearTaskHandlers, dispatchTask, getNextHandlerId } from './task-registry.ts';
 
 /**
  * Handles one Pumpkin event and may return a replacement event payload.
+ *
+ * Pumpkin applies the returned payload only for handlers registered as blocking. It ignores what a non-blocking
+ * handler returns, so such a handler cannot modify or cancel the event. Return `undefined` to leave the payload as it
+ * is.
  *
  * @template T - Payload type accepted and optionally returned by the callback.
  */
@@ -28,7 +33,21 @@ export type EventHandler<T = Event['val']> = (server: Server, event: T) => T | u
  */
 export type EventPayload<T extends EventType> = Extract<Event, { tag: T }>['val'];
 
-/** Handles a registered command and returns its command result code. */
+/**
+ * Error value a command handler throws to fail a command.
+ *
+ * Pumpkin's `handle-command` export returns `result<s32, command-error>`, and the runtime turns a thrown value of this
+ * type into the `err` case. Throw `{ tag: 'command-failed', val }` with a text component to show that text to the
+ * sender.
+ */
+export type CommandError = PumpkinCommandError;
+
+/**
+ * Handles a registered command and returns its command result code.
+ *
+ * To fail the command, throw a {@link CommandError}. The runtime converts any other thrown value into an error itself,
+ * and that conversion differs between engines.
+ */
 export type CommandHandler = (sender: CommandSender, server: Server, args: ConsumedArgs) => number;
 
 /** Produces suggestions for a registered command suggestion handler. */
@@ -99,8 +118,12 @@ export abstract class Plugin {
      * @param context - Plugin context used to register the handler.
      * @param eventType - Event to receive.
      * @param handler - Callback for the event payload.
-     * @param priority - Dispatch priority; defaults to `normal`.
-     * @param blocking - Whether this handler may block event processing; defaults to `true`.
+     * @param priority - Dispatch priority; defaults to `normal`. It can only order handlers within the blocking or
+     * non-blocking group. Pumpkin `0.2.0+26.3-26.51` stores it but does not sort by it, so handlers in a group run in
+     * registration order.
+     * @param blocking - Whether Pumpkin applies the payload the handler returns; defaults to `true`. Pumpkin runs every
+     * blocking handler before any non-blocking one and ignores what non-blocking handlers return, so only blocking
+     * handlers can modify or cancel the event.
      * @remarks The event type determines the payload type accepted by the callback.
      */
     registerEvent<T extends EventType>(
@@ -200,7 +223,8 @@ export function onUnload(context: Context): void {
 /**
  * Dispatch an event to the registered callback.
  *
- * If the callback returns a value, it replaces `event.val` before the event is returned to Pumpkin.
+ * If the callback returns a value, it replaces `event.val` before the event is returned to Pumpkin. Pumpkin applies the
+ * returned event only when the handler was registered as blocking.
  */
 export function handleEvent(eventId: number, server: Server, event: Event): Event {
     const handler = eventHandlers.get(eventId);
@@ -213,9 +237,7 @@ export function handleEvent(eventId: number, server: Server, event: Event): Even
 
 /** Dispatch a command invocation and return the callback's result code. */
 export function handleCommand(commandId: number, sender: CommandSender, server: Server, args: ConsumedArgs): number {
-    const handler = commandHandlers.get(commandId);
-    if (handler) return handler(sender, server, args);
-    throw new Error(`No handler for command ID ${commandId}`);
+    return requireHandler(commandHandlers, commandId, 'command handler')(sender, server, args);
 }
 
 /** Dispatch a command suggestion request. */
@@ -225,9 +247,7 @@ export function handleCommandSuggestion(
     server: Server,
     request: SuggestionRequest,
 ): CommandSuggestions {
-    const handler = commandSuggestionHandlers.get(handlerId);
-    if (handler) return handler(sender, server, request);
-    throw new Error(`No command suggestion handler registered for ID ${handlerId}`);
+    return requireHandler(commandSuggestionHandlers, handlerId, 'command suggestion handler')(sender, server, request);
 }
 
 /** Dispatch a scheduled task invocation. Unknown task IDs are ignored. */
@@ -247,72 +267,51 @@ export function handleIpcMessage(sender: PluginId, message: IpcMessage): IpcMess
 
 /** Ask a registered AI goal whether it can start. */
 export function handleAiGoalCanStart(goalId: number, server: Server, entity: Entity): boolean {
-    const goal = aiGoals.get(goalId);
-    if (goal) return goal.canStart(server, entity);
-    throw new Error(`No AI goal registered for ID ${goalId}`);
+    return requireHandler(aiGoals, goalId, 'AI goal').canStart(server, entity);
 }
 
 /** Ask an active AI goal whether it should continue. */
 export function handleAiGoalShouldContinue(goalId: number, server: Server, entity: Entity): boolean {
-    const goal = aiGoals.get(goalId);
-    if (goal) return goal.shouldContinue(server, entity);
-    throw new Error(`No AI goal registered for ID ${goalId}`);
+    return requireHandler(aiGoals, goalId, 'AI goal').shouldContinue(server, entity);
 }
 
 /** Notify an AI goal that it has started. */
 export function handleAiGoalStart(goalId: number, server: Server, entity: Entity): void {
-    const goal = aiGoals.get(goalId);
-    if (goal) {
-        goal.start(server, entity);
-        return;
-    }
-    throw new Error(`No AI goal registered for ID ${goalId}`);
+    requireHandler(aiGoals, goalId, 'AI goal').start(server, entity);
 }
 
 /** Advance an active AI goal by one tick. */
 export function handleAiGoalTick(goalId: number, server: Server, entity: Entity): void {
-    const goal = aiGoals.get(goalId);
-    if (goal) {
-        goal.tick(server, entity);
-        return;
-    }
-    throw new Error(`No AI goal registered for ID ${goalId}`);
+    requireHandler(aiGoals, goalId, 'AI goal').tick(server, entity);
 }
 
 /** Notify an AI goal that it has stopped. */
 export function handleAiGoalStop(goalId: number, server: Server, entity: Entity): void {
-    const goal = aiGoals.get(goalId);
-    if (goal) {
-        goal.stop(server, entity);
-        return;
-    }
-    throw new Error(`No AI goal registered for ID ${goalId}`);
+    requireHandler(aiGoals, goalId, 'AI goal').stop(server, entity);
 }
 
 /** Dispatch a world-generation phase to a registered chunk generator. */
 export function handleGeneratePhase(generatorId: number, phase: GenerationPhase, chunk: ChunkBuffer): void {
-    const generator = chunkGenerators.get(generatorId);
-    if (generator) {
-        generator(phase, chunk);
-        return;
-    }
-    throw new Error(`No generator registered for ID ${generatorId}`);
+    requireHandler(chunkGenerators, generatorId, 'generator')(phase, chunk);
+}
+
+function requireHandler<T>(handlers: Map<number, T>, id: number, label: string): T {
+    const handler = handlers.get(id);
+    if (handler === undefined) throw new Error(`No ${label} registered for ID ${id}`);
+    return handler;
 }
 
 /** The metadata export consumed by Pumpkin during plugin loading. */
 export const metadata = {
-    /** Return metadata from the registered plugin, or a safe fallback when none exists. */
+    /**
+     * Return metadata from the registered plugin.
+     *
+     * @throws {Error} When `registerPlugin()` was not called, so Pumpkin fails the load instead of loading an unnamed
+     * plugin.
+     */
     getMetadata(): PluginMetadata {
-        return (
-            pluginInstance?.metadata() ?? {
-                name: 'unknown',
-                version: '0.0.0',
-                authors: [],
-                description: 'No metadata',
-                dependencies: [],
-                permissions: [],
-            }
-        );
+        if (!pluginInstance) throw new Error('registerPlugin() was not called before Pumpkin requested metadata');
+        return pluginInstance.metadata();
     },
 };
 

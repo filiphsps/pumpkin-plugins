@@ -5,7 +5,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 
 const schemaPath = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    '../../../schemas/pumpkin-api-compatibility.schema.json',
+    '../schemas/pumpkin-api-compatibility.schema.json',
 );
 const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8')) as { $id: string };
 const ajv = new Ajv2020({ allErrors: true });

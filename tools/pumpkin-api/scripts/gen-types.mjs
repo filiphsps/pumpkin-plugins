@@ -17,7 +17,7 @@ export function generateTypes(args = process.argv) {
         .argument('[output-directory]', 'Directory where guest types are written', path.join(apiRoot, 'build/types'))
         .parse(args);
     const [outputDirectoryArgument] = program.processedArgs;
-    const cacheRoot = process.env.PUMPKIN_PLUGINS_CACHE_DIR ?? path.join(workspaceRoot, '.cache');
+    const cacheRoot = process.env.PUMPKIN_PLUGINS_CACHE_DIR || path.join(workspaceRoot, '.cache');
     const witDir = ensurePumpkinWit({ lockFile: path.join(apiRoot, 'wit.lock.json'), cacheRoot });
     const jco = resolveJcoCli(path.join(apiRoot, 'package.json'));
     const outputDirectory = path.resolve(outputDirectoryArgument);
