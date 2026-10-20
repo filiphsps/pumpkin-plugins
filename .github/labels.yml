@@ -1,4 +1,5 @@
-# Complete GitHub label catalog. `ai_apply_when` is consumed by CodeRabbit only.
+# Complete GitHub label catalog. `ai_apply_when` is consumed by CodeRabbit only; after editing, run
+# `node .github/scripts/coderabbit-labels.mjs` to regenerate its instructions in .coderabbit.yaml.
 - name: "area: actions"
   color: 006b75
   description: Changes to reusable GitHub Actions

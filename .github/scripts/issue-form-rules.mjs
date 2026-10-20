@@ -1,52 +1,9 @@
-/** Required section labels and category labels for each public issue form. */
-export const formPolicies = new Map([
-    [
-        'bug-report.yml',
-        {
-            categoryLabel: 'bug',
-            requiredFields: ['What happened?', 'What did you expect to happen?', 'Steps to reproduce'],
-        },
-    ],
-    [
-        'feature-request.yml',
-        {
-            categoryLabel: 'enhancement',
-            requiredFields: ['What problem or use case should this address?', 'What outcome would you like?'],
-        },
-    ],
-    [
-        'new-plugin-proposal.yml',
-        {
-            categoryLabel: 'enhancement',
-            requiredFields: [
-                'Who would use this plugin?',
-                'What problem or use case would it solve?',
-                'Why should it be part of the Pumpkin ecosystem?',
-            ],
-        },
-    ],
-    [
-        'documentation.yml',
-        {
-            categoryLabel: 'documentation',
-            requiredFields: ['Page or path', 'What is missing, incorrect, or confusing?'],
-        },
-    ],
-    [
-        'maintenance-task.yml',
-        {
-            categoryLabel: 'maintenance',
-            requiredFields: ['What outcome should this task achieve?', 'Why does this matter?'],
-        },
-    ],
-    [
-        'usage-question.yml',
-        {
-            categoryLabel: 'question',
-            requiredFields: ['What is your question?', 'What were you doing?'],
-        },
-    ],
-]);
+/** GitHub writes this placeholder into the body for a form field left empty. */
+const noResponsePlaceholder = '_No response_';
+
+function isAnswered(value) {
+    return value.length > 0 && value !== noResponsePlaceholder;
+}
 
 function parseIssueSections(body) {
     const sections = new Map();
@@ -79,16 +36,14 @@ function parseIssueSections(body) {
     saveSection();
 
     return new Map(
-        [...sections.entries()].map(([label, values]) => [label, values.find((value) => value.length > 0) ?? '']),
+        [...sections.entries()].map(([label, values]) => [label, values.find((value) => isAnswered(value)) ?? '']),
     );
 }
 
-function findIssueForm(body, labels, preferredFormId) {
+function findIssueForm(policies, body, labels, preferredFormId) {
     const sections = parseIssueSections(body);
-    const scoredForms = [...formPolicies.entries()]
-        .map(([fileName, policy]) => ({
-            id: fileName.slice(0, -'.yml'.length),
-            fileName,
+    const scoredForms = policies
+        .map((policy) => ({
             policy,
             matchedRequiredFields: policy.requiredFields.filter((field) => sections.has(field)).length,
         }))
@@ -99,40 +54,31 @@ function findIssueForm(body, labels, preferredFormId) {
         scoredForms.length === 1 ||
         (scoredForms.length > 1 && scoredForms[0].matchedRequiredFields > scoredForms[1].matchedRequiredFields)
     ) {
-        return scoredForms[0];
+        return scoredForms[0].policy;
     }
 
-    if (preferredFormId) {
-        const preferred = [...formPolicies.entries()].find(
-            ([fileName]) => fileName.slice(0, -'.yml'.length) === preferredFormId,
-        );
-        if (preferred) {
-            const [fileName, policy] = preferred;
-            return { id: preferredFormId, fileName, policy };
-        }
+    const preferred = policies.find((policy) => policy.id === preferredFormId);
+    if (preferred) {
+        return preferred;
     }
 
     const issueLabels = new Set(labels);
-    const labelMatches = [...formPolicies.entries()].filter(([, policy]) => issueLabels.has(policy.categoryLabel));
-    if (labelMatches.length !== 1) {
-        return undefined;
-    }
-
-    const [fileName, policy] = labelMatches[0];
-    return { id: fileName.slice(0, -'.yml'.length), fileName, policy };
+    const labelMatches = policies.filter((policy) => issueLabels.has(policy.categoryLabel));
+    return labelMatches.length === 1 ? labelMatches[0] : undefined;
 }
 
 /**
- * Finds missing required answers in an issue body using the configured form definitions.
+ * Finds the issue form an issue body was written for and the required sections it leaves empty.
+ * `policies` come from `loadIssueFormPolicies()`; `preferredFormId` breaks ties between forms.
  */
-export function inspectIssueSubmission(body, labels, preferredFormId) {
-    const form = findIssueForm(body, labels, preferredFormId);
+export function inspectIssueSubmission(policies, body, labels, preferredFormId) {
+    const form = findIssueForm(policies, body, labels, preferredFormId);
     if (!form) {
         return { form: undefined, missingFields: [] };
     }
 
     const sections = parseIssueSections(body);
-    const missingFields = form.policy.requiredFields.filter((field) => !sections.get(field)?.trim());
+    const missingFields = form.requiredFields.filter((field) => !sections.get(field));
 
     return { form, missingFields };
 }
