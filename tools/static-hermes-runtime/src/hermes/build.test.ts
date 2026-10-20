@@ -110,6 +110,54 @@ it('keeps Hades and malloc build artifacts cached independently', async () => {
     expect(cmakeCalls(calls)).toHaveLength(8);
 });
 
+it('reuses a Hermes build that another install of the same runtime prepared and was then deleted', async () => {
+    const { options, calls } = fixture();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    // Each external consumer installs its own copy of the runtime, and the whole consumer is deleted afterwards.
+    const earlierInstall = path.join(path.dirname(options.packageRoot), 'earlier-consumer/runtime');
+    fs.cpSync(options.packageRoot, earlierInstall, { recursive: true });
+    await buildHermes({
+        ...options,
+        packageRoot: earlierInstall,
+        toolchainFile: path.join(earlierInstall, 'cmake/wasi-sdk-hermes-p2.cmake'),
+    });
+    fs.rmSync(path.dirname(earlierInstall), { recursive: true });
+
+    await buildHermes(options);
+
+    expect(cmakeCalls(calls)).toHaveLength(4);
+});
+
+it.each([
+    ['was deleted', false],
+    ['belongs to another runtime install', true],
+])(
+    'configures the WASI build with this runtime toolchain when CMake set it up with one that %s',
+    async (_, earlierToolchainExists) => {
+        const { options, includedToolchains } = fixture();
+        vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        const earlierToolchain = path.join(path.dirname(options.packageRoot), 'earlier/cmake/wasi-sdk-hermes-p2.cmake');
+        if (earlierToolchainExists) {
+            fs.mkdirSync(path.dirname(earlierToolchain), { recursive: true });
+            fs.writeFileSync(earlierToolchain, 'earlier toolchain fixture');
+        }
+        // An earlier install configured the tree first. A later configure from this install changed only the cache entry.
+        fs.mkdirSync(path.join(options.wasiBuild, 'CMakeFiles/4.4.4'), { recursive: true });
+        fs.writeFileSync(
+            path.join(options.wasiBuild, 'CMakeFiles/4.4.4/CMakeSystem.cmake'),
+            `include("${earlierToolchain}")\n`,
+        );
+        fs.writeFileSync(
+            path.join(options.wasiBuild, 'CMakeCache.txt'),
+            `CMAKE_TOOLCHAIN_FILE:UNINITIALIZED=${options.toolchainFile}\n`,
+        );
+
+        await buildHermes(options);
+
+        expect(includedToolchains.at(-1)).toBe('toolchain fixture');
+    },
+);
+
 it('builds with a read-only WASI SDK that already has the libc++ include marker', async () => {
     const { options, calls } = fixture();
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -501,6 +549,8 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
     options: HermesBuildOptions;
     packageRoot: string;
     calls: Array<{ command: string; args: string[] }>;
+    /** Contents of the toolchain file each WASI configure included, in call order. */
+    includedToolchains: string[];
     outputCalls: Array<{ command: string; args: string[] }>;
     setPlatform(platform: NodeJS.Platform): void;
 } {
@@ -536,6 +586,7 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
     fs.writeFileSync(patchFile, 'patch fixture');
 
     const calls: Array<{ command: string; args: string[] }> = [];
+    const includedToolchains: string[] = [];
     const outputCalls: Array<{ command: string; args: string[] }> = [];
     const process: HermesProcessRunner = {
         run(command, rawArgs) {
@@ -545,6 +596,10 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
                 const buildDirectory = args[3];
                 if (!buildDirectory) throw new Error('CMake build directory is missing');
                 fs.mkdirSync(buildDirectory, { recursive: true });
+                const toolchain = args
+                    .find((argument) => argument.startsWith('-DCMAKE_TOOLCHAIN_FILE='))
+                    ?.slice('-DCMAKE_TOOLCHAIN_FILE='.length);
+                if (toolchain) includedToolchains.push(includeRecordedToolchain(buildDirectory, toolchain));
                 const compiler =
                     buildDirectory === hostBuild
                         ? 'C:/BuildTools/VC/Tools/MSVC/bin/Hostx64/x64/cl.exe'
@@ -555,7 +610,8 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
                               '\n',
                           )}\n`
                         : '';
-                fs.writeFileSync(path.join(buildDirectory, 'CMakeCache.txt'), compilerCache);
+                const toolchainCache = toolchain ? `CMAKE_TOOLCHAIN_FILE:UNINITIALIZED=${toolchain}\n` : '';
+                fs.writeFileSync(path.join(buildDirectory, 'CMakeCache.txt'), `${compilerCache}${toolchainCache}`);
                 if (optionsPlatform === 'win32') {
                     const compilerId = buildDirectory === hostBuild ? 'MSVC' : 'Clang';
                     const compilerVersion = buildDirectory === hostBuild ? '19.44.35207' : '20.1.0';
@@ -626,6 +682,7 @@ function fixture({ failBuild = false }: { failBuild?: boolean } = {}): {
     return {
         packageRoot,
         calls,
+        includedToolchains,
         outputCalls,
         options,
         setPlatform(platform) {
@@ -648,6 +705,21 @@ function readOnlyBelow(directory: string): HermesFileSystem {
             return hermesFileSystem.mkdirSync(target, mkdirOptions);
         },
     };
+}
+
+/**
+ * Include a build tree's toolchain file the way CMake does: the first configure records the
+ * `CMAKE_TOOLCHAIN_FILE` it was given, and every later configure includes that recorded file instead.
+ */
+function includeRecordedToolchain(buildDirectory: string, toolchain: string): string {
+    const system = path.join(buildDirectory, 'CMakeFiles/4.4.4/CMakeSystem.cmake');
+    if (!fs.existsSync(system)) {
+        fs.mkdirSync(path.dirname(system), { recursive: true });
+        fs.writeFileSync(system, `include("${toolchain}")\n`);
+    }
+    const included = fs.readFileSync(system, 'utf8').match(/^include\("(.*)"\)$/m)?.[1] ?? '';
+    if (!fs.existsSync(included)) throw new Error(`include could not find requested file: ${included}`);
+    return fs.readFileSync(included, 'utf8');
 }
 
 function writeArtifact(filename: string): void {
