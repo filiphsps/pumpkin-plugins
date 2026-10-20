@@ -1,11 +1,9 @@
 import * as fs from 'node:fs';
+import { formatBenchmarkChangeSvgs } from '../src/benchmark-chart.ts';
+import { formatBenchmarkComment } from '../src/benchmark-comment.ts';
+import { compareBenchmarkResults } from '../src/benchmark-regression.ts';
+import { API_BEHAVIOR_KEYS, type EngineResult } from '../src/benchmark-results.ts';
 import type { BenchmarkWorkload } from '../src/benchmark-workloads.ts';
-import {
-    compareBenchmarkResults,
-    formatBenchmarkChangeSvgs,
-    formatBenchmarkComment,
-} from '../test/benchmark-regression.ts';
-import type { EngineResult } from '../test/engine-comparison-report.ts';
 
 const headResults = readEngineResults(requiredEnvironment('ENGINE_COMPARISON_HEAD_RESULTS'));
 const repository = requiredEnvironment('GITHUB_REPOSITORY');
@@ -15,7 +13,7 @@ const jitterThreshold = Number(process.env.BENCHMARK_JITTER_PERCENT ?? '10');
 if (!Number.isFinite(jitterThreshold) || jitterThreshold < 0 || jitterThreshold > 100) {
     throw new Error('BENCHMARK_JITTER_PERCENT must be a finite percentage from 0 through 100');
 }
-const comparison = baselineResults ? compareBenchmarkResults(headResults, baselineResults, jitterThreshold) : undefined;
+const comparison = compareBenchmarkResults(headResults, baselineResults ?? [], jitterThreshold);
 const currentSha = requiredEnvironment('CURRENT_SHA');
 const baselineSha = baselineResults ? process.env.BASELINE_SHA : undefined;
 const reportRunUrl = `${requiredEnvironment('GITHUB_SERVER_URL')}/${repository}/actions/runs/${requiredEnvironment('SOURCE_RUN_ID')}`;
@@ -28,7 +26,7 @@ const comment = formatBenchmarkComment({
                   dark: process.env.BENCHMARK_CHANGE_SVG_DARK_URL,
               }
             : undefined,
-    comparison,
+    comparison: baselineResults ? comparison : undefined,
     currentSha,
     noBaselineReason:
         process.env.NO_BASELINE_REASON ??
@@ -42,7 +40,7 @@ if (lightChartPath || darkChartPath) {
     if (!lightChartPath || !darkChartPath) {
         throw new Error('Set both BENCHMARK_CHANGE_SVG_LIGHT and BENCHMARK_CHANGE_SVG_DARK');
     }
-    const charts = await formatBenchmarkChangeSvgs(comparison ?? emptyComparison(jitterThreshold, headResults));
+    const charts = formatBenchmarkChangeSvgs(comparison);
     fs.writeFileSync(lightChartPath, charts.light);
     fs.writeFileSync(darkChartPath, charts.dark);
     process.stdout.write(`Benchmark light and dark charts written to ${lightChartPath} and ${darkChartPath}\n`);
@@ -84,18 +82,7 @@ function validateEngineResult(value: unknown, description: string): EngineResult
         throw new Error(`${description} has invalid engine metadata`);
     }
     if (!isRecord(value.apiBehavior)) throw new Error(`${description} has invalid API behavior data`);
-    const apiBehaviorKeys = [
-        'eventRegistrations',
-        'eventDispatches',
-        'scheduledTasks',
-        'scheduledCallbacks',
-        'permissionRegistrations',
-        'commandRegistrations',
-        'commandDispatches',
-        'serverQueries',
-        'playersObserved',
-    ] as const;
-    for (const key of apiBehaviorKeys) {
+    for (const key of API_BEHAVIOR_KEYS) {
         if (!isFiniteNumber(value.apiBehavior[key]) || value.apiBehavior[key] < 0) {
             throw new Error(`${description} has invalid API behavior count ${key}`);
         }
@@ -144,23 +131,6 @@ function validateWorkload(value: unknown, description: string): BenchmarkWorkloa
         checksum: value.checksum,
         provenance: value.provenance,
         samplesMs: value.samplesMs,
-    };
-}
-
-function emptyComparison(thresholdPercent: number, engines: readonly EngineResult[]) {
-    return {
-        changes: [],
-        engineSizes: engines.map(({ binarySizeBytes, id, label }) => ({
-            binarySizeBytes,
-            engineId: id,
-            engineLabel: label,
-        })),
-        improvements: [],
-        medianChangePercent: null,
-        regressions: [],
-        skippedWorkloads: [],
-        status: 'regular' as const,
-        thresholdPercent,
     };
 }
 

@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
-import type { BenchmarkWorkload } from '../src/benchmark-workloads.ts';
-import { type EngineResult, formatConsoleReport, formatReport } from './engine-comparison-report.ts';
+import type { EngineResult } from './benchmark-results.ts';
+import type { BenchmarkWorkload } from './benchmark-workloads.ts';
+import { formatConsoleReport, formatReport } from './engine-comparison-report.ts';
 
 const workloads: BenchmarkWorkload[] = [
     {
@@ -78,6 +79,15 @@ it('formats a console report with aligned tables and dynamic workload labels', (
             expect(lines[index + 1]?.length).toBe(line.length);
         }
     }
+});
+
+it('reports the mean of the two middle samples as the median of an even sample count', () => {
+    const engines = [engine('baseline', 'Baseline', 1_000, [0, 0]), engine('variant-b', 'Variant B', 1_000, [0, 0])];
+    for (const result of engines) {
+        for (const workload of result.workloads) workload.samplesMs = [4, 1, 3, 2];
+    }
+
+    expect(formatReport(engines, 'baseline')).toContain('2.50 ms (1.00–4.00 ms)');
 });
 
 function engine(id: string, label: string, binarySizeBytes: number, offsets: number[]): EngineResult {
