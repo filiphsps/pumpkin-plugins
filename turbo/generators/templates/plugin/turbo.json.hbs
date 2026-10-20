@@ -1,0 +1,9 @@
+{
+    "extends": ["//"],
+    "tasks": {
+        "typecheck": {
+            "dependsOn": ["transit", "@pumpkin-plugins/build#build"],
+            "outputs": ["build/types/**"]
+        }
+    }
+}

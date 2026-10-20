@@ -1,8 +1,10 @@
+/** A VS Code resource that is released when the extension deactivates. */
 export interface Disposable {
     /** Disposes of the registered VS Code command. */
     dispose(): void;
 }
 
+/** The part of the VS Code extension context that keeps command disposables. */
 export interface CommandContext {
     /** Disposables released when the extension deactivates. */
     subscriptions: Disposable[];

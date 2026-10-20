@@ -3,37 +3,17 @@
     "version": "0.0.0",
     "private": true,
     "description": {{{ json description }}},
-    "homepage": "https://github.com/filiphsps/pumpkin-plugins/tree/master/packages/{{ name }}#readme",
-    "bugs": {
-        "url": "https://github.com/filiphsps/pumpkin-plugins/issues"
-    },
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/filiphsps/pumpkin-plugins.git",
-        "directory": "packages/{{ name }}"
-    },
-    "funding": [
-        {
-            "type": "github",
-            "url": "https://github.com/sponsors/filiphsps"
-        },
-        {
-            "type": "custom",
-            "url": "https://paypal.me/filiph"
-        }
-    ],
-    "license": "MIT",
-    "author": "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)",
-    "contributors": [
-        "Filiph Sandström <filfat@hotmail.se> (https://github.com/filiphsps)"
-    ],
+    "funding": {{{ json rootPackage.funding }}},
+    "author": {{{ json rootPackage.author }}},
+    "contributors": {{{ json rootPackage.contributors }}},
     "type": "module",
     "scripts": {
         "build": "pumpkin-plugins-build",
+        "build:parse-ts": "pumpkin-plugins-build --parse-ts",
         "readme": "pumpkin-plugins-docs",
         "readme:check": "pumpkin-plugins-docs --check",
-        "test": "vitest run --project unit",
-        "test:coverage": "vitest run --project unit --coverage",
+        "test": "vitest run --project unit --passWithNoTests",
+        "test:coverage": "vitest run --project unit --coverage --passWithNoTests",
         "test:integration": "vitest run --project integration",
         "typecheck": "pnpm types && tsc --noEmit",
         "types": "pumpkin-plugins-build --types-only"

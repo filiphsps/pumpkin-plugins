@@ -3,9 +3,9 @@
 A minimal Pumpkin plugin written in TypeScript. Start here to check its types and build the WebAssembly component.
 
 ```sh
-npm install
-npm run typecheck
-npm run build
+__PACKAGE_MANAGER__ install
+__PACKAGE_MANAGER__ run typecheck
+__PACKAGE_MANAGER__ run build
 ```
 
 On a fresh project, these commands may need network access. `typecheck` fetches the Pumpkin WIT

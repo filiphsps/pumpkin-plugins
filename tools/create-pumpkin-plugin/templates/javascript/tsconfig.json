@@ -12,5 +12,5 @@
         "skipLibCheck": true,
         "types": []
     },
-    "include": ["build/types/bindings/**/*.d.ts", "src/**/*.js"]
+    "include": ["build/types/bindings/**/*.d.ts", "node_modules/@pumpkin-plugins/build/globals.d.ts", "src/**/*.js"]
 }

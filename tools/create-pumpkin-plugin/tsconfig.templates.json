@@ -4,5 +4,5 @@
             "@pumpkin-plugins/pumpkin-api": ["../pumpkin-api/src/index.ts"]
         }
     },
-    "files": ["../pumpkin-api/build/types/index.d.ts"]
+    "files": ["../pumpkin-api/build/types/index.d.ts", "../build/globals.d.ts"]
 }
