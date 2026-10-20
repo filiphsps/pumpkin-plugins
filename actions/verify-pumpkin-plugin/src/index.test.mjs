@@ -5,7 +5,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
 import { publicKeyOf, signWasm } from '../../../tools/signing/src/sign.ts';
-import { METADATA, minimalWasm, SEED } from '../../../tools/signing/src/testing/fixtures.ts';
+import { METADATA, minimalWasm, SEED, signedMetadata } from '../../../tools/signing/src/testing/fixtures.ts';
 
 const actionRoot = path.resolve(import.meta.dirname, '..');
 const entrypoint = path.join(actionRoot, 'src/index.mjs');
@@ -29,8 +29,7 @@ function run(dir, inputs = {}) {
     fs.writeFileSync(outputFile, '');
     const result = spawnSync(process.execPath, [entrypoint], {
         cwd: dir,
-        env: {
-            ...process.env,
+        env: childEnv(dir, {
             GITHUB_OUTPUT: outputFile,
             'INPUT_WASM-FILE': 'plugin.wasm',
             'INPUT_PLUGINS-MANIFEST': '',
@@ -38,13 +37,26 @@ function run(dir, inputs = {}) {
             'INPUT_PLUGIN-NAME': '',
             INPUT_VERSION: '',
             ...inputs,
-        },
+        }),
         encoding: 'utf8',
     });
     return {
         ok: result.status === 0,
         out: `${result.stdout}${result.stderr}`,
         outputs: fs.readFileSync(outputFile, 'utf8'),
+    };
+}
+
+// Start from a minimal environment so the runner's own INPUT_* and GITHUB_* values can't reach the action.
+// NODE_V8_COVERAGE stays so coverage runs still collect the child's coverage.
+function childEnv(dir, env) {
+    const base = { PATH: process.env.PATH, HOME: process.env.HOME };
+    for (const name of ['SystemRoot', 'NODE_V8_COVERAGE']) if (process.env[name]) base[name] = process.env[name];
+    return {
+        ...base,
+        GITHUB_OUTPUT: path.join(dir, 'unread-outputs.txt'),
+        GITHUB_STEP_SUMMARY: path.join(dir, 'unread-summary.md'),
+        ...env,
     };
 }
 
@@ -108,7 +120,8 @@ describe('verify-pumpkin-plugin action', () => {
 
     it('rejects genuinely signed malformed metadata without success outputs', () => {
         const { dir, wasmFile } = fixture();
-        fs.writeFileSync(wasmFile, signWasm(minimalWasm(), { ...METADATA, plugin_name: undefined }, SEED));
+        const { plugin_name: _, ...withoutName } = METADATA;
+        fs.writeFileSync(wasmFile, signedMetadata(JSON.stringify(withoutName)));
         const result = run(dir);
         assert.equal(result.ok, false);
         assert.match(result.out, /metadata/);

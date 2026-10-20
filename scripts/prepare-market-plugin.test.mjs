@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, it } from 'node:test';
-import { customSection, signWasm, verifyWasm } from '../tools/signing/src/index.ts';
+import { customSection, generateKeyPair, signWasm, verifyWasm } from '../tools/signing/src/index.ts';
 
 const root = path.resolve(import.meta.dirname, '..');
 const script = path.join(root, 'scripts', 'prepare-market-plugin.mjs');
@@ -39,9 +39,10 @@ function fixture(wasm) {
     return file;
 }
 
-function run(file, pluginName = metadata.plugin_name, version = metadata.version) {
+function run(file, pluginName = metadata.plugin_name, version = metadata.version, env = { PLUGIN_SIGNING_KEY: seed }) {
     return spawnSync(process.execPath, [script, file, pluginName, version], {
         cwd: root,
+        env: { ...process.env, ...env },
         encoding: 'utf8',
     });
 }
@@ -79,5 +80,27 @@ describe('prepare-market-plugin', () => {
         assert.equal(result.status, 1);
         assert.match(result.stderr, /failed verification: no signature found/);
         assert.deepEqual(fs.readFileSync(file), component);
+    });
+
+    it('rejects an artifact signed by a key other than PLUGIN_SIGNING_KEY without changing it', () => {
+        const signed = signWasm(component, metadata, generateKeyPair().secretKeyHex);
+        const file = fixture(signed);
+
+        const result = run(file);
+
+        assert.equal(result.status, 1);
+        assert.match(result.stderr, /unexpected signer/);
+        assert.deepEqual(fs.readFileSync(file), signed);
+    });
+
+    it('refuses to run without PLUGIN_SIGNING_KEY', () => {
+        const signed = signWasm(component, metadata, seed);
+        const file = fixture(signed);
+
+        const result = run(file, metadata.plugin_name, metadata.version, { PLUGIN_SIGNING_KEY: '' });
+
+        assert.equal(result.status, 1);
+        assert.match(result.stderr, /PLUGIN_SIGNING_KEY/);
+        assert.deepEqual(fs.readFileSync(file), signed);
     });
 });

@@ -117,16 +117,6 @@ function parseUrl(url: string): { scheme: string; authority: string; path: strin
 }
 
 function isClosed(error: unknown): boolean {
-    const closedMessage = 'WASI HTTP input stream read failed: closed';
-    if (error instanceof Error && error.message === closedMessage) return true;
-    try {
-        if (String(error) === `Error: ${closedMessage}`) return true;
-    } catch {
-        // Fall through to the structured payload check.
-    }
-    if (typeof error !== 'object' || error === null) return false;
-    if ('message' in error && error.message === closedMessage) return true;
-    if (!('payload' in error)) return false;
-    const payload = error.payload;
-    return typeof payload === 'object' && payload !== null && 'tag' in payload && payload.tag === 'closed';
+    // Both engines throw stream errors with the WIT error variant as `payload`.
+    return (error as { payload?: { tag?: unknown } } | null)?.payload?.tag === 'closed';
 }

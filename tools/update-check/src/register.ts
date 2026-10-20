@@ -8,7 +8,15 @@ import type { JsonRequest } from './updates.ts';
 
 /** Update registration options. A scheduler is required unless a request override is supplied. */
 export type UpdateRegistrationOptions =
-    | { request: JsonRequest; marketplaceUrl?: string; schedule?: SchedulePoll }
+    | {
+          /**
+           * Replaces the scheduled Market request. It runs synchronously inside `onLoad` and blocks
+           * plugin loading, so use it only in tests.
+           */
+          request: JsonRequest;
+          marketplaceUrl?: string;
+          schedule?: SchedulePoll;
+      }
     | { request?: never; marketplaceUrl?: string; schedule: SchedulePoll };
 
 /** Registers a plugin and checks Pumpkin Market for an update after the plugin loads. */

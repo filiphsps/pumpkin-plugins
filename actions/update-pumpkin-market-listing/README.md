@@ -27,8 +27,9 @@ of plugin releases and other actions.
 
 ## Metadata sources
 
-Choose the existing listing with exactly one of `plugin-name` or `plugin-id`. A name lookup must
-match the full listing name, ignoring case; `plugin-id` accepts a numeric database ID or public ID.
+Choose the existing listing with exactly one of `plugin-name` or `plugin-id`. A name lookup reads up
+to 10 pages of Market search results and must match the full listing name, ignoring case;
+`plugin-id` accepts a numeric database ID or public ID.
 
 The metadata file must be a JSON object that uses Market field names. You can provide direct inputs
 on their own or layer them over the file; when both sources set the same field, the direct input wins.
@@ -79,7 +80,7 @@ and `commands`.
 | `commands` | No |  | JSON array of listing commands with names, optional aliases and permissions, localized descriptions, display order, and IDs |
 | `update-mode` | No | `patch` | Metadata validation mode, patch or full; full requires all listing metadata fields |
 | `api-token` | Yes |  | Market API token with listing update permission |
-| `api-url` | No | `https://market.pumpkinmc.org` | Pumpkin Market base URL |
+| `api-url` | No | `https://market.pumpkinmc.org` | Pumpkin Market base URL; must use https |
 <!-- action-inputs:end -->
 
 ## Outputs

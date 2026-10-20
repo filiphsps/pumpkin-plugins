@@ -44,7 +44,8 @@ tested behavior and its limits.
 Provide an API token that can update listing metadata. The minimum token scope hasn’t been
 established; the [Market API notes](../../../docs/pumpkin-market-api.md#updating-listing-metadata)
 describe the token behavior that has been tested. `api-url` defaults to
-`https://market.pumpkinmc.org`; set it only when you use a different Market instance. For a complete
+`https://market.pumpkinmc.org`; set it only when you use a different Market instance. It must use
+https, because the action sends the token to it. For a complete
 workflow example, see the [action README](../README.md).
 
 After Market accepts the update, the action reports `status: success` and sets `listing-id` and

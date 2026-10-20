@@ -22,6 +22,11 @@ export function compareVersions(current: string, latest: string): number {
     return comparePrerelease(currentParts[3], latestParts[3]);
 }
 
+/** Throws a `TypeError` when a version is not a valid semantic version. */
+export function assertSemver(version: string): void {
+    parseVersion(version);
+}
+
 /** Parses a strict semantic version into numeric components and prerelease identifiers. */
 function parseVersion(version: string): [string, string, string, string[]] {
     const match =

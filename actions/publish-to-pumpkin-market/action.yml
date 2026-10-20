@@ -21,7 +21,7 @@ inputs:
         description: Market API token with plugins:update and plugins:versions:upload scopes; required unless warn is true
         required: false
     api-url:
-        description: Pumpkin Market base URL
+        description: Pumpkin Market base URL; must use https
         required: false
         default: https://market.pumpkinmc.org
     track:
