@@ -18,16 +18,21 @@ Direct children of `docs/` are guides and appear under `/guides/`. Put reference
 such as `docs/plugin-api/setup-and-build.md`, and they appear under `/docs/` with their folder
 structure. A nested `index.md` is the landing page for its folder. The repository home and Team page
 are exceptions: `docs/index.md` renders at `/`, and `docs/team.md` renders at `/team`. Neither is
-listed in the Guides or Docs catalog.
+listed in the Guides or Docs catalog. Instructions for coding agents in `docs/agents/` stay in the
+repository and are not published.
 
-For a plugin, put component-specific pages in `packages/<plugin>/docs/`; tools and actions use the
-same layout in their own folders. The site adds those pages to the component sidebar. If you create
-`docs/index.md`, it becomes the component's landing page and the README remains available as a
-separate **README** entry. Otherwise, the README is the overview when one exists; if it doesn't, the
-first docs page is used.
+For a plugin, put component-specific pages in `packages/<plugin>/docs/`; tools, actions and VS Code
+extensions use the same layout in their own folders. The site adds those pages to the component
+sidebar. If you create `docs/index.md`, it becomes the component's landing page and the README
+remains available as a separate **README** entry. Otherwise, the README is the overview when one
+exists; if it doesn't, the first docs page is used.
 
 Write links from component docs to repository docs as relative Markdown links. `pnpm check` checks
-relative links, and the site rewrites those links to their site routes during the build.
+relative links, and the site rewrites those links to their site routes during the build. Source
+files and folders have no page on the site, so the build points relative links to them at GitHub.
+The build fails if a link points to a Markdown page the site doesn't publish, such as the root
+README or a benchmark page. Link a published page that covers the same ground, or use the file's
+GitHub URL.
 
 ## Set page titles and navigation
 
@@ -55,6 +60,7 @@ navigation:
 ```
 
 `category` is optional; without it, the item stays in its default Plugins, Tools, or Actions group.
+VS Code extensions appear in the Tools menu, in a VS Code extensions group by default.
 `type` defaults to a regular link and can be set to `card` or `spotlight`. An `icon` path is relative
 to the component root. If you omit it—or the configured file doesn't exist—the site looks for
 `icon.svg`, `icon.png`, `icon.webp`, `logo.svg`, `logo.png`, or `logo.webp` first in the component
@@ -101,9 +107,9 @@ history; the docs workflow fetches full history so it can show the latest edit t
 
 The site creates `/llms.txt` during the build from discovered guides, component docs, package and
 action metadata, and API references. Links to guides and component docs point to raw Markdown in the
-repository; API links point to the published docs site. The generated copy under `docs/` is
-gitignored. The development server serves the same content at `/llms.txt`. Update source docs or
-metadata to change its entries, and `docs/.vitepress/config.mts` to change its structure.
+repository; API links point to the published docs site. The development server serves the same
+content at `/llms.txt`. Update source docs or metadata to change its entries, and
+`docs/.vitepress/llms.mts` to change its structure.
 
 The [Team page](team.md) fetches all pages of contributor data from GitHub during builds and
 development, so the build needs network access and fails if GitHub is unavailable. It excludes bot
@@ -113,8 +119,9 @@ locally; the docs workflow supplies a read-only token. With a token, each contri
 make at most one GraphQL request to look up public profile names. Without a token, or if name lookup
 fails, cards show GitHub usernames. The token and data loader aren't published with the cards.
 
-`filiphsps` is marked as the owner and sorted first; other contributors are sorted by contribution
-count. GitHub may take time to refresh those counts.
+The repository owner, taken from the repository URL in the root `package.json`, gets an Owner label
+and is sorted first; other contributors are sorted by contribution count. GitHub may take time to
+refresh those counts.
 
 Plugin and action landing pages, READMEs, and API overview pages show native VitePress version
 badges. A badge reads its version from the package manifest or action version file. It links to a

@@ -47,13 +47,12 @@
         "pumpkin-plugins-docs": "bin/pumpkin-plugins-docs.mjs"
     },
     "files": [
-        "src/**/*.ts",
-        "!src/**/*.test.ts",
-        "!src/**/*.spec.ts",
-        "bin/**/*.mjs",
+        "dist",
         "README.md"
     ],
     "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "prepack": "pnpm build",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage",
         "typecheck": "tsc --noEmit"
@@ -72,6 +71,25 @@
         "node": ">=24.21.0"
     },
     "publishConfig": {
-        "access": "public"
+        "access": "public",
+        "bin": {
+            "pumpkin-plugins-docs": "dist/bin/pumpkin-plugins-docs.mjs"
+        },
+        "exports": {
+            ".": {
+                "types": "./dist/src/info.d.ts",
+                "import": "./dist/src/info.js"
+            },
+            "./markdown": {
+                "types": "./dist/src/markdown.d.ts",
+                "import": "./dist/src/markdown.js"
+            },
+            "./node": {
+                "types": "./dist/src/node.d.ts",
+                "import": "./dist/src/node.js"
+            }
+        },
+        "module": "./dist/src/info.js",
+        "types": "./dist/src/info.d.ts"
     }
 }

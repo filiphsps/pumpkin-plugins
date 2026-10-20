@@ -12,6 +12,8 @@ export interface PackageRow {
     licenseFile?: string;
     /** Name shown as the link text. */
     name: string;
+    /** Whether the package is held back from releases in `release-please-paused.json`. */
+    unreleased?: boolean;
 }
 
 /** One row of the action table in the root README. */
@@ -46,7 +48,7 @@ export function renderPackagesBlock(
         [...list]
             .sort((a, b) => a.dir.localeCompare(b.dir))
             .map((p) => [
-                `[${p.name}](${p.dir})`,
+                `[${p.name}](${p.dir})${p.unreleased ? ' (unreleased)' : ''}`,
                 p.description,
                 p.licenseFile ? `[${p.license}](${p.licenseFile})` : p.license,
             ]);

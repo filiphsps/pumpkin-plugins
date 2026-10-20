@@ -1,0 +1,15 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "rootDir": ".",
+        "outDir": "dist",
+        "newLine": "lf",
+        "noEmit": false,
+        "noEmitOnError": true,
+        "declaration": true,
+        "allowJs": true,
+        "rewriteRelativeImportExtensions": true
+    },
+    "include": ["src/**/*.ts", "bin/**/*.mjs"],
+    "exclude": ["src/**/*.test.ts"]
+}

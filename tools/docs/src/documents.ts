@@ -86,10 +86,10 @@ export function writeDocuments(updates: readonly DocumentUpdate[], check = false
 export function generateDocuments(documents: readonly DocumentSpec[], root: string, check = false): Status {
     const seen = new Set<string>();
     const updates = documents.map((document) => {
-        const file = resolveDocumentPath(root, document.file);
-        if (seen.has(file)) throw new Error(`Duplicate documentation target: ${file}`);
-        seen.add(file);
-        return prepareDocument(document, root);
+        const update = prepareDocument(document, root);
+        if (seen.has(update.file)) throw new Error(`Duplicate documentation target: ${update.file}`);
+        seen.add(update.file);
+        return update;
     });
     return writeDocuments(updates, check);
 }

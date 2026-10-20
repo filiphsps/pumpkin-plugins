@@ -19,7 +19,7 @@ export interface BlockOptions {
  * @param note - The comment to put at the top of each block.
  * @param options - Marker syntax and missing-block policy.
  * @returns The README with the blocks replaced.
- * @throws {Error} When a block's markers are unbalanced, duplicated or out of order.
+ * @throws When a block's markers are unbalanced, duplicated or out of order.
  */
 export function applyBlocks(
     text: string,

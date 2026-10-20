@@ -34,10 +34,10 @@ Browse the [public documentation site](https://filiphsps.github.io/pumpkin-plugi
 | Plugin | Description | License |
 | --- | --- | --- |
 | [AppleSkinPumpkin](packages/apple-skin-pumpkin) | The plugin syncs saturation and exhaustion so AppleSkin can show accurate food stats. | MIT |
-| [BedrockAddonManager](packages/bedrock-addon-manager) | BedrockAddonManager hosts resource packs over HTTP and reads their manifests. Players still need another way to download the packs because the plugin does not send offers. | MIT |
+| [BedrockAddonManager](packages/bedrock-addon-manager) (unreleased) | BedrockAddonManager hosts resource packs over HTTP and reads their manifests. Players still need another way to download the packs because the plugin does not send offers. | MIT |
 | [DistantHorizonsSupportPumpkin](packages/distant-horizons-support-pumpkin) | This unofficial integration lets Java players use Distant Horizons with terrain from your Pumpkin server. | [GPL-3.0-or-later](packages/distant-horizons-support-pumpkin/LICENSE) |
 | [DynamicLightsPumpkin](packages/dynamic-lights-pumpkin) | DynamicLightsPumpkin shows temporary light around supported items and nearby entities without changing the world. | MIT |
-| [TabDisplay](packages/tab-display) | TabDisplay formats Java player-list names, headers, and footers. It leaves Bedrock lists unchanged. | MIT |
+| [TabDisplay](packages/tab-display) (unreleased) | TabDisplay formats Java player-list names, headers, and footers. It leaves Bedrock lists unchanged. | MIT |
 | [UPnPumpkin](packages/upnpumpkin) | UPnPumpkin asks UPnP or NAT-PMP routers to forward server ports so players outside your network can connect. Other plugins can request mappings too. | MIT |
 | [Waypoints](packages/waypoints) | Waypoints lets you create shared locations, control who can access each one, show them on a Java HUD, and look them up with PumpkinPIE placeholders. | MIT |
 
