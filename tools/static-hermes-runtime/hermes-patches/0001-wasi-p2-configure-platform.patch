@@ -22,13 +22,13 @@ index 66cb429..87235fd 100644
 @@ -59,7 +59,8 @@ if(HERMES_APPLE_TARGET_PLATFORM MATCHES "catalyst")
    set(THREADS_PREFER_PTHREAD_FLAG ON)
  endif()
-
+ 
 -if (WIN32)
 +# This runs before project(), so CMAKE_SYSTEM_NAME is not set yet; the WASI build passes HERMES_WASI_TARGET=ON.
 +if (WIN32 AND NOT HERMES_WASI_TARGET)
  add_definitions(-D_WINDOWS)
  endif()
-
+ 
 diff --git a/cmake/modules/Hermes.cmake b/cmake/modules/Hermes.cmake
 index 466b01d..0820cdc 100644
 --- a/cmake/modules/Hermes.cmake
