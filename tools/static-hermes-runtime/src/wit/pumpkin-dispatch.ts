@@ -1,4 +1,5 @@
 import type { WitAnalysis } from './analysis.ts';
+import { cIdentifier, jsName, pascalCase } from './names.ts';
 import {
     generateWitApiFunctionForResolvedOperation,
     generateWitResourceMethodForResolvedPlan,
@@ -14,7 +15,6 @@ interface ResourceApiGroup {
 /** Generate native Pumpkin dispatch from resolved operation plans. */
 export function generatePumpkinMethodDispatch(apiPackage: WitApiPackage, analysis: WitAnalysis): string {
     const namespace = cIdentifier(apiPackage.packageName);
-    const resourceDrops = new Map<string, [string, string]>();
     const apiFunctions = new Map<string, string[]>();
     const resourceApiFunctions = new Map<string, ResourceApiGroup>();
     const resourceMethods: string[] = [];
@@ -27,7 +27,6 @@ export function generatePumpkinMethodDispatch(apiPackage: WitApiPackage, analysi
                 operation: plan.operation,
                 parameters: plan.parameters,
                 resultType: plan.resultType,
-                options: { resourceDrops },
             });
             if (!adapter) throw unsupportedPlanError(plan);
             append(apiFunctions, plan.apiInterface.name, adapter);
@@ -39,7 +38,6 @@ export function generatePumpkinMethodDispatch(apiPackage: WitApiPackage, analysi
             const branch = generateWitResourceMethodForResolvedPlan(apiPackage, plan, {
                 includePackageName: false,
                 preserveArgumentCheckLine: true,
-                resourceDrops,
             });
             if (!branch) throw unsupportedPlanError(plan);
             resourceMethods.push(branch);
@@ -63,21 +61,24 @@ export function generatePumpkinMethodDispatch(apiPackage: WitApiPackage, analysi
                 functionName: nativeOperation,
                 apiObjectName,
                 propertyName: methodName,
-                resourceDrops,
             },
         });
         if (!adapter) throw unsupportedPlanError(plan);
         appendResource(resourceApiFunctions, plan.apiInterface.name, resource.name, adapter);
     }
 
-    const drops = [...resourceDrops.values()].map(([interfaceName, resourceName]) => {
-        const iface = cIdentifier(interfaceName);
-        const resource = cIdentifier(resourceName);
-        return `  if (interfaceName == ${JSON.stringify(interfaceName)} && resourceName == ${JSON.stringify(resourceName)}) {
+    // Any resource can reach JavaScript nested in a result, event payload or callback, and wit-bindgen
+    // emits a drop function for every resource in the imported interfaces, so each one gets a branch.
+    const drops = apiPackage.interfaces.flatMap((apiInterface) =>
+        apiInterface.resources.map(({ name }) => {
+            const iface = cIdentifier(apiInterface.name);
+            const resource = cIdentifier(name);
+            return `  if (interfaceName == ${JSON.stringify(apiInterface.name)} && resourceName == ${JSON.stringify(name)}) {
     ${namespace}_${iface}_${resource}_drop_own(${namespace}_${iface}_own_${resource}_t{handle});
     return;
   }`;
-    });
+        }),
+    );
     const interfaceNames = new Set([
         ...apiFunctions.keys(),
         ...[...resourceApiFunctions.values()].map(({ interfaceName }) => interfaceName),
@@ -111,6 +112,7 @@ export function generatePumpkinMethodDispatch(apiPackage: WitApiPackage, analysi
     return [
         'void generatedWitDropResource(const std::string &interfaceName, const std::string &resourceName, int32_t handle) {',
         `    ${drops.join('\n')}`,
+        '    throw std::runtime_error("No generated drop for Pumpkin resource " + interfaceName + "." + resourceName);',
         '}',
         '',
         'Value generatedWitSimpleMethod(Runtime &runtime, const std::string &interfaceName, const std::string &resourceName, const std::string &methodName, std::shared_ptr<ResourceState> state) {',
@@ -145,24 +147,4 @@ function appendResource(
 function unsupportedPlanError(plan: WitApiAdapterPlan): Error {
     const operationPath = plan.resource ? `${plan.resource.name}.${plan.operation.name}` : plan.operation.name;
     return new Error(`No Static Hermes adapter is generated for ${plan.apiInterface.specifier}#${operationPath}`);
-}
-
-function pascalCase(value: string): string {
-    return value
-        .split(/[^a-zA-Z0-9]+/)
-        .filter(Boolean)
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join('');
-}
-
-function jsName(value: string): string {
-    return value.replace(/^%/, '').replace(/-([a-zA-Z0-9])/g, (_match, character: string) => character.toUpperCase());
-}
-
-function cIdentifier(value: string): string {
-    return value
-        .replace(/^%/, '')
-        .replace(/[^a-zA-Z0-9_]/g, '_')
-        .replace(/_+/g, '_')
-        .toLowerCase();
 }

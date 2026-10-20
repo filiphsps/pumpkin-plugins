@@ -66,45 +66,46 @@ void plugin_command_suggestions_free(plugin_command_suggestions_t *suggestions) 
     std::free(suggestions->values.ptr);
 }
 
-enum class ResourceKind { CommandSender, Server, Text };
 struct ResourceState {
-    ResourceKind kind;
     std::int32_t handle;
     bool owned;
+    std::string interfaceName;
+    std::string resourceName;
     bool valid = true;
     void drop() {
         if (!owned) return;
         owned = false;
         valid = false;
-        if (kind == ResourceKind::CommandSender) senderDrops++;
-        if (kind == ResourceKind::Server) serverDrops++;
-        if (kind == ResourceKind::Text) textDrops++;
+        if (interfaceName == "command" && resourceName == "command-sender") senderDrops++;
+        if (interfaceName == "server" && resourceName == "server") serverDrops++;
+        if (interfaceName == "text" && resourceName == "text-component") textDrops++;
     }
     void transfer() { owned = false; valid = false; }
 };
 void pumpkin_plugin_command_command_sender_drop_own(plugin_own_command_sender_t) {}
 void pumpkin_plugin_server_server_drop_own(plugin_own_server_instance_t) {}
-class ResourceObject : public HostObject {
+class WitResourceObject : public HostObject {
   public:
-    explicit ResourceObject(std::shared_ptr<ResourceState> state) : state_(std::move(state)) {}
+    explicit WitResourceObject(std::shared_ptr<ResourceState> state) : state_(std::move(state)) {}
     const std::shared_ptr<ResourceState> &state() const { return state_; }
   private:
     std::shared_ptr<ResourceState> state_;
 };
-class CommandSenderObject : public ResourceObject { using ResourceObject::ResourceObject; };
-class ServerObject : public ResourceObject { using ResourceObject::ResourceObject; };
-class TextObject : public ResourceObject { using ResourceObject::ResourceObject; };
+std::shared_ptr<WitResourceObject> makeWitResourceObject(std::shared_ptr<ResourceState> state) {
+    return std::make_shared<WitResourceObject>(std::move(state));
+}
 
-Object wrapResourceObject(Runtime &, std::shared_ptr<ResourceObject> resource) {
+Object wrapResourceObject(Runtime &, std::shared_ptr<WitResourceObject> resource) {
     return Object::createFromHostObject(*jsRuntime, std::move(resource));
 }
 std::shared_ptr<ResourceState> getWitResourceState(
     Runtime &, const Value &value, const std::string &interfaceName,
     const std::string &resourceName, const std::string & = "") {
     const auto object = value.asObject(*jsRuntime);
-    const auto resource = std::dynamic_pointer_cast<ResourceObject>(object.getHostObject(*jsRuntime));
-    if (!resource || interfaceName != "text" || resourceName != "text-component")
-        throw std::runtime_error("Expected text.text-component resource");
+    const auto resource = std::dynamic_pointer_cast<WitResourceObject>(object.getHostObject(*jsRuntime));
+    if (!resource || resource->state()->interfaceName != interfaceName ||
+        resource->state()->resourceName != resourceName)
+        throw std::runtime_error("Expected " + interfaceName + "." + resourceName + " resource");
     if (!resource->state()->valid) throw std::runtime_error("Resource is not valid");
     return resource->state();
 }
@@ -149,8 +150,8 @@ plugin_suggestion_request_t makeRequest() {
 }
 Object makeTooltip(Runtime &runtime, std::int32_t handle,
                    const std::shared_ptr<ResourceState> &state) {
-    *state = ResourceState{ResourceKind::Text, handle, true};
-    return Object::createFromHostObject(runtime, std::make_shared<TextObject>(state));
+    *state = ResourceState{handle, true, "text", "text-component"};
+    return Object::createFromHostObject(runtime, std::make_shared<WitResourceObject>(state));
 }
 Object makeResult(Runtime &runtime, const std::shared_ptr<ResourceState> &tooltipState,
                   bool malformedSecondValue = false) {
@@ -175,7 +176,7 @@ Object makeResult(Runtime &runtime, const std::shared_ptr<ResourceState> &toolti
 int main() {
     Runtime runtime;
     jsRuntime = &runtime;
-    auto tooltipState = std::make_shared<ResourceState>(ResourceState{ResourceKind::Text, 0, false});
+    auto tooltipState = std::make_shared<ResourceState>(ResourceState{0, false, "text", "text-component"});
     callbackResult = Value(makeResult(runtime, tooltipState));
     auto request = makeRequest();
     plugin_command_suggestions_t result{};
@@ -183,12 +184,12 @@ int main() {
     assert(invokedExport == "handleCommandSuggestion");
     assert(receivedArgs.size() == 4);
     assert(receivedArgs[0].asNumber() == 23);
-    const auto sender = std::dynamic_pointer_cast<CommandSenderObject>(
+    const auto sender = std::dynamic_pointer_cast<WitResourceObject>(
         receivedArgs[1].asObject(runtime).getHostObject(runtime));
-    const auto server = std::dynamic_pointer_cast<ServerObject>(
+    const auto server = std::dynamic_pointer_cast<WitResourceObject>(
         receivedArgs[2].asObject(runtime).getHostObject(runtime));
-    assert(sender && sender->state()->handle == 41);
-    assert(server && server->state()->handle == 42);
+    assert(sender && sender->state()->handle == 41 && sender->state()->resourceName == "command-sender");
+    assert(server && server->state()->handle == 42 && server->state()->resourceName == "server");
     const auto requestObject = receivedArgs[3].asObject(runtime);
     assert(requestObject.getProperty(runtime, "input").asString() == "/wp g");
     assert(requestObject.getProperty(runtime, "cursor").asNumber() == 5);
@@ -205,7 +206,7 @@ int main() {
     assert(senderDrops == 1 && serverDrops == 1 && requestFrees == 1);
     plugin_command_suggestions_free(&result);
 
-    auto failedTooltipState = std::make_shared<ResourceState>(ResourceState{ResourceKind::Text, 0, false});
+    auto failedTooltipState = std::make_shared<ResourceState>(ResourceState{0, false, "text", "text-component"});
     callbackResult = Value(makeResult(runtime, failedTooltipState, true));
     request = makeRequest();
     result = {};

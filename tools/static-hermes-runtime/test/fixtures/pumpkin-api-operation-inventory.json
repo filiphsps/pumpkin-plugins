@@ -1,6 +1,5 @@
 {
     "apiPackage": "@pumpkin-plugins/pumpkin-api",
-    "apiPackageVersion": "0.1.0",
     "witPackage": "pumpkin:plugin@0.1.0",
     "sourceWit": {
         "repository": "https://github.com/Pumpkin-MC/pumpkin-plugin-wit",

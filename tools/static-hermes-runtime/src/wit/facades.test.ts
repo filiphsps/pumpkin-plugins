@@ -69,6 +69,63 @@ it('turns Pumpkin WIT result errors into JavaScript errors', async () => {
     expect(() => module.saveAll()).toThrow('Pumpkin API error: disk full');
 });
 
+it('wraps resources nested in Pumpkin results and variants with their resource classes', async () => {
+    const playerType: ResolvedWitType = {
+        kind: 'resource',
+        name: 'player',
+        interfaceName: 'player',
+        packageName: 'pumpkin:plugin',
+        interfaceSpecifier: 'pumpkin:plugin/player@0.1.0',
+        interfaceDependencies: [],
+    };
+    const player = {
+        ...apiInterface('player', 'pumpkin:plugin/player@0.1.0', []),
+        resources: [{ name: 'player', functions: [operation('get-name')] }],
+    };
+    const server = {
+        ...apiInterface('server', 'pumpkin:plugin/server@0.1.0', [
+            {
+                ...operation('find-sender'),
+                resolvedResult: {
+                    kind: 'variant',
+                    name: 'sender',
+                    interfaceName: 'server',
+                    packageName: 'pumpkin:plugin',
+                    interfaceSpecifier: 'pumpkin:plugin/server@0.1.0',
+                    interfaceDependencies: [],
+                    cases: [
+                        { name: 'player', type: 'player', resolvedType: playerType },
+                        { name: 'console', type: '' },
+                    ],
+                },
+            },
+            {
+                ...operation('parse-player'),
+                resolvedResult: { kind: 'result', ok: playerType, error: { kind: 'primitive', name: 'string' } },
+            },
+        ]),
+        dependencies: ['player'],
+    };
+    const module = (await importFacade(generateEsmFacade(server, [server, player]))) as unknown as {
+        findSender(): { tag: string; val: { getName(): string } };
+        parsePlayer(): { getName(): string };
+    };
+    const nativePlayer = { getName: () => 'Steve' };
+    globalState.__pumpkinHost = {
+        server: { findSender: () => ({ tag: 'player', val: nativePlayer }), parsePlayer: () => nativePlayer },
+    };
+
+    const sender = module.findSender();
+    const parsed = module.parsePlayer();
+    expect(sender.tag).toBe('player');
+    expect(sender.val.constructor.name).toBe('Player');
+    expect(sender.val.getName()).toBe('Steve');
+    expect(parsed.constructor.name).toBe('Player');
+    globalState.__staticHermesPluginUnloading = true;
+    expect(() => sender.val.getName()).toThrow('Pumpkin host calls are unavailable during plugin unload');
+    expect(() => parsed.getName()).toThrow('Pumpkin host calls are unavailable during plugin unload');
+});
+
 it('wraps WASI resource lifetimes and turns native error markers into JavaScript errors', async () => {
     const wasiInterface = wasiApiInterface();
     const module = (await importFacade(generateWasiEsmFacade(wasiInterface))) as unknown as WasiFacade;

@@ -1,10 +1,11 @@
 import type { WitAnalysis } from './analysis.ts';
+import { cIdentifier, jsName, pascalCase, wasiHostName, witOperationCFunctionName } from './names.ts';
 import {
     annotateWitCleanupAvailability,
     generateWitApiFunctionForResolvedOperation,
     generateWitResourceMethodForResolvedPlan,
 } from './native-adapters.ts';
-import type { ResolvedWitType, WitApiPackage, WitFunction, WitResource, WitWasiInterface } from './types.ts';
+import { resourcesIn, type WitApiPackage, type WitFunction, type WitResource, type WitWasiInterface } from './types.ts';
 
 /**
  * Generate WASI resource methods, resource drops, and interface host objects from a resolved plan.
@@ -26,8 +27,10 @@ export function generateWasiAdapterDispatch(
     const usedResources = new Set<string>();
     for (const plan of analysis.wasiAdapters) {
         if (plan.resource) usedResources.add(`${plan.apiInterface.specifier}#${plan.resource.name}`);
-        for (const parameter of plan.parameters) collectWitResources(parameter.resolvedType, usedResources);
-        collectWitResources(plan.resultType, usedResources);
+        for (const type of [...plan.parameters.map(({ resolvedType }) => resolvedType), plan.resultType]) {
+            for (const resource of resourcesIn(type))
+                usedResources.add(`${resource.interfaceSpecifier}#${resource.name}`);
+        }
     }
 
     const resourceMethods: string[] = [];
@@ -83,7 +86,7 @@ export function generateWasiAdapterDispatch(
                     parameters: plan.parameters,
                     resultType: plan.resultType,
                     options: {
-                        functionName: wasiOperationCFunctionName(apiPackage, apiInterface, plan.operation, resource),
+                        functionName: witOperationCFunctionName(apiPackage, apiInterface, plan.operation, resource),
                         apiObjectName: resourceApiName,
                         propertyName:
                             plan.operation.name === 'constructor' ? 'constructor' : jsName(plan.operation.name),
@@ -120,92 +123,10 @@ ${installations.join('\n')}
 }`;
 }
 
-function collectWitResources(type: ResolvedWitType, resources: Set<string>): void {
-    switch (type.kind) {
-        case 'resource':
-            resources.add(`${type.interfaceSpecifier}#${type.name}`);
-            return;
-        case 'borrow':
-        case 'list':
-        case 'option':
-            collectWitResources(type.item, resources);
-            return;
-        case 'record':
-            for (const field of type.fields) {
-                if (field.resolvedType) collectWitResources(field.resolvedType, resources);
-            }
-            return;
-        case 'variant':
-            for (const variant of type.cases) {
-                if (variant.resolvedType) collectWitResources(variant.resolvedType, resources);
-            }
-            return;
-        case 'tuple':
-            for (const item of type.items) collectWitResources(item, resources);
-            return;
-        case 'result':
-            collectWitResources(type.ok, resources);
-            collectWitResources(type.error, resources);
-            return;
-        case 'unit':
-        case 'primitive':
-        case 'enum':
-        case 'flags':
-        case 'unsupported':
-            return;
-        default:
-            return void assertNever(type);
-    }
-}
-
 function operationId(apiInterface: WitWasiInterface, operation: WitFunction, resource?: WitResource): string {
     return `${apiInterface.specifier}#${resource ? `${resource.name}.` : ''}${operation.name}`;
 }
 
-function wasiOperationCFunctionName(
-    apiPackage: WitApiPackage,
-    apiInterface: WitWasiInterface,
-    operation: WitFunction,
-    resource?: WitResource,
-): string {
-    const namespace = cIdentifier(apiPackage.packageName);
-    const interfaceName = cIdentifier(apiInterface.name);
-    if (!resource) return `${namespace}_${interfaceName}_${cIdentifier(operation.name)}`;
-    if (operation.name === 'constructor')
-        return `${namespace}_${interfaceName}_constructor_${cIdentifier(resource.name)}`;
-    const kind = operation.isStatic ? 'static' : 'method';
-    return `${namespace}_${interfaceName}_${kind}_${cIdentifier(resource.name)}_${cIdentifier(operation.name)}`;
-}
-
 function noAdapter(operationId: string): Error {
     return new Error(`No Static Hermes JSI adapter is generated for ${operationId}`);
-}
-
-function cIdentifier(witName: string): string {
-    return witName
-        .replace(/^%/, '')
-        .replace(/[^a-zA-Z0-9_]/g, '_')
-        .replace(/_+/g, '_')
-        .toLowerCase();
-}
-
-function jsName(witName: string): string {
-    return witName.replace(/^%/, '').replace(/-([a-zA-Z0-9])/g, (_match, character: string) => character.toUpperCase());
-}
-
-function pascalCase(value: string): string {
-    return value
-        .split(/[^a-zA-Z0-9]+/)
-        .filter(Boolean)
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join('');
-}
-
-function wasiHostName(apiInterface: WitWasiInterface): string {
-    const namespace = apiInterface.packageName.slice(apiInterface.packageName.indexOf(':') + 1);
-    return `__pumpkinWasi${pascalCase(namespace)}${pascalCase(apiInterface.name)}`;
-}
-
-function assertNever(type: never): never {
-    throw new Error(`Unhandled resolved WIT resource type: ${JSON.stringify(type)}`);
 }

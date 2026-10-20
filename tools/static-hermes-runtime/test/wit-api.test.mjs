@@ -2,20 +2,70 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { setupHermesToolchainEnvironment } from '../src/hermes/toolchain-environment.ts';
+import { analyzeWitUsage } from '../src/wit/analysis.ts';
 import {
-    generateEsmFacade,
-    generateWasiAdapterDispatch,
-    generateWasiEsmFacade,
-    generateWitEventDispatch,
-    generateWitSimpleMethodDispatch,
-    planWasiAdapterDispatch,
-    readWasiWitImports,
-    readWitPackage,
-    wasiFeaturesForMethods,
-} from './oracles/wit-api.mjs';
+    emitEventDispatch,
+    emitPumpkinFacade,
+    emitPumpkinMethodDispatch,
+    emitWasiAdapterDispatch,
+    emitWasiFacade,
+} from '../src/wit/emitters.ts';
+import { readInterfaceDeclarationOrder, readPluginImportOrder, readWitToolsDocument } from '../src/wit/parser.ts';
+import { resolvePluginApi, resolveWitDocument } from '../src/wit/resolver.ts';
 
 const directories = [];
+let wasmTools;
+
+beforeAll(async () => {
+    const toolchain = await setupHermesToolchainEnvironment({
+        workspaceRoot: path.resolve(import.meta.dirname, '../../..'),
+        includeWasiSdk: false,
+        includeWitBindgen: false,
+        includeWasmTools: true,
+    });
+    wasmTools = process.env.WASM_TOOLS ?? toolchain.WASM_TOOLS;
+}, 120_000);
+
+/** Resolve a WIT directory and analyze one operation selection the way `codegen generate` does. */
+function resolveWit(root, selection = {}) {
+    const pluginImportOrder = readPluginImportOrder(root);
+    const resolved = resolveWitDocument(
+        readWitToolsDocument(root, { executable: wasmTools }),
+        readInterfaceDeclarationOrder(root),
+    );
+    return {
+        apiPackage: resolvePluginApi(resolved, pluginImportOrder),
+        analysis: analyzeWitUsage(resolved, { pluginImportOrder, ...selection }),
+    };
+}
+
+/** Generate native Pumpkin dispatch for the selected operations, or for every operation when omitted. */
+function methodDispatch(root, apiMethods) {
+    const { apiPackage, analysis } = resolveWit(root, apiMethods === undefined ? {} : { apiMethods });
+    return emitPumpkinMethodDispatch(apiPackage, analysis);
+}
+
+/** Generate native event conversion for every declared event. */
+function eventDispatch(root) {
+    const { apiPackage, analysis } = resolveWit(root, { apiMethods: [] });
+    return emitEventDispatch(apiPackage, analysis);
+}
+
+/** Plan and generate native WASI dispatch for the selected imports and operations. */
+function wasiDispatch(root, wasiImports, wasiMethods) {
+    const { analysis } = resolveWit(root, {
+        apiMethods: [],
+        wasiImports,
+        ...(wasiMethods === undefined ? {} : { wasiMethods }),
+    });
+    return {
+        analysis,
+        plan: analysis.wasiAdapters.map(({ operationId }) => operationId),
+        dispatch: emitWasiAdapterDispatch(analysis.resolvedWasiInterfaces, analysis),
+    };
+}
 
 function writeWit(root, filename, source) {
     fs.mkdirSync(path.dirname(path.join(root, filename)), { recursive: true });
@@ -305,7 +355,7 @@ function wasiSocketAddressFixture() {
                 record outgoing-datagram { data: list<u8>, remote-address: option<ip-socket-address> }
                 resource udp-socket {
                     start-bind: func(network: borrow<network>, local-address: ip-socket-address) -> result<_, error-code>;
-                    stream: func(remote-address: option<ip-socket-address>) -> result<tuple<incoming-datagram-stream, outgoing-datagram-stream>, error-code>;
+                    %stream: func(remote-address: option<ip-socket-address>) -> result<tuple<incoming-datagram-stream, outgoing-datagram-stream>, error-code>;
                 }
                 resource incoming-datagram-stream {
                     receive: func(max-results: u64) -> result<list<incoming-datagram>, error-code>;
@@ -383,7 +433,7 @@ function fixture() {
                 enum piston-behavior { normal, destroy, }
                 record block-state { piston-behavior: piston-behavior, }
 
-                resource world {
+                resource %world {
                     constructor();
                     get-dimension: func() -> string;
                     get-world-border: func() -> world-border;
@@ -461,13 +511,13 @@ function fixture() {
             interface player {
                 use common.{position};
                 use uuid.{uuid};
-                use world.{world};
+                use %world.{%world};
                 use text.{text-component};
 
                 resource player {
                     get-id: func() -> uuid;
                     get-position: func() -> position;
-                    get-world: func() -> world;
+                    get-world: func() -> %world;
                     as-java: func() -> option<java-player>;
                     send-system-message: func(text: text-component, overlay: bool);
                 }
@@ -503,7 +553,7 @@ function fixture() {
         `
             interface game-rules {
                 enum game-rule { natural-health-regeneration, }
-                variant game-rule-value { int(s32), bool(bool), }
+                variant game-rule-value { int(s32), %bool(bool), }
             }
         `,
     );
@@ -582,7 +632,6 @@ function fixture() {
                     server-tick-end-event(server-tick-end-event-data),
                     player-move-event(player-move-event-data),
                     player-click-event(player-click-event-data),
-                    unused-event(string),
                 }
             }
         `,
@@ -654,9 +703,11 @@ afterEach(() => {
     for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 
-async function loadFacade(root, apiInterface, name) {
+async function loadFacade(root, interfaceName, name) {
+    const { interfaces } = resolveWit(root, { apiMethods: [] }).apiPackage;
+    const apiInterface = interfaces.find((value) => value.name === interfaceName);
     const modulePath = path.join(root, `${name}-facade.mjs`);
-    fs.writeFileSync(modulePath, generateEsmFacade(apiInterface, readWitPackage(root).interfaces));
+    fs.writeFileSync(modulePath, emitPumpkinFacade(apiInterface, interfaces));
     return import(pathToFileURL(modulePath).href);
 }
 
@@ -672,9 +723,6 @@ function setHost(host) {
 describe('WIT-derived Pumpkin API facades', () => {
     it('runs generated free-function and resource facades against host adapters', async () => {
         const root = fixture();
-        const api = readWitPackage(root);
-        const world = api.interfaces.find((value) => value.name === 'world');
-        const command = api.interfaces.find((value) => value.name === 'command');
         const calls = [];
         const worldHandle = { getDimension: () => 'overworld', drop() {} };
         const commandHandle = {
@@ -710,8 +758,8 @@ describe('WIT-derived Pumpkin API facades', () => {
         });
 
         try {
-            const worldFacade = await loadFacade(root, world, 'world-runtime');
-            const commandFacade = await loadFacade(root, command, 'command-runtime');
+            const worldFacade = await loadFacade(root, 'world', 'world-runtime');
+            const commandFacade = await loadFacade(root, 'command', 'command-runtime');
 
             expect(worldFacade.lookupAddedByApiUpdate('new-api')).toBe('resolved:new-api');
             expect(new worldFacade.World().getDimension()).toBe('overworld');
@@ -732,32 +780,24 @@ describe('WIT-derived Pumpkin API facades', () => {
 
     it('preserves Uint8Array arguments passed to WIT functions', async () => {
         const root = fixture();
-        const api = readWitPackage(root);
-        const ipc = api.interfaces.find((value) => value.name === 'ipc');
-        const modulePath = path.join(root, 'ipc-facade.mjs');
-        fs.writeFileSync(modulePath, generateEsmFacade(ipc));
-
-        const previousHost = globalThis.__pumpkinHost;
-        globalThis.__pumpkinHost = {
+        const restoreHost = setHost({
             ipc: { sendIpcMessage: (_recipient, message) => message },
-        };
+        });
 
         try {
-            const { sendIpcMessage } = await import(pathToFileURL(modulePath).href);
+            const { sendIpcMessage } = await loadFacade(root, 'ipc', 'ipc');
             const message = new Uint8Array([99, 0, 128, 255, 77]).subarray(1, 4);
             const answer = sendIpcMessage('OtherPlugin', message);
 
             expect(answer).toBeInstanceOf(Uint8Array);
             expect(Array.from(answer)).toEqual([0, 128, 255]);
         } finally {
-            if (previousHost === undefined) Reflect.deleteProperty(globalThis, '__pumpkinHost');
-            else globalThis.__pumpkinHost = previousHost;
+            restoreHost();
         }
     });
 
     it('allows only scheduler cancellation while the plugin is unloading', async () => {
         const root = schedulerFixture();
-        const scheduler = readWitPackage(root).interfaces.find((value) => value.name === 'scheduler');
         const canceledTasks = [];
         const restoreHost = setHost({
             scheduler: {
@@ -769,7 +809,7 @@ describe('WIT-derived Pumpkin API facades', () => {
         globalThis.__staticHermesPluginUnloading = true;
 
         try {
-            const facade = await loadFacade(root, scheduler, 'scheduler-unloading');
+            const facade = await loadFacade(root, 'scheduler', 'scheduler-unloading');
 
             facade.cancelTask(42);
 
@@ -786,14 +826,13 @@ describe('WIT-derived Pumpkin API facades', () => {
 
     it('wraps an optional resource result so the returned facade can dispose it', async () => {
         const root = fixture();
-        const world = readWitPackage(root).interfaces.find((value) => value.name === 'world');
         let dropped = false;
         const chunkHandle = { getX: () => 12, drop: () => (dropped = true) };
         const worldHandle = { getChunk: () => chunkHandle };
         const restoreHost = setHost({ world: { world: { constructor: () => worldHandle } } });
 
         try {
-            const { Chunk, World } = await loadFacade(root, world, 'world-optional-resource');
+            const { Chunk, World } = await loadFacade(root, 'world', 'world-optional-resource');
 
             const chunk = new World().getChunk(4, 8);
 
@@ -808,7 +847,6 @@ describe('WIT-derived Pumpkin API facades', () => {
 
     it('throws a catchable JavaScript error when using a disposed Pumpkin resource', async () => {
         const root = fixture();
-        const world = readWitPackage(root).interfaces.find((value) => value.name === 'world');
         let valid = true;
         const worldHandle = {
             getDimension: () => 'overworld',
@@ -822,7 +860,7 @@ describe('WIT-derived Pumpkin API facades', () => {
         const restoreHost = setHost({ world: { world: { constructor: () => worldHandle } } });
 
         try {
-            const { World } = await loadFacade(root, world, 'world-disposed-resource');
+            const { World } = await loadFacade(root, 'world', 'world-disposed-resource');
             const resource = new World();
             resource[Symbol.dispose]();
 
@@ -834,7 +872,6 @@ describe('WIT-derived Pumpkin API facades', () => {
 
     it('wraps resources returned through another Pumpkin interface', async () => {
         const root = fixture();
-        const server = readWitPackage(root).interfaces.find((value) => value.name === 'server');
         let valid = true;
         const worldHandle = {
             getDimension: () => 'overworld',
@@ -849,7 +886,7 @@ describe('WIT-derived Pumpkin API facades', () => {
         const restoreHost = setHost({ server: { server: { constructor: () => serverHandle } } });
 
         try {
-            const { Server } = await loadFacade(root, server, 'server-cross-interface-resource');
+            const { Server } = await loadFacade(root, 'server', 'server-cross-interface-resource');
             const [world] = new Server().getAllWorlds();
             world[Symbol.dispose]();
 
@@ -861,8 +898,6 @@ describe('WIT-derived Pumpkin API facades', () => {
 
     it('tracks disposal of foreign resources without a host validity flag', async () => {
         const root = fixture();
-        const api = readWitPackage(root);
-        const server = api.interfaces.find((value) => value.name === 'server');
         let drops = 0;
         const worldHandle = {
             getDimension: () => 'overworld',
@@ -874,7 +909,7 @@ describe('WIT-derived Pumpkin API facades', () => {
         const restoreHost = setHost({ server: { server: { constructor: () => serverHandle } } });
 
         try {
-            const { Server } = await loadFacade(root, server, 'server-foreign-resource');
+            const { Server } = await loadFacade(root, 'server', 'server-foreign-resource');
             const [world] = new Server().getAllWorlds();
 
             expect(world.getDimension()).toBe('overworld');
@@ -890,7 +925,6 @@ describe('WIT-derived Pumpkin API facades', () => {
 
     it('wraps every resource in a WIT resource list', async () => {
         const root = fixture();
-        const world = readWitPackage(root).interfaces.find((value) => value.name === 'world');
         const chunkHandles = [
             { getX: () => 3, drop() {} },
             { getX: () => 9, drop() {} },
@@ -899,7 +933,7 @@ describe('WIT-derived Pumpkin API facades', () => {
         const restoreHost = setHost({ world: { world: { constructor: () => worldHandle } } });
 
         try {
-            const { Chunk, World } = await loadFacade(root, world, 'world-resource-list');
+            const { Chunk, World } = await loadFacade(root, 'world', 'world-resource-list');
 
             const chunks = new World().getChunks();
 
@@ -912,7 +946,9 @@ describe('WIT-derived Pumpkin API facades', () => {
     });
 
     it('does not add an interface absent from the plugin world', () => {
-        const api = readWitPackage(fixture());
+        const root = fixture();
+        writeWit(root, 'unused.wit', 'interface unused { ping: func(); }');
+        const { apiPackage: api } = resolveWit(root, { apiMethods: [] });
 
         expect(api.packageName).toBe('pumpkin:plugin');
         expect(api.version).toBe('0.1.0');
@@ -935,8 +971,8 @@ describe('WIT-derived Pumpkin API facades', () => {
 
         const world = api.interfaces.find((value) => value.name === 'world');
         expect(world.dependencies).toEqual(['common', 'biomes', 'game-rules']);
-        expect(world.resources.find((resource) => resource.name === 'world').functions).toContainEqual({
-            name: 'get-chunk',
+        const worldResource = world.resources.find((resource) => resource.name === 'world');
+        expect(worldResource.functions.find((operation) => operation.name === 'get-chunk')).toMatchObject({
             isStatic: false,
             features: [],
             parameters: [
@@ -947,21 +983,8 @@ describe('WIT-derived Pumpkin API facades', () => {
         });
     });
 
-    it('generates event conversion only for event variants and fields used by the bundle', () => {
-        const api = readWitPackage(fixture());
-
-        const dispatch = generateWitEventDispatch(api, 'registerEvent("server-tick-end-event"); event.tick;');
-
-        expect(dispatch).toContain('PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_SERVER_TICK_END_EVENT');
-        expect(dispatch).toContain('eventData.tick');
-        expect(dispatch).not.toContain('durationNanos');
-        expect(dispatch).not.toContain('unused-event');
-    });
-
-    it('converts used tuple aliases in event records to JavaScript arrays', () => {
-        const api = readWitPackage(fixture());
-
-        const dispatch = generateWitEventDispatch(api, 'registerEvent("player-move-event"); event.toPosition;');
+    it('converts tuple aliases in event records to JavaScript arrays', () => {
+        const dispatch = eventDispatch(fixture());
 
         expect(dispatch).toContain('Array eventValueToPosition(runtime, 3);');
         expect(dispatch).toContain(
@@ -977,39 +1000,29 @@ describe('WIT-derived Pumpkin API facades', () => {
     });
 
     it('wraps event resources with the generic Pumpkin WIT resource adapter', () => {
-        const api = readWitPackage(fixture());
+        const dispatch = eventDispatch(fixture());
 
-        const dispatch = generateWitEventDispatch(
-            api,
-            'registerEvent("player-click-event"); event.cursor?.getRegistryKey();',
-        );
-
-        expect(dispatch).toContain(
-            'ResourceState{ResourceKind::Wit, eventData.cursor.val.__handle, true, "item-stack", "item-stack"}',
-        );
+        expect(dispatch).toContain('ResourceState{eventData.cursor.val.__handle, true, "item-stack", "item-stack"}');
         expect(dispatch).toContain('wrapResourceObject(runtime, makeWitResourceObject(eventValueCursorValueState))');
     });
 
     it('generates only requested interface functions with nested result and byte-list conversions', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(api, '', ['ipc.send-ipc-message']);
-        const unused = generateWitSimpleMethodDispatch(api, '', []);
+        const root = fixture();
+        const dispatch = methodDispatch(root, ['ipc.send-ipc-message']);
+        const unused = methodDispatch(root, []);
 
         expect(dispatch).toContain('pumpkin_plugin_ipc_send_ipc_message');
         expect(dispatch).toContain('wasiInputString(rt, args[0])');
         expect(dispatch).toContain('asUint8Array(rt)');
         expect(dispatch).toContain('result.is_err');
         expect(dispatch).toContain('Uint8Array');
-        expect(dispatch).toContain(
-            'if (!callSucceeded) { Object errorValue(rt); errorValue.setProperty(rt, "tag", "err"); return errorValue; }',
-        );
+        expect(dispatch).toContain('if (!callSucceeded) { Object errorValue(rt);');
         expect(dispatch).not.toContain('pumpkin_plugin_world_lookup_added_by_api_update');
         expect(unused).not.toContain('pumpkin_plugin_ipc_send_ipc_message');
     });
 
     it('generates adapters for optional scalar results with tuple-list arguments', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(api, '', ['world.resolve-block-state']);
+        const dispatch = methodDispatch(fixture(), ['world.resolve-block-state']);
 
         expect(dispatch).toContain('pumpkin_plugin_world_resolve_block_state');
         expect(dispatch).toContain('const bool hasResult = pumpkin_plugin_world_resolve_block_state');
@@ -1018,9 +1031,9 @@ describe('WIT-derived Pumpkin API facades', () => {
     });
 
     it('accepts and returns typed arrays for primitive WIT lists', () => {
-        const api = readWitPackage(fixture());
-        const inputDispatch = generateWitSimpleMethodDispatch(api, '', ['world.world.accept-entity-ids']);
-        const resultDispatch = generateWitSimpleMethodDispatch(api, '', ['world.world.get-entity-ids']);
+        const root = fixture();
+        const inputDispatch = methodDispatch(root, ['world.world.accept-entity-ids']);
+        const resultDispatch = methodDispatch(root, ['world.world.get-entity-ids']);
 
         expect(inputDispatch).toContain('isTypedArray(rt)');
         expect(inputDispatch).toContain('std::to_string(argument0Index).c_str()');
@@ -1029,8 +1042,7 @@ describe('WIT-derived Pumpkin API facades', () => {
     });
 
     it('accepts a typed array nested inside a packet variant record', () => {
-        const api = readWitPackage(packetListFixture());
-        const dispatch = generateWitSimpleMethodDispatch(api, '', ['java-packets.java-player.send-packet']);
+        const dispatch = methodDispatch(packetListFixture(), ['java-packets.java-player.send-packet']);
 
         expect(dispatch).toContain('argument0CRemoveEntitiesEntityIdsArray.isTypedArray(rt)');
         expect(dispatch).toContain(
@@ -1040,8 +1052,7 @@ describe('WIT-derived Pumpkin API facades', () => {
     });
 
     it('generates selected static resource functions as WIT-derived host methods', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(api, '', ['text.text-component.from-json']);
+        const dispatch = methodDispatch(fixture(), ['text.text-component.from-json']);
 
         expect(dispatch).toContain('pumpkin_plugin_text_static_text_component_from_json');
         expect(dispatch).toContain('generatedTextTextComponentApi.setProperty');
@@ -1053,9 +1064,8 @@ describe('WIT-derived Pumpkin API facades', () => {
         expect(dispatch).toContain('pumpkin_plugin_text_text_component_drop_own');
     });
 
-    it('generates constructors for only the Pumpkin resources instantiated by the bundle', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(api, 'new Command(["say"], "Send a message")');
+    it('generates constructors only for the selected Pumpkin resources', () => {
+        const dispatch = methodDispatch(fixture(), ['command.command.constructor']);
 
         expect(dispatch).toContain('pumpkin_plugin_command_constructor_command');
         expect(dispatch).toContain('generatedCommandCommandApi.setProperty');
@@ -1075,9 +1085,8 @@ describe('WIT-derived Pumpkin API facades', () => {
                 'encode: func() -> list<u8>;\nround-trip-char: static func(value: char) -> char;',
             ),
         );
-        const api = readWitPackage(root);
 
-        const dispatch = generateWitSimpleMethodDispatch(api, '', ['text.text-component.round-trip-char']);
+        const dispatch = methodDispatch(root, ['text.text-component.round-trip-char']);
 
         expect(dispatch).toContain(
             'pumpkin_plugin_text_static_text_component_round_trip_char(wasiInputChar(rt, args[0]))',
@@ -1086,8 +1095,7 @@ describe('WIT-derived Pumpkin API facades', () => {
     });
 
     it('generates native scalar resource methods from WIT declarations', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(api);
+        const dispatch = methodDispatch(fixture());
 
         expect(dispatch).toContain('pumpkin_plugin_server_method_server_get_mspt');
         expect(dispatch).toContain('pumpkin_plugin_server_method_server_get_player_count');
@@ -1096,8 +1104,7 @@ describe('WIT-derived Pumpkin API facades', () => {
     });
 
     it('wraps generated Pumpkin resource results in native resource objects', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(api, '', ['server.server.get-all-worlds']);
+        const dispatch = methodDispatch(fixture(), ['server.server.get-all-worlds']);
 
         expect(dispatch).toContain('wrapResourceObject(rt, makeWitResourceObject(');
     });
@@ -1111,6 +1118,7 @@ describe('WIT-derived Pumpkin API facades', () => {
                 interface player {
                     use java-packets.{clientbound-packet as java-packet};
                     use bedrock-packets.{clientbound-packet as bedrock-packet};
+                    resource player;
                     resource java-player {
                         send-packet: func(packet: java-packet);
                     }
@@ -1137,8 +1145,7 @@ describe('WIT-derived Pumpkin API facades', () => {
                 }
             `,
         );
-        const api = readWitPackage(root);
-        const dispatch = generateWitSimpleMethodDispatch(api, '', ['player.java-player.send-packet']);
+        const dispatch = methodDispatch(root, ['player.java-player.send-packet']);
 
         expect(dispatch).toContain('pumpkin_plugin_player_method_java_player_send_packet');
         expect(dispatch).toContain('pumpkin_plugin_java_packets_clientbound_packet_t argument0{};');
@@ -1148,27 +1155,8 @@ describe('WIT-derived Pumpkin API facades', () => {
         expect(dispatch).not.toContain('PUMPKIN_PLUGIN_BEDROCK_PACKETS_CLIENTBOUND_PACKET_OTHER');
     });
 
-    it('fails generation for a selected Pumpkin method without a native type adapter', () => {
-        const root = fixture();
-        const playerPath = path.join(root, 'player.wit');
-        const source = fs.readFileSync(playerPath, 'utf8');
-        fs.writeFileSync(
-            playerPath,
-            source.replace('resource player {', 'resource player { unsupported: func(value: future-value);'),
-        );
-        const api = readWitPackage(root);
-
-        expect(() => generateWitSimpleMethodDispatch(api, '', ['player.player.unsupported'])).toThrow(
-            'No Static Hermes adapter is generated for pumpkin:plugin/player@0.1.0#player.unsupported: unsupported WIT input or result type',
-        );
-    });
-
     it('generates event registration adapters from their WIT enum definitions', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(
-            api,
-            'context.registerEvent(3, "server-tick-end-event", "normal", true)',
-        );
+        const dispatch = methodDispatch(fixture(), ['context.context.register-event']);
 
         expect(dispatch).toContain('pumpkin_plugin_context_method_context_register_event');
         expect(dispatch).toContain('PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_SERVER_TICK_END_EVENT');
@@ -1176,8 +1164,7 @@ describe('WIT-derived Pumpkin API facades', () => {
     });
 
     it('generates string-returning resource methods with owned WIT string cleanup', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(api);
+        const dispatch = methodDispatch(fixture());
 
         expect(dispatch).toContain('"getDimension"');
         expect(dispatch).toContain('pumpkin_plugin_world_method_world_get_dimension');
@@ -1187,12 +1174,26 @@ describe('WIT-derived Pumpkin API facades', () => {
         expect(dispatch).toContain('return jsString(rt, text);');
     });
 
-    it('generates tuple and resource return adapters only for methods used by the plugin', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(
-            api,
-            'player.getPosition() player.getWorld() player.getId() player.asJava() player.sendSystemMessage(component, false) sender.hasPermission(server, "x") world.getWorldBorder() border.getCenterX() border.getCenterZ() border.getSize() server.getAllPlayers() server.getPlayerByName("Alex") world.getBlockStateId({x: 1, y: 2, z: 3}) world.getBiome({x: 1, y: 2, z: 3}) world.getGameRule("natural-health-regeneration") world.getChunk(1, 2) java.sendCustomPayload("channel", bytes)',
-        );
+    it('generates tuple and resource return adapters only for the selected methods', () => {
+        const dispatch = methodDispatch(fixture(), [
+            'player.player.get-position',
+            'player.player.get-world',
+            'player.player.get-id',
+            'player.player.as-java',
+            'player.player.send-system-message',
+            'command.command-sender.has-permission',
+            'world.world.get-world-border',
+            'world.world-border.get-center-x',
+            'world.world-border.get-center-z',
+            'world.world-border.get-size',
+            'server.server.get-all-players',
+            'server.server.get-player-by-name',
+            'world.world.get-block-state-id',
+            'world.world.get-biome',
+            'world.world.get-game-rule',
+            'world.world.get-chunk',
+            'player.java-player.send-custom-payload',
+        ]);
 
         expect(dispatch).toContain('pumpkin_plugin_player_method_player_get_position');
         expect(dispatch).toContain('result.f0');
@@ -1221,20 +1222,8 @@ describe('WIT-derived Pumpkin API facades', () => {
         expect(dispatch).not.toContain('getPlayerCount');
     });
 
-    it('keeps only scalar methods referenced by the plugin bundle', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(
-            api,
-            'server.getMspt(); class Server { getPlayerCount(...args) {} } __resourceApi("server")["getPlayerCount"]()',
-        );
-
-        expect(dispatch).toContain('getMspt');
-        expect(dispatch).not.toContain('getPlayerCount');
-    });
-
-    it('uses typed method identities when available to avoid same-name false positives', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(api, '', ['server.server.get-mspt']);
+    it('generates adapters only for the selected methods', () => {
+        const dispatch = methodDispatch(fixture(), ['server.server.get-mspt']);
 
         expect(dispatch).toContain('getMspt');
         expect(dispatch).not.toContain('getPlayerCount');
@@ -1242,9 +1231,7 @@ describe('WIT-derived Pumpkin API facades', () => {
     });
 
     it('converts enum fields in returned records to their WIT names', () => {
-        const api = readWitPackage(fixture());
-
-        const dispatch = generateWitSimpleMethodDispatch(api, '', ['world.get-block-state']);
+        const dispatch = methodDispatch(fixture(), ['world.get-block-state']);
 
         expect(dispatch).toContain('case PUMPKIN_PLUGIN_WORLD_PISTON_BEHAVIOR_NORMAL');
         expect(dispatch).toContain('jsString(rt, "normal")');
@@ -1256,8 +1243,7 @@ describe('WIT-derived Pumpkin API facades', () => {
     });
 
     it('uses WIT C signatures and frees only allocated result values', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(api, '', [
+        const dispatch = methodDispatch(fixture(), [
             'server.server.get-all-players',
             'server.server.get-player-by-name',
             'uuid.to-string',
@@ -1272,15 +1258,13 @@ describe('WIT-derived Pumpkin API facades', () => {
     });
 
     it('escapes C++ keywords in generated WIT record member access', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(api, '', ['permission.permission-registry.register']);
+        const dispatch = methodDispatch(fixture(), ['permission.permission-registry.register']);
 
         expect(dispatch).toContain('argument0.default_ = argument0Default;');
     });
 
     it('uses the declaring interface namespace for lists of named Pumpkin WIT records', () => {
-        const api = readWitPackage(fixture());
-        const dispatch = generateWitSimpleMethodDispatch(api, '', ['permission.permission-registry.register']);
+        const dispatch = methodDispatch(fixture(), ['permission.permission-registry.register']);
 
         expect(dispatch).toContain('pumpkin_plugin_permission_list_permission_child_t argument0Children');
     });
@@ -1289,16 +1273,17 @@ describe('WIT-derived Pumpkin API facades', () => {
 describe('WASI adapter planning', () => {
     it('enables WIT features only for selected gated operations', () => {
         const root = wasiSocketFixture();
+        const imports = ['wasi:sockets/instance-network@0.2.3'];
 
-        expect(wasiFeaturesForMethods(root, [])).toEqual([]);
-        expect(wasiFeaturesForMethods(root, ['wasi:sockets/network@0.2.3#network-error-code'])).toEqual([
-            'network-error-code',
-        ]);
+        expect(wasiDispatch(root, imports, []).analysis.wasiFeatures).toEqual([]);
+        expect(
+            wasiDispatch(root, imports, ['wasi:sockets/network@0.2.3#network-error-code']).analysis.wasiFeatures,
+        ).toEqual(['network-error-code']);
     });
 
     it('plans every resource constructor and static function', () => {
         const root = wasiResourceOperationsFixture();
-        const { interfaces } = readWasiWitImports(root);
+        const imports = ['wasi:test/runtime@0.2.3'];
         const operationIds = [
             'wasi:test/runtime@0.2.3#handle.constructor',
             'wasi:test/runtime@0.2.3#handle.value',
@@ -1306,14 +1291,9 @@ describe('WASI adapter planning', () => {
             'wasi:test/runtime@0.2.3#handle.release',
         ];
 
-        expect(planWasiAdapterDispatch(interfaces, interfaces).map(({ operationId }) => operationId)).toEqual(
-            operationIds,
-        );
-        expect(
-            planWasiAdapterDispatch(interfaces, interfaces, operationIds).map(({ operationId }) => operationId),
-        ).toEqual(operationIds);
-
-        const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, operationIds);
+        expect(wasiDispatch(root, imports).plan).toEqual(operationIds);
+        const { plan, dispatch } = wasiDispatch(root, imports, operationIds);
+        expect(plan).toEqual(operationIds);
         expect(dispatch).toContain('wasi_test_runtime_constructor_handle');
         expect(dispatch).toContain('wasi_test_runtime_static_handle_create');
         expect(dispatch).toContain('wasi_test_runtime_static_handle_release');
@@ -1321,10 +1301,10 @@ describe('WASI adapter planning', () => {
 
     it('exposes WASI resource constructors and static functions through the generated facade', async () => {
         const root = wasiResourceOperationsFixture();
-        const { interfaces } = readWasiWitImports(root);
-        const apiInterface = interfaces.find((value) => value.name === 'runtime');
+        const { analysis } = wasiDispatch(root, ['wasi:test/runtime@0.2.3']);
+        const apiInterface = analysis.resolvedWasiInterfaces.find((value) => value.name === 'runtime');
         const modulePath = path.join(root, 'runtime-facade.mjs');
-        fs.writeFileSync(modulePath, generateWasiEsmFacade(apiInterface));
+        fs.writeFileSync(modulePath, emitWasiFacade(apiInterface));
         const previousApi = globalThis.__pumpkinWasiTestRuntime;
         globalThis.__pumpkinWasiTestRuntime = {
             handle: {
@@ -1347,33 +1327,29 @@ describe('WASI adapter planning', () => {
     });
 
     it('plans only the functions and resource methods used by the plugin', () => {
-        const root = wasiSocketFixture();
-        const { interfaces } = readWasiWitImports(root, ['wasi:sockets/instance-network@0.2.3']);
-
-        const plan = planWasiAdapterDispatch(interfaces, interfaces, [
+        const usedMethods = [
             'wasi:sockets/instance-network@0.2.3#instance-network',
             'wasi:sockets/network@0.2.3#network.get-network-id',
-        ]);
+        ];
 
-        expect(plan.map(({ operationId }) => operationId)).toEqual([
-            'wasi:sockets/instance-network@0.2.3#instance-network',
-            'wasi:sockets/network@0.2.3#network.get-network-id',
-        ]);
+        const { plan, dispatch } = wasiDispatch(
+            wasiSocketFixture(),
+            ['wasi:sockets/instance-network@0.2.3'],
+            usedMethods,
+        );
 
-        const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, [
-            'wasi:sockets/instance-network@0.2.3#instance-network',
-            'wasi:sockets/network@0.2.3#network.get-network-id',
-        ]);
+        expect(plan).toEqual(usedMethods);
         expect(dispatch).toContain('wasi_sockets_network_network_drop_own');
         expect(dispatch).not.toContain('wasi_sockets_network_unused_drop_own');
     });
 
     it('rejects a used operation that is absent from the imported WIT interfaces', () => {
-        const root = wasiSocketFixture();
-        const { interfaces } = readWasiWitImports(root, ['wasi:sockets/instance-network@0.2.3']);
-
         expect(() =>
-            planWasiAdapterDispatch(interfaces, interfaces, ['wasi:sockets/network@0.2.3#missing-operation']),
+            wasiDispatch(
+                wasiSocketFixture(),
+                ['wasi:sockets/instance-network@0.2.3'],
+                ['wasi:sockets/network@0.2.3#missing-operation'],
+            ),
         ).toThrow(
             /WASI operation used by the plugin is not declared in WIT: wasi:sockets\/network@0\.2\.3#missing-operation/,
         );
@@ -1381,53 +1357,40 @@ describe('WASI adapter planning', () => {
 
     it('plans WASI operations whose result contains tuples and byte lists', () => {
         const root = wasiFilesystemFixture();
-        const { interfaces } = readWasiWitImports(root, ['wasi:filesystem/types@0.2.3', 'wasi:http/types@0.2.3']);
+        const imports = ['wasi:filesystem/types@0.2.3', 'wasi:http/types@0.2.3'];
         const usedMethods = ['wasi:filesystem/types@0.2.3#descriptor.read'];
 
-        const allOperations = interfaces.flatMap((apiInterface) => [
-            ...apiInterface.functions.map((operation) => `${apiInterface.specifier}#${operation.name}`),
-            ...apiInterface.resources.flatMap((resource) =>
-                resource.functions
-                    .filter((operation) => !operation.isStatic && operation.name !== 'constructor')
-                    .map((operation) => `${apiInterface.specifier}#${resource.name}.${operation.name}`),
-            ),
+        expect(wasiDispatch(root, imports).plan).toEqual([
+            'wasi:filesystem/types@0.2.3#descriptor.read',
+            'wasi:filesystem/types@0.2.3#descriptor.stat-at',
         ]);
-        expect(planWasiAdapterDispatch(interfaces, interfaces).map(({ operationId }) => operationId)).toEqual(
-            allOperations,
-        );
-        expect(
-            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId),
-        ).toEqual(usedMethods);
+        expect(wasiDispatch(root, imports, usedMethods).plan).toEqual(usedMethods);
     });
 
     it('plans preopen results that pair resource handles with paths', () => {
-        const root = wasiFilesystemPreopensFixture();
-        const { interfaces } = readWasiWitImports(root, ['wasi:filesystem/preopens@0.2.3']);
         const usedMethods = ['wasi:filesystem/preopens@0.2.3#get-directories'];
 
         expect(
-            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId),
+            wasiDispatch(wasiFilesystemPreopensFixture(), ['wasi:filesystem/preopens@0.2.3'], usedMethods).plan,
         ).toEqual(usedMethods);
     });
 
     it('resolves nested records from a different WASI package', () => {
-        const root = wasiFilesystemFixture();
-        const { interfaces } = readWasiWitImports(root, ['wasi:filesystem/types@0.2.3', 'wasi:http/types@0.2.3']);
         const usedMethods = ['wasi:filesystem/types@0.2.3#descriptor.stat-at'];
 
-        expect(
-            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId),
-        ).toEqual(usedMethods);
+        const { plan, dispatch } = wasiDispatch(
+            wasiFilesystemFixture(),
+            ['wasi:filesystem/types@0.2.3', 'wasi:http/types@0.2.3'],
+            usedMethods,
+        );
 
-        const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, usedMethods);
+        expect(plan).toEqual(usedMethods);
         expect(dispatch).toContain('WASI_FILESYSTEM_TYPES_PATH_FLAGS_SYMLINK_FOLLOW');
         expect(dispatch).toContain('dataModificationTimestamp');
         expect(dispatch).toContain('result.data_modification_timestamp.val.seconds');
     });
 
     it('plans stream and pollable operations from their WIT declarations', () => {
-        const root = wasiHttpStreamFixture();
-        const { interfaces } = readWasiWitImports(root, ['wasi:http/types@0.2.3', 'wasi:io/streams@0.2.3']);
         const usedMethods = [
             'wasi:http/types@0.2.3#fields.set',
             'wasi:http/types@0.2.3#outgoing-request.set-method',
@@ -1440,11 +1403,13 @@ describe('WASI adapter planning', () => {
             'wasi:io/poll@0.2.3#pollable.block',
         ];
 
-        expect(
-            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId),
-        ).toEqual(usedMethods);
+        const { plan, dispatch } = wasiDispatch(
+            wasiHttpStreamFixture(),
+            ['wasi:http/types@0.2.3', 'wasi:io/streams@0.2.3'],
+            usedMethods,
+        );
 
-        const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, usedMethods);
+        expect(plan).toEqual(usedMethods);
         expect(dispatch).toContain('WASI_HTTP_TYPES_METHOD_OTHER');
         expect(dispatch).toContain('argument0.val.other');
         expect(dispatch).toContain('callSucceeded');
@@ -1458,8 +1423,6 @@ describe('WASI adapter planning', () => {
     });
 
     it('uses bindgen C names for resource aliases, borrowed-resource lists, and acronym types', () => {
-        const root = wasiHttpStreamFixture();
-        const { interfaces } = readWasiWitImports(root, ['wasi:http/types@0.2.3', 'wasi:io/poll@0.2.3']);
         const usedMethods = [
             'wasi:http/types@0.2.3#echo-trailers',
             'wasi:http/types@0.2.3#accept-payload',
@@ -1468,7 +1431,11 @@ describe('WASI adapter planning', () => {
             'wasi:io/poll@0.2.3#poll',
         ];
 
-        const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, usedMethods);
+        const { dispatch } = wasiDispatch(
+            wasiHttpStreamFixture(),
+            ['wasi:http/types@0.2.3', 'wasi:io/poll@0.2.3'],
+            usedMethods,
+        );
 
         expect(dispatch).toContain('wasi_http_types_own_trailers_t argument0');
         expect(dispatch).toContain('wasi_http_types_own_trailers_t result{};');
@@ -1484,7 +1451,7 @@ describe('WASI adapter planning', () => {
 
     it('plans and converts TCP socket addresses and UDP datagram records', () => {
         const root = wasiSocketAddressFixture();
-        const { interfaces } = readWasiWitImports(root);
+        const imports = ['wasi:sockets/tcp@0.2.3', 'wasi:sockets/udp@0.2.3'];
         const usedMethods = [
             'wasi:sockets/tcp@0.2.3#tcp-socket.start-bind',
             'wasi:sockets/tcp@0.2.3#tcp-socket.start-connect',
@@ -1496,22 +1463,9 @@ describe('WASI adapter planning', () => {
             'wasi:sockets/udp@0.2.3#outgoing-datagram-stream.send',
         ];
 
-        const allOperations = interfaces.flatMap((apiInterface) => [
-            ...apiInterface.functions.map((operation) => `${apiInterface.specifier}#${operation.name}`),
-            ...apiInterface.resources.flatMap((resource) =>
-                resource.functions
-                    .filter((operation) => !operation.isStatic && operation.name !== 'constructor')
-                    .map((operation) => `${apiInterface.specifier}#${resource.name}.${operation.name}`),
-            ),
-        ]);
-        expect(planWasiAdapterDispatch(interfaces, interfaces).map(({ operationId }) => operationId)).toEqual(
-            allOperations,
-        );
-        expect(
-            planWasiAdapterDispatch(interfaces, interfaces, usedMethods).map(({ operationId }) => operationId),
-        ).toEqual(usedMethods);
-
-        const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, usedMethods);
+        expect(wasiDispatch(root, imports).plan).toEqual(usedMethods);
+        const { plan, dispatch } = wasiDispatch(root, imports, usedMethods);
+        expect(plan).toEqual(usedMethods);
         expect(dispatch).toContain('wasi_sockets_network_borrow_network_t argument0');
         expect(dispatch).toContain('WASI_SOCKETS_NETWORK_IP_SOCKET_ADDRESS_IPV4');
         expect(dispatch).toContain('static_cast<wasi_sockets_udp_outgoing_datagram_t *>');
@@ -1523,13 +1477,11 @@ describe('WASI adapter planning', () => {
 
     it('resolves a renamed resource from a WASI dependency in an unused operation', () => {
         const root = wasiHttpStreamFixture();
-        const { interfaces } = readWasiWitImports(root, ['wasi:http/types@0.2.3']);
+        const imports = ['wasi:http/types@0.2.3'];
         const operationId = 'wasi:http/types@0.2.3#http-error-code';
 
-        expect(planWasiAdapterDispatch(interfaces, interfaces).map(({ operationId: planned }) => planned)).toContain(
-            operationId,
-        );
-        const dispatch = generateWasiAdapterDispatch(interfaces, interfaces, [operationId]);
+        expect(wasiDispatch(root, imports).plan).toContain(operationId);
+        const { dispatch } = wasiDispatch(root, imports, [operationId]);
         expect(dispatch).toContain('getWitResourceState(rt, args[0], "error", "error", "wasi:io")');
         expect(dispatch.indexOf('const bool hasResult = wasi_http_types_http_error_code')).toBeLessThan(
             dispatch.indexOf('switch (result)'),

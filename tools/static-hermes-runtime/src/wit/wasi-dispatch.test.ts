@@ -4,9 +4,10 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect, it } from 'vitest';
-import type { WitAnalysis } from './analysis.ts';
+import { planApiAdapterOperations, type WitAnalysis } from './analysis.ts';
 import { generateWitOutputs } from './generation.ts';
 import { generateWitApiFunctionForResolvedOperation } from './native-adapters.ts';
+import { generatePumpkinMethodDispatch } from './pumpkin-dispatch.ts';
 import type {
     ResolvedWitType,
     WitApiInterface,
@@ -453,18 +454,19 @@ it('recursively frees variant payload records without standalone wit-bindgen cle
         'void wasi_http_types_error_code_free(wasi_http_types_error_code_t *value);',
         'void wasi_http_types_option_field_size_payload_free(wasi_http_types_option_field_size_payload_t *value);',
     ].join('\n');
-    const generated = generateWitOutputs({
-        analysis,
-        apiPackage,
-        wasiInterfaces: [apiInterface],
-        pluginHeader,
-        runtimeTemplate: [
-            '/* <PUMPKIN_WASI_RUNTIME> */',
-            '/* <PUMPKIN_WASI_INITIALIZATION> */',
-            '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
-            '/* <PUMPKIN_WIT_EVENT_DISPATCH> */',
-        ].join('\n'),
-    }).runtimeSource;
+    const markers = [
+        '/* <PUMPKIN_WASI_RUNTIME> */',
+        '/* <PUMPKIN_WASI_INITIALIZATION> */',
+        '/* <PUMPKIN_WIT_SIMPLE_METHODS> */',
+        '/* <PUMPKIN_WIT_EVENT_DISPATCH> */',
+        '/* <PUMPKIN_WIT_EVENT_RESULT> */',
+    ];
+    const input = { analysis, apiPackage, wasiInterfaces: [apiInterface], pluginHeader };
+    const generated = generateWitOutputs({ ...input, runtimeTemplate: markers.join('\n') }).runtimeSource;
+    // A template without the event-result marker would silently drop blocking event results.
+    expect(() => generateWitOutputs({ ...input, runtimeTemplate: markers.slice(0, -1).join('\n') })).toThrow(
+        'PUMPKIN_WIT_EVENT_RESULT',
+    );
 
     expect(generated).toContain('wasi_http_types_error_code_free(&argument0);');
     expect(generated).toContain('plugin_option_string_free(&argument0DNSErrorRcode);');
@@ -474,4 +476,126 @@ it('recursively frees variant payload records without standalone wit-bindgen cle
     expect(generated).not.toContain('wasi_http_types_dns_error_payload_free');
     expect(generated).not.toContain('wasi_http_types_tls_alert_received_payload_free');
     expect(generated).not.toContain('wasi_http_types_field_size_payload_free');
+});
+
+it('drops Pumpkin resources returned inside lists and options', () => {
+    const playerType: ResolvedWitType = {
+        kind: 'resource',
+        name: 'player',
+        interfaceName: 'player',
+        packageName: 'pumpkin:plugin',
+        interfaceSpecifier: 'pumpkin:plugin/player@0.1.0',
+        interfaceDependencies: [],
+    };
+    const pumpkinInterface = (
+        name: string,
+        details: Pick<WitApiInterface, 'functions' | 'resources'>,
+    ): WitApiInterface => ({
+        packageName: 'pumpkin:plugin',
+        name,
+        specifier: `pumpkin:plugin/${name}@0.1.0`,
+        records: [],
+        variants: [],
+        enums: [],
+        flags: [],
+        types: [],
+        dependencies: [],
+        ...details,
+    });
+    const apiPackage: WitApiPackage = {
+        packageName: 'pumpkin:plugin',
+        version: '0.1.0',
+        interfaces: [
+            pumpkinInterface('server', {
+                resources: [],
+                functions: [
+                    {
+                        name: 'get-all-players',
+                        isStatic: false,
+                        parameters: [],
+                        result: 'list<player>',
+                        resolvedResult: { kind: 'list', item: playerType },
+                    },
+                    {
+                        name: 'get-player-by-name',
+                        isStatic: false,
+                        parameters: [],
+                        result: 'option<player>',
+                        resolvedResult: { kind: 'option', item: playerType },
+                    },
+                ],
+            }),
+            pumpkinInterface('player', { functions: [], resources: [{ name: 'player', functions: [] }] }),
+        ],
+    };
+    const analysis: WitAnalysis = {
+        apiInterfaces: apiPackage.interfaces.map(({ specifier }) => specifier),
+        apiMethods: ['server.get-all-players', 'server.get-player-by-name'],
+        apiAdapters: planApiAdapterOperations(apiPackage, ['server.get-all-players', 'server.get-player-by-name']),
+        wasiImports: [],
+        wasiInterfaces: [],
+        resolvedWasiInterfaces: [],
+        wasiMethods: [],
+        wasiFeatures: [],
+        wasiAdapters: [],
+        eventFields: [],
+    };
+    const drop = extractCppFunction(
+        generatePumpkinMethodDispatch(apiPackage, analysis),
+        'void generatedWitDropResource(',
+    );
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'static-hermes-wit-drop-'));
+    temporaryDirectories.push(root);
+    compileAndRunCpp(
+        root,
+        `
+#include <cstdint>
+#include <stdexcept>
+#include <string>
+
+struct pumpkin_plugin_player_own_player_t { int32_t __handle; };
+int32_t droppedPlayer = 0;
+void pumpkin_plugin_player_player_drop_own(pumpkin_plugin_player_own_player_t player) { droppedPlayer = player.__handle; }
+
+${drop}
+
+int main() {
+    generatedWitDropResource("player", "player", 7);
+    if (droppedPlayer != 7) return 1;
+    try {
+        generatedWitDropResource("player", "missing", 8);
+    } catch (const std::exception &) {
+        return 0;
+    }
+    return 2;
+}
+`,
+    );
+}, 20_000);
+
+it('reports a failed result with no error payload through the error marker', () => {
+    const apiInterface: WitApiInterface = {
+        packageName: 'pumpkin:plugin',
+        name: 'ipc',
+        specifier: 'pumpkin:plugin/ipc@0.1.0',
+        functions: [],
+        resources: [],
+        records: [],
+        variants: [],
+        enums: [],
+        flags: [],
+        types: [],
+    };
+    const generated = generateWitApiFunctionForResolvedOperation({
+        apiPackage: { packageName: 'pumpkin:plugin', version: '0.1.0', interfaces: [apiInterface] },
+        apiInterface,
+        operation: { name: 'send', isStatic: false, parameters: [], result: 'result<u32>' },
+        parameters: [],
+        resultType: { kind: 'result', ok: { kind: 'primitive', name: 'u32' }, error: { kind: 'unit' } },
+    });
+
+    if (generated === undefined) throw new Error('Expected an adapter for the supported WIT operation');
+    const failure = generated.slice(generated.indexOf('if (!callSucceeded)'));
+    expect(failure).toContain('"__staticHermesWitError"');
+    expect(failure).not.toContain('"tag"');
 });

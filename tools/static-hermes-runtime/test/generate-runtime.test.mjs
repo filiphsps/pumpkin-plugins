@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const packageRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
-const generator = path.join(packageRoot, 'test/oracles/generate-runtime.mjs');
+const cli = path.join(packageRoot, 'dist/cli.js');
 const fixtures = path.join(packageRoot, 'test/fixtures');
 const directories = [];
 
@@ -17,19 +17,19 @@ function fixture() {
     fs.mkdirSync(wit);
     fs.writeFileSync(
         path.join(wit, 'plugin.wit'),
-        'package pumpkin:plugin@0.1.0;\nworld plugin {\n  import %world;\n  import context;\n  import server;\n  import player;\n  import command;\n  import text;\n  import common;\n  import event;\n  import wasi:filesystem/preopens@0.2.3;\n  import wasi:http/types@0.2.3;\n  import wasi:http/outgoing-handler@0.2.3;\n  import wasi:io/streams@0.2.3;\n  import wasi:clocks/monotonic-clock@0.2.3;\n  export init: func();\n}\n',
+        'package pumpkin:plugin@0.1.0;\nworld plugin {\n  import %world;\n  import context;\n  import server;\n  import player;\n  import command;\n  import text;\n  import common;\n  import game-rules;\n  import event;\n  import wasi:filesystem/preopens@0.2.3;\n  import wasi:http/types@0.2.3;\n  import wasi:http/outgoing-handler@0.2.3;\n  import wasi:io/streams@0.2.3;\n  import wasi:clocks/monotonic-clock@0.2.3;\n  export init: func();\n}\n',
     );
     fs.writeFileSync(
         path.join(wit, 'world.wit'),
-        'interface %world { resource world { get-min-y: func() -> s32; } }\n',
+        'interface %world { resource %world { get-min-y: func() -> s32; } }\n',
     );
     fs.writeFileSync(
         path.join(wit, 'context.wit'),
-        'interface context { resource context { get-server: func() -> server; } }\n',
+        'interface context { use server.{server}; resource context { get-server: func() -> server; } }\n',
     );
     fs.writeFileSync(
         path.join(wit, 'server.wit'),
-        'interface server { use world.{world}; resource server { get-mspt: func() -> f64; get-all-worlds: func() -> list<world>; } }\n',
+        'interface server { use %world.{%world}; resource server { get-mspt: func() -> f64; get-all-worlds: func() -> list<%world>; } }\n',
     );
     fs.writeFileSync(
         path.join(wit, 'player.wit'),
@@ -42,11 +42,12 @@ function fixture() {
     );
     fs.writeFileSync(
         path.join(wit, 'common.wit'),
-        'interface common { record block-pos { x: s32, y: s32, z: s32 } }\n',
+        'interface common { record block-pos { x: s32, y: s32, z: s32 } enum named-color { red } }\n',
     );
+    fs.writeFileSync(path.join(wit, 'game-rules.wit'), 'interface game-rules { enum game-rule { keep-inventory } }\n');
     fs.writeFileSync(
         path.join(wit, 'event.wit'),
-        'interface event { use common.{block-pos}; use player.{player}; record player-custom-payload-event-data { player: player, channel: string, data: list<u8>, unused: string } record server-tick-end-event-data { tick: s32, duration-nanos: s64 } variant event { player-custom-payload-event(player-custom-payload-event-data), server-tick-end-event(server-tick-end-event-data), unused-event(string) } }\n',
+        'interface event { enum event-type { player-custom-payload-event } enum event-priority { normal } record player-custom-payload-event-data { channel: string, data: list<u8> } variant event { player-custom-payload-event(player-custom-payload-event-data) } }\n',
     );
     const wasiDefinitions = {
         'filesystem/preopens.wit':
@@ -66,11 +67,22 @@ function fixture() {
         fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file, source);
     }
+    const header = path.join(root, 'plugin.h');
+    fs.writeFileSync(
+        header,
+        [
+            '#define PUMPKIN_PLUGIN_EVENT_EVENT_TYPE_PLAYER_CUSTOM_PAYLOAD_EVENT 0',
+            '#define PUMPKIN_PLUGIN_EVENT_EVENT_PRIORITY_NORMAL 0',
+            '#define PUMPKIN_PLUGIN_GAME_RULES_GAME_RULE_KEEP_INVENTORY 0',
+            '#define PUMPKIN_PLUGIN_COMMON_NAMED_COLOR_RED 0',
+        ].join('\n'),
+    );
     const template = path.join(packageRoot, 'src/component/templates/runtime-shim.template');
-    return { root, wit, template, output: path.join(root, 'runtime.cpp'), bundle: path.join(root, 'bundle.js') };
+    const outDir = path.join(root, 'out');
+    return { root, wit, template, header, outDir, output: path.join(outDir, 'runtime.cpp') };
 }
 
-function addUnsupportedWasiRuntime(witDir) {
+function addUnreadableWasiRuntime(witDir) {
     const pluginPath = path.join(witDir, 'plugin.wit');
     const pluginSource = fs.readFileSync(pluginPath, 'utf8');
     fs.writeFileSync(
@@ -85,29 +97,31 @@ function addUnsupportedWasiRuntime(witDir) {
     );
     fs.writeFileSync(
         path.join(dependencyDir, 'runtime.wit'),
-        'package wasi:test@0.2.3; interface runtime { unsupported: func(value: future-value); }\n',
+        'package wasi:test@0.2.3; interface runtime { unsupported: func(value: future<u32>); }\n',
     );
 }
 
-function generate({ wit, template, output, wasiImports, wasiMethods, bundle, bundleSource = 'server.getMspt();' }) {
-    fs.writeFileSync(bundle, bundleSource);
+/** Run the compiled `codegen generate` command for the fixture and its WASI selection. */
+function generate({ wit, template, header, outDir, wasiImports, wasiMethods }) {
     childProcess.execFileSync(
         process.execPath,
         [
-            generator,
+            cli,
+            'codegen',
+            'generate',
             '--wit',
             wit,
-            '--bundle',
-            bundle,
             '--template',
             template,
+            '--header',
+            header,
+            '--out-dir',
+            outDir,
             '--wasi-imports',
             JSON.stringify(wasiImports),
             ...(wasiMethods === undefined ? [] : ['--wasi-methods', JSON.stringify(wasiMethods)]),
-            '--output',
-            output,
         ],
-        { stdio: 'pipe' },
+        { cwd: packageRoot, stdio: 'pipe' },
     );
 }
 
@@ -147,24 +161,11 @@ afterEach(() => {
     for (const directory of directories.splice(0)) fs.rmSync(directory, { recursive: true, force: true });
 });
 
-describe('generate-runtime', () => {
-    it('does not generate unsupported WASI operations when the bundle does not use them', () => {
+describe('codegen generate', () => {
+    it('fails without writing runtime source when the WIT uses an async future type', () => {
         const f = fixture();
-        addUnsupportedWasiRuntime(f.wit);
+        addUnreadableWasiRuntime(f.wit);
         f.wasiImports = [];
-        f.wasiMethods = [];
-
-        generate(f);
-
-        const output = fs.readFileSync(f.output, 'utf8');
-        expect(output).not.toContain('wasi_test_runtime_unsupported');
-    });
-
-    it('rejects selected WASI operations that have no type adapter', () => {
-        const f = fixture();
-        addUnsupportedWasiRuntime(f.wit);
-        f.wasiImports = ['wasi:test/runtime@0.2.3'];
-        f.wasiMethods = ['wasi:test/runtime@0.2.3#unsupported'];
 
         let failure;
         try {
@@ -174,9 +175,8 @@ describe('generate-runtime', () => {
         }
 
         expect(failure).toBeDefined();
-        expect(failure.stderr?.toString()).toContain(
-            'No Static Hermes JSI adapter is generated for wasi:test/runtime@0.2.3#unsupported',
-        );
+        expect(failure.stderr?.toString()).toContain('Unsupported WIT JSON type kind "future"');
+        expect(fs.existsSync(f.output)).toBe(false);
     });
 
     it('passes command IDs and owned resources to the plugin command callback', () => {
@@ -235,10 +235,9 @@ describe('generate-runtime', () => {
         });
     }, 15_000);
 
-    it('generates event payloads from imported WIT and plugin event usage', () => {
+    it('generates string and byte-list event payloads from imported WIT', () => {
         const f = fixture();
         f.wasiImports = [];
-        f.bundleSource = ['registerEvent("player-custom-payload-event");', 'event.channel;', 'event.data;'].join('\n');
 
         generate(f);
 
@@ -260,12 +259,10 @@ describe('generate-runtime', () => {
         expect(output).toContain('generatedMonotonicClockApi.setProperty');
         expect(output).toContain('wasi_clocks_monotonic_clock_now()');
         expect(output).toContain('__pumpkinWasiClocksMonotonicClock');
-        expect(output).not.toContain('installWasiClocksMonotonicClock');
         expect(output).not.toContain('__pumpkinWasiHttpTypes');
-        expect(output).not.toContain('installWasiHttpTypes');
     });
 
-    it('generates an adapter for a used WIT method missing from resolved bundle imports', () => {
+    it('generates an adapter for a selected WASI method outside the selected imports', () => {
         const f = fixture();
         f.wasiImports = ['wasi:http/types@0.2.3', 'wasi:http/outgoing-handler@0.2.3'];
         f.wasiMethods = ['wasi:clocks/monotonic-clock@0.2.3#now'];
@@ -292,8 +289,6 @@ describe('generate-runtime', () => {
         expect(output).toContain('wasi_http_types_constructor_outgoing_request');
         expect(output).toContain('wasi_http_types_method_future_incoming_response_get');
         expect(output).toContain('__pumpkinWasiHttpTypes');
-        expect(output).not.toContain('WasiHttpFutureObject');
-        expect(output).not.toContain('installWasiHttpTypes');
     });
 
     it('wraps a returned WASI resource handle as an owned host resource', () => {

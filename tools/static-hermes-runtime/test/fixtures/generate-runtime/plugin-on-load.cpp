@@ -19,22 +19,26 @@ void pumpkin_plugin_context_context_drop_own(pumpkin_plugin_context_own_context_
     contextDrops++;
 }
 
-enum class ResourceKind { Context };
 struct ResourceState {
-    ResourceKind kind;
     std::int32_t handle;
     bool owned;
+    std::string interfaceName;
+    std::string resourceName;
     void drop() {
         if (!owned) return;
         owned = false;
+        assert(interfaceName == "context" && resourceName == "context");
         pumpkin_plugin_context_context_drop_own({handle});
     }
 };
-class ContextObject : public HostObject {
+class WitResourceObject : public HostObject {
   public:
-    explicit ContextObject(std::shared_ptr<ResourceState>) {}
+    explicit WitResourceObject(std::shared_ptr<ResourceState>) {}
 };
-Object wrapResourceObject(Runtime &runtime, std::shared_ptr<ContextObject> context) {
+std::shared_ptr<WitResourceObject> makeWitResourceObject(std::shared_ptr<ResourceState> state) {
+    return std::make_shared<WitResourceObject>(std::move(state));
+}
+Object wrapResourceObject(Runtime &runtime, std::shared_ptr<WitResourceObject> context) {
     return Object::createFromHostObject(runtime, std::move(context));
 }
 void initializeRuntime() { throw std::runtime_error("bundle evaluation failed"); }

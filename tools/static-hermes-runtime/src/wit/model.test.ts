@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { parseWitToolsJson } from '../src/wit/model.ts';
+import { parseWitToolsJson } from './model.ts';
 
 const document = {
     worlds: [

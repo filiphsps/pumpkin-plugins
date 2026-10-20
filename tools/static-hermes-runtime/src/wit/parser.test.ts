@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { readInterfaceDeclarationOrder, readWitToolsDocument } from '../src/wit/parser.ts';
+import { readInterfaceDeclarationOrder, readWitToolsDocument } from './parser.ts';
 
 const directories: string[] = [];
 
