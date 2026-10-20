@@ -5,7 +5,7 @@ class StarterPlugin extends Plugin {
     metadata(): PluginMetadata {
         return {
             name: '__PLUGIN_NAME__',
-            version: '0.1.0',
+            version: __PLUGIN_VERSION__,
             authors: [],
             description: 'A Pumpkin plugin.',
             dependencies: [],

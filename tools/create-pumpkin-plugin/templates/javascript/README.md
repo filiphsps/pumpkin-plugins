@@ -6,9 +6,9 @@ changing the source language.
 Install the dependencies, check the plugin's types, then build its WebAssembly component:
 
 ```sh
-npm install
-npm run typecheck
-npm run build
+__PACKAGE_MANAGER__ install
+__PACKAGE_MANAGER__ run typecheck
+__PACKAGE_MANAGER__ run build
 ```
 
 The first `typecheck` fetches the Pumpkin WIT revision pinned by the API package, so Git and network
