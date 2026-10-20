@@ -19,7 +19,10 @@ permissions, resource ownership, and runtime limits.
 | Used methods, feature closure, event fields, and adapter plans | [`src/wit/analysis.ts`](../src/wit/analysis.ts) |
 | JavaScript facades and native adapter emission | [`src/wit/emitters.ts`](../src/wit/emitters.ts) |
 | Runtime shim and API enum generation | [`src/wit/generation.ts`](../src/wit/generation.ts) |
-| Hermes source checkout, patches, build profiles, cache, and artifacts | [`src/hermes/prepare.ts`](../src/hermes/prepare.ts) |
+| Hermes preparation stages | [`src/hermes/prepare.ts`](../src/hermes/prepare.ts) |
+| Hermes source pin and checkout | [`src/hermes/source.ts`](../src/hermes/source.ts) |
+| Hermes patch series | [`src/hermes/patch.ts`](../src/hermes/patch.ts) |
+| Hermes build profiles, cache, and artifacts | [`src/hermes/build.ts`](../src/hermes/build.ts) |
 | Component analysis, bindings, bytecode compilation, and linking | [`src/component/build.ts`](../src/component/build.ts) |
 
 ## Add or upgrade an interface

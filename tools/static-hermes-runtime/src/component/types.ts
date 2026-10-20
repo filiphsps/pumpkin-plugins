@@ -27,3 +27,9 @@ export interface ComponentBuildOptions {
     /** Consumer project directory used to find the nearest pnpm workspace root for runtime caches. */
     workspaceRoot?: string;
 }
+
+/** WIT world and operation selections that decide which adapters a component includes. */
+export type ComponentWitSelection = Pick<
+    ComponentBuildOptions,
+    'apiMethods' | 'eventTypes' | 'wasiImports' | 'wasiMethods' | 'wit'
+>;

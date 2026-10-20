@@ -22,7 +22,7 @@ const maximumStackSizeBytes = 0xffff_fff0;
  * @returns A promise that resolves after the component has been compiled and linked.
  * @throws {Error} If required toolchain setup, WIT analysis, compilation, or linking fails.
  */
-export async function buildStaticHermesComponent(options: ComponentBuildOptions): Promise<void> {
+export async function buildComponent(options: ComponentBuildOptions): Promise<void> {
     const environment = process.env;
     const runtimeVariant =
         options.runtimeVariant ?? (environment.STATIC_HERMES_ENABLE_LEAN_ARCHIVE === '0' ? 'full' : 'lean');

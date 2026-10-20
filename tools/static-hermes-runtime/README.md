@@ -10,9 +10,9 @@ marks that parser partial and unstable. The compiler links the bytecode with Her
 and generated Pumpkin/WASI bindings into a WebAssembly component. Static Hermes is the default
 engine, with QuickJS available as an alternative.
 
-Start with the [runtime documentation](docs/index.md). It links to the
-[benchmarking guide](../../docs/benchmarking.md); this README covers toolchain setup, build profiles,
-compiler and linker flags, and API coverage.
+Start with the [runtime documentation](docs/index.md). This README covers toolchain setup, build
+profiles, compiler and linker flags, and API coverage. The
+[benchmarking guide](../../docs/benchmarking.md) compares the engines.
 
 ## Prepare Hermes
 
@@ -38,23 +38,28 @@ The cache is reused while its source pin, patches, toolchain, and build settings
 input triggers a rebuild. Preparation refreshes the managed checkout when the source pin changes and
 rejects local Hermes source changes outside the managed patch set. Concurrent preparations lock the
 cache, source checkout, host build directory, and WASI build directory by resolved path, so separate
-workspaces that share any of those directories serialize.
+workspaces that share any of those directories serialize. Toolchain setup takes its own lock on
+`toolchain/` inside the cache and reuses valid cached tools without locking, so it does not wait for a
+Hermes build.
 
 Plugin builds prepare Hermes automatically when `engine` is omitted or set to `"static-hermes"`.
 Run the command above to prewarm Hermes or prepare it explicitly before a build. A full component
 build also resolves the pinned `wit-bindgen` and `wasm-tools` versions from
-`toolchain-versions.json`; it sets them up automatically. If `WASM_TOOLS` is unset and no valid cached
-binary is available, setup downloads the pinned `wasm-tools` release and replaces an invalid cache entry.
-A valid `WIT_BINDGEN` override,
-shared-cache binary, or `~/.cargo/bin/wit-bindgen` is reused. With no `WIT_BINDGEN` override and no
-cached or user-installed executable, setup installs `wit-bindgen` and needs Rust/Cargo (using the
-pinned Rust toolchain through `rustup` when available). An executable that reports the wrong pinned
-version fails setup. The files follow the
-[WASI SDK release pin schema](schemas/wasi-sdk-release-pin.schema.json),
-[upstream Git pin schema](schemas/upstream-git-pin.schema.json), and
-[toolchain versions schema](../../schemas/toolchain-versions.schema.json). The package also carries
-the WASI Preview 2 CMake toolchain adjustment required by Hermes. Optional paths and build settings are
-listed under [Build flags](#build-flags).
+`toolchain-versions.json` and sets them up automatically. If `WASM_TOOLS` is unset and no valid
+cached binary is available, setup downloads the platform archive pinned in `wasm-tools.lock.json`,
+checks its SHA-256 digest, and replaces an invalid cache entry. A valid `WIT_BINDGEN` override,
+shared-cache binary, or `~/.cargo/bin/wit-bindgen` is reused. Without a `WIT_BINDGEN` override, setup
+skips a `~/.cargo/bin/wit-bindgen` that reports another version. With no matching cached or
+user-installed executable, it installs the pinned `wit-bindgen` into the shared cache and needs
+Rust/Cargo (using the pinned Rust toolchain through `rustup` when available). A `WIT_BINDGEN` or
+`WASM_TOOLS` override that reports the wrong version fails setup.
+
+The WASI SDK, Hermes source, and toolchain version pins follow the
+[WASI SDK release pin schema](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/wasi-sdk-release-pin.schema.json),
+[upstream Git pin schema](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/upstream-git-pin.schema.json), and
+[toolchain versions schema](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/schemas/toolchain-versions.schema.json).
+The package also carries the WASI Preview 2 CMake toolchain adjustment required by Hermes. Optional
+paths and build settings are listed under [Build flags](#build-flags).
 
 The external-consumer CI check uses these tool versions:
 
@@ -91,9 +96,10 @@ Package consumers can import `buildStaticHermesComponent`, `prepareHermes`, and 
 runtime functions directly from `@pumpkin-plugins/static-hermes-runtime`. The `codegen analyze` and
 `codegen generate` commands take prepared WIT inputs and do not read a JavaScript bundle. Use
 `--api-methods` and `--wasi-methods` to select operation identifiers; when omitted, codegen includes
-all operations in the selected interfaces. `component build` accepts a JavaScript bundle by default;
-pass `--parse-ts` with a TypeScript bundle, or set `parseTypeScript: true` in
-`buildStaticHermesComponent`. Hermes marks TypeScript parser support partial and unstable. Set
+all operations in the selected interfaces. `--event-types` selects event variants the same way it
+does for `component build`, so codegen output matches a build's event selection. `component build`
+accepts a JavaScript bundle by default; pass `--parse-ts` with a TypeScript bundle, or set
+`parseTypeScript: true` in `buildStaticHermesComponent`. Hermes marks TypeScript parser support partial and unstable. Set
 `quietOutput: true` on `buildStaticHermesComponent` when a caller owns the console format; runtime
 stdout is suppressed, while command failures retain stderr diagnostics.
 
@@ -132,9 +138,8 @@ Static Hermes builds prepare the toolchain automatically when required.
 Production builds minify the JavaScript bundle, compile it to optimized Hermes bytecode with
 function names and debug information stripped, and compile the native WASI code with `-Oz`.
 Function/data sections allow unused code to be removed at link time. The linker strips symbols from
-the production component. For plugins built inside this repository, the shared build tool enforces
-a 5 MiB (5,242,880-byte) threshold. When external projects use the published package, it warns
-above that threshold but still writes the component.
+the production component. The shared build tool warns when the component is larger than 5 MiB
+(5,242,880 bytes) and fails the build instead when `PUMPKIN_PLUGINS_FAIL_ON_SIZE_LIMIT=1` is set.
 
 Development builds keep the JavaScript bundle readable and retain Hermes source locations and native
 line tables for backtraces. Native code remains size optimized. The specific compiler and linker
@@ -154,7 +159,7 @@ compilation, and WASI C/C++ compilation and linking.
 | `STATIC_HERMES_SOURCE_DIR` | Hermes checkout; defaults to `source/` under the cache root. |
 | `STATIC_HERMES_HOST_BUILD_DIR` | Host build directory; defaults to `build-host/` under the cache root. |
 | `STATIC_HERMES_WASI_BUILD_DIR` | Hades WASI build directory; defaults to `build-wasip2/` under the cache root. The malloc build uses a sibling directory with the `-malloc` suffix. |
-| `WIT_BINDGEN` | Optional `wit-bindgen` path override. The override, cached executable, and `~/.cargo/bin/wit-bindgen` must report the pinned `tools.wit-bindgen` version from `toolchain-versions.json`; a mismatch fails setup. If no executable exists, setup installs the pinned version. |
+| `WIT_BINDGEN` | Optional `wit-bindgen` path override. The override must report the pinned `tools.wit-bindgen` version from `toolchain-versions.json`; a mismatch fails setup. Without it, setup reuses a matching cached or `~/.cargo/bin/wit-bindgen` executable, or installs the pinned version into the shared cache. |
 | `WASM_TOOLS` | Optional `wasm-tools` path override for component builds and WIT analysis. It must report the pinned `tools.wasm-tools` version from `toolchain-versions.json`; otherwise setup reuses a valid cache or downloads and replaces an invalid cached executable. |
 
 ### Hermes configuration
@@ -178,6 +183,7 @@ compilation, and WASI C/C++ compilation and linking.
 | `HERMES_ALLOW_BOOST_CONTEXT=0` | Avoids Boost.Context, which is unavailable on this WASI target. |
 | `HERMESVM_GCKIND=HADES` | Default collector. With threads disabled on this wasm32 WASI target, Hades uses incremental collection. |
 | `HERMESVM_GCKIND=MALLOC` | Selects malloc-managed GC for WASI. Set `pumpkinPlugin.staticHermesGc` to `"malloc"` to choose it. |
+| `STATIC_HERMES_ENABLE_LEAN_ARCHIVE=0` | Links the full runtime profile instead of lean. In plugin builds it overrides `pumpkinPlugin.staticHermesRuntime`; `buildStaticHermesComponent` uses it only when `runtimeVariant` is omitted. |
 
 ### JavaScript-to-C compiler
 
@@ -210,6 +216,7 @@ components retain those line tables; the linker does not use `--strip-debug` or 
 | `-ffunction-sections -fdata-sections` | Separates code and data so unused sections can be removed. |
 | `-DSTATIC_HERMES` | Selects the Static Hermes implementation in the native JSI shim. |
 | `-mllvm -wasm-enable-sjlj` with `-lsetjmp` | Provides the setjmp/longjmp lowering Hermes uses for JavaScript exceptions. |
+| `-mllvm -wasm-use-legacy-eh=false` | Emits standard WebAssembly exception-handling instructions instead of the legacy ones. Every native compile and link step passes it, including the Hermes WASI library build. |
 | `-D_WASI_EMULATED_MMAN`, `-D_WASI_EMULATED_PROCESS_CLOCKS` | Enables wasi-libc emulation for the POSIX calls Hermes needs. |
 | `-lwasi-emulated-mman`, `-lwasi-emulated-process-clocks` | Links those wasi-libc emulation implementations. |
 | `-fwasm-exceptions` | Keeps C++ exceptions for error handling in the JSI shim. |
@@ -236,10 +243,12 @@ direct codegen can select operations with `--api-methods`, and omission includes
 operations. Event conversion keeps complete payload fields for statically registered event types;
 dynamic or unresolved registrations retain every event case and payload field.
 
-The native JSI shim implements part of the Pumpkin API: plugin lifecycle and metadata, command and
-task dispatch, event registration and dispatch, selected server/player/world methods, logging,
-scheduling, and Java custom payloads. Calls outside that supported subset are not available through
-Static Hermes.
+The runtime generator emits a JSI host function and a JavaScript facade for every operation in the
+pinned Pumpkin API WIT. A component includes the operations that source analysis selects, or all of
+them when the selection is unknown. If a selected operation uses a WIT type that has no adapter, the
+build fails and the error names the operation. Limits on the host side are documented separately;
+for example, the pinned Pumpkin host does not start custom AI goals, as the
+[runtime documentation](docs/index.md) explains.
 
 The generated Pumpkin API facades reject host calls during `on_unload`, except
 `scheduler.cancel-task`, which plugins need to stop scheduled callbacks. Cancel scheduled tasks and
@@ -256,8 +265,7 @@ omission includes all operations in the selected WASI imports. The imported inte
 [WASI guide](docs/wasi.md#capability-bundles). The build enables a
 feature-gated WIT operation when it is selected.
 
-Static Hermes development builds bypass the shared automatic Market update check. See the
-[WASI guide](docs/wasi.md) for supported imports and runtime limits.
+See the [WASI guide](docs/wasi.md) for supported imports and runtime limits.
 
 <!-- docs:begin reference -->
 <!-- Generated by pumpkin-plugins-docs from package, action, extension, and component docs metadata. Run `pnpm readme`. -->

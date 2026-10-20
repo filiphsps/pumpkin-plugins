@@ -3,27 +3,17 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Command, Option } from '@commander-js/extra-typings';
-import { buildStaticHermesComponent } from './component/build.ts';
-import type { ComponentBuildOptions } from './component/types.ts';
+import { analyzeComponentWit } from './component/analyze.ts';
+import { buildComponent } from './component/build.ts';
+import type { ComponentBuildOptions, ComponentWitSelection } from './component/types.ts';
 import { buildHermesArtifacts, patchHermesSource, prepareHermes, prepareHermesSource } from './hermes/prepare.ts';
 import { setupHermesToolchainEnvironment } from './hermes/toolchain-environment.ts';
-import { analyzeWitUsage } from './wit/analysis.ts';
 import { generateWitOutputs, writeWitGeneration } from './wit/generation.ts';
-import { readInterfaceDeclarationOrder, readPluginImportOrder, readWitToolsDocument } from './wit/parser.ts';
-import { resolvePluginApi, resolveWitDocument } from './wit/resolver.ts';
+import { readInterfaceDeclarationOrder, readPluginImportOrder } from './wit/parser.ts';
 import { resolveConsumerWorkspaceRoot } from './workspace-root.ts';
 
 /** WIT inputs and selections shared by the analyze and generate commands. */
-export interface CodegenSelectionOptions {
-    /** Optional Pumpkin API operation identifiers; omission includes every declared operation. */
-    apiMethods?: string[];
-    /** WASI interface specifiers explicitly selected for adapter generation. */
-    wasiImports: string[];
-    /** Optional fully qualified WASI operation identifiers to include. */
-    wasiMethods?: string[];
-    /** Directory containing the prepared plugin WIT world. */
-    wit: string;
-}
+export type CodegenSelectionOptions = ComponentWitSelection;
 
 /** Additional file paths needed to generate runtime sources. */
 export interface CodegenGenerateOptions extends CodegenSelectionOptions {
@@ -83,6 +73,7 @@ export function createStaticHermesProgram(dependencies: StaticHermesCliDependenc
         .option('--wasi-imports <json-array>', 'WASI interface specifiers', '[]')
         .option('--wasi-methods <json-array>', 'WASI operation identifiers; omit to include all')
         .option('--api-methods <json-array>', 'Pumpkin operation identifiers; omit to include all')
+        .option('--event-types <json-array>', 'Event type names; omit to include all')
         .action(async (options) => dependencies.analyze(parseCodegenSelection(options)));
     codegen
         .command('generate')
@@ -91,6 +82,7 @@ export function createStaticHermesProgram(dependencies: StaticHermesCliDependenc
         .option('--wasi-imports <json-array>', 'WASI interface specifiers', '[]')
         .option('--wasi-methods <json-array>', 'WASI operation identifiers; omit to include all')
         .option('--api-methods <json-array>', 'Pumpkin operation identifiers; omit to include all')
+        .option('--event-types <json-array>', 'Event type names; omit to include all')
         .requiredOption('--template <file>', 'Runtime C++ template')
         .requiredOption('--header <file>', 'Generated plugin.h')
         .requiredOption('--out-dir <dir>', 'Generated output directory')
@@ -151,14 +143,17 @@ function parseCodegenSelection(options: {
     wasiImports: string;
     wasiMethods?: string;
     apiMethods?: string;
+    eventTypes?: string;
 }): CodegenSelectionOptions {
     const wasiMethods = parseJsonStringArray(options.wasiMethods, 'wasi-methods', 'WASI method identifiers');
     const apiMethods = parseJsonStringArray(options.apiMethods, 'api-methods', 'method identifiers');
+    const eventTypes = parseJsonStringArray(options.eventTypes, 'event-types', 'event type names');
     return {
         wit: path.resolve(options.wit),
         wasiImports: parseJsonStringArray(options.wasiImports, 'wasi-imports', 'module specifiers') ?? [],
         ...(wasiMethods === undefined ? {} : { wasiMethods }),
         ...(apiMethods === undefined ? {} : { apiMethods }),
+        ...(eventTypes === undefined ? {} : { eventTypes }),
     };
 }
 
@@ -167,6 +162,7 @@ function parseCodegenGenerate(options: {
     wasiImports: string;
     wasiMethods?: string;
     apiMethods?: string;
+    eventTypes?: string;
     template: string;
     header: string;
     outDir: string;
@@ -195,20 +191,13 @@ function parseComponentBuild(options: {
     runtimeVariant?: 'full' | 'lean';
     gcVariant?: 'hades' | 'malloc';
 }): ComponentBuildOptions {
-    const wasiMethods = parseJsonStringArray(options.wasiMethods, 'wasi-methods', 'WASI method identifiers');
-    const apiMethods = parseJsonStringArray(options.apiMethods, 'api-methods', 'method identifiers');
-    const eventTypes = parseJsonStringArray(options.eventTypes, 'event-types', 'event type names');
     return {
+        ...parseCodegenSelection(options),
         bundle: path.resolve(options.bundle),
-        wit: path.resolve(options.wit),
         output: path.resolve(options.output),
         ...(options.workspaceRoot === undefined ? {} : { workspaceRoot: path.resolve(options.workspaceRoot) }),
         developmentMode: options.developmentMode ?? false,
         ...(options.parseTs ? { parseTypeScript: true } : {}),
-        wasiImports: parseJsonStringArray(options.wasiImports, 'wasi-imports', 'module specifiers') ?? [],
-        ...(wasiMethods === undefined ? {} : { wasiMethods }),
-        ...(apiMethods === undefined ? {} : { apiMethods }),
-        ...(eventTypes === undefined ? {} : { eventTypes }),
         ...(options.runtimeVariant === undefined ? {} : { runtimeVariant: options.runtimeVariant }),
         ...(options.gcVariant === undefined ? {} : { gcVariant: options.gcVariant }),
     };
@@ -235,28 +224,15 @@ async function runAnalysis(options: CodegenSelectionOptions): Promise<void> {
 }
 
 async function analyzeCodegen(options: CodegenSelectionOptions) {
-    const imports = readPluginImportOrder(options.wit);
-    const declarationOrder = readInterfaceDeclarationOrder(options.wit);
+    // Reject a broken WIT package before downloading wasm-tools.
+    readPluginImportOrder(options.wit);
+    readInterfaceDeclarationOrder(options.wit);
     await ensureWasmTools();
-    const document = readWitToolsDocument(options.wit);
-    const resolved = resolveWitDocument(document, declarationOrder);
-    const apiPackage = resolvePluginApi(resolved, imports);
-    const analysis = analyzeWitUsage(resolved, {
-        pluginImportOrder: imports,
-        wasiImports: options.wasiImports,
-        ...(options.wasiMethods === undefined ? {} : { wasiMethods: options.wasiMethods }),
-        ...(options.apiMethods === undefined ? {} : { apiMethods: options.apiMethods }),
-    });
-    return { analysis, apiPackage };
+    return analyzeComponentWit(options);
 }
 
 async function runGeneration(options: CodegenGenerateOptions): Promise<void> {
-    const { analysis, apiPackage } = await analyzeCodegen({
-        wit: options.wit,
-        wasiImports: options.wasiImports,
-        ...(options.wasiMethods === undefined ? {} : { wasiMethods: options.wasiMethods }),
-        ...(options.apiMethods === undefined ? {} : { apiMethods: options.apiMethods }),
-    });
+    const { analysis, apiPackage } = await analyzeCodegen(options);
     const output = generateWitOutputs({
         analysis,
         apiPackage,
@@ -267,26 +243,14 @@ async function runGeneration(options: CodegenGenerateOptions): Promise<void> {
     writeWitGeneration(options.outDir, output);
 }
 
-async function runComponentBuild(options: ComponentBuildOptions): Promise<void> {
-    await buildStaticHermesComponent(options);
-}
-
-let setupWasmTools: Promise<void> | undefined;
 async function ensureWasmTools(): Promise<void> {
-    const setupOptions = {
+    const toolchain = await setupHermesToolchainEnvironment({
         workspaceRoot: resolveConsumerWorkspaceRoot(),
         includeWasiSdk: false,
         includeWitBindgen: false,
         includeWasmTools: true,
-    };
-    if (process.env.WASM_TOOLS) {
-        Object.assign(process.env, await setupHermesToolchainEnvironment(setupOptions));
-        return;
-    }
-    setupWasmTools ??= (async () => {
-        Object.assign(process.env, await setupHermesToolchainEnvironment(setupOptions));
-    })();
-    await setupWasmTools;
+    });
+    Object.assign(process.env, toolchain);
 }
 
 function defaultDependencies(): StaticHermesCliDependencies {
@@ -299,7 +263,7 @@ function defaultDependencies(): StaticHermesCliDependencies {
         hermesPrepare: () => prepareHermes(),
         analyze: runAnalysis,
         generate: runGeneration,
-        componentBuild: runComponentBuild,
+        componentBuild: buildComponent,
     };
 }
 

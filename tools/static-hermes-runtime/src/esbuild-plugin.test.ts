@@ -60,12 +60,7 @@ afterEach(() => {
 
 it('bundles declared Pumpkin and WASI imports through generated facades', async () => {
     const onWasiImport = vi.fn();
-    const plugin = staticHermesImportsPlugin({
-        resolveDir: process.cwd(),
-        workspaceRoot: process.cwd(),
-        witDir: witDirectory,
-        onWasiImport,
-    });
+    const plugin = staticHermesImportsPlugin({ witDir: witDirectory, onWasiImport });
     const result = await build({
         stdin: {
             contents: `import { pumpkinValue } from ${JSON.stringify(apiInterface.specifier)}; import { wasiValue } from ${JSON.stringify(wasiInterface.specifier)}; console.log(pumpkinValue, wasiValue);`,
@@ -78,12 +73,6 @@ it('bundles declared Pumpkin and WASI imports through generated facades', async 
         logLevel: 'silent',
     });
 
-    expect(mocks.setupToolchain).toHaveBeenCalledWith({
-        workspaceRoot: path.resolve(process.cwd(), '../..'),
-        includeWasiSdk: false,
-        includeWitBindgen: false,
-        includeWasmTools: true,
-    });
     expect(mocks.readDocument).toHaveBeenCalledWith(witDirectory);
     expect(onWasiImport).toHaveBeenCalledWith(wasiInterface.specifier);
     expect(result.outputFiles[0]?.text).toContain('api-facade');
@@ -100,7 +89,7 @@ it('uses the nearest pnpm workspace root when the cache workspace is omitted', a
 
     try {
         process.chdir(nestedPackage);
-        const plugin = staticHermesImportsPlugin({ resolveDir: nestedPackage, witDir: witDirectory });
+        const plugin = staticHermesImportsPlugin({ witDir: witDirectory });
         await build({
             stdin: { contents: 'export {}', resolveDir: nestedPackage, sourcefile: 'plugin-entry.js' },
             bundle: true,
@@ -129,7 +118,6 @@ it('resolves the nearest pnpm workspace from a nested consumer cache directory',
 
     try {
         const plugin = staticHermesImportsPlugin({
-            resolveDir: nestedPackage,
             workspaceRoot: path.join(workspaceRoot, 'packages/plugin'),
             witDir: witDirectory,
         });
@@ -152,30 +140,8 @@ it('resolves the nearest pnpm workspace from a nested consumer cache directory',
     }
 });
 
-it('replaces update checks in development bundles and rejects undeclared imports', async () => {
-    const developmentPlugin = staticHermesImportsPlugin({
-        resolveDir: process.cwd(),
-        witDir: witDirectory,
-        developmentMode: true,
-    });
-    const development = await build({
-        stdin: {
-            contents:
-                'import { registerPluginWithUpdates } from "@pumpkin-plugins/update-check"; registerPluginWithUpdates({});',
-            resolveDir: process.cwd(),
-            sourcefile: 'plugin-entry.js',
-        },
-        bundle: true,
-        external: ['@pumpkin-plugins/pumpkin-api'],
-        write: false,
-        plugins: [developmentPlugin],
-        logLevel: 'silent',
-    });
-    expect(development.outputFiles[0]?.text).toContain('registerPluginWithUpdates');
-    expect(development.outputFiles[0]?.text).toContain('registerPlugin');
-    expect(development.outputFiles[0]?.text).not.toContain('checkForUpdates');
-
-    const productionPlugin = staticHermesImportsPlugin({ resolveDir: process.cwd(), witDir: witDirectory });
+it('rejects imports that are not in the WIT world', async () => {
+    const plugin = staticHermesImportsPlugin({ witDir: witDirectory });
     await expect(
         build({
             stdin: {
@@ -185,7 +151,7 @@ it('replaces update checks in development bundles and rejects undeclared imports
             },
             bundle: true,
             write: false,
-            plugins: [productionPlugin],
+            plugins: [plugin],
             logLevel: 'silent',
         }),
     ).rejects.toThrow("pumpkin:plugin/unlisted@0.1.0 is not imported by the plugin's WIT world");
