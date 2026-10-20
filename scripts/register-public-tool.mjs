@@ -1,7 +1,5 @@
-import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
 import { publicToolReleaseTitleOptions } from './utils/release-pr-title.mjs';
 
 const FIRST_TOOL_VERSION = '0.1.0';
@@ -80,23 +78,9 @@ export function registerPublicTool(root, toolDirectory) {
     const manifestText = `${JSON.stringify(sortedManifest, null, 4)}\n`;
     const configChanged = configText !== fs.readFileSync(configPath, 'utf8');
     const manifestChanged = manifestText !== fs.readFileSync(manifestPath, 'utf8');
-    if (configChanged) writeFileAtomically(configPath, configText);
-    if (manifestChanged) writeFileAtomically(manifestPath, manifestText);
+    if (configChanged) fs.writeFileSync(configPath, configText);
+    if (manifestChanged) fs.writeFileSync(manifestPath, manifestText);
     return { configChanged, manifestChanged };
-}
-
-/** Replaces a file through a temporary sibling so interruption cannot truncate the target. */
-function writeFileAtomically(filePath, text) {
-    const temporaryPath = path.join(path.dirname(filePath), `.release-please-${process.pid}-${randomUUID()}.tmp`);
-    const mode = fs.statSync(filePath).mode;
-    try {
-        fs.writeFileSync(temporaryPath, text, { encoding: 'utf8', flag: 'wx', mode: mode & 0o777 });
-        fs.chmodSync(temporaryPath, mode & 0o7777);
-        fs.renameSync(temporaryPath, filePath);
-    } catch (error) {
-        fs.rmSync(temporaryPath, { force: true });
-        throw error;
-    }
 }
 
 /** Parses one JSON file and verifies its root value is an object. */
@@ -127,10 +111,7 @@ function main(args = process.argv.slice(2)) {
     );
 }
 
-if (
-    process.argv[1] &&
-    pathToFileURL(path.resolve(process.argv[1])).href === pathToFileURL(fileURLToPath(import.meta.url)).href
-) {
+if (import.meta.main) {
     try {
         main();
     } catch (error) {

@@ -2,10 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { it } from 'node:test';
-import { collectReleaseFanout } from './utils/release-fanout.mjs';
-import { recoverImmutableReleaseConflict } from './utils/release-recovery.mjs';
+import { collectReleaseFanout, releaseOutputs } from './release-fanout.mjs';
 
-const root = resolve(import.meta.dirname, '..');
+const root = resolve(import.meta.dirname, '../..');
 const releaseConfig = JSON.parse(readFileSync(resolve(root, 'release-please-config.json'), 'utf8'));
 const releaseManifest = JSON.parse(readFileSync(resolve(root, '.release-please-manifest.json'), 'utf8'));
 const upnpumpkinConfig = {
@@ -32,7 +31,6 @@ const codemodComponentPrefix =
         : `${codemodConfig.component}${codemodConfig.tagSeparator ?? '-'}`;
 const codemodVersionPrefix = codemodConfig.includeVInTag === false ? '' : 'v';
 const codemodTagName = `${codemodComponentPrefix}${codemodVersionPrefix}${codemodVersion}`;
-const [codemodMajor, codemodMinor, codemodPatch] = codemodVersion.split('.').map(Number);
 const codemod = {
     tagName: codemodTagName,
     sha: 'release-sha',
@@ -50,157 +48,10 @@ const baseOptions = {
     root,
     log: () => {},
 };
-const immutableTagConflict = Object.assign(new Error('GitHub rejected an immutable release tag'), {
-    status: 422,
-    body: { errors: [{ field: 'tag_name', message: 'tag_name was used by an immutable release' }] },
-});
-const immutableCandidate = {
-    tagName: codemod.tagName,
-    sha: codemod.sha,
-    path: 'tools/codemod',
-    version: codemodVersion,
-    major: codemodMajor,
-    minor: codemodMinor,
-    patch: codemodPatch,
-};
 
 function collect(options = {}) {
     return collectReleaseFanout({ ...baseOptions, ...options });
 }
-
-function recoverImmutable(options = {}) {
-    return recoverImmutableReleaseConflict({
-        error: immutableTagConflict,
-        getCandidates: () => [immutableCandidate],
-        pullRequestNumber: 123,
-        labelingEnabled: true,
-        findRelease: async (tagName) => (tagName === codemod.tagName ? codemod : undefined),
-        restoreLabels: async () => {},
-        ...options,
-    });
-}
-
-it('reuses matching immutable-tag releases and restores release PR labels', async () => {
-    let restoredLabelsFor;
-    const recovered = await recoverImmutable({
-        restoreLabels: async (pullRequestNumber) => {
-            restoredLabelsFor = pullRequestNumber;
-        },
-    });
-
-    assert.deepEqual(recovered, [
-        {
-            ...codemod,
-            path: immutableCandidate.path,
-            version: immutableCandidate.version,
-            major: immutableCandidate.major,
-            minor: immutableCandidate.minor,
-            patch: immutableCandidate.patch,
-            prNumber: 123,
-            recovered: true,
-        },
-    ]);
-    assert.equal(restoredLabelsFor, 123);
-});
-
-it('rethrows non-immutable release errors unchanged without resolving candidates', async () => {
-    const error = new Error('GitHub API failed');
-    let candidatesRead = false;
-
-    await assert.rejects(
-        recoverImmutable({
-            error,
-            getCandidates: () => {
-                candidatesRead = true;
-                return [immutableCandidate];
-            },
-        }),
-        (caught) => caught === error,
-    );
-    assert.equal(candidatesRead, false);
-});
-
-it('recognizes only the immutable tag-name conflict', async () => {
-    const unrelatedErrors = [
-        Object.assign(new Error('Wrong status'), { status: 500, body: immutableTagConflict.body }),
-        Object.assign(new Error('Wrong field'), {
-            status: 422,
-            body: { errors: [{ field: 'body', message: 'tag_name was used by an immutable release' }] },
-        }),
-        Object.assign(new Error('Wrong message'), {
-            status: 422,
-            body: { errors: [{ field: 'tag_name', message: 'tag already exists' }] },
-        }),
-    ];
-
-    for (const error of unrelatedErrors) {
-        await assert.rejects(recoverImmutable({ error }), (caught) => caught === error);
-    }
-});
-
-it('fails with the immutable conflict as cause when the duplicate tag is missing', async () => {
-    await assert.rejects(recoverImmutable({ findRelease: async () => undefined }), (error) => {
-        assert.match(error.message, /no existing release was found/);
-        assert.equal(error.cause, immutableTagConflict);
-        return true;
-    });
-});
-
-it('validates the entire candidate batch before restoring labels', async () => {
-    const secondCandidate = { ...immutableCandidate, tagName: 'sample-v1.0.0', sha: 'expected-sha' };
-    const lookedUpTags = [];
-    let labelsRestored = false;
-
-    await assert.rejects(
-        recoverImmutable({
-            getCandidates: () => [immutableCandidate, secondCandidate],
-            findRelease: async (tagName) => {
-                lookedUpTags.push(tagName);
-                return tagName === immutableCandidate.tagName ? codemod : { tagName, sha: 'different-sha' };
-            },
-            restoreLabels: async () => {
-                labelsRestored = true;
-            },
-        }),
-        (error) => {
-            assert.match(error.message, /points to different-sha/);
-            assert.equal(error.cause, immutableTagConflict);
-            return true;
-        },
-    );
-
-    assert.deepEqual(lookedUpTags, [immutableCandidate.tagName, secondCandidate.tagName]);
-    assert.equal(labelsRestored, false);
-});
-
-it('skips label restoration without a PR number or when labeling is disabled', async () => {
-    for (const options of [
-        { pullRequestNumber: undefined, labelingEnabled: true },
-        { pullRequestNumber: 123, labelingEnabled: false },
-    ]) {
-        let labelsRestored = false;
-        await recoverImmutable({
-            ...options,
-            restoreLabels: async () => {
-                labelsRestored = true;
-            },
-        });
-        assert.equal(labelsRestored, false);
-    }
-});
-
-it('propagates label restoration failures', async () => {
-    const labelError = new Error('Could not update release labels');
-
-    await assert.rejects(
-        recoverImmutable({
-            restoreLabels: async () => {
-                throw labelError;
-            },
-        }),
-        (error) => error === labelError,
-    );
-});
 
 it('routes a previously created codemod release for its commit to npm publishing', async () => {
     const result = await collect();
@@ -352,4 +203,36 @@ it('rejects releases without a target commit before building the publisher fanou
         collect({ createdReleases: [{ tagName: codemod.tagName, path: 'tools/codemod', version: '0.1.0' }] }),
         /has no target commit SHA/,
     );
+});
+
+it('writes every release output that the release workflow reads', () => {
+    const workflow = readFileSync(resolve(root, '.github/workflows/release.yml'), 'utf8');
+    // Release PR outputs come from the PR step, not from the release fan-out.
+    const pullRequestOutputs = new Set(['prs', 'pr_count']);
+    const readOutputs = [...workflow.matchAll(/steps\.release\.outputs\.(\w+)/g)]
+        .map(([, name]) => name)
+        .filter((name) => !pullRequestOutputs.has(name));
+    const readKeys = [...workflow.matchAll(/fromJSON\(needs\.release\.outputs\.(\w+)\)\[format\('\{0\}--(\w+)'/g)].map(
+        ([, output, key]) => ({ output, key }),
+    );
+    assert.ok(readOutputs.includes('paths_released'));
+    assert.ok(readKeys.some(({ output, key }) => output === 'release_metadata' && key === 'tag_name'));
+
+    const release = { ...upnpumpkinRelease, sha: 'a'.repeat(40), path: 'packages/upnpumpkin', version: '0.0.8' };
+    const outputs = releaseOutputs([release], {
+        pluginPaths: ['packages/upnpumpkin'],
+        actionPaths: [],
+        toolPaths: [],
+        extensionPaths: [],
+    });
+
+    for (const name of readOutputs) assert.equal(typeof outputs[name], 'string', `${name} must be a string output`);
+    assert.deepEqual(JSON.parse(outputs.paths_released), ['packages/upnpumpkin']);
+    assert.equal(outputs.release_count, '1');
+    for (const { output, key } of readKeys) {
+        assert.ok(
+            JSON.parse(outputs[output])[`${release.path}--${key}`],
+            `${output} must hold ${release.path}--${key}`,
+        );
+    }
 });

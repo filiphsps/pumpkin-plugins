@@ -110,10 +110,9 @@ OIDC publish within two days. Preserve every unrelated relationship.
 ## Runtime and provenance
 
 The setup command and the automated publish job have different npm minimums. Use npm CLI `11.15.0`
-or newer to run `npm trust`; the workflow checks for npm CLI `11.5.1` or newer and Node `22.14.0`
-or newer before publishing. The [publish workflow](../.github/workflows/release.yml) sets its Node
-version and enforces the npm minimum. It publishes from GitHub-hosted runners in this public GitHub
-repository.
+or newer to run `npm trust`; the workflow checks for npm CLI `11.5.1` or newer before publishing.
+The [publish workflow](../.github/workflows/release.yml) runs on the repository Node version from
+`.node-version`. It publishes from GitHub-hosted runners in this public GitHub repository.
 
 npm automatically generates provenance for public packages published through trusted publishing
 from a public repository. The workflow also passes `--provenance` explicitly to keep the
