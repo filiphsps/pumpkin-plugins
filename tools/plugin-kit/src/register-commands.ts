@@ -37,6 +37,9 @@ function text(line: string, tone?: 'error'): TextComponent {
  * @param ctx - The plugin context.
  * @param tree - The commands, from `defineCommands`.
  * @param handlers - What runs each command: the lines to send back, or a thrown `CommandFailed`.
+ * @param suggestions - Optional dynamic suggestions. `arguments` maps an argument name to its handler,
+ * which then applies to every argument with that name anywhere in the tree. `register` registers the
+ * wrapped handler with the host and returns its id.
  */
 export function registerCommands<T extends CommandTree>(
     ctx: Context,
@@ -198,8 +201,8 @@ function decodeArguments(
         }
 
         if (spec.type === 'item') {
-            // Some Pumpkin hosts expose an item argument through a different Arg variant; callers can recover its raw token.
-            values[spec.name] = argument.tag === 'item' || argument.tag === 'simple' ? argument.val : '';
+            if (argument.tag !== 'item') throw new CommandFailed(`Argument ${spec.name} must be an item.`);
+            values[spec.name] = argument.val;
             continue;
         }
 
