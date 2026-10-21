@@ -108,21 +108,17 @@ describe('Static Hermes esbuild plugin', () => {
 
     it.each([true, false])('routes automatic update checks based on developmentMode=%s', async (developmentMode) => {
         const imports: string[] = [];
-        const witDir = createWitDir(
-            developmentMode
-                ? {}
-                : {
-                      'http/types.wit': `package wasi:http@0.2.3; interface types {
-                          resource fields { constructor(); set: func(name: string); }
-                          resource outgoing-request { constructor(headers: fields); set-method: func(); set-scheme: func(); set-authority: func(); set-path-with-query: func(); }
-                          resource request-options { constructor(); set-connect-timeout: func(); set-first-byte-timeout: func(); set-between-bytes-timeout: func(); }
-                      }`,
-                      'http/outgoing-handler.wit':
-                          'package wasi:http@0.2.3; interface outgoing-handler { handle: func(request: u32, options: u32); }',
-                      'clocks/monotonic-clock.wit':
-                          'package wasi:clocks@0.2.3; interface monotonic-clock { now: func() -> u64; }',
-                  },
-        );
+        const witDir = createWitDir({
+            'http/types.wit': `package wasi:http@0.2.3; interface types {
+                resource fields { constructor(); set: func(name: string); }
+                resource outgoing-request { constructor(headers: fields); set-method: func(); set-scheme: func(); set-authority: func(); set-path-with-query: func(); }
+                resource request-options { constructor(); set-connect-timeout: func(); set-first-byte-timeout: func(); set-between-bytes-timeout: func(); }
+            }`,
+            'http/outgoing-handler.wit':
+                'package wasi:http@0.2.3; interface outgoing-handler { handle: func(request: u32, options: u32); }',
+            'clocks/monotonic-clock.wit':
+                'package wasi:clocks@0.2.3; interface monotonic-clock { now: func() -> u64; }',
+        });
         const result = await esbuild.build({
             stdin: {
                 contents:
@@ -147,15 +143,18 @@ describe('Static Hermes esbuild plugin', () => {
         });
 
         expect(result.outputFiles[0]?.text).toContain('registerPlugin(');
+        expect(imports).toEqual(
+            expect.arrayContaining([
+                'wasi:http/outgoing-handler@0.2.3',
+                'wasi:http/types@0.2.3',
+                'wasi:clocks/monotonic-clock@0.2.3',
+            ]),
+        );
         if (developmentMode) {
-            expect(result.outputFiles[0]?.text).not.toContain('Market response is too large');
-            expect(imports).toEqual([]);
+            expect(result.outputFiles[0]?.text).toContain('if (true) return;');
         } else {
             expect(result.outputFiles[0]?.text).toContain('Market response is too large');
             expect(result.outputFiles[0]?.text).toContain('__pumpkinWasiHttpTypes');
-            expect(imports).toContain('wasi:http/outgoing-handler@0.2.3');
-            expect(imports).toContain('wasi:http/types@0.2.3');
-            expect(imports).toContain('wasi:clocks/monotonic-clock@0.2.3');
         }
     });
 
