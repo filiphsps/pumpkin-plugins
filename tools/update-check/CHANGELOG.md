@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/filiphsps/pumpkin-plugins/compare/update-check-v0.1.2...update-check-v0.1.3) (2026-10-21)
+
+
+### Features
+
+* **update-check:** include release notes in update logs ([37197d2](https://github.com/filiphsps/pumpkin-plugins/commit/37197d25692121238b95f45c77299330315a124a))
+
 ## [0.1.2](https://github.com/filiphsps/pumpkin-plugins/compare/update-check-v0.1.1...update-check-v0.1.2) (2026-10-16)
 
 
