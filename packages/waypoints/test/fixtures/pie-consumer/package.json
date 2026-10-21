@@ -9,6 +9,9 @@
         "test-fixture"
     ],
     "type": "module",
+    "dependencies": {
+        "@pumpkin-plugins/pumpkin-api": "catalog:"
+    },
     "pumpkinPlugin": {
         "entry": "src/plugin.ts",
         "output": "waypoints-pie-consumer-fixture.wasm",
