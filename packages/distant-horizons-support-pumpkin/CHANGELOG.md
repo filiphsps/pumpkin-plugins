@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.1.1...distant-horizons-support-pumpkin-v0.1.2) (2026-10-21)
+
+
+### Features
+
+* **update-check:** include release notes in update logs ([37197d2](https://github.com/filiphsps/pumpkin-plugins/commit/37197d25692121238b95f45c77299330315a124a))
+
+
+### Bug Fixes
+
+* **distant-horizons:** bound forced terrain checks per tick ([ab83ed1](https://github.com/filiphsps/pumpkin-plugins/commit/ab83ed124116a2791aa8dbad2c4cbaab19379df0))
+
 ## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/distant-horizons-support-pumpkin-v0.1.0...distant-horizons-support-pumpkin-v0.1.1) (2026-10-18)
 
 
