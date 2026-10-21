@@ -42,6 +42,44 @@ function workflowNodeVersion(workflow: string): string {
 }
 
 function parsePlatformMatrix(workflow: string): PlatformRow[] {
+    const matrixExpression = workflow.match(/^\s*matrix:\s*\$\{\{\s*fromJSON\((.+)\)\s*\}\}\s*$/m)?.[1];
+    if (matrixExpression) {
+        const jsonLiterals = [...matrixExpression.matchAll(/'([^']+)'/g)];
+        if (jsonLiterals.length === 0) {
+            throw new Error('.github/workflows/external-consumer.yml: matrix JSON values not found');
+        }
+
+        const rows = new Map<string, PlatformRow>();
+        for (const [, json] of jsonLiterals) {
+            const matrix: unknown = JSON.parse(json ?? '');
+            if (
+                typeof matrix !== 'object' ||
+                matrix === null ||
+                !('include' in matrix) ||
+                !Array.isArray(matrix.include)
+            ) {
+                throw new Error('.github/workflows/external-consumer.yml: matrix JSON must include platform rows');
+            }
+
+            for (const value of matrix.include) {
+                if (typeof value !== 'object' || value === null) {
+                    throw new Error('.github/workflows/external-consumer.yml: matrix platform row must be an object');
+                }
+                const fields = value as Record<string, unknown>;
+                const platform = requiredString(fields.platform, 'matrix platform');
+                const runner = requiredString(fields.os, `${platform} runner`);
+                const existing = rows.get(platform);
+                if (existing && existing.runner !== runner) {
+                    throw new Error(`.github/workflows/external-consumer.yml: conflicting runners for ${platform}`);
+                }
+                rows.set(platform, { platform, runner });
+            }
+        }
+
+        if (rows.size === 0) throw new Error('.github/workflows/external-consumer.yml: matrix has no platform rows');
+        return [...rows.values()];
+    }
+
     const lines = workflow.split(/\r?\n/);
     const includeIndex = lines.findIndex((line) => /^\s*include:\s*$/.test(line));
     if (includeIndex < 0) throw new Error('.github/workflows/external-consumer.yml: matrix include list not found');
