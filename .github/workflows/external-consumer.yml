@@ -2,6 +2,11 @@ name: External consumer
 
 on:
     workflow_call:
+        inputs:
+            external_consumer_full:
+                required: false
+                type: boolean
+                default: false
 
 env:
     CI: true
@@ -16,14 +21,7 @@ jobs:
         timeout-minutes: 90
         strategy:
             fail-fast: false
-            matrix:
-                include:
-                    - platform: Linux x64
-                      os: ubuntu-26.04
-                    - platform: macOS arm64
-                      os: macos-15
-                    - platform: Windows x64
-                      os: windows-2025
+            matrix: ${{ fromJSON(inputs.external_consumer_full && '{"include":[{"platform":"Linux x64","os":"ubuntu-26.04"},{"platform":"macOS arm64","os":"macos-15"},{"platform":"Windows x64","os":"windows-2025"}]}' || '{"include":[{"platform":"Linux x64","os":"ubuntu-26.04"}]}') }}
         runs-on: ${{ matrix.os }}
         steps:
             - name: 🕶️ Checkout repository
