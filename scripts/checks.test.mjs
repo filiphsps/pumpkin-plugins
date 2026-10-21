@@ -877,7 +877,8 @@ describe('CI result and release prerequisites', () => {
         assert.equal(ci.jobs.build.steps.find((step) => step.name === '🏗️ Prepare Static Hermes')?.id, 'prepare-hermes');
         assert.deepEqual(ci.jobs.lint.needs, ['changes']);
         assert.deepEqual(ci.jobs.typecheck.needs, ['changes']);
-        assert.deepEqual(ci.jobs['ci-result'].needs, ['changes', ...Object.keys(selectJobs({}, 'pull_request'))]);
+        const ciResultJobs = Object.keys(selectJobs({}, 'pull_request')).filter((job) => job !== 'engine-comparison');
+        assert.deepEqual(ci.jobs['ci-result'].needs, ['changes', ...ciResultJobs]);
         assert.deepEqual(ci.jobs.release.needs, ['ci-result']);
         assert.match(ci.jobs.release.if, /needs\['ci-result'\]\.result == 'success'/);
     });
@@ -914,7 +915,7 @@ describe('CI result and release prerequisites', () => {
         }
     });
 
-    it('runs engine comparison through its reusable workflow and includes it in ci-result', () => {
+    it('runs engine comparison through its reusable workflow without gating ci-result', () => {
         const comparison = parse(
             fs.readFileSync(path.join(scripts, '../.github/workflows/engine-comparison.yml'), 'utf8'),
         );
@@ -922,7 +923,7 @@ describe('CI result and release prerequisites', () => {
         assert.ok(Object.hasOwn(comparison.on, 'workflow_call'));
         assert.equal(job.uses, './.github/workflows/engine-comparison.yml');
         assert.deepEqual(job.needs, ['changes', 'build']);
-        assert.ok(ci.jobs['ci-result'].needs.includes('engine-comparison'));
+        assert.ok(!ci.jobs['ci-result'].needs.includes('engine-comparison'));
         assert.ok(
             Object.values(comparison.jobs).some((job) =>
                 job.steps?.some((step) => step.run?.includes('compare-engines')),
