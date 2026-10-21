@@ -12,6 +12,7 @@ import { discoverWorkspace } from './utils/workspace-discovery.mjs';
 /** Classifier outputs for a change that touches nothing CI checks. */
 const nothing = {
     code: 'false',
+    native: 'false',
     config_only: 'false',
     skip_expensive_checks: 'false',
     actions: '[]',
@@ -54,12 +55,19 @@ describe('selectJobs', () => {
 
     it('skips the expensive suites for a release merge but still builds it', () => {
         const selected = selectJobs(
-            { ...nothing, code: 'true', skip_expensive_checks: 'true', generator: 'true', integration_scope: 'all' },
+            {
+                ...nothing,
+                code: 'true',
+                native: 'true',
+                skip_expensive_checks: 'true',
+                generator: 'true',
+                integration_scope: 'all',
+            },
             'push',
         );
         assert.equal(selected.build, true);
         assert.equal(selected.lint, true);
-        for (const job of ['test', 'external-consumer', 'integration', 'generator', 'engine-comparison']) {
+        for (const job of ['test', 'external-consumer', 'integration', 'generator', 'engine-comparison', 'native']) {
             assert.equal(selected[job], false, job);
         }
     });
@@ -104,6 +112,11 @@ describe('selectJobs', () => {
         assert.equal(selectJobs(code, 'pull_request')['engine-comparison'], false);
         assert.equal(selectJobs({ ...code, benchmark: 'true' }, 'pull_request')['engine-comparison'], true);
         assert.equal(selectJobs(code, 'push')['engine-comparison'], true);
+    });
+
+    it('selects native build and load tests only for native changes outside release-only pushes', () => {
+        assert.equal(selectJobs({ ...nothing, native: 'true' }, 'pull_request').native, true);
+        assert.equal(selectJobs({ ...nothing, native: 'true', skip_expensive_checks: 'true' }, 'push').native, false);
     });
 
     it('checks commits only on pull requests', () => {

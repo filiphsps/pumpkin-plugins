@@ -3,12 +3,13 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { discoverComponents } from '@pumpkin-plugins/docs/node';
+import { discoverComponents, readNativeManifest } from '@pumpkin-plugins/docs/node';
 import { Command } from 'commander';
 // Import the harness modules directly: its index also loads instance.ts, which Node can't strip.
 import { resolvePumpkinBinary as resolvePinnedPumpkinBinary } from '../tools/test-harness/src/binary.ts';
 import { PUMPKIN_RELEASE } from '../tools/test-harness/src/pumpkin-version.ts';
 import { assetName, isMuslLinux, parseChecksums } from '../tools/test-harness/src/util.ts';
+import { nativeAssetNames, nativeTargetForHost } from './utils/native-targets.mjs';
 
 const REPOSITORY = 'Pumpkin-MC/Pumpkin';
 const RELEASES_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
@@ -49,6 +50,87 @@ export function listPluginBuilds(root) {
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Lists native components and their host-specific build outputs. */
+function listNativeBuilds(root, { release = false, env = process.env } = {}) {
+    const components = discoverComponents(root, 'native');
+    if (components.length === 0) return [];
+
+    const target = nativeTargetForHost();
+    return components
+        .map(({ slug, directory, metadataFile }) => {
+            const { library } = readNativeManifest(metadataFile);
+            const releaseFile = path.join(directory, 'release.json');
+            if (!fs.existsSync(releaseFile)) {
+                throw new Error(`${releaseFile} is required to run native component ${slug}`);
+            }
+            const nativeRelease = JSON.parse(fs.readFileSync(releaseFile, 'utf8'));
+            const host = nativeRelease.host;
+            if (
+                typeof host?.repository !== 'string' ||
+                typeof host?.tag !== 'string' ||
+                !host.tag ||
+                /latest|nightly|[\r\n]/i.test(host.tag) ||
+                !/^[\w.-]+\/[\w.-]+$/.test(host.repository) ||
+                !/^[0-9a-f]{40}$/i.test(host.sha ?? '')
+            ) {
+                throw new Error(`${releaseFile} must pin an exact Pumpkin repository, tag, and source SHA`);
+            }
+            const hostAsset = host.assets?.[target.target];
+            if (
+                typeof hostAsset?.name !== 'string' ||
+                !/^[\w.+-]+$/.test(hostAsset.name) ||
+                !/^[0-9a-f]{64}$/i.test(hostAsset.sha256 ?? '')
+            ) {
+                throw new Error(`${releaseFile} must pin a Pumpkin asset and SHA-256 for ${target.target}`);
+            }
+            const buildScript = path.join(directory, 'build.mjs');
+            if (!fs.existsSync(buildScript))
+                throw new Error(`${buildScript} is required to build native component ${slug}`);
+            const targetDirectory = env.CARGO_TARGET_DIR
+                ? path.resolve(directory, env.CARGO_TARGET_DIR)
+                : path.join(directory, 'target');
+            const profile = release ? 'release' : 'debug';
+            return {
+                name: slug,
+                directory,
+                buildScript,
+                host,
+                target: target.target,
+                outputPath: path.join(
+                    targetDirectory,
+                    target.target,
+                    profile,
+                    `${target.prefix}${library}.${target.extension}`,
+                ),
+                assetName: nativeAssetNames(slug, target.target)[0],
+                release,
+            };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Ensures all native components use one compatible Pumpkin host binary. */
+function pinnedNativeHost(nativeBuilds) {
+    if (nativeBuilds.length === 0) return undefined;
+
+    const { host, target } = nativeBuilds[0];
+    const asset = host.assets[target];
+    for (const component of nativeBuilds.slice(1)) {
+        const otherAsset = component.host.assets[component.target];
+        if (
+            component.host.repository !== host.repository ||
+            component.host.tag !== host.tag ||
+            component.host.sha !== host.sha ||
+            component.target !== target ||
+            otherAsset.name !== asset.name ||
+            otherAsset.sha256.toLowerCase() !== asset.sha256.toLowerCase()
+        ) {
+            throw new Error('Native components require different Pumpkin host binaries for this platform');
+        }
+    }
+    return host;
+}
+
 /** Copies a built plugin into Pumpkin's watched directory, overwriting regular files in place. */
 export function copyPluginBuild(plugin, serverPluginsDir) {
     fs.mkdirSync(serverPluginsDir, { recursive: true });
@@ -59,6 +141,19 @@ export function copyPluginBuild(plugin, serverPluginsDir) {
         if (error.code !== 'ENOENT') throw error;
     }
     fs.copyFileSync(plugin.outputPath, destination);
+    return destination;
+}
+
+/** Copies a built native library into Pumpkin's plugin directory. */
+function copyNativeBuild(component, serverPluginsDir) {
+    fs.mkdirSync(serverPluginsDir, { recursive: true });
+    const destination = path.join(serverPluginsDir, component.assetName);
+    try {
+        if (fs.lstatSync(destination).isSymbolicLink()) fs.unlinkSync(destination);
+    } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+    }
+    fs.copyFileSync(component.outputPath, destination);
     return destination;
 }
 
@@ -148,6 +243,39 @@ async function getLatestRelease(fetchImpl) {
     return release;
 }
 
+/** Resolves an exact Pumpkin release pinned by a native component. */
+async function getPinnedRelease(fetchImpl, nativeHost) {
+    const url = `https://api.github.com/repos/${nativeHost.repository}/releases/tags/${encodeURIComponent(nativeHost.tag)}`;
+    let response;
+    try {
+        response = await fetchImpl(url, {
+            headers: {
+                Accept: 'application/vnd.github+json',
+                'User-Agent': 'pumpkin-plugins-dev',
+            },
+        });
+    } catch (cause) {
+        const error = new Error(`Could not reach pinned Pumpkin release ${nativeHost.tag}.`, { cause });
+        error.retryable = true;
+        throw error;
+    }
+    if (!response.ok) {
+        const error = new Error(`Could not get pinned Pumpkin release ${nativeHost.tag} (HTTP ${response.status})`);
+        error.retryable = await isRateLimitResponse(response);
+        throw error;
+    }
+    const release = await response.json();
+    if (release?.tag_name !== nativeHost.tag) {
+        throw new Error(
+            `GitHub returned Pumpkin release ${release?.tag_name ?? '(unknown)'} instead of ${nativeHost.tag}`,
+        );
+    }
+    if (!isValidRelease(release)) {
+        throw new Error(`GitHub returned invalid pinned Pumpkin release metadata (${nativeHost.tag})`);
+    }
+    return release;
+}
+
 async function getLatestNightly(fetchImpl) {
     let response;
     try {
@@ -192,15 +320,50 @@ export async function resolveLatestPumpkinBinary({
     fetchImpl = fetch,
     now = Date.now,
     nightly = false,
+    nativeHost,
 }) {
+    if (nativeHost && nightly) {
+        throw new Error(`--nightly cannot be used with native components pinned to Pumpkin ${nativeHost.tag}`);
+    }
+    const nativeTarget = nativeHost ? nativeTargetForHost(platform, arch).target : undefined;
+    const pinnedAsset = nativeHost?.assets?.[nativeTarget];
+    if (
+        nativeHost &&
+        (typeof pinnedAsset?.name !== 'string' ||
+            !/^[\w.+-]+$/.test(pinnedAsset.name) ||
+            !/^[0-9a-f]{64}$/i.test(pinnedAsset.sha256 ?? ''))
+    ) {
+        throw new Error(`Native release metadata has no valid Pumpkin host asset for ${nativeTarget}`);
+    }
     if (env.PUMPKIN_BIN) {
         if (!fs.existsSync(env.PUMPKIN_BIN)) throw new Error(`PUMPKIN_BIN does not exist: ${env.PUMPKIN_BIN}`);
+        if (nativeHost) {
+            const binary = path.resolve(env.PUMPKIN_BIN);
+            const actual = fileHash(binary);
+            const expected = pinnedAsset.sha256.toLowerCase();
+            if (actual !== expected) {
+                throw new Error(
+                    `PUMPKIN_BIN does not match the native host pin ${nativeHost.tag}: expected SHA-256 ${expected}, got ${actual ?? '(unreadable)'}`,
+                );
+            }
+            return { binary, release: nativeHost.tag };
+        }
         return { binary: path.resolve(env.PUMPKIN_BIN), release: 'local PUMPKIN_BIN' };
     }
 
     const cacheDir = env.PUMPKIN_CACHE_DIR || path.join(root, '.cache', 'pumpkin');
-    const metadataPath = path.join(cacheDir, nightly ? NIGHTLY_METADATA_FILE : RELEASE_METADATA_FILE);
-    const isValidMetadata = nightly ? isValidNightlyRelease : isValidRelease;
+    const nativeCacheKey = nativeHost
+        ? createHash('sha256').update(`${nativeHost.repository}\0${nativeHost.tag}`).digest('hex').slice(0, 16)
+        : undefined;
+    const metadataPath = path.join(
+        cacheDir,
+        nativeCacheKey ? `pinned-${nativeCacheKey}.json` : nightly ? NIGHTLY_METADATA_FILE : RELEASE_METADATA_FILE,
+    );
+    const isValidMetadata = nativeHost
+        ? (release) => isValidRelease(release) && release.tag_name === nativeHost.tag
+        : nightly
+          ? isValidNightlyRelease
+          : isValidRelease;
     const cachedMetadata = readReleaseMetadata(metadataPath, isValidMetadata);
     const currentTime = now();
     const cacheIsFresh =
@@ -213,7 +376,11 @@ export async function resolveLatestPumpkinBinary({
         release = cachedMetadata.release;
     } else {
         try {
-            release = nightly ? await getLatestNightly(fetchImpl) : await getLatestRelease(fetchImpl);
+            release = nativeHost
+                ? await getPinnedRelease(fetchImpl, nativeHost)
+                : nightly
+                  ? await getLatestNightly(fetchImpl)
+                  : await getLatestRelease(fetchImpl);
             writeReleaseMetadata(metadataPath, { fetchedAt: now(), release });
         } catch (error) {
             if (!cachedMetadata || !error.retryable) throw error;
@@ -223,21 +390,28 @@ export async function resolveLatestPumpkinBinary({
             release = cachedMetadata.release;
         }
     }
-    const assetFile = assetName(platform, arch, musl);
+    const assetFile = pinnedAsset?.name ?? assetName(platform, arch, musl);
     const binaryAsset = releaseAsset(release, assetFile);
     if (nightly && !Number.isSafeInteger(binaryAsset.id)) {
         throw new Error(`Pumpkin nightly asset ${assetFile} is missing its release asset ID`);
     }
     const safeTag = String(release.tag_name).replace(/[^\w.+-]/g, '_');
     const assetVersion = nightly ? `${safeTag}-${binaryAsset.id}` : safeTag;
-    const target = path.join(cacheDir, `${assetVersion}-${assetFile}`);
-    if (fs.existsSync(target)) return { binary: target, release: release.tag_name };
+    const binaryPath = path.join(cacheDir, `${assetVersion}-${assetFile}`);
+    if (fs.existsSync(binaryPath)) {
+        if (!pinnedAsset || fileHash(binaryPath) === pinnedAsset.sha256.toLowerCase()) {
+            return { binary: binaryPath, release: release.tag_name };
+        }
+        fs.unlinkSync(binaryPath);
+    }
 
     let expected;
     if (nightly) {
         const digest = /^sha256:([0-9a-f]{64})$/i.exec(binaryAsset.digest ?? '');
         expected = digest?.[1].toLowerCase();
         if (!expected) throw new Error(`Pumpkin nightly metadata for ${assetFile} has no valid SHA-256 digest`);
+    } else if (pinnedAsset) {
+        expected = pinnedAsset.sha256.toLowerCase();
     } else {
         const checksumAsset = releaseAsset(release, 'checksums.sha256');
         const sums = parseChecksums(await fetchText(fetchImpl, checksumAsset.browser_download_url));
@@ -253,14 +427,15 @@ export async function resolveLatestPumpkinBinary({
     if (actual !== expected) throw new Error(`Checksum mismatch for ${assetFile}: expected ${expected}, got ${actual}`);
 
     fs.mkdirSync(cacheDir, { recursive: true });
-    const partial = `${target}.${process.pid}.partial`;
+    const partial = `${binaryPath}.${process.pid}.partial`;
     fs.writeFileSync(partial, bytes, { mode: 0o755 });
-    fs.renameSync(partial, target);
-    return { binary: target, release: release.tag_name };
+    fs.renameSync(partial, binaryPath);
+    return { binary: binaryPath, release: release.tag_name };
 }
 
 /** Resolves the pinned Pumpkin release, or the newest stable or nightly build when asked for one. */
-export async function resolveDevPumpkinBinary({ root, latest = false, nightly = false }) {
+export async function resolveDevPumpkinBinary({ root, latest = false, nightly = false, nativeHost }) {
+    if (nativeHost) return resolveLatestPumpkinBinary({ root, nativeHost });
     if (latest || nightly) return resolveLatestPumpkinBinary({ root, nightly });
     const binary = await resolvePinnedPumpkinBinary();
     return { binary, release: process.env.PUMPKIN_BIN ? 'local PUMPKIN_BIN' : PUMPKIN_RELEASE };
@@ -443,6 +618,20 @@ export function startInitialBuild(root, spawnImpl = spawn, env = process.env, pa
     );
 }
 
+/** Starts a native component build for the current host. */
+function startNativeBuild(component, spawnImpl, env) {
+    return spawnChild(
+        process.execPath,
+        [component.buildScript, ...(component.release ? ['--release'] : []), '--target', component.target],
+        {
+            cwd: component.directory,
+            stdio: 'inherit',
+            env,
+        },
+        spawnImpl,
+    );
+}
+
 /** Starts a dev server with optional plugin hot reload and release-mode builds. */
 export async function runDev({
     root = path.resolve(import.meta.dirname, '..'),
@@ -460,6 +649,13 @@ export async function runDev({
 } = {}) {
     const plugins = listPluginBuilds(root);
     if (plugins.length === 0) throw new Error('No plugin packages with pumpkinPlugin.output were found');
+    const nativeBuilds = listNativeBuilds(root, { release });
+    const nativeHost = pinnedNativeHost(nativeBuilds);
+    if (nativeHost && (latest || nightly)) {
+        throw new Error(
+            `--latest and --nightly cannot be used with native components pinned to Pumpkin ${nativeHost.tag}`,
+        );
+    }
 
     const serverDir = path.join(root, '.cache', 'pumpkin-dev');
     const serverPluginsDir = createServerDirectory(serverDir, hotReload);
@@ -497,12 +693,16 @@ export async function runDev({
     signalSource.on('SIGTERM', onTerminate);
 
     try {
-        const target = nightly
-            ? 'the latest Pumpkin nightly build'
-            : latest
-              ? 'the latest stable Pumpkin release'
-              : `Pumpkin ${PUMPKIN_RELEASE}`;
-        console.log(`Building every plugin, then launching ${target}.`);
+        const target = nativeHost
+            ? `pinned Pumpkin ${nativeHost.tag}`
+            : nightly
+              ? 'the latest Pumpkin nightly build'
+              : latest
+                ? 'the latest stable Pumpkin release'
+                : `Pumpkin ${PUMPKIN_RELEASE}`;
+        console.log(
+            `Building ${plugins.length} plugin${plugins.length === 1 ? '' : 's'} and ${nativeBuilds.length} native component${nativeBuilds.length === 1 ? '' : 's'}, then launching ${target}.`,
+        );
         const initialBuild = startInitialBuild(root, spawnImpl, buildEnv, parseTypeScript, turboArgs);
         children.push(initialBuild);
         const buildResult = initialBuild.done.then(({ code, signal }) => {
@@ -510,12 +710,27 @@ export async function runDev({
                 throw new Error(`pnpm run build exited (${signal ?? code ?? 'unknown status'})`);
             }
         });
-        const startup = Promise.all([buildResult, resolveBinary({ root, latest, nightly })]);
+        const nativeBuildResults = nativeBuilds.map((component) => {
+            const nativeBuild = startNativeBuild(component, spawnImpl, buildEnv);
+            children.push(nativeBuild);
+            return nativeBuild.done.then(({ code, signal }) => {
+                if (!shuttingDown && (code !== 0 || signal)) {
+                    throw new Error(
+                        `native build for ${component.name} exited (${signal ?? code ?? 'unknown status'})`,
+                    );
+                }
+            });
+        });
+        const startup = Promise.all([
+            Promise.all([buildResult, ...nativeBuildResults]),
+            resolveBinary({ root, latest, nightly, nativeHost }),
+        ]);
         const startupResult = await Promise.race([startup, shutdown]);
         if (shuttingDown) return;
         const [, resolvedBinary] = startupResult;
 
         for (const plugin of plugins) copyPluginBuild(plugin, serverPluginsDir);
+        for (const component of nativeBuilds) copyNativeBuild(component, serverPluginsDir);
         const backgroundTasks = [];
         if (hotReload) {
             outputs = watchBuildOutputs(plugins, serverPluginsDir, watchImpl);
@@ -541,7 +756,9 @@ export async function runDev({
         }
 
         const { binary: serverBinary, release: serverRelease } = resolvedBinary;
-        console.log(`Starting Pumpkin ${serverRelease} with ${plugins.length} plugins in ${serverDir}`);
+        console.log(
+            `Starting Pumpkin ${serverRelease} with ${plugins.length} plugin${plugins.length === 1 ? '' : 's'} and ${nativeBuilds.length} native component${nativeBuilds.length === 1 ? '' : 's'} in ${serverDir}`,
+        );
         const server = spawnChild(serverBinary, [], { cwd: serverDir, stdio: 'inherit' }, spawnImpl);
         children.push(server);
         const serverResult = await Promise.race([server.done, ...backgroundTasks, shutdown]);

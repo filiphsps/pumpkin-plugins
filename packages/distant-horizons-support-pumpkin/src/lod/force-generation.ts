@@ -1,10 +1,13 @@
 import { ansi } from '@pumpkin-plugins/minecraft-colors';
 import type { Logger } from '@pumpkin-plugins/plugin-kit/logger';
+import { LIMITS, SESSION_TIMING } from '@pumpkin-plugins/pumpkin-plus-plus-api';
 import { AdaptiveWorkBudget, type TerrainAccess, type TerrainRegion } from '@pumpkin-plugins/terrain';
+import { PLUGIN_NAME } from '../name.ts';
 import { SECTION_SIZE_BLOCKS } from '../protocol/constants.ts';
 import { encodeSection } from '../protocol/messages.ts';
 import { LodBuilder } from './builder.ts';
 import type { CacheRecoveryBackup, LodCache } from './cache.ts';
+import type { ChunkPreparation } from './chunk-preparation.ts';
 import {
     iterateLodSectionsWithin,
     type LodSectionBounds,
@@ -44,7 +47,7 @@ export interface ForcedLodStart {
 }
 /** One selected cached section exported safely before an operator recovery job. */
 export interface ForcedLodRecovery {
-    backup: CacheRecoveryBackup;
+    key: string;
     start: ForcedLodStart;
 }
 
@@ -53,16 +56,21 @@ interface ForcedSection {
     coordinate: LodSectionCoordinate;
     invalidated: boolean;
     key: string;
+    preparationId: string;
 }
 
 interface ForcedJob extends ForcedLodStart {
     built: number;
     coordinates: Generator<LodSectionCoordinate>;
     current?: ForcedSection;
+    id: string;
     inBorderSections: number;
     lastReportedStep: number;
     level: string;
     owner: string;
+    recoveryBackup?: CacheRecoveryBackup;
+    recoveryKey?: string;
+    recoveryPreparationDeadline?: number;
     scanned: number;
     skipped: number;
     skippedAlreadyGenerated: number;
@@ -72,10 +80,13 @@ interface ForcedJob extends ForcedLodStart {
 const MAX_SECTIONS_CHECKED_PER_TICK = 64;
 // Terrain checks call the host synchronously; cap them separately from cache and border scans.
 const MAX_TERRAIN_PREPARATIONS_PER_TICK = 8;
+const MAX_RECOVERY_PREPARATION_MS = LIMITS.maxJobDeadlineMs + SESSION_TIMING.maxRetryMs;
+const logTag = ansi.named.name(PLUGIN_NAME);
 
 /** Captures operator-requested sections with spare tick time, without retaining Pumpkin handles. */
 export class ForcedLodGeneration {
     private job?: ForcedJob;
+    private nextJobId = 0;
     private readonly workBudget = new AdaptiveWorkBudget({ initialUnits: FORCE_BLOCK_SAMPLES_PER_TICK });
 
     constructor(
@@ -83,6 +94,7 @@ export class ForcedLodGeneration {
         private readonly log: Logger,
         private readonly now = Date.now,
         private readonly measureNow = Date.now,
+        private readonly preparations?: ChunkPreparation,
     ) {}
 
     /** Starts one bounded, cache-refreshing job around the selected block position. */
@@ -114,17 +126,8 @@ export class ForcedLodGeneration {
         const key = sectionKey(peer.level, centerX, centerZ);
         if (!this.cache.has(key)) throw new Error('No cached LOD section exists at the selected coordinates.');
         const selection = this.validateSelection(peer, blockX, blockZ, 0);
-        const prepared = peer.terrain.prepare?.(sectionRegion({ x: centerX, z: centerZ }, peer.terrain));
-        if (prepared?.status !== 'ready') {
-            const reason = prepared && 'reason' in prepared ? ` ${prepared.reason}` : '';
-            throw new Error(
-                `Cache recovery deferred until all section chunks are loaded; the selected cache entry is preserved.${reason}`,
-            );
-        }
-
-        const backup = this.cache.backupAndRemove(key);
-        if (!backup) throw new Error('Selected cache entry could not be backed up; it was preserved.');
-        return { start: this.begin(peer, blockX, blockZ, 0, { ...selection, sections }), backup };
+        const start = this.begin(peer, blockX, blockZ, 0, { ...selection, sections }, key);
+        return { start, key };
     }
 
     private begin(
@@ -133,14 +136,19 @@ export class ForcedLodGeneration {
         blockZ: number,
         radius: number,
         selection: { bounds: LodSectionBounds; inBorderSections: number; sections: number },
+        recoveryKey?: string,
     ): ForcedLodStart {
         const centerX = Math.floor(blockX / SECTION_SIZE_BLOCKS);
         const centerZ = Math.floor(blockZ / SECTION_SIZE_BLOCKS);
         const { sections } = selection;
+        const recoveryPreparationDeadline =
+            recoveryKey === undefined ? undefined : this.now() + MAX_RECOVERY_PREPARATION_MS;
 
         this.job = {
+            id: `forced-${++this.nextJobId}`,
             owner: peer.name,
             level: peer.level,
+            recoveryPreparationDeadline,
             centerX,
             centerZ,
             radius,
@@ -153,6 +161,7 @@ export class ForcedLodGeneration {
             built: 0,
             skipped: 0,
             lastReportedStep: 0,
+            recoveryKey,
         };
         this.log.info(
             `Started forced LOD capture for ${ansi.named.name(peer.name)}: ${ansi.named.number(sections)} requested sections in ${ansi.named.identifier(peer.level)}.`,
@@ -170,6 +179,7 @@ export class ForcedLodGeneration {
             found = peers.withPeer(job.owner, (peer) => {
                 if (peer.level !== job.level) {
                     this.sendReport(peer, 'Forced LOD capture cancelled because you changed worlds.');
+                    if (job.current) this.preparations?.abandon(job.current.preparationId);
                     this.job = undefined;
                     return;
                 }
@@ -179,13 +189,17 @@ export class ForcedLodGeneration {
             this.log.warn(
                 `Cancelled forced LOD capture for ${ansi.named.name(job.owner)} after an error: ${String(err)}.`,
             );
-            if (this.job === job) this.job = undefined;
+            if (this.job === job) {
+                if (job.current) this.preparations?.abandon(job.current.preparationId);
+                this.job = undefined;
+            }
             return true;
         }
         if (!found && this.job === job) {
             this.log.info(
                 `Cancelled forced LOD capture for ${ansi.named.name(job.owner)}: player is no longer available.`,
             );
+            if (job.current) this.preparations?.abandon(job.current.preparationId);
             this.job = undefined;
         }
         return true;
@@ -213,6 +227,7 @@ export class ForcedLodGeneration {
             target?.key === sectionKey(level, Math.floor(x / SECTION_SIZE_BLOCKS), Math.floor(z / SECTION_SIZE_BLOCKS))
         ) {
             target.invalidated = true;
+            this.preparations?.abandon(target.preparationId);
             this.log.debug(
                 `Invalidated forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(level, target.coordinate.x, target.coordinate.z)} after a block change.`,
             );
@@ -222,19 +237,26 @@ export class ForcedLodGeneration {
     /** Cancels an owner's job when they disconnect. */
     left(name: string): void {
         if (this.job?.owner !== name) return;
+        if (this.job.current) this.preparations?.abandon(this.job.current.preparationId);
         this.job = undefined;
         this.log.info(`Cancelled forced LOD capture for ${ansi.named.name(name)}: player disconnected.`);
+    }
+
+    /** Drops local job state during plugin unload without calling host APIs from the lifecycle hook. */
+    stop(): void {
+        this.job = undefined;
     }
 
     private advance(job: ForcedJob, peer: ForcedLodPeer, serverMspt: number): void {
         let budget = this.workBudget.next(serverMspt, FORCE_BLOCK_SAMPLES_PER_TICK);
         let sectionsChecked = 0;
         let terrainPreparations = 0;
-        const prepareTerrain = (region: TerrainRegion) => {
-            if (!peer.terrain.prepare) return undefined;
+        const prepareTerrain = (preparationId: string, region: TerrainRegion) => {
+            if (!peer.terrain.prepare && !this.preparations?.hasProvider()) return undefined;
             if (terrainPreparations >= MAX_TERRAIN_PREPARATIONS_PER_TICK) return { status: 'pending' as const };
             terrainPreparations++;
-            return peer.terrain.prepare(region);
+            const local = peer.terrain.prepare?.(region);
+            return this.preparations ? this.preparations.prepare(preparationId, job.level, region, local) : local;
         };
 
         while (sectionsChecked < MAX_SECTIONS_CHECKED_PER_TICK) {
@@ -250,12 +272,17 @@ export class ForcedLodGeneration {
                     job.skippedOutsideBorder++;
                     continue;
                 }
-                target = { coordinate, key, invalidated: false };
+                target = {
+                    coordinate,
+                    key,
+                    invalidated: false,
+                    preparationId: `${job.id}:${key}`,
+                };
                 job.current = target;
                 // Validate cache blobs within the existing per-tick section budget, never during admission.
                 // A failed read skips only this section; escaping here would end the whole job.
                 try {
-                    if (this.cache.get(key)) {
+                    if (key !== job.recoveryKey && this.cache.get(key)) {
                         job.skippedAlreadyGenerated++;
                         job.current = undefined;
                         continue;
@@ -273,15 +300,42 @@ export class ForcedLodGeneration {
                 job.current = undefined;
                 continue;
             }
+            if (
+                job.recoveryKey === target.key &&
+                !job.recoveryBackup &&
+                job.recoveryPreparationDeadline !== undefined &&
+                this.now() >= job.recoveryPreparationDeadline
+            ) {
+                this.failRecoveryPreparation(job, peer, target);
+                return;
+            }
             if (budget === 0) break;
 
             try {
                 const region = sectionRegion(target.coordinate, peer.terrain);
-                const prepared = prepareTerrain(region);
+                const prepared = prepareTerrain(target.preparationId, region);
                 if (prepared?.status === 'pending') break;
                 if (prepared && prepared.status !== 'ready') {
-                    this.skip(job, prepared.reason);
+                    const reason = 'reason' in prepared ? prepared.reason : 'Terrain preparation failed';
+                    if (job.recoveryKey === target.key && !job.recoveryBackup) {
+                        this.preparations?.defer(target.preparationId);
+                        break;
+                    }
+                    this.skip(job, reason);
                     continue;
+                }
+
+                if (job.recoveryKey === target.key && !job.recoveryBackup) {
+                    const backup = this.cache.backupAndRemove(target.key);
+                    if (!backup) {
+                        this.skip(job, 'Selected cache entry could not be backed up; it was preserved');
+                        continue;
+                    }
+                    job.recoveryBackup = backup;
+                    this.sendReport(
+                        peer,
+                        `Backed up ${backup.key} to ${backup.dataPath}; recorded the key in ${backup.manifestPath}.`,
+                    );
                 }
 
                 target.builder ??= new LodBuilder(
@@ -297,10 +351,11 @@ export class ForcedLodGeneration {
                 budget -= sampled;
                 if (!complete) break;
 
-                const stillPrepared = prepareTerrain(region);
+                const stillPrepared = prepareTerrain(target.preparationId, region);
                 if (stillPrepared?.status === 'pending') break;
                 if (stillPrepared && stillPrepared.status !== 'ready') {
-                    this.skip(job, stillPrepared.reason);
+                    const reason = 'reason' in stillPrepared ? stillPrepared.reason : 'Terrain preparation failed';
+                    this.skip(job, reason);
                     continue;
                 }
 
@@ -310,6 +365,7 @@ export class ForcedLodGeneration {
                     `Built forced LOD for ${ansi.named.name(peer.name)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)} (${ansi.named.number(data.length)} bytes).`,
                 );
                 job.built++;
+                this.preparations?.abandon(target.preparationId);
                 job.current = undefined;
             } catch (err) {
                 this.skip(job, String(err));
@@ -326,12 +382,24 @@ export class ForcedLodGeneration {
     private skip(job: ForcedJob, reason: string): void {
         const target = job.current;
         job.skipped++;
+        if (target) this.preparations?.abandon(target.preparationId);
         job.current = undefined;
         if (target) {
             this.log.debug(
                 `Skipped forced LOD for ${ansi.named.name(job.owner)} at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)}: ${reason}.`,
             );
         }
+    }
+
+    private failRecoveryPreparation(job: ForcedJob, peer: ForcedLodPeer, target: ForcedSection): void {
+        const timeoutSeconds = MAX_RECOVERY_PREPARATION_MS / 1000;
+        const message = `Forced LOD recovery timed out after ${timeoutSeconds} seconds waiting for chunk preparation; the previous cached section was preserved.`;
+        this.preparations?.abandon(target.preparationId);
+        this.sendReport(peer, message);
+        this.log.info(
+            `${logTag} forced LOD recovery timed out after ${ansi.named.number(timeoutSeconds)} seconds waiting for chunk preparation; the previous cached section was preserved at ${lodLocation(job.level, target.coordinate.x, target.coordinate.z)}.`,
+        );
+        this.job = undefined;
     }
 
     private reportProgress(job: ForcedJob, peer: ForcedLodPeer): void {

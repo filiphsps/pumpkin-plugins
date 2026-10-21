@@ -53,7 +53,7 @@
     },
     "dependencies": {
         "@pumpkin-plugins/docs": "workspace:*",
-        "smol-toml": "1.9.0"
+        "smol-toml": "catalog:"
     },
     "devDependencies": {
         "@types/node": "catalog:",

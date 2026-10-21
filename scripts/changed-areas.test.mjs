@@ -234,6 +234,61 @@ describe('changed-areas', () => {
         assert.match(result.log, /Code: packages\/plug\/src\/index\.ts/);
     });
 
+    it('selects native platform checks and full integration for native source changes', () => {
+        const dir = repo({ 'native/pumpkin-plus-plus/src/lib.rs': '// native\n' });
+        const base = change(dir, { 'native/pumpkin-plus-plus/src/lib.rs': '// changed native\n' });
+        const result = run(dir, base, 'HEAD');
+        assert.ok(result.ok, result.log);
+        assert.match(result.outputs, /^native=true$/m);
+        assert.match(result.outputs, /integration_scope=all/);
+        assert.match(result.outputs, /generator=false/);
+    });
+
+    it('selects native checks when native runtime and load-test inputs change', () => {
+        for (const file of [
+            'scripts/utils/native-load-test.mjs',
+            'scripts/utils/native-release-config.mjs',
+            '.github/common/bootstrap/action.yml',
+            '.github/common/setup-static-hermes/action.yml',
+            'packages/distant-horizons-support-pumpkin/src/session.ts',
+            'tools/apis/pumpkin-plus-plus-api/src/client.ts',
+            'tools/build/src/bundle.ts',
+            'tools/static-hermes-runtime/src/hermes/toolchain-environment.ts',
+            'tools/test-harness/src/instance.ts',
+        ]) {
+            const dir = repo({ [file]: '// input\n' });
+            const base = change(dir, { [file]: '// changed input\n' });
+            const result = run(dir, base, 'HEAD');
+            assert.ok(result.ok, `${file}: ${result.log}`);
+            assert.match(result.outputs, /^native=true$/m, file);
+        }
+    });
+
+    it('selects native checks when root Node and pnpm toolchain inputs change', () => {
+        const initial = {
+            '.node-version': '24.21.0\n',
+            'package.json':
+                '{"name":"changed-areas-test","devEngines":{"packageManager":{"name":"pnpm","version":"10.20.0"}}}\n',
+            'pnpm-lock.yaml': 'lockfileVersion: "9.0"\nsettings: {}\nimporters:\n  .: {}\n',
+        };
+        const changes = [
+            ['.node-version', '24.21.1\n'],
+            [
+                'package.json',
+                '{"name":"changed-areas-test","devEngines":{"packageManager":{"name":"pnpm","version":"10.21.0"}}}\n',
+            ],
+            ['pnpm-lock.yaml', 'lockfileVersion: "9.0"\nsettings: { autoInstallPeers: false }\nimporters:\n  .: {}\n'],
+        ];
+
+        for (const [file, contents] of changes) {
+            const dir = repo(initial);
+            const base = change(dir, { [file]: contents });
+            const result = run(dir, base, 'HEAD');
+            assert.ok(result.ok, result.log);
+            assert.match(result.outputs, /^native=true$/m, `${file} did not select native checks`);
+        }
+    });
+
     it('selects the generator smoke test only for scaffold-related changes', () => {
         for (const [file, expected] of [
             ['turbo/generators/templates/plugin/src/plugin.ts.hbs', 'true'],

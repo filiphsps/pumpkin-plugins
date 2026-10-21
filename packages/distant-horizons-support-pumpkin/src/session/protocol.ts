@@ -116,6 +116,7 @@ export function receiveMessage(state: SessionState, peer: Peer, bytes: Uint8Arra
         `Queued DH request ${ansi.named.number(message.tracker)} from ${ansi.named.name(peer.name)} for ${lodLocation(peer.level, message.section.x, message.section.z)}.`,
     );
     state.requests.push({
+        captureId: `lod-${++state.nextCaptureId}`,
         name: peer.name,
         tracker: message.tracker,
         key,

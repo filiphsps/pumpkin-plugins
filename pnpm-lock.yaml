@@ -179,6 +179,9 @@ catalogs:
     '@pumpkin-plugins/pumpkin-pie-api':
       specifier: workspace:*
       version: workspace:*
+    '@pumpkin-plugins/pumpkin-plus-plus-api':
+      specifier: workspace:*
+      version: workspace:*
     '@pumpkin-plugins/wasi-capabilities':
       specifier: workspace:*
       version: workspace:*
@@ -209,6 +212,9 @@ catalogs:
     fflate:
       specifier: 0.8.3
       version: 0.8.3
+    smol-toml:
+      specifier: 1.9.0
+      version: 1.9.0
     tsc-rs:
       specifier: 0.7.0
       version: 0.7.0
@@ -424,7 +430,7 @@ importers:
         specifier: 'catalog:'
         version: 5.0.4(vitest@5.0.4)
       smol-toml:
-        specifier: 1.9.0
+        specifier: 'catalog:'
         version: 1.9.0
       typescript:
         specifier: 'catalog:'
@@ -453,6 +459,9 @@ importers:
       '@pumpkin-plugins/pumpkin-pie-api':
         specifier: 'catalog:'
         version: link:../../tools/apis/pumpkin-pie-api
+      '@pumpkin-plugins/pumpkin-plus-plus-api':
+        specifier: 'catalog:'
+        version: link:../../tools/apis/pumpkin-plus-plus-api
       '@pumpkin-plugins/terrain':
         specifier: workspace:*
         version: link:../../tools/terrain
@@ -604,6 +613,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 5.0.4(vitest@5.0.4)
+      smol-toml:
+        specifier: 'catalog:'
+        version: 1.9.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -675,6 +687,25 @@ importers:
       '@pumpkin-plugins/test-harness':
         specifier: workspace:*
         version: link:../../test-harness
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.1
+      '@vitest/coverage-v8':
+        specifier: 'catalog:'
+        version: 5.0.4(vitest@5.0.4)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.4(@types/node@24.19.1)(@vitest/coverage-v8@5.0.4)(vite@8.3.4(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+
+  tools/apis/pumpkin-plus-plus-api:
+    dependencies:
+      fflate:
+        specifier: 'catalog:'
+        version: 0.8.3
+    devDependencies:
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.1
@@ -805,7 +836,7 @@ importers:
         specifier: workspace:*
         version: link:../docs
       smol-toml:
-        specifier: 1.9.0
+        specifier: 'catalog:'
         version: 1.9.0
     devDependencies:
       '@types/node':
@@ -860,6 +891,9 @@ importers:
       commander:
         specifier: 'catalog:'
         version: 15.0.0
+      smol-toml:
+        specifier: 'catalog:'
+        version: 1.9.0
       yaml:
         specifier: 'catalog:'
         version: 2.9.1
@@ -1058,7 +1092,7 @@ importers:
   tools/test-harness:
     dependencies:
       smol-toml:
-        specifier: 1.9.0
+        specifier: 'catalog:'
         version: 1.9.0
     devDependencies:
       '@types/node':

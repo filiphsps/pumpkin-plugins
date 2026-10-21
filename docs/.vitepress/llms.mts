@@ -9,6 +9,7 @@ export interface LlmsSite {
     apiNav: { link: string; text: string }[];
     extensions: Component[];
     handwrittenDocs: HandwrittenDocPage[];
+    native: Component[];
     plugins: Component[];
     repoRoot: string;
     repoUrl: string;
@@ -34,7 +35,7 @@ function llmsSection(title: string, entries: LlmsEntry[]): string {
 
 /** Builds `/llms.txt`: guides and component docs link to raw Markdown, API pages to the published site. */
 export function generateLlmsText(site: LlmsSite): string {
-    const { repoRoot, repoUrl, plugins, tools, actions, extensions } = site;
+    const { repoRoot, repoUrl, plugins, tools, actions, extensions, native } = site;
     const githubRepository = /^https:\/\/github\.com\/([^/]+\/[^/]+)$/.exec(repoUrl)?.[1];
     const rawRepositoryUrl = githubRepository
         ? `https://raw.githubusercontent.com/${githubRepository}/master`
@@ -119,6 +120,7 @@ export function generateLlmsText(site: LlmsSite): string {
             .filter(([category]) => category !== 'Getting started')
             .map(([category, entries]) => llmsSection(category, entries)),
         llmsSection('Docs', [docsIndex, ...docsEntries]),
+        llmsSection('Native extensions', native.flatMap(componentLlmsEntries)),
         llmsSection('Plugins', plugins.flatMap(componentLlmsEntries)),
         llmsSection('Shared tools', tools.flatMap(componentLlmsEntries)),
         llmsSection('GitHub Actions', actions.flatMap(componentLlmsEntries)),
@@ -129,7 +131,7 @@ export function generateLlmsText(site: LlmsSite): string {
                 url: publishedPageUrl(link),
                 description: 'Generated API and action contract documentation.',
             })),
-            ...[...plugins, ...tools, ...actions, ...extensions]
+            ...[...plugins, ...tools, ...actions, ...extensions, ...native]
                 .filter((item) => item.apiReference)
                 .map((item) => ({
                     text: `${item.title} API reference`,
@@ -143,7 +145,7 @@ export function generateLlmsText(site: LlmsSite): string {
     return [
         '# `pumpkin-plugins`',
         '',
-        '> TypeScript plugins, shared tools, and GitHub Actions for Pumpkin Minecraft servers.',
+        '> Pumpkin plugins, native server extensions, shared tools, and GitHub Actions.',
         '',
         `Plugins are WebAssembly components that Pumpkin loads through its WASI host; each component embeds Static Hermes by default, or QuickJS when the package selects it. Source links below return Markdown from the repository; generated API links point to the [documentation site](${siteLink}). This file is generated from discovered guides, component documentation, package metadata, and API references.`,
         '',

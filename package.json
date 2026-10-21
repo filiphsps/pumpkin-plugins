@@ -33,8 +33,6 @@
         "coverage": "node scripts/coverage.mjs",
         "dev": "node scripts/dev.mjs",
         "dev:docs": "pnpm run docs:api && vitepress dev docs",
-        "dev:nightly": "node scripts/dev.mjs --nightly",
-        "dev:nightly:no-hot-reload": "node scripts/dev.mjs --nightly --no-hot-reload",
         "dev:no-hot-reload": "node scripts/dev.mjs --no-hot-reload",
         "docs": "pnpm run docs:build",
         "docs:api": "pnpm run docs:types && node scripts/generate-api-references.mjs",

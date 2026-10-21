@@ -9,19 +9,20 @@ description: "Which checks run for each change, how releases are prepared, and h
 
 Use this guide to see which checks your change runs, how to read their results, and what happens after
 a release PR merges. The main workflow, `.github/workflows/ci.yml`, classifies changes and selects
-checks for plugins, repository code, actions, extensions and public tools. It calls the reusable
+checks for plugins, repository code, actions, extensions, native components, and public tools. It calls the reusable
 external-consumer workflow at `.github/workflows/external-consumer.yml` to make sure published tools
 work outside this monorepo.
 
 On eligible `master` pushes, `.github/workflows/release.yml` handles releases after the main CI
 workflow's `ci-result` job passes. An operator can also run CI manually for an explicit commit on
 `master`. The `🧪 Test` job runs script, hook and action suites; `.github/workflows/extensions.yml`
-checks changed extensions. `.github/workflows/docs.yml` checks the documentation and, outside forks,
-publishes the VitePress site, then mirrors it to `gh-pages`. GitHub workflow validation runs
-separately in
-`.github/workflows/actionlint.yml`. `.github/workflows/issue-forms.yml` validates the chooser, the
-issue forms and the label catalog; `.github/workflows/issue-intake.yml` checks new and edited issue
-bodies and manages `status: needs info` and `status: needs triage` for incomplete submissions.
+checks changed extensions, and `.github/workflows/native.yml` builds and load-tests native libraries
+on their matching platforms. `.github/workflows/docs.yml` checks the documentation and, outside
+forks, publishes the VitePress site, then mirrors it to `gh-pages`. GitHub workflow validation runs
+separately in `.github/workflows/actionlint.yml`. `.github/workflows/issue-forms.yml` validates the
+chooser, the issue forms and the label catalog; `.github/workflows/issue-intake.yml` checks new and
+edited issue bodies and manages `status: needs info` and `status: needs triage` for incomplete
+submissions.
 
 Most jobs use the shared setup in `.github/common/bootstrap` for pnpm, Node, dependencies and the
 Turborepo cache. Most CI jobs run on `ubuntu-26.04`; external-consumer checks also run on `macos-15`
@@ -61,6 +62,7 @@ pins.
 | 🧪 Test | Plugin, repository or action code changes | Runs `pnpm coverage`: the `test:coverage` suite of every workspace package outside `extensions/`, then the script, hook and action tests. A failing suite doesn't stop the others, so the job reports every failure before it fails. Merges Node process coverage with package reports in Codecov and retains coverage evidence. Tooling coverage is gated with a 1 percentage-point tolerance; plugin guest coverage is informational until WASM execution can be measured. |
 | 📦 External consumer | Code changes | Packs public tools with their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters and runs `pumpkin-codemod list` outside the repository. Pull requests run Linux x64 for code changes; changes to a public tool, its workspace build dependencies, or the consumer workflow add macOS arm64 and Windows x64. Code pushes to `master` run all three platforms; release merges skip the expensive suites. Node and pnpm versions are pinned. |
 | 🧪 Extension tests | Extension changes that need checks | The reusable workflow lints, typechecks, tests and packages each changed extension. |
+| 🦀 Native build and load tests | Native source, packaging scripts, or native workflow changes | Builds the committed Cargo lockfile with the pinned compiler, then loads each target against its checksum-verified Pumpkin release binary. |
 | 📝 Docs and config | Code, action, extension, generated README, or docs-only `master` pushes | Checks that generated READMEs are current and runs `pnpm check` for release configuration, package metadata and docs-to-code links. |
 | 🔨 Build | Code changes, after change classification | Prepares Static Hermes while lint and typecheck run, then builds each production plugin with its configured engine (Static Hermes by default). It loads one Static Hermes plugin on a real server as a smoke test, then signs and verifies the artifacts. |
 | 📊 Engine comparison | Changes to the benchmarks or the packages and workflow they build and run, and every code push to `master`; after build | Calls `.github/workflows/engine-comparison.yml` through `workflow_call`. The matrix includes one benchmark job per engine variant and Static Hermes stack-guard jobs for its runtime profiles. A report job validates and combines results from real Pumpkin servers. |
@@ -68,7 +70,7 @@ pins.
 | 🎃 Integration | Plugin or suite-dependency changes, workspace-wide build configuration, or shared integration setup changes; after build | Runs affected packages and their dependents against the pinned Pumpkin release. Workspace-wide or shared integration changes run the full suite. The job reuses WASM files from Build. |
 | 🧬 Generator | Scaffold, generator setup, or generated-plugin dependency changes; after lint and build | Reuses Build's Static Hermes cache, generates a throwaway plugin, action and extension, checks release registration and READMEs, tests the action and extension, and typechecks, builds and integration-tests the plugin. |
 | 🛡️ CI result | Every CI run outside Release Please branches, after the jobs in its `needs` list; Engine comparison runs separately | The single required check. It fails when a selected dependency does not succeed, or when any dependency fails or is cancelled. Engine comparison is not a dependency and does not block release. |
-| 🚢 Release | Eligible `master` pushes after CI result passes, including docs-only pushes | Calls the reusable release workflow. It catches up pending releases and refreshes every open release PR; Actions get GitHub releases, extensions get VSIX assets, public tools publish npm tarballs, and plugins get signed artifacts and Market listings. |
+| 🚢 Release | Eligible `master` pushes after CI result passes, including docs-only pushes | Calls the reusable release workflow. It catches up pending releases and refreshes every open release PR; Actions get GitHub releases, extensions get VSIX assets, public tools publish npm tarballs, native components get tested libraries, and WASM plugins get signed artifacts and Market listings. |
 | 📝 Prepare release PR | Every open release PR on a release run | Refreshes plugin and extension READMEs, action README examples, starter dependency ranges and first-release pins. |
 | 📎 Publish | Each released plugin | Runs `publish-plugin-release.yml`, which the `Recover plugin release` workflow also uses for one tag. It confirms the tag points to the release commit, signs, verifies and uploads the artifact unless the release already has it, publishes it to an existing Market listing, and syncs its description and commands. |
 
@@ -123,7 +125,7 @@ The classifier scopes checks this way:
 - Markdown, files under `docs/`, component-level `docs/` folders and `LICENSE` changes count as
   documentation. A docs-only pull request runs the separate Docs workflow to check the docs and
   build the site. The main CI pull-request path filter excludes ordinary Markdown and guide changes,
-  but re-includes root, package, action and extension README paths so generated README commits can
+  but re-includes root, package, action, extension, and native README paths so generated README commits can
   run the generated-content check. On `master`, the push path filter also includes documentation
   changes. The classifier skips code-dependent jobs; the Docs and config job still runs when
   selected. The release workflow runs only after `ci-result` succeeds. It catches up pending merged
@@ -142,6 +144,10 @@ The classifier scopes checks this way:
   `.github/`, as well as deletions. `.github/labels.yml` and `.coderabbit.yaml` are exceptions:
   changes limited to those two files still start CI and Actionlint so they can report successful
   skips. If a code or workflow file changes alongside them, the relevant checks run.
+
+Native source changes select the platform build and load matrix and the full real-server suite.
+Changes to native packaging, the native workflow, or runtime and host-loading dependencies select
+the native matrix. Native READMEs and guide changes remain documentation-only.
 
 Real-server integration runs when a change affects plugin code or dependencies used by the
 integration suites, or changes workspace-wide build configuration or shared integration setup.
@@ -238,7 +244,7 @@ for every plugin.
 ## Releases
 
 After the required checks pass on `master`, [Release Please](https://github.com/googleapis/release-please)
-keeps a separate release PR up to date for every plugin, action, VS Code extension and public npm
+keeps a separate release PR up to date for every plugin, action, VS Code extension, native component, and public npm
 tool with releasable conventional commits. Public npm tools release independently: a dependency
 change can release that dependency without creating PRs for every tool that consumes it. A tool's
 own shipped files and packed templates determine whether it needs a release PR. Its npm dependencies
@@ -555,6 +561,86 @@ enables that mode so GitHub releases don't depend on a Market listing or credent
 API failures still fail the job and can be retried. See the
 [action README](../actions/publish-to-pumpkin-market/README.md#inputs) for every input, and
 [Pumpkin Market API](pumpkin-market-api.md) for the listing metadata API and its observed behavior.
+
+## Native releases
+
+Native components are discovered separately from WASM plugins by their Cargo manifests. Cargo owns
+the component version; a neighboring package.json, when needed for tests, does not supply it.
+Pumpkin++ uses the canonical crate path shown in the registration command below and the independent
+`pumpkin-plus-plus-v<version>` tag stream. Once the crate, README and changelog exist, register it:
+
+```sh
+node scripts/register-native-component.mjs native/pumpkin-plus-plus
+node scripts/check-release-config.mjs
+pnpm readme
+```
+
+Registration uses a `0.0.0` release-manifest baseline and pins the first release to the Cargo
+version (or `0.0.1` when Cargo is still `0.0.0`). Release Please uses its Rust strategy to update
+Cargo and the release manifest. The release PR retires that pin and regenerates the README's
+`native-release` block from the Cargo version. Keep that block's markers in the native README.
+Its direct versioned download link therefore stays fixed when another component releases.
+
+Each crate must commit `Cargo.lock`, `release.json`, and a Node entrypoint named
+`test/release-load-test.mjs`. The compatibility file declares `rustToolchain` as an exact version,
+`features` as an explicit array, and `protocolVersion` as a positive integer. Its `host` object
+contains `repository` (`Pumpkin-MC/Pumpkin`), the exact `tag` and `sha`, and an `assets` object keyed
+by every supported target triple. Each asset has the exact GitHub release asset `name` and its
+`sha256`. Inspect the supported target and runner matrix with:
+
+```sh
+node scripts/native-release.mjs matrix
+```
+
+For Pumpkin release `0.2.0+26.3-26.51`, the host source is
+`204a94ed895f041a845630d5a23c094705a0704e`. The verified compiler for all five platforms is
+Rust `1.98.1` (`48a229cea`, 2026-09-01), from upstream release workflow run
+[35513835616](https://github.com/Pumpkin-MC/Pumpkin/actions/runs/35513835616).
+The matching runner images are Ubuntu 24.04 for Linux x64, Ubuntu 26.04 for Linux ARM64,
+macOS 26 ARM64, Windows 2025 x64 and Windows 11 ARM64. The GNU Linux hosts use the assets
+without the `-musl` suffix.
+The official `pumpkin-ARM64-macOS` binary for that exact host release has SHA-256
+`7c4e7d61ee31f83faa578b9969f12c29c74281a4129f6aefea0bd8de309a4226`; record it under
+`host.assets.aarch64-apple-darwin` in the compatibility file.
+Seed the native lockfile from that exact upstream source's Cargo.lock so transitive dependencies
+remain compatible. Packaging resolves Cargo, rustc and rustdoc to absolute binary paths with
+`rustup which --toolchain`, checks the resolved compiler version and target, and passes explicit
+`RUSTC` and `RUSTDOC` paths so a Homebrew compiler on PATH cannot override the pin. Tag builds use `cargo build --locked --no-default-features` with only the
+listed native features; they never regenerate the lockfile or update dependency versions. The
+matrix bounds compiler stack and parallelism with `RUST_MIN_STACK=67108864` and
+`CARGO_BUILD_JOBS=2`; these settings alone do not establish native ABI compatibility.
+
+The load-test entrypoint receives `--library`, `--host`, `--target`, and `--evidence` paths. It must
+load that exact library into the supplied host binary, verify the native protocol, retain server
+logs beside the evidence file, and exit unsuccessfully on any load or protocol failure. It writes
+JSON evidence with `status: "passed"`, `target`, `protocolVersion`, `artifactSha256`, and
+`hostBinarySha256`. Packaging verifies the evidence against the tested bytes and compatibility
+file before uploading. A missing compatibility file or load-test entrypoint blocks the build;
+fixture-based packaging tests cannot establish host compatibility.
+
+Release jobs check out the exact native tag, compare its commit and Cargo version with release
+metadata, verify the live native and host tag SHAs, download only the named host release binary,
+and check its digest. Every architecture builds and loads on its matching runner under both
+QuickJS and Static Hermes. Each target
+produces a target-qualified library, a `.sha256` sidecar, and a `.json` metadata sidecar containing
+the exact native tag/source SHA, host tag/source SHA/binary digest, compiler, enabled features,
+protocol version, target and library digest. Retained load evidence includes an `engines` array with
+one entry per runtime. Successful evidence has `{ "engine": "quickjs", "status": "passed" }` and
+`{ "engine": "static-hermes", "status": "passed" }` entries, along with their test counts and log
+paths. Each engine keeps separate logs. Actions retain load evidence for seven days.
+Build and load-test runners have read-only repository tokens. After the whole matrix passes, a
+separate attachment job rechecks the tag, Cargo version, compatibility metadata and downloaded
+artifact digests. It attaches the target-qualified library, checksum and JSON sidecar to the matching
+native GitHub Release. The attachment also adds an idempotent compatibility section to the release
+notes with the exact Pumpkin host build, Rust toolchain, target and runner matrix, and protocol
+version; existing release text is preserved. Native components never enter WASM signing, npm
+publishing or Pumpkin Market publication.
+
+Normal release recovery inspects every native target's three asset names on first-parent history.
+A mutable incomplete matrix, including a partial upload, rebuilds from its own tag; it never uses
+current HEAD artifacts. Complete matrices are left alone. Immutable incomplete releases produce a
+warning because GitHub cannot accept replacement assets. Per-tag fanout records keep multiple
+historical versions of the same native component distinct.
 
 ## GitHub settings
 

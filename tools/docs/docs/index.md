@@ -24,7 +24,7 @@ is out of date.
 | Command | Run from | Writes |
 | --- | --- | --- |
 | `plugin` (the default) | A plugin folder | The generated blocks of that plugin's `README.md` |
-| `root` | The repository root | The action, plugin, tool and extension tables in `README.md`, and the `reference` block with guide and API links in each component README |
+| `root` | The repository root | The action, plugin, native plugin, tool, and extension tables in `README.md`, the `reference` block with guide and API links in each component README, and the `native-release` block in each native README |
 | `docs-index` | The repository root | The Guides and Docs catalog in `docs/README.md` |
 | `generate [module]` | A component folder | The blocks a document module declares; the module defaults to `docs.ts` |
 | `actions` | The repository root | The input and output tables in each action README |
@@ -40,11 +40,11 @@ without TypeScript tooling.
 
 ## What the commands find
 
-The `root` and `actions` commands look for components in `packages/`, `tools/`, `actions/` and
-`extensions/`. A folder is a component when it has a `package.json`, or an `action.yml` or
-`action.yaml` for actions. A folder in `tools/` without a manifest groups related tools, so
-`tools/apis/upnpumpkin-api` is a component of its own. Folders whose names start with `_` are
-skipped, which leaves room for scratch work.
+The `root` command looks for components in `packages/`, `tools/`, `actions/`, `extensions/` and
+`native/`; the `actions` command processes `actions/`. Components use `package.json`, actions use
+`action.yml` or `action.yaml`, and native components use `Cargo.toml`. A folder in `tools/` without a
+manifest groups related tools, so `tools/apis/upnpumpkin-api` is a component of its own. Folders
+whose names start with `_` are skipped, which leaves room for scratch work.
 
 `docs-index` lists each direct child of `docs/` as a guide, grouped by its `navigation.category`
 frontmatter. Pages in subfolders become the Docs tree, and a folder's `index.md` is its landing page.
@@ -135,7 +135,8 @@ Market descriptions and the agent edit guard use these readers.
 
 From `/node`, `generateDocuments(documents, root, check?)` runs the same checks and writes as the
 `generate` command and returns `updated`, `unchanged` or `stale`. `discoverComponents(root, group)`
-and `walkMarkdown(directory, { exclude? })` are the discovery rules described above, and
+returns sorted components with group-specific metadata (`Cargo.toml` for native), while
+`walkMarkdown(directory, { exclude? })` finds Markdown files recursively, and
 `discoverHandwrittenDocs(root)` and `buildDocumentationTree(pages)` build the docs catalog the site
 also uses. `titleOf`, `descriptionOf` and `frontmatterOf` read page metadata the same way the catalog
 does. Never import `/node` from plugin code.

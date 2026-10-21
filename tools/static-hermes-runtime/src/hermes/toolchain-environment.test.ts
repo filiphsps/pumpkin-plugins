@@ -13,6 +13,7 @@ import {
     selectWasmToolsAsset,
     setupHermesToolchainEnvironment,
     verifyWasiSdkArchiveChecksum,
+    wasmToolsArchiveInvocation,
 } from './toolchain-environment.ts';
 import {
     configuredExecutablePath,
@@ -29,6 +30,24 @@ vi.mock('node:child_process', () => ({ execFileSync: mocks.execFileSync }));
 // A block body keeps Vitest from calling the returned mock as a cleanup hook.
 beforeEach(() => {
     mocks.execFileSync.mockReturnValue('wit-bindgen-cli 0.62.0 (test)');
+});
+
+it('passes relative archive and extraction paths to tar on Windows', () => {
+    const installationDirectory = 'C:\\a\\_temp\\wasm-tools.install-test';
+
+    expect(wasmToolsArchiveInvocation(installationDirectory, 'win32', 'D:\\Windows')).toEqual({
+        executable: 'D:\\Windows\\System32\\tar.exe',
+        args: ['-xf', 'wasm-tools.archive', '--strip-components=1', '-C', 'extracted'],
+        cwd: installationDirectory,
+    });
+});
+
+it('uses tar from PATH for non-Windows wasm-tools archives', () => {
+    expect(wasmToolsArchiveInvocation('/tmp/wasm-tools.install-test', 'linux')).toEqual({
+        executable: 'tar',
+        args: ['-xf', 'wasm-tools.archive', '--strip-components=1', '-C', 'extracted'],
+        cwd: '/tmp/wasm-tools.install-test',
+    });
 });
 
 const readJson = (file: string) => JSON.parse(fs.readFileSync(new URL(file, import.meta.url), 'utf8'));
@@ -754,6 +773,39 @@ it('loads SDK assets from the configured GitHub release metadata endpoint', asyn
             headers: expect.objectContaining({ Authorization: 'Bearer gh-token' }),
         }),
     );
+});
+
+it('uses prefetched WASI SDK release metadata without making another GitHub API request', async () => {
+    const workspaceRoot = temporaryDirectory('static-hermes-sdk-release-metadata-');
+    const metadataPath = path.join(workspaceRoot, 'wasi-sdk-release.json');
+    const release = { tag_name: 'wasi-sdk-35', assets: [] };
+    const fetchImpl = vi.fn<typeof fetch>();
+    fs.writeFileSync(metadataPath, JSON.stringify(release));
+
+    await expect(
+        fetchWasiSdkRelease({
+            repository: 'https://github.com/WebAssembly/wasi-sdk',
+            version: '35',
+            metadataPath,
+            fetchImpl,
+        }),
+    ).resolves.toEqual(release);
+    expect(fetchImpl).not.toHaveBeenCalled();
+});
+
+it('rejects prefetched WASI SDK release metadata for a different tag', async () => {
+    const workspaceRoot = temporaryDirectory('static-hermes-sdk-release-metadata-tag-');
+    const metadataPath = path.join(workspaceRoot, 'wasi-sdk-release.json');
+    fs.writeFileSync(metadataPath, JSON.stringify({ tag_name: 'wasi-sdk-34', assets: [] }));
+
+    await expect(
+        fetchWasiSdkRelease({
+            repository: 'https://github.com/WebAssembly/wasi-sdk',
+            version: '35',
+            metadataPath,
+            fetchImpl: vi.fn<typeof fetch>(),
+        }),
+    ).rejects.toThrow('WASI SDK release metadata does not match the pinned version 35');
 });
 
 it.each<[NodeJS.Platform, string, string]>([

@@ -53,7 +53,7 @@ export const commands = defineCommands(PLUGIN_NAME, {
                     },
                     recover: {
                         description:
-                            'Back up and rebuild one cached LOD section from loaded terrain at block coordinates',
+                            'Asynchronously prepare, back up and rebuild one cached LOD section at block coordinates',
                         permission: `${COMMAND_PERMISSION}.cache.recover`,
                         arguments: [
                             { name: 'x', type: 'integer' },

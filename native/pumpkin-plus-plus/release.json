@@ -1,0 +1,32 @@
+{
+    "host": {
+        "repository": "Pumpkin-MC/Pumpkin",
+        "tag": "0.2.0+26.3-26.51",
+        "sha": "204a94ed895f041a845630d5a23c094705a0704e",
+        "assets": {
+            "x86_64-unknown-linux-gnu": {
+                "name": "pumpkin-X64-Linux",
+                "sha256": "68c4416ca9fbfb3f2aeb6a8ce1de0e3fb02c5a85a53c8ba59a27941d7e43d8cd"
+            },
+            "aarch64-unknown-linux-gnu": {
+                "name": "pumpkin-ARM64-Linux",
+                "sha256": "5cc0300f42e37d40f500b7b21d5194351939729c11b3bb0c28b4b77419dc00c9"
+            },
+            "aarch64-apple-darwin": {
+                "name": "pumpkin-ARM64-macOS",
+                "sha256": "7c4e7d61ee31f83faa578b9969f12c29c74281a4129f6aefea0bd8de309a4226"
+            },
+            "x86_64-pc-windows-msvc": {
+                "name": "pumpkin-X64-Windows.exe",
+                "sha256": "6d652f2d272bbe0675f5627e7375ea1aa84dac3c699b5bdd142ff189a4fba180"
+            },
+            "aarch64-pc-windows-msvc": {
+                "name": "pumpkin-ARM64-Windows.exe",
+                "sha256": "7dd2db77b9ea0ccaeda18fed3d465c97ff882561fdc01e160b2f40a66d0f4030"
+            }
+        }
+    },
+    "rustToolchain": "1.98.1",
+    "features": [],
+    "protocolVersion": 1
+}

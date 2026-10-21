@@ -17,6 +17,7 @@ import {
     resolveLatestPumpkinBinary,
     runDev,
 } from './dev.mjs';
+import { nativeAssetNames, nativeTargetForHost, nativeTargets } from './utils/native-targets.mjs';
 
 const configRequire = createRequire(new URL('../tools/config/package.json', import.meta.url));
 const { parse: parseToml } = await import(pathToFileURL(configRequire.resolve('smol-toml')));
@@ -37,6 +38,31 @@ function addPluginFixture(root) {
         JSON.stringify({ pumpkinPlugin: { output: 'build/plugin.wasm' } }),
     );
     fs.writeFileSync(output, 'built plugin');
+}
+
+function addNativeFixture(root) {
+    const componentDir = path.join(root, 'native', 'fixture-native');
+    fs.mkdirSync(componentDir, { recursive: true });
+    fs.writeFileSync(
+        path.join(componentDir, 'Cargo.toml'),
+        '[package]\nname = "fixture-native"\nversion = "1.0.0"\ndescription = "Native test fixture"\nlicense = "MIT"\n\n[lib]\nname = "fixture_native"\ncrate-type = ["cdylib"]\n',
+    );
+    fs.writeFileSync(path.join(componentDir, 'build.mjs'), '// replaced by the test process');
+    const target = nativeTargetForHost();
+    fs.writeFileSync(
+        path.join(componentDir, 'release.json'),
+        JSON.stringify({
+            host: {
+                repository: 'Pumpkin-MC/Pumpkin',
+                tag: '0.2.0-test',
+                sha: 'a'.repeat(40),
+                assets: {
+                    [target.target]: { name: 'pumpkin-test-host', sha256: 'b'.repeat(64) },
+                },
+            },
+        }),
+    );
+    return componentDir;
 }
 
 async function configureDevServer(config) {
@@ -117,6 +143,17 @@ describe('resolveLatestPumpkinBinary', () => {
             { name: 'checksums.sha256', browser_download_url: 'https://example.test/checksums' },
         ],
     };
+    const nativeHost = {
+        repository: 'Pumpkin-MC/Pumpkin',
+        tag: '0.2.0+26.3-26.51',
+        sha: 'a'.repeat(40),
+        assets: {
+            'x86_64-unknown-linux-gnu': {
+                name: 'pumpkin-X64-Linux',
+                sha256: 'b'.repeat(64),
+            },
+        },
+    };
     const nightlyRelease = {
         tag_name: 'nightly',
         prerelease: true,
@@ -182,6 +219,95 @@ describe('resolveLatestPumpkinBinary', () => {
         );
         assert.equal(metadata.release.tag_name, release.tag_name);
         assert.equal(typeof metadata.fetchedAt, 'number');
+    });
+
+    it('downloads the exact native host asset and verifies its release pin', async () => {
+        const root = tempDir();
+        const bytes = Buffer.from('pinned pumpkin binary');
+        const digest = createHash('sha256').update(bytes).digest('hex');
+        const pin = {
+            ...nativeHost,
+            assets: {
+                ...nativeHost.assets,
+                'x86_64-unknown-linux-gnu': { ...nativeHost.assets['x86_64-unknown-linux-gnu'], sha256: digest },
+            },
+        };
+        const calls = [];
+        const endpoint = 'https://api.github.com/repos/Pumpkin-MC/Pumpkin/releases/tags/0.2.0%2B26.3-26.51';
+        const result = await resolveLatestPumpkinBinary({
+            root,
+            platform: 'linux',
+            arch: 'x64',
+            env: {},
+            nativeHost: pin,
+            fetchImpl: async (url) => {
+                calls.push(url);
+                if (url === endpoint) {
+                    return {
+                        ok: true,
+                        json: async () => ({
+                            tag_name: pin.tag,
+                            prerelease: false,
+                            draft: false,
+                            assets: [
+                                { name: 'pumpkin-X64-Linux', browser_download_url: 'https://example.test/pinned' },
+                            ],
+                        }),
+                    };
+                }
+                if (url === 'https://example.test/pinned') {
+                    return {
+                        ok: true,
+                        arrayBuffer: async () =>
+                            bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+                    };
+                }
+                assert.fail(`unexpected request: ${url}`);
+            },
+        });
+
+        assert.deepEqual(calls, [endpoint, 'https://example.test/pinned']);
+        assert.equal(result.release, pin.tag);
+        assert.equal(fs.readFileSync(result.binary).toString(), bytes.toString());
+    });
+
+    it('accepts PUMPKIN_BIN only when its bytes match the native host pin', async () => {
+        const root = tempDir();
+        const binary = path.join(root, 'pumpkin');
+        const bytes = Buffer.from('matching pinned host');
+        fs.writeFileSync(binary, bytes);
+        const pin = {
+            ...nativeHost,
+            assets: {
+                ...nativeHost.assets,
+                'x86_64-unknown-linux-gnu': {
+                    ...nativeHost.assets['x86_64-unknown-linux-gnu'],
+                    sha256: createHash('sha256').update(bytes).digest('hex'),
+                },
+            },
+        };
+        const result = await resolveLatestPumpkinBinary({
+            root,
+            platform: 'linux',
+            arch: 'x64',
+            env: { PUMPKIN_BIN: binary },
+            nativeHost: pin,
+            fetchImpl: async () => assert.fail('PUMPKIN_BIN should avoid GitHub'),
+        });
+
+        assert.equal(result.binary, binary);
+        assert.equal(result.release, pin.tag);
+        await assert.rejects(
+            resolveLatestPumpkinBinary({
+                root,
+                platform: 'linux',
+                arch: 'x64',
+                env: { PUMPKIN_BIN: binary },
+                nativeHost,
+                fetchImpl: async () => assert.fail('PUMPKIN_BIN should avoid GitHub'),
+            }),
+            /PUMPKIN_BIN does not match the native host pin/,
+        );
     });
 
     it('downloads the musl build on musl Linux', async () => {
@@ -548,6 +674,112 @@ describe('copyPluginBuild', () => {
 });
 
 describe('runDev', () => {
+    it('builds and copies host native components before starting Pumpkin', async () => {
+        const root = tempDir();
+        addPluginFixture(root);
+        const componentDir = addNativeFixture(root);
+        const nativeBuildScript = path.join(componentDir, 'build.mjs');
+        const calls = [];
+        let resolveOptions;
+        const spawnImpl = (command, args, options) => {
+            const child = new EventEmitter();
+            child.kill = (signal) => process.nextTick(() => child.emit('exit', null, signal));
+            calls.push({ command, args, options });
+
+            if (command === process.execPath && args[0] === nativeBuildScript) {
+                const target = args[args.indexOf('--target') + 1];
+                const nativeTarget = nativeTargets.find((entry) => entry.target === target);
+                assert.ok(nativeTarget, `expected a supported native target, got ${target}`);
+                const profile = args.includes('--release') ? 'release' : 'debug';
+                const artifactDir = path.join(componentDir, 'target', target, profile);
+                fs.mkdirSync(artifactDir, { recursive: true });
+                fs.writeFileSync(
+                    path.join(artifactDir, `${nativeTarget.prefix}fixture_native.${nativeTarget.extension}`),
+                    'built native library',
+                );
+                process.nextTick(() => child.emit('exit', 0, null));
+            } else if (args.includes('run') || command === '/fake/pumpkin') {
+                process.nextTick(() => child.emit('exit', 0, null));
+            }
+            return child;
+        };
+
+        await runDev({
+            root,
+            spawnImpl,
+            resolveBinary: async (options) => {
+                resolveOptions = options;
+                return { binary: '/fake/pumpkin', release: 'test release' };
+            },
+        });
+
+        assert.equal(resolveOptions.nativeHost.tag, '0.2.0-test');
+        assert.equal(resolveOptions.nativeHost.assets[nativeTargetForHost().target].name, 'pumpkin-test-host');
+        const nativeBuild = calls.find(
+            ({ command, args }) => command === process.execPath && args[0] === nativeBuildScript,
+        );
+        assert.ok(nativeBuild, 'expected the native component build to run');
+        const target = nativeBuild.args[nativeBuild.args.indexOf('--target') + 1];
+        const serverLibrary = path.join(
+            root,
+            '.cache',
+            'pumpkin-dev',
+            'plugins',
+            nativeAssetNames('fixture-native', target)[0],
+        );
+        assert.equal(fs.readFileSync(serverLibrary, 'utf8'), 'built native library');
+        assert.ok(calls.findIndex((call) => call.command === '/fake/pumpkin') > calls.indexOf(nativeBuild));
+    });
+
+    it('rejects latest and nightly modes when native components require a pinned host', async () => {
+        const root = tempDir();
+        addPluginFixture(root);
+        addNativeFixture(root);
+
+        for (const mode of ['latest', 'nightly']) {
+            await assert.rejects(
+                runDev({
+                    root,
+                    [mode]: true,
+                    spawnImpl: () => assert.fail(`${mode} native builds must be rejected before spawning`),
+                }),
+                /cannot be used with native components pinned to Pumpkin 0\.2\.0-test/,
+            );
+        }
+    });
+
+    it('does not start Pumpkin when a native component fails to build', async () => {
+        const root = tempDir();
+        addPluginFixture(root);
+        const componentDir = addNativeFixture(root);
+        const nativeBuildScript = path.join(componentDir, 'build.mjs');
+        const calls = [];
+        const spawnImpl = (command, args, options) => {
+            const child = new EventEmitter();
+            child.kill = (signal) => process.nextTick(() => child.emit('exit', null, signal));
+            calls.push({ command, args, options });
+            if (command === process.execPath && args[0] === nativeBuildScript) {
+                process.nextTick(() => child.emit('exit', 1, null));
+            } else if (args.includes('run') || command === '/fake/pumpkin') {
+                process.nextTick(() => child.emit('exit', 0, null));
+            }
+            return child;
+        };
+
+        await assert.rejects(
+            runDev({
+                root,
+                spawnImpl,
+                resolveBinary: async () => ({ binary: '/fake/pumpkin', release: 'test release' }),
+            }),
+            /native build for fixture-native exited \(1\)/,
+        );
+        assert.equal(
+            calls.some(({ command }) => command === '/fake/pumpkin'),
+            false,
+        );
+    });
+
     it('updates a quoted hot-reload key without adding a duplicate', async () => {
         const config = await configureDevServer('[plugins]\n"hot_reload" = false # keep\n');
 

@@ -7,13 +7,14 @@ import {
     discoverComponents,
     frontmatterOf,
     readActionMetadata,
+    readNativeManifest,
     titleOf,
     walkMarkdown,
 } from '@pumpkin-plugins/docs/node';
 import { parse as parseYaml } from 'yaml';
 import type { MenuCard } from './theme/types.ts';
 
-/** A plugin, tool, action or extension as the site menus, sidebars and llms.txt see it. */
+/** A plugin, native extension, tool, action or VS Code extension shown by the documentation site. */
 export interface Component {
     apiReference?: string;
     category?: string;
@@ -74,7 +75,12 @@ export function components(repoRoot: string, group: ComponentGroup): Component[]
                       .replace(/\.md$/, '')}`
                 : `/${group}/${slug}/README`;
         const headingSource = customIndex ?? (fs.existsSync(readme) ? readme : docs[0]);
-        const manifest = group !== 'actions' ? JSON.parse(fs.readFileSync(metadataFile, 'utf8')) : undefined;
+        const manifest =
+            group === 'native'
+                ? readNativeManifest(metadataFile)
+                : group !== 'actions'
+                  ? JSON.parse(fs.readFileSync(metadataFile, 'utf8'))
+                  : undefined;
         const actionManifest = group === 'actions' ? readActionMetadata(metadataFile) : undefined;
         const fallbackTitle = manifest?.name ?? slug;
         const title = headingSource ? titleOf(headingSource, fallbackTitle) : fallbackTitle;

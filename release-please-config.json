@@ -29,6 +29,11 @@
         "extensions/minecraft-terms": {
             "component": "minecraft-terms"
         },
+        "native/pumpkin-plus-plus": {
+            "component": "pumpkin-plus-plus",
+            "release-type": "rust",
+            "release-as": "0.1.0"
+        },
         "packages/apple-skin-pumpkin": {
             "component": "apple-skin-pumpkin"
         },
@@ -48,6 +53,12 @@
             "component": "pumpkin-pie-api",
             "component-no-space": true,
             "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}"
+        },
+        "tools/apis/pumpkin-plus-plus-api": {
+            "component": "pumpkin-plus-plus-api",
+            "component-no-space": true,
+            "pull-request-title-pattern": "chore${scope}: release @pumpkin-plugins/${component} ${version}",
+            "release-as": "0.1.0"
         },
         "tools/build": {
             "component": "build",
