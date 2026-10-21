@@ -89,7 +89,16 @@ function createBuildPackage(packageDir: string, name: string, pumpkinPlugin: Rec
     fs.symlinkSync(apiRoot, apiLink, process.platform === 'win32' ? 'junction' : 'dir');
     fs.writeFileSync(
         path.join(packageDir, 'package.json'),
-        `${JSON.stringify({ name, version: '0.0.0', pumpkinPlugin }, null, 2)}\n`,
+        `${JSON.stringify(
+            {
+                name,
+                version: '0.0.0',
+                dependencies: { '@pumpkin-plugins/pumpkin-api': 'catalog:' },
+                pumpkinPlugin,
+            },
+            null,
+            2,
+        )}\n`,
     );
     fs.writeFileSync(
         path.join(packageDir, 'tsconfig.json'),
