@@ -145,7 +145,7 @@ function validateEngineFeatures(results: EngineResult[], variants: EngineVariant
 function validateApiBehavior(baseline: EngineResult): void {
     const behavior = baseline.apiBehavior;
     expect(behavior.eventRegistrations).toBeGreaterThan(0);
-    expect(behavior.eventDispatches).toBeGreaterThanOrEqual(behavior.eventRegistrations);
+    expect(behavior.eventDispatches).toBe(behavior.eventRegistrations);
     expect(behavior.scheduledTasks).toBeGreaterThan(0);
     expect(behavior.scheduledCallbacks).toBeGreaterThan(0);
     expect(behavior.permissionRegistrations).toBeGreaterThan(0);

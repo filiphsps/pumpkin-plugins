@@ -39,8 +39,10 @@ class RuntimeBenchmarkPlugin extends Plugin {
         super.onLoad(context);
         for (let listener = 0; listener < EVENT_LISTENER_COUNT; listener++) {
             this.registerEvent(context, 'server-tick-end-event', (server) => {
+                // Startup tick timing varies by runtime; count only after both dispatch paths are ready.
+                if (this.reported || this.scheduledCallbacks === 0 || this.commandDispatches === 0) return;
                 this.eventDispatches++;
-                if (this.eventDispatches % EVENT_LISTENER_COUNT === 0) this.report(server);
+                if (this.eventDispatches === EVENT_LISTENER_COUNT) this.report(server);
             });
         }
         this.scheduleDelayedTask(1, (server) => {
