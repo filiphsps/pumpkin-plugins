@@ -33,12 +33,12 @@ Plugins are WebAssembly components that Pumpkin loads through its WASI host; eac
 
 - [Agent tooling](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agent-tooling.md): Agent guidance, skills, portable hooks and scoped check diagnostics
 - [CI and releases](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/ci-and-releases.md): Which checks run for each change, how releases are prepared, and how plugins reach the Market
+- [Pumpkin Market API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/pumpkin-market-api.md): Market listing lookup, metadata updates, current publisher behavior and API findings
 
 ## Server operations
 
 - [Checking for plugin updates](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-updates.md): How plugin update checks work and how to test them
 - [Port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/port-forwarding.md): UPnP and NAT-PMP for plugins: the engine, UPnPumpkin, its API and how to test them
-- [Pumpkin Market API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/pumpkin-market-api.md): Market listing lookup, metadata updates, current publisher behavior and API findings
 
 ## Docs
 
@@ -56,12 +56,13 @@ Plugins are WebAssembly components that Pumpkin loads through its WASI host; eac
 
 - [AppleSkinPumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/apple-skin-pumpkin/docs/index.md): AppleSkin server-side support
 - [AppleSkinPumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/apple-skin-pumpkin/README.md): Additional component overview and usage details.
-- [BedrockAddonManager](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/index.md): Hosts Bedrock packs over HTTP; it does not offer them to players
+- [BedrockAddonManager](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/index.md): Hosts Bedrock packs over HTTP and exports their pumpkin.toml entries
 - [BedrockAddonManager README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/README.md): Additional component overview and usage details.
 - [BedrockAddonManager: Set up Bedrock packs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/setup.md): BedrockAddonManager scans the folder at startup and whenever you run /baddon reload, so it won't pick up new files automatically.
 - [BedrockAddonManager: Troubleshoot Bedrock pack hosting](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/bedrock-addon-manager/docs/troubleshooting.md): Start by checking that web.enabled is true and that /baddon list shows the pack.
 - [Distant Horizons Support Pumpkin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/index.md): Unofficial Distant Horizons server support for Pumpkin
 - [Distant Horizons Support Pumpkin README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/README.md): Additional component overview and usage details.
+- [Distant Horizons Support Pumpkin: Manage the LOD cache](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/cache.md): Distant Horizons Support keeps every captured LOD section in two caches: one in memory and one on disk under plugins/data/DistantHorizonsSupportPumpkin/cache/.
 - [Distant Horizons Support Pumpkin: PumpkinPIE placeholders](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/placeholders.md): <!-- docs:begin placeholders -- <!-- Generated from src/placeholders/definitions.ts and the PumpkinPIE session timing constants.
 - [Distant Horizons Support Pumpkin: Install and connect](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/setup.md): Before you install the server plugin, check its README for the supported Distant Horizons release and protocol.
 - [Distant Horizons Support Pumpkin: Troubleshooting](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/distant-horizons-support-pumpkin/docs/troubleshooting.md): Check the plugin README for the supported Distant Horizons release and make sure the client is running it.
@@ -75,7 +76,7 @@ Plugins are WebAssembly components that Pumpkin loads through its WASI host; eac
 - [UPnPumpkin: Troubleshoot port forwarding](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/upnpumpkin/docs/troubleshooting.md): Start with /upnp status.
 - [Waypoints](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/index.md): Waypoints with access rules, a Java HUD, and PumpkinPIE placeholders
 - [Waypoints README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/README.md): Additional component overview and usage details.
-- [Waypoints: PumpkinPIE placeholders](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/placeholders.md): <!-- docs:begin placeholders -- <!-- Generated from src/placeholders/definitions.ts and the PumpkinPIE session timing constants.
+- [Waypoints: PumpkinPIE placeholders](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/packages/waypoints/docs/placeholders.md): Waypoints optionally registers the waypoints namespace with PumpkinPIE.
 
 ## Shared tools
 
@@ -144,7 +145,7 @@ Plugins are WebAssembly components that Pumpkin loads through its WASI host; eac
 - [Extensions reference](https://filiphsps.github.io/pumpkin-plugins/api/extensions/): Generated API and action contract documentation.
 - [Scripts reference](https://filiphsps.github.io/pumpkin-plugins/api/scripts/): Generated API and action contract documentation.
 - [AppleSkinPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/apple-skin-pumpkin/): AppleSkin server-side support
-- [BedrockAddonManager API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/bedrock-addon-manager/): Hosts Bedrock packs over HTTP; it does not offer them to players
+- [BedrockAddonManager API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/bedrock-addon-manager/): Hosts Bedrock packs over HTTP and exports their pumpkin.toml entries
 - [Distant Horizons Support Pumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/distant-horizons-support-pumpkin/): Unofficial Distant Horizons server support for Pumpkin
 - [DynamicLightsPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/dynamic-lights-pumpkin/): Server-side dynamic lights for held light sources
 - [TabDisplay API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/tab-display/): Formats Java row names and headers/footers; no Bedrock list changes.
