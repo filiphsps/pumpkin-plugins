@@ -852,6 +852,27 @@ it.each<[NodeJS.Platform, string, string]>([
     });
 });
 
+it('handles long slash runs and trims trailing separators in the wasm-tools repository', () => {
+    const version = tools['wasm-tools'];
+    const repository = `https://github.com/bytecodealliance/${'/'.repeat(20_000)}wasm-tools`;
+    const name = `wasm-tools-${version}-x86_64-linux.tar.gz`;
+    const internalSlashAsset = selectWasmToolsAsset(
+        { ...wasmToolsLock, repository },
+        { version, platform: 'linux', arch: 'x64' },
+    );
+
+    expect(internalSlashAsset.url).toBe(`${repository}/releases/download/v${version}/${name}`);
+
+    const trailingSlashAsset = selectWasmToolsAsset(
+        { ...wasmToolsLock, repository: `${wasmToolsLock.repository}${'/'.repeat(20_000)}` },
+        { version, platform: 'linux', arch: 'x64' },
+    );
+
+    expect(trailingSlashAsset.url).toBe(
+        `https://github.com/bytecodealliance/wasm-tools/releases/download/v${version}/${name}`,
+    );
+});
+
 it('fails clearly for a platform without a pinned wasm-tools binary', () => {
     const version = tools['wasm-tools'];
     expect(() => selectWasmToolsAsset(wasmToolsLock, { version, platform: 'freebsd', arch: 'x64' })).toThrow(

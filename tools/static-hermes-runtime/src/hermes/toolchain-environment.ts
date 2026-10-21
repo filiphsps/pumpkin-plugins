@@ -693,7 +693,9 @@ export function selectWasmToolsAsset(
     validateWasmToolsLock(lock, version);
     const asset = lock.assets[`${platform}/${arch}`];
     if (!asset) throw new Error(`no pinned wasm-tools ${version} binary for ${platform}/${arch}`);
-    const repository = lock.repository.replace(/\/+$/, '');
+    let repositoryEnd = lock.repository.length;
+    while (repositoryEnd > 0 && lock.repository.charCodeAt(repositoryEnd - 1) === 47) repositoryEnd -= 1;
+    const repository = lock.repository.slice(0, repositoryEnd);
     return {
         name: asset.name,
         url: `${repository}/releases/download/v${version}/${asset.name}`,
