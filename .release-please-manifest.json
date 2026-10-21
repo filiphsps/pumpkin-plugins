@@ -8,7 +8,7 @@
     "packages/distant-horizons-support-pumpkin": "0.1.1",
     "packages/dynamic-lights-pumpkin": "0.1.0",
     "packages/upnpumpkin": "0.1.0",
-    "packages/waypoints": "0.1.0",
+    "packages/waypoints": "0.1.1",
     "tools/apis/pumpkin-pie-api": "0.1.1",
     "tools/build": "0.1.5",
     "tools/codemod": "0.1.3",
