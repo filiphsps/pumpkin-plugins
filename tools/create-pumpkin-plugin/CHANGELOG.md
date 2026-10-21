@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/filiphsps/pumpkin-plugins/compare/create-pumpkin-plugin-v0.1.4...create-pumpkin-plugin-v0.1.5) (2026-10-21)
+
+
+### Bug Fixes
+
+* **create-pumpkin-plugin:** parse conditional consumer matrix ([6923718](https://github.com/filiphsps/pumpkin-plugins/commit/6923718daea28349131c5f46bfa68a7db96d53e2))
+
 ## [0.1.4](https://github.com/filiphsps/pumpkin-plugins/compare/create-pumpkin-plugin-v0.1.3...create-pumpkin-plugin-v0.1.4) (2026-10-18)
 
 
