@@ -7,7 +7,7 @@
     "packages/apple-skin-pumpkin": "0.1.0",
     "packages/distant-horizons-support-pumpkin": "0.1.1",
     "packages/dynamic-lights-pumpkin": "0.1.0",
-    "packages/upnpumpkin": "0.1.0",
+    "packages/upnpumpkin": "0.1.1",
     "packages/waypoints": "0.1.0",
     "tools/apis/pumpkin-pie-api": "0.1.1",
     "tools/build": "0.1.5",
