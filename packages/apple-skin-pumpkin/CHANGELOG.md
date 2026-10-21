@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/apple-skin-pumpkin-v0.1.0...apple-skin-pumpkin-v0.1.1) (2026-10-21)
+
+
+### Features
+
+* **build:** color update notice highlights ([fe868f0](https://github.com/filiphsps/pumpkin-plugins/commit/fe868f0a28a454e8ae81f80662f268005f5738f1))
+* **update-check:** include release notes in update logs ([37197d2](https://github.com/filiphsps/pumpkin-plugins/commit/37197d25692121238b95f45c77299330315a124a))
+
+
+### Bug Fixes
+
+* **build:** remove duplicate update check ([06eb3d5](https://github.com/filiphsps/pumpkin-plugins/commit/06eb3d52807d146dcf3acdac5fa6a90d517b7db9))
+
 ## [0.1.0](https://github.com/filiphsps/pumpkin-plugins/compare/apple-skin-pumpkin-v0.0.7...apple-skin-pumpkin-v0.1.0) (2026-10-17)
 
 
