@@ -608,8 +608,8 @@ jobs:
                   title: Generator smoke tests
                   tests: 'true'
 
-    # The single required status check: it fails when a job the change needs did not pass, or when
-    # any job failed. scripts/ci-gate.mjs holds the selection table that every job's `if:` reads.
+    # CI result validates selected dependencies and catches dependency failures or cancellations.
+    # Engine comparison runs separately and does not block release.
     ci-result:
         name: 🛡️ CI result
         needs: [changes, commits, lint, typecheck, test, extension-tests, docs, build, external-consumer, integration, generator]
