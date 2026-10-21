@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.1](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.1.0...upnpumpkin-v0.1.1) (2026-10-21)
+
+
+### Features
+
+* **build:** add release and follow links to update notice ([79d982b](https://github.com/filiphsps/pumpkin-plugins/commit/79d982b79a215bbc977e29731d7ea301d34ff59e))
+* **build:** color update notice highlights ([fe868f0](https://github.com/filiphsps/pumpkin-plugins/commit/fe868f0a28a454e8ae81f80662f268005f5738f1))
+* **build:** expose capability interface lookup ([cc70f9c](https://github.com/filiphsps/pumpkin-plugins/commit/cc70f9c6c69040b5ab4276e86a6247cbb71fb17d))
+* **build:** shorten update cache and add bypass option ([7a7545f](https://github.com/filiphsps/pumpkin-plugins/commit/7a7545f9bed4b8db8beb3a64ea8d797797983e90))
+* **update-check:** include release notes in update logs ([37197d2](https://github.com/filiphsps/pumpkin-plugins/commit/37197d25692121238b95f45c77299330315a124a))
+* **wasi:** share capability metadata across tooling ([bbe0f2f](https://github.com/filiphsps/pumpkin-plugins/commit/bbe0f2f093273132e8fd2101233cada29af270e7))
+
+
+### Bug Fixes
+
+* **build:** analyze consumers without tsconfig ([a42e939](https://github.com/filiphsps/pumpkin-plugins/commit/a42e939f9510ee59a44f9720cae3fc6e9d48d248))
+* **build:** remove duplicate update check ([06eb3d5](https://github.com/filiphsps/pumpkin-plugins/commit/06eb3d52807d146dcf3acdac5fa6a90d517b7db9))
+* **build:** warn on oversized external components ([0ec0559](https://github.com/filiphsps/pumpkin-plugins/commit/0ec0559c53bf95e81855954ab06d9815238bb3be))
+
 ## [0.1.0](https://github.com/filiphsps/pumpkin-plugins/compare/upnpumpkin-v0.0.8...upnpumpkin-v0.1.0) (2026-10-15)
 
 
