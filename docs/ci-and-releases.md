@@ -49,7 +49,7 @@ pins.
 | 📋 Lint | Code changes | Runs `pnpm lint`, which runs Biome followed by the JSDoc check (see [Code style](code-style.md)). |
 | ✅ Typecheck | Code changes | Runs `pnpm typecheck`. |
 | 🧪 Test | Plugin, repository or action code changes | Runs workspace behavior suites and script, hook and action tests with `pnpm coverage`. Merges Node process coverage with package reports in Codecov and retains coverage evidence. Tooling coverage is gated with a 1 percentage-point tolerance; plugin guest coverage is informational until WASM execution can be measured. |
-| 📦 External consumer | Code changes | Packs public tools with their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters and runs `pumpkin-codemod list` outside the repository. The matrix covers Linux, macOS arm64 and Windows x64 with pinned Node and pnpm versions. |
+| 📦 External consumer | Code changes | Packs public tools with their workspace dependencies, checks packed metadata and starter dependency ranges, then installs and builds the creator's TypeScript and JavaScript starters and runs `pumpkin-codemod list` outside the repository. Pull requests run Linux x64 for code changes; changes to a packed public tool, its build dependencies, or the consumer workflow add macOS arm64 and Windows x64. Ordinary code pushes to `master` run all three platforms; release merges skip the expensive suites. Node and pnpm versions are pinned. |
 | 🧪 Extension tests | Extension changes that need checks | The reusable workflow lints, typechecks, tests and packages each changed extension. |
 | 📝 Docs and config | Code, action, extension, generated README, or docs-only `master` pushes | Checks that generated READMEs are current and runs `pnpm check` for release configuration, package metadata and docs-to-code links. |
 | 🔨 Build | Code changes, after change classification | Prepares Static Hermes while lint and typecheck run, then builds each production plugin with its configured engine (Static Hermes by default). It runs a Static Hermes smoke test, signs and verifies the collected plugin artifacts with a run-only CI key, and uploads them. |
@@ -370,19 +370,18 @@ plugin from a metadata manifest. It then runs the
 [`verify-pumpkin-plugin` action](../actions/verify-pumpkin-plugin/README.md) against that manifest,
 pinning verification to the public key derived from the same run's signing key.
 
-When a repository signing key is available, CI uses it on pushes. Pull requests and pushes without
-that secret use an ephemeral key. The verified signed files go to integration tests; the ephemeral
-key is only for checks and is never available to release jobs. Before signing a release artifact,
-the release job confirms its tag points to the commit that produced the build. It uploads the signed
-`.wasm` and refreshed `.sha256` to the GitHub release. Before uploading to Pumpkin Market, CI
-verifies the artifact's expected plugin name and version and removes the publisher's signing
-sections. Market signs each public download itself.
+CI build artifacts always use an ephemeral, run-only key, including on pushes. Those artifacts are
+for checks and cannot be published. The release workflow signs published artifacts with the
+repository's `PLUGIN_SIGNING_KEY` after confirming its tag points to the commit that produced the
+build. It uploads the signed `.wasm` and refreshed `.sha256` to the GitHub release. Before uploading
+to Pumpkin Market, CI verifies the artifact's expected plugin name and version and removes the
+publisher's signing sections. Market signs each public download itself.
 
 | Situation | Result |
 | --- | --- |
 | Local `pnpm package` | Always collects unsigned files without a warning, regardless of the key environment variable |
-| CI push with a valid repository key | Signs the build and release artifacts with the repository key |
-| CI pull request or push without a key | Signs build artifacts with a run-only key; release signing still requires the repository key |
+| CI build artifact | Signs with a run-only key, including on pushes; cannot be published |
+| Release artifact | Signs with `PLUGIN_SIGNING_KEY`; requires the repository secret |
 | Signing action receives a malformed key | Fails rather than silently shipping unsigned files |
 
 To set up the repository signing key:
