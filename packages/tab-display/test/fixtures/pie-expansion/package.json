@@ -10,6 +10,9 @@
         "test-fixture"
     ],
     "type": "module",
+    "dependencies": {
+        "@pumpkin-plugins/pumpkin-api": "catalog:"
+    },
     "pumpkinPlugin": {
         "entry": "src/plugin.ts",
         "output": "tab-display-pie-expansion-fixture.wasm",
