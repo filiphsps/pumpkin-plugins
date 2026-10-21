@@ -2,12 +2,13 @@
 
 > TypeScript plugins, shared tools, and GitHub Actions for Pumpkin Minecraft servers.
 
-Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runtime by default; QuickJS can be selected in the package's build configuration. Source links below return Markdown from the repository; generated API links point to the [documentation site](https://filiphsps.github.io/pumpkin-plugins/). This file is generated from discovered guides, component documentation, package metadata, and API references.
+Plugins are WebAssembly components that Pumpkin loads through its WASI host; each component embeds Static Hermes by default, or QuickJS when the package selects it. Source links below return Markdown from the repository; generated API links point to the [documentation site](https://filiphsps.github.io/pumpkin-plugins/). This file is generated from discovered guides, component documentation, package metadata, and API references.
 
 ## Getting started
 
 - [Creating a plugin](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-a-plugin.md): The `pnpm gen` generator, what it creates, and what to do next
 - [Creating an action](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-action.md): Create, document, test, and release a GitHub Action in this repository
+- [Creating a VS Code extension](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-extension.md): Scaffold, build, test, and release a VS Code extension
 - [Documentation site](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/documentation-site.md): Adding component guides, generated API reference, local preview, and publishing
 
 ## CI and releases
@@ -18,7 +19,6 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 ## Guides
 
 - [Benchmarking](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/benchmarking.md): QuickJS and the Static Hermes profile, collector and parser matrix
-- [Creating a VS Code extension](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/creating-an-extension.md): Scaffold, build, test, and release a VS Code extension
 
 ## Plugin development
 
@@ -43,9 +43,6 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 ## Docs
 
 - [Documentation index](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/README.md): Catalog of guides and documentation pages.
-- [Agent domain docs](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/domain.md): How agents use glossaries and ADRs to keep terms and decisions aligned
-- [Issue tracker](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/issue-tracker.md): GitHub issue commands and repository conventions
-- [Triage labels](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agents/triage-labels.md): Maps triage skill labels to this repository's GitHub labels
 - [Plugin API: ABI and runtime support](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/abi-and-runtime.md): Match the Pumpkin server to the plugin ABI and check engine support
 - [Plugin API: evolution and migration](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/api-evolution-and-migration.md): Compatibility decisions, migration and SemVer policy
 - [Plugin API: host API areas](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/plugin-api/host-api.md): What plugins can ask Pumpkin to do, and when they need WASI capabilities
@@ -133,12 +130,17 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [Verify Pumpkin plugin signatures](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/verify-pumpkin-plugin/docs/index.md): Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks
 - [Verify Pumpkin plugin signatures README](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/actions/verify-pumpkin-plugin/README.md): Additional component overview and usage details.
 
+## VS Code extensions
+
+- [Minecraft Terms](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/extensions/minecraft-terms/README.md): Minecraft terminology for Code Spell Checker
+
 ## API reference
 
 - [Overview reference](https://filiphsps.github.io/pumpkin-plugins/api/): Generated API and action contract documentation.
 - [Plugins reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/): Generated API and action contract documentation.
 - [Tools reference](https://filiphsps.github.io/pumpkin-plugins/api/tools/): Generated API and action contract documentation.
 - [Actions reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/): Generated API and action contract documentation.
+- [Extensions reference](https://filiphsps.github.io/pumpkin-plugins/api/extensions/): Generated API and action contract documentation.
 - [Scripts reference](https://filiphsps.github.io/pumpkin-plugins/api/scripts/): Generated API and action contract documentation.
 - [AppleSkinPumpkin API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/apple-skin-pumpkin/): AppleSkin server-side support
 - [BedrockAddonManager API reference](https://filiphsps.github.io/pumpkin-plugins/api/plugins/bedrock-addon-manager/): Hosts Bedrock packs over HTTP; it does not offer them to players
@@ -168,3 +170,4 @@ Plugins are WebAssembly components that run in Pumpkin's Static Hermes/WASI runt
 - [Sign Pumpkin plugins API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/sign-pumpkin-plugin/): Sign Pumpkin plugin WebAssembly files with their Ed25519 release metadata
 - [Update a Pumpkin Market listing API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/update-pumpkin-market-listing/): Update Pumpkin Market listing metadata from a JSON file or direct inputs
 - [Verify Pumpkin plugin signatures API reference](https://filiphsps.github.io/pumpkin-plugins/api/actions/verify-pumpkin-plugin/): Verify Pumpkin plugin signatures with optional public-key pinning and metadata checks
+- [Minecraft Terms API reference](https://filiphsps.github.io/pumpkin-plugins/api/extensions/minecraft-terms/): Minecraft terminology for Code Spell Checker
