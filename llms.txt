@@ -16,10 +16,6 @@ Plugins are WebAssembly components that Pumpkin loads through its WASI host; eac
 - [Publishing public npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-publishing.md): How to prepare a public tool for npm and recover a missed release
 - [Trusted publishing for npm tools](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/npm-trusted-publishing.md): npm OIDC setup, workflow identity, validation window, provenance and recovery
 
-## Guides
-
-- [Benchmarking](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/benchmarking.md): QuickJS and the Static Hermes profile, collector and parser matrix
-
 ## Plugin development
 
 - [Building](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/building.md): The shared build tool, Turborepo setup, and runtime caveats
@@ -32,6 +28,7 @@ Plugins are WebAssembly components that Pumpkin loads through its WASI host; eac
 ## Repository maintenance
 
 - [Agent tooling](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/agent-tooling.md): Agent guidance, skills, portable hooks and scoped check diagnostics
+- [Benchmarking](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/benchmarking.md): QuickJS and the Static Hermes profile, collector and parser matrix
 - [CI and releases](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/ci-and-releases.md): Which checks run for each change, how releases are prepared, and how plugins reach the Market
 - [Pumpkin Market API](https://raw.githubusercontent.com/filiphsps/pumpkin-plugins/master/docs/pumpkin-market-api.md): Market listing lookup, metadata updates, current publisher behavior and API findings
 
