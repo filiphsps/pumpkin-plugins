@@ -57,7 +57,7 @@ pins.
 | 📈 Engine comparison comment | Successful PR CI runs with a benchmark report | Compares the report with the latest matching default-branch run, updates one PR comment, and embeds an SVG chart of timing changes. |
 | 🎃 Integration | Plugin or suite-dependency changes, workspace-wide build configuration, or shared integration setup changes; after build | Runs affected packages and their dependents against the pinned Pumpkin release. Workspace-wide or shared integration changes run the full suite. The job reuses WASM files from Build. |
 | 🧬 Generator | Scaffold, generator setup, or generated-plugin dependency changes; after lint and build | Reuses Build's Static Hermes cache, generates a throwaway plugin, action and extension, checks release registration and READMEs, tests the action and extension, and typechecks, builds and integration-tests the plugin. |
-| 🛡️ CI result | Every CI run outside Release Please branches, after all CI jobs including Engine comparison | The single required check. It fails when a selected job does not succeed, or when any unselected job fails or is cancelled. |
+| 🛡️ CI result | Every CI run outside Release Please branches, after the jobs in its `needs` list; Engine comparison runs separately | The single required check. It fails when a selected dependency does not succeed, or when any dependency fails or is cancelled. Engine comparison is not a dependency and does not block release. |
 | 🚢 Release | Eligible `master` pushes after CI result passes, including docs-only pushes | Calls the reusable release workflow. It catches up pending releases and refreshes every open release PR; Actions get GitHub releases, extensions get VSIX assets, public tools publish npm tarballs, and plugins get signed artifacts and Market listings. |
 | 📝 Prepare release PR | Every open release PR on a release run | Refreshes plugin and extension READMEs, action README examples, starter dependency ranges and first-release pins. |
 | 🔏 Sign, 📎 Attach, 🛒 Market | Each released plugin | Confirms the tag points to the commit built in this run, signs and uploads that artifact, publishes it to an existing Market listing, and syncs its description and commands. |
@@ -158,12 +158,13 @@ Docs-only pushes also run Docs and config plus the release workflow after `ci-re
 This lets a documentation fix trigger release catch-up and rebase the open Release Please PRs without
 running plugin builds or tests.
 
-Before a push can release, `ci-result` must pass. It checks that every selected job succeeded and
-fails if any unselected job failed or was cancelled. Plugin and repository code changes select lint,
+Before a push can release, `ci-result` must pass. It checks every selected job in its `needs` list
+and fails if any dependency fails or is cancelled. Plugin and repository code changes select lint,
 typecheck, build, external-consumer and test jobs. Action code changes select lint and the coverage
 suite; extension changes select their reusable test workflow. Engine comparison is selected for
-benchmark changes and code pushes to `master`, and it must pass whenever selected. Release and
-pin-retirement commits still require lint, typecheck and build while their expensive suites are
+benchmark changes and code pushes to `master`, but it is not a `ci-result` dependency. Its result
+remains visible as a separate check, and a failed comparison does not block the release job. Release
+and pin-retirement commits still require lint, typecheck and build while their expensive suites are
 skipped by the selection map. Version-only action and extension changes can skip component tests when
 their matrices are empty. Release Please only creates a release for a component with releasable
 changes, so running it after an action code change doesn't create an empty release.
